@@ -1,17 +1,17 @@
+use crate::hdk3::prelude::*;
 use crate::holochain::conductor::p2p_store::AgentKv;
 use crate::holochain::conductor::p2p_store::AgentKvKey;
 use crate::holochain::test_utils::conductor_setup::ConductorTestData;
 use crate::holochain::test_utils::new_zome_call;
-use fallible_iterator::FallibleIterator;
-use crate::hdk3::prelude::*;
-use holochain_lmdb::buffer::KvStoreT;
-use crate::fresh_reader_test;
+use crate::holochain_test_wasm_common::AnchorInput;
+use crate::holochain_test_wasm_common::TestString;
 use crate::holochain_wasm_test_utils::TestWasm;
+use fallible_iterator::FallibleIterator;
+use holochain_lmdb::buffer::KvStoreT;
+use holochain_lmdb::fresh_reader_test;
 use kitsune_p2p::KitsuneBinType;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
-use crate::holochain_test_wasm_common::AnchorInput;
-use crate::holochain_test_wasm_common::TestString;
 
 #[tokio::test(threaded_scheduler)]
 async fn gossip_test() {

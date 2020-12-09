@@ -1,6 +1,6 @@
-use holochain_lmdb::buffer::kv::KvOp;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::prelude::*;
+use crate::buffer::kv::KvOp;
+use crate::error::DatabaseError;
+use crate::prelude::*;
 use fallible_iterator::DoubleEndedFallibleIterator;
 use fallible_iterator::FallibleIterator;
 use rkv::StoreError;

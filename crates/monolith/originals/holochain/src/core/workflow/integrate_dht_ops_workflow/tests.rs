@@ -29,7 +29,7 @@ use crate::holochain_types::dna::DnaDefHashed;
 use crate::holochain_types::fixt::*;
 use crate::holochain_types::header::NewEntryHeader;
 use crate::holochain_types::metadata::TimedHeaderHash;
-use crate::holochain_types::observability;
+use observability;
 use crate::holochain_types::validate::ValidationStatus;
 use crate::holochain_types::Entry;
 use crate::holochain_types::EntryHashed;
@@ -1336,7 +1336,7 @@ mod slow_tests {
     use crate::holochain_types::cell::CellId;
     use crate::holochain_types::dna::DnaDef;
     use crate::holochain_types::dna::DnaFile;
-    use crate::holochain_types::observability;
+    use observability;
     use crate::holochain_types::test_utils::fake_agent_pubkey_1;
     use crate::holochain_types::Entry;
     use crate::holochain_wasm_test_utils::TestWasm;

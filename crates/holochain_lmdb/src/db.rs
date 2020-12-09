@@ -1,14 +1,14 @@
 //! Functionality for safely accessing LMDB database references.
 
-use crate::holochain_types::universal_map::Key as UmKey;
-use crate::holochain_types::universal_map::UniversalMap;
+use crate::env::EnvironmentKind;
+use crate::error::DatabaseError;
+use crate::error::DatabaseResult;
+use crate::exports::IntegerStore;
+use crate::prelude::IntKey;
+use crate::universal_map::Key as UmKey;
+use crate::universal_map::UniversalMap;
 use derive_more::Display;
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::env::EnvironmentKind;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::exports::IntegerStore;
-use holochain_lmdb::prelude::IntKey;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use rkv::MultiStore;

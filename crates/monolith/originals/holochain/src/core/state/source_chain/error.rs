@@ -1,9 +1,12 @@
-use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
+use crate::holochain_types::dht_op::error::DhtOpError;
+use crate::{
+    holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError,
+    holochain_types::element::error::ElementGroupError,
+};
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_serialized_bytes::prelude::*;
 use holochain_lmdb::error::DatabaseError;
-use crate::holochain_types::dht_op::error::DhtOpError;
+use holochain_serialized_bytes::prelude::*;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -68,6 +71,9 @@ pub enum SourceChainError {
     /// Element signature doesn't validate against the header
     #[error("Element associated with header {0} was not found on the source chain")]
     ElementMissing(String),
+
+    #[error(transparent)]
+    ElementGroupError(#[from] ElementGroupError),
 }
 
 // serde_json::Error does not implement PartialEq - why is that a requirement??

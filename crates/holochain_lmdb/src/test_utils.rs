@@ -1,10 +1,10 @@
 //! Helpers for unit tests
 
-use crate::holochain_types::test_utils::fake_cell_id;
+use crate::env::EnvironmentKind;
+use crate::env::EnvironmentWrite;
+use crate::prelude::BufKey;
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::env::EnvironmentKind;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::prelude::BufKey;
+use holochain_zome_types::test_utils::fake_cell_id;
 use shrinkwraprs::Shrinkwrap;
 use std::sync::Arc;
 use tempdir::TempDir;

@@ -516,7 +516,7 @@ mod test {
     use anyhow::Result;
     use holochain_lmdb::test_utils::test_environments;
     use crate::holochain_types::app::InstallAppDnaPayload;
-    use crate::holochain_types::observability;
+    use observability;
     use crate::holochain_types::test_utils::fake_agent_pubkey_1;
     use crate::holochain_types::test_utils::fake_dna_file;
     use crate::holochain_types::test_utils::fake_dna_zomes;

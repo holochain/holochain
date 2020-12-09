@@ -69,7 +69,7 @@ use holochain_lmdb::env::EnvironmentKind;
 use holochain_lmdb::env::EnvironmentWrite;
 use holochain_lmdb::env::ReadManager;
 use holochain_lmdb::exports::SingleStore;
-use crate::fresh_reader;
+use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
 use crate::holochain_types::app::InstalledApp;
 use crate::holochain_types::app::InstalledAppId;

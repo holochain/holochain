@@ -22,7 +22,7 @@ use crate::holochain_types::element::SignedHeaderHashed;
 use crate::holochain_types::fixt::HeaderBuilderCommonFixturator;
 use crate::holochain_types::fixt::SignatureFixturator;
 use crate::holochain_types::header::NewEntryHeader;
-use crate::holochain_types::observability;
+use observability;
 use crate::holochain_types::Entry;
 use crate::holochain_types::EntryHashed;
 use crate::holochain_types::HeaderHashed;

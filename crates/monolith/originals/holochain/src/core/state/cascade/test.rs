@@ -16,7 +16,7 @@ use crate::holochain_types::element::SignedHeaderHashed;
 use crate::holochain_types::entry::EntryHashed;
 use crate::holochain_types::fixt::SignatureFixturator;
 use crate::holochain_types::metadata::EntryDhtStatus;
-use crate::holochain_types::observability;
+use observability;
 use crate::holochain_types::prelude::*;
 use crate::holochain_types::test_utils::fake_agent_pubkey_1;
 use crate::holochain_types::test_utils::fake_agent_pubkey_2;

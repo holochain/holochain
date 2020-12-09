@@ -19,7 +19,7 @@ async fn integration_test() {
         std::process::exit(1);
     }));
 
-    crate::holochain_types::observability::test_run().unwrap();
+    observability::test_run().unwrap();
 
     let server = websocket_bind(
         url2!("ws://127.0.0.1:0"),

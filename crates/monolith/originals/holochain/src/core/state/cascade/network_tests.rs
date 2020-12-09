@@ -46,7 +46,7 @@ use crate::holochain_types::entry::option_entry_hashed;
 use crate::holochain_types::fixt::*;
 use crate::holochain_types::metadata::MetadataSet;
 use crate::holochain_types::metadata::TimedHeaderHash;
-use crate::holochain_types::observability;
+use observability;
 use crate::holochain_types::test_utils::fake_agent_pubkey_1;
 use crate::holochain_types::test_utils::fake_agent_pubkey_2;
 use crate::holochain_types::Entry;

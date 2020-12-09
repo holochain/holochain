@@ -128,7 +128,7 @@ mod test {
     use super::*;
     use crate::holochain::conductor::error::ConductorError;
     use anyhow::Result;
-    use crate::holochain_types::observability;
+    use observability;
 
     #[tokio::test]
     async fn spawn_and_handle_dying_task() -> Result<()> {

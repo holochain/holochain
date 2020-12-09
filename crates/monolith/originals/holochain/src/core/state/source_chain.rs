@@ -3,15 +3,15 @@
 //! which would return Option in the SourceChainBuf, like getting the source chain head, or the AgentPubKey,
 //! cannot fail, so the function return types reflect that.
 
+use crate::holochain_types::prelude::*;
+use crate::holochain_types::EntryHashed;
 pub use error::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_lmdb::buffer::BufferedStore;
 use holochain_lmdb::error::DatabaseResult;
-use crate::fresh_reader;
+use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
-use crate::holochain_types::prelude::*;
-use crate::holochain_types::EntryHashed;
 use holochain_zome_types::capability::CapAccess;
 use holochain_zome_types::capability::CapGrant;
 use holochain_zome_types::capability::CapSecret;
@@ -334,11 +334,11 @@ impl BufferedStore for SourceChain {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::holochain::fixt::*;
-    use ::fixt::prelude::*;
     use crate::hdk3::prelude::*;
-    use holochain_lmdb::test_utils::test_cell_env;
+    use crate::holochain::fixt::*;
     use crate::holochain_types::test_utils::fake_dna_hash;
+    use ::fixt::prelude::*;
+    use holochain_lmdb::test_utils::test_cell_env;
     use holochain_zome_types::capability::CapAccess;
     use holochain_zome_types::capability::ZomeCallCapGrant;
     use std::collections::HashSet;

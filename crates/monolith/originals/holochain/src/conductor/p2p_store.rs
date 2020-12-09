@@ -1,10 +1,10 @@
 //! A simple KvBuf for AgentInfoSigned.
 
+use crate::holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
+use crate::holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
-use crate::holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
-use crate::holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_lmdb::buffer::KvStore;
 use holochain_lmdb::buffer::KvStoreT;
 use holochain_lmdb::db::GetDb;
@@ -13,7 +13,7 @@ use holochain_lmdb::env::EnvironmentWrite;
 use holochain_lmdb::env::WriteManager;
 use holochain_lmdb::error::DatabaseError;
 use holochain_lmdb::error::DatabaseResult;
-use crate::fresh_reader;
+use holochain_lmdb::fresh_reader;
 use holochain_lmdb::key::BufKey;
 use holochain_lmdb::prelude::Readable;
 use std::convert::TryInto;
@@ -204,7 +204,7 @@ mod tests {
     use holochain_lmdb::buffer::KvStoreT;
     use holochain_lmdb::env::ReadManager;
     use holochain_lmdb::env::WriteManager;
-    use crate::fresh_reader_test;
+    use holochain_lmdb::fresh_reader_test;
     use holochain_lmdb::test_utils::test_p2p_env;
     use kitsune_p2p::fixt::AgentInfoFixturator;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
@@ -226,7 +226,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_store_agent_info_signed() {
-        crate::holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
 
         let test_env = test_p2p_env();
         let environ = test_env.env();

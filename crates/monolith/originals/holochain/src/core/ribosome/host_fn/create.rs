@@ -118,6 +118,7 @@ pub fn extract_entry_def(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::create;
+    use crate::hdk3::prelude::*;
     use crate::holochain::core::state::source_chain::ChainInvalidReason;
     use crate::holochain::core::state::source_chain::SourceChainError;
     use crate::holochain::core::state::source_chain::SourceChainResult;
@@ -128,19 +129,19 @@ pub mod wasm_test {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use crate::holochain::test_utils::setup_app;
     use crate::holochain::{conductor::api::ZomeCall, core::ribosome::error::RibosomeError};
-    use ::fixt::prelude::*;
-    use crate::hdk3::prelude::*;
-    use holo_hash::AnyDhtHash;
-    use holo_hash::EntryHash;
+    use crate::holochain_test_wasm_common::TestBytes;
+    use crate::holochain_test_wasm_common::TestInt;
     use crate::holochain_types::app::InstalledCell;
     use crate::holochain_types::cell::CellId;
     use crate::holochain_types::dna::DnaDef;
     use crate::holochain_types::dna::DnaFile;
     use crate::holochain_types::fixt::AppEntry;
-    use crate::holochain_types::observability;
     use crate::holochain_types::test_utils::fake_agent_pubkey_1;
     use crate::holochain_types::test_utils::fake_agent_pubkey_2;
     use crate::holochain_wasm_test_utils::TestWasm;
+    use ::fixt::prelude::*;
+    use holo_hash::AnyDhtHash;
+    use holo_hash::EntryHash;
     use holochain_zome_types::entry::EntryError;
     use holochain_zome_types::entry_def::EntryDefId;
     use holochain_zome_types::CreateInput;
@@ -148,9 +149,8 @@ pub mod wasm_test {
     use holochain_zome_types::Entry;
     use holochain_zome_types::ExternInput;
     use holochain_zome_types::GetOutput;
+    use observability;
     use std::sync::Arc;
-    use crate::holochain_test_wasm_common::TestBytes;
-    use crate::holochain_test_wasm_common::TestInt;
 
     #[tokio::test(threaded_scheduler)]
     /// we cannot commit before genesis
@@ -160,7 +160,8 @@ pub mod wasm_test {
         let env = test_env.env();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
-        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let ribosome =
             RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
@@ -201,7 +202,8 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let ribosome =
             RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
@@ -236,7 +238,7 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_create_entry_test<'a>() {
-        crate::holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
         // test workspace boilerplate
         let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
@@ -246,7 +248,8 @@ pub mod wasm_test {
         crate::holochain::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
-        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
 
@@ -405,7 +408,7 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_serialize_bytes_hash() {
-        crate::holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
         #[derive(Default, SerializedBytes, Serialize, Deserialize)]
         #[repr(transparent)]
         #[serde(transparent)]

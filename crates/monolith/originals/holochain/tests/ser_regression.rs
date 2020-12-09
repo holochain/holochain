@@ -13,7 +13,7 @@ use crate::holochain_types::app::InstalledCell;
 use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dna::DnaDef;
 use crate::holochain_types::dna::DnaFile;
-use crate::holochain_types::observability;
+use observability;
 use crate::holochain_types::test_utils::fake_agent_pubkey_1;
 use crate::holochain_types::test_utils::fake_agent_pubkey_2;
 use crate::holochain_wasm_test_utils::TestWasm;

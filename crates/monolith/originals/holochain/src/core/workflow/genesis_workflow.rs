@@ -109,7 +109,7 @@ pub mod tests {
     use crate::holochain::core::SourceChainResult;
     use fallible_iterator::FallibleIterator;
     use holochain_lmdb::test_utils::test_cell_env;
-    use crate::holochain_types::observability;
+    use observability;
     use crate::holochain_types::test_utils::fake_agent_pubkey_1;
     use crate::holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::Header;

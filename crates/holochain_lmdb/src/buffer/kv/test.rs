@@ -1,9 +1,9 @@
 use super::KvBufUsed;
-use holochain_lmdb::test_utils::DbString;
-use holochain_lmdb::{
+use crate::test_utils::DbString;
+use crate::{
+    buffer::{kv::generic::KvStoreT, BufferedStore},
     env::{ReadManager, WriteManager},
     error::{DatabaseError, DatabaseResult},
-    buffer::{kv::generic::KvStoreT, BufferedStore},
     test_utils::test_cell_env,
 };
 use rkv::StoreOptions;
@@ -11,7 +11,7 @@ use rkv::StoreOptions;
 #[tokio::test(threaded_scheduler)]
 async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
     let test_env = test_cell_env();
-let arc = test_env.env();
+    let arc = test_env.env();
     let env = arc.guard();
     let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
     let db2 = env.inner().open_single("kv1", StoreOptions::create())?;

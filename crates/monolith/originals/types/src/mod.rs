@@ -25,7 +25,6 @@ mod macros;
 pub mod metadata;
 pub mod prelude;
 pub mod timestamp;
-pub mod universal_map;
 pub mod validate;
 
 // #[cfg(test)]
@@ -39,5 +38,3 @@ pub use header::HeaderHashed;
 
 pub use timestamp::Timestamp;
 pub use timestamp::TimestampKey;
-
-pub use observability;

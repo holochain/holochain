@@ -1,16 +1,16 @@
 //! Functions dealing with obtaining and referencing singleton LMDB environments
 
-use crate::holochain_types::cell::CellId;
+use crate::db::get_db;
+use crate::db::initialize_databases;
+use crate::db::DbKey;
+use crate::db::GetDb;
+use crate::error::DatabaseError;
+use crate::error::DatabaseResult;
+use crate::transaction::Reader;
+use crate::transaction::Writer;
 use derive_more::Into;
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::db::get_db;
-use holochain_lmdb::db::initialize_databases;
-use holochain_lmdb::db::DbKey;
-use holochain_lmdb::db::GetDb;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::transaction::Reader;
-use holochain_lmdb::transaction::Writer;
+use holochain_zome_types::cell::CellId;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use parking_lot::RwLockReadGuard;

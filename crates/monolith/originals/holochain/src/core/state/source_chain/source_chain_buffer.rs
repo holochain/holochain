@@ -7,7 +7,7 @@ use crate::holochain::core::state::source_chain::SourceChainResult;
 use fallible_iterator::FallibleIterator;
 use holochain_lmdb::buffer::BufferedStore;
 use holochain_lmdb::error::DatabaseResult;
-use crate::fresh_reader;
+use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
 use crate::holochain_types::dht_op::produce_ops_from_element;
 use crate::holochain_types::dht_op::DhtOp;

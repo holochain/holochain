@@ -1,8 +1,8 @@
-use holochain_lmdb::buffer::iter::SingleIterRaw;
-use holochain_lmdb::buffer::kv::KvStoreT;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::prelude::*;
+use crate::buffer::iter::SingleIterRaw;
+use crate::buffer::kv::KvStoreT;
+use crate::error::DatabaseError;
+use crate::error::DatabaseResult;
+use crate::prelude::*;
 use fallible_iterator::FallibleIterator;
 use rkv::IntegerStore;
 

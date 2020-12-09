@@ -33,15 +33,15 @@ pub fn get_details<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
+    use crate::hdk3::prelude::*;
     use crate::holochain::core::workflow::CallZomeWorkspace;
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
-    use crate::hdk3::prelude::*;
     use crate::holochain_wasm_test_utils::TestWasm;
+    use ::fixt::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_get_details_test<'a>() {
-        crate::holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
 
         let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
@@ -51,7 +51,8 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();

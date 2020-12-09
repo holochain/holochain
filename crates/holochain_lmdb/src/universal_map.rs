@@ -77,11 +77,13 @@ impl<K: Eq + Hash + Send + Sync> UniversalMap<K> {
     }
 
     /// Is this UniversalMap empty?
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     /// Get the length of the UniversalMap.
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.0.len()
     }

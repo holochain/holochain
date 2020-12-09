@@ -26,7 +26,7 @@ use crate::holochain_p2p::HolochainP2pCellT;
 use holochain_lmdb::buffer::BufferedStore;
 use holochain_lmdb::buffer::KvBufFresh;
 use holochain_lmdb::db::AUTHORED_DHT_OPS;
-use crate::fresh_reader;
+use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
 use holochain_lmdb::transaction::Writer;
 use crate::holochain_types::dht_op::DhtOp;
@@ -196,7 +196,7 @@ mod tests {
     use crate::holochain_types::dht_op::DhtOpLight;
     use crate::holochain_types::fixt::AppEntryTypeFixturator;
     use crate::holochain_types::fixt::SignatureFixturator;
-    use crate::holochain_types::observability;
+    use observability;
     use crate::holochain_types::HeaderHashed;
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::entry_def::EntryVisibility;

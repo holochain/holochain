@@ -14,7 +14,7 @@ use crate::holochain::fixt::*;
 use crate::holochain_types::app::InstallAppDnaPayload;
 use crate::holochain_types::app::InstallAppPayload;
 use crate::holochain_types::cell::CellId;
-use crate::holochain_types::observability;
+use observability;
 use crate::holochain_types::prelude::*;
 use crate::holochain_types::test_utils::fake_agent_pubkey_1;
 use crate::holochain_types::test_utils::fake_dna_zomes;

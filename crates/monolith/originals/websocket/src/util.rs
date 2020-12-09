@@ -1,7 +1,7 @@
 //! internal websocket utility types and code
 
-use crate::*;
 use crate::holochain_websocket::*;
+use crate::*;
 
 /// Implements both sides of TryFrom SerializedBytes for the passed in item.
 /// See holochain_serialized_bytes::holochain_serial! macro.
@@ -58,7 +58,7 @@ try_from_serialized_bytes!(WireMessage);
 
 #[cfg(test)]
 pub(crate) fn init_tracing() {
-    crate::holochain_types::observability::test_run().unwrap();
+    observability::test_run().unwrap();
 }
 
 /// internal socket type

@@ -238,7 +238,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_store_entry_defs() {
-        crate::holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
 
         // all the stuff needed to have a WasmBuf
         let envs = test_environments();

@@ -17,7 +17,7 @@ use holochain_lmdb::db::GetDb;
 use holochain_lmdb::db::CHAIN_SEQUENCE;
 use holochain_lmdb::error::DatabaseError;
 use holochain_lmdb::error::DatabaseResult;
-use crate::fresh_reader;
+use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -205,8 +205,8 @@ pub mod tests {
     use holochain_lmdb::error::DatabaseResult;
     use holochain_lmdb::prelude::*;
     use holochain_lmdb::test_utils::test_cell_env;
-    use crate::holochain_types::observability;
     use matches::assert_matches;
+    use observability;
 
     #[tokio::test(threaded_scheduler)]
     async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {

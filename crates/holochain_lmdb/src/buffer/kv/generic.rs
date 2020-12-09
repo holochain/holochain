@@ -1,6 +1,6 @@
-use holochain_lmdb::buffer::iter::SingleIterRaw;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::prelude::*;
+use crate::buffer::iter::SingleIterRaw;
+use crate::error::DatabaseResult;
+use crate::prelude::*;
 
 pub trait KvStoreT<K, V> {
     /// Fetch data from DB as raw byte slice

@@ -7,13 +7,6 @@ use crate::holochain::core::state::metadata::MetadataBuf;
 use crate::holochain::core::state::metadata::MetadataBufT;
 use fallible_iterator::FallibleIterator;
 
-use crate::fresh_reader;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::env::ReadManager;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::prelude::PrefixType;
-use holochain_lmdb::prelude::Readable;
 use crate::holochain_types::activity::AgentActivity;
 use crate::holochain_types::activity::ChainItems;
 use crate::holochain_types::element::ElementStatus;
@@ -26,6 +19,13 @@ use crate::holochain_types::metadata::TimedHeaderHash;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
+use holochain_lmdb::env::EnvironmentRead;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::env::ReadManager;
+use holochain_lmdb::error::DatabaseError;
+use holochain_lmdb::fresh_reader;
+use holochain_lmdb::prelude::PrefixType;
+use holochain_lmdb::prelude::Readable;
 use holochain_zome_types::header::conversions::WrongHeaderError;
 use holochain_zome_types::*;
 use std::collections::BTreeSet;
@@ -378,7 +378,7 @@ fn _show_agent_activity_read_times(env: EnvironmentRead, agent: AgentPubKey) {
     }
     let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
     let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
-    crate::fresh_reader_test!(env, |r| {
+    holochain_lmdb::fresh_reader_test!(env, |r| {
         let now = std::time::Instant::now();
         let hashes = meta_integrated
             .get_activity_sequence(

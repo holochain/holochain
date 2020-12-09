@@ -174,7 +174,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validation_receipts_db_populate_and_list() -> DatabaseResult<()> {
-        crate::holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
 
         let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();

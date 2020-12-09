@@ -61,10 +61,8 @@ pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempd
     Ok((path, tmp_dir))
 }
 
-/// A fixture example CellId for unit testing.
-pub fn fake_cell_id(name: u8) -> CellId {
-    (fake_dna_hash(name), fake_agent_pubkey_1()).into()
-}
+/// Re-export for convenience
+pub use holochain_zome_types::test_utils::fake_cell_id;
 
 /// Keeping with convention if Alice is pubkey 1
 /// and bob is pubkey 2 the this helps make test

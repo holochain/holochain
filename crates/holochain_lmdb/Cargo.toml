@@ -21,7 +21,7 @@ futures = "0.3.1"
 holo_hash = { path = "../holo_hash" }
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.45"
-# holochain_types = { path = "../holochain_types" }
+holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
 lazy_static = "1.4.0"
 must_future = "0.1.1"
 nanoid = "0.3.0"
@@ -40,6 +40,7 @@ tracing = "0.1.18"
 tracing-futures = "0.2"
 
 [dev-dependencies]
+observability = { version = "0.1" }
 
 [features]
 default = [ "lmdb_no_tls", "test_utils" ]

@@ -1,7 +1,7 @@
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::prelude::*;
+use crate::buffer::BufferedStore;
+use crate::error::DatabaseError;
+use crate::error::DatabaseResult;
+use crate::prelude::*;
 use either::Either;
 use rkv::MultiStore;
 use std::collections::BTreeMap;

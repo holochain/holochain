@@ -61,7 +61,7 @@ use holochain_lmdb::buffer::BufferedStore;
 use holochain_lmdb::buffer::KvBufFresh;
 use holochain_lmdb::db::INTEGRATED_DHT_OPS;
 use holochain_lmdb::db::INTEGRATION_LIMBO;
-use crate::fresh_reader;
+use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
 use crate::holochain_types::activity::AgentActivity;
 use crate::holochain_types::activity::ChainItems;

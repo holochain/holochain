@@ -1,13 +1,13 @@
 //! Common types, especially traits, which we'd like to import en masse
 
-pub use holochain_lmdb::buffer::BufferedStore;
-pub use holochain_lmdb::buffer::KvStoreT;
-pub use holochain_lmdb::db::GetDb;
-pub use holochain_lmdb::env::EnvironmentRead;
-pub use holochain_lmdb::env::ReadManager;
-pub use holochain_lmdb::env::WriteManager;
-pub use holochain_lmdb::exports::*;
-pub use holochain_lmdb::key::*;
-pub use holochain_lmdb::transaction::Readable;
-pub use holochain_lmdb::transaction::Reader;
-pub use holochain_lmdb::transaction::Writer;
+pub use crate::buffer::BufferedStore;
+pub use crate::buffer::KvStoreT;
+pub use crate::db::GetDb;
+pub use crate::env::EnvironmentRead;
+pub use crate::env::ReadManager;
+pub use crate::env::WriteManager;
+pub use crate::exports::*;
+pub use crate::key::*;
+pub use crate::transaction::Readable;
+pub use crate::transaction::Reader;
+pub use crate::transaction::Writer;

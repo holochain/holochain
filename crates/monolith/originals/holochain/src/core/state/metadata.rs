@@ -21,7 +21,7 @@ use holochain_lmdb::db::META_VAULT_MISC;
 use holochain_lmdb::db::META_VAULT_SYS;
 use holochain_lmdb::error::DatabaseError;
 use holochain_lmdb::error::DatabaseResult;
-use crate::fresh_reader;
+use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
 use crate::holochain_types::header::NewEntryHeader;
 use crate::holochain_types::link::WireLinkMetaKey;

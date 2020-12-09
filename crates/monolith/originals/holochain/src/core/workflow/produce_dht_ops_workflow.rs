@@ -7,13 +7,13 @@ use crate::holochain::core::state::dht_op_integration::AuthoredDhtOpsValue;
 use crate::holochain::core::state::source_chain::SourceChain;
 use crate::holochain::core::state::workspace::Workspace;
 use crate::holochain::core::state::workspace::WorkspaceResult;
+use crate::holochain_types::dht_op::DhtOpHashed;
 use holochain_lmdb::buffer::KvBufFresh;
 use holochain_lmdb::db::AUTHORED_DHT_OPS;
 use holochain_lmdb::prelude::BufferedStore;
 use holochain_lmdb::prelude::EnvironmentRead;
 use holochain_lmdb::prelude::GetDb;
 use holochain_lmdb::prelude::Writer;
-use crate::holochain_types::dht_op::DhtOpHashed;
 use tracing::*;
 
 pub mod dht_op_light;
@@ -94,19 +94,19 @@ mod tests {
     use fallible_iterator::FallibleIterator;
     use holo_hash::*;
 
-    use holochain_lmdb::env::ReadManager;
-    use holochain_lmdb::env::WriteManager;
-    use holochain_lmdb::test_utils::test_cell_env;
     use crate::holochain_types::dht_op::produce_ops_from_element;
     use crate::holochain_types::dht_op::DhtOp;
     use crate::holochain_types::fixt::*;
-    use crate::holochain_types::observability;
     use crate::holochain_types::Entry;
     use crate::holochain_types::EntryHashed;
+    use holochain_lmdb::env::ReadManager;
+    use holochain_lmdb::env::WriteManager;
+    use holochain_lmdb::test_utils::test_cell_env;
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::header::builder;
     use holochain_zome_types::header::EntryType;
     use matches::assert_matches;
+    use observability;
     use std::collections::HashSet;
 
     struct TestData {
@@ -127,9 +127,10 @@ mod tests {
         ) -> Vec<DhtOp> {
             let app_entry = self.app_entry.next().unwrap();
             let (app_entry, entry_hash) = EntryHashed::from_content_sync(app_entry).into();
-            let app_entry_type = crate::holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
-                .next()
-                .unwrap();
+            let app_entry_type =
+                crate::holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
+                    .next()
+                    .unwrap();
             source_chain
                 .put(
                     builder::Create {

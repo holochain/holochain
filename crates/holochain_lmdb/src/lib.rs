@@ -38,7 +38,7 @@
 //! - IntegerStore: a key-value store with integer key and one value per key
 //! - MultiStore: a key-value store with arbitrary key and multiple values per key
 //!
-//! On top of these abstractions, the `holochain_lmdb` crate provides three buffered store abstractions to wrap each of the rkv store types, as well as a simple CAS abstraction:
+//! On top of these abstractions, the `crate` crate provides three buffered store abstractions to wrap each of the rkv store types, as well as a simple CAS abstraction:
 //!
 //! - [KvBuffer]: a SingleStore with a scratch space
 //! - [KvIntBuffer]: an IntegerStore with a scratch space
@@ -60,6 +60,7 @@ pub mod fatal;
 pub mod key;
 pub mod prelude;
 pub mod transaction;
+mod universal_map;
 
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils;

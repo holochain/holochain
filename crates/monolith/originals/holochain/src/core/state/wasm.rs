@@ -1,3 +1,5 @@
+use crate::holochain_types::dna::wasm::DnaWasm;
+use crate::holochain_types::dna::wasm::DnaWasmHashed;
 use holo_hash::WasmHash;
 use holochain_lmdb::buffer::CasBufFreshAsync;
 use holochain_lmdb::error::DatabaseError;
@@ -6,8 +8,6 @@ use holochain_lmdb::exports::SingleStore;
 use holochain_lmdb::prelude::BufferedStore;
 use holochain_lmdb::prelude::EnvironmentRead;
 use holochain_lmdb::transaction::Writer;
-use crate::holochain_types::dna::wasm::DnaWasm;
-use crate::holochain_types::dna::wasm::DnaWasmHashed;
 
 /// This is where wasm lives
 pub struct WasmBuf(CasBufFreshAsync<DnaWasm>);
@@ -38,13 +38,13 @@ impl BufferedStore for WasmBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use holo_hash::HasHash;
     use crate::holochain_types::dna::wasm::DnaWasm;
+    use holo_hash::HasHash;
 
     #[tokio::test(threaded_scheduler)]
     async fn wasm_store_round_trip() -> DatabaseResult<()> {
         use holochain_lmdb::prelude::*;
-        crate::holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
 
         // all the stuff needed to have a WasmBuf
         let env = holochain_lmdb::test_utils::test_wasm_env();
@@ -55,9 +55,10 @@ mod tests {
         .unwrap();
 
         // a wasm
-        let wasm =
-            DnaWasmHashed::from_content(DnaWasm::from(crate::holochain_wasm_test_utils::TestWasm::Foo))
-                .await;
+        let wasm = DnaWasmHashed::from_content(DnaWasm::from(
+            crate::holochain_wasm_test_utils::TestWasm::Foo,
+        ))
+        .await;
 
         // a wasm in the WasmBuf
         wasm_buf.put(wasm.clone());

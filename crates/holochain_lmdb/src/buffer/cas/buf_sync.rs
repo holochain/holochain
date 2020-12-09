@@ -1,15 +1,15 @@
 // FIXME: remove
 #![allow(dead_code)]
 
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::buffer::KvBufUsed;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
+use crate::buffer::BufferedStore;
+use crate::buffer::KvBufUsed;
+use crate::env::EnvironmentRead;
+use crate::error::DatabaseError;
+use crate::error::DatabaseResult;
 use crate::fatal_db_hash_integrity_check;
 use crate::fresh_reader;
-use holochain_lmdb::prelude::*;
-use holochain_lmdb::transaction::Readable;
+use crate::prelude::*;
+use crate::transaction::Readable;
 use fallible_iterator::FallibleIterator;
 use holo_hash::hash_type::HashTypeSync;
 use holo_hash::HasHash;

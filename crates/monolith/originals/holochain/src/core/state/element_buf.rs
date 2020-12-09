@@ -8,6 +8,11 @@
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
 use crate::holochain::core::state::source_chain::SourceChainResult;
+use crate::holochain_types::element::Element;
+use crate::holochain_types::element::ElementGroup;
+use crate::holochain_types::element::SignedHeader;
+use crate::holochain_types::element::SignedHeaderHashed;
+use crate::holochain_types::entry::EntryHashed;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
@@ -22,11 +27,6 @@ use holochain_lmdb::error::DatabaseError;
 use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::exports::SingleStore;
 use holochain_lmdb::prelude::*;
-use crate::holochain_types::element::Element;
-use crate::holochain_types::element::ElementGroup;
-use crate::holochain_types::element::SignedHeader;
-use crate::holochain_types::element::SignedHeaderHashed;
-use crate::holochain_types::entry::EntryHashed;
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::Entry;
 use holochain_zome_types::Header;
@@ -246,7 +246,7 @@ where
         Ok(())
     }
 
-    pub fn put_element_group(&mut self, element_group: ElementGroup) -> DatabaseResult<()> {
+    pub fn put_element_group(&mut self, element_group: ElementGroup) -> SourceChainResult<()> {
         for shh in element_group.owned_signed_headers() {
             self.headers.put(shh.into());
         }

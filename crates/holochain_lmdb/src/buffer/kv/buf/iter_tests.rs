@@ -2,13 +2,13 @@ use super::tests::VFixturator;
 use super::tests::V;
 use super::BufferedStore;
 use super::KvBufUsed;
-use holochain_lmdb::buffer::kv::generic::KvStoreT;
-use holochain_lmdb::env::ReadManager;
-use holochain_lmdb::env::WriteManager;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::prelude::*;
-use holochain_lmdb::test_utils::test_cell_env;
-use holochain_lmdb::test_utils::DbString;
+use crate::buffer::kv::generic::KvStoreT;
+use crate::env::ReadManager;
+use crate::env::WriteManager;
+use crate::error::DatabaseError;
+use crate::prelude::*;
+use crate::test_utils::test_cell_env;
+use crate::test_utils::DbString;
 use ::fixt::prelude::*;
 use fallible_iterator::DoubleEndedFallibleIterator;
 use fallible_iterator::FallibleIterator;
@@ -241,7 +241,7 @@ fn re_do_test<R: Readable>(
 // test scratch and db
 #[tokio::test(threaded_scheduler)]
 async fn kv_single_iter() {
-    crate::holochain_types::observability::test_run().ok();
+    observability::test_run().ok();
     let mut rng = rand::thread_rng();
     let test_env = test_cell_env();
     let arc = test_env.env();
@@ -366,7 +366,7 @@ async fn kv_single_iter() {
 
 #[tokio::test(threaded_scheduler)]
 async fn kv_single_iter_found_1() {
-    crate::holochain_types::observability::test_run().ok();
+    observability::test_run().ok();
     let in_scratch = vec![
         TestData::Del(".".into()),
         TestData::Put(("bar".into(), V(0))),
@@ -414,7 +414,7 @@ async fn kv_single_iter_found_1() {
 #[tokio::test(threaded_scheduler)]
 #[should_panic]
 async fn kv_single_iter_found_2() {
-    crate::holochain_types::observability::test_run().ok();
+    observability::test_run().ok();
     let in_scratch = vec![TestData::Del("".into()), TestData::Put(("".into(), V(0)))];
     let in_db_first = vec![TestData::Del("".into()), TestData::Put(("".into(), V(2)))];
     let in_db_second = vec![TestData::Del("".into()), TestData::Put(("".into(), V(2)))];
@@ -432,7 +432,7 @@ async fn kv_single_iter_found_2() {
 
 #[tokio::test(threaded_scheduler)]
 async fn kv_single_iter_found_3() {
-    crate::holochain_types::observability::test_run().ok();
+    observability::test_run().ok();
     let in_scratch = vec![
         TestData::Put(("m".into(), V(0))),
         TestData::Put(("n".into(), V(0))),
@@ -464,7 +464,7 @@ async fn kv_single_iter_found_3() {
 
 #[tokio::test(threaded_scheduler)]
 async fn kv_single_iter_found_4() {
-    crate::holochain_types::observability::test_run().ok();
+    observability::test_run().ok();
     let in_scratch = vec![TestData::Put((".".into(), V(0)))];
 
     let in_db_first = vec![

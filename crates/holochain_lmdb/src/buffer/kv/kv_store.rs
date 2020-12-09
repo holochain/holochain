@@ -1,9 +1,9 @@
 use super::KvStoreT;
-use holochain_lmdb::buffer::check_empty_key;
-use holochain_lmdb::buffer::iter::SingleIterRaw;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::prelude::*;
+use crate::buffer::check_empty_key;
+use crate::buffer::iter::SingleIterRaw;
+use crate::error::DatabaseError;
+use crate::error::DatabaseResult;
+use crate::prelude::*;
 use fallible_iterator::FallibleIterator;
 use rkv::SingleStore;
 

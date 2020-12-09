@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::transaction::Writer;
+use crate::error::DatabaseError;
+use crate::error::DatabaseResult;
+use crate::transaction::Writer;
 
 mod cas;
 pub mod iter;
@@ -56,7 +56,7 @@ pub trait BufferedStore: Sized {
 macro_rules! fresh_reader {
     ($env: expr, $f: expr) => {{
         let g = $env.guard();
-        let r = holochain_lmdb::env::ReadManager::reader(&g)?;
+        let r = $crate::env::ReadManager::reader(&g)?;
         $f(r)
     }};
 }
@@ -67,7 +67,7 @@ macro_rules! fresh_reader {
 macro_rules! fresh_reader_test {
     ($env: expr, $f: expr) => {{
         let g = $env.guard();
-        let r = holochain_lmdb::env::ReadManager::reader(&g).unwrap();
+        let r = $crate::env::ReadManager::reader(&g).unwrap();
         $f(r)
     }};
 }

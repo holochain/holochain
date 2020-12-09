@@ -1,14 +1,14 @@
-use holochain_lmdb::buffer::kvv::KvvBufUsed;
-use holochain_lmdb::buffer::kvv::KvvOp;
-use holochain_lmdb::buffer::kvv::ValuesDelta;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::env::ReadManager;
-use holochain_lmdb::env::WriteManager;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::test_utils::test_cell_env;
-use holochain_lmdb::test_utils::DbString;
-use holochain_lmdb::transaction::Readable;
+use crate::buffer::kvv::KvvBufUsed;
+use crate::buffer::kvv::KvvOp;
+use crate::buffer::kvv::ValuesDelta;
+use crate::buffer::BufferedStore;
+use crate::env::ReadManager;
+use crate::env::WriteManager;
+use crate::error::DatabaseError;
+use crate::error::DatabaseResult;
+use crate::test_utils::test_cell_env;
+use crate::test_utils::DbString;
+use crate::transaction::Readable;
 use rkv::StoreOptions;
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
@@ -157,7 +157,7 @@ async fn kvvbuf_basics() {
 
 #[tokio::test(threaded_scheduler)]
 async fn delete_all() {
-    crate::holochain_types::observability::test_run().ok();
+    observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();
@@ -334,7 +334,7 @@ async fn idempotent_inserts() {
 
 #[tokio::test(threaded_scheduler)]
 async fn kvv_indicate_value_appends() -> DatabaseResult<()> {
-    crate::holochain_types::observability::test_run().ok();
+    observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();
@@ -355,7 +355,7 @@ async fn kvv_indicate_value_appends() -> DatabaseResult<()> {
 
 #[tokio::test(threaded_scheduler)]
 async fn kvv_indicate_value_overwritten() -> DatabaseResult<()> {
-    crate::holochain_types::observability::test_run().ok();
+    observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();
@@ -377,7 +377,7 @@ async fn kvv_indicate_value_overwritten() -> DatabaseResult<()> {
 
 #[tokio::test(threaded_scheduler)]
 async fn kvv_deleted_persisted() -> DatabaseResult<()> {
-    crate::holochain_types::observability::test_run().ok();
+    observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();
@@ -415,7 +415,7 @@ async fn kvv_deleted_persisted() -> DatabaseResult<()> {
 #[tokio::test(threaded_scheduler)]
 async fn kvv_deleted_buffer() -> DatabaseResult<()> {
     use KvvOp::*;
-    crate::holochain_types::observability::test_run().ok();
+    observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();
@@ -466,7 +466,7 @@ async fn kvv_deleted_buffer() -> DatabaseResult<()> {
 
 #[tokio::test(threaded_scheduler)]
 async fn kvv_get_buffer() -> DatabaseResult<()> {
-    crate::holochain_types::observability::test_run().ok();
+    observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();
@@ -487,7 +487,7 @@ async fn kvv_get_buffer() -> DatabaseResult<()> {
 
 #[tokio::test(threaded_scheduler)]
 async fn kvv_get_persisted() -> DatabaseResult<()> {
-    crate::holochain_types::observability::test_run().ok();
+    observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();
@@ -514,7 +514,7 @@ async fn kvv_get_persisted() -> DatabaseResult<()> {
 
 #[tokio::test(threaded_scheduler)]
 async fn kvv_get_del_buffer() -> DatabaseResult<()> {
-    crate::holochain_types::observability::test_run().ok();
+    observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();
@@ -535,7 +535,7 @@ async fn kvv_get_del_buffer() -> DatabaseResult<()> {
 
 #[tokio::test(threaded_scheduler)]
 async fn kvv_get_del_persisted() -> DatabaseResult<()> {
-    crate::holochain_types::observability::test_run().ok();
+    observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();

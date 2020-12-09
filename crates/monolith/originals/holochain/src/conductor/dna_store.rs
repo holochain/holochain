@@ -5,7 +5,7 @@ use holochain_lmdb::env::EnvironmentRead;
 use holochain_lmdb::error::DatabaseError;
 use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::exports::SingleStore;
-use crate::fresh_reader;
+use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
 use crate::holochain_types::dna::DnaDef;
 use crate::holochain_types::dna::DnaDefHashed;
