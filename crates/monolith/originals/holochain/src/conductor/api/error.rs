@@ -64,7 +64,7 @@ pub enum ConductorApiError {
 
     /// DnaError
     #[error("DnaError: {0}")]
-    DnaError(#[from] crate::holochain_types::dna::DnaError),
+    DnaError(#[from] holochain_types::dna::DnaError),
 
     /// The Dna file path provided was invalid
     #[error("The Dna file path provided was invalid")]

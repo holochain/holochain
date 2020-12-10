@@ -3,8 +3,8 @@
 //! which would return Option in the SourceChainBuf, like getting the source chain head, or the AgentPubKey,
 //! cannot fail, so the function return types reflect that.
 
-use crate::holochain_types::prelude::*;
-use crate::holochain_types::EntryHashed;
+use holochain_types::prelude::*;
+use holochain_types::EntryHashed;
 pub use error::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
@@ -336,7 +336,7 @@ pub mod tests {
     use super::*;
     use hdk3::prelude::*;
     use crate::holochain::fixt::*;
-    use crate::holochain_types::test_utils::fake_dna_hash;
+    use holochain_types::test_utils::fake_dna_hash;
     use ::fixt::prelude::*;
     use holochain_lmdb::test_utils::test_cell_env;
     use holochain_zome_types::capability::CapAccess;

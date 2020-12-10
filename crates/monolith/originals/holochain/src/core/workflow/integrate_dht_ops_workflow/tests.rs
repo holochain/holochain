@@ -22,18 +22,18 @@ use holochain_lmdb::env::ReadManager;
 use holochain_lmdb::env::WriteManager;
 use holochain_lmdb::error::DatabaseError;
 use holochain_lmdb::test_utils::test_cell_env;
-use crate::holochain_types::dht_op::DhtOp;
-use crate::holochain_types::dht_op::DhtOpHashed;
-use crate::holochain_types::dna::zome::Zome;
-use crate::holochain_types::dna::DnaDefHashed;
-use crate::holochain_types::fixt::*;
-use crate::holochain_types::header::NewEntryHeader;
-use crate::holochain_types::metadata::TimedHeaderHash;
+use holochain_types::dht_op::DhtOp;
+use holochain_types::dht_op::DhtOpHashed;
+use holochain_types::dna::zome::Zome;
+use holochain_types::dna::DnaDefHashed;
+use holochain_types::fixt::*;
+use holochain_types::header::NewEntryHeader;
+use holochain_types::metadata::TimedHeaderHash;
 use observability;
-use crate::holochain_types::validate::ValidationStatus;
-use crate::holochain_types::Entry;
-use crate::holochain_types::EntryHashed;
-use crate::holochain_types::HeaderHashed;
+use holochain_types::validate::ValidationStatus;
+use holochain_types::Entry;
+use holochain_types::EntryHashed;
+use holochain_types::HeaderHashed;
 use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::entry_def::EntryDefs;
 use holochain_zome_types::header::builder;
@@ -953,7 +953,7 @@ async fn commit_entry<'env>(
             .unwrap();
     }
 
-    let entry_hash = crate::holochain_types::entry::EntryHashed::from_content_sync(entry).into_hash();
+    let entry_hash = holochain_types::entry::EntryHashed::from_content_sync(entry).into_hash();
 
     (entry_hash, output.into_inner().try_into().unwrap())
 }
@@ -1332,13 +1332,13 @@ mod slow_tests {
     use holochain_lmdb::db::GetDb;
     use holochain_lmdb::db::INTEGRATED_DHT_OPS;
     use holochain_lmdb::env::ReadManager;
-    use crate::holochain_types::app::InstalledCell;
+    use holochain_types::app::InstalledCell;
     use holochain_zome_types::cell::CellId;
-    use crate::holochain_types::dna::DnaDef;
-    use crate::holochain_types::dna::DnaFile;
+    use holochain_types::dna::DnaDef;
+    use holochain_types::dna::DnaFile;
     use observability;
-    use crate::holochain_types::test_utils::fake_agent_pubkey_1;
-    use crate::holochain_types::Entry;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::Entry;
     use crate::holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
     use tracing::*;

@@ -1,11 +1,11 @@
 use super::*;
 use crate::holochain::conductor::api::error::ConductorApiError;
 use crate::holochain::conductor::api::MockCellConductorApi;
-use crate::holochain_types::dna::DnaDef;
-use crate::holochain_types::dna::DnaFile;
-use crate::holochain_types::fixt::*;
-use crate::holochain_types::test_utils::fake_agent_pubkey_1;
-use crate::holochain_types::Timestamp;
+use holochain_types::dna::DnaDef;
+use holochain_types::dna::DnaFile;
+use holochain_types::fixt::*;
+use holochain_types::test_utils::fake_agent_pubkey_1;
+use holochain_types::Timestamp;
 use crate::holochain_wasm_test_utils::TestWasm;
 use crate::meta_mock;
 use ::fixt::prelude::*;

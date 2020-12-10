@@ -1,5 +1,5 @@
 use crate::display::{dump_kv, dump_kvi};
-use crate::holochain_types::{app::CellNick, cell::CellId};
+use holochain_types::{app::CellNick, cell::CellId};
 use holochain_lmdb::{db, env::EnvironmentWrite, prelude::*};
 
 pub async fn dump_cell_state(

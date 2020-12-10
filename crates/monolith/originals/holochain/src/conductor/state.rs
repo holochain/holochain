@@ -3,9 +3,9 @@
 
 use crate::holochain::conductor::interface::InterfaceDriver;
 
-use crate::holochain_types::app::InstalledApp;
-use crate::holochain_types::app::InstalledAppId;
-use crate::holochain_types::app::InstalledCell;
+use holochain_types::app::InstalledApp;
+use holochain_types::app::InstalledAppId;
+use holochain_types::app::InstalledCell;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;

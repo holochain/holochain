@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use std::time::Duration;
 
 use holo_hash::EntryHash;
-use crate::holochain_types::Entry;
+use holochain_types::Entry;
 use crate::holochain_wasm_test_utils::TestWasm;
 
 use crate::holochain::core::state::element_buf::ElementBuf;

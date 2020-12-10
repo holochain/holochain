@@ -1,12 +1,12 @@
 //! Defines a Element, the basic unit of Holochain data.
 
-use crate::holochain_types::header::WireDelete;
-use crate::holochain_types::header::WireHeaderStatus;
-use crate::holochain_types::header::WireNewEntryHeader;
-use crate::holochain_types::header::WireUpdateRelationship;
-use crate::holochain_types::prelude::*;
-use crate::holochain_types::EntryHashed;
-use crate::holochain_types::HeaderHashed;
+use crate::header::WireDelete;
+use crate::header::WireHeaderStatus;
+use crate::header::WireNewEntryHeader;
+use crate::header::WireUpdateRelationship;
+use crate::prelude::*;
+use crate::EntryHashed;
+use crate::HeaderHashed;
 use error::ElementGroupError;
 use error::ElementGroupResult;
 use holochain_keystore::KeystoreError;
@@ -377,7 +377,7 @@ impl WireElement {
 mod tests {
     use super::SignedHeader;
     use super::SignedHeaderHashed;
-    use crate::holochain_types::fixt::*;
+    use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::HasHash;
     use holo_hash::HoloHashed;

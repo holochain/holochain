@@ -7,7 +7,7 @@ use crate::holochain::core::state::dht_op_integration::AuthoredDhtOpsValue;
 use crate::holochain::core::state::source_chain::SourceChain;
 use crate::holochain::core::state::workspace::Workspace;
 use crate::holochain::core::state::workspace::WorkspaceResult;
-use crate::holochain_types::dht_op::DhtOpHashed;
+use holochain_types::dht_op::DhtOpHashed;
 use holochain_lmdb::buffer::KvBufFresh;
 use holochain_lmdb::db::AUTHORED_DHT_OPS;
 use holochain_lmdb::prelude::BufferedStore;
@@ -94,11 +94,11 @@ mod tests {
     use fallible_iterator::FallibleIterator;
     use holo_hash::*;
 
-    use crate::holochain_types::dht_op::produce_ops_from_element;
-    use crate::holochain_types::dht_op::DhtOp;
-    use crate::holochain_types::fixt::*;
-    use crate::holochain_types::Entry;
-    use crate::holochain_types::EntryHashed;
+    use holochain_types::dht_op::produce_ops_from_element;
+    use holochain_types::dht_op::DhtOp;
+    use holochain_types::fixt::*;
+    use holochain_types::Entry;
+    use holochain_types::EntryHashed;
     use holochain_lmdb::env::ReadManager;
     use holochain_lmdb::env::WriteManager;
     use holochain_lmdb::test_utils::test_cell_env;
@@ -128,7 +128,7 @@ mod tests {
             let app_entry = self.app_entry.next().unwrap();
             let (app_entry, entry_hash) = EntryHashed::from_content_sync(app_entry).into();
             let app_entry_type =
-                crate::holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
+                holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
                     .next()
                     .unwrap();
             source_chain

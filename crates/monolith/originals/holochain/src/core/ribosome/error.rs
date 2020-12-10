@@ -7,8 +7,8 @@ use crate::holochain::core::state::cascade::error::CascadeError;
 use crate::holochain::core::state::source_chain::SourceChainError;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
-use crate::holochain_types::dna::error::DnaError;
-use crate::holochain_types::dna::zome::inline_zome::error::InlineZomeError;
+use holochain_types::dna::error::DnaError;
+use holochain_types::dna::zome::inline_zome::error::InlineZomeError;
 use holochain_wasmer_host::prelude::WasmError;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
@@ -92,7 +92,7 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
-    P2pError(#[from] crate::holochain_p2p::HolochainP2pError),
+    P2pError(#[from] holochain_p2p::HolochainP2pError),
 }
 
 impl From<ring::error::Unspecified> for RibosomeError {

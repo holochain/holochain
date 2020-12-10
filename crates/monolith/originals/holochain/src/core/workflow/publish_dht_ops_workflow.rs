@@ -21,16 +21,16 @@ use crate::holochain::core::state::workspace::Workspace;
 use crate::holochain::core::state::workspace::WorkspaceResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use crate::holochain_p2p::HolochainP2pCell;
-use crate::holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_lmdb::buffer::BufferedStore;
 use holochain_lmdb::buffer::KvBufFresh;
 use holochain_lmdb::db::AUTHORED_DHT_OPS;
 use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
 use holochain_lmdb::transaction::Writer;
-use crate::holochain_types::dht_op::DhtOp;
-use crate::holochain_types::Timestamp;
+use holochain_types::dht_op::DhtOp;
+use holochain_types::Timestamp;
 use std::collections::HashMap;
 use std::time;
 use tracing::*;
@@ -183,21 +183,21 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use holo_hash::fixt::*;
-    use crate::holochain_p2p::actor::HolochainP2pSender;
-    use crate::holochain_p2p::HolochainP2pRef;
+    use holochain_p2p::actor::HolochainP2pSender;
+    use holochain_p2p::HolochainP2pRef;
     use holochain_lmdb::buffer::BufferedStore;
     use holochain_lmdb::env::EnvironmentWrite;
     use holochain_lmdb::env::ReadManager;
     use holochain_lmdb::env::WriteManager;
     use holochain_lmdb::error::DatabaseError;
     use holochain_lmdb::test_utils::test_cell_env;
-    use crate::holochain_types::dht_op::DhtOp;
-    use crate::holochain_types::dht_op::DhtOpHashed;
-    use crate::holochain_types::dht_op::DhtOpLight;
-    use crate::holochain_types::fixt::AppEntryTypeFixturator;
-    use crate::holochain_types::fixt::SignatureFixturator;
+    use holochain_types::dht_op::DhtOp;
+    use holochain_types::dht_op::DhtOpHashed;
+    use holochain_types::dht_op::DhtOpLight;
+    use holochain_types::fixt::AppEntryTypeFixturator;
+    use holochain_types::fixt::SignatureFixturator;
     use observability;
-    use crate::holochain_types::HeaderHashed;
+    use holochain_types::HeaderHashed;
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::header::builder;
@@ -283,7 +283,7 @@ mod tests {
 
         // Create the network
         let filter_events = |evt: &_| match evt {
-            crate::holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
+            holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
             _ => false,
         };
         let (tx, mut recv) = tokio::sync::mpsc::channel(10);
@@ -306,7 +306,7 @@ mod tests {
                 use tokio::stream::StreamExt;
                 let mut tx_complete = Some(tx_complete);
                 while let Some(evt) = recv.next().await {
-                    use crate::holochain_p2p::event::HolochainP2pEvent::*;
+                    use holochain_p2p::event::HolochainP2pEvent::*;
                     match evt {
                         Publish { respond, .. } => {
                             respond.respond(Ok(async move { Ok(()) }.boxed().into()));
@@ -675,7 +675,7 @@ mod tests {
                 // Create the network
 
                 let filter_events = |evt: &_| match evt {
-                    crate::holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
+                    holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
                     _ => false,
                 };
                 let (tx, mut recv) = tokio::sync::mpsc::channel(10);
@@ -698,7 +698,7 @@ mod tests {
                         use tokio::stream::StreamExt;
                         let mut tx_complete = Some(tx_complete);
                         while let Some(evt) = recv.next().await {
-                            use crate::holochain_p2p::event::HolochainP2pEvent::*;
+                            use holochain_p2p::event::HolochainP2pEvent::*;
                             match evt {
                                 Publish {
                                     respond,

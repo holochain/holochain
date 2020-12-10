@@ -6,10 +6,10 @@ use crate::holochain::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::EntryHash;
 use holochain_keystore::KeystoreSender;
-use crate::holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use crate::holochain_types::dna::zome::HostFnAccess;
-use crate::holochain_types::dna::DnaDef;
+use holochain_types::dna::zome::HostFnAccess;
+use holochain_types::dna::DnaDef;
 use holochain_zome_types::init::InitCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
@@ -106,7 +106,7 @@ mod test {
     use crate::holochain::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
-    use crate::holochain_types::dna::zome::HostFnAccess;
+    use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::init::InitCallbackResult;
     use holochain_zome_types::ExternInput;
 

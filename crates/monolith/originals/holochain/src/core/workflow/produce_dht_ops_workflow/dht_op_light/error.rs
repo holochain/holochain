@@ -3,7 +3,7 @@ use holo_hash::AnyDhtHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_lmdb::error::DatabaseError;
-use crate::holochain_types::dht_op::error::DhtOpError;
+use holochain_types::dht_op::error::DhtOpError;
 use holochain_zome_types::header::conversions::WrongHeaderError;
 use thiserror::Error;
 

@@ -37,21 +37,21 @@ use crate::holochain::core::workflow::GenesisWorkflowArgs;
 use crate::holochain::core::workflow::GenesisWorkspace;
 use crate::holochain::core::workflow::InitializeZomesWorkflowArgs;
 use crate::holochain::core::workflow::ZomeCallResult;
-use crate::holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_lmdb::db::GetDb;
 use holochain_lmdb::env::EnvironmentRead;
 use holochain_lmdb::env::EnvironmentWrite;
 use holochain_lmdb::env::ReadManager;
-use crate::holochain_types::activity::AgentActivity;
-use crate::holochain_types::autonomic::AutonomicProcess;
+use holochain_types::activity::AgentActivity;
+use holochain_types::autonomic::AutonomicProcess;
 use holochain_zome_types::cell::CellId;
-use crate::holochain_types::element::GetElementResponse;
-use crate::holochain_types::link::GetLinksResponse;
-use crate::holochain_types::link::WireLinkMetaKey;
-use crate::holochain_types::metadata::MetadataSet;
-use crate::holochain_types::metadata::TimedHeaderHash;
-use crate::holochain_types::validate::ValidationPackageResponse;
-use crate::holochain_types::Timestamp;
+use holochain_types::element::GetElementResponse;
+use holochain_types::link::GetLinksResponse;
+use holochain_types::link::WireLinkMetaKey;
+use holochain_types::metadata::MetadataSet;
+use holochain_types::metadata::TimedHeaderHash;
+use holochain_types::validate::ValidationPackageResponse;
+use holochain_types::Timestamp;
 use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
 use error::AuthorityDataError;
 use error::CellError;
@@ -111,10 +111,10 @@ impl PartialEq for Cell {
 /// The [Conductor] manages a collection of Cells, and will call functions
 /// on the Cell when a Conductor API method is called (either a
 /// [CellConductorApi] or an [AppInterfaceApi])
-pub struct Cell<Api = CellConductorApi, P2pCell = crate::holochain_p2p::HolochainP2pCell>
+pub struct Cell<Api = CellConductorApi, P2pCell = holochain_p2p::HolochainP2pCell>
 where
     Api: CellConductorApiT,
-    P2pCell: crate::holochain_p2p::HolochainP2pCellT,
+    P2pCell: holochain_p2p::HolochainP2pCellT,
 {
     id: CellId,
     conductor_api: Api,
@@ -131,7 +131,7 @@ impl Cell {
         id: CellId,
         conductor_handle: ConductorHandle,
         env: EnvironmentWrite,
-        mut holochain_p2p_cell: crate::holochain_p2p::HolochainP2pCell,
+        mut holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<Self> {
@@ -220,7 +220,7 @@ impl Cell {
     }
 
     /// Access a network sender that is partially applied to this cell's DnaHash/AgentPubKey
-    pub fn holochain_p2p_cell(&self) -> &crate::holochain_p2p::HolochainP2pCell {
+    pub fn holochain_p2p_cell(&self) -> &holochain_p2p::HolochainP2pCell {
         &self.holochain_p2p_cell
     }
 
@@ -232,9 +232,9 @@ impl Cell {
     /// Entry point for incoming messages from the network that need to be handled
     pub async fn handle_holochain_p2p_event(
         &self,
-        evt: crate::holochain_p2p::event::HolochainP2pEvent,
+        evt: holochain_p2p::event::HolochainP2pEvent,
     ) -> CellResult<()> {
-        use crate::holochain_p2p::event::HolochainP2pEvent::*;
+        use holochain_p2p::event::HolochainP2pEvent::*;
         match evt {
             PutAgentInfoSigned { .. } | GetAgentInfoSigned { .. } | QueryAgentInfoSigned { .. } => {
                 // PutAgentInfoSigned needs to be handled at the conductor level where the p2p
@@ -255,7 +255,7 @@ impl Cell {
                     let res = self
                         .handle_call_remote(from_agent, zome_name, fn_name, cap, request)
                         .await
-                        .map_err(crate::holochain_p2p::HolochainP2pError::other);
+                        .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("call_remote"))
@@ -275,7 +275,7 @@ impl Cell {
                     let res = self
                         .handle_publish(from_agent, request_validation_receipt, dht_hash, ops)
                         .await
-                        .map_err(crate::holochain_p2p::HolochainP2pError::other);
+                        .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("cell_handle_publish"))
@@ -291,7 +291,7 @@ impl Cell {
                     let res = self
                         .handle_get_validation_package(header_hash)
                         .await
-                        .map_err(crate::holochain_p2p::HolochainP2pError::other);
+                        .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("cell_handle_get_validation_package"))
@@ -308,7 +308,7 @@ impl Cell {
                     let res = self
                         .handle_get(dht_hash, options)
                         .await
-                        .map_err(crate::holochain_p2p::HolochainP2pError::other);
+                        .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("cell_handle_get"))
@@ -325,7 +325,7 @@ impl Cell {
                     let res = self
                         .handle_get_meta(dht_hash, options)
                         .await
-                        .map_err(crate::holochain_p2p::HolochainP2pError::other);
+                        .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("cell_handle_get_meta"))
@@ -341,7 +341,7 @@ impl Cell {
                 async {
                     let res = self
                         .handle_get_links(link_key, options)
-                        .map_err(crate::holochain_p2p::HolochainP2pError::other);
+                        .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("cell_handle_get_links"))
@@ -358,7 +358,7 @@ impl Cell {
                 async {
                     let res = self
                         .handle_get_agent_activity(agent, query, options)
-                        .map_err(crate::holochain_p2p::HolochainP2pError::other);
+                        .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("cell_handle_get_agent_activity"))
@@ -374,7 +374,7 @@ impl Cell {
                     let res = self
                         .handle_validation_receipt(receipt)
                         .await
-                        .map_err(crate::holochain_p2p::HolochainP2pError::other);
+                        .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("cell_handle_validation_receipt_received"))
@@ -391,7 +391,7 @@ impl Cell {
                 async {
                     let res = self
                         .handle_fetch_op_hashes_for_constraints(dht_arc, since, until)
-                        .map_err(crate::holochain_p2p::HolochainP2pError::other);
+                        .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("cell_handle_fetch_op_hashes_for_constraints"))
@@ -407,7 +407,7 @@ impl Cell {
                     let res = self
                         .handle_fetch_op_hash_data(op_hashes)
                         .await
-                        .map_err(crate::holochain_p2p::HolochainP2pError::other);
+                        .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("cell_handle_fetch_op_hash_data"))
@@ -422,7 +422,7 @@ impl Cell {
                     let res = self
                         .handle_sign_network_data()
                         .await
-                        .map_err(crate::holochain_p2p::HolochainP2pError::other);
+                        .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("cell_handle_sign_network_data"))
@@ -439,7 +439,7 @@ impl Cell {
         from_agent: AgentPubKey,
         _request_validation_receipt: bool,
         _dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, crate::holochain_types::dht_op::DhtOp)>,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
         incoming_dht_ops_workflow(
             &self.env,
@@ -502,7 +502,7 @@ impl Cell {
     async fn handle_get(
         &self,
         dht_hash: holo_hash::AnyDhtHash,
-        options: crate::holochain_p2p::event::GetOptions,
+        options: holochain_p2p::event::GetOptions,
     ) -> CellResult<GetElementResponse> {
         // TODO: Later we will need more get types but for now
         // we can just have these defaults depending on whether or not
@@ -522,7 +522,7 @@ impl Cell {
     async fn handle_get_entry(
         &self,
         hash: EntryHash,
-        options: crate::holochain_p2p::event::GetOptions,
+        options: holochain_p2p::event::GetOptions,
     ) -> CellResult<GetElementResponse> {
         let env = self.env.clone();
         authority::handle_get_entry(env, hash, options).await
@@ -539,7 +539,7 @@ impl Cell {
     async fn handle_get_meta(
         &self,
         _dht_hash: holo_hash::AnyDhtHash,
-        _options: crate::holochain_p2p::event::GetMetaOptions,
+        _options: holochain_p2p::event::GetMetaOptions,
     ) -> CellResult<MetadataSet> {
         unimplemented!()
     }
@@ -552,7 +552,7 @@ impl Cell {
     fn handle_get_links(
         &self,
         link_key: WireLinkMetaKey,
-        _options: crate::holochain_p2p::event::GetLinksOptions,
+        _options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<GetLinksResponse> {
         // Get the vaults
         let env_ref = self.env.guard();
@@ -614,7 +614,7 @@ impl Cell {
         &self,
         agent: AgentPubKey,
         query: ChainQueryFilter,
-        options: crate::holochain_p2p::event::GetActivityOptions,
+        options: holochain_p2p::event::GetActivityOptions,
     ) -> CellResult<AgentActivity> {
         let env = self.env.clone();
         authority::handle_get_agent_activity(env.into(), agent, query, options)
@@ -630,7 +630,7 @@ impl Cell {
     /// the network module is requesting a list of dht op hashes
     fn handle_fetch_op_hashes_for_constraints(
         &self,
-        dht_arc: crate::holochain_p2p::dht_arc::DhtArc,
+        dht_arc: holochain_p2p::dht_arc::DhtArc,
         since: Timestamp,
         until: Timestamp,
     ) -> CellResult<Vec<DhtOpHash>> {
@@ -653,7 +653,7 @@ impl Cell {
         Vec<(
             holo_hash::AnyDhtHash,
             holo_hash::DhtOpHash,
-            crate::holochain_types::dht_op::DhtOp,
+            holochain_types::dht_op::DhtOp,
         )>,
     > {
         let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into())?;

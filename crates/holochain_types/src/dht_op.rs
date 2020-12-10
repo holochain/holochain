@@ -4,10 +4,10 @@
 //!
 //! [DhtOp]: enum.DhtOp.html
 
-use crate::holochain_types::element::Element;
-use crate::holochain_types::element::ElementGroup;
-use crate::holochain_types::header::NewEntryHeader;
-use crate::holochain_types::prelude::*;
+use crate::element::Element;
+use crate::element::ElementGroup;
+use crate::header::NewEntryHeader;
+use crate::prelude::*;
 use error::DhtOpError;
 use error::DhtOpResult;
 use holo_hash::hash_type;

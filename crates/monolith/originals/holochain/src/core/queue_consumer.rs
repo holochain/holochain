@@ -51,7 +51,7 @@ mod publish_dht_ops_consumer;
 use super::state::workspace::WorkspaceError;
 use crate::holochain::conductor::api::CellConductorApiT;
 use crate::holochain::conductor::manager::ManagedTaskAdd;
-use crate::holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pCell;
 use publish_dht_ops_consumer::*;
 
 /// Spawns several long-running tasks which are responsible for processing work

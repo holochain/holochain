@@ -1,4 +1,4 @@
-use crate::holochain_types::app::InstalledAppId;
+use holochain_types::app::InstalledAppId;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::cell::CellId;
 use std::collections::HashMap;

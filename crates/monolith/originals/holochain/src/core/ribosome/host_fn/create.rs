@@ -30,7 +30,7 @@ pub fn create<'a>(
     // build the entry hash
     let async_entry = entry.clone();
     let entry_hash =
-        crate::holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
+        holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
 
     // extract the zome position
     let header_zome_id = ribosome.zome_to_id(&call_context.zome)?;
@@ -130,12 +130,12 @@ pub mod wasm_test {
     use crate::holochain::{conductor::api::ZomeCall, core::ribosome::error::RibosomeError};
     use crate::holochain_test_wasm_common::TestBytes;
     use crate::holochain_test_wasm_common::TestInt;
-    use crate::holochain_types::app::InstalledCell;
-    use crate::holochain_types::dna::DnaDef;
-    use crate::holochain_types::dna::DnaFile;
-    use crate::holochain_types::fixt::AppEntry;
-    use crate::holochain_types::test_utils::fake_agent_pubkey_1;
-    use crate::holochain_types::test_utils::fake_agent_pubkey_2;
+    use holochain_types::app::InstalledCell;
+    use holochain_types::dna::DnaDef;
+    use holochain_types::dna::DnaFile;
+    use holochain_types::fixt::AppEntry;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::test_utils::fake_agent_pubkey_2;
     use crate::holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;

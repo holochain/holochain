@@ -16,8 +16,8 @@ use crate::holochain::core::state::workspace::Workspace;
 use crate::holochain::core::state::workspace::WorkspaceResult;
 use derive_more::Constructor;
 use holochain_lmdb::prelude::*;
-use crate::holochain_types::dna::DnaFile;
-use crate::holochain_types::prelude::*;
+use holochain_types::dna::DnaFile;
+use holochain_types::prelude::*;
 use tracing::*;
 
 /// The struct which implements the genesis Workflow
@@ -110,8 +110,8 @@ pub mod tests {
     use fallible_iterator::FallibleIterator;
     use holochain_lmdb::test_utils::test_cell_env;
     use observability;
-    use crate::holochain_types::test_utils::fake_agent_pubkey_1;
-    use crate::holochain_types::test_utils::fake_dna_file;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::Header;
     use matches::assert_matches;
 

@@ -8,11 +8,11 @@
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
 use crate::holochain::core::state::source_chain::SourceChainResult;
-use crate::holochain_types::element::Element;
-use crate::holochain_types::element::ElementGroup;
-use crate::holochain_types::element::SignedHeader;
-use crate::holochain_types::element::SignedHeaderHashed;
-use crate::holochain_types::entry::EntryHashed;
+use holochain_types::element::Element;
+use holochain_types::element::ElementGroup;
+use holochain_types::element::SignedHeader;
+use holochain_types::element::SignedHeaderHashed;
+use holochain_types::entry::EntryHashed;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;

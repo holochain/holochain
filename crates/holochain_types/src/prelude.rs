@@ -1,6 +1,6 @@
 //! reexport some common things
 
-pub use crate::holochain_types::Timestamp;
+pub use crate::Timestamp;
 pub use holo_hash::*;
 pub use holochain_keystore::AgentPubKeyExt;
 pub use holochain_keystore::KeystoreSender;

@@ -1,12 +1,12 @@
 use hdk3::prelude::Element;
 use hdk3::prelude::EntryType;
 use hdk3::prelude::ValidationPackage;
-use crate::holochain_p2p::actor::GetActivityOptions;
-use crate::holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::actor::GetActivityOptions;
+use holochain_p2p::HolochainP2pCellT;
 use crate::holochain_test_wasm_common::AgentActivitySearch;
-use crate::holochain_types::activity::AgentActivity;
-use crate::holochain_types::activity::ChainItems;
-use crate::holochain_types::HeaderHashed;
+use holochain_types::activity::AgentActivity;
+use holochain_types::activity::ChainItems;
+use holochain_types::HeaderHashed;
 use crate::holochain_wasm_test_utils::TestWasm;
 use fallible_iterator::FallibleIterator;
 use holo_hash::HeaderHash;

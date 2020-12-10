@@ -52,12 +52,12 @@ use crate::holochain::conductor::p2p_store::AgentKvKey;
 use crate::holochain::core::signal::Signal;
 use crate::holochain::core::state::source_chain::SourceChainBuf;
 use crate::holochain::core::state::wasm::WasmBuf;
-use crate::holochain_types::app::InstalledApp;
-use crate::holochain_types::app::InstalledAppId;
-use crate::holochain_types::app::InstalledCell;
-use crate::holochain_types::app::MembraneProof;
-use crate::holochain_types::dna::wasm::DnaWasmHashed;
-use crate::holochain_types::dna::DnaFile;
+use holochain_types::app::InstalledApp;
+use holochain_types::app::InstalledAppId;
+use holochain_types::app::InstalledCell;
+use holochain_types::app::MembraneProof;
+use holochain_types::dna::wasm::DnaWasmHashed;
+use holochain_types::dna::DnaFile;
 pub use builder::*;
 use fallible_iterator::FallibleIterator;
 use futures::future;
@@ -166,7 +166,7 @@ where
     root_env_dir: EnvironmentRootPath,
 
     /// Handle to the network actor.
-    holochain_p2p: crate::holochain_p2p::HolochainP2pRef,
+    holochain_p2p: holochain_p2p::HolochainP2pRef,
 }
 
 impl Conductor {
@@ -440,7 +440,7 @@ where
                             )
                         });
 
-                    use crate::holochain_p2p::actor::HolochainP2pRefToCell;
+                    use holochain_p2p::actor::HolochainP2pRefToCell;
 
                     // Create each cell
                     let cells_tasks = cells_to_create.map(
@@ -861,7 +861,7 @@ where
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
-        holochain_p2p: crate::holochain_p2p::HolochainP2pRef,
+        holochain_p2p: holochain_p2p::HolochainP2pRef,
     ) -> ConductorResult<Self> {
         let db: SingleStore = env.get_db(&db::CONDUCTOR_STATE)?;
         let (task_tx, task_manager_run_handle) = spawn_task_manager();
@@ -1022,11 +1022,11 @@ mod builder {
             } = self;
 
             let network_config = match &config.network {
-                None => crate::holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
+                None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
                 Some(config) => config.clone(),
             };
             let (holochain_p2p, p2p_evt) =
-                crate::holochain_p2p::spawn_holochain_p2p(network_config).await?;
+                holochain_p2p::spawn_holochain_p2p(network_config).await?;
 
             let conductor = Conductor::new(
                 environment,
@@ -1048,7 +1048,7 @@ mod builder {
         async fn finish(
             conductor: Conductor<DS>,
             conductor_config: ConductorConfig,
-            p2p_evt: crate::holochain_p2p::event::HolochainP2pEventReceiver,
+            p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
         ) -> ConductorResult<ConductorHandle> {
             // Get data before handle
             let keystore = conductor.keystore.clone();
@@ -1119,7 +1119,7 @@ mod builder {
         /// Build a Conductor with a test environment
         pub async fn test(self, envs: &TestEnvironments) -> ConductorResult<ConductorHandle> {
             let keystore = envs.conductor().keystore();
-            let (holochain_p2p, p2p_evt) = crate::holochain_p2p::spawn_holochain_p2p(
+            let (holochain_p2p, p2p_evt) = holochain_p2p::spawn_holochain_p2p(
                 self.config.network.clone().unwrap_or_default(),
             )
             .await?;
@@ -1143,7 +1143,7 @@ mod builder {
 }
 
 async fn p2p_event_task(
-    mut p2p_evt: crate::holochain_p2p::event::HolochainP2pEventReceiver,
+    mut p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,
 ) {
     use tokio::stream::StreamExt;
@@ -1165,7 +1165,7 @@ pub mod tests {
     use super::ConductorState;
     use super::*;
     use crate::holochain::conductor::dna_store::MockDnaStore;
-    use crate::holochain_types::test_utils::fake_cell_id;
+    use holochain_types::test_utils::fake_cell_id;
     use holochain_lmdb::test_utils::test_environments;
     use matches::assert_matches;
 
@@ -1174,7 +1174,7 @@ pub mod tests {
         let envs = test_environments();
         let dna_store = MockDnaStore::new();
         let keystore = envs.conductor().keystore().clone();
-        let holochain_p2p = crate::holochain_p2p::stub_network().await;
+        let holochain_p2p = holochain_p2p::stub_network().await;
         let conductor = Conductor::new(
             envs.conductor(),
             envs.wasm(),
@@ -1218,7 +1218,7 @@ pub mod tests {
     async fn app_ids_are_unique() {
         let environments = test_environments();
         let dna_store = MockDnaStore::new();
-        let holochain_p2p = crate::holochain_p2p::stub_network().await;
+        let holochain_p2p = holochain_p2p::stub_network().await;
         let mut conductor = Conductor::new(
             environments.conductor(),
             environments.wasm(),

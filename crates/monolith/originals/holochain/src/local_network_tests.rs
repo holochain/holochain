@@ -1,9 +1,9 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use crate::holochain_types::app::InstalledCell;
-use crate::holochain_types::dna::DnaDef;
-use crate::holochain_types::dna::DnaFile;
+use holochain_types::app::InstalledCell;
+use holochain_types::dna::DnaDef;
+use holochain_types::dna::DnaFile;
 use crate::holochain_wasm_test_utils::TestWasm;
 use hdk3::prelude::CellId;
 use hdk3::prelude::WasmError;

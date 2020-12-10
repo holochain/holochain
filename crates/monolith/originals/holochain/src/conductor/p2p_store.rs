@@ -1,7 +1,7 @@
 //! A simple KvBuf for AgentInfoSigned.
 
-use crate::holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
-use crate::holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
+use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
+use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
@@ -69,8 +69,8 @@ impl From<&AgentInfo> for AgentKvKey {
 
 impl From<(DnaHash, AgentPubKey)> for AgentKvKey {
     fn from((space, agent): (DnaHash, AgentPubKey)) -> Self {
-        let space = crate::holochain_p2p::space_holo_to_kit(space);
-        let agent = crate::holochain_p2p::agent_holo_to_kit(agent);
+        let space = holochain_p2p::space_holo_to_kit(space);
+        let agent = holochain_p2p::agent_holo_to_kit(agent);
         (&space, &agent).into()
     }
 }

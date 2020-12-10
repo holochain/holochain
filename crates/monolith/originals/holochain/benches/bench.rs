@@ -1,7 +1,7 @@
 use crate::holochain::core::ribosome::RibosomeT;
 use crate::holochain::core::ribosome::ZomeCallInvocation;
-use crate::holochain_types::dna::zome::Zome;
-use crate::holochain_types::fixt::CapSecretFixturator;
+use holochain_types::dna::zome::Zome;
+use holochain_types::fixt::CapSecretFixturator;
 use crate::holochain_wasm_test_utils::TestWasm;
 use ::fixt::prelude::*;
 use criterion::criterion_group;
@@ -38,7 +38,7 @@ static REAL_RIBOSOME: Lazy<Mutex<crate::holochain::core::ribosome::real_ribosome
 
 static CELL_ID: Lazy<Mutex<holochain_zome_types::cell::CellId>> = Lazy::new(|| {
     Mutex::new(
-        crate::holochain_types::fixt::CellIdFixturator::new(Unpredictable)
+        holochain_types::fixt::CellIdFixturator::new(Unpredictable)
             .next()
             .unwrap(),
     )

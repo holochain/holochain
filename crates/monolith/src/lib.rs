@@ -1,9 +1,7 @@
 #![allow(unused_imports)]
 
 pub mod holochain;
-pub mod holochain_p2p;
 pub mod holochain_test_wasm_common;
-pub mod holochain_types;
 pub mod holochain_wasm_test_utils;
 pub mod holochain_websocket;
 

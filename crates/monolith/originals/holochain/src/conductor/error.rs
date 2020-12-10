@@ -3,7 +3,7 @@ use super::interface::error::InterfaceError;
 use crate::holochain::conductor::cell::error::CellError;
 use crate::holochain::core::workflow::error::WorkflowError;
 use holochain_lmdb::error::DatabaseError;
-use crate::holochain_types::app::InstalledAppId;
+use holochain_types::app::InstalledAppId;
 use holochain_zome_types::cell::CellId;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -52,7 +52,7 @@ pub enum ConductorError {
     SubmitTaskError(String),
 
     #[error("DnaError: {0}")]
-    DnaError(#[from] crate::holochain_types::dna::DnaError),
+    DnaError(#[from] holochain_types::dna::DnaError),
 
     #[error("Workflow error: {0:?}")]
     WorkflowError(#[from] WorkflowError),
@@ -83,7 +83,7 @@ pub enum ConductorError {
     AppNotActive(InstalledAppId),
 
     #[error(transparent)]
-    HolochainP2pError(#[from] crate::holochain_p2p::HolochainP2pError),
+    HolochainP2pError(#[from] holochain_p2p::HolochainP2pError),
 
     #[error(transparent)]
     EntryDefStoreError(#[from] EntryDefStoreError),

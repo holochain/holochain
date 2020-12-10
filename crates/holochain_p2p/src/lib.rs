@@ -3,7 +3,7 @@
 
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use crate::holochain_types::activity::AgentActivity;
+use holochain_types::activity::AgentActivity;
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::query::ChainQueryFilter;
 use holochain_zome_types::zome::FunctionName;
@@ -18,11 +18,11 @@ pub use types::*;
 mod spawn;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
-use crate::holochain_types::element::GetElementResponse;
-use crate::holochain_types::link::GetLinksResponse;
-use crate::holochain_types::link::WireLinkMetaKey;
-use crate::holochain_types::metadata::MetadataSet;
-use crate::holochain_types::validate::ValidationPackageResponse;
+use holochain_types::element::GetElementResponse;
+use holochain_types::link::GetLinksResponse;
+use holochain_types::link::WireLinkMetaKey;
+use holochain_types::metadata::MetadataSet;
+use holochain_types::validate::ValidationPackageResponse;
 pub use spawn::*;
 pub use test::stub_network;
 pub use test::HolochainP2pCellFixturator;
@@ -62,7 +62,7 @@ pub trait HolochainP2pCellT {
         &mut self,
         request_validation_receipt: bool,
         dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, crate::holochain_types::dht_op::DhtOp)>,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<()>;
 
@@ -172,7 +172,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
         &mut self,
         request_validation_receipt: bool,
         dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, crate::holochain_types::dht_op::DhtOp)>,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<()> {
         self.sender

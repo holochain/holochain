@@ -2,7 +2,7 @@
 //! # Metadata
 //! This module is responsible for generating and storing holochain metadata.
 //!
-//! [Entry]: crate::holochain_types::Entry
+//! [Entry]: holochain_types::Entry
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
@@ -23,12 +23,12 @@ use holochain_lmdb::error::DatabaseError;
 use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
-use crate::holochain_types::header::NewEntryHeader;
-use crate::holochain_types::link::WireLinkMetaKey;
-use crate::holochain_types::metadata::EntryDhtStatus;
-use crate::holochain_types::metadata::TimedHeaderHash;
-use crate::holochain_types::HeaderHashed;
-use crate::holochain_types::Timestamp;
+use holochain_types::header::NewEntryHeader;
+use holochain_types::link::WireLinkMetaKey;
+use holochain_types::metadata::EntryDhtStatus;
+use holochain_types::metadata::TimedHeaderHash;
+use holochain_types::HeaderHashed;
+use holochain_types::Timestamp;
 use holochain_zome_types::header;
 use holochain_zome_types::header::CreateLink;
 use holochain_zome_types::header::DeleteLink;

@@ -29,8 +29,8 @@ use holochain_lmdb::prelude::GetDb;
 use holochain_lmdb::prelude::IntegratedPrefix;
 use holochain_lmdb::prelude::PendingPrefix;
 use holochain_lmdb::prelude::Writer;
-use crate::holochain_types::dht_op::DhtOp;
-use crate::holochain_types::Timestamp;
+use holochain_types::dht_op::DhtOp;
+use holochain_types::Timestamp;
 use holochain_zome_types::query::HighestObserved;
 use tracing::instrument;
 
@@ -41,7 +41,7 @@ mod test;
 pub async fn incoming_dht_ops_workflow(
     state_env: &EnvironmentWrite,
     mut sys_validation_trigger: TriggerSender,
-    ops: Vec<(holo_hash::DhtOpHash, crate::holochain_types::dht_op::DhtOp)>,
+    ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     from_agent: Option<AgentPubKey>,
 ) -> WorkflowResult<()> {
     // set up our workspace

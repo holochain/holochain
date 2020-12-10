@@ -52,8 +52,8 @@ pub mod tests {
     use holochain_lmdb::prelude::*;
     use holochain_lmdb::test_utils::test_cell_env;
     use holochain_lmdb::test_utils::DbString;
-    use crate::holochain_types::prelude::*;
-    use crate::holochain_types::test_utils::fake_header_hash;
+    use holochain_types::prelude::*;
+    use holochain_types::test_utils::fake_header_hash;
 
     pub struct TestWorkspace {
         one: KvBufFresh<HeaderHash, u32>,

@@ -55,9 +55,9 @@ pub mod wasm_test {
     use hdk3::prelude::CellId;
     use holo_hash::HeaderHash;
     use holochain_serialized_bytes::SerializedBytes;
-    use crate::holochain_types::app::InstalledCell;
-    use crate::holochain_types::dna::DnaDef;
-    use crate::holochain_types::dna::DnaFile;
+    use holochain_types::app::InstalledCell;
+    use holochain_types::dna::DnaDef;
+    use holochain_types::dna::DnaFile;
     use crate::holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
     use holochain_zome_types::ExternInput;

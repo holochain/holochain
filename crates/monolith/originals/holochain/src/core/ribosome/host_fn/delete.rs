@@ -6,7 +6,7 @@ use crate::holochain::core::state::cascade::error::CascadeError;
 use crate::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::holochain::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use crate::holochain::core::SourceChainError;
-use crate::holochain_p2p::actor::GetOptions;
+use holochain_p2p::actor::GetOptions;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_zome_types::element::SignedHeaderHashed;

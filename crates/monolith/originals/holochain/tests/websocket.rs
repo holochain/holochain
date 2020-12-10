@@ -8,12 +8,12 @@ use crate::holochain::conductor::error::ConductorError;
 use crate::holochain::conductor::Conductor;
 use crate::holochain::core::signal::Signal;
 use crate::holochain::fixt::*;
-use crate::holochain_types::app::InstallAppDnaPayload;
-use crate::holochain_types::app::InstallAppPayload;
-use crate::holochain_types::prelude::*;
-use crate::holochain_types::test_utils::fake_agent_pubkey_1;
-use crate::holochain_types::test_utils::fake_dna_zomes;
-use crate::holochain_types::test_utils::write_fake_dna_file;
+use holochain_types::app::InstallAppDnaPayload;
+use holochain_types::app::InstallAppPayload;
+use holochain_types::prelude::*;
+use holochain_types::test_utils::fake_agent_pubkey_1;
+use holochain_types::test_utils::fake_dna_zomes;
+use holochain_types::test_utils::write_fake_dna_file;
 use crate::holochain_wasm_test_utils::TestWasm;
 use crate::holochain_websocket::*;
 use crate::*;
@@ -151,7 +151,7 @@ async fn call_admin() {
     let original_dna_hash = dna.dna_hash().clone();
 
     // Make properties
-    let properties: crate::holochain_types::dna::JsonProperties = serde_json::json!({
+    let properties: holochain_types::dna::JsonProperties = serde_json::json!({
         "test": "example",
         "how_many": 42,
     })
@@ -184,7 +184,7 @@ async fn call_admin() {
     let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
     let mut tmp_dna = dna.dna_def().clone();
     tmp_dna.properties = properties.try_into().unwrap();
-    let dna = crate::holochain_types::dna::DnaFile::new(tmp_dna, tmp_wasm)
+    let dna = holochain_types::dna::DnaFile::new(tmp_dna, tmp_wasm)
         .await
         .unwrap();
 

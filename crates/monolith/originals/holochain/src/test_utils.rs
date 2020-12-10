@@ -14,24 +14,24 @@ use crate::holochain::core::state::cascade::DbPair;
 use crate::holochain::core::state::element_buf::ElementBuf;
 use crate::holochain::core::state::metadata::MetadataBuf;
 use crate::holochain::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
-use crate::holochain_p2p::actor::HolochainP2pRefToCell;
-use crate::holochain_p2p::event::HolochainP2pEvent;
-use crate::holochain_p2p::spawn_holochain_p2p;
-use crate::holochain_p2p::HolochainP2pCell;
-use crate::holochain_p2p::HolochainP2pRef;
-use crate::holochain_p2p::HolochainP2pSender;
-use crate::holochain_types::app::InstalledCell;
+use holochain_p2p::actor::HolochainP2pRefToCell;
+use holochain_p2p::event::HolochainP2pEvent;
+use holochain_p2p::spawn_holochain_p2p;
+use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pRef;
+use holochain_p2p::HolochainP2pSender;
+use holochain_types::app::InstalledCell;
 use holochain_zome_types::cell::CellId;
-use crate::holochain_types::dna::zome::Zome;
-use crate::holochain_types::dna::DnaFile;
-use crate::holochain_types::element::SignedHeaderHashed;
-use crate::holochain_types::element::SignedHeaderHashedExt;
-use crate::holochain_types::fixt::CapSecretFixturator;
-use crate::holochain_types::test_utils::fake_header_hash;
-use crate::holochain_types::Entry;
-use crate::holochain_types::EntryHashed;
-use crate::holochain_types::HeaderHashed;
-use crate::holochain_types::Timestamp;
+use holochain_types::dna::zome::Zome;
+use holochain_types::dna::DnaFile;
+use holochain_types::element::SignedHeaderHashed;
+use holochain_types::element::SignedHeaderHashedExt;
+use holochain_types::fixt::CapSecretFixturator;
+use holochain_types::test_utils::fake_header_hash;
+use holochain_types::Entry;
+use holochain_types::EntryHashed;
+use holochain_types::HeaderHashed;
+use holochain_types::Timestamp;
 use crate::holochain_wasm_test_utils::TestWasm;
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
@@ -77,7 +77,7 @@ macro_rules! here {
 macro_rules! meta_mock {
     () => {{ $crate::holochain::core::state::metadata::MockMetadataBuf::new() }};
     ($fun:ident) => {{
-        let d: Vec<crate::holochain_types::metadata::TimedHeaderHash> = Vec::new();
+        let d: Vec<holochain_types::metadata::TimedHeaderHash> = Vec::new();
         meta_mock!($fun, d)
     }};
     ($fun:ident, $data:expr) => {{
@@ -88,7 +88,7 @@ macro_rules! meta_mock {
                     $data
                         .clone()
                         .into_iter()
-                        .map(crate::holochain_types::metadata::TimedHeaderHash::from)
+                        .map(holochain_types::metadata::TimedHeaderHash::from)
                         .map(Ok),
                 )))
             }
@@ -104,7 +104,7 @@ macro_rules! meta_mock {
                         $data
                             .clone()
                             .into_iter()
-                            .map(crate::holochain_types::metadata::TimedHeaderHash::from)
+                            .map(holochain_types::metadata::TimedHeaderHash::from)
                             .map(Ok),
                     )))
                 } else {
@@ -112,7 +112,7 @@ macro_rules! meta_mock {
                     data.clear();
                     Ok(Box::new(fallible_iterator::convert(
                         data.into_iter()
-                            .map(crate::holochain_types::metadata::TimedHeaderHash::from)
+                            .map(holochain_types::metadata::TimedHeaderHash::from)
                             .map(Ok),
                     )))
                 }
@@ -131,7 +131,7 @@ pub async fn fake_unique_element(
     let content: SerializedBytes =
         UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned()).into();
     let entry = EntryHashed::from_content_sync(Entry::App(content.try_into().unwrap()));
-    let app_entry_type = crate::holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
+    let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
         .next()
         .unwrap();
     let header_1 = Header::Create(Create {
@@ -229,7 +229,7 @@ where
     F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
 {
     let (network, mut recv) =
-        spawn_holochain_p2p(crate::holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
+        spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
             .await
             .unwrap();
     let respond_task = tokio::task::spawn(async move {
@@ -242,7 +242,7 @@ where
                     continue;
                 }
             }
-            use crate::holochain_p2p::event::HolochainP2pEvent::*;
+            use holochain_p2p::event::HolochainP2pEvent::*;
             match evt {
                 SignNetworkData { respond, .. } => {
                     respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));

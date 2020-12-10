@@ -1,6 +1,6 @@
-use crate::holochain_p2p::actor::*;
-use crate::holochain_p2p::HolochainP2pCell;
-use crate::holochain_p2p::*;
+use crate::actor::*;
+use crate::HolochainP2pCell;
+use crate::*;
 use ::fixt::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
@@ -46,7 +46,7 @@ impl HolochainP2pHandler for StubNetwork {
         from_agent: AgentPubKey,
         request_validation_receipt: bool,
         dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, crate::holochain_types::dht_op::DhtOp)>,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         timeout_ms: Option<u64>,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
@@ -126,7 +126,7 @@ fixturator!(
     HolochainP2pCell;
     curve Empty {
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            let holochain_p2p = crate::holochain_p2p::test::stub_network().await;
+            let holochain_p2p = crate::test::stub_network().await;
             holochain_p2p.to_cell(
                 DnaHashFixturator::new(Empty).next().unwrap(),
                 AgentPubKeyFixturator::new(Empty).next().unwrap(),
@@ -143,17 +143,17 @@ fixturator!(
 
 #[cfg(test)]
 mod tests {
-    use crate::holochain_p2p::*;
+    use crate::*;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use crate::holochain_types::element::Element;
-    use crate::holochain_types::element::ElementStatus;
-    use crate::holochain_types::element::SignedHeaderHashed;
-    use crate::holochain_types::element::WireElement;
-    use crate::holochain_types::fixt::*;
-    use crate::holochain_types::validate::ValidationStatus;
-    use crate::holochain_types::HeaderHashed;
+    use holochain_types::element::Element;
+    use holochain_types::element::ElementStatus;
+    use holochain_types::element::SignedHeaderHashed;
+    use holochain_types::element::WireElement;
+    use holochain_types::fixt::*;
+    use holochain_types::validate::ValidationStatus;
+    use holochain_types::HeaderHashed;
     use kitsune_p2p::KitsuneP2pConfig;
 
     macro_rules! newhash {
@@ -188,7 +188,7 @@ mod tests {
         let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
             while let Some(evt) = evt.next().await {
-                use crate::holochain_p2p::types::event::HolochainP2pEvent::*;
+                use crate::types::event::HolochainP2pEvent::*;
                 match evt {
                     CallRemote { respond, .. } => {
                         respond.r(Ok(
@@ -242,7 +242,7 @@ mod tests {
         let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
             while let Some(evt) = evt.next().await {
-                use crate::holochain_p2p::types::event::HolochainP2pEvent::*;
+                use crate::types::event::HolochainP2pEvent::*;
                 match evt {
                     ValidationReceiptReceived {
                         respond, receipt, ..
@@ -292,7 +292,7 @@ mod tests {
         let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
             while let Some(evt) = evt.next().await {
-                use crate::holochain_p2p::types::event::HolochainP2pEvent::*;
+                use crate::types::event::HolochainP2pEvent::*;
                 match evt {
                     Publish { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
@@ -372,7 +372,7 @@ mod tests {
         let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
             while let Some(evt) = evt.next().await {
-                use crate::holochain_p2p::types::event::HolochainP2pEvent::*;
+                use crate::types::event::HolochainP2pEvent::*;
                 match evt {
                     Get { respond, .. } => {
                         let resp = if let Some(h) = respond_queue.pop() {
@@ -434,7 +434,7 @@ mod tests {
             use tokio::stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 let test_1_clone = test_1_clone.clone();
-                use crate::holochain_p2p::types::event::HolochainP2pEvent::*;
+                use crate::types::event::HolochainP2pEvent::*;
                 match evt {
                     GetLinks { respond, .. } => {
                         respond.r(Ok(async move { Ok(test_1_clone) }.boxed().into()));

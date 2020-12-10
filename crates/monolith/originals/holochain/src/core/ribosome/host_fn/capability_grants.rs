@@ -23,12 +23,12 @@ pub mod wasm_test {
     use crate::holochain::core::ribosome::ZomeCall;
     use crate::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
-    use crate::holochain_types::app::InstalledCell;
-    use crate::holochain_types::dna::DnaDef;
-    use crate::holochain_types::dna::DnaFile;
-    use crate::holochain_types::fixt::CapSecretFixturator;
-    use crate::holochain_types::test_utils::fake_agent_pubkey_1;
-    use crate::holochain_types::test_utils::fake_agent_pubkey_2;
+    use holochain_types::app::InstalledCell;
+    use holochain_types::dna::DnaDef;
+    use holochain_types::dna::DnaFile;
+    use holochain_types::fixt::CapSecretFixturator;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::test_utils::fake_agent_pubkey_2;
     use crate::holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;

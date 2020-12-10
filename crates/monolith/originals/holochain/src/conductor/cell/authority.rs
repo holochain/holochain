@@ -7,15 +7,15 @@ use crate::holochain::core::state::metadata::MetadataBuf;
 use crate::holochain::core::state::metadata::MetadataBufT;
 use fallible_iterator::FallibleIterator;
 
-use crate::holochain_types::activity::AgentActivity;
-use crate::holochain_types::activity::ChainItems;
-use crate::holochain_types::element::ElementStatus;
-use crate::holochain_types::element::GetElementResponse;
-use crate::holochain_types::element::RawGetEntryResponse;
-use crate::holochain_types::element::WireElement;
-use crate::holochain_types::header::WireHeaderStatus;
-use crate::holochain_types::header::WireUpdateRelationship;
-use crate::holochain_types::metadata::TimedHeaderHash;
+use holochain_types::activity::AgentActivity;
+use holochain_types::activity::ChainItems;
+use holochain_types::element::ElementStatus;
+use holochain_types::element::GetElementResponse;
+use holochain_types::element::RawGetEntryResponse;
+use holochain_types::element::WireElement;
+use holochain_types::header::WireHeaderStatus;
+use holochain_types::header::WireUpdateRelationship;
+use holochain_types::metadata::TimedHeaderHash;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
@@ -36,7 +36,7 @@ use tracing::*;
 pub async fn handle_get_entry(
     state_env: EnvironmentWrite,
     hash: EntryHash,
-    options: crate::holochain_p2p::event::GetOptions,
+    options: holochain_p2p::event::GetOptions,
 ) -> CellResult<GetElementResponse> {
     // Get the vaults
     let element_vault = ElementBuf::vault(state_env.clone().into(), false)?;
@@ -260,7 +260,7 @@ pub fn handle_get_agent_activity(
     env: EnvironmentRead,
     agent: AgentPubKey,
     query: ChainQueryFilter,
-    options: crate::holochain_p2p::event::GetActivityOptions,
+    options: holochain_p2p::event::GetActivityOptions,
 ) -> CellResult<AgentActivity> {
     // Databases
     let element_integrated = ElementBuf::vault(env.clone(), false)?;
@@ -332,7 +332,7 @@ fn get_full_headers<'a, P: PrefixType + 'a, R: Readable>(
 fn check_headers<P: PrefixType, R: Readable>(
     hashes: impl FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError>,
     query: ChainQueryFilter,
-    options: crate::holochain_p2p::event::GetActivityOptions,
+    options: holochain_p2p::event::GetActivityOptions,
     database: ElementBuf<P>,
     reader: &R,
 ) -> CellResult<ChainItems> {

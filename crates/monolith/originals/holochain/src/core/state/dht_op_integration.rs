@@ -2,7 +2,7 @@
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use crate::holochain_p2p::dht_arc::DhtArc;
+use holochain_p2p::dht_arc::DhtArc;
 use holochain_serialized_bytes::prelude::*;
 use holochain_lmdb::buffer::KvBufFresh;
 use holochain_lmdb::db::INTEGRATED_DHT_OPS;
@@ -12,9 +12,9 @@ use holochain_lmdb::prelude::BufferedStore;
 use holochain_lmdb::prelude::EnvironmentRead;
 use holochain_lmdb::prelude::GetDb;
 use holochain_lmdb::prelude::Readable;
-use crate::holochain_types::dht_op::DhtOpLight;
-use crate::holochain_types::validate::ValidationStatus;
-use crate::holochain_types::Timestamp;
+use holochain_types::dht_op::DhtOpLight;
+use holochain_types::validate::ValidationStatus;
+use holochain_types::Timestamp;
 
 /// Database type for AuthoredDhtOps
 /// Buffer for accessing [DhtOp]s that you authored and finding the amount of validation receipts

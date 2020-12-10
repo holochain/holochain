@@ -1,4 +1,4 @@
-//! crate::holochain_types::dna::wasm is a module for managing webassembly code
+//! crate::dna::wasm is a module for managing webassembly code
 //!  - within the in-memory dna struct
 //!  - and serialized to json
 use backtrace::Backtrace;

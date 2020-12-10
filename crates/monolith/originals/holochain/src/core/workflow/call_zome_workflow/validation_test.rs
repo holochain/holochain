@@ -6,11 +6,11 @@ use crate::holochain::core::SourceChainError;
 use crate::holochain::test_utils::new_zome_call;
 use crate::holochain::test_utils::setup_app;
 use holochain_serialized_bytes::SerializedBytes;
-use crate::holochain_types::app::InstalledCell;
+use holochain_types::app::InstalledCell;
 use holochain_zome_types::cell::CellId;
-use crate::holochain_types::dna::DnaDef;
-use crate::holochain_types::dna::DnaFile;
-use crate::holochain_types::test_utils::fake_agent_pubkey_1;
+use holochain_types::dna::DnaDef;
+use holochain_types::dna::DnaFile;
+use holochain_types::test_utils::fake_agent_pubkey_1;
 use crate::holochain_wasm_test_utils::TestWasm;
 use std::convert::TryFrom;
 

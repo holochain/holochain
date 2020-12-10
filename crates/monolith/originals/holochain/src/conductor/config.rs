@@ -74,7 +74,7 @@ pub struct ConductorConfig {
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
     /// Config options for the network module. Optional.
-    pub network: Option<crate::holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
+    pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
     //
     //
     // /// Which signals to emit
@@ -188,7 +188,7 @@ pub mod tests {
 
     "#;
         let result: ConductorResult<ConductorConfig> = config_from_yaml(yaml);
-        use crate::holochain_p2p::kitsune_p2p::*;
+        use holochain_p2p::kitsune_p2p::*;
         let mut network_config = KitsuneP2pConfig::default();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap.holo.host"));
         network_config.transport_pool.push(TransportConfig::Proxy {

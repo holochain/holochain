@@ -1,5 +1,5 @@
-use crate::holochain_types::dna::wasm::DnaWasm;
-use crate::holochain_types::dna::wasm::DnaWasmHashed;
+use holochain_types::dna::wasm::DnaWasm;
+use holochain_types::dna::wasm::DnaWasmHashed;
 use holo_hash::WasmHash;
 use holochain_lmdb::buffer::CasBufFreshAsync;
 use holochain_lmdb::error::DatabaseError;
@@ -38,7 +38,7 @@ impl BufferedStore for WasmBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::holochain_types::dna::wasm::DnaWasm;
+    use holochain_types::dna::wasm::DnaWasm;
     use holo_hash::HasHash;
 
     #[tokio::test(threaded_scheduler)]

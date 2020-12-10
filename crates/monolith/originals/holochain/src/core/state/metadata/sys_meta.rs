@@ -18,10 +18,10 @@ mod tests {
     use holo_hash::*;
     use holochain_lmdb::prelude::*;
     use holochain_lmdb::test_utils::test_cell_env;
-    use crate::holochain_types::fixt::AppEntryTypeFixturator;
-    use crate::holochain_types::fixt::HeaderBuilderCommonFixturator;
-    use crate::holochain_types::header::NewEntryHeader;
-    use crate::holochain_types::HeaderHashed;
+    use holochain_types::fixt::AppEntryTypeFixturator;
+    use holochain_types::fixt::HeaderBuilderCommonFixturator;
+    use holochain_types::header::NewEntryHeader;
+    use holochain_types::HeaderHashed;
     use holochain_zome_types::header;
     use holochain_zome_types::header::builder;
     use holochain_zome_types::header::Delete;

@@ -8,10 +8,10 @@ use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::holochain::conductor::api::CellConductorApiT;
 use crate::holochain::conductor::entry_def_store::get_entry_def;
-use crate::holochain_p2p::HolochainP2pCell;
-use crate::holochain_types::dht_op::DhtOp;
-use crate::holochain_types::header::NewEntryHeaderRef;
-use crate::holochain_types::Entry;
+use holochain_p2p::HolochainP2pCell;
+use holochain_types::dht_op::DhtOp;
+use holochain_types::header::NewEntryHeaderRef;
+use holochain_types::Entry;
 use fallible_iterator::FallibleIterator;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_lmdb::env::EnvironmentWrite;
@@ -24,10 +24,10 @@ pub use crate::holochain::core::state::source_chain::SourceChainError;
 pub use crate::holochain::core::state::source_chain::SourceChainResult;
 pub(super) use error::*;
 
-pub use crate::holochain_types::element::Element;
-pub use crate::holochain_types::element::ElementExt;
-pub use crate::holochain_types::HeaderHashed;
-pub use crate::holochain_types::Timestamp;
+pub use holochain_types::element::Element;
+pub use holochain_types::element::ElementExt;
+pub use holochain_types::HeaderHashed;
+pub use holochain_types::Timestamp;
 pub use holo_hash::*;
 
 #[allow(missing_docs)]

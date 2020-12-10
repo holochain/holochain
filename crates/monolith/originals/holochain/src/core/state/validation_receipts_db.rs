@@ -153,7 +153,7 @@ mod tests {
     use holochain_keystore::KeystoreSenderExt;
     use holochain_lmdb::env::ReadManager;
     use holochain_lmdb::prelude::*;
-    use crate::holochain_types::test_utils::fake_dht_op_hash;
+    use holochain_types::test_utils::fake_dht_op_hash;
 
     async fn fake_vr(
         dht_op_hash: &DhtOpHash,

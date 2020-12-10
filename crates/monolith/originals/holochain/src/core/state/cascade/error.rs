@@ -1,11 +1,11 @@
 use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use crate::holochain::core::SourceChainError;
 use holo_hash::AnyDhtHash;
-use crate::holochain_p2p::HolochainP2pError;
+use holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_lmdb::error::DatabaseError;
-use crate::holochain_types::dht_op::error::DhtOpError;
-use crate::holochain_types::element::error::ElementGroupError;
+use holochain_types::dht_op::error::DhtOpError;
+use holochain_types::element::error::ElementGroupError;
 use holochain_zome_types::header::conversions::WrongHeaderError;
 use thiserror::Error;
 use tokio::task::JoinError;

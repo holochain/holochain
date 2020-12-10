@@ -23,9 +23,9 @@ use crate::holochain::core::state::workspace::WorkspaceResult;
 pub use call_zome_workspace_lock::CallZomeWorkspaceLock;
 use either::Either;
 use holochain_keystore::KeystoreSender;
-use crate::holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pCell;
 use holochain_lmdb::prelude::*;
-use crate::holochain_types::element::Element;
+use holochain_types::element::Element;
 use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::Header;
 use holochain_zome_types::ZomeCallResponse;
@@ -326,13 +326,13 @@ pub mod tests {
     use ::fixt::prelude::*;
     use holo_hash::fixt::*;
     use holo_hash::*;
-    use crate::holochain_p2p::HolochainP2pCellFixturator;
+    use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_lmdb::env::ReadManager;
     use holochain_lmdb::test_utils::test_cell_env;
     use holochain_zome_types::cell::CellId;
     use observability;
-    use crate::holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
     use crate::holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry::Entry;
     use holochain_zome_types::ExternInput;
@@ -380,7 +380,7 @@ pub mod tests {
         // FIXME: CAP: Set this function to private
         let invocation =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
-                crate::holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
+                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
@@ -451,7 +451,7 @@ pub mod tests {
 
         let invocation =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
-                crate::holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
+                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
@@ -486,7 +486,7 @@ pub mod tests {
         let ribosome = MockRibosomeT::new();
         let invocation =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
-                crate::holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
+                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
@@ -522,7 +522,7 @@ pub mod tests {
         // TODO: Make this mock return an output
         let invocation =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
-                crate::holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
+                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),

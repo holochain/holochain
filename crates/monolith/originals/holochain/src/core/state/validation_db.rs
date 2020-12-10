@@ -9,8 +9,8 @@ use holochain_lmdb::db::VALIDATION_LIMBO;
 use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::prelude::EnvironmentRead;
 use holochain_lmdb::prelude::GetDb;
-use crate::holochain_types::dht_op::DhtOpLight;
-use crate::holochain_types::Timestamp;
+use holochain_types::dht_op::DhtOpLight;
+use holochain_types::Timestamp;
 use shrinkwraprs::Shrinkwrap;
 
 #[derive(Shrinkwrap)]

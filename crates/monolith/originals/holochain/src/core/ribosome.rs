@@ -32,10 +32,10 @@ use crate::holochain::core::ribosome::guest_callback::validation_package::Valida
 use crate::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::holochain::core::ribosome::guest_callback::CallIterator;
 use crate::holochain::core::workflow::CallZomeWorkspaceLock;
-use crate::holochain_p2p::HolochainP2pCell;
-use crate::holochain_types::dna::zome::HostFnAccess;
-use crate::holochain_types::dna::zome::Zome;
-use crate::holochain_types::dna::DnaDefHashed;
+use holochain_p2p::HolochainP2pCell;
+use holochain_types::dna::zome::HostFnAccess;
+use holochain_types::dna::zome::Zome;
+use holochain_types::dna::DnaDefHashed;
 use derive_more::Constructor;
 use error::RibosomeResult;
 use guest_callback::entry_defs::EntryDefsHostAccess;
@@ -534,7 +534,7 @@ pub mod wasm_test {
             let mut host_access = $host_access.clone();
             let input = $input.clone();
             tokio::task::spawn(async move {
-                use crate::holochain_p2p::HolochainP2pCellT;
+                use holochain_p2p::HolochainP2pCellT;
                 use holo_hash::*;
                 use std::convert::TryInto;
                 use $crate::holochain::core::ribosome::RibosomeT;

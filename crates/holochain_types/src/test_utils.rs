@@ -1,11 +1,11 @@
 //! Some common testing helpers.
 
-use crate::holochain_types::dna::wasm::DnaWasm;
-use crate::holochain_types::dna::zome::WasmZome;
-use crate::holochain_types::dna::DnaDef;
-use crate::holochain_types::dna::DnaFile;
-use crate::holochain_types::dna::JsonProperties;
-use crate::holochain_types::prelude::*;
+use crate::dna::wasm::DnaWasm;
+use crate::dna::zome::WasmZome;
+use crate::dna::DnaDef;
+use crate::dna::DnaFile;
+use crate::dna::JsonProperties;
+use crate::prelude::*;
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::capability::CAP_SECRET_BYTES;
 use holochain_zome_types::cell::CellId;
@@ -42,7 +42,7 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let mut wasm_code = Vec::new();
         for (zome_name, wasm) in zomes {
-            let wasm = crate::holochain_types::dna::wasm::DnaWasmHashed::from_content(wasm).await;
+            let wasm = crate::dna::wasm::DnaWasmHashed::from_content(wasm).await;
             let (wasm, wasm_hash) = wasm.into_inner();
             dna.zomes.push((zome_name, WasmZome { wasm_hash }.into()));
             wasm_code.push(wasm);

@@ -1,7 +1,7 @@
 //! Module containing the HolochainP2p actor definition.
 #![allow(clippy::too_many_arguments)]
 
-use crate::holochain_p2p::*;
+use crate::*;
 use holochain_zome_types::request::MetadataRequest;
 use holochain_zome_types::zome::FunctionName;
 
@@ -215,7 +215,7 @@ ghost_actor::ghost_chan! {
             from_agent: AgentPubKey,
             request_validation_receipt: bool,
             dht_hash: holo_hash::AnyDhtHash,
-            ops: Vec<(holo_hash::DhtOpHash, crate::holochain_types::dht_op::DhtOp)>,
+            ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
             timeout_ms: Option<u64>,
         ) -> ();
 

@@ -2,7 +2,7 @@ use crate::holochain::core::ribosome::FnComponents;
 use crate::holochain::core::ribosome::HostAccess;
 use crate::holochain::core::ribosome::Invocation;
 use crate::holochain::core::ribosome::ZomesToInvoke;
-use crate::holochain_types::dna::zome::HostFnAccess;
+use holochain_types::dna::zome::HostFnAccess;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::*;
@@ -97,7 +97,7 @@ mod test {
     use crate::holochain::fixt::EntryDefsFixturator;
     use crate::holochain::fixt::EntryDefsInvocationFixturator;
     use crate::holochain::fixt::ZomeNameFixturator;
-    use crate::holochain_types::dna::zome::HostFnAccess;
+    use holochain_types::dna::zome::HostFnAccess;
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_zome_types::entry_def::EntryDefsCallbackResult;

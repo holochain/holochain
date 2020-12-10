@@ -2,7 +2,7 @@ use crate::holochain::core::ribosome::error::RibosomeResult;
 use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::RibosomeT;
 use crate::holochain::core::state::metadata::LinkMetaKey;
-use crate::holochain_p2p::actor::GetLinksOptions;
+use holochain_p2p::actor::GetLinksOptions;
 use holochain_zome_types::link::LinkDetails;
 use holochain_zome_types::GetLinkDetailsInput;
 use holochain_zome_types::GetLinkDetailsOutput;

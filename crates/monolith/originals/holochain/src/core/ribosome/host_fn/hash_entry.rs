@@ -14,7 +14,7 @@ pub fn hash_entry(
 ) -> RibosomeResult<HashEntryOutput> {
     let entry: Entry = input.into_inner();
 
-    let entry_hash = crate::holochain_types::entry::EntryHashed::from_content_sync(entry).into_hash();
+    let entry_hash = holochain_types::entry::EntryHashed::from_content_sync(entry).into_hash();
 
     Ok(HashEntryOutput::new(entry_hash))
 }
@@ -105,7 +105,7 @@ pub mod wasm_test {
 
         let expected_path = hdk3::hash_path::path::Path::from("foo.bar");
 
-        let expected_hash = crate::holochain_types::entry::EntryHashed::from_content_sync(
+        let expected_hash = holochain_types::entry::EntryHashed::from_content_sync(
             Entry::app((&expected_path).try_into().unwrap()).unwrap(),
         )
         .into_hash();

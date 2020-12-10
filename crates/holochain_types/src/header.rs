@@ -6,10 +6,10 @@
 
 #![allow(missing_docs)]
 
-use crate::holochain_types::element::ElementStatus;
-use crate::holochain_types::element::SignedHeaderHashed;
-use crate::holochain_types::element::SignedHeaderHashedExt;
-use crate::holochain_types::prelude::*;
+use crate::element::ElementStatus;
+use crate::element::SignedHeaderHashed;
+use crate::element::SignedHeaderHashedExt;
+use crate::prelude::*;
 use conversions::WrongHeaderError;
 use derive_more::From;
 use holo_hash::EntryHash;
@@ -391,11 +391,11 @@ impl<'a> From<&'a NewEntryHeader> for NewEntryHeaderRef<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::holochain_types::fixt::HeaderBuilderCommonFixturator;
-    use crate::holochain_types::test_utils::fake_dna_hash;
-    use crate::holochain_types::test_utils::fake_entry_hash;
-    use ::fixt::prelude::*;
+    use super::{fixt as _, *};
+    use crate::fixt::HeaderBuilderCommonFixturator;
+    use crate::test_utils::fake_dna_hash;
+    use crate::test_utils::fake_entry_hash;
+    use ::fixt::prelude::Unpredictable;
 
     #[test]
     fn test_header_msgpack_roundtrip() {

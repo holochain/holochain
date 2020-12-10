@@ -1,5 +1,5 @@
-use crate::holochain_p2p::HolochainP2pCell;
-use crate::holochain_types::HeaderHashed;
+use holochain_p2p::HolochainP2pCell;
+use holochain_types::HeaderHashed;
 use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::EntryType;
 use holochain_zome_types::query::ChainQueryFilter;

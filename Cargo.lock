@@ -809,6 +809,7 @@ version = "0.0.1"
 dependencies = [
  "holo_hash",
  "holochain_serialized_bytes",
+ "holochain_types",
  "holochain_zome_types",
  "monolith",
  "serde",
@@ -1362,6 +1363,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_p2p"
+version = "0.0.1"
+dependencies = [
+ "async-trait",
+ "fixt",
+ "futures",
+ "ghost_actor",
+ "holo_hash",
+ "holochain_keystore",
+ "holochain_serialized_bytes",
+ "holochain_types",
+ "holochain_zome_types",
+ "kitsune_p2p",
+ "kitsune_p2p_types",
+ "mockall",
+ "observability",
+ "serde",
+ "serde_bytes",
+ "thiserror",
+ "tokio",
+ "tokio_safe_block_on",
+]
+
+[[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1384,6 +1409,44 @@ checksum = "2dbbf84d56f0a0cb00e5532fd4d40b1d42ffb403a1a964d8eeedc4d40131e208"
 dependencies = [
  "quote 0.6.13",
  "syn 0.15.44",
+]
+
+[[package]]
+name = "holochain_types"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "backtrace",
+ "base64 0.10.1",
+ "chrono",
+ "derive_builder",
+ "derive_more",
+ "fixt",
+ "flate2",
+ "futures",
+ "holo_hash",
+ "holochain_keystore",
+ "holochain_serialized_bytes",
+ "holochain_zome_types",
+ "lazy_static",
+ "maplit",
+ "must_future",
+ "nanoid",
+ "observability",
+ "rand 0.7.3",
+ "regex",
+ "serde",
+ "serde_bytes",
+ "serde_derive",
+ "serde_json",
+ "shrinkwraprs",
+ "strum",
+ "tempdir",
+ "thiserror",
+ "tokio",
+ "tokio_safe_block_on",
+ "tracing",
 ]
 
 [[package]]
@@ -2061,7 +2124,9 @@ dependencies = [
  "holo_hash",
  "holochain_keystore",
  "holochain_lmdb",
+ "holochain_p2p",
  "holochain_serialized_bytes",
+ "holochain_types",
  "holochain_wasmer_guest",
  "holochain_wasmer_host",
  "holochain_zome_types",

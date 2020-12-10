@@ -1,7 +1,7 @@
 use crate::holochain::core::ribosome::error::RibosomeResult;
 use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::RibosomeT;
-use crate::holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_zome_types::CallRemoteInput;
 use holochain_zome_types::CallRemoteOutput;
 use holochain_zome_types::ZomeCallResponse;
@@ -41,11 +41,11 @@ pub mod wasm_test {
     use crate::holochain::conductor::interface::websocket::test::setup_app;
     use crate::holochain::conductor::{api::ZomeCall, dna_store::MockDnaStore};
     use crate::holochain::core::ribosome::ZomeCallResponse;
-    use crate::holochain_types::app::InstalledCell;
-    use crate::holochain_types::dna::DnaDef;
-    use crate::holochain_types::dna::DnaFile;
-    use crate::holochain_types::test_utils::fake_agent_pubkey_1;
-    use crate::holochain_types::test_utils::fake_agent_pubkey_2;
+    use holochain_types::app::InstalledCell;
+    use holochain_types::dna::DnaDef;
+    use holochain_types::dna::DnaFile;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::test_utils::fake_agent_pubkey_2;
     use crate::holochain_wasm_test_utils::TestWasm;
     use hdk3::prelude::*;
     pub use holochain_zome_types::capability::CapSecret;

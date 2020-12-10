@@ -1,5 +1,5 @@
-use crate::holochain_p2p::actor::*;
-use crate::holochain_p2p::event::*;
+use crate::actor::*;
+use crate::event::*;
 
 mod actor;
 use actor::*;
