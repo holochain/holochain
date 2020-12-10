@@ -6,16 +6,16 @@
 pub mod error;
 pub mod wasm;
 pub mod zome;
+use self::{
+    error::DnaResult,
+    zome::{Zome, ZomeDef},
+};
 use crate::prelude::*;
 pub use error::DnaError;
 use holo_hash::impl_hashable_content;
 pub use holo_hash::*;
 use holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
-use self::{
-    error::DnaResult,
-    zome::{Zome, ZomeDef},
-};
 
 #[cfg(feature = "test_utils")]
 use zome::inline_zome::InlineZome;
