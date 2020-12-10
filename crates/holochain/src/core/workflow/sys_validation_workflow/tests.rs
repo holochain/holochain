@@ -4,7 +4,7 @@ use crate::{
         state::{element_buf::ElementBuf, validation_db::ValidationLimboStatus},
         workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
     },
-    test_utils::{host_fn_api::*, setup_app, wait_for_integration},
+    test_utils::{host_fn_caller::*, setup_app, wait_for_integration},
 };
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
@@ -280,7 +280,11 @@ async fn run_test(
                         let s = debug_span!("inspect_ops");
                         let _g = s.enter();
                         debug!(?i.op);
-                        assert_matches!(i.status, ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingAppDeps(_));
+                        assert_matches!(
+                            i.status,
+                            ValidationLimboStatus::Pending
+                                | ValidationLimboStatus::AwaitingAppDeps(_)
+                        );
                         Ok(())
                     })
                     .count()

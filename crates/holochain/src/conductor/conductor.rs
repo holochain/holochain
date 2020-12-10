@@ -918,7 +918,8 @@ pub type ConductorStateDb = KvStore<UnitDbKey, ConductorState>;
 mod builder {
     use super::*;
     use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
-    use holochain_state::{env::EnvironmentKind, test_utils::TestEnvironments};
+    use holochain_state::env::EnvironmentKind;
+    use holochain_state::test_utils::TestEnvironments;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
@@ -1107,6 +1108,7 @@ mod builder {
         }
 
         /// Build a Conductor with a test environment
+        #[cfg(any(test, feature = "test_utils"))]
         pub async fn test(self, envs: &TestEnvironments) -> ConductorResult<ConductorHandle> {
             let keystore = envs.conductor().keystore();
             let (holochain_p2p, p2p_evt) =

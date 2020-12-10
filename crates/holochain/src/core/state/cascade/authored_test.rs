@@ -9,7 +9,7 @@ use holochain_wasm_test_utils::TestWasm;
 
 use crate::{
     core::state::{element_buf::ElementBuf, source_chain::SourceChain},
-    test_utils::{conductor_setup::ConductorTestData, host_fn_api::*, wait_for_integration},
+    test_utils::{conductor_setup::ConductorTestData, host_fn_caller::*, wait_for_integration},
 };
 
 /// - Alice commits an entry and it is in their authored store
