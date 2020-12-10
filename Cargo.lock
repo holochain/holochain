@@ -1445,8 +1445,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adca869d80860a04757af4fc011d49505594365391a6e3a04105e8f88b9c32e1"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=no-rmp-error#0c9e0a06e1ee72d3edcf73a3a5bbaf2e3d861c31"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
@@ -1460,8 +1459,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes_derive"
 version = "0.0.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2dbbf84d56f0a0cb00e5532fd4d40b1d42ffb403a1a964d8eeedc4d40131e208"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=no-rmp-error#0c9e0a06e1ee72d3edcf73a3a5bbaf2e3d861c31"
 dependencies = [
  "quote 0.6.13",
  "syn 0.15.44",

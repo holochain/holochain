@@ -1,5 +1,5 @@
 use super::{CallContext, RibosomeT};
-use holochain_zome_types::zome_io::{HostFnApiErrorPlaceholder, HostFnApiT};
+use holochain_zome_types::zome_io::{HostFnApiError, HostFnApiT};
 use std::sync::Arc;
 
 pub struct HostFnApi<Ribosome: RibosomeT> {
@@ -24,13 +24,12 @@ macro_rules! host_fn_api_impls {
 
         impl<Ribosome: RibosomeT> HostFnApiT for HostFnApi<Ribosome> {
             $(
-                fn $f(&self, input: $input) -> Result<$output, HostFnApiErrorPlaceholder> {
-                    let out = $f::$f(
+                fn $f(&self, input: $input) -> Result<$output, HostFnApiError> {
+                    $f::$f(
                         self.ribosome.clone(),
                         self.call_context.clone(),
                         input.into()
-                    ).map(|r| r.into_inner());
-                    Ok(out.expect("TODO, handle after crate re-org [B-03640]"))
+                    ).map(|r| r.into_inner()).map_err(|e| HostFnApiError::RibosomeError(Box::new(e)))
                 }
             )*
         }

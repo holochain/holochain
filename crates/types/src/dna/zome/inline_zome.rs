@@ -61,10 +61,10 @@ impl InlineZome {
         O: Serialize,
     {
         let z = move |api: BoxApi, input: SerializedBytes| -> InlineZomeResult<SerializedBytes> {
-            let output = f(api, sb::decode(input.bytes()).expect("TODO"))?;
-            Ok(SerializedBytes::from(UnsafeBytes::from(
-                sb::encode(&output).expect("TODO"),
-            )))
+            let output = f(api, sb::decode(input.bytes())?)?;
+            Ok(SerializedBytes::from(UnsafeBytes::from(sb::encode(
+                &output,
+            )?)))
         };
         if self.callbacks.insert(name.into(), Box::new(z)).is_some() {
             tracing::warn!("Replacing existing InlineZome callback '{}'", name);

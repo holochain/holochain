@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 
-use holochain_zome_types::zome::FunctionName;
+use holochain_serialized_bytes::SerializedBytesError;
+use holochain_zome_types::{zome::FunctionName, HostFnApiError};
 use thiserror::Error;
 
 pub type InlineZomeResult<T> = Result<T, InlineZomeError>;
@@ -10,6 +11,9 @@ pub enum InlineZomeError {
     #[error("No such InlineZome callback: {0}")]
     NoSuchCallback(FunctionName),
 
-    #[error("TODO: remove after crate re-org [B-03640]")]
-    Infallible(#[from] std::convert::Infallible),
+    #[error("Error during host fn call: {0}")]
+    HostFnApiError(#[from] HostFnApiError),
+
+    #[error(transparent)]
+    SerializationError(#[from] SerializedBytesError),
 }
