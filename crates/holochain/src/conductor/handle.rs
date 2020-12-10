@@ -392,8 +392,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn shutdown(&self) {
-        let handle = self.conductor.write().await.take_shutdown_handle();
-        self.conductor.write().await.shutdown();
+        let handle = {
+            self.conductor.write().await.take_shutdown_handle()
+        };
+        {
+            self.conductor.write().await.shutdown();
+        }
         if let Some(handle) = handle {
             handle
                 .await
