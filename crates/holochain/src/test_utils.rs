@@ -351,6 +351,52 @@ pub fn warm_wasm_tests() {
     }
 }
 
+/// Number of ops per sourechain change
+pub struct WaitOps;
+
+#[allow(missing_docs)]
+impl WaitOps {
+    pub const GENESIS: usize = 7;
+    pub const INIT: usize = 2;
+    pub const CAP_TOKEN: usize = 2;
+    pub const ENTRY: usize = 3;
+    pub const LINK: usize = 3;
+    pub const DELETE_LINK: usize = 2;
+    pub const UPDATE: usize = 5;
+    pub const DELETE: usize = 4;
+
+    /// Added the app but haven't made any zome calls
+    /// so init hasn't happened.
+    pub const fn cold_start() -> usize {
+        Self::GENESIS
+    }
+
+    /// Genesis and init.
+    pub const fn start() -> usize {
+        Self::GENESIS + Self::INIT
+    }
+
+    /// Start but there's a cap grant in init.
+    pub const fn start_with_cap() -> usize {
+        Self::GENESIS + Self::INIT + Self::CAP_TOKEN
+    }
+
+    /// Path to a set depth.
+    /// This doesn't take into account paths
+    /// with sharding strategy.
+    pub const fn path(depth: usize) -> usize {
+        Self::ENTRY + (Self::LINK + Self::ENTRY) * depth
+    }
+}
+
+/// Same as wait_for_integration but with a default wait time of 10 seconds
+#[tracing::instrument(skip(env))]
+pub async fn wait_for_integration_10s(env: &EnvironmentWrite, expected_count: usize) {
+    const NUM_ATTEMPTS: usize = 100;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
+    wait_for_integration(env, expected_count, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
+}
+
 /// Exit early if the expected number of ops
 /// have been integrated or wait for num_attempts * delay
 #[tracing::instrument(skip(env))]
@@ -500,8 +546,26 @@ async fn display_integration(env: &EnvironmentWrite) -> usize {
         let mut cascade = Cascade::empty()
             .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
             .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
+        let mut headers_to_display = Vec::with_capacity(int.len());
         for iv in int {
-            tracing::trace!(op = ?iv.op, el = ?cascade.retrieve(iv.op.header_hash().clone().into(), Default::default()).await.unwrap());
+            let el = cascade
+                .retrieve(iv.op.header_hash().clone().into(), Default::default())
+                .await
+                .unwrap()
+                .unwrap();
+            tracing::trace!(op = ?iv.op, ?el);
+            let header = el.header();
+            let entry = format!("{:?}", el.entry());
+            headers_to_display.push((
+                header.header_seq(),
+                header.header_type(),
+                iv.op.to_string(),
+                entry,
+            ))
+        }
+        headers_to_display.sort_by_key(|i| i.0);
+        for (i, h) in headers_to_display.into_iter().enumerate() {
+            tracing::debug!(?i, seq_num = %h.0, header_type = ?h.1, op_type = %h.2, entry = ?h.3);
         }
     }
     count

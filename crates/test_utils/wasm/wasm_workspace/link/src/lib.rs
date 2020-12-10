@@ -38,3 +38,22 @@ fn delete_all_links(_: ()) -> ExternResult<()> {
     }
     Ok(())
 }
+
+/// Same as path.ensure() but doesn't check for
+/// exists. This can happen when ensuring paths
+/// in partitions.
+#[hdk_extern]
+fn commit_existing_path(_: ()) -> ExternResult<()> {
+    let path = Path::from("a.c");
+    create_entry(&path)?;
+    if let Some(parent) = path.parent() {
+        parent.ensure()?;
+        hdk3::prelude::create_link(parent.hash()?, path.hash()?, LinkTag::try_from(&path)?)?;
+    }
+    Ok(())
+}
+
+#[hdk_extern]
+fn get_long_path(_: ()) -> ExternResult<Links> {
+    Ok(Path::from("a").children()?)
+}
