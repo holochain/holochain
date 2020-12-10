@@ -12,10 +12,6 @@ use holo_hash::impl_hashable_content;
 pub use holo_hash::*;
 use holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
-
-#[cfg(feature = "test_utils")]
-use zome::inline_zome::InlineZome;
-
 use self::{
     error::DnaResult,
     zome::{Zome, ZomeDef},
