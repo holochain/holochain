@@ -325,6 +325,26 @@ where
         Ok(port)
     }
 
+    /// Start all app interfaces currently in state.
+    /// This should only be run at conductor initialization.
+    #[allow(irrefutable_let_patterns)]
+    pub(super) async fn startup_app_interfaces_via_handle(
+        &mut self,
+        handle: ConductorHandle,
+    ) -> ConductorResult<()> {
+        for i in self.get_state().await?.app_interfaces.values() {
+            let port = if let InterfaceDriver::Websocket { port } = i.driver {
+                port
+            } else {
+                unreachable!()
+            };
+            let _ = self
+                .add_app_interface_via_handle(port, handle.clone())
+                .await?;
+        }
+        Ok(())
+    }
+
     pub(super) fn signal_broadcaster(&self) -> SignalBroadcaster {
         SignalBroadcaster::new(
             self.app_interface_signal_broadcasters
@@ -1070,6 +1090,9 @@ mod builder {
             if let Some(configs) = conductor_config.admin_interfaces {
                 handle.clone().add_admin_interfaces(configs).await?;
             }
+
+            // Create app interfaces
+            handle.clone().startup_app_interfaces().await?;
 
             Ok(handle)
         }
