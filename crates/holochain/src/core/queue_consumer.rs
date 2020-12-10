@@ -269,7 +269,7 @@ async fn next_job_or_exit(
     rx: &mut TriggerReceiver,
     stop: &mut sync::broadcast::Receiver<()>,
 ) -> Job {
-    if let Ok(_) = stop.try_recv() {
+    if stop.try_recv().is_ok() {
         return Job::Shutdown;
     }
     // Check for shutdown or next job
