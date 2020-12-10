@@ -4,7 +4,6 @@ use hdk3::prelude::{CellId, WasmError};
 use holo_hash::AgentPubKey;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::env::EnvironmentWrite;
 use holochain_types::{
     app::InstalledCell,
     dna::{DnaDef, DnaFile},
@@ -16,12 +15,9 @@ use matches::assert_matches;
 use tempdir::TempDir;
 
 use crate::{
-    conductor::p2p_store::all_agent_infos,
-    conductor::p2p_store::inject_agent_infos,
-    conductor::ConductorHandle,
-    core::ribosome::error::RibosomeError,
-    core::ribosome::error::RibosomeResult,
-    test_utils::{install_app, new_invocation, setup_app_with_network},
+    conductor::{p2p_store::exchange_peer_info, ConductorHandle},
+    core::ribosome::error::{RibosomeError, RibosomeResult},
+    test_utils::{install_app, new_zome_call, setup_app_with_network},
 };
 use shrinkwraprs::Shrinkwrap;
 use test_case::test_case;
@@ -58,7 +54,7 @@ fn conductors_call_remote(num_conductors: usize) {
                 },
                 // None also means a timeout which is what we want before the
                 // agent info is shared
-                None => (),
+                None => {}
             }
         }
 
@@ -84,7 +80,7 @@ async fn init_all(handles: &[TestHandle]) {
     for h in handles.iter().cloned() {
         let f = async move {
             let invocation =
-                new_invocation(&h.cell_id, "create_entry", (), TestWasm::Create).unwrap();
+                new_zome_call(&h.cell_id, "create_entry", (), TestWasm::Create).unwrap();
             h.call_zome(invocation).await.unwrap().unwrap();
         };
         let f = tokio::task::spawn(f);
@@ -96,7 +92,7 @@ async fn init_all(handles: &[TestHandle]) {
 }
 
 async fn call_remote(a: TestHandle, b: TestHandle) -> RibosomeResult<ZomeCallResponse> {
-    let invocation = new_invocation(
+    let invocation = new_zome_call(
         &a.cell_id,
         "call_create_entry_remotely",
         b.cell_id.agent_pubkey().clone(),
@@ -139,18 +135,6 @@ async fn call_each_other(
         }
     }
     results
-}
-
-fn exchange_peer_info(envs: Vec<EnvironmentWrite>) {
-    for (i, a) in envs.iter().enumerate() {
-        for (j, b) in envs.iter().enumerate() {
-            if i == j {
-                continue;
-            }
-            inject_agent_infos(a.clone(), all_agent_infos(b.clone().into()).unwrap()).unwrap();
-            inject_agent_infos(b.clone(), all_agent_infos(a.clone().into()).unwrap()).unwrap();
-        }
-    }
 }
 
 #[derive(Shrinkwrap, Clone)]

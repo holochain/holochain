@@ -145,8 +145,8 @@ impl TestEnvironments {
         self.tempdir.clone()
     }
 
-    pub fn keystore(&self) -> &KeystoreSender {
-        &self.keystore
+    pub fn keystore(&self) -> KeystoreSender {
+        self.keystore.clone()
     }
 }
 

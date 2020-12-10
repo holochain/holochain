@@ -8,18 +8,19 @@
 // FIXME: creating entries in the config db
 
 use super::error::{WorkflowError, WorkflowResult};
-use crate::conductor::api::CellConductorApiT;
-use crate::core::{
-    queue_consumer::OneshotWriter,
-    state::{
-        source_chain::SourceChainBuf,
-        workspace::{Workspace, WorkspaceResult},
+use crate::{
+    conductor::api::CellConductorApiT,
+    core::{
+        queue_consumer::OneshotWriter,
+        state::{
+            source_chain::SourceChainBuf,
+            workspace::{Workspace, WorkspaceResult},
+        },
     },
 };
 use derive_more::Constructor;
 use holochain_state::prelude::*;
-use holochain_types::dna::DnaFile;
-use holochain_types::prelude::*;
+use holochain_types::{dna::DnaFile, prelude::*};
 use tracing::*;
 
 /// The struct which implements the genesis Workflow
@@ -104,7 +105,6 @@ impl Workspace for GenesisWorkspace {
 
 #[cfg(test)]
 pub mod tests {
-
     use super::*;
 
     use crate::{

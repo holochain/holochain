@@ -4,7 +4,7 @@ use crate::{
         state::{element_buf::ElementBuf, validation_db::ValidationLimboStatus},
         workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
     },
-    test_utils::{host_fn_api::*, setup_app, wait_for_integration},
+    test_utils::{host_fn_caller::*, setup_app, wait_for_integration},
 };
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
@@ -13,8 +13,13 @@ use holo_hash::{AnyDhtHash, DhtOpHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{fresh_reader_test, prelude::ReadManager};
 use holochain_types::{
-    app::InstalledCell, cell::CellId, dht_op::DhtOpLight, dna::DnaDef, dna::DnaFile, fixt::*,
-    test_utils::fake_agent_pubkey_1, test_utils::fake_agent_pubkey_2, validate::ValidationStatus,
+    app::InstalledCell,
+    cell::CellId,
+    dht_op::DhtOpLight,
+    dna::{DnaDef, DnaFile},
+    fixt::*,
+    test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2},
+    validate::ValidationStatus,
     Entry,
 };
 use holochain_wasm_test_utils::TestWasm;
@@ -275,7 +280,11 @@ async fn run_test(
                         let s = debug_span!("inspect_ops");
                         let _g = s.enter();
                         debug!(?i.op);
-                        assert_matches!(i.status, ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingAppDeps(_));
+                        assert_matches!(
+                            i.status,
+                            ValidationLimboStatus::Pending
+                                | ValidationLimboStatus::AwaitingAppDeps(_)
+                        );
                         Ok(())
                     })
                     .count()

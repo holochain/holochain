@@ -1,6 +1,6 @@
-use crate::zome_io::ExternOutput;
-use crate::CallbackResult;
-use crate::{crdt::CrdtType, validate::RequiredValidationType};
+use crate::{
+    crdt::CrdtType, validate::RequiredValidationType, zome_io::ExternOutput, CallbackResult,
+};
 use holochain_serialized_bytes::prelude::*;
 
 const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
@@ -94,6 +94,17 @@ impl EntryDef {
             required_validation_type,
         }
     }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn default_with_id<I: Into<EntryDefId>>(id: I) -> Self {
+        EntryDef::new(
+            id.into(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        )
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -160,12 +171,8 @@ impl CallbackResult for EntryDefsCallbackResult {
 
 #[cfg(test)]
 mod tests {
-
-    use super::EntryDef;
-    use super::EntryDefsCallbackResult;
-    use super::EntryVisibility;
-    use crate::zome_io::ExternOutput;
-    use crate::{crdt::CrdtType, validate::RequiredValidationType};
+    use super::{EntryDef, EntryDefsCallbackResult, EntryVisibility};
+    use crate::{crdt::CrdtType, validate::RequiredValidationType, zome_io::ExternOutput};
     use std::convert::TryInto;
 
     #[test]

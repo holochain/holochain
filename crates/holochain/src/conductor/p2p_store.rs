@@ -2,13 +2,16 @@
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::{AgentPubKey, DnaHash};
-use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
-use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
-use holochain_state::{buffer::KvStore, buffer::KvStoreT, fresh_reader};
-use holochain_state::{db::GetDb, prelude::Readable};
-use holochain_state::{env::EnvironmentRead, error::DatabaseError};
-use holochain_state::{env::EnvironmentWrite, error::DatabaseResult};
-use holochain_state::{env::WriteManager, key::BufKey};
+use holochain_p2p::kitsune_p2p::agent_store::{AgentInfo, AgentInfoSigned};
+use holochain_state::{
+    buffer::{KvStore, KvStoreT},
+    db::GetDb,
+    env::{EnvironmentRead, EnvironmentWrite, WriteManager},
+    error::{DatabaseError, DatabaseResult},
+    fresh_reader,
+    key::BufKey,
+    prelude::Readable,
+};
 use std::convert::TryInto;
 
 const AGENT_KEY_LEN: usize = 64;
@@ -190,18 +193,34 @@ pub fn get_single_agent_info(
     fresh_reader!(env, |r| { p2p_store.get_agent_info(&r, space, agent) })
 }
 
+/// Interconnect every provided pair of conductors via their peer store lmdb environments
+#[cfg(any(test, feature = "test_utils"))]
+pub fn exchange_peer_info(envs: Vec<EnvironmentWrite>) {
+    for (i, a) in envs.iter().enumerate() {
+        for (j, b) in envs.iter().enumerate() {
+            if i == j {
+                continue;
+            }
+            inject_agent_infos(a.clone(), all_agent_infos(b.clone().into()).unwrap()).unwrap();
+            inject_agent_infos(b.clone(), all_agent_infos(a.clone().into()).unwrap()).unwrap();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use fixt::prelude::*;
-    use holochain_state::env::ReadManager;
-    use holochain_state::env::WriteManager;
-    use holochain_state::test_utils::test_p2p_env;
-    use holochain_state::{buffer::KvStoreT, fresh_reader_test};
-    use kitsune_p2p::fixt::AgentInfoFixturator;
-    use kitsune_p2p::fixt::AgentInfoSignedFixturator;
-    use kitsune_p2p::KitsuneBinType;
+    use holochain_state::{
+        buffer::KvStoreT,
+        env::{ReadManager, WriteManager},
+        fresh_reader_test,
+        test_utils::test_p2p_env,
+    };
+    use kitsune_p2p::{
+        fixt::{AgentInfoFixturator, AgentInfoSignedFixturator},
+        KitsuneBinType,
+    };
     use std::convert::TryInto;
 
     #[test]

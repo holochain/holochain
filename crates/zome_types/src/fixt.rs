@@ -4,11 +4,10 @@ use ::fixt::prelude::*;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 
-use crate::entry_def::EntryVisibility;
-use crate::header::*;
-use crate::link::LinkTag;
-use crate::timestamp::Timestamp;
-use crate::validate::RequiredValidationType;
+use crate::{
+    entry_def::EntryVisibility, header::*, link::LinkTag, timestamp::Timestamp,
+    validate::RequiredValidationType,
+};
 
 pub use holo_hash::fixt::*;
 

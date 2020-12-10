@@ -1,6 +1,6 @@
 use super::{BufferedStore, KvBufUsed, KvOp};
-use crate::buffer::kv::generic::KvStoreT;
 use crate::{
+    buffer::kv::generic::KvStoreT,
     env::{ReadManager, WriteManager},
     error::DatabaseResult,
     test_utils::{test_cell_env, DbString},

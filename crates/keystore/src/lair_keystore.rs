@@ -2,8 +2,7 @@
 
 use crate::*;
 use ghost_actor::dependencies::futures::{future::FutureExt, stream::StreamExt};
-use lair_keystore_api::actor::*;
-use lair_keystore_api::*;
+use lair_keystore_api::{actor::*, *};
 
 /// Spawn a new keystore backed by lair_keystore_client.
 pub async fn spawn_lair_keystore(

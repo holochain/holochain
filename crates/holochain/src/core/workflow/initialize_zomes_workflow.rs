@@ -73,10 +73,10 @@ async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::core::ribosome::MockRibosomeT;
-    use crate::core::workflow::fake_genesis;
-    use crate::fixt::DnaDefFixturator;
-    use crate::fixt::KeystoreSenderFixturator;
+    use crate::{
+        core::{ribosome::MockRibosomeT, workflow::fake_genesis},
+        fixt::{DnaDefFixturator, KeystoreSenderFixturator},
+    };
     use ::fixt::prelude::*;
     use fixt::Unpredictable;
     use holochain_p2p::HolochainP2pCellFixturator;

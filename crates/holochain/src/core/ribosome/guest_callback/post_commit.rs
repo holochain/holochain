@@ -1,27 +1,25 @@
-use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
-use crate::core::ribosome::Invocation;
-use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
+use crate::core::{
+    ribosome::{FnComponents, HostAccess, Invocation, ZomesToInvoke},
+    workflow::CallZomeWorkspaceLock,
+};
 use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::HostFnAccess;
-use holochain_zome_types::header::HeaderHashes;
-use holochain_zome_types::post_commit::PostCommitCallbackResult;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use holochain_types::dna::zome::{HostFnAccess, Zome};
+use holochain_zome_types::{
+    header::HeaderHashes, post_commit::PostCommitCallbackResult, zome::ZomeName, ExternInput,
+};
 
 #[derive(Clone)]
 pub struct PostCommitInvocation {
-    zome_name: ZomeName,
+    zome: Zome,
     headers: HeaderHashes,
 }
 
 impl PostCommitInvocation {
-    pub fn new(zome_name: ZomeName, headers: HeaderHashes) -> Self {
-        Self { zome_name, headers }
+    pub fn new(zome: Zome, headers: HeaderHashes) -> Self {
+        Self { zome, headers }
     }
 }
 
@@ -46,7 +44,7 @@ impl From<&PostCommitHostAccess> for HostFnAccess {
 
 impl Invocation for PostCommitInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::One(self.zome_name.to_owned())
+        ZomesToInvoke::One(self.zome.to_owned())
     }
     fn fn_components(&self) -> FnComponents {
         vec!["post_commit".into()].into()
@@ -93,18 +91,17 @@ impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
 
 #[cfg(test)]
 mod test {
-
     use super::PostCommitResult;
-    use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::HeaderHashesFixturator;
-    use crate::fixt::PostCommitHostAccessFixturator;
-    use crate::fixt::PostCommitInvocationFixturator;
+    use crate::{
+        core::ribosome::{Invocation, ZomesToInvoke},
+        fixt::{
+            HeaderHashesFixturator, PostCommitHostAccessFixturator, PostCommitInvocationFixturator,
+        },
+    };
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
-    use holochain_zome_types::post_commit::PostCommitCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::{post_commit::PostCommitCallbackResult, ExternInput};
 
     #[test]
     fn post_commit_callback_result_fold() {
@@ -165,11 +162,8 @@ mod test {
         let post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let zome_name = post_commit_invocation.zome_name.clone();
-        assert_eq!(
-            ZomesToInvoke::One(zome_name),
-            post_commit_invocation.zomes(),
-        );
+        let zome = post_commit_invocation.zome.clone();
+        assert_eq!(ZomesToInvoke::One(zome), post_commit_invocation.zomes(),);
     }
 
     #[test]
@@ -205,13 +199,14 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-
     use super::PostCommitResult;
-    use crate::core::ribosome::RibosomeT;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::PostCommitHostAccessFixturator;
-    use crate::fixt::PostCommitInvocationFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::{
+        core::ribosome::RibosomeT,
+        fixt::{
+            curve::Zomes, PostCommitHostAccessFixturator, PostCommitInvocationFixturator,
+            RealRibosomeFixturator,
+        },
+    };
     use holo_hash::fixt::HeaderHashFixturator;
     use holochain_wasm_test_utils::TestWasm;
 
@@ -220,13 +215,13 @@ mod slow_tests {
         let host_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        post_commit_invocation.zome_name = TestWasm::Foo.into();
+        post_commit_invocation.zome = TestWasm::Foo.into();
 
         let result = ribosome
             .run_post_commit(host_access, post_commit_invocation)
@@ -239,13 +234,13 @@ mod slow_tests {
         let host_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitSuccess]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitSuccess]))
             .next()
             .unwrap();
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        post_commit_invocation.zome_name = TestWasm::PostCommitSuccess.into();
+        post_commit_invocation.zome = TestWasm::PostCommitSuccess.into();
 
         let result = ribosome
             .run_post_commit(host_access, post_commit_invocation)
@@ -258,13 +253,13 @@ mod slow_tests {
         let host_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitFail]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitFail]))
             .next()
             .unwrap();
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        post_commit_invocation.zome_name = TestWasm::PostCommitFail.into();
+        post_commit_invocation.zome = TestWasm::PostCommitFail.into();
 
         let result = ribosome
             .run_post_commit(host_access, post_commit_invocation)

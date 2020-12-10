@@ -4,8 +4,10 @@
 use super::{
     queue_consumer::TriggerSender,
     state::metadata::{ChainItemKey, MetadataBufT},
-    workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow,
-    workflow::sys_validation_workflow::SysValidationWorkspace,
+    workflow::{
+        incoming_dht_ops_workflow::incoming_dht_ops_workflow,
+        sys_validation_workflow::SysValidationWorkspace,
+    },
 };
 use crate::conductor::{api::CellConductorApiT, entry_def_store::get_entry_def};
 use fallible_iterator::FallibleIterator;
@@ -14,12 +16,12 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_state::{env::EnvironmentWrite, error::DatabaseResult, fresh_reader};
 use holochain_types::{dht_op::DhtOp, header::NewEntryHeaderRef, Entry};
 use holochain_zome_types::{
-    element::ElementEntry, signature::Signature, validate::ValidationStatus,
-};
-use holochain_zome_types::{
+    element::ElementEntry,
     entry_def::{EntryDef, EntryVisibility},
     header::{AppEntryType, EntryType, Update},
     link::LinkTag,
+    signature::Signature,
+    validate::ValidationStatus,
     Header,
 };
 use std::convert::TryInto;
@@ -202,9 +204,7 @@ pub async fn check_app_entry_type(
     let zome_index = u8::from(entry_type.zome_id()) as usize;
     // We want to be careful about holding locks open to the conductor api
     // so calls are made in blocks
-    let dna_file = { conductor_api.get_this_dna().await };
-    let dna_file =
-        dna_file.ok_or_else(|| SysValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
+    let dna_file = conductor_api.get_this_dna().await.map_err(Box::new)?;
 
     // Check if the zome is found
     let zome = dna_file
@@ -212,10 +212,10 @@ pub async fn check_app_entry_type(
         .zomes
         .get(zome_index)
         .ok_or_else(|| ValidationOutcome::ZomeId(entry_type.clone()))?
-        .1
-        .clone();
+        .clone()
+        .1;
 
-    let entry_def = get_entry_def(entry_type.id(), zome, &dna_file, conductor_api).await?;
+    let entry_def = get_entry_def(entry_type.id(), zome, dna_file.dna(), conductor_api).await?;
 
     // Check the visibility and return
     match entry_def {

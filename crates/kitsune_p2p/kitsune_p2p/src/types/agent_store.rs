@@ -1,9 +1,6 @@
 //! Data structures to be stored in the agent/peer database.
 
-use crate::types::KitsuneAgent;
-use crate::types::KitsuneP2pError;
-use crate::types::KitsuneSignature;
-use crate::types::KitsuneSpace;
+use crate::types::{KitsuneAgent, KitsuneP2pError, KitsuneSignature, KitsuneSpace};
 use url2::Url2;
 
 /// A list of Urls.

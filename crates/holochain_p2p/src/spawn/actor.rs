@@ -9,8 +9,7 @@ use holochain_types::{
     element::GetElementResponse, validate::ValidationPackageResponse, Timestamp,
 };
 use holochain_zome_types::zome::FunctionName;
-use kitsune_p2p::actor::KitsuneP2pSender;
-use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p::{actor::KitsuneP2pSender, agent_store::AgentInfoSigned};
 
 pub(crate) struct HolochainP2pActor {
     evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,

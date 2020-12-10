@@ -5,9 +5,7 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-use crate::capability::CapClaim;
-use crate::capability::CapGrant;
-use crate::capability::ZomeCallCapGrant;
+use crate::capability::{CapClaim, CapGrant, ZomeCallCapGrant};
 use holo_hash::{hash_type, AgentPubKey, HashableContent, HashableContentBytes};
 use holochain_serialized_bytes::prelude::*;
 
@@ -29,7 +27,7 @@ pub type CapGrantEntry = ZomeCallCapGrant;
 /// The data type written to the source chain to denote a capability claim
 pub type CapClaimEntry = CapClaim;
 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Default, Clone, Serialize, Deserialize)]
 /// @todo make some options for get
 pub struct GetOptions;
 

@@ -1,24 +1,28 @@
 use crate::{
     conductor::ConductorHandle,
-    core::ribosome::ZomeCallInvocation,
-    core::state::dht_op_integration::IntegratedDhtOpsValue,
-    core::state::validation_db::ValidationLimboValue,
     core::{
-        state::element_buf::ElementBuf,
+        ribosome::ZomeCallInvocation,
+        state::{
+            dht_op_integration::IntegratedDhtOpsValue, element_buf::ElementBuf,
+            validation_db::ValidationLimboValue,
+        },
         workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
     },
-    test_utils::host_fn_api::*,
-    test_utils::new_invocation,
-    test_utils::setup_app,
-    test_utils::wait_for_integration,
+    test_utils::{
+        host_fn_caller::*, new_invocation, new_zome_call, setup_app, wait_for_integration,
+    },
 };
 use fallible_iterator::FallibleIterator;
 use holo_hash::{AnyDhtHash, DhtOpHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{env::EnvironmentWrite, fresh_reader_test};
 use holochain_types::{
-    app::InstalledCell, cell::CellId, dht_op::DhtOpLight, dna::DnaDef, dna::DnaFile,
-    test_utils::fake_agent_pubkey_1, test_utils::fake_agent_pubkey_2, validate::ValidationStatus,
+    app::InstalledCell,
+    cell::CellId,
+    dht_op::DhtOpLight,
+    dna::{DnaDef, DnaFile},
+    test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2},
+    validate::ValidationStatus,
     Entry,
 };
 use holochain_wasm_test_utils::TestWasm;
@@ -202,7 +206,7 @@ async fn run_test(
     let delay_per_attempt = Duration::from_millis(100);
 
     let invocation =
-        new_invocation(&bob_cell_id, "always_validates", (), TestWasm::Validate).unwrap();
+        new_zome_call(&bob_cell_id, "always_validates", (), TestWasm::Validate).unwrap();
     handle.call_zome(invocation).await.unwrap().unwrap();
 
     // Integration should have 3 ops in it
@@ -257,7 +261,7 @@ async fn run_test(
     }
 
     let invocation =
-        new_invocation(&bob_cell_id, "add_valid_link", (), TestWasm::ValidateLink).unwrap();
+        new_zome_call(&bob_cell_id, "add_valid_link", (), TestWasm::ValidateLink).unwrap();
     handle.call_zome(invocation).await.unwrap().unwrap();
 
     // Integration should have 6 ops in it

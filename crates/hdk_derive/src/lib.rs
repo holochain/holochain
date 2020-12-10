@@ -2,8 +2,10 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::TokenStreamExt;
-use syn::parse::{Parse, ParseStream, Result};
-use syn::punctuated::Punctuated;
+use syn::{
+    parse::{Parse, ParseStream, Result},
+    punctuated::Punctuated,
+};
 
 struct EntryDef(holochain_zome_types::entry_def::EntryDef);
 struct EntryDefId(holochain_zome_types::entry_def::EntryDefId);

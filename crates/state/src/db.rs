@@ -12,8 +12,10 @@ use holochain_types::universal_map::{Key as UmKey, UniversalMap};
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use rkv::{MultiStore, Rkv, SingleStore, StoreOptions};
-use std::collections::{hash_map, HashMap};
-use std::path::{Path, PathBuf};
+use std::{
+    collections::{hash_map, HashMap},
+    path::{Path, PathBuf},
+};
 
 /// TODO This is incomplete
 /// Enumeration of all databases needed by Holochain
@@ -180,7 +182,7 @@ pub(super) fn initialize_databases(rkv: &Rkv, kind: &EnvironmentKind) -> Databas
     let path = rkv.path().to_owned();
     match dbmap.entry(path.clone()) {
         hash_map::Entry::Occupied(_) => {
-            return Err(DatabaseError::EnvironmentDoubleInitialized(path))
+            return Err(DatabaseError::EnvironmentDoubleInitialized(path));
         }
         hash_map::Entry::Vacant(e) => e.insert({
             let mut um = UniversalMap::new();

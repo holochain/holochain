@@ -14,7 +14,9 @@ pub enum DhtOpConvertError {
     SerializedBytesError(#[from] SerializedBytesError),
     #[error("The header is expected to contain EntryData, but doesn't: {0}")]
     MissingEntryDataForHeader(HeaderHash),
-    #[error("Data for a DhtOp was missing from the source chain. Make sure that elements are always integrated before metadata")]
+    #[error(
+        "Data for a DhtOp was missing from the source chain. Make sure that elements are always integrated before metadata"
+    )]
     MissingData(AnyDhtHash),
     #[error("Tried to create a StoreEntry with a header that is not Create or Update")]
     HeaderEntryMismatch,

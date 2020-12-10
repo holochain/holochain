@@ -1,16 +1,15 @@
 #![allow(missing_docs)]
 
 use crate::{
-    conductor::ConductorHandle,
     conductor::{
         api::{CellConductorApi, CellConductorApiT, CellConductorReadHandle},
         interface::SignalBroadcaster,
+        ConductorHandle,
     },
-    core::ribosome::RibosomeT,
-    core::ribosome::ZomeCallInvocation,
     core::{
         ribosome::{
-            host_fn, wasm_ribosome::WasmRibosome, CallContext, HostAccess, ZomeCallHostAccess,
+            host_fn, real_ribosome::RealRibosome, CallContext, HostAccess, RibosomeT,
+            ZomeCallHostAccess, ZomeCallInvocation,
         },
         state::{metadata::LinkMetaKey, workspace::Workspace},
         workflow::{CallZomeWorkspace, CallZomeWorkspaceLock},
@@ -34,9 +33,7 @@ use holochain_zome_types::{
     entry_def,
     link::{Link, LinkTag},
     metadata::Details,
-    query::ActivityRequest,
-    query::AgentActivity,
-    query::ChainQueryFilter,
+    query::{ActivityRequest, AgentActivity, ChainQueryFilter},
     zome::ZomeName,
     CreateInput, CreateLinkInput, DeleteInput, DeleteLinkInput, GetAgentActivityInput,
     GetDetailsInput, GetInput, GetLinksInput, UpdateInput, ZomeCallResponse,
@@ -100,7 +97,7 @@ pub enum MaybeLinkable {
 #[derive(Clone)]
 pub struct HostFnCaller {
     pub env: EnvironmentWrite,
-    pub ribosome: WasmRibosome,
+    pub ribosome: RealRibosome,
     pub zome_path: ZomePath,
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
@@ -110,7 +107,7 @@ pub struct HostFnCaller {
 
 impl HostFnCaller {
     /// Create HostFnCaller for the first zome.
-    #[deprecated = "use create_for_zome"]
+    // #[deprecated = "use create_for_zome"]
     pub async fn create(
         cell_id: &CellId,
         handle: &ConductorHandle,
@@ -137,7 +134,7 @@ impl HostFnCaller {
             dna_file.dna().zomes.get(zome_index).unwrap().0.clone(),
         )
             .into();
-        let ribosome = WasmRibosome::new(dna_file.clone());
+        let ribosome = RealRibosome::new(dna_file.clone());
         let signal_tx = handle.signal_broadcaster().await;
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
@@ -160,7 +157,7 @@ impl HostFnCaller {
         &self,
     ) -> (
         EnvironmentWrite,
-        Arc<WasmRibosome>,
+        Arc<RealRibosome>,
         Arc<CallContext>,
         CallZomeWorkspaceLock,
     ) {
@@ -187,7 +184,8 @@ impl HostFnCaller {
             cell_id,
         );
         let ribosome = Arc::new(ribosome);
-        let call_context = Arc::new(CallContext::new(zome_name, host_access.into()));
+        let zome = ribosome.dna_def().get_zome(&zome_name).unwrap();
+        let call_context = Arc::new(CallContext::new(zome, host_access.into()));
         (env, ribosome, call_context, workspace_lock)
     }
 }

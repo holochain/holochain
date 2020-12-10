@@ -52,7 +52,11 @@ impl BufKey for IntKey {
         let boxed_slice = vec.to_vec().into_boxed_slice();
         let boxed_array: Box<[u8; 4]> = match boxed_slice.try_into() {
             Ok(ba) => ba,
-            Err(o) => panic!("Holochain detected database corruption.\n\nInvalid IntKey: expected {} bytes but got {}", 4, o.len()),
+            Err(o) => panic!(
+                "Holochain detected database corruption.\n\nInvalid IntKey: expected {} bytes but got {}",
+                4,
+                o.len()
+            ),
         };
         IntKey(*boxed_array)
     }

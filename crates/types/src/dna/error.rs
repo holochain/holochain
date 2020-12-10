@@ -1,6 +1,7 @@
 //! Holochain DnaError type.
 
 use holo_hash::DnaHash;
+use holochain_zome_types::zome::ZomeName;
 use thiserror::Error;
 
 /// Holochain DnaError type.
@@ -38,6 +39,10 @@ pub enum DnaError {
     /// InvalidWasmHash
     #[error("InvalidWasmHash")]
     InvalidWasmHash,
+
+    /// NonWasmZome
+    #[error("Accessed a zome expecting to find a WasmZome, but found other type. Zome name: {0}")]
+    NonWasmZome(ZomeName),
 
     /// DnaHashMismatch
     #[error("DNA hash of file does not match contents.\nHash in file: {0}\nActual hash: {1}")]

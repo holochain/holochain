@@ -1,3 +1,9 @@
+use crate as zt;
+use crate::{
+    cell::CellId,
+    zome::{FunctionName, ZomeName},
+};
+use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 
 macro_rules! wasm_io_type {
@@ -40,9 +46,8 @@ macro_rules! wasm_io_types {
         )*
 
         pub trait HostFnApiT {
-            type Error: std::fmt::Display + std::fmt::Debug + std::error::Error;
             $(
-                fn $f(&self, _: $in_arg) -> Result<$out_arg, Self::Error>;
+                fn $f(&self, _: $in_arg) -> Result<$out_arg, HostFnApiErrorPlaceholder>;
             )*
         }
     }
@@ -62,8 +67,6 @@ macro_rules! wasm_io_types {
 //   callback flavour
 wasm_io_type!(ExternInput(SerializedBytes));
 wasm_io_type!(ExternOutput(SerializedBytes));
-
-use crate as zt;
 
 wasm_io_types! {
 
@@ -178,8 +181,17 @@ wasm_io_types! {
     // All the information is provided by core so there is no input value.
     // These are constant for the lifetime of a zome call.
     fn zome_info (()) -> zt::zome_info::ZomeInfo;
-
 }
+
+/// We probably actually want to use RibosomeError for HostApiFn errors, but
+/// RibosomeError is downstream of this crate. So, we'd need to make an
+/// associated Error type for HostFnApiT, which would infect everything from
+/// InlineZome all the way to DnaFile with generics.
+///
+/// I use a dummy uninhabitable error type for now. We can remove the need
+/// for abstraction over the trait once refactoring crates to put Dna and Ribosome
+/// types together in the same crate. FIXME [B-03640]
+pub type HostFnApiErrorPlaceholder = std::convert::Infallible;
 
 /// Response to a zome call.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq)]
@@ -189,7 +201,7 @@ pub enum ZomeCallResponse {
     Ok(ExternOutput),
     /// Cap grant failure.
     /// Something like a 401 http response.
-    Unauthorized,
+    Unauthorized(CellId, ZomeName, FunctionName, AgentPubKey),
     /// This was a zome call made remotely but
     /// something has failed on the network
     NetworkError(String),

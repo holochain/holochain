@@ -309,7 +309,6 @@ impl<'a> FallibleIterator for SourceChainBackwardIterator<'a> {
 
 #[cfg(test)]
 pub mod tests {
-
     use super::SourceChainBuf;
     use crate::core::state::source_chain::SourceChainResult;
     use fallible_iterator::FallibleIterator;

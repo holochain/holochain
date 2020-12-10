@@ -8,11 +8,8 @@ use holochain_types::Entry;
 use holochain_wasm_test_utils::TestWasm;
 
 use crate::{
-    core::state::element_buf::ElementBuf,
-    test_utils::{host_fn_api::*, wait_for_integration},
-};
-use crate::{
-    core::state::source_chain::SourceChain, test_utils::conductor_setup::ConductorTestData,
+    core::state::{element_buf::ElementBuf, source_chain::SourceChain},
+    test_utils::{conductor_setup::ConductorTestData, host_fn_caller::*, wait_for_integration},
 };
 
 /// - Alice commits an entry and it is in their authored store

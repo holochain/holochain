@@ -4,9 +4,7 @@ use super::*;
 use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
     state::{
-        cascade::error::CascadeResult,
-        cascade::Cascade,
-        cascade::DbPair,
+        cascade::{error::CascadeResult, Cascade, DbPair},
         dht_op_integration::{
             IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationLimboStore,
             IntegrationLimboValue,
@@ -16,15 +14,13 @@ use crate::core::{
         validation_db::ValidationLimboStore,
         workspace::{Workspace, WorkspaceResult},
     },
-    validation::DhtOpOrder,
-    validation::OrderedOp,
+    validation::{DhtOpOrder, OrderedOp},
 };
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::{DhtOpHash, EntryHash, HeaderHash};
 use holochain_state::{
-    buffer::BufferedStore,
-    buffer::KvBufFresh,
+    buffer::{BufferedStore, KvBufFresh},
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
     error::DatabaseResult,
     fresh_reader,
@@ -38,9 +34,11 @@ use holochain_types::{
     Entry, EntryHashed, Timestamp,
 };
 use holochain_zome_types::{
-    element::ElementEntry, query::ChainHead, query::ChainStatus, signature::Signature,
+    element::{ElementEntry, SignedHeader},
+    query::{ChainHead, ChainStatus},
+    signature::Signature,
+    Header,
 };
-use holochain_zome_types::{element::SignedHeader, Header};
 use produce_dht_ops_workflow::dht_op_light::{
     error::{DhtOpConvertError, DhtOpConvertResult},
     light_to_op,
@@ -257,7 +255,7 @@ fn update_validation_status(
     match op {
         DhtOp::StoreElement(_, h, _) => meta_integrated.register_rejected_element_header(h)?,
         DhtOp::StoreEntry(_, h, _) => meta_integrated.register_rejected_header(h.clone())?,
-        _ => (),
+        _ => {}
     }
     Ok(())
 }
@@ -269,7 +267,7 @@ async fn op_dependencies_held(
 ) -> CascadeResult<bool> {
     {
         match op {
-            DhtOp::StoreElement(_, _, _) | DhtOp::StoreEntry(_, _, _) => (),
+            DhtOp::StoreElement(_, _, _) | DhtOp::StoreEntry(_, _, _) => {}
             DhtOp::RegisterAgentActivity(_, header) => {
                 // RegisterAgentActivity is the exception where we need to make
                 // sure that we have integrated the previous RegisterAgentActivity DhtOp

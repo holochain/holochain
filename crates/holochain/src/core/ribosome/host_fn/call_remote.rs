@@ -38,9 +38,8 @@ pub fn call_remote(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::conductor::dna_store::MockDnaStore;
     use crate::conductor::interface::websocket::test::setup_app;
-    use crate::core::ribosome::ZomeCallInvocation;
+    use crate::conductor::{api::ZomeCall, dna_store::MockDnaStore};
     use crate::core::ribosome::ZomeCallResponse;
     use hdk3::prelude::*;
     use holochain_types::app::InstalledCell;
@@ -127,7 +126,7 @@ pub mod wasm_test {
         // BOB INIT (to do cap grant)
 
         let _ = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: bob_cell_id,
                 zome_name: TestWasm::WhoAmI.into(),
                 cap: None,
@@ -141,7 +140,7 @@ pub mod wasm_test {
         // ALICE DOING A CALL
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id,
                 zome_name: TestWasm::WhoAmI.into(),
                 cap: None,

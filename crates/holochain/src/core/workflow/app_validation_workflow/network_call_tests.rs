@@ -19,16 +19,17 @@ use test_wasm_common::AgentActivitySearch;
 
 use crate::{
     conductor::ConductorHandle,
-    core::state::cascade::Cascade,
-    core::state::cascade::DbPair,
-    core::state::cascade::DbPairMut,
-    core::state::element_buf::ElementBuf,
-    core::state::metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
-    test_utils::host_fn_api::Post,
-    test_utils::{conductor_setup::CellHostFnCaller, new_invocation, wait_for_integration},
-};
-use crate::{
-    core::state::source_chain::SourceChain, test_utils::conductor_setup::ConductorTestData,
+    core::state::{
+        cascade::{Cascade, DbPair, DbPairMut},
+        element_buf::ElementBuf,
+        metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
+        source_chain::SourceChain,
+    },
+    test_utils::{
+        conductor_setup::{CellHostFnCaller, ConductorTestData},
+        host_fn_caller::Post,
+        new_zome_call, wait_for_integration,
+    },
 };
 
 const NUM_COMMITS: usize = 5;
@@ -488,7 +489,7 @@ async fn get_custom_package_test() {
     let bob_call_data = conductor_test.bob_call_data().unwrap();
     let alice_cell_id = &alice_call_data.cell_id;
 
-    let invocation = new_invocation(
+    let invocation = new_zome_call(
         &alice_cell_id,
         "commit_artist",
         (),
@@ -499,7 +500,7 @@ async fn get_custom_package_test() {
 
     assert_matches!(result, Err(_));
 
-    let invocation = new_invocation(
+    let invocation = new_zome_call(
         &alice_cell_id,
         "commit_songs",
         (),
@@ -510,7 +511,7 @@ async fn get_custom_package_test() {
 
     assert_matches!(result, ZomeCallResponse::Ok(_));
 
-    let invocation = new_invocation(
+    let invocation = new_zome_call(
         &alice_cell_id,
         "commit_artist",
         (),
@@ -644,7 +645,7 @@ async fn get_agent_activity_host_fn_test() {
         query: ChainQueryFilter::new(),
         request: ActivityRequest::Full,
     };
-    let invocation = new_invocation(
+    let invocation = new_zome_call(
         &alice_call_data.cell_id,
         "get_activity",
         search,
@@ -669,7 +670,7 @@ async fn commit_some_data(
     // Commit 5 entries
     for _ in 0..NUM_COMMITS {
         let invocation =
-            new_invocation(&alice_call_data.cell_id, call, (), TestWasm::Create).unwrap();
+            new_zome_call(&alice_call_data.cell_id, call, (), TestWasm::Create).unwrap();
         let result = handle.call_zome(invocation).await.unwrap().unwrap();
         let result = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
             .clone()
@@ -721,7 +722,7 @@ async fn slow_lmdb_reads_test() {
     // Commit some data to put some load on the network
     let mut invocations = vec![];
     invocations.push(
-        new_invocation(
+        new_zome_call(
             &alice_call_data.cell_id,
             "create_entry",
             (),
@@ -729,11 +730,10 @@ async fn slow_lmdb_reads_test() {
         )
         .unwrap(),
     );
+    invocations
+        .push(new_zome_call(&alice_call_data.cell_id, "create_msg", (), TestWasm::Create).unwrap());
     invocations.push(
-        new_invocation(&alice_call_data.cell_id, "create_msg", (), TestWasm::Create).unwrap(),
-    );
-    invocations.push(
-        new_invocation(
+        new_zome_call(
             &alice_call_data.cell_id,
             "create_priv_msg",
             (),
@@ -746,7 +746,7 @@ async fn slow_lmdb_reads_test() {
             let r = handle.call_zome(invocation.clone()).await.unwrap().unwrap();
             assert_matches!(r, ZomeCallResponse::Ok(_));
         }
-        let invocation = new_invocation(
+        let invocation = new_zome_call(
             &alice_call_data.cell_id,
             "create_post",
             Post(format!("{}", i)),

@@ -30,7 +30,7 @@ pub mod wasm_test {
     use super::debug;
 
     use crate::fixt::CallContextFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
@@ -42,7 +42,7 @@ pub mod wasm_test {
     /// we can get an entry hash out of the fn directly
     #[tokio::test(threaded_scheduler)]
     async fn debug_test() {
-        let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
+        let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
         let call_context = CallContextFixturator::new(fixt::Unpredictable)

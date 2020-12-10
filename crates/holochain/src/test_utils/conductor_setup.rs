@@ -1,14 +1,13 @@
 #![allow(missing_docs)]
 
-use super::{host_fn_api::HostFnCaller, install_app, setup_app_inner};
+use super::{host_fn_caller::HostFnCaller, install_app, setup_app_inner};
 use crate::{
     conductor::{
         api::{CellConductorApi, CellConductorApiT},
         interface::SignalBroadcaster,
         ConductorHandle,
     },
-    core::queue_consumer::InitialQueueTriggers,
-    core::ribosome::{wasm_ribosome::WasmRibosome, RibosomeT},
+    core::{queue_consumer::InitialQueueTriggers, ribosome::real_ribosome::RealRibosome},
 };
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_keystore::KeystoreSender;
@@ -19,8 +18,10 @@ use holochain_state::{
     test_utils::{test_environments, TestEnvironments},
 };
 use holochain_types::{
-    app::InstalledCell, cell::CellId, dna::DnaDef, dna::DnaFile, test_utils::fake_agent_pubkey_1,
-    test_utils::fake_agent_pubkey_2,
+    app::InstalledCell,
+    cell::CellId,
+    dna::{DnaDef, DnaFile},
+    test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2},
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::zome::ZomeName;
@@ -32,7 +33,7 @@ use tempdir::TempDir;
 pub struct CellHostFnCaller {
     pub cell_id: CellId,
     pub env: EnvironmentWrite,
-    pub ribosome: WasmRibosome,
+    pub ribosome: RealRibosome,
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
     pub signal_tx: SignalBroadcaster,
@@ -50,7 +51,7 @@ impl CellHostFnCaller {
         let triggers = handle.get_cell_triggers(cell_id).await.unwrap();
         let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 
-        let ribosome = WasmRibosome::new(dna_file.clone());
+        let ribosome = RealRibosome::new(dna_file.clone());
         let signal_tx = handle.signal_broadcaster().await;
         CellHostFnCaller {
             cell_id: cell_id.clone(),
@@ -204,7 +205,7 @@ impl ConductorTestData {
         let dna_file = self.alice_call_data().ribosome.dna_file().clone();
         if self.bob_call_data().is_none() {
             let bob_agent_id = fake_agent_pubkey_2();
-            let bob_cell_id = CellId::new(dna_file.dna_hash.clone(), bob_agent_id.clone());
+            let bob_cell_id = CellId::new(dna_file.dna_hash().clone(), bob_agent_id.clone());
             let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
             let cell_data = vec![(bob_installed_cell, None)];
             install_app("bob_app", cell_data, vec![dna_file.clone()], self.handle()).await;

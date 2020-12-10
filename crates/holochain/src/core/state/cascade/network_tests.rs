@@ -7,9 +7,10 @@ use crate::{
             element_buf::ElementBuf,
             metadata::{MetadataBuf, MetadataBufT},
         },
-        workflow::integrate_dht_ops_workflow::integrate_single_metadata,
-        workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult,
-        workflow::CallZomeWorkspace,
+        workflow::{
+            integrate_dht_ops_workflow::integrate_single_metadata,
+            produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult, CallZomeWorkspace,
+        },
     },
     test_utils::test_network,
 };
@@ -18,10 +19,7 @@ use fallible_iterator::FallibleIterator;
 use futures::future::{Either, FutureExt};
 use ghost_actor::GhostControlSender;
 use hdk3::prelude::EntryVisibility;
-use holo_hash::{
-    hash_type::{self, AnyDht},
-    AnyDhtHash, EntryHash, HasHash, HeaderHash,
-};
+use holo_hash::{hash_type, hash_type::AnyDht, AnyDhtHash, EntryHash, HasHash, HeaderHash};
 use holochain_p2p::{
     actor::{GetLinksOptions, GetMetaOptions, GetOptions},
     HolochainP2pCell, HolochainP2pRef,
@@ -37,8 +35,7 @@ use holochain_types::{
     cell::CellId,
     dht_op::produce_op_lights_from_elements,
     dna::{DnaDef, DnaFile},
-    element::ElementStatus,
-    element::{Element, GetElementResponse, WireElement},
+    element::{Element, ElementStatus, GetElementResponse, WireElement},
     entry::option_entry_hashed,
     fixt::*,
     metadata::{MetadataSet, TimedHeaderHash},
@@ -55,13 +52,15 @@ use holochain_zome_types::{
     validate::ValidationStatus,
 };
 use maplit::btreeset;
-use std::collections::BTreeMap;
-use std::convert::{TryFrom, TryInto};
+use std::{
+    collections::BTreeMap,
+    convert::{TryFrom, TryInto},
+};
 use tokio::{sync::oneshot, task::JoinHandle};
 use tracing::*;
 use unwrap_to::unwrap_to;
 
-use crate::test_utils::host_fn_api::*;
+use crate::test_utils::host_fn_caller::*;
 
 /*
 #[tokio::test(threaded_scheduler)]
