@@ -282,6 +282,7 @@ pub mod test {
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
     #[serde(rename_all = "snake_case", tag = "type", content = "data")]
+    // NB: intentionally misspelled to test for serialization errors :)
     enum AdmonRequest {
         InstallsDna(String),
     }
@@ -605,7 +606,7 @@ pub mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::AppInterfaceAttached{ .. });
+            assert_matches!(response, AdminResponse::AppInterfaceAttached { .. });
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);

@@ -50,7 +50,7 @@ pub async fn dump_cell_state(
     kv!("metadata cache - links", CACHE_LINKS_META);
     kv!("metadata cache - status", CACHE_STATUS_META);
 
-    kv!("integration queue", integration_limbo);
+    kv!("integration queue", INTEGRATION_LIMBO);
     kv!("integrated dht ops", INTEGRATED_DHT_OPS);
     kv!("authored dht ops", AUTHORED_DHT_OPS);
 

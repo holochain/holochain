@@ -4,7 +4,6 @@ use hdk3::prelude::{CellId, WasmError};
 use holo_hash::AgentPubKey;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::env::EnvironmentWrite;
 use holochain_types::{
     app::InstalledCell,
     dna::{DnaDef, DnaFile},
@@ -16,10 +15,7 @@ use matches::assert_matches;
 use tempdir::TempDir;
 
 use crate::{
-    conductor::{
-        p2p_store::{all_agent_infos, inject_agent_infos},
-        ConductorHandle,
-    },
+    conductor::{p2p_store::exchange_peer_info, ConductorHandle},
     core::ribosome::error::{RibosomeError, RibosomeResult},
     test_utils::{install_app, new_zome_call, setup_app_with_network},
 };
@@ -139,18 +135,6 @@ async fn call_each_other(
         }
     }
     results
-}
-
-fn exchange_peer_info(envs: Vec<EnvironmentWrite>) {
-    for (i, a) in envs.iter().enumerate() {
-        for (j, b) in envs.iter().enumerate() {
-            if i == j {
-                continue;
-            }
-            inject_agent_infos(a.clone(), all_agent_infos(b.clone().into()).unwrap()).unwrap();
-            inject_agent_infos(b.clone(), all_agent_infos(a.clone().into()).unwrap()).unwrap();
-        }
-    }
 }
 
 #[derive(Shrinkwrap, Clone)]

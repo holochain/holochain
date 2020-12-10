@@ -67,26 +67,25 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                     .await?,
             )),
             AppRequest::ZomeCallInvocation(call) => {
-                tracing::warn!("AppRequest::ZomeCallInvocation is deprecated, use AppRequest::ZomeCall (TODO: update conductor-api)");
+                tracing::warn!(
+                    "AppRequest::ZomeCallInvocation is deprecated, use AppRequest::ZomeCall (TODO: update conductor-api)"
+                );
                 self.handle_app_request_inner(AppRequest::ZomeCall(call))
                     .await
                     .map(|r| {
-                        AppResponse::ZomeCallInvocation(
-                            unwrap_to::unwrap_to!(r => AppResponse::ZomeCall).clone(),
-                        )
+                        AppResponse::ZomeCallInvocation(match r {
+                            AppResponse::ZomeCall(zc) => zc,
+                            other => panic!("Found {:?} when ZomeCall was expected", other),
+                        })
                     })
             }
             AppRequest::ZomeCall(call) => {
                 match self.conductor_handle.call_zome(*call.clone()).await? {
-                    Ok(ZomeCallResponse::Ok(output)) => {
-                        Ok(AppResponse::ZomeCall(Box::new(output)))
-                    }
+                    Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCall(Box::new(output))),
                     Ok(ZomeCallResponse::Unauthorized(_, _, _, _)) => Ok(AppResponse::Error(
                         ExternalApiWireError::ZomeCallUnauthorized(format!(
                             "No capabilities grant has been committed that allows the CapSecret {:?} to call the function {} in zome {}",
-                            call.cap,
-                            call.fn_name,
-                            call.zome_name
+                            call.cap, call.fn_name, call.zome_name
                         )),
                     )),
                     Ok(ZomeCallResponse::NetworkError(e)) => unreachable!(

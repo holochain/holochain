@@ -27,7 +27,7 @@ use crate::{
     },
     test_utils::{
         conductor_setup::{CellHostFnCaller, ConductorTestData},
-        host_fn_api::Post,
+        host_fn_caller::Post,
         new_zome_call, wait_for_integration,
     },
 };
