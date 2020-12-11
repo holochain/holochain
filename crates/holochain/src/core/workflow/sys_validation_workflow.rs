@@ -715,7 +715,7 @@ pub struct SysValidationWorkspace {
 }
 
 impl<'a> SysValidationWorkspace {
-    pub fn cascade<Network: HolochainP2pCellT + Clone>(
+    pub fn cascade<Network: HolochainP2pCellT + Clone + Send + 'static>(
         &'a mut self,
         network: Network,
     ) -> Cascade<'a, Network> {
@@ -725,6 +725,8 @@ impl<'a> SysValidationWorkspace {
             &self.meta_authored,
             &self.element_vault,
             &self.meta_vault,
+            &self.element_rejected,
+            &self.meta_rejected,
             &mut self.element_cache,
             &mut self.meta_cache,
             network,
@@ -863,6 +865,8 @@ impl TryFrom<&CallZomeWorkspace> for SysValidationWorkspace {
             meta_authored,
             element_integrated,
             meta_integrated,
+            element_rejected,
+            meta_rejected,
             element_cache,
             meta_cache,
         } = call_zome;
@@ -871,6 +875,8 @@ impl TryFrom<&CallZomeWorkspace> for SysValidationWorkspace {
         sys_val.meta_authored = meta_authored.into();
         sys_val.element_vault = element_integrated.into();
         sys_val.meta_vault = meta_integrated.into();
+        sys_val.element_rejected = element_rejected.into();
+        sys_val.meta_rejected = meta_rejected.into();
         sys_val.element_cache = element_cache.into();
         sys_val.meta_cache = meta_cache.into();
         Ok(sys_val)

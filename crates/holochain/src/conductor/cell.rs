@@ -20,7 +20,7 @@ use crate::{
         state::{
             dht_op_integration::IntegratedDhtOpsBuf,
             element_buf::ElementBuf,
-            metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
+            metadata::{MetadataBuf, MetadataBufT},
             source_chain::{SourceChain, SourceChainBuf},
         },
         workflow::{
@@ -33,7 +33,7 @@ use crate::{
     },
 };
 use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
-use error::{AuthorityDataError, CellError};
+use error::CellError;
 use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use hash_type::AnyDht;
@@ -50,13 +50,13 @@ use holochain_types::{
     cell::CellId,
     element::GetElementResponse,
     link::{GetLinksResponse, WireLinkMetaKey},
-    metadata::{MetadataSet, TimedHeaderHash},
+    metadata::MetadataSet,
     validate::ValidationPackageResponse,
     Timestamp,
 };
 use holochain_zome_types::{
     capability::CapSecret,
-    header::{CreateLink, DeleteLink, EntryType},
+    header::EntryType,
     query::ChainQueryFilter,
     signature::Signature,
     validate::{RequiredValidationType, ValidationPackage, ValidationStatus},
@@ -65,7 +65,6 @@ use holochain_zome_types::{
 };
 use observability::OpenSpanExt;
 use std::{
-    collections::{BTreeMap, BTreeSet},
     convert::TryInto,
     hash::{Hash, Hasher},
 };
@@ -74,7 +73,8 @@ use tracing::*;
 use tracing_futures::Instrument;
 use validation_package::ValidationPackageDb;
 
-mod authority;
+#[allow(missing_docs)]
+pub mod authority;
 mod validation_package;
 
 #[allow(missing_docs)]
@@ -506,6 +506,7 @@ impl Cell {
         dht_hash: holo_hash::AnyDhtHash,
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<GetElementResponse> {
+        debug!("handling get");
         // TODO: Later we will need more get types but for now
         // we can just have these defaults depending on whether or not
         // the hash is an entry or header.
@@ -527,13 +528,13 @@ impl Cell {
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<GetElementResponse> {
         let env = self.env.clone();
-        authority::handle_get_entry(env, hash, options).await
+        authority::handle_get_entry(env, hash, options)
     }
 
     #[tracing::instrument(skip(self))]
     async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
         let env = self.env.clone();
-        authority::handle_get_element(env, hash).await
+        authority::handle_get_element(env, hash)
     }
 
     #[instrument(skip(self, _dht_hash, _options))]
@@ -546,7 +547,7 @@ impl Cell {
         unimplemented!()
     }
 
-    #[instrument(skip(self, _options))]
+    #[instrument(skip(self, options))]
     /// a remote node is asking us for links
     // TODO: Right now we are returning all the full headers
     // We could probably send some smaller types instead of the full headers
@@ -554,61 +555,11 @@ impl Cell {
     fn handle_get_links(
         &self,
         link_key: WireLinkMetaKey,
-        _options: holochain_p2p::event::GetLinksOptions,
+        options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<GetLinksResponse> {
-        // Get the vaults
-        let env_ref = self.env.guard();
-        let reader = env_ref.reader()?;
-        let element_vault = ElementBuf::vault(self.env.clone().into(), false)?;
-        let meta_vault = MetadataBuf::vault(self.env.clone().into())?;
         debug!(id = ?self.id());
-
-        let links = meta_vault
-            .get_links_all(&reader, &LinkMetaKey::from(&link_key))?
-            .map(|link_add| {
-                // Collect the link removes on this link add
-                let link_removes = meta_vault
-                    .get_link_removes_on_link_add(&reader, link_add.link_add_hash.clone())?
-                    .collect::<BTreeSet<_>>()?;
-                // Create timed header hash
-                let link_add = TimedHeaderHash {
-                    timestamp: link_add.timestamp,
-                    header_hash: link_add.link_add_hash,
-                };
-                // Return all link removes with this link add
-                Ok((link_add, link_removes))
-            })
-            .collect::<BTreeMap<_, _>>()?;
-
-        // Get the headers from the element stores
-        let mut result_adds: Vec<(CreateLink, Signature)> = Vec::with_capacity(links.len());
-        let mut result_removes: Vec<(DeleteLink, Signature)> = Vec::with_capacity(links.len());
-        for (link_add, link_removes) in links {
-            if let Some(link_add) = element_vault.get_header(&link_add.header_hash)? {
-                for link_remove in link_removes {
-                    if let Some(link_remove) = element_vault.get_header(&link_remove.header_hash)? {
-                        let (h, s) = link_remove.into_header_and_signature();
-                        let h = h
-                            .into_content()
-                            .try_into()
-                            .map_err(AuthorityDataError::from)?;
-                        result_removes.push((h, s));
-                    }
-                }
-                let (h, s) = link_add.into_header_and_signature();
-                let h = h
-                    .into_content()
-                    .try_into()
-                    .map_err(AuthorityDataError::from)?;
-                result_adds.push((h, s));
-            }
-        }
-
-        // Return the links
-        Ok(GetLinksResponse {
-            link_adds: result_adds,
-            link_removes: result_removes,
-        })
+        let env = self.env.clone();
+        authority::handle_get_links(env.into(), link_key, options)
     }
 
     #[instrument(skip(self, options))]
