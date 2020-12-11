@@ -377,14 +377,6 @@ impl InternalHandler for InnerListen {
         // and the channel create will re-use that.
         // If it is not, it will try to create a new connection that may fail.
         let fut = match proxy_to {
-            /*
-             * erm... This code make a new outgoing connection...
-             *        that's not what proxying is about
-             *        removing this and throwing an error
-            None => self
-                .i_s
-                .create_low_level_channel(dest_proxy_url.as_base().clone()),
-            */
             None => {
                 tracing::warn!("Dropping message for {}", dest_proxy_url.as_full_str());
                 return Ok(async move {
