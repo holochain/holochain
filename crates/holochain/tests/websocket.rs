@@ -345,7 +345,8 @@ async fn call_zome() {
     assert_matches!(response, AdminResponse::AppActivated);
 
     // Attach App Interface
-    let app_port = attach_app_interface(&mut client, &mut holochain, Some(app_port)).await;
+    let app_port_rcvd = attach_app_interface(&mut client, &mut holochain, Some(app_port)).await;
+    assert_eq!(app_port, app_port_rcvd);
 
     // Call Zome
     call_foo_fn(app_port, original_dna_hash.clone(), &mut holochain).await;
@@ -369,6 +370,8 @@ async fn call_zome() {
 
     // Call zome after resart
     let mut holochain = start_holochain(config_path).await;
+
+    tokio::time::delay_for(std::time::Duration::from_millis(1000)).await;
 
     // Call Zome again on the existing app interface port
     call_foo_fn(app_port, original_dna_hash, &mut holochain).await;
