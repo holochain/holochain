@@ -66,7 +66,7 @@ macro_rules! entry_def {
             fn try_from(entry: &$crate::prelude::Entry) -> Result<Self, Self::Error> {
                 match entry {
                     $crate::prelude::Entry::App(eb) => Ok(Self::try_from(
-                        $crate::prelude::SerializedBytes::from(eb.to_owned()),
+                        $crate::prelude::SerializedBytes::try_from(eb.to_owned())?,
                     )?),
                     _ => Err($crate::prelude::SerializedBytesError::FromBytes(format!(
                         "{:?} is not an Entry::App so has no serialized bytes",

@@ -40,12 +40,21 @@ rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
 #rkv = { path = "../../rust/rkv" }
 lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }
 #lmdb-rkv = { path = "../../rust/lmdb-rs" }
-# holochain_wasmer_guest = { path = "../holochain-wasmer/crates/guest" }
 # ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 # ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "add_observability" }
 # lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "bump_ga" }
 # lair_keystore_client = { git = "https://github.com/holochain/lair.git", branch = "bump_ga" }
 # lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
 # lair_keystore_client = { path = "../lair/crates/lair_keystore_client" }
-# observability = { path = "../../rust/observability" }
 tokio_safe_block_on = { git = "https://github.com/neonphog/tokio_safe_block_on.git", branch = "fix_holochain_bug" }
+
+#holochain_json_api                = { git = "https://github.com/pjkundert/holochain-serialization.git", branch = "update-syn" }
+#holochain_json_derive             = { git = "https://github.com/pjkundert/holochain-serialization.git", branch = "update-syn" }
+holochain_serialized_bytes        = { git = "https://github.com/pjkundert/holochain-serialization.git", branch = "update-syn" }
+holochain_serialized_bytes_derive = { git = "https://github.com/pjkundert/holochain-serialization.git", branch = "update-syn" }
+
+holochain_wasmer_guest            = { git = "https://github.com/pjkundert/holochain-wasmer.git",        branch = "update-syn" }
+holochain_wasmer_common           = { git = "https://github.com/pjkundert/holochain-wasmer.git",        branch = "update-syn" }
+holochain_wasmer_host             = { git = "https://github.com/pjkundert/holochain-wasmer.git",        branch = "update-syn" }
+
+observability                     = { git = "https://github.com/pjkundert/observability.git",           branch = "update-syn" }
