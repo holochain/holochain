@@ -7,93 +7,49 @@
 , holonix
 , hcRustPlatform
 , hcToplevelDir
-, hcTargetPrefixEval
+, nixEnvPrefixEval
 , pkgs
 }:
 
 let
-  inherit (lib.attrsets) mapAttrsToList mapAttrs;
+  hcMkShell = input: mkShell {
+    # mkShell reverses the inputs list, which breaks order-sensitive shellHooks
+    inputsFrom = lib.reverseList [
+      { shellHook = nixEnvPrefixEval; }
 
-  commonShellHook = ''
-    ${hcTargetPrefixEval}
-    echo Using "$HC_TARGET_PREFIX" as target prefix...
+      holonix.shell
 
-    export CARGO_TARGET_DIR="$HC_TARGET_PREFIX/target"
-    export CARGO_CACHE_RUSTC_INFO=1
-    export CARGO_HOME="$HC_TARGET_PREFIX/.cargo"
-    export CARGO_INSTALL_ROOT="$HC_TARGET_PREFIX/.cargo"
-    # FIXME: we currently rely on lair-keystore being installed and found here by `holochain`
-    export PATH="$PATH:$CARGO_INSTALL_ROOT/bin"
+      { shellHook = ''
+        echo Using "$NIX_ENV_PREFIX" as target prefix...
 
-    export HC_TEST_WASM_DIR="$HC_TARGET_PREFIX/.wasm_target"
-    mkdir -p $HC_TEST_WASM_DIR
+        export HC_TEST_WASM_DIR="$NIX_ENV_PREFIX/.wasm_target"
+        mkdir -p $HC_TEST_WASM_DIR
 
-    export HC_WASM_CACHE_PATH="$HC_TARGET_PREFIX/.wasm_cache"
-    mkdir -p $HC_WASM_CACHE_PATH
+        export HC_WASM_CACHE_PATH="$NIX_ENV_PREFIX/.wasm_cache"
+        mkdir -p $HC_WASM_CACHE_PATH
+      ''; }
 
-    export RUSTFLAGS="${holonix.rust.compile.stable-flags}"
-  ''
-    # TODO: make thinlto linking work on stable
-    # export RUSTFLAGS="$RUSTFLAGS -C linker-plugin-lto -C linker=${holonix.pkgs.clang_10}/bin/clang -C link-arg=-fuse-ld=${holonix.pkgs.lld}/bin/lld"
-    ;
-
-  applicationPkgsInputs = {
-    build = mapAttrsToList (name: value:
-      value.buildInputs
-    ) pkgs.applications;
-
-    nativeBuild = mapAttrsToList (name: value:
-      value.nativeBuildInputs
-    ) pkgs.applications;
+      input
+    ];
   };
-
-  devPkgsLists =
-    mapAttrs (name: value:
-      mapAttrsToList (name': value':
-        value'
-      ) value
-    ) pkgs.dev;
 in
 
 rec {
-  # TODO: after downsizing holonix.shell, refactor this and use it as a foundation for all the following
-  # legacy = stdenv.mkDerivation (holonix.shell // {
-  #   shellHook = lib.concatStrings [
-  #     holonix.shell.shellHook
-  #     commonShellHook
-  #   ];
-
-  # TODO: clarify if these are still needed by anything/anyone
-  #   buildInputs = with holonix.pkgs; [
-  #       gnuplot
-  #       flamegraph
-  #       fd
-  #       ngrok
-  #       jq
-  #     ]
-  #     ++ holonix.shell.buildInputs
-  #     ++ devPkgsList
-  #     ;
-  # });
-
-  coreDev = mkShell {
-    nativeBuildInputs = applicationPkgsInputs.nativeBuild;
-    buildInputs = applicationPkgsInputs.build
-      ++ devPkgsLists.core
-      ;
-    shellHook = commonShellHook;
+  # shell for HC core development. included dependencies:
+  # * everything needed to compile this repos' crates
+  # * CI scripts
+  coreDev = hcMkShell {
+    nativeBuildInputs = builtins.attrValues (pkgs.core);
   };
 
   # we may need more packages on CI
   ci = coreDev;
 
-  happDev = mkShell {
-    nativeBuildInputs = applicationPkgsInputs.nativeBuild;
-    buildInputs = applicationPkgsInputs.build
-      # ++ devPkgsLists.core
-      ++ devPkgsLists.happ
-      ;
-    shellHook = commonShellHook;
+  happDev = hcMkShell {
+    inputsFrom = [
+      (builtins.removeAttrs coreDev [ "shellHook" ])
+    ];
+    nativeBuildInputs = builtins.attrValues pkgs.happ;
   };
 
   coreDevRustup = coreDev.overrideAttrs (attrs: {
