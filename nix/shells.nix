@@ -18,10 +18,13 @@ let
     ${hcTargetPrefixEval}
     echo Using "$HC_TARGET_PREFIX" as target prefix...
 
-    export CARGO_TARGET_DIR="''${HC_TARGET_PREFIX}/target"
-    export HC_TEST_WASM_DIR="''${HC_TARGET_PREFIX}/.wasm_target"
-    mkdir -p $HC_TEST_WASM_DIR
+    export CARGO_TARGET_DIR="$HC_TARGET_PREFIX/target"
     export CARGO_CACHE_RUSTC_INFO=1
+    export CARGO_HOME="$HC_TARGET_PREFIX/.cargo"
+    export CARGO_INSTALL_ROOT="$HC_TARGET_PREFIX/.cargo"
+
+    export HC_TEST_WASM_DIR="$HC_TARGET_PREFIX/.wasm_target"
+    mkdir -p $HC_TEST_WASM_DIR
 
     export HC_WASM_CACHE_PATH="$HC_TARGET_PREFIX/.wasm_cache"
     mkdir -p $HC_WASM_CACHE_PATH
