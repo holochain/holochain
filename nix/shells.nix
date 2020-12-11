@@ -2,6 +2,7 @@
 , stdenv
 , mkShell
 , rustup
+, coreutils
 
 , holonix
 , hcRustPlatform
@@ -13,7 +14,19 @@ let
   inherit (lib.attrsets) mapAttrsToList;
 
   commonShellHook = ''
-    export HC_TARGET_PREFIX=''${NIX_ENV_PREFIX:-${builtins.toString hcToplevelDir}}
+    if [[ -n "$NIX_ENV_PREFIX" ]]; then
+      export HC_TARGET_PREFIX="$NIX_ENV_PREFIX"
+    elif test -d "${builtins.toString hcToplevelDir}" &&
+         test -w "${builtins.toString hcToplevelDir}"; then
+      export HC_TARGET_PREFIX="${builtins.toString hcToplevelDir}"
+    elif test -d "$HOME" && test -w "$HOME"; then
+      export HC_TARGET_PREFIX="$HOME/.cache/holochain-dev"
+      mkdir -p "$HC_TARGET_PREFIX"
+    else
+      export HC_TARGET_PREFIX="$(${coreutils}/bin/mktemp -d)"
+    fi
+    echo Using "$HC_TARGET_PREFIX" as target prefix...
+
     export CARGO_TARGET_DIR="''${HC_TARGET_PREFIX}/target"
     export HC_TEST_WASM_DIR="''${HC_TARGET_PREFIX}/.wasm_target"
     mkdir -p $HC_TEST_WASM_DIR

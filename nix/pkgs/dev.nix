@@ -12,9 +12,11 @@ rec {
   hnRustClippy = builtins.elemAt (callPackage "${holonixPath}/rust/clippy" {}).buildInputs 0;
   hnRustFmtCheck = builtins.elemAt (callPackage "${holonixPath}/rust/fmt/check" {}).buildInputs 0;
 
-  hcRun = writeShellScriptBin "hc-run" ''
-    pushd ${hcToplevelDir}
-    cargo run --manifest-path=crates/holochain/Cargo.toml -- $@
+  hcRunCrate = writeShellScriptBin "hc-run-crate" ''
+    set -x
+    crate=''${1:?The first argument needs to define the crate name}
+    shift
+    cargo run --target-dir=''${HC_TARGET_PREFIX:?} --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml -- $@
   '';
 
   hcTest = writeShellScriptBin "hc-test" ''
