@@ -18,13 +18,11 @@ use tracing::debug_span;
 
 use crate::{
     conductor::p2p_store::all_agent_infos,
-    conductor::p2p_store::inject_agent_infos,
-    conductor::ConductorHandle,
-    core::ribosome::error::RibosomeError,
-    core::ribosome::error::RibosomeResult,
-    test_utils::host_fn_api::Post,
+    conductor::{p2p_store::exchange_peer_info, ConductorHandle},
+    core::ribosome::error::{RibosomeError, RibosomeResult},
     test_utils::{
-        install_app, new_zome_call, setup_app_with_network, wait_for_integration_with_others,
+        host_fn_caller::Post, install_app, new_zome_call, setup_app_with_network,
+        wait_for_integration_with_others,
     },
 };
 use shrinkwraprs::Shrinkwrap;
@@ -437,18 +435,6 @@ async fn check_gossip(
         tracing::debug!("Checking hash {:?} for {}", hash, i);
         tracing::debug!(?result);
         assert_matches!(result.into_inner(), Some(_));
-    }
-}
-
-fn exchange_peer_info(envs: Vec<EnvironmentWrite>) {
-    for (i, a) in envs.iter().enumerate() {
-        for (j, b) in envs.iter().enumerate() {
-            if i == j {
-                continue;
-            }
-            inject_agent_infos(a.clone(), all_agent_infos(b.clone().into()).unwrap()).unwrap();
-            inject_agent_infos(b.clone(), all_agent_infos(a.clone().into()).unwrap()).unwrap();
-        }
     }
 }
 
