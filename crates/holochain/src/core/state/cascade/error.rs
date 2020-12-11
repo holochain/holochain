@@ -1,5 +1,9 @@
-use crate::core::{
-    workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError, SourceChainError,
+use crate::{
+    conductor::CellError,
+    core::{
+        workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError,
+        SourceChainError,
+    },
 };
 use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pError;
@@ -17,6 +21,9 @@ pub enum CascadeError {
 
     #[error(transparent)]
     ElementGroupError(#[from] ElementGroupError),
+
+    #[error(transparent)]
+    CellError(#[from] Box<CellError>),
 
     #[error(transparent)]
     DhtOpConvertError(#[from] DhtOpConvertError),
