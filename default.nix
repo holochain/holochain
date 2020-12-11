@@ -28,6 +28,20 @@ let
 
       hcToplevelDir = builtins.toString ./.;
 
+      hcTargetPrefixEval = ''
+        if [[ -n "$NIX_ENV_PREFIX" ]]; then
+          export HC_TARGET_PREFIX="$NIX_ENV_PREFIX"
+        elif test -d "${builtins.toString self.hcToplevelDir}" &&
+            test -w "${builtins.toString self.hcToplevelDir}"; then
+          export HC_TARGET_PREFIX="${builtins.toString self.hcToplevelDir}"
+        elif test -d "$HOME" && test -w "$HOME"; then
+          export HC_TARGET_PREFIX="$HOME/.cache/holochain-dev"
+          mkdir -p "$HC_TARGET_PREFIX"
+        else
+          export HC_TARGET_PREFIX="$(${self.coreutils}/bin/mktemp -d)"
+        fi
+      '';
+
       inherit (holonix.pkgs.callPackage ./nix/rust.nix { }) hcRustPlatform;
     })
   ];
