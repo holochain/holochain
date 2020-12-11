@@ -41,7 +41,7 @@ use holochain_zome_types::{
     query::{ChainQueryFilter, ChainStatus},
     validate::{ValidationPackage, ValidationStatus},
 };
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use tracing::*;
 use tracing_futures::Instrument;
 
@@ -1575,7 +1575,7 @@ where
         fresh_reader!(env, |r| {
             // Meta Cache
             // Return any links from the meta cache that don't have removes.
-            Ok(cache_data
+            let mut links = cache_data
                 .meta
                 .get_live_links(&r, key)?
                 .map(|l| Ok(l.into_link()))
@@ -1587,9 +1587,10 @@ where
                 )
                 // Need to collect into a Set first to remove
                 // duplicates from authored and cache
-                .collect::<HashSet<_>>()?
-                .into_iter()
-                .collect())
+                .collect::<Vec<_>>()?;
+            links.sort_by_key(|l| l.timestamp);
+            links.dedup();
+            Ok(links)
         })
     }
 

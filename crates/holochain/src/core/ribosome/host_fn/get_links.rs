@@ -45,10 +45,16 @@ pub fn get_links<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::{
+        fixt::ZomeCallHostAccessFixturator,
+        test_utils::{
+            conductor_setup::ConductorTestData, new_zome_call, wait_for_integration_10s, WaitOps,
+        },
+    };
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
+    use matches::assert_matches;
     use test_wasm_common::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -122,8 +128,8 @@ pub mod slow_tests {
 
         let links = children_output.into_inner();
         assert_eq!(2, links.len());
-        assert_eq!(links[0].target, foo_baz,);
-        assert_eq!(links[1].target, foo_bar,);
+        assert_eq!(links[0].target, foo_bar,);
+        assert_eq!(links[1].target, foo_baz,);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -240,5 +246,57 @@ pub mod slow_tests {
             AnchorTags(vec!["bar".to_string(), "baz".to_string()]),
             list_anchor_tags_output,
         );
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn dup_path_test() {
+        observability::test_run().ok();
+        let zomes = vec![TestWasm::Link];
+        let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
+        let handle = conductor_test.handle();
+        let alice_call_data = &conductor_test.alice_call_data();
+
+        let invocation = new_zome_call(
+            &alice_call_data.cell_id,
+            "commit_existing_path",
+            (),
+            TestWasm::Link,
+        )
+        .unwrap();
+        let result = handle.call_zome(invocation).await.unwrap().unwrap();
+        assert_matches!(result, ZomeCallResponse::Ok(_));
+        let invocation = new_zome_call(
+            &alice_call_data.cell_id,
+            "commit_existing_path",
+            (),
+            TestWasm::Link,
+        )
+        .unwrap();
+        let result = handle.call_zome(invocation).await.unwrap().unwrap();
+        assert_matches!(result, ZomeCallResponse::Ok(_));
+
+        let mut expected_count = WaitOps::start() + WaitOps::path(1);
+        // Plus one length path for the commit existing.
+        expected_count += WaitOps::ENTRY + WaitOps::LINK;
+
+        wait_for_integration_10s(&alice_call_data.env, expected_count).await;
+
+        let invocation = new_zome_call(
+            &alice_call_data.cell_id,
+            "get_long_path",
+            (),
+            TestWasm::Link,
+        )
+        .unwrap();
+
+        let result = handle.call_zome(invocation).await.unwrap().unwrap();
+        let result: hdk3::prelude::Links = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+            .clone()
+            .into_inner()
+            .try_into()
+            .unwrap();
+        let links = result.into_inner();
+        assert_eq!(links.len(), 1);
+        conductor_test.shutdown_conductor().await;
     }
 }
