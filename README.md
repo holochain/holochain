@@ -19,13 +19,13 @@ We will be frequently and heavily restructuring code APIs and data chains until 
 
 **We are currently only supporting Linux at this time**. You may or may not be able to successfully build and run Holochain on macOS. You definitely won't be able to on Windows (unless you are using WSL, but even that is untested). We will definitely be rolling out support for these OSes in the future, but in the meantime please use Linux for development!
 
-## To Build Binaries
+## Making the Holochain binaries available in your shell
 
+### Using nix-shell on a local clone
 Assuming you have [installed the nix shell](https://nixos.wiki/wiki/Nix_Installation_Guide):
 
 ```
-nix-shell
-hc-install
+nix-shell --argstr flavor happDev
 ```
 
 ## Usage

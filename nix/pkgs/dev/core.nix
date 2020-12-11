@@ -5,19 +5,15 @@
 
 , holonixPath
 , hcToplevelDir
+, hcRunCrate
 }:
 
 rec {
+  inherit hcRunCrate;
+
   # TODO: potentially remove these
   hnRustClippy = builtins.elemAt (callPackage "${holonixPath}/rust/clippy" {}).buildInputs 0;
   hnRustFmtCheck = builtins.elemAt (callPackage "${holonixPath}/rust/fmt/check" {}).buildInputs 0;
-
-  hcRunCrate = writeShellScriptBin "hc-run-crate" ''
-    set -x
-    crate=''${1:?The first argument needs to define the crate name}
-    shift
-    cargo run --target-dir=''${HC_TARGET_PREFIX:?} --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml -- $@
-  '';
 
   hcTest = writeShellScriptBin "hc-test" ''
     set -euxo pipefail

@@ -11,7 +11,7 @@
 }:
 
 let
-  inherit (lib.attrsets) mapAttrsToList;
+  inherit (lib.attrsets) mapAttrsToList mapAttrs;
 
   commonShellHook = ''
     if [[ -n "$NIX_ENV_PREFIX" ]]; then
@@ -51,18 +51,12 @@ let
     ) pkgs.applications;
   };
 
-  devPkgsList = builtins.attrValues pkgs.dev;
-
-  happDevFn = { includeRust ? true }: mkShell {
-    buildInputs = builtins.attrValues (
-      pkgs.applications // (
-        if includeRust
-        then hcRustPlatform.rust
-        else {}
-      )
-    );
-    shellHook = commonShellHook;
-  };
+  devPkgsLists =
+    mapAttrs (name: value:
+      mapAttrsToList (name': value':
+        value'
+      ) value
+    ) pkgs.dev;
 in
 
 rec {
@@ -86,11 +80,10 @@ rec {
   #     ;
   # });
 
-
   coreDev = mkShell {
     nativeBuildInputs = applicationPkgsInputs.nativeBuild;
     buildInputs = applicationPkgsInputs.build
-      ++ devPkgsList
+      ++ devPkgsLists.core
       ;
     shellHook = commonShellHook;
   };
@@ -98,12 +91,13 @@ rec {
   # we may need more packages on CI
   ci = coreDev;
 
-  happDev = happDevFn {
-    includeRust = true;
-  };
-
-  happDevRustExcluded = happDevFn {
-    includeRust = false;
+  happDev = mkShell {
+    nativeBuildInputs = applicationPkgsInputs.nativeBuild;
+    buildInputs = applicationPkgsInputs.build
+      # ++ devPkgsLists.core
+      ++ devPkgsLists.happ
+      ;
+    shellHook = commonShellHook;
   };
 
   coreDevRustup = coreDev.overrideAttrs (attrs: {
