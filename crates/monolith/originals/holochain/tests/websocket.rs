@@ -14,7 +14,7 @@ use holochain_types::prelude::*;
 use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_types::test_utils::write_fake_dna_file;
-use crate::holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::TestWasm;
 use crate::holochain_websocket::*;
 use crate::*;
 use anyhow::Result;

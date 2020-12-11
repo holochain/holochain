@@ -4,9 +4,10 @@
 use crate::holochain::conductor::api::error::ConductorApiError;
 use crate::holochain::conductor::interface::error::InterfaceError;
 use crate::holochain::core::state::cascade::error::CascadeError;
-use crate::holochain::core::state::source_chain::SourceChainError;
+use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
+use holochain_state::source_chain::SourceChainError;
 use holochain_types::dna::error::DnaError;
 use holochain_types::dna::zome::inline_zome::error::InlineZomeError;
 use holochain_wasmer_host::prelude::WasmError;
@@ -93,6 +94,10 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     P2pError(#[from] holochain_p2p::HolochainP2pError),
+
+    /// ident
+    #[error(transparent)]
+    DhtOpConvertError(#[from] Box<DhtOpConvertError>),
 }
 
 impl From<ring::error::Unspecified> for RibosomeError {

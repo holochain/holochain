@@ -31,12 +31,12 @@ pub mod wasm_test {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holo_hash::EntryHash;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::HashEntryInput;
     use holochain_zome_types::HashEntryOutput;
     use std::convert::TryInto;
     use std::sync::Arc;
-    use crate::holochain_test_wasm_common::TestString;
+    use holochain_test_wasm_common::TestString;
 
     #[tokio::test(threaded_scheduler)]
     /// we can get an entry hash out of the fn directly

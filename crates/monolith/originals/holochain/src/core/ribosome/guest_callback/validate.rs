@@ -298,13 +298,13 @@ mod slow_tests {
     use super::ValidateResult;
     use crate::holochain::core::ribosome::RibosomeT;
     use crate::holochain::core::ribosome::ZomesToInvoke;
-    use crate::holochain::core::state::source_chain::SourceChainResult;
     use crate::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::holochain::fixt::curve::Zomes;
     use crate::holochain::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_state::source_chain::SourceChainResult;
+    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::CreateOutput;
     use holochain_zome_types::Entry;
     use std::sync::Arc;
@@ -395,7 +395,8 @@ mod slow_tests {
             .await
             .unwrap();
 
-        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
 
@@ -430,7 +431,8 @@ mod slow_tests {
             .await
             .unwrap();
 
-        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();

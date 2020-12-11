@@ -41,13 +41,13 @@ pub mod wasm_test {
     use crate::holochain::conductor::interface::websocket::test::setup_app;
     use crate::holochain::conductor::{api::ZomeCall, dna_store::MockDnaStore};
     use crate::holochain::core::ribosome::ZomeCallResponse;
+    use hdk3::prelude::*;
     use holochain_types::app::InstalledCell;
     use holochain_types::dna::DnaDef;
     use holochain_types::dna::DnaFile;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
-    use crate::holochain_wasm_test_utils::TestWasm;
-    use hdk3::prelude::*;
+    use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::capability::CapSecret;
     use holochain_zome_types::cell::CellId;
     use holochain_zome_types::ExternInput;

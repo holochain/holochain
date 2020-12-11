@@ -231,7 +231,7 @@ mod tests {
     use holochain_types::dna::wasm::DnaWasmHashed;
     use holochain_types::dna::zome::ZomeDef;
     use holochain_types::test_utils::fake_dna_zomes;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::crdt::CrdtType;
     use holochain_zome_types::entry_def::EntryDef;
     use holochain_zome_types::entry_def::EntryVisibility;

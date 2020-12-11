@@ -241,7 +241,7 @@ mod slow_tests {
     use crate::holochain::fixt::MigrateAgentHostAccessFixturator;
     use crate::holochain::fixt::MigrateAgentInvocationFixturator;
     use crate::holochain::fixt::RealRibosomeFixturator;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_migrate_agent_unimplemented() {

@@ -229,7 +229,7 @@ mod slow_tests {
     use crate::holochain::fixt::curve::Zomes;
     use crate::holochain::fixt::EntryDefsInvocationFixturator;
     use crate::holochain::fixt::RealRibosomeFixturator;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::*;
     use std::collections::BTreeMap;

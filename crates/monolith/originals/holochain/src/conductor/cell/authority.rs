@@ -1,11 +1,11 @@
 use super::error::AuthorityDataError;
 use super::error::CellResult;
 use crate::holochain::conductor::CellError;
-use crate::holochain::core::state::element_buf::ElementBuf;
-use crate::holochain::core::state::metadata::ChainItemKey;
-use crate::holochain::core::state::metadata::LinkMetaKey;
-use crate::holochain::core::state::metadata::MetadataBuf;
-use crate::holochain::core::state::metadata::MetadataBufT;
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::metadata::ChainItemKey;
+use holochain_state::metadata::LinkMetaKey;
+use holochain_state::metadata::MetadataBuf;
+use holochain_state::metadata::MetadataBufT;
 use fallible_iterator::FallibleIterator;
 
 use holo_hash::AgentPubKey;

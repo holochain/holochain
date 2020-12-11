@@ -22,7 +22,8 @@ impl WasmBuf {
     }
 
     pub fn put(&mut self, v: DnaWasmHashed) {
-        self.0.put(v);
+        self.0.put(v)
+        ;
     }
 }
 
@@ -56,7 +57,7 @@ mod tests {
 
         // a wasm
         let wasm = DnaWasmHashed::from_content(DnaWasm::from(
-            crate::holochain_wasm_test_utils::TestWasm::Foo,
+            holochain_wasm_test_utils::TestWasm::Foo,
         ))
         .await;
 

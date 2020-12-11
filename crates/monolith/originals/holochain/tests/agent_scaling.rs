@@ -7,7 +7,7 @@ use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_lmdb::test_utils::test_environments;
 use holochain_types::dna::DnaDef;
 use holochain_types::dna::DnaFile;
-use crate::holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::TestWasm;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::ExternInput;
 use holochain_zome_types::ZomeCallResponse;

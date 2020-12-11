@@ -50,14 +50,6 @@ use crate::holochain::conductor::handle::ConductorHandle;
 use crate::holochain::conductor::p2p_store::AgentKv;
 use crate::holochain::conductor::p2p_store::AgentKvKey;
 use crate::holochain::core::signal::Signal;
-use crate::holochain::core::state::source_chain::SourceChainBuf;
-use crate::holochain::core::state::wasm::WasmBuf;
-use holochain_types::app::InstalledApp;
-use holochain_types::app::InstalledAppId;
-use holochain_types::app::InstalledCell;
-use holochain_types::app::MembraneProof;
-use holochain_types::dna::wasm::DnaWasmHashed;
-use holochain_types::dna::DnaFile;
 pub use builder::*;
 use fallible_iterator::FallibleIterator;
 use futures::future;
@@ -78,6 +70,14 @@ use holochain_lmdb::env::ReadManager;
 use holochain_lmdb::exports::SingleStore;
 use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
+use holochain_state::source_chain::SourceChainBuf;
+use holochain_state::wasm::WasmBuf;
+use holochain_types::app::InstalledApp;
+use holochain_types::app::InstalledAppId;
+use holochain_types::app::InstalledCell;
+use holochain_types::app::MembraneProof;
+use holochain_types::dna::wasm::DnaWasmHashed;
+use holochain_types::dna::DnaFile;
 use holochain_zome_types::cell::CellId;
 use holochain_zome_types::entry_def::EntryDef;
 use kitsune_p2p::agent_store::AgentInfoSigned;
@@ -1122,10 +1122,9 @@ mod builder {
         #[cfg(any(test, feature = "test_utils"))]
         pub async fn test(self, envs: &TestEnvironments) -> ConductorResult<ConductorHandle> {
             let keystore = envs.conductor().keystore();
-            let (holochain_p2p, p2p_evt) = holochain_p2p::spawn_holochain_p2p(
-                self.config.network.clone().unwrap_or_default(),
-            )
-            .await?;
+            let (holochain_p2p, p2p_evt) =
+                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default())
+                    .await?;
             let conductor = Conductor::new(
                 envs.conductor(),
                 envs.wasm(),
@@ -1178,8 +1177,8 @@ pub mod tests {
     use super::ConductorState;
     use super::*;
     use crate::holochain::conductor::dna_store::MockDnaStore;
-    use holochain_types::test_utils::fake_cell_id;
     use holochain_lmdb::test_utils::test_environments;
+    use holochain_types::test_utils::fake_cell_id;
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]

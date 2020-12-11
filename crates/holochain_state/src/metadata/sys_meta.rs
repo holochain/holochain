@@ -7,10 +7,10 @@ pub enum MetaGetStatus<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::holochain::core::state::metadata::EntryDhtStatus;
-    use crate::holochain::core::state::metadata::MetadataBuf;
-    use crate::holochain::core::state::metadata::MetadataBufT;
-    use crate::holochain::core::state::metadata::TimedHeaderHash;
+    use crate::metadata::EntryDhtStatus;
+    use crate::metadata::MetadataBuf;
+    use crate::metadata::MetadataBufT;
+    use crate::metadata::TimedHeaderHash;
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
     use header::Create;

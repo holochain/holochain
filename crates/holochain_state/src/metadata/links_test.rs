@@ -1,11 +1,11 @@
 use super::*;
 use crate::here;
-use crate::holochain::fixt::CreateLinkFixturator;
-use crate::holochain::fixt::DeleteLinkFixturator;
-use crate::holochain::fixt::EntryHashFixturator;
-use crate::holochain::fixt::KnownCreateLink;
-use crate::holochain::fixt::KnownDeleteLink;
-use crate::holochain::fixt::ZomeIdFixturator;
+use holochain_zome_types::fixt::CreateLinkFixturator;
+use holochain_zome_types::fixt::DeleteLinkFixturator;
+use holochain_zome_types::fixt::EntryHashFixturator;
+use holochain_zome_types::fixt::KnownCreateLink;
+use holochain_zome_types::fixt::KnownDeleteLink;
+use holochain_zome_types::fixt::ZomeIdFixturator;
 use observability;
 use ::fixt::prelude::*;
 use holochain_lmdb::buffer::BufferedStore;

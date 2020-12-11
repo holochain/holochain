@@ -1,16 +1,16 @@
 use crate::holochain::core::ribosome::RibosomeT;
 use crate::holochain::core::ribosome::ZomeCallInvocation;
-use holochain_types::dna::zome::Zome;
-use holochain_types::fixt::CapSecretFixturator;
-use crate::holochain_wasm_test_utils::TestWasm;
-use ::fixt::prelude::*;
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::Throughput;
+use fixt::prelude::*;
 use hdk3::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
+use holochain_types::dna::zome::Zome;
+use holochain_types::fixt::CapSecretFixturator;
+use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::ExternInput;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
@@ -70,7 +70,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
 
         group.bench_function(BenchmarkId::from_parameter(n), |b| {
             // bytes
-            let bytes = crate::holochain_test_wasm_common::TestBytes::from(vec![0; n]);
+            let bytes = holochain_test_wasm_common::TestBytes::from(vec![0; n]);
             let sb: SerializedBytes = bytes.try_into().unwrap();
 
             TOKIO_RUNTIME.lock().unwrap().enter(move || {

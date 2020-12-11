@@ -34,16 +34,3 @@
 
 #[allow(missing_docs)]
 pub mod cascade;
-#[allow(missing_docs)]
-pub mod chain_sequence;
-pub mod dht_op_integration;
-#[allow(missing_docs)]
-pub mod element_buf;
-pub mod metadata;
-#[allow(missing_docs)]
-pub mod source_chain;
-pub mod validation_db;
-pub mod validation_receipts_db;
-#[allow(missing_docs)]
-pub mod wasm;
-pub mod workspace;

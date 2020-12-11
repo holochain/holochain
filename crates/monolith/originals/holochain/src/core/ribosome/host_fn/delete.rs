@@ -47,8 +47,7 @@ pub fn delete<'a>(
             workspace.source_chain.elements(),
             &mut workspace.meta_authored,
         )
-        .map_err(Box::new)
-        .map_err(SourceChainError::from)?;
+        .map_err(Box::new)?;
         Ok(DeleteOutput::new(header_hash))
     })
 }
@@ -99,7 +98,7 @@ pub mod wasm_test {
     use hdk3::prelude::*;
     use crate::holochain::core::workflow::CallZomeWorkspace;
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
 
     #[tokio::test(threaded_scheduler)]

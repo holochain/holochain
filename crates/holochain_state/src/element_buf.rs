@@ -7,7 +7,7 @@
 /// using the ElementBuf for caching non-authored data, or for situations where
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
-use crate::holochain::core::state::source_chain::SourceChainResult;
+use crate::source_chain::SourceChainResult;
 use holo_hash::hash_type::AnyDht;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
@@ -325,7 +325,7 @@ where
         self.private_entries.as_ref()
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test_utils"))]
     /// Clear all scratch and db, useful for tests
     pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         self.public_entries.clear_all(writer)?;
@@ -365,12 +365,12 @@ impl<P: PrefixType> BufferedStore for ElementBuf<P> {
 #[cfg(test)]
 mod tests {
     use super::ElementBuf;
-    use crate::holochain::test_utils::fake_unique_element;
     use holo_hash::*;
     use holochain_keystore::test_keystore::spawn_test_keystore;
     use holochain_keystore::AgentPubKeyExt;
     use holochain_lmdb::prelude::*;
     use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_types::test_utils::fake_unique_element;
     use holochain_zome_types::entry_def::EntryVisibility;
 
     #[tokio::test(threaded_scheduler)]

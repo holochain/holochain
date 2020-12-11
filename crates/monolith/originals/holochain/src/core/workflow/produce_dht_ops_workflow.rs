@@ -2,11 +2,11 @@ use super::error::WorkflowResult;
 use crate::holochain::core::queue_consumer::OneshotWriter;
 use crate::holochain::core::queue_consumer::TriggerSender;
 use crate::holochain::core::queue_consumer::WorkComplete;
-use crate::holochain::core::state::dht_op_integration::AuthoredDhtOpsStore;
-use crate::holochain::core::state::dht_op_integration::AuthoredDhtOpsValue;
-use crate::holochain::core::state::source_chain::SourceChain;
-use crate::holochain::core::state::workspace::Workspace;
-use crate::holochain::core::state::workspace::WorkspaceResult;
+use holochain_state::dht_op_integration::AuthoredDhtOpsStore;
+use holochain_state::dht_op_integration::AuthoredDhtOpsValue;
+use holochain_state::source_chain::SourceChain;
+use holochain_state::workspace::Workspace;
+use holochain_state::workspace::WorkspaceResult;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_lmdb::buffer::KvBufFresh;
 use holochain_lmdb::db::AUTHORED_DHT_OPS;
@@ -88,7 +88,7 @@ impl Workspace for ProduceDhtOpsWorkspace {
 mod tests {
     use super::super::genesis_workflow::tests::fake_genesis;
     use super::*;
-    use crate::holochain::core::state::source_chain::SourceChain;
+    use holochain_state::source_chain::SourceChain;
 
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;

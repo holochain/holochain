@@ -32,7 +32,8 @@ hdk3_derive = { version = "0.0.1", path = "../hdk3_derive" }
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }
 holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
-holochain_types = { version = "0.0.1", path = "../holochain_types", features = ["test_utils"] }
+holochain_state = { version = "0.0.1", path = "../holochain_state" }
+holochain_types = { version = "0.0.1", path = "../holochain_types" }
 holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
 human-panic = "1.0.3"
 lazy_static = "1.4.0"
@@ -63,9 +64,7 @@ url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 
-# hdk3 = { path = "../hdk", optional = false }
 matches = {version = "0.1.8", optional = false }
-# crate::holochain_test_wasm_common = { version = "0.0.1", path = "originals/test_utils/wasm_common", optional = false  }
 unwrap_to = { version = "0.1.0", optional = false }
 itertools = { version = "0.9", optional = false }
 lair_keystore_api = "=0.0.1-alpha.8"
@@ -88,6 +87,8 @@ tokio-tungstenite = { version = "0.10.1", features = [ "tls" ] }
 tungstenite = "0.10"
 
 
+holochain_wasm_test_utils = { version = "0.0.1", path = "../test_utils/wasm", optional = false  }
+holochain_test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_common", optional = false  }
 
 
 
@@ -110,7 +111,6 @@ once_cell = "1.4.1"
 # Dependencies for test_utils: keep in sync with above
 # hdk3 = { path = "../hdk", optional = false }
 matches = {version = "0.1.8", optional = false }
-# crate::holochain_test_wasm_common = { version = "0.0.1", path = "originals/test_utils/wasm_common", optional = false  }
 unwrap_to = { version = "0.1.0", optional = false }
 
 
@@ -128,7 +128,11 @@ unwrap_to = { version = "0.1.0", optional = false }
 
 [features]
 default = ["slow_tests", "test_utils", "only_check_wasms", "fixturators"]
-test_utils = []
+test_utils = [
+    "holochain_state/test_utils",
+    "holochain_types/test_utils",
+    "holochain_zome_types/test_utils",
+]
 slow_tests = []
 only_check_wasms = []
 fixturators = []
@@ -141,7 +145,7 @@ fixturators = []
 #   "hdk3",
 #   "holochain_types/test_utils",
 #   "matches",
-#   "crate::holochain_test_wasm_common",
+#   "holochain_test_wasm_common",
 #   "unwrap_to"
 # ]
 

@@ -2,14 +2,14 @@
 #![allow(dead_code)]
 use crate::holochain::conductor::dna_store::MockDnaStore;
 use crate::holochain::conductor::interface::websocket::test::setup_app;
-use crate::holochain::core::state::element_buf::ElementBuf;
-use crate::holochain::core::state::metadata::MetadataBuf;
-use crate::holochain::core::state::metadata::MetadataBufT;
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::metadata::MetadataBuf;
+use holochain_state::metadata::MetadataBufT;
 use crate::holochain::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
 use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
 use crate::holochain::core::workflow::CallZomeWorkspace;
 use crate::holochain::test_utils::test_network;
-use crate::holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::TestWasm;
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use futures::future::Either;

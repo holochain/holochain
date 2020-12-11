@@ -73,8 +73,7 @@ pub fn create<'a>(
             workspace.source_chain.elements(),
             &mut workspace.meta_authored,
         )
-        .map_err(Box::new)
-        .map_err(SourceChainError::from)?;
+        .map_err(Box::new)?;
         Ok(CreateOutput::new(header_hash))
     })
 }
@@ -118,9 +117,6 @@ pub fn extract_entry_def(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::create;
-    use crate::holochain::core::state::source_chain::ChainInvalidReason;
-    use crate::holochain::core::state::source_chain::SourceChainError;
-    use crate::holochain::core::state::source_chain::SourceChainResult;
     use crate::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::holochain::fixt::CallContextFixturator;
     use crate::holochain::fixt::EntryFixturator;
@@ -128,19 +124,22 @@ pub mod wasm_test {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use crate::holochain::test_utils::setup_app;
     use crate::holochain::{conductor::api::ZomeCall, core::ribosome::error::RibosomeError};
-    use crate::holochain_test_wasm_common::TestBytes;
-    use crate::holochain_test_wasm_common::TestInt;
+    use holochain_test_wasm_common::TestBytes;
+    use holochain_test_wasm_common::TestInt;
+    use holochain_wasm_test_utils::TestWasm;
+    use ::fixt::prelude::*;
+    use hdk3::prelude::*;
+    use holo_hash::AnyDhtHash;
+    use holo_hash::EntryHash;
+    use holochain_state::source_chain::ChainInvalidReason;
+    use holochain_state::source_chain::SourceChainError;
+    use holochain_state::source_chain::SourceChainResult;
     use holochain_types::app::InstalledCell;
     use holochain_types::dna::DnaDef;
     use holochain_types::dna::DnaFile;
     use holochain_types::fixt::AppEntry;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
-    use crate::holochain_wasm_test_utils::TestWasm;
-    use ::fixt::prelude::*;
-    use hdk3::prelude::*;
-    use holo_hash::AnyDhtHash;
-    use holo_hash::EntryHash;
     use holochain_zome_types::cell::CellId;
     use holochain_zome_types::entry::EntryError;
     use holochain_zome_types::entry_def::EntryDefId;

@@ -4,11 +4,6 @@
 //! where as retrieve only checks that where the data was found
 //! the appropriate validation has been run.
 
-use super::element_buf::ElementBuf;
-use super::metadata::ChainItemKey;
-use super::metadata::LinkMetaKey;
-use super::metadata::MetadataBuf;
-use super::metadata::MetadataBufT;
 use crate::holochain::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
 use either::Either;
 use error::CascadeResult;
@@ -19,15 +14,20 @@ use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
+use holochain_lmdb::error::DatabaseResult;
+use holochain_lmdb::fresh_reader;
+use holochain_lmdb::prelude::*;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetMetaOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::metadata::ChainItemKey;
+use holochain_state::metadata::LinkMetaKey;
+use holochain_state::metadata::MetadataBuf;
+use holochain_state::metadata::MetadataBufT;
 use holochain_types::activity::AgentActivity;
 use holochain_types::activity::ChainItems;
 use holochain_types::chain::AgentActivityExt;
@@ -49,6 +49,8 @@ use holochain_types::metadata::TimedHeaderHash;
 use holochain_types::EntryHashed;
 use holochain_types::HeaderHashed;
 use holochain_zome_types::element::SignedHeader;
+use holochain_zome_types::entry::GetOptions;
+use holochain_zome_types::entry::GetStrategy;
 use holochain_zome_types::header::HeaderType;
 use holochain_zome_types::link::Link;
 use holochain_zome_types::metadata::Details;
@@ -58,8 +60,6 @@ use holochain_zome_types::query::ChainQueryFilter;
 use holochain_zome_types::query::ChainStatus;
 use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::validate::ValidationStatus;
-use holochain_zome_types::entry::GetOptions;
-use holochain_zome_types::entry::GetStrategy;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashSet;
@@ -452,9 +452,11 @@ where
                 self.put_entry_in_cache(response)?;
             }
             AnyDht::Header => {
-                let response =
-                    crate::holochain::conductor::authority::handle_get_element(env.into(), hash.into())
-                        .map_err(Box::new)?;
+                let response = crate::holochain::conductor::authority::handle_get_element(
+                    env.into(),
+                    hash.into(),
+                )
+                .map_err(Box::new)?;
                 self.put_element_in_cache(response)?;
             }
         }
@@ -475,9 +477,12 @@ where
             return Ok(());
         }
         let env = ok_or_return!(self.env.clone());
-        let response =
-            crate::holochain::conductor::authority::handle_get_links(env, key.into(), (&options).into())
-                .map_err(Box::new)?;
+        let response = crate::holochain::conductor::authority::handle_get_links(
+            env,
+            key.into(),
+            (&options).into(),
+        )
+        .map_err(Box::new)?;
         self.put_link_in_cache(response)?;
         Ok(())
     }
@@ -2154,13 +2159,13 @@ pub fn test_dbs_and_mocks(
     env: EnvironmentRead,
 ) -> (
     ElementBuf,
-    super::metadata::MockMetadataBuf,
+    holochain_state::metadata::MockMetadataBuf,
     ElementBuf,
-    super::metadata::MockMetadataBuf,
+    holochain_state::metadata::MockMetadataBuf,
 ) {
     let cas = ElementBuf::vault(env.clone().into(), true).unwrap();
     let element_cache = ElementBuf::cache(env.clone().into()).unwrap();
-    let metadata = super::metadata::MockMetadataBuf::new();
-    let metadata_cache = super::metadata::MockMetadataBuf::new();
+    let metadata = holochain_state::metadata::MockMetadataBuf::new();
+    let metadata_cache = holochain_state::metadata::MockMetadataBuf::new();
     (cas, metadata, element_cache, metadata_cache)
 }

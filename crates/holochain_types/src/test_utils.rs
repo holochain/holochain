@@ -1,14 +1,15 @@
 //! Some common testing helpers.
 
-use crate::dna::wasm::DnaWasm;
 use crate::dna::zome::WasmZome;
 use crate::dna::DnaDef;
 use crate::dna::DnaFile;
 use crate::dna::JsonProperties;
+use crate::element::SignedHeaderHashedExt;
+use crate::fixt::*;
 use crate::prelude::*;
-use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::capability::CAP_SECRET_BYTES;
-use holochain_zome_types::zome::ZomeName;
+use crate::Timestamp;
+use crate::{dna::wasm::DnaWasm, EntryHashed};
+use holochain_zome_types::*;
 use std::path::PathBuf;
 
 pub use holochain_zome_types::test_utils::*;
@@ -82,4 +83,30 @@ pub fn which_agent(key: &AgentPubKey) -> String {
 /// A fixture CapSecret for unit testing.
 pub fn fake_cap_secret() -> CapSecret {
     [0; CAP_SECRET_BYTES].into()
+}
+
+/// Create a fake SignedHeaderHashed and EntryHashed pair with random content
+pub async fn fake_unique_element(
+    keystore: &KeystoreSender,
+    agent_key: AgentPubKey,
+    visibility: EntryVisibility,
+) -> anyhow::Result<(SignedHeaderHashed, EntryHashed)> {
+    let content: SerializedBytes =
+        UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned()).into();
+    let entry = EntryHashed::from_content_sync(Entry::App(content.try_into().unwrap()));
+    let app_entry_type = AppEntryTypeFixturator::new(visibility).next().unwrap();
+    let header_1 = Header::Create(Create {
+        author: agent_key,
+        timestamp: Timestamp::now().into(),
+        header_seq: 0,
+        prev_header: fake_header_hash(1),
+
+        entry_type: EntryType::App(app_entry_type),
+        entry_hash: entry.as_hash().to_owned(),
+    });
+
+    Ok((
+        SignedHeaderHashed::new(&keystore, HeaderHashed::from_content_sync(header_1)).await?,
+        entry,
+    ))
 }

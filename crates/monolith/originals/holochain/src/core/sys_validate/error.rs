@@ -4,7 +4,7 @@ use super::SourceChainError;
 use crate::holochain::conductor::api::error::ConductorApiError;
 use crate::holochain::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::holochain::core::state::cascade::error::CascadeError;
-use crate::holochain::core::state::workspace::WorkspaceError;
+use holochain_state::workspace::WorkspaceError;
 use crate::holochain::core::validation::OutcomeOrError;
 use crate::holochain::core::workflow::error::WorkflowError;
 use crate::from_sub_error;

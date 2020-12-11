@@ -27,7 +27,7 @@ pub mod wasm_test {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use crate::holochain::test_utils::test_conductor::MaybeElement;
     use crate::holochain::test_utils::test_conductor::TestConductorHandle;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_lmdb::test_utils::test_environments;

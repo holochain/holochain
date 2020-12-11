@@ -29,7 +29,7 @@ pub mod wasm_test {
     use crate::holochain::fixt::RealRibosomeFixturator;
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::RandomBytesInput;
     use holochain_zome_types::RandomBytesOutput;
     use std::convert::TryInto;

@@ -521,7 +521,7 @@ mod test {
     use holochain_types::test_utils::fake_dna_file;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_types::test_utils::write_fake_dna_file;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
     use uuid::Uuid;
 

@@ -1,7 +1,7 @@
 use crate::holochain::core::ribosome::error::RibosomeResult;
 use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::RibosomeT;
-use crate::holochain::core::state::metadata::LinkMetaKey;
+use holochain_state::metadata::LinkMetaKey;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_zome_types::GetLinksInput;
 use holochain_zome_types::GetLinksOutput;
@@ -50,8 +50,8 @@ pub mod slow_tests {
     use crate::holochain::test_utils::new_zome_call;
     use crate::holochain::test_utils::wait_for_integration_10s;
     use crate::holochain::test_utils::WaitOps;
-    use crate::holochain_test_wasm_common::*;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_test_wasm_common::*;
+    use holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use matches::assert_matches;

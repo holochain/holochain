@@ -11,7 +11,7 @@ use holochain_zome_types::cell::CellId;
 use holochain_types::dna::DnaDef;
 use holochain_types::dna::DnaFile;
 use holochain_types::test_utils::fake_agent_pubkey_1;
-use crate::holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::TestWasm;
 use std::convert::TryFrom;
 
 #[tokio::test(threaded_scheduler)]

@@ -3,8 +3,6 @@
 //! which would return Option in the SourceChainBuf, like getting the source chain head, or the AgentPubKey,
 //! cannot fail, so the function return types reflect that.
 
-use holochain_types::prelude::*;
-use holochain_types::EntryHashed;
 pub use error::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
@@ -12,6 +10,8 @@ use holochain_lmdb::buffer::BufferedStore;
 use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
+use holochain_types::prelude::*;
+use holochain_types::EntryHashed;
 use holochain_zome_types::capability::CapAccess;
 use holochain_zome_types::capability::CapGrant;
 use holochain_zome_types::capability::CapSecret;
@@ -334,13 +334,13 @@ impl BufferedStore for SourceChain {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use hdk3::prelude::*;
-    use crate::holochain::fixt::*;
-    use holochain_types::test_utils::fake_dna_hash;
     use ::fixt::prelude::*;
+    use hdk3::prelude::*;
     use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_types::test_utils::fake_dna_hash;
     use holochain_zome_types::capability::CapAccess;
     use holochain_zome_types::capability::ZomeCallCapGrant;
+    use holochain_zome_types::fixt::*;
     use std::collections::HashSet;
 
     #[tokio::test(threaded_scheduler)]

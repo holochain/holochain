@@ -58,14 +58,14 @@ pub mod wasm_test {
     use holochain_types::app::InstalledCell;
     use holochain_types::dna::DnaDef;
     use holochain_types::dna::DnaFile;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
     use holochain_zome_types::ExternInput;
     use holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
 
     use crate::holochain::conductor::{api::ZomeCall, ConductorHandle};
-    use crate::holochain::core::state::element_buf::ElementBuf;
+    use holochain_state::element_buf::ElementBuf;
     use crate::holochain::test_utils::conductor_setup::ConductorTestData;
     use crate::holochain::test_utils::install_app;
     use crate::holochain::test_utils::new_zome_call;

@@ -257,7 +257,7 @@ pub mod test {
     use crate::holochain::conductor::state::ConductorState;
     use crate::holochain::conductor::Conductor;
     use crate::holochain::conductor::ConductorHandle;
-    use crate::holochain::core::state::source_chain::SourceChainBuf;
+    use holochain_state::source_chain::SourceChainBuf;
     use crate::holochain::fixt::RealRibosomeFixturator;
     use crate::holochain::test_utils::conductor_setup::ConductorTestData;
     use holochain_types::app::InstallAppDnaPayload;
@@ -270,7 +270,7 @@ pub mod test {
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_types::test_utils::fake_dna_zomes;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
     use crate::holochain_websocket::WebsocketMessage;
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;

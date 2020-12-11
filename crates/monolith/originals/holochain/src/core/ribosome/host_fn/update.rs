@@ -77,8 +77,7 @@ pub fn update<'a>(
             workspace.source_chain.elements(),
             &mut workspace.meta_authored,
         )
-        .map_err(Box::new)
-        .map_err(SourceChainError::from)?;
+        .map_err(Box::new)?;
         Ok(UpdateOutput::new(header_hash))
     })
 }

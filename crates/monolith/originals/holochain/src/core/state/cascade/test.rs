@@ -1,9 +1,9 @@
 use super::Cascade;
-use crate::holochain::core::state::element_buf::ElementBuf;
-use crate::holochain::core::state::metadata::LinkMetaKey;
-use crate::holochain::core::state::metadata::MockMetadataBuf;
-use crate::holochain::core::state::source_chain::SourceChainBuf;
-use crate::holochain::core::state::source_chain::SourceChainResult;
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::metadata::LinkMetaKey;
+use holochain_state::metadata::MockMetadataBuf;
+use holochain_state::source_chain::SourceChainBuf;
+use holochain_state::source_chain::SourceChainResult;
 use crate::holochain::fixt::LinkMetaValFixturator;
 use crate::holochain::fixt::ZomeIdFixturator;
 use crate::holochain::test_utils::test_network;

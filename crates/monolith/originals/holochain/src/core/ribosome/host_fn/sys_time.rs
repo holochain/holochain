@@ -22,7 +22,7 @@ pub fn sys_time(
 pub mod wasm_test {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::SysTimeOutput;
 
     #[tokio::test(threaded_scheduler)]

@@ -506,8 +506,8 @@ impl RibosomeT for RealRibosome {
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
-    use crate::holochain_test_wasm_common::TestString;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_test_wasm_common::TestString;
+    use holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
 

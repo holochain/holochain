@@ -1,6 +1,5 @@
 //! Utils for Holochain tests
 
-use hdk3::prelude::ZomeName;
 use crate::holochain::conductor::api::RealAppInterfaceApi;
 use crate::holochain::conductor::api::ZomeCall;
 use crate::holochain::conductor::config::AdminInterfaceConfig;
@@ -11,17 +10,30 @@ use crate::holochain::conductor::ConductorHandle;
 use crate::holochain::core::ribosome::ZomeCallInvocation;
 use crate::holochain::core::state::cascade::Cascade;
 use crate::holochain::core::state::cascade::DbPair;
-use crate::holochain::core::state::element_buf::ElementBuf;
-use crate::holochain::core::state::metadata::MetadataBuf;
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::metadata::MetadataBuf;
 use crate::holochain::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
+use holochain_wasm_test_utils::TestWasm;
+use ::fixt::prelude::*;
+use fallible_iterator::FallibleIterator;
+use hdk3::prelude::ZomeName;
+use holo_hash::fixt::*;
+use holo_hash::*;
+use holochain_keystore::KeystoreSender;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::fresh_reader_test;
+use holochain_lmdb::test_utils::test_environments;
+use holochain_lmdb::test_utils::TestEnvironments;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::spawn_holochain_p2p;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_serialized_bytes::SerializedBytesError;
+use holochain_serialized_bytes::UnsafeBytes;
 use holochain_types::app::InstalledCell;
-use holochain_zome_types::cell::CellId;
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
 use holochain_types::element::SignedHeaderHashed;
@@ -32,19 +44,7 @@ use holochain_types::Entry;
 use holochain_types::EntryHashed;
 use holochain_types::HeaderHashed;
 use holochain_types::Timestamp;
-use crate::holochain_wasm_test_utils::TestWasm;
-use ::fixt::prelude::*;
-use fallible_iterator::FallibleIterator;
-use holo_hash::fixt::*;
-use holo_hash::*;
-use holochain_keystore::KeystoreSender;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::fresh_reader_test;
-use holochain_lmdb::test_utils::test_environments;
-use holochain_lmdb::test_utils::TestEnvironments;
-use holochain_serialized_bytes::SerializedBytes;
-use holochain_serialized_bytes::SerializedBytesError;
-use holochain_serialized_bytes::UnsafeBytes;
+use holochain_zome_types::cell::CellId;
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::header::Create;
 use holochain_zome_types::header::EntryType;
@@ -75,13 +75,15 @@ macro_rules! here {
 /// expected functions, return data and with_f checks
 #[macro_export]
 macro_rules! meta_mock {
-    () => {{ $crate::holochain::core::state::metadata::MockMetadataBuf::new() }};
+    () => {{
+        holochain_state::metadata::MockMetadataBuf::new()
+    }};
     ($fun:ident) => {{
         let d: Vec<holochain_types::metadata::TimedHeaderHash> = Vec::new();
         meta_mock!($fun, d)
     }};
     ($fun:ident, $data:expr) => {{
-        let mut metadata = $crate::holochain::core::state::metadata::MockMetadataBuf::new();
+        let mut metadata = holochain_state::metadata::MockMetadataBuf::new();
         metadata.$fun().returning({
             move |_| {
                 Ok(Box::new(fallible_iterator::convert(
@@ -96,7 +98,7 @@ macro_rules! meta_mock {
         metadata
     }};
     ($fun:ident, $data:expr, $match_fn:expr) => {{
-        let mut metadata = $crate::holochain::core::state::metadata::MockMetadataBuf::new();
+        let mut metadata = holochain_state::metadata::MockMetadataBuf::new();
         metadata.$fun().returning({
             move |a| {
                 if $match_fn(a) {
@@ -120,34 +122,6 @@ macro_rules! meta_mock {
         });
         metadata
     }};
-}
-
-/// Create a fake SignedHeaderHashed and EntryHashed pair with random content
-pub async fn fake_unique_element(
-    keystore: &KeystoreSender,
-    agent_key: AgentPubKey,
-    visibility: EntryVisibility,
-) -> anyhow::Result<(SignedHeaderHashed, EntryHashed)> {
-    let content: SerializedBytes =
-        UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned()).into();
-    let entry = EntryHashed::from_content_sync(Entry::App(content.try_into().unwrap()));
-    let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
-        .next()
-        .unwrap();
-    let header_1 = Header::Create(Create {
-        author: agent_key,
-        timestamp: Timestamp::now().into(),
-        header_seq: 0,
-        prev_header: fake_header_hash(1),
-
-        entry_type: EntryType::App(app_entry_type),
-        entry_hash: entry.as_hash().to_owned(),
-    });
-
-    Ok((
-        SignedHeaderHashed::new(&keystore, HeaderHashed::from_content_sync(header_1)).await?,
-        entry,
-    ))
 }
 
 /// A running test network with a joined cell.

@@ -84,7 +84,9 @@ fn validate_create_entry_post(
 }
 
 #[hdk_extern]
-fn get_activity(input: crate::holochain_test_wasm_common::AgentActivitySearch) -> ExternResult<AgentActivity> {
+fn get_activity(
+    input: holochain_test_wasm_common::AgentActivitySearch,
+) -> ExternResult<AgentActivity> {
     Ok(get_agent_activity(input.agent, input.query, input.request)?)
 }
 

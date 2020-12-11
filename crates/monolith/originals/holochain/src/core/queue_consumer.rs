@@ -48,10 +48,10 @@ use app_validation_consumer::*;
 mod produce_dht_ops_consumer;
 use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
-use super::state::workspace::WorkspaceError;
 use crate::holochain::conductor::api::CellConductorApiT;
 use crate::holochain::conductor::manager::ManagedTaskAdd;
 use holochain_p2p::HolochainP2pCell;
+use holochain_state::workspace::WorkspaceError;
 use publish_dht_ops_consumer::*;
 
 /// Spawns several long-running tasks which are responsible for processing work

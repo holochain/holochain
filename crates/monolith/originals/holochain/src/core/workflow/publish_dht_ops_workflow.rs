@@ -15,10 +15,10 @@ use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use super::produce_dht_ops_workflow::dht_op_light::light_to_op;
 use crate::holochain::core::queue_consumer::OneshotWriter;
 use crate::holochain::core::queue_consumer::WorkComplete;
-use crate::holochain::core::state::dht_op_integration::AuthoredDhtOpsStore;
-use crate::holochain::core::state::element_buf::ElementBuf;
-use crate::holochain::core::state::workspace::Workspace;
-use crate::holochain::core::state::workspace::WorkspaceResult;
+use holochain_state::dht_op_integration::AuthoredDhtOpsStore;
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::workspace::Workspace;
+use holochain_state::workspace::WorkspaceResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_p2p::HolochainP2pCell;
@@ -170,8 +170,8 @@ impl PublishDhtOpsWorkspace {
 mod tests {
     use super::*;
     use crate::holochain::core::queue_consumer::TriggerSender;
-    use crate::holochain::core::state::dht_op_integration::AuthoredDhtOpsValue;
-    use crate::holochain::core::state::source_chain::SourceChain;
+    use holochain_state::dht_op_integration::AuthoredDhtOpsValue;
+    use holochain_state::source_chain::SourceChain;
     use crate::holochain::core::workflow::fake_genesis;
     use crate::holochain::core::workflow::produce_dht_ops_workflow::produce_dht_ops_workflow;
     use crate::holochain::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace;

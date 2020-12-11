@@ -10,7 +10,6 @@ use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
-use holochain_serialized_bytes::prelude::*;
 use holochain_lmdb::buffer::KvBufUsed;
 use holochain_lmdb::buffer::KvvBufUsed;
 use holochain_lmdb::db::CACHE_LINKS_META;
@@ -23,6 +22,7 @@ use holochain_lmdb::error::DatabaseError;
 use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
+use holochain_serialized_bytes::prelude::*;
 use holochain_types::header::NewEntryHeader;
 use holochain_types::link::WireLinkMetaKey;
 use holochain_types::metadata::EntryDhtStatus;
@@ -48,9 +48,9 @@ use activity::*;
 pub use keys::*;
 pub use sys_meta::*;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 pub use mock::MockMetadataBuf;
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 use mockall::mock;
 
 use self::status::DisputedStatus;
@@ -65,7 +65,7 @@ mod status;
 mod sys_meta;
 
 #[allow(missing_docs)]
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 mod mock;
 
 /// Trait for the [MetadataBuf], needed for mocking
@@ -612,7 +612,7 @@ where
         Ok(())
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test_utils"))]
     pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         self.links_meta.clear_all(writer)?;
         self.system_meta.clear_all(writer)

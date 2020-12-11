@@ -7,16 +7,16 @@ use crate::holochain::core::queue_consumer::WorkComplete;
 use crate::holochain::core::state::cascade::error::CascadeResult;
 use crate::holochain::core::state::cascade::Cascade;
 use crate::holochain::core::state::cascade::DbPair;
-use crate::holochain::core::state::dht_op_integration::IntegratedDhtOpsStore;
-use crate::holochain::core::state::dht_op_integration::IntegratedDhtOpsValue;
-use crate::holochain::core::state::dht_op_integration::IntegrationLimboStore;
-use crate::holochain::core::state::dht_op_integration::IntegrationLimboValue;
-use crate::holochain::core::state::element_buf::ElementBuf;
-use crate::holochain::core::state::metadata::MetadataBuf;
-use crate::holochain::core::state::metadata::MetadataBufT;
-use crate::holochain::core::state::validation_db::ValidationLimboStore;
-use crate::holochain::core::state::workspace::Workspace;
-use crate::holochain::core::state::workspace::WorkspaceResult;
+use holochain_state::dht_op_integration::IntegratedDhtOpsStore;
+use holochain_state::dht_op_integration::IntegratedDhtOpsValue;
+use holochain_state::dht_op_integration::IntegrationLimboStore;
+use holochain_state::dht_op_integration::IntegrationLimboValue;
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::metadata::MetadataBuf;
+use holochain_state::metadata::MetadataBufT;
+use holochain_state::validation_db::ValidationLimboStore;
+use holochain_state::workspace::Workspace;
+use holochain_state::workspace::WorkspaceResult;
 use crate::holochain::core::validation::DhtOpOrder;
 use crate::holochain::core::validation::OrderedOp;
 use holochain_types::dht_op::produce_op_lights_from_elements;
@@ -59,6 +59,8 @@ use tracing::*;
 pub use disintegrate::*;
 
 mod disintegrate;
+
+#[cfg(feature = "test_utils")]
 mod tests;
 
 #[instrument(skip(workspace, writer, trigger_sys))]

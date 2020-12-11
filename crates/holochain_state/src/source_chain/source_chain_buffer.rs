@@ -1,9 +1,9 @@
 use super::ChainInvalidReason;
-use crate::holochain::core::state::chain_sequence::ChainSequenceBuf;
-use crate::holochain::core::state::element_buf::ElementBuf;
-use crate::holochain::core::state::element_buf::HeaderCas;
-use crate::holochain::core::state::source_chain::SourceChainError;
-use crate::holochain::core::state::source_chain::SourceChainResult;
+use crate::chain_sequence::ChainSequenceBuf;
+use crate::element_buf::ElementBuf;
+use crate::element_buf::HeaderCas;
+use crate::source_chain::SourceChainError;
+use crate::source_chain::SourceChainResult;
 use fallible_iterator::FallibleIterator;
 use holochain_lmdb::buffer::BufferedStore;
 use holochain_lmdb::error::DatabaseResult;
@@ -316,7 +316,7 @@ impl<'a> FallibleIterator for SourceChainBackwardIterator<'a> {
 #[cfg(test)]
 pub mod tests {
     use super::SourceChainBuf;
-    use crate::holochain::core::state::source_chain::SourceChainResult;
+    use crate::source_chain::SourceChainResult;
     use fallible_iterator::FallibleIterator;
     use holochain_lmdb::prelude::*;
     use holochain_lmdb::test_utils::test_cell_env;

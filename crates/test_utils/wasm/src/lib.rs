@@ -3,6 +3,7 @@ use holochain_types::dna::zome::WasmZome;
 use holochain_types::dna::zome::ZomeDef;
 use holochain_types::dna::zome::Zome;
 use holochain_zome_types::zome::ZomeName;
+use strum_macros::EnumIter;
 
 const WASM_WORKSPACE_TARGET: &str = "wasm_workspace/target";
 

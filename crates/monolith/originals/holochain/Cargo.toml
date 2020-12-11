@@ -114,7 +114,7 @@ test_utils = [
   "holochain_zome_types/test_utils",
   "itertools",
   "matches",
-  "crate::holochain_test_wasm_common",
+  "holochain_test_wasm_common",
   "unwrap_to"
 ]
 

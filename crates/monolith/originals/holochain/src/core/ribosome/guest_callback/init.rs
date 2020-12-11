@@ -227,7 +227,7 @@ mod slow_tests {
     use crate::holochain::fixt::InitInvocationFixturator;
     use crate::holochain::fixt::RealRibosomeFixturator;
     use ::fixt::prelude::*;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_init_unimplemented() {

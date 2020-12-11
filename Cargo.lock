@@ -1390,6 +1390,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_state"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "byteorder",
+ "chrono",
+ "derive_more",
+ "fallible-iterator",
+ "fixt",
+ "hdk3",
+ "holo_hash",
+ "holochain_keystore",
+ "holochain_lmdb",
+ "holochain_p2p",
+ "holochain_serialized_bytes",
+ "holochain_types",
+ "holochain_wasm_test_utils",
+ "holochain_zome_types",
+ "matches",
+ "mockall",
+ "observability",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "shrinkwraprs",
+ "thiserror",
+ "tokio",
+ "tokio_safe_block_on",
+ "tracing",
+ "tracing-futures",
+]
+
+[[package]]
+name = "holochain_test_wasm_common"
+version = "0.0.1"
+dependencies = [
+ "hdk3",
+ "holochain_serialized_bytes",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
 name = "holochain_types"
 version = "0.0.1"
 dependencies = [
@@ -1425,6 +1468,22 @@ dependencies = [
  "tokio",
  "tokio_safe_block_on",
  "tracing",
+]
+
+[[package]]
+name = "holochain_wasm_test_utils"
+version = "0.0.1"
+dependencies = [
+ "fixt",
+ "holo_hash",
+ "holochain_types",
+ "holochain_zome_types",
+ "rand 0.7.3",
+ "strum",
+ "strum_macros",
+ "tokio_safe_block_on",
+ "toml",
+ "walkdir",
 ]
 
 [[package]]
@@ -2105,7 +2164,10 @@ dependencies = [
  "holochain_lmdb",
  "holochain_p2p",
  "holochain_serialized_bytes",
+ "holochain_state",
+ "holochain_test_wasm_common",
  "holochain_types",
+ "holochain_wasm_test_utils",
  "holochain_wasmer_guest",
  "holochain_wasmer_host",
  "holochain_zome_types",

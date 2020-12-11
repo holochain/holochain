@@ -166,7 +166,7 @@ impl IntegratedDhtOpsBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::holochain::fixt::AnyDhtHashFixturator;
+    use holo_hash::fixt::AnyDhtHashFixturator;
     use ::fixt::prelude::*;
     use chrono::Duration;
     use chrono::Utc;

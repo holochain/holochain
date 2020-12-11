@@ -43,7 +43,7 @@ pub trait Workspace: Send + Sized {
 #[cfg(test)]
 pub mod tests {
     use super::Workspace;
-    use crate::holochain::core::state::workspace::WorkspaceResult;
+    use crate::workspace::WorkspaceResult;
     use holochain_lmdb::buffer::BufferedStore;
     use holochain_lmdb::buffer::KvBufFresh;
     use holochain_lmdb::db::GetDb;

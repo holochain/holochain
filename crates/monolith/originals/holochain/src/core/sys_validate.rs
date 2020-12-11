@@ -2,8 +2,8 @@
 //! This module contains all the checks we run for sys validation
 
 use super::queue_consumer::TriggerSender;
-use super::state::metadata::ChainItemKey;
-use super::state::metadata::MetadataBufT;
+use holochain_state::metadata::ChainItemKey;
+use holochain_state::metadata::MetadataBufT;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::holochain::conductor::api::CellConductorApiT;
@@ -20,8 +20,8 @@ use holochain_lmdb::fresh_reader;
 use holochain_zome_types::*;
 use std::convert::TryInto;
 
-pub use crate::holochain::core::state::source_chain::SourceChainError;
-pub use crate::holochain::core::state::source_chain::SourceChainResult;
+pub use holochain_state::source_chain::SourceChainError;
+pub use holochain_state::source_chain::SourceChainResult;
 pub(super) use error::*;
 
 pub use holochain_types::element::Element;

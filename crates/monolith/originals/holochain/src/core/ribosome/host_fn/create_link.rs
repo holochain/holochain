@@ -39,7 +39,7 @@ pub fn create_link<'a>(
                 &mut workspace.meta_authored,
             )
             .map_err(Box::new)?;
-            SourceChainResult::Ok(header_hash)
+            RibosomeResult::Ok(header_hash)
         }))??;
 
     // return the hash of the committed link

@@ -36,7 +36,7 @@ pub mod wasm_test {
     use hdk3::prelude::*;
     use crate::holochain::core::workflow::CallZomeWorkspace;
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
 
     #[tokio::test(threaded_scheduler)]

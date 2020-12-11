@@ -1,7 +1,7 @@
 use hdk3::prelude::LinkTag;
 use crate::holochain::conductor::ConductorHandle;
-use crate::holochain::core::state::element_buf::ElementBuf;
-use crate::holochain::core::state::validation_db::ValidationLimboStatus;
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::validation_db::ValidationLimboStatus;
 use crate::holochain::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
 use crate::holochain::test_utils::host_fn_caller::*;
 use crate::holochain::test_utils::setup_app;
@@ -16,7 +16,7 @@ use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_types::test_utils::fake_agent_pubkey_2;
 use holochain_types::validate::ValidationStatus;
 use holochain_types::Entry;
-use crate::holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::TestWasm;
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::AnyDhtHash;

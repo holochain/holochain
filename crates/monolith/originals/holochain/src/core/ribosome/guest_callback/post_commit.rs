@@ -209,7 +209,7 @@ mod slow_tests {
     use crate::holochain::fixt::PostCommitInvocationFixturator;
     use crate::holochain::fixt::RealRibosomeFixturator;
     use holo_hash::fixt::HeaderHashFixturator;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_post_commit_unimplemented() {

@@ -1,7 +1,7 @@
 use crate::holochain::core::ribosome::error::RibosomeResult;
 use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::RibosomeT;
-use crate::holochain::core::state::metadata::LinkMetaKey;
+use holochain_state::metadata::LinkMetaKey;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_zome_types::link::LinkDetails;
 use holochain_zome_types::GetLinkDetailsInput;
@@ -50,10 +50,10 @@ pub fn get_link_details<'a>(
 pub mod slow_tests {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::Header;
-    use crate::holochain_test_wasm_common::*;
+    use holochain_test_wasm_common::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_entry_hash_path_children_details() {

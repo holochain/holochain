@@ -1,7 +1,5 @@
-use crate::holochain::fixt::*;
+use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
-use fixt::prelude::*;
-use hdk3::prelude::Create;
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
 use holochain_lmdb::env::ReadManager;
@@ -10,6 +8,7 @@ use holochain_lmdb::test_utils::TestEnvironment;
 use holochain_zome_types::test_utils::fake_agent_pubkey_1;
 use holochain_zome_types::validate::ValidationStatus;
 use holochain_zome_types::Header;
+use holochain_zome_types::{fixt::*, Create};
 
 use super::ChainItemKey;
 use super::MetadataBuf;
