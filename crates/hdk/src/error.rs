@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use holo_hash::AgentPubKey;
 use holochain_zome_types::{
     prelude::CellId,
@@ -21,6 +22,9 @@ pub enum HdkError {
 
     #[error("A remote zome call was made but there was a network error: {0}")]
     ZomeCallNetworkError(String),
+
+    #[error(transparent)]
+    Infallible(#[from] Infallible),
 }
 
 pub type HdkResult<T> = Result<T, HdkError>;

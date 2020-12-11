@@ -14,8 +14,8 @@ edition = "2018"
 [dependencies]
 fixt = { path = "../fixt", optional = true }
 holo_hash = { path = "../holo_hash" }
-holochain_serialized_bytes = "=0.0.46"
-paste = "=1.0.3"
+holochain_serialized_bytes = "=0.0.47"
+paste = "1.0"
 serde = { version = "1.0.104", features = [ "derive" ] }
 serde_bytes = "0.11"
 strum = { version = "0.18.0", optional = true }
