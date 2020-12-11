@@ -34,7 +34,7 @@ pub struct GetOptions {
     /// the latest data before returning.
     /// If it is false you will get whatever is locally
     /// available on this conductor.
-    pub call: GetCall,
+    pub strategy: GetStrategy,
 }
 
 impl GetOptions {
@@ -48,7 +48,7 @@ impl GetOptions {
     /// for this hash.
     pub fn latest() -> Self {
         Self {
-            call: GetCall::Latest,
+            strategy: GetStrategy::Latest,
         }
     }
     /// Gets the content but does not
@@ -60,7 +60,7 @@ impl GetOptions {
     /// is not found locally
     pub fn content() -> Self {
         Self {
-            call: GetCall::Content,
+            strategy: GetStrategy::Content,
         }
     }
 }
@@ -75,7 +75,7 @@ impl Default for GetOptions {
 /// Describes the get call and what information
 /// the caller is concerned about.
 /// This helps the subconscious avoid unnecessary network calls.
-pub enum GetCall {
+pub enum GetStrategy {
     /// Will try to get the latest metadata but fallback
     /// to the cache if none is found.
     /// Does not go to the network if you are an authority for the data.

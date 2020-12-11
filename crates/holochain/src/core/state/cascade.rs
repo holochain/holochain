@@ -31,8 +31,8 @@ use holochain_types::{
     metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
     EntryHashed, HeaderHashed,
 };
-use holochain_zome_types::entry::GetCall;
 use holochain_zome_types::entry::GetOptions;
+use holochain_zome_types::entry::GetStrategy;
 use holochain_zome_types::{
     element::SignedHeader,
     header::HeaderType,
@@ -1026,7 +1026,7 @@ where
         options: GetOptions,
     ) -> CascadeResult<Option<EntryDetails>> {
         debug!("in get entry details");
-        let get_call = options.call;
+        let get_call = options.strategy;
         let mut options: NetworkGetOptions = options.into();
         options.all_live_headers_with_metadata = true;
         let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
@@ -1038,7 +1038,7 @@ where
         } else {
             // If the caller only needs the content we and we have the
             // content locally we can avoid the network call and return early.
-            if let GetCall::Content = get_call {
+            if let GetStrategy::Content = get_call {
                 // Found local data return early.
                 if let Some(result) = self.create_entry_details(entry_hash.clone()).await? {
                     return Ok(Some(result));
@@ -1134,7 +1134,7 @@ where
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
         debug!("in get entry");
-        let get_call = options.call;
+        let get_call = options.strategy;
         let mut oldest_live_element = Search::NotInCascade;
         let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         let authoring = self.am_i_authoring(&entry_hash.clone().into()).await?;
@@ -1150,7 +1150,7 @@ where
         } else {
             // If the caller only needs the content we and we have the
             // content locally we can avoid the network call
-            if let GetCall::Content = get_call {
+            if let GetStrategy::Content = get_call {
                 oldest_live_element = self.get_oldest_live_element(&entry_hash)?;
             }
             // Was not found locally so go to the network
@@ -1180,7 +1180,7 @@ where
         options: GetOptions,
     ) -> CascadeResult<Option<ElementDetails>> {
         debug!("in get header details");
-        let get_call = options.call;
+        let get_call = options.strategy;
         let mut options: NetworkGetOptions = options.into();
         options.all_live_headers_with_metadata = true;
 
@@ -1196,7 +1196,7 @@ where
         } else {
             // If the caller only needs the content we and we have the
             // content locally we can avoid the network call and return early.
-            if let GetCall::Content = get_call {
+            if let GetStrategy::Content = get_call {
                 // Found local data return early.
                 if let Some(result) = self.create_element_details(header_hash.clone())? {
                     return Ok(Some(result));
@@ -1260,7 +1260,7 @@ where
             return Ok(None);
         }
 
-        let get_call = options.call;
+        let get_call = options.strategy;
         let authority = self.am_i_an_authority(header_hash.clone().into()).await?;
         let authoring = self.am_i_authoring(&header_hash.clone().into()).await?;
 
@@ -1273,7 +1273,7 @@ where
         } else {
             // If the caller only needs the content we and we have the
             // content locally we can avoid the network call and return early.
-            if let GetCall::Content = get_call {
+            if let GetStrategy::Content = get_call {
                 // Found local data return early.
                 if let Some(result) = self.dht_get_header_inner(header_hash.clone())? {
                     return Ok(Some(result));
