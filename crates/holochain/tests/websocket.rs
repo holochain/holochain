@@ -248,8 +248,12 @@ pub async fn call_zome_fn<SB: TryInto<SerializedBytes, Error = SerializedBytesEr
     assert_matches!(call_response, AppResponse::ZomeCallInvocation(_));
 }
 
-pub async fn attach_app_interface(client: &mut WebsocketSender, holochain: &mut Child) -> u16 {
-    let request = AdminRequest::AttachAppInterface { port: None };
+pub async fn attach_app_interface(
+    client: &mut WebsocketSender,
+    holochain: &mut Child,
+    port: Option<u16>,
+) -> u16 {
+    let request = AdminRequest::AttachAppInterface { port };
     let response = client.request(request);
     let response = check_timeout(holochain, response, 1000).await;
     match response {
@@ -289,18 +293,19 @@ async fn call_zome() {
     // actually runs the holochain binary
 
     // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
-    let port = 9910;
+    let admin_port = 9910;
+    let app_port = 9913;
 
     let tmp_dir = TempDir::new("conductor_cfg_2").unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
-    let config = create_config(port, environment_path);
+    let config = create_config(admin_port, environment_path);
     let config_path = write_config(path, &config);
 
     let mut holochain = start_holochain(config_path.clone()).await;
 
-    let (mut client, _) = websocket_client_by_port(port).await.unwrap();
-    let (_, receiver2) = websocket_client_by_port(port).await.unwrap();
+    let (mut client, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (_, receiver2) = websocket_client_by_port(admin_port).await.unwrap();
 
     let uuid = uuid::Uuid::new_v4();
     let dna = fake_dna_zomes(
@@ -340,7 +345,7 @@ async fn call_zome() {
     assert_matches!(response, AdminResponse::AppActivated);
 
     // Attach App Interface
-    let app_port = attach_app_interface(&mut client, &mut holochain).await;
+    let app_port = attach_app_interface(&mut client, &mut holochain, Some(app_port)).await;
 
     // Call Zome
     call_foo_fn(app_port, original_dna_hash.clone(), &mut holochain).await;
@@ -423,7 +428,7 @@ async fn emit_signals() {
     assert_matches!(response, AdminResponse::AppActivated);
 
     // Attach App Interface
-    let app_port = attach_app_interface(&mut admin_tx, &mut holochain).await;
+    let app_port = attach_app_interface(&mut admin_tx, &mut holochain, None).await;
 
     ///////////////////////////////////////////////////////
     // Emit signals (the real test!)
