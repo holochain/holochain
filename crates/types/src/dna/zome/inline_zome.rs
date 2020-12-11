@@ -48,6 +48,10 @@ impl InlineZome {
         }
         .callback("entry_defs", Box::new(entry_defs_callback))
     }
+    /// Create a new zome with a unique random UUID
+    pub fn new_unique(entry_defs: Vec<EntryDef>) -> Self {
+        Self::new(nanoid::nanoid!(), entry_defs)
+    }
 
     /// Define a new zome function or callback with the given name
     pub fn callback<F, I, O>(mut self, name: &str, f: F) -> Self

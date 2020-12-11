@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use super::{host_fn_api::HostFnCaller, install_app, setup_app_inner};
+use super::{host_fn_caller::HostFnCaller, install_app, setup_app_inner};
 use crate::{
     conductor::{
         api::{CellConductorApi, CellConductorApiT},

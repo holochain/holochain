@@ -61,7 +61,7 @@ use tokio::{sync::oneshot, task::JoinHandle};
 use tracing::*;
 use unwrap_to::unwrap_to;
 
-use crate::test_utils::host_fn_api::*;
+use crate::test_utils::host_fn_caller::*;
 
 /*
 #[tokio::test(threaded_scheduler)]

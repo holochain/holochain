@@ -230,11 +230,14 @@ mod tests {
                 .iter(&reader)
                 .unwrap()
                 .map(|(k, v)| {
-                    assert_matches!(v, AuthoredDhtOpsValue {
-                        receipt_count: 0,
-                        last_publish_time: None,
-                        ..
-                    });
+                    assert_matches!(
+                        v,
+                        AuthoredDhtOpsValue {
+                            receipt_count: 0,
+                            last_publish_time: None,
+                            ..
+                        }
+                    );
 
                     Ok(DhtOpHash::from_raw_39_panicky(k.to_vec()))
                 })
