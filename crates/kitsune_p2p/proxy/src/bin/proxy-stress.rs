@@ -55,11 +55,8 @@ pub struct Opt {
 
 #[tokio::main]
 async fn main() {
-    let _ = ghost_actor::dependencies::tracing::subscriber::set_global_default(
-        tracing_subscriber::FmtSubscriber::builder()
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-            .finish(),
-    );
+    observability::init_fmt(observability::Output::Compact)
+        .expect("Failed to start contextual logging");
 
     if let Err(e) = inner().await {
         eprintln!("{:?}", e);
