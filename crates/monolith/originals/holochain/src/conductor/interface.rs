@@ -46,18 +46,4 @@ impl SignalBroadcaster {
     }
 }
 
-/// Configuration for interfaces, specifying the means by which an interface
-/// should be opened.
-///
-/// NB: This struct is used in both [ConductorConfig] and [ConductorState], so
-/// any change to the serialization strategy is a **breaking change**.
-#[derive(Clone, Deserialize, Serialize, Debug)]
-#[cfg_attr(test, derive(PartialEq))]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum InterfaceDriver {
-    /// An interface implemented via Websockets
-    Websocket {
-        /// The port on which to establish the WebsocketListener
-        port: u16,
-    },
-}
+pub use holochain_conductor_api::config::InterfaceDriver;

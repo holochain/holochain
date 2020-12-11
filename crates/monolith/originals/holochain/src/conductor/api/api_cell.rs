@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
-use super::ZomeCall;
 use crate::holochain::conductor::entry_def_store::EntryDefBufferKey;
 use crate::holochain::conductor::interface::SignalBroadcaster;
 use crate::holochain::conductor::ConductorHandle;
@@ -12,11 +11,12 @@ use crate::holochain::core::workflow::call_zome_workflow::call_zome_workspace_lo
 use crate::holochain::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
+use holochain_conductor_api::ZomeCall;
 use holochain_keystore::KeystoreSender;
 use holochain_types::autonomic::AutonomicCue;
-use holochain_zome_types::cell::CellId;
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
+use holochain_zome_types::cell::CellId;
 use holochain_zome_types::entry_def::EntryDef;
 use holochain_zome_types::zome::ZomeName;
 use tracing::*;

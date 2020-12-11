@@ -14,9 +14,8 @@ use super::error::ConductorError;
 use super::error::ConductorResult;
 use super::paths::EnvironmentRootPath;
 
-pub use crate::holochain::conductor::interface::InterfaceDriver;
-pub use admin_interface_config::AdminInterfaceConfig;
 pub use dpki_config::DpkiConfig;
+pub use holochain_conductor_api::config::*;
 //pub use logger_config::LoggerConfig;
 pub use passphrase_service_config::PassphraseServiceConfig;
 //pub use signal_config::SignalConfig;

@@ -1,16 +1,14 @@
 //! Structs which allow the Conductor's state to be persisted across
 //! startups and shutdowns
 
-use crate::holochain::conductor::interface::InterfaceDriver;
-
+use holochain_conductor_api::config::InterfaceDriver;
+use holochain_conductor_api::signal_subscription::SignalSubscription;
 use holochain_types::app::InstalledApp;
 use holochain_types::app::InstalledAppId;
 use holochain_types::app::InstalledCell;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
-
-use super::api::SignalSubscription;
 
 /// Mutable conductor state, stored in a DB and writeable only via Admin interface.
 ///

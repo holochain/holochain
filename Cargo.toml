@@ -7,18 +7,22 @@ members = [
   "crates/hdk3",
   "crates/hdk3_derive",
   "crates/holo_hash",
+  
   "crates/monolith",
-  # "crates/holochain",
+
+  "crates/holochain_conductor_api",
   "crates/holochain_lmdb",
   "crates/holochain_p2p",
   "crates/holochain_keystore",
   "crates/holochain_state",
   "crates/holochain_types",
   "crates/holochain_zome_types",
+
   "crates/kitsune_p2p/kitsune_p2p",
   "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",
   "crates/kitsune_p2p/proxy",
+  
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
   # "crates/websocket",
