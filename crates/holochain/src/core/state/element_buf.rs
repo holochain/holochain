@@ -8,7 +8,7 @@
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
 use crate::core::state::source_chain::SourceChainResult;
-use holo_hash::{EntryHash, HasHash, HeaderHash};
+use holo_hash::{hash_type::AnyDht, AnyDhtHash, EntryHash, HasHash, HeaderHash};
 use holochain_state::{
     buffer::CasBufFreshSync,
     db::{
@@ -23,8 +23,7 @@ use holochain_types::{
     element::{Element, ElementGroup, SignedHeader, SignedHeaderHashed},
     entry::EntryHashed,
 };
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::{Entry, Header};
+use holochain_zome_types::{entry_def::EntryVisibility, Entry, Header};
 use tracing::*;
 
 /// A CasBufFresh with Entries for values
@@ -153,6 +152,29 @@ where
         self.headers.contains(header_hash)
     }
 
+    pub fn contains_in_scratch(&self, hash: &AnyDhtHash) -> DatabaseResult<bool> {
+        match *hash.hash_type() {
+            AnyDht::Entry => {
+                Ok(
+                    if self
+                        .public_entries
+                        .contains_in_scratch(&hash.clone().into())?
+                    {
+                        true
+                    } else {
+                        // Potentially avoid this let Some if the above branch is hit first
+                        if let Some(private) = &self.private_entries {
+                            private.contains_in_scratch(&hash.clone().into())?
+                        } else {
+                            false
+                        }
+                    },
+                )
+            }
+            AnyDht::Header => self.headers.contains_in_scratch(&hash.clone().into()),
+        }
+    }
+
     pub fn get_header(
         &self,
         header_address: &HeaderHash,
@@ -222,7 +244,10 @@ where
                         if let Some(db) = self.private_entries.as_mut() {
                             db.put(entry);
                         } else {
-                            error!("Attempted ElementBuf::put on a private entry with a disabled private DB: {}", entry.as_hash());
+                            error!(
+                                "Attempted ElementBuf::put on a private entry with a disabled private DB: {}",
+                                entry.as_hash()
+                            );
                         }
                     }
                 }
@@ -249,7 +274,10 @@ where
                 if let Some(db) = self.private_entries.as_mut() {
                     db.put(entry);
                 } else {
-                    error!("Attempted ElementBuf::put on a private entry with a disabled private DB: {}", entry.as_hash());
+                    error!(
+                        "Attempted ElementBuf::put on a private entry with a disabled private DB: {}",
+                        entry.as_hash()
+                    );
                 }
             }
         }
@@ -328,12 +356,10 @@ impl<P: PrefixType> BufferedStore for ElementBuf<P> {
 
 #[cfg(test)]
 mod tests {
-
     use super::ElementBuf;
     use crate::test_utils::fake_unique_element;
     use holo_hash::*;
-    use holochain_keystore::test_keystore::spawn_test_keystore;
-    use holochain_keystore::AgentPubKeyExt;
+    use holochain_keystore::{test_keystore::spawn_test_keystore, AgentPubKeyExt};
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_zome_types::entry_def::EntryVisibility;
 

@@ -7,9 +7,10 @@ use crate::{
             element_buf::ElementBuf,
             metadata::{MetadataBuf, MetadataBufT},
         },
-        workflow::integrate_dht_ops_workflow::integrate_single_metadata,
-        workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult,
-        workflow::CallZomeWorkspace,
+        workflow::{
+            integrate_dht_ops_workflow::integrate_single_metadata,
+            produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult, CallZomeWorkspace,
+        },
     },
     test_utils::test_network,
 };
@@ -18,12 +19,9 @@ use fallible_iterator::FallibleIterator;
 use futures::future::{Either, FutureExt};
 use ghost_actor::GhostControlSender;
 use hdk3::prelude::EntryVisibility;
-use holo_hash::{
-    hash_type::{self, AnyDht},
-    AnyDhtHash, EntryHash, HasHash, HeaderHash,
-};
+use holo_hash::{hash_type, hash_type::AnyDht, AnyDhtHash, EntryHash, HasHash, HeaderHash};
 use holochain_p2p::{
-    actor::{GetLinksOptions, GetMetaOptions, GetOptions},
+    actor::{GetLinksOptions, GetMetaOptions},
     HolochainP2pCell, HolochainP2pRef,
 };
 use holochain_serialized_bytes::SerializedBytes;
@@ -37,8 +35,7 @@ use holochain_types::{
     cell::CellId,
     dht_op::produce_op_lights_from_elements,
     dna::{DnaDef, DnaFile},
-    element::ElementStatus,
-    element::{Element, GetElementResponse, WireElement},
+    element::{Element, ElementStatus, GetElementResponse, WireElement},
     entry::option_entry_hashed,
     fixt::*,
     metadata::{MetadataSet, TimedHeaderHash},
@@ -47,6 +44,7 @@ use holochain_types::{
     Entry, EntryHashed, HeaderHashed, Timestamp,
 };
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::{
     element::SignedHeaderHashed,
     header::*,
@@ -55,13 +53,15 @@ use holochain_zome_types::{
     validate::ValidationStatus,
 };
 use maplit::btreeset;
-use std::collections::BTreeMap;
-use std::convert::{TryFrom, TryInto};
+use std::{
+    collections::BTreeMap,
+    convert::{TryFrom, TryInto},
+};
 use tokio::{sync::oneshot, task::JoinHandle};
 use tracing::*;
 use unwrap_to::unwrap_to;
 
-use crate::test_utils::host_fn_api::*;
+use crate::test_utils::host_fn_caller::*;
 
 /*
 #[tokio::test(threaded_scheduler)]
@@ -217,20 +217,13 @@ async fn get_from_another_agent() {
     )
     .await;
 
-    let options = GetOptions {
-        remote_agent_count: None,
-        timeout_ms: None,
-        as_race: false,
-        race_timeout_ms: None,
-        follow_redirects: false,
-        all_live_headers_with_metadata: false,
-    };
+    let options = GetOptions::latest();
 
     // Bob store element
     let entry = Post("Bananas are good for you".into());
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     let header_hash = {
-        let call_data = HostFnApi::create(&bob_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&bob_cell_id, &handle, &dna_file).await;
         let header_hash = call_data
             .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
             .await;
@@ -243,7 +236,7 @@ async fn get_from_another_agent() {
 
     // Alice get element from bob
     let element = {
-        let call_data = HostFnApi::create(&alice_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&alice_cell_id, &handle, &dna_file).await;
         call_data
             .get(entry_hash.clone().into(), options.clone())
             .await
@@ -262,7 +255,7 @@ async fn get_from_another_agent() {
 
     let new_entry = Post("Bananas are bendy".into());
     let (remove_hash, update_hash) = {
-        let call_data = HostFnApi::create(&bob_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&bob_cell_id, &handle, &dna_file).await;
         let remove_hash = call_data.delete_entry(header_hash.clone()).await;
 
         fake_authority(remove_hash.clone().into(), &call_data).await;
@@ -279,7 +272,7 @@ async fn get_from_another_agent() {
 
     // Alice get element from bob
     let (entry_details, header_details) = {
-        let call_data = HostFnApi::create(&alice_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&alice_cell_id, &handle, &dna_file).await;
         debug!(the_entry_hash = ?entry_hash);
         let entry_details = call_data
             .get_details(entry_hash.into(), options.clone())
@@ -377,7 +370,7 @@ async fn get_links_from_another_agent() {
     let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
     let link_tag = fixt!(LinkTag);
     let link_add_hash = {
-        let call_data = HostFnApi::create(&bob_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&bob_cell_id, &handle, &dna_file).await;
         let base_header_hash = call_data
             .commit_entry(base.clone().try_into().unwrap(), POST_ID)
             .await;
@@ -405,7 +398,7 @@ async fn get_links_from_another_agent() {
 
     // Alice get links from bob
     let links = {
-        let call_data = HostFnApi::create(&alice_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&alice_cell_id, &handle, &dna_file).await;
 
         call_data
             .get_links(base_entry_hash.clone(), None, link_options.clone())
@@ -424,7 +417,7 @@ async fn get_links_from_another_agent() {
 
     // Remove the link
     {
-        let call_data = HostFnApi::create(&bob_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&bob_cell_id, &handle, &dna_file).await;
 
         // Link the entries
         let link_remove_hash = call_data.delete_link(link_add_hash.clone()).await;
@@ -433,7 +426,7 @@ async fn get_links_from_another_agent() {
     }
 
     let links = {
-        let call_data = HostFnApi::create(&alice_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&alice_cell_id, &handle, &dna_file).await;
 
         call_data
             .get_link_details(
@@ -604,10 +597,10 @@ async fn generate_fixt_store() -> (
     (store, meta_store)
 }
 
-async fn fake_authority(hash: AnyDhtHash, call_data: &HostFnApi) {
+async fn fake_authority(hash: AnyDhtHash, call_data: &HostFnCaller) {
     // Check bob can get the entry
     let element = call_data
-        .get(hash.clone().into(), GetOptions::default())
+        .get(hash.clone().into(), GetOptions::content())
         .await
         .unwrap();
 

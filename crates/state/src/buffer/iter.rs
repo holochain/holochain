@@ -1,6 +1,4 @@
-use crate::buffer::kv::KvOp;
-use crate::error::DatabaseError;
-use crate::prelude::*;
+use crate::{buffer::kv::KvOp, error::DatabaseError, prelude::*};
 use fallible_iterator::{DoubleEndedFallibleIterator, FallibleIterator};
 use rkv::StoreError;
 use std::collections::BTreeMap;
@@ -355,7 +353,7 @@ where
             self.key = Some(k);
             match self.key_back {
                 Some(k_back) if k >= k_back => return Ok(None),
-                _ => (),
+                _ => {}
             }
         }
         r
@@ -372,7 +370,7 @@ where
             self.key_back = Some(k_back);
             match self.key {
                 Some(key) if k_back <= key => return Ok(None),
-                _ => (),
+                _ => {}
             }
         }
         r

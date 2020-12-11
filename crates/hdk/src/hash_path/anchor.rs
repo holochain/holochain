@@ -1,6 +1,7 @@
-use crate::hash_path::path::Component;
-use crate::hash_path::path::Path;
-use crate::prelude::*;
+use crate::{
+    hash_path::path::{Component, Path},
+    prelude::*,
+};
 use holochain_wasmer_guest::*;
 
 /// "hdk3anchor"
@@ -81,7 +82,7 @@ pub fn anchor(anchor_type: String, anchor_text: String) -> Result<holo_hash::Ent
 /// We can't do anything fancy like ensure the anchor if not exists because we only have a hash.
 pub fn get_anchor(anchor_address: EntryHash) -> Result<Option<Anchor>, HdkError> {
     Ok(
-        match crate::prelude::get(anchor_address, GetOptions)?.and_then(|el| el.into()) {
+        match crate::prelude::get(anchor_address, GetOptions::content())?.and_then(|el| el.into()) {
             Some(Entry::App(eb)) => {
                 let path = Path::try_from(SerializedBytes::from(eb))?;
                 Some(Anchor::try_from(&path)?)

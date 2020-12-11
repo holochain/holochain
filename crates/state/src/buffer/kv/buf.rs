@@ -1,12 +1,11 @@
 use super::KvIntStore;
-use crate::buffer::kv::generic::KvStoreT;
-use crate::buffer::{
-    check_empty_key,
-    iter::{DrainIter, SingleIter, SingleIterFrom, SingleIterKeyMatch},
-    kv::KvStore,
-    BufferedStore,
-};
 use crate::{
+    buffer::{
+        check_empty_key,
+        iter::{DrainIter, SingleIter, SingleIterFrom, SingleIterKeyMatch},
+        kv::{generic::KvStoreT, KvStore},
+        BufferedStore,
+    },
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
     fresh_reader,
@@ -110,6 +109,18 @@ where
             Some(Put(_)) => true,
             Some(Delete) => false,
             None => self.store.get(r, k)?.is_some(),
+        };
+        Ok(exists)
+    }
+
+    /// Check if a value is in the scratch space
+    pub fn contains_in_scratch(&self, k: &K) -> DatabaseResult<bool> {
+        check_empty_key(k)?;
+        use KvOp::*;
+        let exists = match self.scratch.get(k.as_ref()) {
+            Some(Put(_)) => true,
+            Some(Delete) => false,
+            None => false,
         };
         Ok(exists)
     }
@@ -335,7 +346,7 @@ where
                     self.store.db().put(writer, k, &encoded)?;
                 }
                 Delete => match self.store.db().delete(writer, k) {
-                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => (),
+                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => {}
                     r => r?,
                 },
             }
@@ -378,7 +389,7 @@ where
                     .db()
                     .delete(writer, IntKey::from_key_bytes_or_friendly_panic(k))
                 {
-                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => (),
+                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => {}
                     r => r?,
                 },
             }

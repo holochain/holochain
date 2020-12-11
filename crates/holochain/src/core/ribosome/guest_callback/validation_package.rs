@@ -1,29 +1,29 @@
-use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
-use crate::core::ribosome::Invocation;
-use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
+use crate::core::{
+    ribosome::{FnComponents, HostAccess, Invocation, ZomesToInvoke},
+    workflow::CallZomeWorkspaceLock,
+};
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::{HostFnAccess, Permission};
-use holochain_zome_types::header::AppEntryType;
-use holochain_zome_types::validate::ValidationPackage;
-use holochain_zome_types::validate::ValidationPackageCallbackResult;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use holochain_types::dna::zome::{HostFnAccess, Permission, Zome};
+use holochain_zome_types::{
+    header::AppEntryType,
+    validate::{ValidationPackage, ValidationPackageCallbackResult},
+    zome::ZomeName,
+    ExternInput,
+};
 
 #[derive(Clone)]
 pub struct ValidationPackageInvocation {
-    zome_name: ZomeName,
+    zome: Zome,
     app_entry_type: AppEntryType,
 }
 
 impl ValidationPackageInvocation {
-    pub fn new(zome_name: ZomeName, app_entry_type: AppEntryType) -> Self {
+    pub fn new(zome: Zome, app_entry_type: AppEntryType) -> Self {
         Self {
-            zome_name,
+            zome,
             app_entry_type,
         }
     }
@@ -52,7 +52,7 @@ impl From<&ValidationPackageHostAccess> for HostFnAccess {
 
 impl Invocation for ValidationPackageInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::One(self.zome_name.to_owned())
+        ZomesToInvoke::One(self.zome.to_owned())
     }
     fn fn_components(&self) -> FnComponents {
         // @todo zome_id is a u8, is this really an ergonomic way for us to interact with
@@ -124,17 +124,17 @@ impl From<Vec<ValidationPackageCallbackResult>> for ValidationPackageResult {
 
 #[cfg(test)]
 mod test {
-
     use super::ValidationPackageResult;
-    use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::ValidationPackageHostAccessFixturator;
-    use crate::fixt::ValidationPackageInvocationFixturator;
+    use crate::{
+        core::ribosome::{Invocation, ZomesToInvoke},
+        fixt::{ValidationPackageHostAccessFixturator, ValidationPackageInvocationFixturator},
+    };
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
-    use holochain_zome_types::validate::ValidationPackage;
-    use holochain_zome_types::validate::ValidationPackageCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::{
+        validate::{ValidationPackage, ValidationPackageCallbackResult},
+        ExternInput,
+    };
     use rand::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -204,9 +204,9 @@ mod test {
             ValidationPackageInvocationFixturator::new(fixt::Unpredictable)
                 .next()
                 .unwrap();
-        let zome_name = validation_package_invocation.zome_name.clone();
+        let zome = validation_package_invocation.zome.clone();
         assert_eq!(
-            ZomesToInvoke::One(zome_name),
+            ZomesToInvoke::One(zome),
             validation_package_invocation.zomes(),
         );
     }
@@ -251,13 +251,14 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-
     use super::ValidationPackageResult;
-    use crate::core::ribosome::RibosomeT;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::ValidationPackageHostAccessFixturator;
-    use crate::fixt::ValidationPackageInvocationFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::{
+        core::ribosome::RibosomeT,
+        fixt::{
+            curve::Zomes, RealRibosomeFixturator, ValidationPackageHostAccessFixturator,
+            ValidationPackageInvocationFixturator,
+        },
+    };
     use hdk3::prelude::{AppEntryType, EntryVisibility};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::validate::ValidationPackage;
@@ -267,14 +268,14 @@ mod slow_tests {
         let host_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
         let mut validation_package_invocation =
             ValidationPackageInvocationFixturator::new(fixt::Empty)
                 .next()
                 .unwrap();
-        validation_package_invocation.zome_name = TestWasm::Foo.into();
+        validation_package_invocation.zome = TestWasm::Foo.into();
 
         let result = ribosome
             .run_validation_package(host_access, validation_package_invocation)
@@ -287,14 +288,14 @@ mod slow_tests {
         let host_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageSuccess]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageSuccess]))
             .next()
             .unwrap();
         let mut validation_package_invocation =
             ValidationPackageInvocationFixturator::new(fixt::Empty)
                 .next()
                 .unwrap();
-        validation_package_invocation.zome_name = TestWasm::ValidationPackageSuccess.into();
+        validation_package_invocation.zome = TestWasm::ValidationPackageSuccess.into();
         validation_package_invocation.app_entry_type =
             AppEntryType::new(3.into(), 0.into(), EntryVisibility::Public);
 
@@ -312,14 +313,14 @@ mod slow_tests {
         let host_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageFail]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageFail]))
             .next()
             .unwrap();
         let mut validation_package_invocation =
             ValidationPackageInvocationFixturator::new(fixt::Empty)
                 .next()
                 .unwrap();
-        validation_package_invocation.zome_name = TestWasm::ValidationPackageFail.into();
+        validation_package_invocation.zome = TestWasm::ValidationPackageFail.into();
 
         let result = ribosome
             .run_validation_package(host_access, validation_package_invocation)

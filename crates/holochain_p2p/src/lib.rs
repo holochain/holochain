@@ -4,24 +4,29 @@
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::activity::AgentActivity;
-use holochain_zome_types::{capability::CapSecret, zome::ZomeName};
-use holochain_zome_types::{query::ChainQueryFilter, zome::FunctionName};
+use holochain_zome_types::{
+    capability::CapSecret,
+    query::ChainQueryFilter,
+    zome::{FunctionName, ZomeName},
+};
 use std::sync::Arc;
 
 mod types;
-pub use types::actor::{HolochainP2pRef, HolochainP2pSender};
-pub use types::*;
+pub use types::{
+    actor::{HolochainP2pRef, HolochainP2pSender},
+    *,
+};
 
 mod spawn;
 use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
-use holochain_types::{element::GetElementResponse, validate::ValidationPackageResponse};
 use holochain_types::{
+    element::GetElementResponse,
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::MetadataSet,
+    validate::ValidationPackageResponse,
 };
 pub use spawn::*;
-pub use test::stub_network;
-pub use test::HolochainP2pCellFixturator;
+pub use test::{stub_network, HolochainP2pCellFixturator};
 
 pub use kitsune_p2p;
 

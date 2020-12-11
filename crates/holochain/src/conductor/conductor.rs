@@ -31,30 +31,37 @@ use super::{
     p2p_store::get_single_agent_info,
     p2p_store::inject_agent_infos,
     paths::EnvironmentRootPath,
-    state::AppInterfaceId,
-    state::ConductorState,
+    state::{AppInterfaceId, ConductorState},
     CellError,
 };
-use crate::conductor::p2p_store::{AgentKv, AgentKvKey};
 use crate::{
     conductor::{
-        api::error::ConductorApiResult, cell::Cell, config::ConductorConfig,
-        dna_store::MockDnaStore, error::ConductorResult, handle::ConductorHandle,
+        api::error::ConductorApiResult,
+        cell::Cell,
+        config::ConductorConfig,
+        dna_store::MockDnaStore,
+        error::ConductorResult,
+        handle::ConductorHandle,
+        p2p_store::{AgentKv, AgentKvKey},
     },
-    core::signal::Signal,
-    core::state::{source_chain::SourceChainBuf, wasm::WasmBuf},
+    core::{
+        signal::Signal,
+        state::{source_chain::SourceChainBuf, wasm::WasmBuf},
+    },
 };
 pub use builder::*;
 use fallible_iterator::FallibleIterator;
-use futures::future::{self, TryFutureExt};
+use futures::{
+    future::{self, TryFutureExt},
+    StreamExt,
+};
 use holo_hash::DnaHash;
 use holochain_keystore::{
     lair_keystore::spawn_lair_keystore, test_keystore::spawn_test_keystore, KeystoreSender,
     KeystoreSenderExt,
 };
 use holochain_state::{
-    buffer::BufferedStore,
-    buffer::{KvStore, KvStoreT},
+    buffer::{BufferedStore, KvStore, KvStoreT},
     db,
     env::{EnvironmentKind, EnvironmentWrite, ReadManager},
     exports::SingleStore,
@@ -68,9 +75,11 @@ use holochain_types::{
 };
 use holochain_zome_types::entry_def::EntryDef;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
-use std::sync::Arc;
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+    sync::Arc,
+};
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
@@ -608,11 +617,11 @@ where
             .into_iter()
             .map(|dna_def| {
                 // Load all wasms for each dna_def from the wasm db into memory
-                let wasms = dna_def.zomes.clone().into_iter().map(|(_, zome)| {
+                let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
                     let wasm_buf = wasm_buf.clone();
                     async move {
                         wasm_buf
-                            .get(&zome.wasm_hash)
+                            .get(&zome.wasm_hash(&zome_name)?)
                             .await?
                             .map(|hashed| hashed.into_content())
                             .ok_or(ConductorError::WasmMissing)
@@ -739,10 +748,10 @@ where
                     match iter.next() {
                         Ok(Some((k, v))) => {
                             let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
-                            if info.signed_at_ms() + info.expires_after_ms() <= now {
-                                expired.push(AgentKvKey::from(k));
-                            } else {
-                                out.push(v);
+                            let expires = info.signed_at_ms().checked_add(info.expires_after_ms());
+                            match expires {
+                                Some(expires) if expires > now => out.push(v),
+                                _ => expired.push(AgentKvKey::from(k)),
                             }
                         }
                         Ok(None) => break,
@@ -789,7 +798,7 @@ where
             }
         }
         if dna_def_buf.get(dna.dna_hash()).await?.is_none() {
-            dna_def_buf.put(dna.dna().clone()).await?;
+            dna_def_buf.put(dna.dna_def().clone()).await?;
         }
         {
             let env = environ.guard();
@@ -910,10 +919,12 @@ where
 pub type ConductorStateDb = KvStore<UnitDbKey, ConductorState>;
 
 mod builder {
-
     use super::*;
     use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
-    use holochain_state::{env::EnvironmentKind, test_utils::TestEnvironments};
+    use holochain_state::env::EnvironmentKind;
+
+    #[cfg(any(test, feature = "test_utils"))]
+    use holochain_state::test_utils::TestEnvironments;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
@@ -1102,6 +1113,7 @@ mod builder {
         }
 
         /// Build a Conductor with a test environment
+        #[cfg(any(test, feature = "test_utils"))]
         pub async fn test(self, envs: &TestEnvironments) -> ConductorResult<ConductorHandle> {
             let keystore = envs.conductor().keystore();
             let (holochain_p2p, p2p_evt) =
@@ -1126,27 +1138,36 @@ mod builder {
     }
 }
 
+#[instrument(skip(p2p_evt, handle))]
 async fn p2p_event_task(
-    mut p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
+    p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,
 ) {
-    use tokio::stream::StreamExt;
-    while let Some(evt) = p2p_evt.next().await {
-        let cell_id = CellId::new(evt.dna_hash().clone(), evt.as_to_agent().clone());
-        if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
-            tracing::error!(
-                message = "error dispatching network event",
-                error = ?e,
-            );
-        }
-    }
+    /// The number of events we allow to run in parallel before
+    /// starting to await on the join handles.
+    const NUM_PARALLEL_EVTS: usize = 100;
+    p2p_evt
+        .for_each_concurrent(NUM_PARALLEL_EVTS, |evt| {
+            let handle = handle.clone();
+            async move {
+                let cell_id = CellId::new(evt.dna_hash().clone(), evt.as_to_agent().clone());
+                if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
+                    tracing::error!(
+                        message = "error dispatching network event",
+                        error = ?e,
+                    );
+                }
+            }
+            .in_current_span()
+        })
+        .await;
+
     tracing::warn!("p2p_event_task has ended");
 }
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
-    use super::{Conductor, ConductorState};
+    use super::{Conductor, ConductorState, *};
     use crate::conductor::dna_store::MockDnaStore;
     use holochain_state::test_utils::test_environments;
     use holochain_types::test_utils::fake_cell_id;

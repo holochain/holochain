@@ -2,12 +2,14 @@
 //! i.e. those configured with `InterfaceDriver::Websocket`
 
 use super::error::{InterfaceError, InterfaceResult};
-use crate::conductor::{
-    conductor::StopReceiver,
-    interface::*,
-    manager::{ManagedTaskHandle, ManagedTaskResult},
+use crate::{
+    conductor::{
+        conductor::StopReceiver,
+        interface::*,
+        manager::{ManagedTaskHandle, ManagedTaskResult},
+    },
+    core::signal::Signal,
 };
-use crate::core::signal::Signal;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_websocket::{
     websocket_bind, WebsocketConfig, WebsocketListener, WebsocketMessage, WebsocketReceiver,
@@ -16,9 +18,7 @@ use holochain_websocket::{
 use std::convert::TryFrom;
 
 use std::sync::Arc;
-use tokio::stream::StreamExt;
-use tokio::sync::broadcast;
-use tokio::task::JoinHandle;
+use tokio::{stream::StreamExt, sync::broadcast, task::JoinHandle};
 use tracing::*;
 use url2::url2;
 
@@ -161,7 +161,7 @@ async fn handle_shutdown(listener_handles: Vec<JoinHandle<InterfaceResult<()>>>)
     for h in listener_handles {
         // Show if these are actually finishing
         match tokio::time::timeout(std::time::Duration::from_secs(1), h).await {
-            Ok(Ok(Ok(_))) => (),
+            Ok(Ok(Ok(_))) => {}
             r => warn!(message = "Websocket listener failed to join child tasks", result = ?r),
         }
     }
@@ -174,7 +174,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, mut rx_from_iface: We
         match handle_incoming_message(msg, api.clone()).await {
             Err(InterfaceError::Closed) => break,
             Err(e) => error!(error = &e as &dyn std::error::Error),
-            Ok(()) => (),
+            Ok(()) => {}
         }
     }
 }
@@ -245,7 +245,7 @@ where
 pub mod test {
     use super::*;
     use crate::{conductor::p2p_store::AgentKv, core::state::source_chain::SourceChainBuf};
-    use crate::{conductor::p2p_store::AgentKvKey, fixt::WasmRibosomeFixturator};
+    use crate::{conductor::p2p_store::AgentKvKey, fixt::RealRibosomeFixturator};
     use crate::{
         conductor::{
             api::{
@@ -282,6 +282,7 @@ pub mod test {
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
     #[serde(rename_all = "snake_case", tag = "type", content = "data")]
+    // NB: intentionally misspelled to test for serialization errors :)
     enum AdmonRequest {
         InstallsDna(String),
     }
@@ -431,7 +432,7 @@ pub mod test {
         );
 
         // warm the zome
-        let _ = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
+        let _ = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
 
@@ -455,20 +456,18 @@ pub mod test {
             .return_const(());
 
         let (_tmpdir, app_api, handle) = setup_app(vec![(installed_cell, None)], dna_store).await;
-        let mut request = Box::new(
-            crate::core::ribosome::ZomeCallInvocationFixturator::new(
-                crate::core::ribosome::NamedInvocation(
-                    cell_id.clone(),
-                    TestWasm::Foo.into(),
-                    "foo".into(),
-                    ExternInput::new(().try_into().unwrap()),
-                ),
-            )
+        let mut request: ZomeCall =
+            crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
+                cell_id.clone(),
+                TestWasm::Foo.into(),
+                "foo".into(),
+                ExternInput::new(().try_into().unwrap()),
+            ))
             .next()
-            .unwrap(),
-        );
+            .unwrap()
+            .into();
         request.cell_id = cell_id;
-        let msg = AppRequest::ZomeCallInvocation(request);
+        let msg = AppRequest::ZomeCallInvocation(Box::new(request));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
@@ -479,7 +478,7 @@ pub mod test {
 
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, app_api).await.unwrap();
-        // the time here should be almost the same (about +0.1ms) vs. the raw wasm_ribosome call
+        // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
         // the overhead of a websocket request locally is small
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
@@ -612,7 +611,7 @@ pub mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::AppInterfaceAttached{ .. });
+            assert_matches!(response, AdminResponse::AppInterfaceAttached { .. });
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);

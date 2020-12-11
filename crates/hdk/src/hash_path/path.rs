@@ -1,6 +1,7 @@
-use crate::hash_path::shard::ShardStrategy;
-use crate::hash_path::shard::SHARDEND;
-use crate::prelude::*;
+use crate::{
+    hash_path::shard::{ShardStrategy, SHARDEND},
+    prelude::*,
+};
 use holochain_wasmer_guest::*;
 use holochain_zome_types::link::LinkTag;
 use std::str::FromStr;
@@ -262,7 +263,7 @@ impl Path {
 
     /// Does an entry exist at the hash we expect?
     pub fn exists(&self) -> Result<bool, HdkError> {
-        Ok(get(self.hash()?, GetOptions)?.is_some())
+        Ok(get(self.hash()?, GetOptions::content())?.is_some())
     }
 
     /// Recursively touch this and every parent that doesn't exist yet.

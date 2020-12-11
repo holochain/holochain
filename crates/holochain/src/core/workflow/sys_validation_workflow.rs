@@ -7,9 +7,7 @@ use crate::{
     core::{
         queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
         state::{
-            cascade::Cascade,
-            cascade::DbPair,
-            cascade::DbPairMut,
+            cascade::{Cascade, DbPair, DbPairMut},
             dht_op_integration::{IntegrationLimboStore, IntegrationLimboValue},
             element_buf::ElementBuf,
             metadata::MetadataBuf,
@@ -34,12 +32,16 @@ use holochain_types::{
     dht_op::DhtOp, header::NewEntryHeaderRef, test_utils::which_agent, validate::ValidationStatus,
     Entry, Timestamp,
 };
-use holochain_zome_types::{entry_def::EntryVisibility, signature::Signature};
 use holochain_zome_types::{
+    entry_def::EntryVisibility,
     header::{CreateLink, Delete, DeleteLink, EntryType, Update},
+    signature::Signature,
     Header,
 };
-use std::{collections::BinaryHeap, convert::TryFrom, convert::TryInto};
+use std::{
+    collections::BinaryHeap,
+    convert::{TryFrom, TryInto},
+};
 use tracing::*;
 
 use produce_dht_ops_workflow::dht_op_light::light_to_op;
@@ -439,7 +441,7 @@ async fn sys_validate_element_inner(
         Header::DeleteLink(header) => {
             register_delete_link(header, workspace, network, incoming_dht_ops_sender).await?;
         }
-        _ => (),
+        _ => {}
     }
     Ok(())
 }
@@ -713,7 +715,7 @@ pub struct SysValidationWorkspace {
 }
 
 impl<'a> SysValidationWorkspace {
-    pub fn cascade<Network: HolochainP2pCellT + Clone>(
+    pub fn cascade<Network: HolochainP2pCellT + Clone + Send + 'static>(
         &'a mut self,
         network: Network,
     ) -> Cascade<'a, Network> {
@@ -723,6 +725,8 @@ impl<'a> SysValidationWorkspace {
             &self.meta_authored,
             &self.element_vault,
             &self.meta_vault,
+            &self.element_rejected,
+            &self.meta_rejected,
             &mut self.element_cache,
             &mut self.meta_cache,
             network,
@@ -861,6 +865,8 @@ impl TryFrom<&CallZomeWorkspace> for SysValidationWorkspace {
             meta_authored,
             element_integrated,
             meta_integrated,
+            element_rejected,
+            meta_rejected,
             element_cache,
             meta_cache,
         } = call_zome;
@@ -869,6 +875,8 @@ impl TryFrom<&CallZomeWorkspace> for SysValidationWorkspace {
         sys_val.meta_authored = meta_authored.into();
         sys_val.element_vault = element_integrated.into();
         sys_val.meta_vault = meta_integrated.into();
+        sys_val.element_rejected = element_rejected.into();
+        sys_val.meta_rejected = meta_rejected.into();
         sys_val.element_cache = element_cache.into();
         sys_val.meta_cache = meta_cache.into();
         Ok(sys_val)

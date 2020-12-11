@@ -1,14 +1,18 @@
-use crate::core::ribosome::error::{RibosomeError, RibosomeResult};
+use crate::core::ribosome::error::RibosomeError;
+use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::cascade::error::CascadeError;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-use crate::core::{workflow::integrate_dht_ops_workflow::integrate_to_authored, SourceChainError};
-use holo_hash::{EntryHash, HeaderHash};
-use holochain_p2p::actor::GetOptions;
+use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
+use crate::core::SourceChainError;
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
+use holochain_zome_types::element::SignedHeaderHashed;
+use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::builder;
 use holochain_zome_types::DeleteInput;
-use holochain_zome_types::{element::SignedHeaderHashed, DeleteOutput};
+use holochain_zome_types::DeleteOutput;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -62,7 +66,7 @@ pub(crate) fn get_original_address<'a>(
         let mut cascade = workspace.cascade(network);
         // TODO: Think about what options to use here
         let maybe_original_element: Option<SignedHeaderHashed> = cascade
-            .get_details(address.clone().into(), GetOptions::default())
+            .get_details(address.clone().into(), GetOptions::content())
             .await?
             .map(|el| {
                 match el {
@@ -92,7 +96,8 @@ pub(crate) fn get_original_address<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::{core::workflow::CallZomeWorkspace, fixt::ZomeCallHostAccessFixturator};
+    use crate::core::workflow::CallZomeWorkspace;
+    use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_wasm_test_utils::TestWasm;

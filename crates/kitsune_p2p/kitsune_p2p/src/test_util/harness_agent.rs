@@ -50,11 +50,7 @@ pub(crate) async fn spawn_test_agent(
     Ok((agent, p2p, control))
 }
 
-use lair_keystore_api::{
-    entry::EntrySignEd25519,
-    //actor::SignEd25519PubKey,
-    internal::sign_ed25519::*,
-};
+use lair_keystore_api::{entry::EntrySignEd25519, internal::sign_ed25519::*};
 
 struct AgentHarness {
     agent: Arc<KitsuneAgent>,

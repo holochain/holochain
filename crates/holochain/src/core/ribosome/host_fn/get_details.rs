@@ -1,6 +1,8 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::{CallContext, RibosomeT};
-use holochain_zome_types::{GetDetailsInput, GetDetailsOutput};
+use crate::core::ribosome::CallContext;
+use crate::core::ribosome::RibosomeT;
+use holochain_zome_types::GetDetailsInput;
+use holochain_zome_types::GetDetailsOutput;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -22,7 +24,7 @@ pub fn get_details<'a>(
             .write()
             .await
             .cascade(network)
-            .get_details(hash, options.into())
+            .get_details(hash, options)
             .await?;
         Ok(GetDetailsOutput::new(maybe_details))
     })
@@ -31,7 +33,8 @@ pub fn get_details<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::{core::workflow::CallZomeWorkspace, fixt::ZomeCallHostAccessFixturator};
+    use crate::core::workflow::CallZomeWorkspace;
+    use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_wasm_test_utils::TestWasm;

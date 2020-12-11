@@ -1,8 +1,8 @@
 use holo_hash::WasmHash;
-use holochain_state::error::{DatabaseError, DatabaseResult};
-use holochain_state::exports::SingleStore;
 use holochain_state::{
     buffer::CasBufFreshAsync,
+    error::{DatabaseError, DatabaseResult},
+    exports::SingleStore,
     prelude::{BufferedStore, EnvironmentRead},
     transaction::Writer,
 };

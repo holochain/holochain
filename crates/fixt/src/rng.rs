@@ -7,8 +7,7 @@
 //! of a previous run'
 
 use parking_lot::Mutex;
-use rand::SeedableRng;
-use rand::{rngs::StdRng, RngCore};
+use rand::{rngs::StdRng, RngCore, SeedableRng};
 use std::sync::Arc;
 
 lazy_static::lazy_static! {

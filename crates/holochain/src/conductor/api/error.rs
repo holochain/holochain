@@ -12,6 +12,7 @@ use crate::{
         workflow::error::WorkflowError,
     },
 };
+use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::CellId;
@@ -24,13 +25,19 @@ pub enum ConductorApiError {
     #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
     CellMissing(CellId),
 
+    /// The Dna for this Cell is not installed in the conductor.
+    #[error("The Dna for this Cell is not installed in the conductor! DnaHash: {0}")]
+    DnaMissing(DnaHash),
+
     /// Cell was referenced, but is missing from the conductor.
-    #[error("A Cell attempted to use an CellConductorApi it was not given.\nAPI CellId: {api_cell_id:?}\nInvocation CellId: {invocation_cell_id:?}")]
-    ZomeCallInvocationCellMismatch {
+    #[error(
+        "A Cell attempted to use an CellConductorApi it was not given.\nAPI CellId: {api_cell_id:?}\nInvocation CellId: {call_cell_id:?}"
+    )]
+    ZomeCallCellMismatch {
         /// The CellId which is referenced by the CellConductorApi
         api_cell_id: CellId,
         /// The CellId which is referenced by the ZomeCallInvocation
-        invocation_cell_id: CellId,
+        call_cell_id: CellId,
     },
 
     /// Conductor threw an error during API call.

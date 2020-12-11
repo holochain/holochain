@@ -6,10 +6,10 @@ use std::collections::HashMap;
 
 /// How often should NAT nodes refresh their proxy contract?
 /// Note - ProxyTo entries will be expired at double this time.
-const PROXY_KEEPALIVE_MS: u64 = 30000;
+const PROXY_KEEPALIVE_MS: u64 = 15000;
 /// How much longer the proxy should wait to remove the contract
 /// if no keep alive is received.
-const KEEPALIVE_MULTIPLIER: u64 = 2;
+const KEEPALIVE_MULTIPLIER: u64 = 3;
 
 /// Wrap a transport listener sender/receiver in kitsune proxy logic.
 pub async fn spawn_kitsune_proxy_listener(

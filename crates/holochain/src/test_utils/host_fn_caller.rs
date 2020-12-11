@@ -1,16 +1,15 @@
 #![allow(missing_docs)]
 
 use crate::{
-    conductor::ConductorHandle,
     conductor::{
         api::{CellConductorApi, CellConductorApiT, CellConductorReadHandle},
         interface::SignalBroadcaster,
+        ConductorHandle,
     },
-    core::ribosome::RibosomeT,
-    core::ribosome::ZomeCallInvocation,
     core::{
         ribosome::{
-            host_fn, wasm_ribosome::WasmRibosome, CallContext, HostAccess, ZomeCallHostAccess,
+            host_fn, real_ribosome::RealRibosome, CallContext, HostAccess, RibosomeT,
+            ZomeCallHostAccess, ZomeCallInvocation,
         },
         state::{metadata::LinkMetaKey, workspace::Workspace},
         workflow::{CallZomeWorkspace, CallZomeWorkspaceLock},
@@ -20,7 +19,7 @@ use hdk3::prelude::EntryError;
 use holo_hash::{AgentPubKey, AnyDhtHash, EntryHash, HeaderHash};
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{
-    actor::{GetLinksOptions, GetOptions, HolochainP2pRefToCell},
+    actor::{GetLinksOptions, HolochainP2pRefToCell},
     HolochainP2pCell,
 };
 use holochain_serialized_bytes::prelude::*;
@@ -29,14 +28,13 @@ use holochain_state::{
     prelude::{GetDb, WriteManager},
 };
 use holochain_types::{cell::CellId, dna::DnaFile, element::Element, Entry};
+use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::{
     element::SignedHeaderHashed,
     entry_def,
     link::{Link, LinkTag},
     metadata::Details,
-    query::ActivityRequest,
-    query::AgentActivity,
-    query::ChainQueryFilter,
+    query::{ActivityRequest, AgentActivity, ChainQueryFilter},
     zome::ZomeName,
     CreateInput, CreateLinkInput, DeleteInput, DeleteLinkInput, GetAgentActivityInput,
     GetDetailsInput, GetInput, GetLinksInput, UpdateInput, ZomeCallResponse,
@@ -98,9 +96,9 @@ pub enum MaybeLinkable {
 /// A freely callable version of the host fn api, so that host functions
 /// can be called from Rust instead of Wasm
 #[derive(Clone)]
-pub struct HostFnApi {
+pub struct HostFnCaller {
     pub env: EnvironmentWrite,
-    pub ribosome: WasmRibosome,
+    pub ribosome: RealRibosome,
     pub zome_path: ZomePath,
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
@@ -108,24 +106,24 @@ pub struct HostFnApi {
     pub call_zome_handle: CellConductorReadHandle,
 }
 
-impl HostFnApi {
-    /// Create HostFnApi for the first zome.
-    #[deprecated = "use create_for_zome"]
+impl HostFnCaller {
+    /// Create HostFnCaller for the first zome.
+    // #[deprecated = "use create_for_zome"]
     pub async fn create(
         cell_id: &CellId,
         handle: &ConductorHandle,
         dna_file: &DnaFile,
-    ) -> HostFnApi {
+    ) -> HostFnCaller {
         Self::create_for_zome(cell_id, handle, dna_file, 0).await
     }
 
-    /// Create HostFnApi for a specific zome if there are multiple.
+    /// Create HostFnCaller for a specific zome if there are multiple.
     pub async fn create_for_zome(
         cell_id: &CellId,
         handle: &ConductorHandle,
         dna_file: &DnaFile,
         zome_index: usize,
-    ) -> HostFnApi {
+    ) -> HostFnCaller {
         let env = handle.get_cell_env(cell_id).await.unwrap();
         let keystore = env.keystore().clone();
         let network = handle
@@ -137,11 +135,11 @@ impl HostFnApi {
             dna_file.dna().zomes.get(zome_index).unwrap().0.clone(),
         )
             .into();
-        let ribosome = WasmRibosome::new(dna_file.clone());
+        let ribosome = RealRibosome::new(dna_file.clone());
         let signal_tx = handle.signal_broadcaster().await;
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
-        HostFnApi {
+        HostFnCaller {
             env,
             ribosome,
             zome_path,
@@ -160,11 +158,11 @@ impl HostFnApi {
         &self,
     ) -> (
         EnvironmentWrite,
-        Arc<WasmRibosome>,
+        Arc<RealRibosome>,
         Arc<CallContext>,
         CallZomeWorkspaceLock,
     ) {
-        let HostFnApi {
+        let HostFnCaller {
             env,
             network,
             keystore,
@@ -187,12 +185,13 @@ impl HostFnApi {
             cell_id,
         );
         let ribosome = Arc::new(ribosome);
-        let call_context = Arc::new(CallContext::new(zome_name, host_access.into()));
+        let zome = ribosome.dna_def().get_zome(&zome_name).unwrap();
+        let call_context = Arc::new(CallContext::new(zome, host_access.into()));
         (env, ribosome, call_context, workspace_lock)
     }
 }
 
-impl HostFnApi {
+impl HostFnCaller {
     pub async fn commit_entry<E: Into<entry_def::EntryDefId>>(
         &self,
         entry: Entry,
@@ -251,9 +250,9 @@ impl HostFnApi {
         output.into_inner()
     }
 
-    pub async fn get(&self, entry_hash: AnyDhtHash, _options: GetOptions) -> Option<Element> {
+    pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Option<Element> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
+        let input = GetInput::new((entry_hash, options));
         let output = { host_fn::get::get(ribosome, call_context, input).unwrap() };
         output.into_inner()
     }
@@ -261,10 +260,10 @@ impl HostFnApi {
     pub async fn get_details<'env>(
         &self,
         entry_hash: AnyDhtHash,
-        _options: GetOptions,
+        options: GetOptions,
     ) -> Option<Details> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetDetailsInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
+        let input = GetDetailsInput::new((entry_hash, options));
         let output = { host_fn::get_details::get_details(ribosome, call_context, input).unwrap() };
         output.into_inner()
     }

@@ -5,8 +5,7 @@
 //! [Entry]: holochain_types::Entry
 
 use fallible_iterator::FallibleIterator;
-use holo_hash::HasHash;
-use holo_hash::{AgentPubKey, AnyDhtHash, EntryHash, HeaderHash};
+use holo_hash::{AgentPubKey, AnyDhtHash, EntryHash, HasHash, HeaderHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::{KvBufUsed, KvvBufUsed},
@@ -18,18 +17,20 @@ use holochain_state::{
     fresh_reader,
     prelude::*,
 };
-use holochain_types::metadata::{EntryDhtStatus, TimedHeaderHash};
-use holochain_types::{header::NewEntryHeader, link::WireLinkMetaKey};
-use holochain_types::{HeaderHashed, Timestamp};
-use holochain_zome_types::{
-    header::{self, CreateLink, DeleteLink, ZomeId},
-    query::ChainFork,
-    query::ChainHead,
-    query::ChainStatus,
-    query::HighestObserved,
-    validate::ValidationStatus,
+use holochain_types::{
+    header::NewEntryHeader,
+    link::WireLinkMetaKey,
+    metadata::{EntryDhtStatus, TimedHeaderHash},
+    HeaderHashed, Timestamp,
 };
-use holochain_zome_types::{link::LinkTag, Header};
+use holochain_zome_types::{
+    header,
+    header::{CreateLink, DeleteLink, ZomeId},
+    link::LinkTag,
+    query::{ChainFork, ChainHead, ChainStatus, HighestObserved},
+    validate::ValidationStatus,
+    Header,
+};
 use std::{collections::HashSet, fmt::Debug};
 use tracing::*;
 

@@ -1,5 +1,6 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::{CallContext, RibosomeT};
+use crate::core::ribosome::CallContext;
+use crate::core::ribosome::RibosomeT;
 use holochain_zome_types::GetInput;
 use holochain_zome_types::GetOutput;
 use std::sync::Arc;
@@ -23,7 +24,7 @@ pub fn get<'a>(
             .write()
             .await
             .cascade(network)
-            .dht_get(hash, options.into())
+            .dht_get(hash, options)
             .await?;
 
         Ok(GetOutput::new(maybe_element))

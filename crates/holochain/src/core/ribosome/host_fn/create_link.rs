@@ -1,10 +1,9 @@
 use crate::core::ribosome::error::RibosomeResult;
+use crate::core::ribosome::CallContext;
+use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
-use crate::core::{
-    ribosome::{CallContext, RibosomeT},
-    workflow::CallZomeWorkspace,
-    SourceChainResult,
-};
+use crate::core::workflow::CallZomeWorkspace;
+use crate::core::SourceChainResult;
 use holochain_zome_types::header::builder;
 use holochain_zome_types::CreateLinkInput;
 use holochain_zome_types::CreateLinkOutput;
@@ -19,7 +18,7 @@ pub fn create_link<'a>(
     let (base_address, target_address, tag) = input.into_inner();
 
     // extract the zome position
-    let zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
+    let zome_id = ribosome.zome_to_id(&call_context.zome)?;
 
     // Construct the link add
     let header_builder = builder::CreateLink::new(base_address, target_address, zome_id, tag);

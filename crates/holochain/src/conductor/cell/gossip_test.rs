@@ -1,11 +1,10 @@
 use crate::{
     conductor::p2p_store::{AgentKv, AgentKvKey},
-    test_utils::{conductor_setup::ConductorTestData, new_invocation},
+    test_utils::{conductor_setup::ConductorTestData, new_zome_call, wait_for_integration},
 };
 use fallible_iterator::FallibleIterator;
 use hdk3::prelude::*;
-use holochain_state::buffer::KvStoreT;
-use holochain_state::fresh_reader_test;
+use holochain_state::{buffer::KvStoreT, fresh_reader_test};
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::{KitsuneBinType, KitsuneP2pConfig};
 use matches::assert_matches;
@@ -25,7 +24,7 @@ async fn gossip_test() {
 
     let anchor_invocation = |anchor: &str, cell_id, i: usize| {
         let anchor = AnchorInput(anchor.into(), i.to_string());
-        new_invocation(cell_id, "anchor", anchor, TestWasm::Anchor)
+        new_zome_call(cell_id, "anchor", anchor, TestWasm::Anchor)
     };
 
     for i in 0..NUM {
@@ -35,7 +34,7 @@ async fn gossip_test() {
     }
 
     // Give publish time to finish
-    tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+    tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
 
     // Bring Bob online
     conductor_test.bring_bob_online().await;
@@ -43,10 +42,21 @@ async fn gossip_test() {
     let bob_cell_id = &bob_call_data.cell_id;
 
     // Give gossip some time to finish
-    tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+    const NUM_ATTEMPTS: usize = 100;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
+
+    // 13 ops per anchor plus 7 for genesis + 2 for init + 2 for cap
+    let expected_count = NUM * 13 + 7 * 2 + 2 + 2;
+    wait_for_integration(
+        &bob_call_data.env,
+        expected_count,
+        NUM_ATTEMPTS,
+        DELAY_PER_ATTEMPT.clone(),
+    )
+    .await;
 
     // Bob list anchors
-    let invocation = new_invocation(
+    let invocation = new_zome_call(
         bob_cell_id,
         "list_anchor_addresses",
         TestString("alice".into()),

@@ -2,21 +2,24 @@
 
 use crate::{
     conductor::{
-        api::RealAppInterfaceApi,
+        api::{RealAppInterfaceApi, ZomeCall},
         config::{AdminInterfaceConfig, ConductorConfig, InterfaceDriver},
         ConductorBuilder, ConductorHandle,
     },
-    core::ribosome::ZomeCallInvocation,
-    core::state::cascade::Cascade,
-    core::state::cascade::DbPair,
-    core::state::element_buf::ElementBuf,
-    core::state::metadata::MetadataBuf,
-    core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
+    core::{
+        ribosome::ZomeCallInvocation,
+        state::{
+            cascade::{Cascade, DbPair},
+            element_buf::ElementBuf,
+            metadata::MetadataBuf,
+        },
+        workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
+    },
 };
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
-use holo_hash::fixt::*;
-use holo_hash::*;
+use hdk3::prelude::ZomeName;
+use holo_hash::{fixt::*, *};
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{
     actor::HolochainP2pRefToCell, event::HolochainP2pEvent, spawn_holochain_p2p, HolochainP2pCell,
@@ -24,21 +27,22 @@ use holochain_p2p::{
 };
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
 use holochain_state::{
-    env::EnvironmentWrite, fresh_reader_test, test_utils::test_environments,
-    test_utils::TestEnvironments,
+    env::EnvironmentWrite,
+    fresh_reader_test,
+    test_utils::{test_environments, TestEnvironments},
 };
 use holochain_types::{
     app::InstalledCell,
     cell::CellId,
-    dna::DnaFile,
+    dna::{zome::Zome, DnaFile},
     element::{SignedHeaderHashed, SignedHeaderHashedExt},
     fixt::CapSecretFixturator,
     test_utils::fake_header_hash,
     Entry, EntryHashed, HeaderHashed, Timestamp,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{entry_def::EntryVisibility, zome::ZomeName};
 use holochain_zome_types::{
+    entry_def::EntryVisibility,
     header::{Create, EntryType, Header},
     ExternInput,
 };
@@ -47,11 +51,9 @@ use std::{convert::TryInto, sync::Arc, time::Duration};
 use tempdir::TempDir;
 use tokio::sync::mpsc;
 
-#[cfg(any(test, feature = "test_utils"))]
-pub mod host_fn_api;
-
-#[cfg(any(test, feature = "test_utils"))]
 pub mod conductor_setup;
+pub mod host_fn_caller;
+pub mod test_conductor;
 
 /// Produce file and line number info at compile-time
 #[macro_export]
@@ -245,7 +247,7 @@ where
                 QueryAgentInfoSigned { respond, .. } => {
                     respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                 }
-                _ => (),
+                _ => {}
             }
         }
     });
@@ -341,11 +343,12 @@ pub async fn setup_app_inner(
 pub fn warm_wasm_tests() {
     if let Some(_path) = std::env::var_os("HC_WASM_CACHE_PATH") {
         let wasms: Vec<_> = TestWasm::iter().collect();
-        crate::fixt::WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
+        crate::fixt::RealRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
             .next()
             .unwrap();
     }
 }
+
 /// Exit early if the expected number of ops
 /// have been integrated or wait for num_attempts * delay
 #[tracing::instrument(skip(env))]
@@ -355,79 +358,186 @@ pub async fn wait_for_integration(
     num_attempts: usize,
     delay: Duration,
 ) {
-    for _ in 0..num_attempts {
-        let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
-
-        let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
-            workspace
-                .validation_limbo
-                .iter(&r)
-                .unwrap()
-                .map(|(_, v)| Ok(v))
-                .collect()
-                .unwrap()
-        });
-        tracing::debug!(?val_limbo);
-
-        let int_limbo: Vec<_> = fresh_reader_test!(env, |r| {
-            workspace
-                .integration_limbo
-                .iter(&r)
-                .unwrap()
-                .map(|(_, v)| Ok(v))
-                .collect()
-                .unwrap()
-        });
-        tracing::debug!(?int_limbo);
-
-        let int: Vec<_> = fresh_reader_test!(env, |r| {
-            workspace
-                .integrated_dht_ops
-                .iter(&r)
-                .unwrap()
-                .map(|(_, v)| Ok(v))
-                .collect()
-                .unwrap()
-        });
-        let count = int.len();
-
-        {
-            let s = tracing::trace_span!("wait_for_integration_deep");
-            let _g = s.enter();
-            let element_integrated = ElementBuf::vault(env.clone().into(), false).unwrap();
-            let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
-            let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
-            let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
-            let mut cascade = Cascade::empty()
-                .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
-                .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
-            for iv in int {
-                tracing::trace!(op = ?iv.op, el = ?cascade.retrieve(iv.op.header_hash().clone().into(), Default::default()).await.unwrap());
-            }
-        }
-
+    for i in 0..num_attempts {
+        let count = display_integration(env).await;
         if count == expected_count {
             return;
         } else {
-            tracing::debug!(?count);
+            let total_time_waited = delay * i as u32;
+            tracing::debug!(?count, ?total_time_waited);
         }
         tokio::time::delay_for(delay).await;
     }
 }
 
+#[tracing::instrument(skip(env, others))]
+/// Same as wait for integration but can print other states at the same time
+pub async fn wait_for_integration_with_others(
+    env: &EnvironmentWrite,
+    others: &[&EnvironmentWrite],
+    expected_count: usize,
+    num_attempts: usize,
+    delay: Duration,
+) {
+    let mut last_total = 0;
+    for i in 0..num_attempts {
+        let count = count_integration(env).await;
+        let counts = get_counts(others).await;
+        let total: usize = counts.clone().into_iter().map(|(_, _, i)| i).sum();
+        let change = total.checked_sub(last_total).expect("LOST A VALUE");
+        last_total = total;
+        if count.2 == expected_count {
+            return;
+        } else {
+            let total_time_waited = delay * i as u32;
+            tracing::debug!(
+                "Count: {}, val: {}, int: {}\nTime waited: {:?},\nCounts: {:?}\nTotal: {} change:{}\n",
+                count.2,
+                count.1,
+                count.0,
+                total_time_waited,
+                counts,
+                total,
+                change,
+            );
+        }
+        tokio::time::delay_for(delay).await;
+    }
+}
+
+async fn get_counts(envs: &[&EnvironmentWrite]) -> Vec<(usize, usize, usize)> {
+    let mut output = Vec::new();
+    for env in envs {
+        let env = *env;
+        output.push(count_integration(env).await);
+    }
+    output
+}
+
+async fn count_integration(env: &EnvironmentWrite) -> (usize, usize, usize) {
+    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
+    let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+        workspace
+            .validation_limbo
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v))
+            .collect()
+            .unwrap()
+    });
+
+    let val_len = val_limbo.len();
+
+    let int_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+        workspace
+            .integration_limbo
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v))
+            .collect()
+            .unwrap()
+    });
+    let int_limbo_len = int_limbo.len();
+
+    let int: Vec<_> = fresh_reader_test!(env, |r| {
+        workspace
+            .integrated_dht_ops
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v))
+            .collect()
+            .unwrap()
+    });
+    let int_len = int.len();
+    (val_len, int_limbo_len, int_len)
+}
+
+async fn display_integration(env: &EnvironmentWrite) -> usize {
+    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
+
+    let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+        workspace
+            .validation_limbo
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v))
+            .collect()
+            .unwrap()
+    });
+    tracing::debug!(?val_limbo);
+
+    let int_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+        workspace
+            .integration_limbo
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v))
+            .collect()
+            .unwrap()
+    });
+    tracing::debug!(?int_limbo);
+
+    let int: Vec<_> = fresh_reader_test!(env, |r| {
+        workspace
+            .integrated_dht_ops
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v))
+            .collect()
+            .unwrap()
+    });
+    let count = int.len();
+
+    {
+        let s = tracing::trace_span!("wait_for_integration_deep");
+        let _g = s.enter();
+        let element_integrated = ElementBuf::vault(env.clone().into(), false).unwrap();
+        let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
+        let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
+        let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
+        let mut cascade = Cascade::empty()
+            .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
+            .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
+        for iv in int {
+            tracing::trace!(op = ?iv.op, el = ?cascade.retrieve(iv.op.header_hash().clone().into(), Default::default()).await.unwrap());
+        }
+    }
+    count
+}
+
 /// Helper to create a zome invocation for tests
-pub fn new_invocation<P, Z: Into<ZomeName>>(
+pub fn new_zome_call<P, Z: Into<ZomeName>>(
     cell_id: &CellId,
     func: &str,
     payload: P,
-    zome_name: Z,
+    zome: Z,
+) -> Result<ZomeCall, SerializedBytesError>
+where
+    P: TryInto<SerializedBytes, Error = SerializedBytesError>,
+{
+    Ok(ZomeCall {
+        cell_id: cell_id.clone(),
+        zome_name: zome.into(),
+        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        fn_name: func.into(),
+        payload: ExternInput::new(payload.try_into()?),
+        provenance: cell_id.agent_pubkey().clone(),
+    })
+}
+
+/// Helper to create a zome invocation for tests
+pub fn new_invocation<P, Z: Into<Zome>>(
+    cell_id: &CellId,
+    func: &str,
+    payload: P,
+    zome: Z,
 ) -> Result<ZomeCallInvocation, SerializedBytesError>
 where
     P: TryInto<SerializedBytes, Error = SerializedBytesError>,
 {
     Ok(ZomeCallInvocation {
         cell_id: cell_id.clone(),
-        zome_name: zome_name.into(),
+        zome: zome.into(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
         payload: ExternInput::new(payload.try_into()?),

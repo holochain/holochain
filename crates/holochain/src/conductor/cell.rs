@@ -4,42 +4,36 @@
 //! Elements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
-use super::{interface::SignalBroadcaster, manager::ManagedTaskAdd};
-use crate::conductor::handle::ConductorHandle;
-use crate::conductor::{api::error::ConductorApiError, entry_def_store::get_entry_def_from_ids};
-use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
-use crate::core::ribosome::ZomeCallInvocation;
+use super::{api::ZomeCall, interface::SignalBroadcaster, manager::ManagedTaskAdd};
 use crate::{
-    conductor::api::CellConductorApiT,
-    core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op,
-};
-use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
-use holochain_types::activity::AgentActivity;
-use holochain_zome_types::header::EntryType;
-use holochain_zome_types::validate::ValidationPackage;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::{query::ChainQueryFilter, validate::ValidationStatus};
-use validation_package::ValidationPackageDb;
-
-use crate::{
-    conductor::{api::CellConductorApi, cell::error::CellResult},
-    core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
+    conductor::{
+        api::{error::ConductorApiError, CellConductorApi, CellConductorApiT},
+        cell::error::CellResult,
+        entry_def_store::get_entry_def_from_ids,
+        handle::ConductorHandle,
+    },
     core::{
+        queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers},
+        ribosome::{
+            guest_callback::init::InitResult, real_ribosome::RealRibosome, ZomeCallInvocation,
+        },
         state::{
             dht_op_integration::IntegratedDhtOpsBuf,
             element_buf::ElementBuf,
-            metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
+            metadata::{MetadataBuf, MetadataBufT},
             source_chain::{SourceChain, SourceChainBuf},
         },
         workflow::{
             call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
             incoming_dht_ops_workflow::incoming_dht_ops_workflow, initialize_zomes_workflow,
-            CallZomeWorkflowArgs, CallZomeWorkspace, GenesisWorkflowArgs, GenesisWorkspace,
-            InitializeZomesWorkflowArgs, ZomeCallInvocationResult,
+            produce_dht_ops_workflow::dht_op_light::light_to_op, CallZomeWorkflowArgs,
+            CallZomeWorkspace, GenesisWorkflowArgs, GenesisWorkspace, InitializeZomesWorkflowArgs,
+            ZomeCallResult,
         },
     },
 };
-use error::{AuthorityDataError, CellError};
+use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
+use error::CellError;
 use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use hash_type::AnyDht;
@@ -51,31 +45,36 @@ use holochain_state::{
     env::{EnvironmentRead, EnvironmentWrite, ReadManager},
 };
 use holochain_types::{
+    activity::AgentActivity,
     autonomic::AutonomicProcess,
     cell::CellId,
     element::GetElementResponse,
     link::{GetLinksResponse, WireLinkMetaKey},
-    metadata::{MetadataSet, TimedHeaderHash},
+    metadata::MetadataSet,
     validate::ValidationPackageResponse,
     Timestamp,
 };
-use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::header::{CreateLink, DeleteLink};
-use holochain_zome_types::signature::Signature;
-use holochain_zome_types::validate::RequiredValidationType;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use holochain_zome_types::{
+    capability::CapSecret,
+    header::EntryType,
+    query::ChainQueryFilter,
+    signature::Signature,
+    validate::{RequiredValidationType, ValidationPackage, ValidationStatus},
+    zome::{FunctionName, ZomeName},
+    ExternInput,
+};
 use observability::OpenSpanExt;
 use std::{
-    collections::{BTreeMap, BTreeSet},
     convert::TryInto,
     hash::{Hash, Hasher},
 };
 use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
+use validation_package::ValidationPackageDb;
 
-mod authority;
+#[allow(missing_docs)]
+pub mod authority;
 mod validation_package;
 
 #[allow(missing_docs)]
@@ -507,6 +506,7 @@ impl Cell {
         dht_hash: holo_hash::AnyDhtHash,
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<GetElementResponse> {
+        debug!("handling get");
         // TODO: Later we will need more get types but for now
         // we can just have these defaults depending on whether or not
         // the hash is an entry or header.
@@ -528,13 +528,13 @@ impl Cell {
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<GetElementResponse> {
         let env = self.env.clone();
-        authority::handle_get_entry(env, hash, options).await
+        authority::handle_get_entry(env, hash, options)
     }
 
     #[tracing::instrument(skip(self))]
     async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
         let env = self.env.clone();
-        authority::handle_get_element(env, hash).await
+        authority::handle_get_element(env, hash)
     }
 
     #[instrument(skip(self, _dht_hash, _options))]
@@ -547,7 +547,7 @@ impl Cell {
         unimplemented!()
     }
 
-    #[instrument(skip(self, _options))]
+    #[instrument(skip(self, options))]
     /// a remote node is asking us for links
     // TODO: Right now we are returning all the full headers
     // We could probably send some smaller types instead of the full headers
@@ -555,61 +555,11 @@ impl Cell {
     fn handle_get_links(
         &self,
         link_key: WireLinkMetaKey,
-        _options: holochain_p2p::event::GetLinksOptions,
+        options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<GetLinksResponse> {
-        // Get the vaults
-        let env_ref = self.env.guard();
-        let reader = env_ref.reader()?;
-        let element_vault = ElementBuf::vault(self.env.clone().into(), false)?;
-        let meta_vault = MetadataBuf::vault(self.env.clone().into())?;
         debug!(id = ?self.id());
-
-        let links = meta_vault
-            .get_links_all(&reader, &LinkMetaKey::from(&link_key))?
-            .map(|link_add| {
-                // Collect the link removes on this link add
-                let link_removes = meta_vault
-                    .get_link_removes_on_link_add(&reader, link_add.link_add_hash.clone())?
-                    .collect::<BTreeSet<_>>()?;
-                // Create timed header hash
-                let link_add = TimedHeaderHash {
-                    timestamp: link_add.timestamp,
-                    header_hash: link_add.link_add_hash,
-                };
-                // Return all link removes with this link add
-                Ok((link_add, link_removes))
-            })
-            .collect::<BTreeMap<_, _>>()?;
-
-        // Get the headers from the element stores
-        let mut result_adds: Vec<(CreateLink, Signature)> = Vec::with_capacity(links.len());
-        let mut result_removes: Vec<(DeleteLink, Signature)> = Vec::with_capacity(links.len());
-        for (link_add, link_removes) in links {
-            if let Some(link_add) = element_vault.get_header(&link_add.header_hash)? {
-                for link_remove in link_removes {
-                    if let Some(link_remove) = element_vault.get_header(&link_remove.header_hash)? {
-                        let (h, s) = link_remove.into_header_and_signature();
-                        let h = h
-                            .into_content()
-                            .try_into()
-                            .map_err(AuthorityDataError::from)?;
-                        result_removes.push((h, s));
-                    }
-                }
-                let (h, s) = link_add.into_header_and_signature();
-                let h = h
-                    .into_content()
-                    .try_into()
-                    .map_err(AuthorityDataError::from)?;
-                result_adds.push((h, s));
-            }
-        }
-
-        // Return the links
-        Ok(GetLinksResponse {
-            link_adds: result_adds,
-            link_removes: result_removes,
-        })
+        let env = self.env.clone();
+        authority::handle_get_links(env.into(), link_key, options)
     }
 
     #[instrument(skip(self, options))]
@@ -708,9 +658,9 @@ impl Cell {
         cap: Option<CapSecret>,
         payload: SerializedBytes,
     ) -> CellResult<SerializedBytes> {
-        let invocation = ZomeCallInvocation {
+        let invocation = ZomeCall {
             cell_id: self.id.clone(),
-            zome_name: zome_name.clone(),
+            zome_name,
             cap,
             payload: ExternInput::new(payload),
             provenance: from_agent,
@@ -718,17 +668,17 @@ impl Cell {
         };
         // double ? because
         // - ConductorApiResult
-        // - ZomeCallInvocationResult
+        // - ZomeCallResult
         Ok(self.call_zome(invocation, None).await??.try_into()?)
     }
 
     /// Function called by the Conductor
-    #[instrument(skip(self, invocation, workspace_lock))]
+    #[instrument(skip(self, call, workspace_lock))]
     pub async fn call_zome(
         &self,
-        invocation: ZomeCallInvocation,
+        call: ZomeCall,
         workspace_lock: Option<CallZomeWorkspaceLock>,
-    ) -> CellResult<ZomeCallInvocationResult> {
+    ) -> CellResult<ZomeCallResult> {
         // Check if init has run if not run it
         self.check_or_run_zome_init().await?;
 
@@ -745,6 +695,7 @@ impl Cell {
         let conductor_api = self.conductor_api.clone();
         let signal_tx = self.signal_broadcaster().await;
         let ribosome = self.get_ribosome().await?;
+        let invocation = ZomeCallInvocation::from_interface_call(conductor_api.clone(), call).await;
 
         let args = CallZomeWorkflowArgs {
             ribosome,
@@ -789,10 +740,10 @@ impl Cell {
             .get_dna(id.dna_hash())
             .await
             .ok_or(CellError::DnaMissing)?;
-        let dna_def = dna_file.dna().clone();
+        let dna_def = dna_file.dna_def().clone();
 
         // Get the ribosome
-        let ribosome = WasmRibosome::new(dna_file);
+        let ribosome = RealRibosome::new(dna_file);
 
         // Run the workflow
         let args = InitializeZomesWorkflowArgs { dna_def, ribosome };
@@ -807,7 +758,7 @@ impl Cell {
         .map_err(Box::new)?;
         trace!(?init_result);
         match init_result {
-            InitResult::Pass => (),
+            InitResult::Pass => {}
             r => return Err(CellError::InitFailed(r)),
         }
         Ok(())
@@ -829,9 +780,9 @@ impl Cell {
 
     /// Instantiate a Ribosome for use by this Cell's workflows
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
-    pub(crate) async fn get_ribosome(&self) -> CellResult<WasmRibosome> {
+    pub(crate) async fn get_ribosome(&self) -> CellResult<RealRibosome> {
         match self.conductor_api.get_dna(self.dna_hash()).await {
-            Some(dna) => Ok(WasmRibosome::new(dna)),
+            Some(dna) => Ok(RealRibosome::new(dna)),
             None => Err(CellError::DnaMissing),
         }
     }

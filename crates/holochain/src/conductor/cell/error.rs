@@ -1,6 +1,5 @@
 use crate::{
-    conductor::api::error::ConductorApiError,
-    conductor::entry_def_store::error::EntryDefStoreError,
+    conductor::{api::error::ConductorApiError, entry_def_store::error::EntryDefStoreError},
     core::{
         ribosome::{error::RibosomeError, guest_callback::init::InitResult},
         state::cascade::error::CascadeError,
@@ -12,7 +11,7 @@ use crate::{
 };
 use holochain_p2p::HolochainP2pError;
 use holochain_state::error::DatabaseError;
-use holochain_types::{cell::CellId, header::error::HeaderError};
+use holochain_types::{cell::CellId, dna::DnaError, header::error::HeaderError};
 use holochain_zome_types::header::conversions::WrongHeaderError;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -28,13 +27,17 @@ pub enum CellError {
     #[error("Failed to join the create cell task: {0}")]
     JoinError(#[from] tokio::task::JoinError),
     #[error("Genesis failed: {0}")]
-    Genesis(#[from] Box<ConductorApiError>),
+    Genesis(Box<ConductorApiError>),
     #[error(transparent)]
     HeaderError(#[from] HeaderError),
     #[error("This cell has not had a successful genesis and cannot be created")]
     CellWithoutGenesis(CellId),
-    #[error("The cell failed to cleanup its environment because: {0}. Recommend manually deleting the database at: {1}")]
+    #[error(
+        "The cell failed to cleanup its environment because: {0}. Recommend manually deleting the database at: {1}"
+    )]
     Cleanup(String, PathBuf),
+    #[error(transparent)]
+    DnaError(#[from] DnaError),
     #[error(transparent)]
     EntryDefStoreError(#[from] EntryDefStoreError),
     #[error(transparent)]
@@ -49,6 +52,8 @@ pub enum CellError {
     InitFailed(InitResult),
     #[error(transparent)]
     HolochainP2pError(#[from] HolochainP2pError),
+    #[error(transparent)]
+    ConductorApiError(#[from] Box<ConductorApiError>),
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
     #[error(transparent)]

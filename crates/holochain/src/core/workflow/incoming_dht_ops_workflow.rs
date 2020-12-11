@@ -11,16 +11,14 @@ use crate::core::{
     state::{
         dht_op_integration::{IntegratedDhtOpsStore, IntegrationLimboStore},
         element_buf::ElementBuf,
-        metadata::MetadataBuf,
-        metadata::MetadataBufT,
+        metadata::{MetadataBuf, MetadataBufT},
         validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
         workspace::{Workspace, WorkspaceResult},
     },
 };
 use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_state::{
-    buffer::BufferedStore,
-    buffer::KvBufFresh,
+    buffer::{BufferedStore, KvBufFresh},
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
     env::EnvironmentWrite,
     error::DatabaseResult,
@@ -48,9 +46,7 @@ pub async fn incoming_dht_ops_workflow(
         if !workspace.op_exists(&hash)? {
             tracing::debug!(?hash, ?op);
             if should_keep(&op).await? {
-                workspace
-                    .add_to_pending(hash, op, from_agent.clone())
-                    .await?;
+                workspace.add_to_pending(hash, op, from_agent.clone())?;
             } else {
                 tracing::warn!(
                     msg = "Dropping op because it failed counterfeit checks",
@@ -71,6 +67,7 @@ pub async fn incoming_dht_ops_workflow(
     Ok(())
 }
 
+#[instrument(skip(op))]
 /// If this op fails the counterfeit check it should be dropped
 async fn should_keep(op: &DhtOp) -> WorkflowResult<bool> {
     let header = op.header();
@@ -123,7 +120,7 @@ impl IncomingDhtOpsWorkspace {
         })
     }
 
-    async fn add_to_pending(
+    fn add_to_pending(
         &mut self,
         hash: DhtOpHash,
         op: DhtOp,

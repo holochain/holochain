@@ -1,5 +1,8 @@
 use crate::{
-    buffer::{kvv::KvvBufUsed, kvv::KvvOp, kvv::ValuesDelta, BufferedStore},
+    buffer::{
+        kvv::{KvvBufUsed, KvvOp, ValuesDelta},
+        BufferedStore,
+    },
     env::{ReadManager, WriteManager},
     error::{DatabaseError, DatabaseResult},
     test_utils::{test_cell_env, DbString},

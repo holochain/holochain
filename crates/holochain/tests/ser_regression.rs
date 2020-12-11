@@ -1,24 +1,26 @@
 use ::fixt::prelude::*;
 use hdk3::prelude::*;
 use holo_hash::fixt::*;
-use holochain::conductor::{
-    api::{AppInterfaceApi, AppRequest, AppResponse, RealAppInterfaceApi},
-    dna_store::MockDnaStore,
-    ConductorBuilder, ConductorHandle,
+use holochain::{
+    conductor::{
+        api::ZomeCall,
+        api::{AppInterfaceApi, AppRequest, AppResponse, RealAppInterfaceApi},
+        dna_store::MockDnaStore,
+        ConductorBuilder, ConductorHandle,
+    },
+    fixt::*,
 };
-use holochain::core::ribosome::ZomeCallInvocation;
-use holochain::fixt::*;
 use holochain_state::test_utils::test_environments;
-use holochain_types::app::InstalledCell;
-use holochain_types::cell::CellId;
-use holochain_types::dna::DnaDef;
-use holochain_types::dna::DnaFile;
-use holochain_types::test_utils::fake_agent_pubkey_1;
-use holochain_types::{observability, test_utils::fake_agent_pubkey_2};
+use holochain_types::{
+    app::InstalledCell,
+    cell::CellId,
+    dna::{DnaDef, DnaFile},
+    observability,
+    test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2},
+};
 use holochain_wasm_test_utils::TestWasm;
 pub use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::ExternInput;
-use holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::{ExternInput, ZomeCallResponse};
 use std::sync::Arc;
 use tempdir::TempDir;
 
@@ -122,7 +124,7 @@ async fn ser_regression_test() {
 
     let channel = ChannelName("hello world".into());
 
-    let invocation = ZomeCallInvocation {
+    let invocation = ZomeCall {
         cell_id: alice_cell_id.clone(),
         zome_name: TestWasm::SerRegression.into(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
@@ -132,11 +134,11 @@ async fn ser_regression_test() {
     };
 
     let request = Box::new(invocation.clone());
-    let request = AppRequest::ZomeCallInvocation(request).try_into().unwrap();
+    let request = AppRequest::ZomeCall(request).try_into().unwrap();
     let response = app_api.handle_app_request(request).await;
 
     let _channel_hash = match response {
-        AppResponse::ZomeCallInvocation(r) => {
+        AppResponse::ZomeCall(r) => {
             let response: SerializedBytes = r.into_inner();
             let channel_hash: EntryHash = response.try_into().unwrap();
             channel_hash
@@ -159,7 +161,7 @@ async fn ser_regression_test() {
         channel_hash,
         content: "Hello from alice :)".into(),
     };
-    let invocation = ZomeCallInvocation {
+    let invocation = ZomeCall {
         cell_id: alice_cell_id.clone(),
         zome_name: TestWasm::SerRegression.into(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
@@ -169,11 +171,11 @@ async fn ser_regression_test() {
     };
 
     let request = Box::new(invocation.clone());
-    let request = AppRequest::ZomeCallInvocation(request).try_into().unwrap();
+    let request = AppRequest::ZomeCall(request).try_into().unwrap();
     let response = app_api.handle_app_request(request).await;
 
     let _msg_hash = match response {
-        AppResponse::ZomeCallInvocation(r) => {
+        AppResponse::ZomeCall(r) => {
             let response: SerializedBytes = r.into_inner();
             let msg_hash: EntryHash = response.try_into().unwrap();
             msg_hash

@@ -1,9 +1,11 @@
 use super::*;
-use crate::fixt::{
-    CreateLinkFixturator, DeleteLinkFixturator, EntryHashFixturator, KnownCreateLink,
-    KnownDeleteLink, ZomeIdFixturator,
+use crate::{
+    fixt::{
+        CreateLinkFixturator, DeleteLinkFixturator, EntryHashFixturator, KnownCreateLink,
+        KnownDeleteLink, ZomeIdFixturator,
+    },
+    here,
 };
-use crate::here;
 use ::fixt::prelude::*;
 use holochain_state::{
     buffer::BufferedStore, env::EnvironmentWrite, fresh_reader_test, test_utils::test_cell_env,
