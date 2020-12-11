@@ -31,7 +31,7 @@ pub mod p2p_store;
 pub mod paths;
 pub mod state;
 
-pub use cell::{error::CellError, Cell};
+pub use cell::{authority, error::CellError, Cell};
 pub use conductor::{Conductor, ConductorBuilder, ConductorStateDb};
 pub use handle::ConductorHandle;
 
