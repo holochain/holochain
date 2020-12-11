@@ -16,14 +16,6 @@ use crate::holochain::core::state::metadata::LinkMetaKey;
 use crate::holochain::core::state::workspace::Workspace;
 use crate::holochain::core::workflow::CallZomeWorkspace;
 use crate::holochain::core::workflow::CallZomeWorkspaceLock;
-use holochain_p2p::actor::GetLinksOptions;
-use holochain_p2p::actor::GetOptions;
-use holochain_p2p::actor::HolochainP2pRefToCell;
-use holochain_p2p::HolochainP2pCell;
-use holochain_zome_types::cell::CellId;
-use holochain_types::dna::DnaFile;
-use holochain_types::element::Element;
-use holochain_types::Entry;
 use hdk3::prelude::EntryError;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
@@ -33,7 +25,14 @@ use holochain_keystore::KeystoreSender;
 use holochain_lmdb::env::EnvironmentWrite;
 use holochain_lmdb::prelude::GetDb;
 use holochain_lmdb::prelude::WriteManager;
+use holochain_p2p::actor::GetLinksOptions;
+use holochain_p2p::actor::HolochainP2pRefToCell;
+use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::dna::DnaFile;
+use holochain_types::element::Element;
+use holochain_types::Entry;
+use holochain_zome_types::cell::CellId;
 use holochain_zome_types::element::SignedHeaderHashed;
 use holochain_zome_types::entry_def;
 use holochain_zome_types::link::Link;
@@ -51,6 +50,7 @@ use holochain_zome_types::GetAgentActivityInput;
 use holochain_zome_types::GetDetailsInput;
 use holochain_zome_types::GetInput;
 use holochain_zome_types::GetLinksInput;
+use holochain_zome_types::GetOptions;
 use holochain_zome_types::UpdateInput;
 use holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
@@ -264,9 +264,9 @@ impl HostFnCaller {
         output.into_inner()
     }
 
-    pub async fn get(&self, entry_hash: AnyDhtHash, _options: GetOptions) -> Option<Element> {
+    pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Option<Element> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
+        let input = GetInput::new((entry_hash, options));
         let output = { host_fn::get::get(ribosome, call_context, input).unwrap() };
         output.into_inner()
     }
@@ -274,10 +274,10 @@ impl HostFnCaller {
     pub async fn get_details<'env>(
         &self,
         entry_hash: AnyDhtHash,
-        _options: GetOptions,
+        options: GetOptions,
     ) -> Option<Details> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetDetailsInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
+        let input = GetDetailsInput::new((entry_hash, options));
         let output = { host_fn::get_details::get_details(ribosome, call_context, input).unwrap() };
         output.into_inner()
     }

@@ -32,7 +32,7 @@ hdk3_derive = { version = "0.0.1", path = "../hdk3_derive" }
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }
 holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
-holochain_types = { version = "0.0.1", path = "../holochain_types" }
+holochain_types = { version = "0.0.1", path = "../holochain_types", features = ["test_utils"] }
 holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
 human-panic = "1.0.3"
 lazy_static = "1.4.0"
@@ -67,7 +67,7 @@ kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 matches = {version = "0.1.8", optional = false }
 # crate::holochain_test_wasm_common = { version = "0.0.1", path = "originals/test_utils/wasm_common", optional = false  }
 unwrap_to = { version = "0.1.0", optional = false }
-
+itertools = { version = "0.9", optional = false }
 lair_keystore_api = "=0.0.1-alpha.8"
 lair_keystore_client = "=0.0.1-alpha.8"
 strum_macros = "0.18.0"

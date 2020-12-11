@@ -11,14 +11,8 @@ use crate::dna::Zomes;
 use crate::header::NewEntryHeader;
 use crate::Timestamp;
 use ::fixt::prelude::*;
-use holo_hash::AgentPubKey;
-use holo_hash::EntryHash;
-use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::*;
 use rand::seq::IteratorRandom;
-use rand::Rng;
-use std::collections::BTreeMap;
-use std::collections::HashSet;
 use std::iter::Iterator;
 
 pub use holochain_zome_types::fixt::TimestampFixturator as ZomeTimestampFixturator;

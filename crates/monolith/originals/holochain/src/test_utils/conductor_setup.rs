@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use super::host_fn_api::HostFnCaller;
+use super::host_fn_caller::HostFnCaller;
 use super::install_app;
 use super::setup_app_inner;
 use crate::holochain::conductor::api::CellConductorApi;

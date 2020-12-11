@@ -24,7 +24,7 @@ pub fn get<'a>(
             .write()
             .await
             .cascade(network)
-            .dht_get(hash, options.into())
+            .dht_get(hash, options)
             .await?;
 
         Ok(GetOutput::new(maybe_element))

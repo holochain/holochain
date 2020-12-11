@@ -9,7 +9,7 @@ use crate::holochain_wasm_test_utils::TestWasm;
 use crate::holochain::core::state::element_buf::ElementBuf;
 use crate::holochain::core::state::source_chain::SourceChain;
 use crate::holochain::test_utils::conductor_setup::ConductorTestData;
-use crate::holochain::test_utils::host_fn_api::*;
+use crate::holochain::test_utils::host_fn_caller::*;
 use crate::holochain::test_utils::wait_for_integration;
 
 /// - Alice commits an entry and it is in their authored store

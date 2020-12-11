@@ -2,6 +2,7 @@
 
 use super::*;
 
+use crate::here;
 use crate::holochain::core::queue_consumer::TriggerSender;
 use crate::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::holochain::core::ribosome::host_fn;
@@ -13,7 +14,6 @@ use crate::holochain::core::workflow::CallZomeWorkspaceLock;
 use crate::holochain::fixt::CallContextFixturator;
 use crate::holochain::fixt::ZomeCallHostAccessFixturator;
 use crate::holochain::fixt::*;
-use crate::here;
 use crate::holochain::test_utils::test_network;
 use ::fixt::prelude::*;
 use holo_hash::*;
@@ -29,7 +29,6 @@ use holochain_types::dna::DnaDefHashed;
 use holochain_types::fixt::*;
 use holochain_types::header::NewEntryHeader;
 use holochain_types::metadata::TimedHeaderHash;
-use observability;
 use holochain_types::validate::ValidationStatus;
 use holochain_types::Entry;
 use holochain_types::EntryHashed;
@@ -51,6 +50,7 @@ use holochain_zome_types::CreateLinkInput;
 use holochain_zome_types::GetInput;
 use holochain_zome_types::GetLinksInput;
 use holochain_zome_types::Header;
+use observability;
 use produce_dht_ops_workflow::produce_dht_ops_workflow;
 use produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
 use std::collections::BTreeMap;
@@ -968,7 +968,7 @@ async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
 
-    let input = GetInput::new((entry_hash.clone().into(), GetOptions));
+    let input = GetInput::new((entry_hash.clone().into(), GetOptions::latest()));
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -1322,25 +1322,26 @@ mod slow_tests {
     use crate::holochain::core::state::metadata::MetadataBuf;
     use crate::holochain::core::state::metadata::MetadataBufT;
     use crate::holochain::fixt::*;
-    use crate::holochain::test_utils::host_fn_api::*;
+    use crate::holochain::test_utils::host_fn_caller::*;
     use crate::holochain::test_utils::setup_app;
     use crate::holochain::test_utils::wait_for_integration;
+    use crate::holochain_wasm_test_utils::TestWasm;
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
     use holo_hash::EntryHash;
-    use holochain_serialized_bytes::SerializedBytes;
     use holochain_lmdb::db::GetDb;
     use holochain_lmdb::db::INTEGRATED_DHT_OPS;
     use holochain_lmdb::env::ReadManager;
+    use holochain_serialized_bytes::SerializedBytes;
     use holochain_types::app::InstalledCell;
-    use holochain_zome_types::cell::CellId;
     use holochain_types::dna::DnaDef;
     use holochain_types::dna::DnaFile;
-    use observability;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::Entry;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::cell::CellId;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
+    use holochain_zome_types::GetOptions;
+    use observability;
     use tracing::*;
 
     /// The aim of this test is to show from a high level that committing
@@ -1463,14 +1464,14 @@ mod slow_tests {
 
             // Check bob can get the target
             let e = call_data
-                .get(target_entry_hash.clone().into(), Default::default())
+                .get(target_entry_hash.clone().into(), GetOptions::content())
                 .await
                 .unwrap();
             assert_eq!(e.into_inner().1.into_option().unwrap(), target_entry);
 
             // Check bob can get the base
             let e = call_data
-                .get(base_entry_hash.clone().into(), Default::default())
+                .get(base_entry_hash.clone().into(), GetOptions::content())
                 .await
                 .unwrap();
             assert_eq!(e.into_inner().1.into_option().unwrap(), base_entry);

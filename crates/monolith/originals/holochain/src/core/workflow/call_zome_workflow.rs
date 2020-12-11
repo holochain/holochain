@@ -41,7 +41,7 @@ mod validation_test;
 pub type ZomeCallResult = RibosomeResult<ZomeCallResponse>;
 
 #[derive(Debug)]
-pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT, C: CellConductorApiT> {
+pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT + Send, C: CellConductorApiT> {
     pub ribosome: Ribosome,
     pub invocation: ZomeCallInvocation,
     pub signal_tx: SignalBroadcaster,
@@ -57,7 +57,11 @@ pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT, C: CellConductorApiT> {
     args,
     trigger_produce_dht_ops
 ))]
-pub async fn call_zome_workflow<'env, Ribosome: RibosomeT, C: CellConductorApiT>(
+pub async fn call_zome_workflow<
+    'env,
+    Ribosome: RibosomeT + Send + 'static,
+    C: CellConductorApiT,
+>(
     workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
@@ -82,7 +86,11 @@ pub async fn call_zome_workflow<'env, Ribosome: RibosomeT, C: CellConductorApiT>
     Ok(result)
 }
 
-async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApiT>(
+async fn call_zome_workflow_inner<
+    'env,
+    Ribosome: RibosomeT + Send + 'static,
+    C: CellConductorApiT,
+>(
     workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
@@ -104,17 +112,23 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
 
     tracing::trace!(line = line!());
     // Create the unsafe sourcechain for use with wasm closure
-    let result = {
-        let host_access = ZomeCallHostAccess::new(
-            workspace_lock.clone(),
-            keystore,
-            network.clone(),
-            signal_tx,
-            call_zome_handle,
-            invocation.cell_id.clone(),
-        );
-        ribosome.call_zome_function(host_access, invocation)
-    };
+    let (ribosome, result) = tokio::task::spawn_blocking({
+        let workspace_lock = workspace_lock.clone();
+        let network = network.clone();
+        move || {
+            let host_access = ZomeCallHostAccess::new(
+                workspace_lock,
+                keystore,
+                network,
+                signal_tx,
+                call_zome_handle,
+                invocation.cell_id.clone(),
+            );
+            let result = ribosome.call_zome_function(host_access, invocation);
+            (ribosome, result)
+        }
+    })
+    .await?;
     tracing::trace!(line = line!());
 
     let to_app_validate = {
@@ -161,7 +175,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
                         let mut cascade = workspace.cascade(network.clone());
                         let base_address = &link_add.base_address;
                         let base = cascade
-                            .retrieve_entry(base_address.clone(), GetOptions.into())
+                            .retrieve_entry(base_address.clone(), Default::default())
                             .await
                             .map_err(RibosomeError::from)?
                             .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone().into()))?
@@ -170,7 +184,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
 
                         let target_address = &link_add.target_address;
                         let target = cascade
-                            .retrieve_entry(target_address.clone(), GetOptions.into())
+                            .retrieve_entry(target_address.clone(), Default::default())
                             .await
                             .map_err(RibosomeError::from)?
                             .ok_or_else(|| {
@@ -252,6 +266,8 @@ pub struct CallZomeWorkspace {
     pub meta_authored: MetadataBuf<AuthoredPrefix>,
     pub element_integrated: ElementBuf<IntegratedPrefix>,
     pub meta_integrated: MetadataBuf<IntegratedPrefix>,
+    pub element_rejected: ElementBuf<RejectedPrefix>,
+    pub meta_rejected: MetadataBuf<RejectedPrefix>,
     pub element_cache: ElementBuf,
     pub meta_cache: MetadataBuf,
 }
@@ -262,6 +278,8 @@ impl<'a> CallZomeWorkspace {
         let meta_authored = MetadataBuf::authored(env.clone())?;
         let element_integrated = ElementBuf::vault(env.clone(), true)?;
         let meta_integrated = MetadataBuf::vault(env.clone())?;
+        let element_rejected = ElementBuf::rejected(env.clone())?;
+        let meta_rejected = MetadataBuf::rejected(env.clone())?;
         let element_cache = ElementBuf::cache(env.clone())?;
         let meta_cache = MetadataBuf::cache(env)?;
 
@@ -270,6 +288,8 @@ impl<'a> CallZomeWorkspace {
             meta_authored,
             element_integrated,
             meta_integrated,
+            element_rejected,
+            meta_rejected,
             element_cache,
             meta_cache,
         })
@@ -282,6 +302,8 @@ impl<'a> CallZomeWorkspace {
             &self.meta_authored,
             &self.element_integrated,
             &self.meta_integrated,
+            &self.element_rejected,
+            &self.meta_rejected,
             &mut self.element_cache,
             &mut self.meta_cache,
             network,
@@ -344,7 +366,7 @@ pub mod tests {
         a: u32,
     }
 
-    async fn run_call_zome<'env, Ribosome: RibosomeT + Send + Sync + 'env>(
+    async fn run_call_zome<'env, Ribosome: RibosomeT + Send + Sync + 'static>(
         workspace: CallZomeWorkspace,
         ribosome: Ribosome,
         invocation: ZomeCallInvocation,

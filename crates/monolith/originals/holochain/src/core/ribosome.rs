@@ -291,7 +291,6 @@ mockall::mock! {
 
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface
-#[allow(missing_docs)] // members are self-explanitory
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZomeCallInvocation {
     /// The Id of the `Cell` in which this Zome-call would be invoked

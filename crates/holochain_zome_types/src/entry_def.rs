@@ -95,6 +95,17 @@ impl EntryDef {
             required_validation_type,
         }
     }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn default_with_id<I: Into<EntryDefId>>(id: I) -> Self {
+        EntryDef::new(
+            id.into(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        )
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]

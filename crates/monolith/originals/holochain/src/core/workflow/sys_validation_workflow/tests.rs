@@ -3,7 +3,7 @@ use crate::holochain::conductor::ConductorHandle;
 use crate::holochain::core::state::element_buf::ElementBuf;
 use crate::holochain::core::state::validation_db::ValidationLimboStatus;
 use crate::holochain::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
-use crate::holochain::test_utils::host_fn_api::*;
+use crate::holochain::test_utils::host_fn_caller::*;
 use crate::holochain::test_utils::setup_app;
 use crate::holochain::test_utils::wait_for_integration;
 use holochain_types::app::InstalledCell;

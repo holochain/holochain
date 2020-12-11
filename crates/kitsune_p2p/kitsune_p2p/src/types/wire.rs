@@ -88,5 +88,18 @@ kitsune_p2p_types::write_codec_enum! {
         AgentInfoQueryResp(0x41) {
             agent_infos.0: Vec<AgentInfoSigned>,
         },
+
+        /// Fetch DhtOp data and AgentInfo for hashes lists
+        Gossip(0x50) {
+            space.0: Arc<KitsuneSpace>,
+            from_agent.1: Arc<KitsuneAgent>,
+            to_agent.2: Arc<KitsuneAgent>,
+            ops.3: Vec<(Arc<KitsuneOpHash>, WireData)>,
+            agents.4: Vec<AgentInfoSigned>,
+        },
+
+        /// Lists of data in response to FetchOpData
+        GossipResp(0x51) {
+        },
     }
 }

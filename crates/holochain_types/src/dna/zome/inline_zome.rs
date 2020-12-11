@@ -48,6 +48,10 @@ impl InlineZome {
         }
         .callback("entry_defs", Box::new(entry_defs_callback))
     }
+    /// Create a new zome with a unique random UUID
+    pub fn new_unique(entry_defs: Vec<EntryDef>) -> Self {
+        Self::new(nanoid::nanoid!(), entry_defs)
+    }
 
     /// Define a new zome function or callback with the given name
     pub fn callback<F, I, O>(mut self, name: &str, f: F) -> Self
@@ -57,10 +61,10 @@ impl InlineZome {
         O: Serialize,
     {
         let z = move |api: BoxApi, input: SerializedBytes| -> InlineZomeResult<SerializedBytes> {
-            let output = f(api, sb::decode(input.bytes()).expect("TODO"))?;
-            Ok(SerializedBytes::from(UnsafeBytes::from(
-                sb::encode(&output).expect("TODO"),
-            )))
+            let output = f(api, sb::decode(input.bytes())?)?;
+            Ok(SerializedBytes::from(UnsafeBytes::from(sb::encode(
+                &output,
+            )?)))
         };
         if self.callbacks.insert(name.into(), Box::new(z)).is_some() {
             tracing::warn!("Replacing existing InlineZome callback '{}'", name);

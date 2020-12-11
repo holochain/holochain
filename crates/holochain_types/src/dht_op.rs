@@ -23,8 +23,11 @@ pub mod error;
 
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
 /// as well as changes to the status of already held data.
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq)]
+#[derive(
+    Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, derive_more::Display,
+)]
 pub enum DhtOp {
+    #[display(fmt = "StoreElement")]
     /// Used to notify the authority for a header that it has been created.
     ///
     /// Conceptually, authorities receiving this `DhtOp` do three things:
@@ -36,6 +39,7 @@ pub enum DhtOp {
     ///     references from that entry up-to-date.
     StoreElement(Signature, Header, Option<Box<Entry>>),
 
+    #[display(fmt = "StoreEntry")]
     /// Used to notify the authority for an entry that it has been created
     /// anew. (The same entry can be created more than once.)
     ///
@@ -52,6 +56,7 @@ pub enum DhtOp {
     /// reality.
     StoreEntry(Signature, NewEntryHeader, Box<Entry>),
 
+    #[display(fmt = "RegisterAgentActivity")]
     /// Used to notify the authority for an agent's public key that that agent
     /// has committed a new header.
     ///
@@ -67,6 +72,7 @@ pub enum DhtOp {
     /// reality.
     RegisterAgentActivity(Signature, Header),
 
+    #[display(fmt = "RegisterUpdatedContent")]
     /// Op for updating an entry.
     /// This is sent to the entry authority.
     // TODO: This entry is here for validation by the entry update header holder
@@ -74,20 +80,25 @@ pub enum DhtOp {
     // need to remove the Entry here or add it to link.
     RegisterUpdatedContent(Signature, header::Update, Option<Box<Entry>>),
 
+    #[display(fmt = "RegisterUpdatedElement")]
     /// Op for updating an element.
     /// This is sent to the element authority.
     RegisterUpdatedElement(Signature, header::Update, Option<Box<Entry>>),
 
+    #[display(fmt = "RegisterDeletedBy")]
     /// Op for registering a Header deletion with the Header authority
     RegisterDeletedBy(Signature, header::Delete),
 
+    #[display(fmt = "RegisterDeletedEntryHeader")]
     /// Op for registering a Header deletion with the Entry authority, so that
     /// the Entry can be marked Dead if all of its Headers have been deleted
     RegisterDeletedEntryHeader(Signature, header::Delete),
 
+    #[display(fmt = "RegisterAddLink")]
     /// Op for adding a link
     RegisterAddLink(Signature, header::CreateLink),
 
+    #[display(fmt = "RegisterRemoveLink")]
     /// Op for removing a link
     RegisterRemoveLink(Signature, header::DeleteLink),
 }
@@ -98,16 +109,25 @@ type DhtBasis = AnyDhtHash;
 /// A type for storing in databases that don't need the actual
 /// data. Everything is a hash of the type except the signatures.
 #[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, derive_more::Display)]
 pub enum DhtOpLight {
+    #[display(fmt = "StoreElement")]
     StoreElement(HeaderHash, Option<EntryHash>, DhtBasis),
+    #[display(fmt = "StoreEntry")]
     StoreEntry(HeaderHash, EntryHash, DhtBasis),
+    #[display(fmt = "RegisterAgentActivity")]
     RegisterAgentActivity(HeaderHash, DhtBasis),
+    #[display(fmt = "RegisterUpdatedContent")]
     RegisterUpdatedContent(HeaderHash, EntryHash, DhtBasis),
+    #[display(fmt = "RegisterUpdatedElement")]
     RegisterUpdatedElement(HeaderHash, EntryHash, DhtBasis),
+    #[display(fmt = "RegisterDeletedBy")]
     RegisterDeletedBy(HeaderHash, DhtBasis),
+    #[display(fmt = "RegisterDeletedEntryHeader")]
     RegisterDeletedEntryHeader(HeaderHash, DhtBasis),
+    #[display(fmt = "RegisterAddLink")]
     RegisterAddLink(HeaderHash, DhtBasis),
+    #[display(fmt = "RegisterRemoveLink")]
     RegisterRemoveLink(HeaderHash, DhtBasis),
 }
 

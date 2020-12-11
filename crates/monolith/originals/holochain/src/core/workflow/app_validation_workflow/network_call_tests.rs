@@ -1,17 +1,17 @@
+use crate::holochain_test_wasm_common::AgentActivitySearch;
+use crate::holochain_wasm_test_utils::TestWasm;
+use fallible_iterator::FallibleIterator;
 use hdk3::prelude::Element;
 use hdk3::prelude::EntryType;
 use hdk3::prelude::ValidationPackage;
-use holochain_p2p::actor::GetActivityOptions;
-use holochain_p2p::HolochainP2pCellT;
-use crate::holochain_test_wasm_common::AgentActivitySearch;
-use holochain_types::activity::AgentActivity;
-use holochain_types::activity::ChainItems;
-use holochain_types::HeaderHashed;
-use crate::holochain_wasm_test_utils::TestWasm;
-use fallible_iterator::FallibleIterator;
 use holo_hash::HeaderHash;
 use holochain_lmdb::env::EnvironmentRead;
 use holochain_lmdb::fresh_reader_test;
+use holochain_p2p::actor::GetActivityOptions;
+use holochain_p2p::HolochainP2pCellT;
+use holochain_types::activity::AgentActivity;
+use holochain_types::activity::ChainItems;
+use holochain_types::HeaderHashed;
 use holochain_zome_types::query::ActivityRequest;
 use holochain_zome_types::query::ChainHead;
 use holochain_zome_types::query::ChainQueryFilter;
@@ -33,7 +33,7 @@ use crate::holochain::core::state::metadata::MetadataBufT;
 use crate::holochain::core::state::source_chain::SourceChain;
 use crate::holochain::test_utils::conductor_setup::CellHostFnCaller;
 use crate::holochain::test_utils::conductor_setup::ConductorTestData;
-use crate::holochain::test_utils::host_fn_api::Post;
+use crate::holochain::test_utils::host_fn_caller::Post;
 use crate::holochain::test_utils::new_zome_call;
 use crate::holochain::test_utils::wait_for_integration;
 
@@ -170,11 +170,13 @@ async fn get_validation_package_test() {
         .iter_back()
         .filter_map(|shh| alice_authored.get_element(shh.header_address()))
         .filter_map(|el| {
-            Ok(el
-                .header()
-                .entry_type()
-                .cloned()
-                .and_then(|et| if et == entry_type { Some(el) } else { None }))
+            Ok(el.header().entry_type().cloned().and_then(|et| {
+                if et == entry_type {
+                    Some(el)
+                } else {
+                    None
+                }
+            }))
         })
         // Skip the actual entry
         .skip(1)

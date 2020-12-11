@@ -1,5 +1,3 @@
-use crate::agent_store::AgentInfoSigned;
-
 use super::*;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
@@ -81,9 +79,9 @@ impl ghost_actor::GhostHandler<gossip::GossipEvent> for Space {}
 impl gossip::GossipEventHandler for Space {
     fn handle_list_neighbor_agents(
         &mut self,
-    ) -> gossip::GossipEventHandlerResult<Vec<Arc<KitsuneAgent>>> {
+    ) -> gossip::GossipEventHandlerResult<ListNeighborAgents> {
         // while full-sync this is just a clone of list_by_basis
-        let all_agents = self
+        let local_agents = self
             .local_joined_agents
             .iter()
             .cloned()
@@ -99,14 +97,14 @@ impl gossip::GossipEventHandler for Space {
             None => async { Ok(Vec::new()) }.boxed().into(),
         };
         Ok(async move {
-            let mut peer_store = fut
+            let remote_agents = fut
                 .await?
                 .into_iter()
                 .map(|ai| Arc::new(ai.into_agent()))
-                .filter(|a| !all_agents.contains(a))
+                .filter(|a| !local_agents.contains(a))
                 .collect::<Vec<_>>();
-            peer_store.extend(all_agents);
-            Ok(peer_store)
+            let local_agents = local_agents.into_iter().collect::<Vec<_>>();
+            Ok((local_agents, remote_agents))
         }
         .boxed()
         .into())
@@ -226,55 +224,56 @@ impl gossip::GossipEventHandler for Space {
         }
     }
 
-    fn handle_gossip_ops(
-        &mut self,
-        from_agent: Arc<KitsuneAgent>,
-        to_agent: Arc<KitsuneAgent>,
-        ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
-        agents: Vec<AgentInfoSigned>,
-    ) -> gossip::GossipEventHandlerResult<()> {
-        let all = ops
-            .into_iter()
-            .map(|(op_hash, op_data)| {
-                self.evt_sender.gossip(
-                    self.space.clone(),
-                    to_agent.clone(),
-                    from_agent.clone(),
-                    op_hash,
-                    op_data,
-                )
-            })
-            .collect::<Vec<_>>();
-        let all_agents = agents
-            .into_iter()
-            .map(|agent_info_signed| {
-                self.evt_sender
-                    .put_agent_info_signed(PutAgentInfoSignedEvt {
-                        space: self.space.clone(),
+    fn handle_gossip_ops(&mut self, input: GossipEvt) -> gossip::GossipEventHandlerResult<()> {
+        if self.local_joined_agents.contains(&input.to_agent) {
+            let fut = local_gossip_ops(&self.evt_sender, self.space.clone(), input);
+            Ok(async move { fut.await }.boxed().into())
+        } else {
+            let GossipEvt {
+                from_agent,
+                to_agent,
+                ops,
+                agents,
+            } = input;
+            let transport_tx = self.transport.clone();
+            let evt_sender = self.evt_sender.clone();
+            let space = self.space.clone();
+            Ok(async move {
+                // see if we have an entry for this agent in our agent_store
+                let info = match evt_sender
+                    .get_agent_info_signed(GetAgentInfoSignedEvt {
+                        space: space.clone(),
                         agent: to_agent.clone(),
-                        agent_info_signed,
                     })
-            })
-            .collect::<Vec<_>>();
-        Ok(async move {
-            futures::stream::iter(all)
-                .for_each_concurrent(10, |res| async move {
-                    if let Err(e) = res.await {
-                        ghost_actor::dependencies::tracing::error!(?e);
-                    }
-                })
-                .await;
-            futures::stream::iter(all_agents)
-                .for_each_concurrent(10, |res| async move {
-                    if let Err(e) = res.await {
-                        ghost_actor::dependencies::tracing::error!(?e);
-                    }
-                })
-                .await;
-            Ok(())
+                    .await?
+                {
+                    None => return Err(KitsuneP2pError::RoutingAgentError(to_agent)),
+                    Some(i) => i,
+                };
+                let data = wire::Wire::gossip(
+                    space,
+                    from_agent.clone(),
+                    to_agent.clone(),
+                    ops.into_iter().map(|(k, v)| (k, v.into())).collect(),
+                    agents,
+                )
+                .encode_vec()?;
+                let info = types::agent_store::AgentInfo::try_from(&info)?;
+                let url = info.as_urls_ref().get(0).unwrap().clone();
+                let (_, mut write, read) = transport_tx.create_channel(url.clone()).await?;
+                write.write_and_close(data.to_vec()).await?;
+                let read = read.read_to_end().await;
+                let (_, read) = wire::Wire::decode_ref(&read)?;
+                match read {
+                    wire::Wire::Failure(wire::Failure { reason }) => Err(dbg!(reason.into())),
+                    wire::Wire::GossipResp(_) => Ok(()),
+                    _ => unreachable!(),
+                }
+            }
+            .instrument(tracing::debug_span!("handle_gossip_ops"))
+            .boxed()
+            .into())
         }
-        .boxed()
-        .into())
     }
 }
 
@@ -348,6 +347,60 @@ pub fn local_req_op_data(
             .filter(|ai| peer_hashes.contains(ai.as_agent_ref()))
             .collect();
         Ok((fut.await?, agent_infos))
+    }
+}
+
+pub fn local_gossip_ops(
+    evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    space: Arc<KitsuneSpace>,
+    input: GossipEvt,
+) -> impl std::future::Future<Output = Result<(), KitsuneP2pError>> {
+    let GossipEvt {
+        from_agent,
+        to_agent,
+        ops,
+        agents,
+    } = input;
+    let all = ops
+        .into_iter()
+        .map(|(op_hash, op_data)| {
+            evt_sender.gossip(
+                space.clone(),
+                to_agent.clone(),
+                from_agent.clone(),
+                op_hash,
+                op_data,
+            )
+        })
+        .collect::<Vec<_>>();
+    let all_agents = agents
+        .into_iter()
+        .map(|agent_info_signed| {
+            evt_sender.put_agent_info_signed(PutAgentInfoSignedEvt {
+                space: space.clone(),
+                agent: to_agent.clone(),
+                agent_info_signed,
+            })
+        })
+        .collect::<Vec<_>>();
+    async move {
+        let to_agent = &to_agent;
+        let from_agent = &from_agent;
+        futures::stream::iter(all)
+                .for_each_concurrent(10, |res| async move {
+                    if let Err(e) = res.await {
+                        ghost_actor::dependencies::tracing::error!(failed_to_gossip_ops = ?e, ?from_agent, ?to_agent);
+                    }
+                })
+                .await;
+        futures::stream::iter(all_agents)
+                .for_each_concurrent(10, |res| async move {
+                    if let Err(e) = res.await {
+                        ghost_actor::dependencies::tracing::error!(failed_to_gossip_peer_info = ?e, ?from_agent, ?to_agent);
+                    }
+                })
+                .await;
+        Ok(())
     }
 }
 
@@ -454,11 +507,40 @@ impl KitsuneP2pHandler for Space {
 
     fn handle_join(
         &mut self,
-        _space: Arc<KitsuneSpace>,
+        space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
-        self.local_joined_agents.insert(agent);
+        self.local_joined_agents.insert(agent.clone());
         let fut = self.i_s.update_agent_info();
+        let i_s = self.i_s.clone();
+        let evt_sender = self.evt_sender.clone();
+        let bootstrap_service = self.config.bootstrap_service.clone();
+        if let Some(bootstrap_service) = bootstrap_service {
+            tokio::task::spawn(async move {
+                const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
+                const MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+                let mut delay_len = START_DELAY;
+
+                loop {
+                    tokio::time::delay_for(delay_len).await;
+                    if delay_len <= MAX_DELAY {
+                        delay_len *= 2;
+                    }
+
+                    if let Err(e) = super::discover::add_5_or_less_non_local_agents(
+                        space.clone(),
+                        agent.clone(),
+                        i_s.clone(),
+                        evt_sender.clone(),
+                        bootstrap_service.clone(),
+                    )
+                    .await
+                    {
+                        tracing::error!(msg = "Failed to get peers from bootstrap", ?e);
+                    }
+                }
+            });
+        }
         Ok(async move { fut.await }.boxed().into())
     }
 
@@ -625,6 +707,7 @@ impl Space {
                 }
             }
         });
+
         Self {
             space,
             i_s,
@@ -686,7 +769,7 @@ impl Space {
                 space.clone(),
                 from_agent.clone(),
                 from_agent,
-                payload.into(),
+                payload.clone().into(),
             ),
             |a, w| match w {
                 wire::Wire::CallResp(c) => Ok(actor::RpcMultiResponse {
@@ -695,7 +778,8 @@ impl Space {
                 }),
                 _ => Err(()),
             },
-        );
+        )
+        .instrument(tracing::debug_span!("message_neighborhood", payload = ?payload.iter().take(5).collect::<Vec<_>>()));
 
         Ok(async move {
             let mut out: Vec<actor::RpcMultiResponse> = futures::future::join_all(local_all)

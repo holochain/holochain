@@ -24,7 +24,7 @@ pub fn get_details<'a>(
             .write()
             .await
             .cascade(network)
-            .get_details(hash, options.into())
+            .get_details(hash, options)
             .await?;
         Ok(GetDetailsOutput::new(maybe_details))
     })

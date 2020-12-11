@@ -265,7 +265,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
         let entry_defs = self.conductor.read().await.put_wasm(dna.clone()).await?;
         let mut store = self.conductor.write().await;
-        store.dna_store_mut().add(dna);
+        store.dna_store_mut().add_dna(dna);
         store.dna_store_mut().add_entry_defs(entry_defs);
         Ok(())
     }
@@ -479,6 +479,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
             .deactivate_app_in_db(installed_app_id)
             .await?;
+        // MD: I'm not sure about this. We never add the cells back in after re-activating an app,
+        //     so it seems either we shouldn't remove them here, or we should be sure to add them
+        //     back in when re-activating.
         self.conductor
             .write()
             .await

@@ -32,9 +32,64 @@ pub type CapGrantEntry = ZomeCallCapGrant;
 /// The data type written to the source chain to denote a capability claim
 pub type CapClaimEntry = CapClaim;
 
-#[derive(PartialEq, Debug, Default, Clone, Serialize, Deserialize)]
-/// @todo make some options for get
-pub struct GetOptions;
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+/// Options for controlling how get works
+pub struct GetOptions {
+    /// If this is true the get call will wait for
+    /// the latest data before returning.
+    /// If it is false you will get whatever is locally
+    /// available on this conductor.
+    pub strategy: GetStrategy,
+}
+
+impl GetOptions {
+    /// This will get you the content
+    /// with latest metadata if it can
+    /// otherwise it will fallback to what
+    /// you have cached locally.
+    ///
+    /// This call is guaranteed to not go to
+    /// the network if you are an authority
+    /// for this hash.
+    pub fn latest() -> Self {
+        Self {
+            strategy: GetStrategy::Latest,
+        }
+    }
+    /// Gets the content but does not
+    /// try to get the latest metadata.
+    /// This will save a network call if the
+    /// entry is local (cached, authored or integrated).
+    ///
+    /// This will fallback to the network if the content
+    /// is not found locally
+    pub fn content() -> Self {
+        Self {
+            strategy: GetStrategy::Content,
+        }
+    }
+}
+
+impl Default for GetOptions {
+    fn default() -> Self {
+        Self::latest()
+    }
+}
+
+#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
+/// Describes the get call and what information
+/// the caller is concerned about.
+/// This helps the subconscious avoid unnecessary network calls.
+pub enum GetStrategy {
+    /// Will try to get the latest metadata but fallback
+    /// to the cache if none is found.
+    /// Does not go to the network if you are an authority for the data.
+    Latest,
+    /// Will try to get the content locally but go
+    /// to the network if it is not found.
+    /// Does not go to the network if you are an authority for the data.
+    Content,
+}
 
 /// Structure holding the entry portion of a chain element.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]

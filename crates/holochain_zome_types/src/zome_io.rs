@@ -46,7 +46,7 @@ macro_rules! wasm_io_types {
 
         pub trait HostFnApiT {
             $(
-                fn $f(&self, _: $in_arg) -> Result<$out_arg, HostFnApiErrorPlaceholder>;
+                fn $f(&self, _: $in_arg) -> Result<$out_arg, HostFnApiError>;
             )*
         }
     }
@@ -182,15 +182,12 @@ wasm_io_types! {
     fn zome_info (()) -> zt::zome_info::ZomeInfo;
 }
 
-/// We probably actually want to use RibosomeError for HostApiFn errors, but
-/// RibosomeError is downstream of this crate. So, we'd need to make an
-/// associated Error type for HostFnApiT, which would infect everything from
-/// InlineZome all the way to DnaFile with generics.
-///
-/// I use a dummy uninhabitable error type for now. We can remove the need
-/// for abstraction over the trait once refactoring crates to put Dna and Ribosome
-/// types together in the same crate. FIXME [B-03640]
-pub type HostFnApiErrorPlaceholder = std::convert::Infallible;
+/// Anything that can go wrong while calling a HostFnApi method
+#[derive(thiserror::Error, Debug)]
+pub enum HostFnApiError {
+    #[error("Error from within host function implementation: {0}")]
+    RibosomeError(Box<dyn std::error::Error + Send + Sync>),
+}
 
 /// Response to a zome call.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq)]

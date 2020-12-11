@@ -29,7 +29,7 @@ pub struct DnaDefBuf {
 
 #[automock]
 pub trait DnaStore: Default + Send + Sync {
-    fn add(&mut self, dna: DnaFile);
+    fn add_dna(&mut self, dna: DnaFile);
     fn add_dnas<T: IntoIterator<Item = (DnaHash, DnaFile)> + 'static>(&mut self, dnas: T);
     fn add_entry_def(&mut self, k: EntryDefBufferKey, entry_def: EntryDef);
     fn add_entry_defs<T: IntoIterator<Item = (EntryDefBufferKey, EntryDef)> + 'static>(
@@ -44,7 +44,7 @@ pub trait DnaStore: Default + Send + Sync {
 
 impl DnaStore for RealDnaStore {
     #[instrument]
-    fn add(&mut self, dna: DnaFile) {
+    fn add_dna(&mut self, dna: DnaFile) {
         self.dnas.insert(dna.dna_hash().clone(), dna);
     }
     fn add_dnas<T: IntoIterator<Item = (DnaHash, DnaFile)> + 'static>(&mut self, dnas: T) {

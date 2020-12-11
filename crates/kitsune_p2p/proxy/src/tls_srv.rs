@@ -103,15 +103,24 @@ async fn tls_server(
                             short,
                             data.channel_data.len()
                         );
+                        in_pre.get_mut().clear();
+                        in_pre.set_position(0);
                         in_pre.get_mut().extend_from_slice(&data.channel_data);
-                        srv.read_tls(&mut in_pre).map_err(TransportError::other)?;
-                        srv.process_new_packets().map_err(TransportError::other)?;
-                        while let Ok(size) = srv.read(&mut buf) {
-                            tracing::trace!("{}: SRV incoming decrypted {} bytes", short, size);
-                            if size == 0 {
+                        let in_buf_len = in_pre.get_ref().len();
+                        loop {
+                            if in_pre.position() >= in_buf_len as u64 {
                                 break;
                             }
-                            send1.send(buf[..size].to_vec()).await?;
+
+                            srv.read_tls(&mut in_pre).map_err(TransportError::other)?;
+                            srv.process_new_packets().map_err(TransportError::other)?;
+                            while let Ok(size) = srv.read(&mut buf) {
+                                tracing::trace!("{}: SRV incoming decrypted {} bytes", short, size);
+                                if size == 0 {
+                                    break;
+                                }
+                                send1.send(buf[..size].to_vec()).await?;
+                            }
                         }
                     }
                     _ => return Err(format!("invalid wire: {:?}", wire).into()),

@@ -9,6 +9,7 @@ use crate::holochain::core::workflow::integrate_dht_ops_workflow::integrate_sing
 use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
 use crate::holochain::core::workflow::CallZomeWorkspace;
 use crate::holochain::test_utils::test_network;
+use crate::holochain_wasm_test_utils::TestWasm;
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use futures::future::Either;
@@ -21,20 +22,18 @@ use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
-use holochain_p2p::actor::GetLinksOptions;
-use holochain_p2p::actor::GetMetaOptions;
-use holochain_p2p::actor::GetOptions;
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pRef;
-use holochain_serialized_bytes::SerializedBytes;
 use holochain_lmdb::env::EnvironmentWrite;
 use holochain_lmdb::env::ReadManager;
 use holochain_lmdb::prelude::BufferedStore;
 use holochain_lmdb::prelude::IntegratedPrefix;
 use holochain_lmdb::prelude::WriteManager;
 use holochain_lmdb::test_utils::test_cell_env;
+use holochain_p2p::actor::GetLinksOptions;
+use holochain_p2p::actor::GetMetaOptions;
+use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pRef;
+use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::app::InstalledCell;
-use holochain_zome_types::cell::CellId;
 use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dna::DnaDef;
 use holochain_types::dna::DnaFile;
@@ -46,21 +45,22 @@ use holochain_types::entry::option_entry_hashed;
 use holochain_types::fixt::*;
 use holochain_types::metadata::MetadataSet;
 use holochain_types::metadata::TimedHeaderHash;
-use observability;
 use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_types::test_utils::fake_agent_pubkey_2;
 use holochain_types::Entry;
 use holochain_types::EntryHashed;
 use holochain_types::HeaderHashed;
 use holochain_types::Timestamp;
-use crate::holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::cell::CellId;
 use holochain_zome_types::element::SignedHeaderHashed;
+use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::*;
 use holochain_zome_types::link::Link;
 use holochain_zome_types::metadata::Details;
 use holochain_zome_types::metadata::EntryDhtStatus;
 use holochain_zome_types::validate::ValidationStatus;
 use maplit::btreeset;
+use observability;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::convert::TryInto;
@@ -69,7 +69,7 @@ use tokio::task::JoinHandle;
 use tracing::*;
 use unwrap_to::unwrap_to;
 
-use crate::holochain::test_utils::host_fn_api::*;
+use crate::holochain::test_utils::host_fn_caller::*;
 
 /*
 #[tokio::test(threaded_scheduler)]
@@ -225,14 +225,7 @@ async fn get_from_another_agent() {
     )
     .await;
 
-    let options = GetOptions {
-        remote_agent_count: None,
-        timeout_ms: None,
-        as_race: false,
-        race_timeout_ms: None,
-        follow_redirects: false,
-        all_live_headers_with_metadata: false,
-    };
+    let options = GetOptions::latest();
 
     // Bob store element
     let entry = Post("Bananas are good for you".into());
@@ -615,7 +608,7 @@ async fn generate_fixt_store() -> (
 async fn fake_authority(hash: AnyDhtHash, call_data: &HostFnCaller) {
     // Check bob can get the entry
     let element = call_data
-        .get(hash.clone().into(), GetOptions::default())
+        .get(hash.clone().into(), GetOptions::content())
         .await
         .unwrap();
 

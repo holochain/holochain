@@ -8,11 +8,8 @@
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
 use crate::holochain::core::state::source_chain::SourceChainResult;
-use holochain_types::element::Element;
-use holochain_types::element::ElementGroup;
-use holochain_types::element::SignedHeader;
-use holochain_types::element::SignedHeaderHashed;
-use holochain_types::entry::EntryHashed;
+use holo_hash::hash_type::AnyDht;
+use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
@@ -27,6 +24,11 @@ use holochain_lmdb::error::DatabaseError;
 use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::exports::SingleStore;
 use holochain_lmdb::prelude::*;
+use holochain_types::element::Element;
+use holochain_types::element::ElementGroup;
+use holochain_types::element::SignedHeader;
+use holochain_types::element::SignedHeaderHashed;
+use holochain_types::entry::EntryHashed;
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::Entry;
 use holochain_zome_types::Header;
@@ -156,6 +158,29 @@ where
 
     pub fn contains_header(&self, header_hash: &HeaderHash) -> DatabaseResult<bool> {
         self.headers.contains(header_hash)
+    }
+
+    pub fn contains_in_scratch(&self, hash: &AnyDhtHash) -> DatabaseResult<bool> {
+        match *hash.hash_type() {
+            AnyDht::Entry => {
+                Ok(
+                    if self
+                        .public_entries
+                        .contains_in_scratch(&hash.clone().into())?
+                    {
+                        true
+                    } else {
+                        // Potentially avoid this let Some if the above branch is hit first
+                        if let Some(private) = &self.private_entries {
+                            private.contains_in_scratch(&hash.clone().into())?
+                        } else {
+                            false
+                        }
+                    },
+                )
+            }
+            AnyDht::Header => self.headers.contains_in_scratch(&hash.clone().into()),
+        }
     }
 
     pub fn get_header(

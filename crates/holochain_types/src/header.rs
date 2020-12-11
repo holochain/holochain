@@ -391,7 +391,7 @@ impl<'a> From<&'a NewEntryHeader> for NewEntryHeaderRef<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{fixt as _, *};
+    use super::*;
     use crate::fixt::HeaderBuilderCommonFixturator;
     use crate::test_utils::fake_dna_hash;
     use crate::test_utils::fake_entry_hash;

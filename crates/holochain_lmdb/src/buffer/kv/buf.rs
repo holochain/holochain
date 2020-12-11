@@ -115,6 +115,18 @@ where
         Ok(exists)
     }
 
+    /// Check if a value is in the scratch space
+    pub fn contains_in_scratch(&self, k: &K) -> DatabaseResult<bool> {
+        check_empty_key(k)?;
+        use KvOp::*;
+        let exists = match self.scratch.get(k.as_ref()) {
+            Some(Put(_)) => true,
+            Some(Delete) => false,
+            None => false,
+        };
+        Ok(exists)
+    }
+
     /// Get a value, taking the scratch space into account,
     /// or from persistence if needed
     pub fn get<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<Option<V>> {

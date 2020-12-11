@@ -4,7 +4,7 @@ use crate::holochain::core::state::dht_op_integration::IntegratedDhtOpsValue;
 use crate::holochain::core::state::element_buf::ElementBuf;
 use crate::holochain::core::state::validation_db::ValidationLimboValue;
 use crate::holochain::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
-use crate::holochain::test_utils::host_fn_api::*;
+use crate::holochain::test_utils::host_fn_caller::*;
 use crate::holochain::test_utils::new_invocation;
 use crate::holochain::test_utils::new_zome_call;
 use crate::holochain::test_utils::setup_app;

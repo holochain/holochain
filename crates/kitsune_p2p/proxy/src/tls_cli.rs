@@ -112,15 +112,23 @@ async fn tls_client(
                             short,
                             data.channel_data.len()
                         );
+                        in_pre.get_mut().clear();
+                        in_pre.set_position(0);
                         in_pre.get_mut().extend_from_slice(&data.channel_data);
-                        cli.read_tls(&mut in_pre).map_err(TransportError::other)?;
-                        cli.process_new_packets().map_err(TransportError::other)?;
-                        while let Ok(size) = cli.read(&mut buf) {
-                            tracing::trace!("{}: CLI incoming decrypted {} bytes", short, size);
-                            if size == 0 {
+                        let in_buf_len = in_pre.get_ref().len();
+                        loop {
+                            if in_pre.position() >= in_buf_len as u64 {
                                 break;
                             }
-                            send.send(buf[..size].to_vec()).await?;
+                            cli.read_tls(&mut in_pre).map_err(TransportError::other)?;
+                            cli.process_new_packets().map_err(TransportError::other)?;
+                            while let Ok(size) = cli.read(&mut buf) {
+                                tracing::trace!("{}: CLI incoming decrypted {} bytes", short, size);
+                                if size == 0 {
+                                    break;
+                                }
+                                send.send(buf[..size].to_vec()).await?;
+                            }
                         }
                     }
                     _ => return Err(format!("invalid wire: {:?}", wire).into()),
