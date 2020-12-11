@@ -58,7 +58,7 @@ async fn tls_server_and_client_inner() -> TransportResult<()> {
         srv_proxy_recv,
     );
 
-    let ((cli_data_send1, cli_data_recv1), (mut cli_data_send2, mut cli_data_recv2)) =
+    let ((cli_data_send1, cli_data_recv1), (mut cli_data_send2, cli_data_recv2)) =
         kitsune_p2p_types::transport::create_transport_channel_pair();
 
     let expected_proxy_url = ProxyUrl::new("srv://srv.srv", tls_config_1.cert_digest)?;
@@ -73,12 +73,18 @@ async fn tls_server_and_client_inner() -> TransportResult<()> {
     );
 
     tracing::warn!("about to write");
-    cli_data_send2.write_and_close(b"test".to_vec()).await?;
+    let large_msg = std::iter::repeat(b"a"[0]).take(70_400).collect::<Vec<_>>();
+    cli_data_send2.write_and_close(large_msg.clone()).await?;
 
     tracing::warn!("about to recv");
-    let res = cli_data_recv2.next().await.unwrap();
-    let res = String::from_utf8_lossy(&res);
-    assert_eq!("echo: test", res);
+    let res = cli_data_recv2.collect::<Vec<_>>().await;
+    let res = res.into_iter().flat_map(|a| a).collect::<Vec<_>>();
+    let data = String::from_utf8_lossy(&res);
+    assert_eq!(data.len(), 70_406);
+    assert_eq!(
+        format!("echo: {}", String::from_utf8_lossy(&large_msg)),
+        data
+    );
 
     tracing::warn!("end test");
 

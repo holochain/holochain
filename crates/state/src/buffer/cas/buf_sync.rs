@@ -80,6 +80,12 @@ where
         self.0.contains(r, &k)
     }
 
+    /// Check if a value is in the scratch space
+    pub fn contains_in_scratch(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
+        let k = PrefixHashKey::new(k.as_hash());
+        self.0.contains_in_scratch(&k)
+    }
+
     /// Iterate over the underlying persisted data taking the scratch space into consideration
     pub fn iter_fail<'r, R: Readable>(
         &'r self,
@@ -151,6 +157,11 @@ where
     /// Check if a value is stored at this key
     pub fn contains(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
         fresh_reader!(self.env, |r| self.inner.contains(&r, k))
+    }
+
+    /// Check if a value is in the scratch space
+    pub fn contains_in_scratch(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
+        self.inner.contains_in_scratch(k)
     }
 
     pub fn inner(&self) -> &CasBufUsedSync<C, P> {

@@ -15,4 +15,5 @@ perf.data.old
 *.svg
 
 .todo.md
+admin/
 result
