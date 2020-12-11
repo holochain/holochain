@@ -26,9 +26,9 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "865f8b0b3fced577b7df82e9b0eb7609595d7209c0b39e78d0646672e244b1b1"
+checksum = "a75b7e6a93ecd6dbd2c225154d0fa7f86205574ecaa6c87429fb5f66ee677c44"
 dependencies = [
  "getrandom 0.2.0",
  "lazy_static",
@@ -939,7 +939,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
  "parking_lot",
- "paste 1.0.3",
+ "paste 1.0.4",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "serde",
@@ -952,7 +952,7 @@ name = "fixt_test"
 version = "0.0.1"
 dependencies = [
  "fixt",
- "paste 1.0.3",
+ "paste 1.0.4",
 ]
 
 [[package]]
@@ -1252,7 +1252,7 @@ dependencies = [
  "holo_hash",
  "holochain_wasmer_guest",
  "holochain_zome_types",
- "paste 1.0.3",
+ "paste 1.0.4",
  "serde",
  "serde_bytes",
  "thiserror",
@@ -1263,7 +1263,7 @@ name = "hdk3_derive"
 version = "0.0.1"
 dependencies = [
  "holochain_zome_types",
- "paste 1.0.3",
+ "paste 1.0.4",
  "proc-macro2",
  "quote",
  "syn",
@@ -1594,7 +1594,7 @@ dependencies = [
  "fixt",
  "holo_hash",
  "holochain_serialized_bytes",
- "paste 1.0.3",
+ "paste 1.0.4",
  "serde",
  "serde_bytes",
  "strum",
@@ -1753,7 +1753,7 @@ version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "514b79a9791d88f90889bd38a88dc43a6058b3ec72a8930a817c6e59fa9e4927"
 dependencies = [
- "ahash 0.6.1",
+ "ahash 0.6.2",
  "crossbeam-channel",
  "crossbeam-utils",
  "dashmap",
@@ -1913,7 +1913,7 @@ dependencies = [
  "ghost_actor",
  "nanoid",
  "once_cell",
- "paste 1.0.3",
+ "paste 1.0.4",
  "rmp-serde",
  "serde",
  "serde_json",
@@ -2527,9 +2527,9 @@ dependencies = [
 
 [[package]]
 name = "paste"
-version = "1.0.3"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7151b083b0664ed58ed669fcdd92f01c3d2fdbf10af4931a301474950b52bfa9"
+checksum = "c5d65c4d95931acda4498f675e332fcbdc9a06705cd07086c510e9b6009cd1c1"
 
 [[package]]
 name = "paste-impl"
