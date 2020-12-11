@@ -6,7 +6,7 @@
 let
   pkgs = {
     applications = callPackage ./applications.nix { inherit hcRustPlatform; };
-    dev = callPackage ./dev.nix { inherit holonixPath; };
+    dev = callPackage ./dev { inherit holonixPath; };
   };
 in
 
