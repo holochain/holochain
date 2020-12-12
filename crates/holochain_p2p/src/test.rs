@@ -151,6 +151,7 @@ mod tests {
         validate::ValidationStatus,
         HeaderHashed,
     };
+    use kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig;
     use kitsune_p2p::KitsuneP2pConfig;
 
     macro_rules! newhash {
@@ -178,9 +179,12 @@ mod tests {
     async fn test_call_remote_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
-            .await
-            .unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            KitsuneP2pConfig::default(),
+            TlsConfig::new_ephemeral().await.unwrap(),
+        )
+        .await
+        .unwrap();
 
         let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
@@ -232,9 +236,12 @@ mod tests {
     async fn test_send_validation_receipt_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
-            .await
-            .unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            KitsuneP2pConfig::default(),
+            TlsConfig::new_ephemeral().await.unwrap(),
+        )
+        .await
+        .unwrap();
 
         let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
@@ -279,9 +286,12 @@ mod tests {
     async fn test_publish_workflow() {
         let (dna, a1, a2, a3) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
-            .await
-            .unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            KitsuneP2pConfig::default(),
+            TlsConfig::new_ephemeral().await.unwrap(),
+        )
+        .await
+        .unwrap();
 
         let recv_count = Arc::new(std::sync::atomic::AtomicU8::new(0));
 
@@ -332,9 +342,12 @@ mod tests {
     async fn test_get_workflow() {
         let (dna, a1, a2, _a3) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
-            .await
-            .unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            KitsuneP2pConfig::default(),
+            TlsConfig::new_ephemeral().await.unwrap(),
+        )
+        .await
+        .unwrap();
 
         let test_1 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
             ElementStatus::new(
@@ -417,9 +430,12 @@ mod tests {
     async fn test_get_links_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
-            .await
-            .unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            KitsuneP2pConfig::default(),
+            TlsConfig::new_ephemeral().await.unwrap(),
+        )
+        .await
+        .unwrap();
 
         let test_1 = GetLinksResponse {
             link_adds: vec![(fixt!(CreateLink), fixt!(Signature))],
