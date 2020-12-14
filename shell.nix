@@ -1,4 +1,4 @@
-{ nixpkgs ? import <nixpkgs> {}
+{ nixpkgs ? null
 , flavor ? "coreDev"
 , ... } @ args:
 
