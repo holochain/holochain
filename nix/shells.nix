@@ -2,22 +2,29 @@
 , stdenv
 , mkShell
 , rustup
+, coreutils
 
 , holonix
 , hcRustPlatform
 , hcToplevelDir
+, hcTargetPrefixEval
 , pkgs
 }:
 
 let
-  inherit (lib.attrsets) mapAttrsToList;
+  inherit (lib.attrsets) mapAttrsToList mapAttrs;
 
   commonShellHook = ''
-    export HC_TARGET_PREFIX=''${NIX_ENV_PREFIX:-${builtins.toString hcToplevelDir}}
-    export CARGO_TARGET_DIR="''${HC_TARGET_PREFIX}/target"
-    export HC_TEST_WASM_DIR="''${HC_TARGET_PREFIX}/.wasm_target"
-    mkdir -p $HC_TEST_WASM_DIR
+    ${hcTargetPrefixEval}
+    echo Using "$HC_TARGET_PREFIX" as target prefix...
+
+    export CARGO_TARGET_DIR="$HC_TARGET_PREFIX/target"
     export CARGO_CACHE_RUSTC_INFO=1
+    export CARGO_HOME="$HC_TARGET_PREFIX/.cargo"
+    export CARGO_INSTALL_ROOT="$HC_TARGET_PREFIX/.cargo"
+
+    export HC_TEST_WASM_DIR="$HC_TARGET_PREFIX/.wasm_target"
+    mkdir -p $HC_TEST_WASM_DIR
 
     export HC_WASM_CACHE_PATH="$HC_TARGET_PREFIX/.wasm_cache"
     mkdir -p $HC_WASM_CACHE_PATH
@@ -38,18 +45,12 @@ let
     ) pkgs.applications;
   };
 
-  devPkgsList = builtins.attrValues pkgs.dev;
-
-  happDevFn = { includeRust ? true }: mkShell {
-    buildInputs = builtins.attrValues (
-      pkgs.applications // (
-        if includeRust
-        then hcRustPlatform.rust
-        else {}
-      )
-    );
-    shellHook = commonShellHook;
-  };
+  devPkgsLists =
+    mapAttrs (name: value:
+      mapAttrsToList (name': value':
+        value'
+      ) value
+    ) pkgs.dev;
 in
 
 rec {
@@ -73,11 +74,10 @@ rec {
   #     ;
   # });
 
-
   coreDev = mkShell {
     nativeBuildInputs = applicationPkgsInputs.nativeBuild;
     buildInputs = applicationPkgsInputs.build
-      ++ devPkgsList
+      ++ devPkgsLists.core
       ;
     shellHook = commonShellHook;
   };
@@ -85,12 +85,13 @@ rec {
   # we may need more packages on CI
   ci = coreDev;
 
-  happDev = happDevFn {
-    includeRust = true;
-  };
-
-  happDevRustExcluded = happDevFn {
-    includeRust = false;
+  happDev = mkShell {
+    nativeBuildInputs = applicationPkgsInputs.nativeBuild;
+    buildInputs = applicationPkgsInputs.build
+      # ++ devPkgsLists.core
+      ++ devPkgsLists.happ
+      ;
+    shellHook = commonShellHook;
   };
 
   coreDevRustup = coreDev.overrideAttrs (attrs: {
