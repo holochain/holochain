@@ -67,7 +67,7 @@ impl KeystoreSenderExt for KeystoreSender {
         async move {
             let last_index = this.lair_get_last_entry_index().await?;
             for i in 1..=*last_index {
-                if let LairEntryType::TlsCert = this.lair_get_entry_type(i.into()).await? {
+                if let Ok(LairEntryType::TlsCert) = this.lair_get_entry_type(i.into()).await {
                     let (_, digest) = this.tls_cert_get(i.into()).await?;
                     let cert = this.tls_cert_get_cert_by_index(i.into()).await?;
                     let cert_priv = this.tls_cert_get_priv_key_by_index(i.into()).await?;
