@@ -28,6 +28,10 @@ pub trait KeystoreSenderExt {
     fn sign(&self, input: Sign) -> KeystoreApiFuture<Signature>;
 
     /// If we have a TLS cert in lair - return the first one
+    /// Errors if no certs in lair
+    fn get_first_tls_cert(&self) -> KeystoreApiFuture<(CertDigest, Cert, CertPrivKey)>;
+
+    /// If we have a TLS cert in lair - return the first one
     /// otherwise, generate a TLS cert and return it
     fn get_or_create_first_tls_cert(&self) -> KeystoreApiFuture<(CertDigest, Cert, CertPrivKey)>;
 }
@@ -58,7 +62,7 @@ impl KeystoreSenderExt for KeystoreSender {
         .into()
     }
 
-    fn get_or_create_first_tls_cert(&self) -> KeystoreApiFuture<(CertDigest, Cert, CertPrivKey)> {
+    fn get_first_tls_cert(&self) -> KeystoreApiFuture<(CertDigest, Cert, CertPrivKey)> {
         let this = self.clone();
         async move {
             let last_index = this.lair_get_last_entry_index().await?;
@@ -70,12 +74,24 @@ impl KeystoreSenderExt for KeystoreSender {
                     return Ok((digest, cert, cert_priv));
                 }
             }
-            let (i, _, digest) = this
+            Err("no tls cert registered".into())
+        }
+        .boxed()
+        .into()
+    }
+
+    fn get_or_create_first_tls_cert(&self) -> KeystoreApiFuture<(CertDigest, Cert, CertPrivKey)> {
+        let this = self.clone();
+        async move {
+            if let Ok(r) = this.get_first_tls_cert().await {
+                return Ok(r);
+            }
+
+            let _ = this
                 .tls_cert_new_self_signed_from_entropy(TlsCertOptions::default())
                 .await?;
-            let cert = this.tls_cert_get_cert_by_index(i).await?;
-            let cert_priv = this.tls_cert_get_priv_key_by_index(i).await?;
-            Ok((digest, cert, cert_priv))
+
+            this.get_first_tls_cert().await
         }
         .boxed()
         .into()
