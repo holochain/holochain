@@ -12,8 +12,6 @@ edition = "2018"
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
 holochain_serialized_bytes = "=0.0.45"
-holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
-holochain_state = { version = "0.0.1", path = "../holochain_state" }
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
 holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
 serde = { version = "1.0.104", features = [ "derive" ] }

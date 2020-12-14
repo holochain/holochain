@@ -1292,9 +1292,7 @@ name = "holochain_conductor_api"
 version = "0.0.1"
 dependencies = [
  "holo_hash",
- "holochain_keystore",
  "holochain_serialized_bytes",
- "holochain_state",
  "holochain_types",
  "holochain_zome_types",
  "kitsune_p2p",
