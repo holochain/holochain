@@ -77,15 +77,18 @@ pub async fn spawn_kitsune_proxy_listener(
             loop {
                 tokio::time::delay_for(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS)).await;
 
-                if i_s_c.req_proxy(proxy_url.clone()).await.is_err() {
-                    tracing::error!("renewing proxy failed");
+                if let Err(e) = i_s_c.req_proxy(proxy_url.clone()).await {
+                    tracing::error!(msg = "renewing proxy failed", ?proxy_url, ?e);
                     // either we failed because the actor is already shutdown
                     // or the remote end rejected us.
                     // if it's the latter - shut down our ghost actor : )
-                    let _ = i_s_c.ghost_actor_shutdown().await;
-                    break;
+                    if !i_s_c.ghost_actor_is_active() {
+                        tracing::debug!("Ghost actor has closed so exiting keep alive");
+                        break;
+                    }
+                } else {
+                    tracing::info!("Proxy renewed for {:?}", proxy_url);
                 }
-                tracing::info!("Proxy renewed for {:?}", proxy_url);
             }
             tracing::error!("Keep alive closed");
         });
