@@ -38,7 +38,7 @@ pub fn call_remote(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::holochain::conductor::interface::websocket::test::setup_app;
+    use crate::holochain::conductor::interface::websocket::test_utils::setup_app;
     use crate::holochain::conductor::{api::ZomeCall, dna_store::MockDnaStore};
     use crate::holochain::core::ribosome::ZomeCallResponse;
     use hdk3::prelude::*;

@@ -1,15 +1,6 @@
+#![cfg(feature = "test_utils")]
 #![allow(unused_imports)]
 #![allow(dead_code)]
-use crate::holochain::conductor::dna_store::MockDnaStore;
-use crate::holochain::conductor::interface::websocket::test::setup_app;
-use holochain_state::element_buf::ElementBuf;
-use holochain_state::metadata::MetadataBuf;
-use holochain_state::metadata::MetadataBufT;
-use crate::holochain::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
-use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
-use crate::holochain::core::workflow::CallZomeWorkspace;
-use crate::holochain::test_utils::test_network;
-use holochain_wasm_test_utils::TestWasm;
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use futures::future::Either;
@@ -33,6 +24,9 @@ use holochain_p2p::actor::GetMetaOptions;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pRef;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::metadata::MetadataBuf;
+use holochain_state::metadata::MetadataBufT;
 use holochain_types::app::InstalledCell;
 use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dna::DnaDef;
@@ -51,6 +45,7 @@ use holochain_types::Entry;
 use holochain_types::EntryHashed;
 use holochain_types::HeaderHashed;
 use holochain_types::Timestamp;
+use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::cell::CellId;
 use holochain_zome_types::element::SignedHeaderHashed;
 use holochain_zome_types::entry::GetOptions;
@@ -60,6 +55,12 @@ use holochain_zome_types::metadata::Details;
 use holochain_zome_types::metadata::EntryDhtStatus;
 use holochain_zome_types::validate::ValidationStatus;
 use maplit::btreeset;
+use monolith::holochain::conductor::dna_store::MockDnaStore;
+use monolith::holochain::conductor::interface::websocket::test_utils::setup_app;
+use monolith::holochain::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
+use monolith::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
+use monolith::holochain::core::workflow::CallZomeWorkspace;
+use monolith::holochain::test_utils::test_network;
 use observability;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
@@ -69,7 +70,7 @@ use tokio::task::JoinHandle;
 use tracing::*;
 use unwrap_to::unwrap_to;
 
-use crate::holochain::test_utils::host_fn_caller::*;
+use monolith::holochain::test_utils::host_fn_caller::*;
 
 /*
 #[tokio::test(threaded_scheduler)]

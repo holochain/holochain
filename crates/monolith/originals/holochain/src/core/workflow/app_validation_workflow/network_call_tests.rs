@@ -23,9 +23,9 @@ use matches::assert_matches;
 use std::convert::TryInto;
 
 use crate::holochain::conductor::ConductorHandle;
-use crate::holochain::core::state::cascade::Cascade;
-use crate::holochain::core::state::cascade::DbPair;
-use crate::holochain::core::state::cascade::DbPairMut;
+use holochain_cascade::Cascade;
+use holochain_cascade::DbPair;
+use holochain_cascade::DbPairMut;
 use holochain_state::element_buf::ElementBuf;
 use holochain_state::metadata::ChainItemKey;
 use holochain_state::metadata::MetadataBuf;

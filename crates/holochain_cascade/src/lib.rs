@@ -4,9 +4,8 @@
 //! where as retrieve only checks that where the data was found
 //! the appropriate validation has been run.
 
-use crate::holochain::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
 use either::Either;
-use error::CascadeResult;
+use error::{AuthorityDataError, CascadeResult};
 use fallible_iterator::FallibleIterator;
 use holo_hash::hash_type::AnyDht;
 use holo_hash::AgentPubKey;
@@ -28,52 +27,16 @@ use holochain_state::metadata::ChainItemKey;
 use holochain_state::metadata::LinkMetaKey;
 use holochain_state::metadata::MetadataBuf;
 use holochain_state::metadata::MetadataBufT;
-use holochain_types::activity::AgentActivity;
-use holochain_types::activity::ChainItems;
-use holochain_types::chain::AgentActivityExt;
-use holochain_types::dht_op::produce_op_lights_from_element_group;
-use holochain_types::dht_op::produce_op_lights_from_elements;
-use holochain_types::element::Element;
-use holochain_types::element::ElementGroup;
-use holochain_types::element::ElementStatus;
-use holochain_types::element::GetElementResponse;
-use holochain_types::element::RawGetEntryResponse;
-use holochain_types::element::SignedHeaderHashed;
-use holochain_types::element::SignedHeaderHashedExt;
-use holochain_types::entry::option_entry_hashed;
-use holochain_types::link::GetLinksResponse;
-use holochain_types::link::WireLinkMetaKey;
-use holochain_types::metadata::EntryDhtStatus;
-use holochain_types::metadata::MetadataSet;
-use holochain_types::metadata::TimedHeaderHash;
-use holochain_types::EntryHashed;
-use holochain_types::HeaderHashed;
-use holochain_zome_types::element::SignedHeader;
-use holochain_zome_types::entry::GetOptions;
-use holochain_zome_types::entry::GetStrategy;
-use holochain_zome_types::header::HeaderType;
-use holochain_zome_types::link::Link;
-use holochain_zome_types::metadata::Details;
-use holochain_zome_types::metadata::ElementDetails;
-use holochain_zome_types::metadata::EntryDetails;
-use holochain_zome_types::query::ChainQueryFilter;
-use holochain_zome_types::query::ChainStatus;
-use holochain_zome_types::validate::ValidationPackage;
-use holochain_zome_types::validate::ValidationStatus;
+use holochain_types::AgentActivity;
+use holochain_types::*;
+use holochain_zome_types::Link;
+use holochain_zome_types::*;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::collections::HashSet;
 use tracing::*;
 use tracing_futures::Instrument;
 
-#[cfg(test)]
-mod authored_test;
-#[cfg(test)]
-mod network_tests;
-
-#[cfg(all(test, outdated_tests))]
-mod test;
-
+pub mod authority;
 pub mod error;
 
 /////////////////
@@ -443,20 +406,12 @@ where
         let env = ok_or_return!(self.env.clone());
         match *hash.hash_type() {
             AnyDht::Entry => {
-                let response = crate::holochain::conductor::authority::handle_get_entry(
-                    env.into(),
-                    hash.into(),
-                    (&options).into(),
-                )
-                .map_err(Box::new)?;
+                let response =
+                    authority::handle_get_entry(env.into(), hash.into(), (&options).into())?;
                 self.put_entry_in_cache(response)?;
             }
             AnyDht::Header => {
-                let response = crate::holochain::conductor::authority::handle_get_element(
-                    env.into(),
-                    hash.into(),
-                )
-                .map_err(Box::new)?;
+                let response = authority::handle_get_element(env.into(), hash.into())?;
                 self.put_element_in_cache(response)?;
             }
         }
@@ -477,12 +432,7 @@ where
             return Ok(());
         }
         let env = ok_or_return!(self.env.clone());
-        let response = crate::holochain::conductor::authority::handle_get_links(
-            env,
-            key.into(),
-            (&options).into(),
-        )
-        .map_err(Box::new)?;
+        let response = authority::handle_get_links(env, key.into(), (&options).into())?;
         self.put_link_in_cache(response)?;
         Ok(())
     }
@@ -2151,6 +2101,68 @@ impl<'a, M: MetadataBufT> From<&'a DbPairMut<'a, M>> for DbPair<'a, M> {
             meta: n.meta,
         }
     }
+}
+
+pub fn integrate_single_metadata<C, P>(
+    op: DhtOpLight,
+    element_store: &ElementBuf<P>,
+    meta_store: &mut C,
+) -> CascadeResult<()>
+where
+    P: PrefixType,
+    C: MetadataBufT<P>,
+{
+    match op {
+        DhtOpLight::StoreElement(hash, _, _) => {
+            let header = get_header(hash, element_store)?;
+            meta_store.register_element_header(&header)?;
+        }
+        DhtOpLight::StoreEntry(hash, _, _) => {
+            let new_entry_header = get_header(hash, element_store)?.try_into()?;
+            if let NewEntryHeader::Update(update) = &new_entry_header {
+                meta_store.register_update(update.clone())?;
+            }
+            // Reference to headers
+            meta_store.register_header(new_entry_header)?;
+        }
+        DhtOpLight::RegisterAgentActivity(hash, _) => {
+            let header = get_header(hash, element_store)?;
+            // register agent activity on this agents pub key
+            meta_store.register_activity(&header, ValidationStatus::Valid)?;
+        }
+        DhtOpLight::RegisterUpdatedContent(hash, _, _)
+        | DhtOpLight::RegisterUpdatedElement(hash, _, _) => {
+            let header = get_header(hash, element_store)?.try_into()?;
+            meta_store.register_update(header)?;
+        }
+        DhtOpLight::RegisterDeletedEntryHeader(hash, _)
+        | DhtOpLight::RegisterDeletedBy(hash, _) => {
+            let header = get_header(hash, element_store)?.try_into()?;
+            meta_store.register_delete(header)?
+        }
+        DhtOpLight::RegisterAddLink(hash, _) => {
+            let header = get_header(hash, element_store)?.try_into()?;
+            meta_store.add_link(header)?;
+        }
+        DhtOpLight::RegisterRemoveLink(hash, _) => {
+            let header = get_header(hash, element_store)?.try_into()?;
+            meta_store.delete_link(header)?;
+        }
+    }
+    Ok(())
+}
+
+pub fn get_header<P: PrefixType>(
+    hash: HeaderHash,
+    element_store: &ElementBuf<P>,
+) -> CascadeResult<Header> {
+    Ok(element_store
+        .get_header(&hash)?
+        // TODO: is this the right error type? [ TK-06690 ]
+        .ok_or_else(|| AuthorityDataError::MissingData(format!("{}", hash)))?
+        .into_header_and_signature()
+        .0
+        .into_content())
 }
 
 #[cfg(test)]

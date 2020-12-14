@@ -1288,6 +1288,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_cascade"
+version = "0.0.1"
+dependencies = [
+ "derive_more",
+ "either",
+ "fallible-iterator",
+ "fixt",
+ "futures",
+ "ghost_actor",
+ "hdk3",
+ "hdk3_derive",
+ "holo_hash",
+ "holochain_lmdb",
+ "holochain_p2p",
+ "holochain_serialized_bytes",
+ "holochain_state",
+ "holochain_types",
+ "holochain_wasm_test_utils",
+ "holochain_zome_types",
+ "kitsune_p2p",
+ "maplit",
+ "monolith",
+ "observability",
+ "serde",
+ "serde_derive",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-futures",
+ "unwrap_to",
+]
+
+[[package]]
 name = "holochain_conductor_api"
 version = "0.0.1"
 dependencies = [
@@ -2173,6 +2206,7 @@ dependencies = [
  "hdk3",
  "hdk3_derive",
  "holo_hash",
+ "holochain_cascade",
  "holochain_conductor_api",
  "holochain_keystore",
  "holochain_lmdb",

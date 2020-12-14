@@ -2,7 +2,7 @@ use crate::holochain::core::ribosome::error::RibosomeError;
 use crate::holochain::core::ribosome::error::RibosomeResult;
 use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::RibosomeT;
-use crate::holochain::core::state::cascade::error::CascadeError;
+use holochain_cascade::error::CascadeError;
 use crate::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::holochain::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use crate::holochain::core::SourceChainError;

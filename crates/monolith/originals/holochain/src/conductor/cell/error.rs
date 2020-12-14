@@ -2,10 +2,10 @@ use crate::holochain::conductor::api::error::ConductorApiError;
 use crate::holochain::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::holochain::core::ribosome::error::RibosomeError;
 use crate::holochain::core::ribosome::guest_callback::init::InitResult;
-use crate::holochain::core::state::cascade::error::CascadeError;
 use crate::holochain::core::workflow::error::WorkflowError;
 use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use crate::holochain::core::SourceChainError;
+use holochain_cascade::error::CascadeError;
 use holochain_lmdb::error::DatabaseError;
 use holochain_p2p::HolochainP2pError;
 use holochain_types::dna::DnaError;
@@ -57,36 +57,11 @@ pub enum CellError {
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
     #[error(transparent)]
     DhtOpConvertError(#[from] DhtOpConvertError),
-    #[error("Cell is an authority for is missing or incorrect: {0}")]
-    AuthorityDataError(#[from] AuthorityDataError),
     #[error("Todo")]
     Todo,
 }
 
 pub type CellResult<T> = Result<T, CellError>;
 
-#[derive(Error, Debug)]
-pub enum AuthorityDataError {
-    #[error(transparent)]
-    DhtOpConvertError(#[from] DhtOpConvertError),
-    #[error(transparent)]
-    WrongHeaderError(#[from] WrongHeaderError),
-    #[error(transparent)]
-    HeaderError(#[from] HeaderError),
-    #[error("Missing element data: {0:?}")]
-    MissingData(String),
-    #[error("Missing metadata: {0:?}")]
-    MissingMetadata(String),
-}
-
-impl AuthorityDataError {
-    pub fn missing_data<T: std::fmt::Debug>(data: T) -> CellError {
-        Self::MissingData(format!("Missing header {:?}", data)).into()
-    }
-    pub fn missing_data_entry<T: std::fmt::Debug>(data: T) -> CellError {
-        Self::MissingData(format!("Missing entry for header {:?}", data)).into()
-    }
-    pub fn missing_metadata<T: std::fmt::Debug>(data: T) -> CellError {
-        Self::MissingMetadata(format!("{:?}", data)).into()
-    }
-}
+/// Re-export for convenience [ TK-06690 ]
+pub use holochain_cascade::error::AuthorityDataError;

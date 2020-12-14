@@ -1,13 +1,7 @@
 use super::error::AuthorityDataError;
-use super::error::CellResult;
-use crate::holochain::conductor::CellError;
-use holochain_state::element_buf::ElementBuf;
-use holochain_state::metadata::ChainItemKey;
-use holochain_state::metadata::LinkMetaKey;
-use holochain_state::metadata::MetadataBuf;
-use holochain_state::metadata::MetadataBufT;
+use super::error::CascadeError;
+use super::error::CascadeResult;
 use fallible_iterator::FallibleIterator;
-
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
@@ -18,6 +12,11 @@ use holochain_lmdb::error::DatabaseError;
 use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::PrefixType;
 use holochain_lmdb::prelude::Readable;
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::metadata::ChainItemKey;
+use holochain_state::metadata::LinkMetaKey;
+use holochain_state::metadata::MetadataBuf;
+use holochain_state::metadata::MetadataBufT;
 use holochain_types::activity::AgentActivity;
 use holochain_types::activity::ChainItems;
 use holochain_types::element::ElementStatus;
@@ -41,7 +40,7 @@ pub fn handle_get_entry(
     state_env: EnvironmentWrite,
     hash: EntryHash,
     options: holochain_p2p::event::GetOptions,
-) -> CellResult<GetElementResponse> {
+) -> CascadeResult<GetElementResponse> {
     // Get the vaults
     let element_vault = ElementBuf::vault(state_env.clone().into(), false)?;
     let element_rejected = ElementBuf::rejected(state_env.clone().into())?;
@@ -60,7 +59,7 @@ pub fn handle_get_entry(
             status = ValidationStatus::Rejected;
         }
         let r = r.ok_or_else(|| AuthorityDataError::missing_data(header_hash))?;
-        CellResult::Ok((r, status))
+        CascadeResult::Ok((r, status))
     };
 
     // ### Get entry data closure
@@ -80,7 +79,7 @@ pub fn handle_get_entry(
             .map(|e| (e.into_content(), et.clone()))
             // Missing the entry
             .ok_or_else(|| AuthorityDataError::missing_data_entry(header))?;
-        CellResult::Ok(entry_data)
+        CascadeResult::Ok(entry_data)
     };
 
     // ### Gather headers closure
@@ -112,7 +111,7 @@ pub fn handle_get_entry(
                     render_header_and_status(update)?
                         .try_into()
                         .map_err(AuthorityDataError::from)?;
-                CellResult::Ok(update)
+                CascadeResult::Ok(update)
             });
             updates = updates_returns.collect::<Result<_, _>>()?;
 
@@ -146,7 +145,7 @@ pub fn handle_get_entry(
             let header = render_header_and_status(delete?)?;
             return_deletes.push(header.try_into().map_err(AuthorityDataError::from)?);
         }
-        CellResult::Ok((live_headers, return_deletes, updates))
+        CascadeResult::Ok((live_headers, return_deletes, updates))
     };
 
     // ## Gather the entry and header data to return
@@ -189,7 +188,7 @@ pub fn handle_get_entry(
 pub fn handle_get_element(
     env: EnvironmentWrite,
     hash: HeaderHash,
-) -> CellResult<GetElementResponse> {
+) -> CascadeResult<GetElementResponse> {
     // Get the vaults
     let env_ref = env.guard();
     let reader = env_ref.reader()?;
@@ -206,7 +205,7 @@ pub fn handle_get_element(
     // Look for a deletes on the header and collect them
     let deletes = meta_vault
         .get_deletes_on_header(&reader, hash.clone())?
-        .map_err(CellError::from)
+        .map_err(CascadeError::from)
         .map(|delete_header| {
             let delete_hash = delete_header.header_hash;
             let mut status = ValidationStatus::Valid;
@@ -227,7 +226,7 @@ pub fn handle_get_element(
     // Look for a updates on the header and collect them
     let updates = meta_vault
         .get_updates(&reader, hash.clone().into())?
-        .map_err(CellError::from)
+        .map_err(CascadeError::from)
         .map(|update_header| {
             let update_hash = update_header.header_hash;
             let mut status = ValidationStatus::Valid;
@@ -265,7 +264,7 @@ pub fn handle_get_agent_activity(
     agent: AgentPubKey,
     query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
-) -> CellResult<AgentActivity> {
+) -> CascadeResult<AgentActivity> {
     // Databases
     let element_integrated = ElementBuf::vault(env.clone(), false)?;
     let meta_integrated = MetadataBuf::vault(env.clone())?;
@@ -339,9 +338,9 @@ fn check_headers<P: PrefixType, R: Readable>(
     options: holochain_p2p::event::GetActivityOptions,
     database: ElementBuf<P>,
     reader: &R,
-) -> CellResult<ChainItems> {
+) -> CascadeResult<ChainItems> {
     if options.include_full_headers {
-        CellResult::Ok(ChainItems::Full(
+        CascadeResult::Ok(ChainItems::Full(
             get_full_headers(hashes, query, database, reader)
                 .map(|(_, shh)| Ok(shh))
                 .collect()?,
@@ -411,7 +410,7 @@ pub fn handle_get_links(
     env: EnvironmentRead,
     link_key: WireLinkMetaKey,
     _options: holochain_p2p::event::GetLinksOptions,
-) -> CellResult<GetLinksResponse> {
+) -> CascadeResult<GetLinksResponse> {
     // Get the vaults
     let env_ref = env.guard();
     let reader = env_ref.reader()?;

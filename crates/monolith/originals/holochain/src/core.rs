@@ -8,7 +8,6 @@ pub mod queue_consumer;
 pub mod ribosome;
 #[allow(missing_docs)]
 pub mod signal;
-pub mod state;
 mod validation;
 #[allow(missing_docs)]
 pub mod workflow;

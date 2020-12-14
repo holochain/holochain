@@ -29,6 +29,7 @@ holochain_serialized_bytes = "=0.0.45"
 holochain_wasmer_host = "=0.0.50"
 hdk3 = { version = "0.0.1", path = "../hdk3" }
 hdk3_derive = { version = "0.0.1", path = "../hdk3_derive" }
+holochain_cascade = { version = "0.0.1", path = "../holochain_cascade" }
 holochain_conductor_api = { version = "0.0.1", path = "../holochain_conductor_api" }
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }

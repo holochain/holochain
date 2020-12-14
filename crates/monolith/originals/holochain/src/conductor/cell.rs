@@ -18,13 +18,6 @@ use crate::holochain::core::queue_consumer::InitialQueueTriggers;
 use crate::holochain::core::ribosome::guest_callback::init::InitResult;
 use crate::holochain::core::ribosome::real_ribosome::RealRibosome;
 use crate::holochain::core::ribosome::ZomeCallInvocation;
-use holochain_state::dht_op_integration::IntegratedDhtOpsBuf;
-use holochain_state::element_buf::ElementBuf;
-use holochain_state::metadata::LinkMetaKey;
-use holochain_state::metadata::MetadataBuf;
-use holochain_state::metadata::MetadataBufT;
-use holochain_state::source_chain::SourceChain;
-use holochain_state::source_chain::SourceChainBuf;
 use crate::holochain::core::workflow::call_zome_workflow;
 use crate::holochain::core::workflow::error::WorkflowError;
 use crate::holochain::core::workflow::genesis_workflow::genesis_workflow;
@@ -37,21 +30,6 @@ use crate::holochain::core::workflow::GenesisWorkflowArgs;
 use crate::holochain::core::workflow::GenesisWorkspace;
 use crate::holochain::core::workflow::InitializeZomesWorkflowArgs;
 use crate::holochain::core::workflow::ZomeCallResult;
-use holochain_p2p::HolochainP2pCellT;
-use holochain_lmdb::db::GetDb;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::env::ReadManager;
-use holochain_types::activity::AgentActivity;
-use holochain_types::autonomic::AutonomicProcess;
-use holochain_zome_types::cell::CellId;
-use holochain_types::element::GetElementResponse;
-use holochain_types::link::GetLinksResponse;
-use holochain_types::link::WireLinkMetaKey;
-use holochain_types::metadata::MetadataSet;
-use holochain_types::metadata::TimedHeaderHash;
-use holochain_types::validate::ValidationPackageResponse;
-use holochain_types::Timestamp;
 use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
 use error::AuthorityDataError;
 use error::CellError;
@@ -59,7 +37,29 @@ use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
+use holochain_lmdb::db::GetDb;
+use holochain_lmdb::env::EnvironmentRead;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::env::ReadManager;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::dht_op_integration::IntegratedDhtOpsBuf;
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::metadata::LinkMetaKey;
+use holochain_state::metadata::MetadataBuf;
+use holochain_state::metadata::MetadataBufT;
+use holochain_state::source_chain::SourceChain;
+use holochain_state::source_chain::SourceChainBuf;
+use holochain_types::activity::AgentActivity;
+use holochain_types::autonomic::AutonomicProcess;
+use holochain_types::element::GetElementResponse;
+use holochain_types::link::GetLinksResponse;
+use holochain_types::link::WireLinkMetaKey;
+use holochain_types::metadata::MetadataSet;
+use holochain_types::metadata::TimedHeaderHash;
+use holochain_types::validate::ValidationPackageResponse;
+use holochain_types::Timestamp;
+use holochain_zome_types::cell::CellId;
 use holochain_zome_types::*;
 use observability::OpenSpanExt;
 use std::collections::BTreeMap;
@@ -72,8 +72,9 @@ use tracing::*;
 use tracing_futures::Instrument;
 use validation_package::ValidationPackageDb;
 
-#[allow(missing_docs)]
-pub mod authority;
+/// Re-export for convenience [ TK-06690 ]
+pub use holochain_cascade::authority;
+
 mod validation_package;
 
 #[allow(missing_docs)]
@@ -527,13 +528,13 @@ impl Cell {
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<GetElementResponse> {
         let env = self.env.clone();
-        authority::handle_get_entry(env, hash, options)
+        authority::handle_get_entry(env, hash, options).map_err(Into::into)
     }
 
     #[tracing::instrument(skip(self))]
     async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
         let env = self.env.clone();
-        authority::handle_get_element(env, hash)
+        authority::handle_get_element(env, hash).map_err(Into::into)
     }
 
     #[instrument(skip(self, _dht_hash, _options))]
@@ -558,7 +559,7 @@ impl Cell {
     ) -> CellResult<GetLinksResponse> {
         debug!(id = ?self.id());
         let env = self.env.clone();
-        authority::handle_get_links(env.into(), link_key, options)
+        authority::handle_get_links(env.into(), link_key, options).map_err(Into::into)
     }
 
     #[instrument(skip(self, options))]
@@ -569,7 +570,7 @@ impl Cell {
         options: holochain_p2p::event::GetActivityOptions,
     ) -> CellResult<AgentActivity> {
         let env = self.env.clone();
-        authority::handle_get_agent_activity(env.into(), agent, query, options)
+        authority::handle_get_agent_activity(env.into(), agent, query, options).map_err(Into::into)
     }
 
     /// a remote agent is sending us a validation receipt.

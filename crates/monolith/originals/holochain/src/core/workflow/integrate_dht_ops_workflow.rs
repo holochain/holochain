@@ -4,9 +4,24 @@ use super::*;
 use crate::holochain::core::queue_consumer::OneshotWriter;
 use crate::holochain::core::queue_consumer::TriggerSender;
 use crate::holochain::core::queue_consumer::WorkComplete;
-use crate::holochain::core::state::cascade::error::CascadeResult;
-use crate::holochain::core::state::cascade::Cascade;
-use crate::holochain::core::state::cascade::DbPair;
+use crate::holochain::core::validation::DhtOpOrder;
+use crate::holochain::core::validation::OrderedOp;
+use error::WorkflowResult;
+use fallible_iterator::FallibleIterator;
+use holo_hash::DhtOpHash;
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
+use holochain_cascade::error::CascadeError;
+use holochain_cascade::error::CascadeResult;
+use holochain_cascade::Cascade;
+use holochain_cascade::DbPair;
+use holochain_lmdb::buffer::BufferedStore;
+use holochain_lmdb::buffer::KvBufFresh;
+use holochain_lmdb::db::INTEGRATED_DHT_OPS;
+use holochain_lmdb::db::INTEGRATION_LIMBO;
+use holochain_lmdb::error::DatabaseResult;
+use holochain_lmdb::fresh_reader;
+use holochain_lmdb::prelude::*;
 use holochain_state::dht_op_integration::IntegratedDhtOpsStore;
 use holochain_state::dht_op_integration::IntegratedDhtOpsValue;
 use holochain_state::dht_op_integration::IntegrationLimboStore;
@@ -17,8 +32,6 @@ use holochain_state::metadata::MetadataBufT;
 use holochain_state::validation_db::ValidationLimboStore;
 use holochain_state::workspace::Workspace;
 use holochain_state::workspace::WorkspaceResult;
-use crate::holochain::core::validation::DhtOpOrder;
-use crate::holochain::core::validation::OrderedOp;
 use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpLight;
@@ -31,18 +44,6 @@ use holochain_types::validate::ValidationStatus;
 use holochain_types::Entry;
 use holochain_types::EntryHashed;
 use holochain_types::Timestamp;
-use error::WorkflowResult;
-use fallible_iterator::FallibleIterator;
-use holo_hash::DhtOpHash;
-use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::db::INTEGRATED_DHT_OPS;
-use holochain_lmdb::db::INTEGRATION_LIMBO;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
 use holochain_zome_types::element::ElementEntry;
 use holochain_zome_types::element::SignedHeader;
 use holochain_zome_types::query::ChainHead;
@@ -364,7 +365,7 @@ async fn header_with_entry_is_stored(
     {
         Some(el) => match el.entry() {
             ElementEntry::Present(_) | ElementEntry::Hidden => Ok(true),
-            ElementEntry::NotApplicable => Err(DhtOpConvertError::HeaderEntryMismatch.into()),
+            ElementEntry::NotApplicable => Err(CascadeError::EntryMissing(hash.clone())),
             // This means we have just the header (probably through register agent activity)
             ElementEntry::NotStored => Ok(false),
         },
@@ -396,54 +397,8 @@ async fn header_is_stored(hash: &HeaderHash, mut cascade: Cascade<'_>) -> Cascad
     }
 }
 
-pub fn integrate_single_metadata<C, P>(
-    op: DhtOpLight,
-    element_store: &ElementBuf<P>,
-    meta_store: &mut C,
-) -> DhtOpConvertResult<()>
-where
-    P: PrefixType,
-    C: MetadataBufT<P>,
-{
-    match op {
-        DhtOpLight::StoreElement(hash, _, _) => {
-            let header = get_header(hash, element_store)?;
-            meta_store.register_element_header(&header)?;
-        }
-        DhtOpLight::StoreEntry(hash, _, _) => {
-            let new_entry_header = get_header(hash, element_store)?.try_into()?;
-            if let NewEntryHeader::Update(update) = &new_entry_header {
-                meta_store.register_update(update.clone())?;
-            }
-            // Reference to headers
-            meta_store.register_header(new_entry_header)?;
-        }
-        DhtOpLight::RegisterAgentActivity(hash, _) => {
-            let header = get_header(hash, element_store)?;
-            // register agent activity on this agents pub key
-            meta_store.register_activity(&header, ValidationStatus::Valid)?;
-        }
-        DhtOpLight::RegisterUpdatedContent(hash, _, _)
-        | DhtOpLight::RegisterUpdatedElement(hash, _, _) => {
-            let header = get_header(hash, element_store)?.try_into()?;
-            meta_store.register_update(header)?;
-        }
-        DhtOpLight::RegisterDeletedEntryHeader(hash, _)
-        | DhtOpLight::RegisterDeletedBy(hash, _) => {
-            let header = get_header(hash, element_store)?.try_into()?;
-            meta_store.register_delete(header)?
-        }
-        DhtOpLight::RegisterAddLink(hash, _) => {
-            let header = get_header(hash, element_store)?.try_into()?;
-            meta_store.add_link(header)?;
-        }
-        DhtOpLight::RegisterRemoveLink(hash, _) => {
-            let header = get_header(hash, element_store)?.try_into()?;
-            meta_store.delete_link(header)?;
-        }
-    }
-    Ok(())
-}
+/// Re-export for convenience [ TK-06690 ]
+pub use holochain_cascade::integrate_single_metadata;
 
 /// Store a DhtOp's data in an element buf
 pub fn integrate_single_data<P: PrefixType>(
@@ -500,17 +455,8 @@ fn put_data<P: PrefixType>(
     Ok(())
 }
 
-fn get_header<P: PrefixType>(
-    hash: HeaderHash,
-    element_store: &ElementBuf<P>,
-) -> DhtOpConvertResult<Header> {
-    Ok(element_store
-        .get_header(&hash)?
-        .ok_or_else(|| DhtOpConvertError::MissingData(hash.into()))?
-        .into_header_and_signature()
-        .0
-        .into_content())
-}
+/// Re-export for convenience [ TK-06690 ]
+pub use holochain_cascade::get_header;
 
 /// After writing an Element to our chain, we want to integrate the meta ops
 /// inline, so that they are immediately available in the authored metadata.

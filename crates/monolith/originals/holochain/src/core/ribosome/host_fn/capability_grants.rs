@@ -20,7 +20,7 @@ pub fn capability_grants(
 pub mod wasm_test {
     use crate::destructure_test_cells;
     use crate::holochain::conductor::dna_store::MockDnaStore;
-    use crate::holochain::conductor::interface::websocket::test::setup_app;
+    use crate::holochain::conductor::interface::websocket::test_utils::setup_app;
     use crate::holochain::conductor::ConductorBuilder;
     use crate::holochain::core::ribosome::ZomeCall;
     use crate::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;

@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use super::SourceChainError;
 use crate::holochain::conductor::api::error::ConductorApiError;
 use crate::holochain::conductor::entry_def_store::error::EntryDefStoreError;
-use crate::holochain::core::state::cascade::error::CascadeError;
+use holochain_cascade::error::CascadeError;
 use holochain_state::workspace::WorkspaceError;
 use crate::holochain::core::validation::OutcomeOrError;
 use crate::holochain::core::workflow::error::WorkflowError;

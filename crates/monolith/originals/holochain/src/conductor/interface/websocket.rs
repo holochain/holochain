@@ -243,9 +243,61 @@ where
     }
 }
 
+/// Test items needed by other crates
+#[cfg(any(test, feature = "test_utils"))]
+pub mod test_utils {
+    use std::sync::Arc;
+    use holochain_types::app::InstalledCell;
+    use crate::holochain::conductor::dna_store::MockDnaStore;
+    use tempdir::TempDir;
+    use holochain_serialized_bytes::prelude::*;
+    use crate::holochain::conductor::conductor::ConductorBuilder;
+    use crate::holochain::conductor::ConductorHandle;
+    use crate::holochain::conductor::api::RealAppInterfaceApi;
+    use holochain_lmdb::test_utils::test_environments;
+    
+    /// One of various ways to setup an app, used somewhere...
+    pub async fn setup_app(
+        cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
+        dna_store: MockDnaStore,
+    ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+        let envs = test_environments();
+    
+        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
+            .test(&envs)
+            .await
+            .unwrap();
+    
+        conductor_handle
+            .clone()
+            .install_app("test app".to_string(), cell_data)
+            .await
+            .unwrap();
+    
+        conductor_handle
+            .activate_app("test app".to_string())
+            .await
+            .unwrap();
+    
+        let errors = conductor_handle.clone().setup_cells().await.unwrap();
+    
+        assert!(errors.is_empty());
+    
+        let handle = conductor_handle.clone();
+    
+        (
+            envs.tempdir(),
+            RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+            handle,
+        )
+    }
+}
+
+
 #[cfg(test)]
 pub mod test {
     use super::*;
+    use super::test_utils::setup_app;
     use crate::holochain::conductor::api::error::ExternalApiWireError;
     use crate::holochain::conductor::api::AdminRequest;
     use crate::holochain::conductor::api::AdminResponse;
@@ -338,41 +390,6 @@ pub mod test {
         assert!(errors.is_empty());
 
         conductor_handle
-    }
-
-    pub async fn setup_app(
-        cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
-        dna_store: MockDnaStore,
-    ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-        let envs = test_environments();
-
-        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(&envs)
-            .await
-            .unwrap();
-
-        conductor_handle
-            .clone()
-            .install_app("test app".to_string(), cell_data)
-            .await
-            .unwrap();
-
-        conductor_handle
-            .activate_app("test app".to_string())
-            .await
-            .unwrap();
-
-        let errors = conductor_handle.clone().setup_cells().await.unwrap();
-
-        assert!(errors.is_empty());
-
-        let handle = conductor_handle.clone();
-
-        (
-            envs.tempdir(),
-            RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
-            handle,
-        )
     }
 
     #[tokio::test(threaded_scheduler)]
