@@ -2,6 +2,7 @@ use ::fixt::prelude::*;
 use anyhow::Result;
 use assert_cmd::prelude::*;
 use futures::future;
+use futures::stream;
 use futures::Future;
 use hdk3::prelude::RemoteSignal;
 use holochain::conductor::p2p_store::exchange_peer_info;
@@ -19,7 +20,6 @@ use holochain::{
     fixt::*,
 };
 use holochain_state::test_utils::test_environments;
-use holochain_types::dna::DnaDef;
 use holochain_types::dna::DnaFile;
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
@@ -33,8 +33,6 @@ use holochain_websocket::*;
 use holochain_zome_types::{signal::AppSignal, *};
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
 use std::{path::PathBuf, process::Stdio, sync::Arc, time::Duration};
 use tempdir::TempDir;
 use tokio::{
@@ -391,25 +389,14 @@ async fn call_zome() {
 
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "slow_tests")]
-async fn remote_signals_int() {
+async fn remote_signals() {
+    use futures::StreamExt;
     observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 5;
-    let mut all_envs = Vec::with_capacity(NUM_CONDUCTORS);
-    let mut all_agents = Vec::with_capacity(NUM_CONDUCTORS);
-    for _ in 0..NUM_CONDUCTORS {
-        let envs = test_environments();
-        let agent = TestAgents::one(envs.keystore()).await;
-        all_envs.push(envs);
-        all_agents.push(agent);
-    }
-    let index = AtomicUsize::new(0);
-    let index_ref = &index;
-    let envs_ref = &all_envs;
 
     let conductors = future::join_all(
         std::iter::repeat_with(|| async move {
-            let i = index_ref.fetch_add(1, Ordering::SeqCst);
-            let envs = envs_ref[i].clone();
+            let envs = test_environments();
             let mut network = KitsuneP2pConfig::default();
             network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
                 bind_to: None,
@@ -431,33 +418,33 @@ async fn remote_signals_int() {
     )
     .await;
 
-    let dna_file = DnaFile::new(
-        DnaDef {
-            name: "conductor_test".to_string(),
-            uuid: nanoid::nanoid!(),
-            properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::EmitSignal.into()],
-        },
-        vec![TestWasm::EmitSignal.into()],
+    let all_agents: Vec<HoloHash<hash_type::Agent>> = futures::StreamExt::collect(
+        stream::iter(conductors.iter().map(|(_, e)| e)).then(|e| TestAgents::one(e.keystore())),
     )
-    .await
-    .unwrap();
+    .await;
+
+    let dna_file = DnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
+        .await
+        .unwrap()
+        .0;
 
     let agents_ref = &all_agents;
 
-    let data = future::join_all(conductors.iter().enumerate().map(|(i, (conductor, envs))| {
-        let dna_file = dna_file.clone();
-        async move {
-            let data = conductor
-                .setup_app_for_agents_with_no_membrane_proof(
-                    "app",
-                    &[agents_ref[i].clone()],
-                    &[dna_file.clone()],
-                )
-                .await;
-            (data, envs)
-        }
-    }))
+    let data: Vec<_> = futures::StreamExt::collect(
+        futures::stream::iter(conductors.iter().enumerate()).then(|(i, (conductor, envs))| {
+            let dna_file = dna_file.clone();
+            async move {
+                let data = conductor
+                    .setup_app_for_agents_with_no_membrane_proof(
+                        "app",
+                        &[agents_ref[i].clone()],
+                        &[dna_file.clone()],
+                    )
+                    .await;
+                (data, envs)
+            }
+        }),
+    )
     .await;
 
     let p2p_envs = data.iter().map(|(_, envs)| envs.p2p()).collect();

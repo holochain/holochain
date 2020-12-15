@@ -21,43 +21,37 @@ pub fn remote_signal(
     const FN_NAME: &str = "recv_remote_signal";
     // Timeouts and errors are ignored,
     // this is a send and forget operation.
-    tokio_safe_block_on::tokio_safe_block_forever_on(
-        async move {
-            let network = call_context.host_access().network().clone();
-            let RemoteSignal { agents, signal } = input.into_inner();
-            let zome_name: ZomeName = call_context.zome().into();
-            let fn_name: FunctionName = FN_NAME.into();
-            let request: SerializedBytes = signal.try_into()?;
-            for agent in agents {
-                tokio::task::spawn(
-                    {
-                        let mut network = network.clone();
-                        let zome_name = zome_name.clone();
-                        let fn_name = fn_name.clone();
-                        let request = request.clone();
-                        async move {
-                            tracing::debug!("sending to {:?}", agent);
-                            let result = network
-                                .call_remote(agent.clone(), zome_name, fn_name, None, request)
-                                .await;
-                            tracing::debug!("sent to {:?}", agent);
-                            if let Err(e) = result {
-                                tracing::info!(
-                                    "Failed to send remote signal to {:?} because of {:?}",
-                                    agent,
-                                    e
-                                );
-                            }
-                        }
+    let network = call_context.host_access().network().clone();
+    let RemoteSignal { agents, signal } = input.into_inner();
+    let zome_name: ZomeName = call_context.zome().into();
+    let fn_name: FunctionName = FN_NAME.into();
+    let request: SerializedBytes = signal.try_into()?;
+    for agent in agents {
+        tokio::task::spawn(
+            {
+                let mut network = network.clone();
+                let zome_name = zome_name.clone();
+                let fn_name = fn_name.clone();
+                let request = request.clone();
+                async move {
+                    tracing::debug!("sending to {:?}", agent);
+                    let result = network
+                        .call_remote(agent.clone(), zome_name, fn_name, None, request)
+                        .await;
+                    tracing::debug!("sent to {:?}", agent);
+                    if let Err(e) = result {
+                        tracing::info!(
+                            "Failed to send remote signal to {:?} because of {:?}",
+                            agent,
+                            e
+                        );
                     }
-                    .in_current_span(),
-                );
+                }
             }
-            Ok(())
-        }
-        .in_current_span(),
-    )
-    .map(RemoteSignalOutput::new)
+            .in_current_span(),
+        );
+    }
+    Ok(RemoteSignalOutput::new(()))
 }
 
 #[cfg(test)]
