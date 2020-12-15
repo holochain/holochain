@@ -1,17 +1,18 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
 // TODO [ B-03669 ] move to own crate
 
-use std::sync::Arc;
-
 use super::CoolCell;
 use crate::{
-    conductor::{api::ZomeCall, handle::ConductorHandle},
+    conductor::{api::ZomeCall, config::ConductorConfig, handle::ConductorHandle, Conductor},
     core::ribosome::ZomeCallInvocation,
 };
+use futures::future;
 use hdk3::prelude::*;
+use holochain_state::test_utils::{test_environments, TestEnvironments};
 use holochain_types::app::{InstalledAppId, InstalledCell};
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
+use std::sync::Arc;
 use unwrap_to::unwrap_to;
 
 #[derive(Clone, shrinkwraprs::Shrinkwrap, derive_more::From)]
@@ -23,6 +24,33 @@ pub struct CoolConductor(pub Arc<CoolConductorInner>);
 pub struct CoolConductorInner(pub(crate) ConductorHandle);
 
 impl CoolConductor {
+    /// Create a CoolConductor with a new set of TestEnvironments from the given config
+    pub async fn from_config(config: ConductorConfig) -> (CoolConductor, TestEnvironments) {
+        let envs = test_environments();
+        let cc = Conductor::builder()
+            .config(config)
+            .test(&envs)
+            .await
+            .unwrap()
+            .into();
+        (cc, envs)
+    }
+
+    /// Map the given ConductorConfigs into CoolConductors, each with its own new TestEnvironments
+    pub async fn multi_from_configs<I: IntoIterator<Item = ConductorConfig>>(
+        configs: I,
+    ) -> Vec<(CoolConductor, TestEnvironments)> {
+        future::join_all(configs.into_iter().map(Self::from_config)).await
+    }
+
+    /// Create the given number of new CoolConductors, each with its own new TestEnvironments
+    pub async fn multi_from_config(
+        num: usize,
+        config: ConductorConfig,
+    ) -> Vec<(CoolConductor, TestEnvironments)> {
+        Self::multi_from_configs(std::iter::repeat(config).take(num)).await
+    }
+
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
     ///
     /// All InstalledAppIds and CellNicks are auto-generated. In tests driven directly
@@ -92,12 +120,21 @@ impl CoolConductor {
             .await
             .expect("Could not setup cells");
 
-        info
+        CoolInstalledApps(info)
     }
 }
 
 /// Return type of opinionated setup function
-pub type CoolInstalledApps = Vec<(InstalledAppId, Vec<CoolCell>)>;
+pub struct CoolInstalledApps(CoolInstalledAppsRaw);
+
+type CoolInstalledAppsRaw = Vec<(InstalledAppId, Vec<CoolCell>)>;
+
+impl CoolInstalledApps {
+    /// Get the underlying data
+    pub fn into_inner(self) -> CoolInstalledAppsRaw {
+        self.0
+    }
+}
 
 /// Helper to destructure the nested app setup return value as nested tuples.
 /// Each level of nesting can contain 1-4 items, i.e. up to 4 agents with 4 DNAs each.
@@ -107,7 +144,8 @@ macro_rules! destructure_test_cells {
     ($blob:expr) => {{
         use itertools::Itertools;
         let blob: $crate::test_utils::cool::CoolInstalledApps = $blob;
-        blob.into_iter()
+        blob.into_inner()
+            .into_iter()
             .map(|(_, v)| {
                 v.into_iter()
                     .collect_tuple()
@@ -215,7 +253,7 @@ where
     E: std::fmt::Debug,
     FunctionName: From<F>,
 {
-    fn from(tzci: CoolZomeCall<'a, P, F, E>) -> Self {
+    fn from(czc: CoolZomeCall<'a, P, F, E>) -> Self {
         let CoolZomeCall {
             cell_id,
             zome,
@@ -223,7 +261,7 @@ where
             cap,
             provenance,
             payload,
-        } = tzci;
+        } = czc;
         let payload = ExternInput::new(payload.try_into().expect("Couldn't serialize payload"));
         let provenance = provenance.unwrap_or_else(|| cell_id.agent_pubkey().clone());
         ZomeCallInvocation {
@@ -243,8 +281,8 @@ where
     E: std::fmt::Debug,
     FunctionName: From<F>,
 {
-    fn from(tzci: CoolZomeCall<'a, P, F, E>) -> Self {
-        ZomeCallInvocation::from(tzci).into()
+    fn from(czc: CoolZomeCall<'a, P, F, E>) -> Self {
+        ZomeCallInvocation::from(czc).into()
     }
 }
 

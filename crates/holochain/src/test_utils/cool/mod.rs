@@ -4,14 +4,14 @@
 
 mod cool_agents;
 mod cool_cell;
+mod cool_conductor;
 mod cool_dna;
-mod cool_handle;
 mod cool_zome;
 
 pub use cool_agents::*;
 pub use cool_cell::*;
+pub use cool_conductor::*;
 pub use cool_dna::*;
-pub use cool_handle::*;
 pub use cool_zome::*;
 
 use hdk3::prelude::Element;

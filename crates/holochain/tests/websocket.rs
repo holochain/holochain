@@ -440,7 +440,7 @@ async fn remote_signals() {
                         &[dna_file.clone()],
                     )
                     .await;
-                (data, envs)
+                (data.into_inner(), envs)
             }
         }),
     )

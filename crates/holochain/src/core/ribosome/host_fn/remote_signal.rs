@@ -179,7 +179,7 @@ mod tests {
                         &[dna_file.clone().into()],
                     )
                     .await;
-                (data, envs)
+                (data.into_inner(), envs)
             }
         }))
         .await;
