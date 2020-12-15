@@ -85,7 +85,7 @@ impl DebugMsg {
 #[macro_export]
 macro_rules! debug_msg {
     ( $msg:expr ) => {
-        $crate::debug_msg!("{}", $msg);
+        holochain_zome_types::debug_msg!("{}", $msg);
     };
     ( $msg:expr, $($tail:expr),* ) => {{
         $crate::debug::DebugMsg::new(module_path!().to_string(), file!().to_string(), line!(), format!($msg, $($tail),*))

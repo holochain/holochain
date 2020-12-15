@@ -55,12 +55,12 @@ use holochain_zome_types::metadata::Details;
 use holochain_zome_types::metadata::EntryDhtStatus;
 use holochain_zome_types::validate::ValidationStatus;
 use maplit::btreeset;
-use monolith::holochain::conductor::dna_store::MockDnaStore;
-use monolith::holochain::conductor::interface::websocket::test_utils::setup_app;
-use monolith::holochain::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
-use monolith::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
-use monolith::holochain::core::workflow::CallZomeWorkspace;
-use monolith::holochain::test_utils::test_network;
+use holochain::conductor::dna_store::MockDnaStore;
+use holochain::conductor::interface::websocket::test_utils::setup_app;
+use holochain::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
+use holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
+use holochain::core::workflow::CallZomeWorkspace;
+use holochain::test_utils::test_network;
 use observability;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
@@ -70,7 +70,7 @@ use tokio::task::JoinHandle;
 use tracing::*;
 use unwrap_to::unwrap_to;
 
-use monolith::holochain::test_utils::host_fn_caller::*;
+use holochain::test_utils::host_fn_caller::*;
 
 /*
 #[tokio::test(threaded_scheduler)]

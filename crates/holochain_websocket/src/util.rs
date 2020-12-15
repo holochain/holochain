@@ -1,6 +1,5 @@
 //! internal websocket utility types and code
 
-use crate::holochain_websocket::*;
 use crate::*;
 
 /// Implements both sides of TryFrom SerializedBytes for the passed in item.

@@ -1,6 +1,5 @@
 //! This task actually sending messages on the SocketSink.
 
-use crate::holochain_websocket::*;
 use crate::*;
 
 /// internal message type for forwarding messages to the actual socket sink.

@@ -7,8 +7,7 @@ members = [
   "crates/hdk3_derive",
   "crates/holo_hash",
   
-  "crates/monolith",
-
+  "crates/holochain",
   "crates/holochain_cascade",
   "crates/holochain_conductor_api",
   "crates/holochain_lmdb",
@@ -29,8 +28,7 @@ members = [
 ]
 
 exclude = [
-  "pseudocode",
-  "crates/holochain_nucleus",
+  
 ]
 
 # These are the default params for RELEASE target

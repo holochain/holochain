@@ -14,7 +14,7 @@ edition = "2018"
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.45"
 
-monolith = { path = "../monolith" }
+holochain = { path = "../holochain" }
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
 holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
 

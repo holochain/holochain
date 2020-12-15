@@ -33,8 +33,8 @@ tracing = "0.1"
 tracing-futures = "0.2"
 
 [dev-dependencies]
+holochain = { version = "0.0.1", path = "../holochain" }
 holochain_wasm_test_utils = { path = "../test_utils/wasm" }
 maplit = "1"
-monolith = { version = "0.0.1", path = "../monolith" }
 observability = "0.1"
 unwrap_to = "0.1"

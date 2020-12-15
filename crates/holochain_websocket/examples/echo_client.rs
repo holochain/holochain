@@ -1,5 +1,4 @@
-use crate::*;
-use crate::holochain_websocket::*;
+use holochain_websocket::*;
 use std::convert::TryInto;
 use tokio::stream::StreamExt;
 use url2::prelude::*;

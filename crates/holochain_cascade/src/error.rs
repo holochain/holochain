@@ -6,8 +6,8 @@ use holochain_state::source_chain::SourceChainError;
 use holochain_types::element::error::ElementGroupError;
 use holochain_types::{dht_op::error::DhtOpError, header::error::HeaderError};
 use holochain_zome_types::header::conversions::WrongHeaderError;
-// use monolith::holochain::conductor::CellError;
-// use monolith::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
+// use holochain::conductor::CellError;
+// use holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use thiserror::Error;
 use tokio::task::JoinError;
 

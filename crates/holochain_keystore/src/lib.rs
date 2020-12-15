@@ -8,7 +8,7 @@
 //!
 //! ```
 //! use holo_hash::AgentPubKey;
-//! use crate::*;
+//! use holochain_keystore::*;
 //! use holochain_serialized_bytes::prelude::*;
 //!
 //! #[tokio::main(threaded_scheduler)]

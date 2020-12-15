@@ -4,7 +4,6 @@
 //! This internal task manages both these cases.
 
 use super::task_socket_sink::ToSocketSinkSender;
-use crate::holochain_websocket::*;
 use crate::*;
 
 /// internal message type for forwarding data to this task

@@ -6,11 +6,11 @@ use holo_hash::EntryHash;
 use holochain_types::Entry;
 use holochain_wasm_test_utils::TestWasm;
 
+use holochain::test_utils::conductor_setup::ConductorTestData;
+use holochain::test_utils::host_fn_caller::*;
+use holochain::test_utils::wait_for_integration;
 use holochain_state::element_buf::ElementBuf;
 use holochain_state::source_chain::SourceChain;
-use monolith::holochain::test_utils::conductor_setup::ConductorTestData;
-use monolith::holochain::test_utils::host_fn_caller::*;
-use monolith::holochain::test_utils::wait_for_integration;
 
 /// - Alice commits an entry and it is in their authored store
 /// - Bob doesn't have the entry in their authored store
