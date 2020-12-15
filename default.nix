@@ -1,4 +1,4 @@
-{ nixpkgs ? import <nixpkgs> {} }:
+{ nixpkgs ? null }:
 
 # This is an example of what downstream consumers of holonix should do
 # This is also used to dogfood as many commands as possible for holonix
@@ -46,7 +46,7 @@ let
     })
   ];
 
-  nixpkgs' = import nixpkgs.path { inherit overlays; };
+  nixpkgs' = import (nixpkgs.path or holonix.pkgs.path) { inherit overlays; };
   inherit (nixpkgs') callPackage;
 
   pkgs = callPackage ./nix/pkgs/default.nix { };
