@@ -18,8 +18,9 @@ pub fn remote_signal(
     call_context: Arc<CallContext>,
     input: RemoteSignalInput,
 ) -> RibosomeResult<RemoteSignalOutput> {
-    const FN_NAME: &'static str = "recv_remote_signal";
-    // it is the network's responsibility to handle timeouts and return an Err result in that case
+    const FN_NAME: &str = "recv_remote_signal";
+    // Timeouts and errors are ignored,
+    // this is a send and forget operation.
     tokio_safe_block_on::tokio_safe_block_forever_on(
         async move {
             let network = call_context.host_access().network().clone();

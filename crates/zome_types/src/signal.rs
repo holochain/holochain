@@ -19,7 +19,7 @@ impl AppSignal {
 /// Remote signal many agents without waiting for responses.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct RemoteSignal {
-    /// Agents to send the signal to
+    /// Agents to send the signal to.
     pub agents: Vec<AgentPubKey>,
     /// The signal to send.
     pub signal: AppSignal,
