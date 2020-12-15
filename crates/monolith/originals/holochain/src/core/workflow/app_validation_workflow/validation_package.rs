@@ -10,9 +10,9 @@ use crate::holochain::core::ribosome::guest_callback::validation_package::Valida
 use crate::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::holochain::core::ribosome::RibosomeT;
-use holochain_state::source_chain::SourceChain;
 use crate::holochain::core::workflow::CallZomeWorkspaceLock;
 use crate::holochain::core::SourceChainResult;
+use holochain_state::source_chain::SourceChain;
 use tracing::*;
 
 pub fn get_as_author_sub_chain(

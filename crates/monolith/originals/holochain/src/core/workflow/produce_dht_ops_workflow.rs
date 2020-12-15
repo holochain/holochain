@@ -2,18 +2,18 @@ use super::error::WorkflowResult;
 use crate::holochain::core::queue_consumer::OneshotWriter;
 use crate::holochain::core::queue_consumer::TriggerSender;
 use crate::holochain::core::queue_consumer::WorkComplete;
-use holochain_state::dht_op_integration::AuthoredDhtOpsStore;
-use holochain_state::dht_op_integration::AuthoredDhtOpsValue;
-use holochain_state::source_chain::SourceChain;
-use holochain_state::workspace::Workspace;
-use holochain_state::workspace::WorkspaceResult;
-use holochain_types::dht_op::DhtOpHashed;
 use holochain_lmdb::buffer::KvBufFresh;
 use holochain_lmdb::db::AUTHORED_DHT_OPS;
 use holochain_lmdb::prelude::BufferedStore;
 use holochain_lmdb::prelude::EnvironmentRead;
 use holochain_lmdb::prelude::GetDb;
 use holochain_lmdb::prelude::Writer;
+use holochain_state::dht_op_integration::AuthoredDhtOpsStore;
+use holochain_state::dht_op_integration::AuthoredDhtOpsValue;
+use holochain_state::source_chain::SourceChain;
+use holochain_state::workspace::Workspace;
+use holochain_state::workspace::WorkspaceResult;
+use holochain_types::dht_op::DhtOpHashed;
 use tracing::*;
 
 pub mod dht_op_light;
@@ -94,14 +94,14 @@ mod tests {
     use fallible_iterator::FallibleIterator;
     use holo_hash::*;
 
+    use holochain_lmdb::env::ReadManager;
+    use holochain_lmdb::env::WriteManager;
+    use holochain_lmdb::test_utils::test_cell_env;
     use holochain_types::dht_op::produce_ops_from_element;
     use holochain_types::dht_op::DhtOp;
     use holochain_types::fixt::*;
     use holochain_types::Entry;
     use holochain_types::EntryHashed;
-    use holochain_lmdb::env::ReadManager;
-    use holochain_lmdb::env::WriteManager;
-    use holochain_lmdb::test_utils::test_cell_env;
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::header::builder;
     use holochain_zome_types::header::EntryType;
@@ -127,10 +127,9 @@ mod tests {
         ) -> Vec<DhtOp> {
             let app_entry = self.app_entry.next().unwrap();
             let (app_entry, entry_hash) = EntryHashed::from_content_sync(app_entry).into();
-            let app_entry_type =
-                holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
-                    .next()
-                    .unwrap();
+            let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
+                .next()
+                .unwrap();
             source_chain
                 .put(
                     builder::Create {

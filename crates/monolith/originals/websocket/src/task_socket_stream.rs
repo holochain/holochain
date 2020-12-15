@@ -1,10 +1,10 @@
 //! This task manages the incoming messages and events from the websocket stream.
 
-use crate::*;
+use super::task_socket_sink::ToSocketSinkSender;
 use crate::holochain_websocket::*;
+use crate::*;
 use task_dispatch_incoming::ToDispatchIncoming;
 use task_dispatch_incoming::ToDispatchIncomingSender;
-use super::task_socket_sink::ToSocketSinkSender;
 
 /// See module-level documentation for this internal task
 pub(crate) fn build<S>(

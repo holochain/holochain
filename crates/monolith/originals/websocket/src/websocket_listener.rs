@@ -1,7 +1,7 @@
 //! defines the websocket listener struct
 
-use crate::*;
 use crate::holochain_websocket::*;
+use crate::*;
 use futures::stream::BoxStream;
 use futures::stream::StreamExt;
 

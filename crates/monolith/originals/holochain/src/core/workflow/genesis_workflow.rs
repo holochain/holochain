@@ -11,11 +11,11 @@ use super::error::WorkflowError;
 use super::error::WorkflowResult;
 use crate::holochain::conductor::api::CellConductorApiT;
 use crate::holochain::core::queue_consumer::OneshotWriter;
+use derive_more::Constructor;
+use holochain_lmdb::prelude::*;
 use holochain_state::source_chain::SourceChainBuf;
 use holochain_state::workspace::Workspace;
 use holochain_state::workspace::WorkspaceResult;
-use derive_more::Constructor;
-use holochain_lmdb::prelude::*;
 use holochain_types::dna::DnaFile;
 use holochain_types::prelude::*;
 use tracing::*;
@@ -105,15 +105,15 @@ pub mod tests {
     use super::*;
 
     use crate::holochain::conductor::api::MockCellConductorApi;
-    use holochain_state::source_chain::SourceChain;
     use crate::holochain::core::SourceChainResult;
     use fallible_iterator::FallibleIterator;
     use holochain_lmdb::test_utils::test_cell_env;
-    use observability;
+    use holochain_state::source_chain::SourceChain;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::Header;
     use matches::assert_matches;
+    use observability;
 
     pub async fn fake_genesis(source_chain: &mut SourceChain) -> SourceChainResult<()> {
         let dna = fake_dna_file("cool dna");
@@ -160,11 +160,7 @@ pub mod tests {
 
             assert_matches!(
                 headers.as_slice(),
-                [
-                    Header::Create(_),
-                    Header::AgentValidationPkg(_),
-                    Header::Dna(_)
-                ]
+                [Header::Create(_), Header::AgentValidationPkg(_), Header::Dna(_)]
             );
         }
 

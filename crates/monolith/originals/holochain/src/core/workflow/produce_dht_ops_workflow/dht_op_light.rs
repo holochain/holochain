@@ -1,8 +1,8 @@
-use holochain_state::element_buf::ElementBuf;
 use error::DhtOpConvertError;
 use error::DhtOpConvertResult;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
+use holochain_state::element_buf::ElementBuf;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::header::NewEntryHeader;

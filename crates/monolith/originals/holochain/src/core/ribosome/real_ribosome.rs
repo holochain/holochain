@@ -60,6 +60,7 @@ use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::Invocation;
 use crate::holochain::core::ribosome::RibosomeT;
 use crate::holochain::core::ribosome::ZomeCallInvocation;
+use fallible_iterator::FallibleIterator;
 use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::zome::Permission;
 use holochain_types::dna::zome::Zome;
@@ -67,7 +68,6 @@ use holochain_types::dna::zome::ZomeDef;
 use holochain_types::dna::DnaDefHashed;
 use holochain_types::dna::DnaError;
 use holochain_types::dna::DnaFile;
-use fallible_iterator::FallibleIterator;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::*;
 use std::sync::Arc;
@@ -506,10 +506,10 @@ impl RibosomeT for RealRibosome {
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
-    use holochain_test_wasm_common::TestString;
-    use holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
+    use holochain_test_wasm_common::TestString;
+    use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
     /// Basic checks that we can call externs internally and externally the way we want using the

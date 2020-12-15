@@ -1,4 +1,3 @@
-use holochain_state::element_buf::ElementBuf;
 use crate::holochain::fixt::AgentValidationPkgFixturator;
 use crate::holochain::fixt::CloseChainFixturator;
 use crate::holochain::fixt::CreateFixturator;
@@ -15,6 +14,7 @@ use ::fixt::prelude::*;
 use holo_hash::fixt::HeaderHashFixturator;
 use holo_hash::*;
 use holochain_lmdb::test_utils::test_cell_env;
+use holochain_state::element_buf::ElementBuf;
 use holochain_types::dht_op::produce_ops_from_element;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::element::Element;
@@ -22,7 +22,6 @@ use holochain_types::element::SignedHeaderHashed;
 use holochain_types::fixt::HeaderBuilderCommonFixturator;
 use holochain_types::fixt::SignatureFixturator;
 use holochain_types::header::NewEntryHeader;
-use observability;
 use holochain_types::Entry;
 use holochain_types::EntryHashed;
 use holochain_types::HeaderHashed;
@@ -41,6 +40,7 @@ use holochain_zome_types::header::InitZomesComplete;
 use holochain_zome_types::header::OpenChain;
 use holochain_zome_types::header::Update;
 use holochain_zome_types::signature::Signature;
+use observability;
 use pretty_assertions::assert_eq;
 use tracing::*;
 

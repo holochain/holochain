@@ -6,10 +6,10 @@ use crate::holochain::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::holochain::core::ribosome::guest_callback::init::InitInvocation;
 use crate::holochain::core::ribosome::guest_callback::init::InitResult;
 use crate::holochain::core::ribosome::RibosomeT;
-use holochain_state::workspace::Workspace;
 use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
+use holochain_state::workspace::Workspace;
 use holochain_types::dna::DnaDef;
 use holochain_zome_types::header::builder;
 use tracing::*;
@@ -79,8 +79,8 @@ pub mod tests {
     use crate::holochain::fixt::KeystoreSenderFixturator;
     use ::fixt::prelude::*;
     use fixt::Unpredictable;
-    use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_zome_types::Header;
     use matches::assert_matches;
 

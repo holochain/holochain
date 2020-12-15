@@ -299,12 +299,12 @@ mod test {
 mod slow_tests {
     use super::ValidateLinkResult;
     use crate::holochain::core::ribosome::RibosomeT;
-    use holochain_state::source_chain::SourceChainResult;
     use crate::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::holochain::fixt::curve::Zomes;
     use crate::holochain::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
+    use holochain_state::source_chain::SourceChainResult;
     use holochain_types::dna::zome::Zome;
     use holochain_wasm_test_utils::TestWasm;
 
@@ -377,7 +377,8 @@ mod slow_tests {
             .await
             .unwrap();
 
-        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
 
@@ -412,7 +413,8 @@ mod slow_tests {
             .await
             .unwrap();
 
-        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();

@@ -1,7 +1,5 @@
 //! A simple KvBuf for AgentInfoSigned.
 
-use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
-use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
@@ -16,6 +14,8 @@ use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::fresh_reader;
 use holochain_lmdb::key::BufKey;
 use holochain_lmdb::prelude::Readable;
+use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
+use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use std::convert::TryInto;
 
 const AGENT_KEY_LEN: usize = 64;

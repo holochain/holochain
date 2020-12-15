@@ -3,17 +3,17 @@ use std::time::Duration;
 
 use super::*;
 use crate::holochain::conductor::ConductorHandle;
-use holochain_state::source_chain::SourceChain;
 use crate::holochain::test_utils::setup_app;
 use crate::holochain::test_utils::wait_for_integration;
 use ::fixt::prelude::*;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::source_chain::SourceChain;
 use holochain_types::app::InstalledCell;
-use holochain_zome_types::cell::CellId;
 use holochain_types::dna::DnaDef;
 use holochain_types::dna::DnaFile;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::cell::CellId;
 use holochain_zome_types::fixt::*;
 use holochain_zome_types::test_utils::fake_agent_pubkey_1;
 

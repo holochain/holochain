@@ -1,10 +1,10 @@
 //! defines the write/send half of a websocket pair
 
-use crate::*;
+use super::task_socket_sink::ToSocketSinkSender;
 use crate::holochain_websocket::*;
+use crate::*;
 use task_dispatch_incoming::ToDispatchIncoming;
 use task_dispatch_incoming::ToDispatchIncomingSender;
-use super::task_socket_sink::ToSocketSinkSender;
 use tracing_futures::Instrument;
 
 /// The Sender/Write half of a split websocket. Use this to make

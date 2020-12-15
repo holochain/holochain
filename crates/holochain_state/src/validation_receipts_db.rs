@@ -5,7 +5,6 @@ use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_keystore::KeystoreSender;
-use holochain_serialized_bytes::prelude::*;
 use holochain_lmdb::buffer::BufferedStore;
 use holochain_lmdb::buffer::KvvBufUsed;
 use holochain_lmdb::db::GetDb;
@@ -13,6 +12,7 @@ use holochain_lmdb::error::DatabaseError;
 use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::prelude::Readable;
 use holochain_lmdb::prelude::Writer;
+use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::signature::Signature;
 
 /// The result of a DhtOp Validation.
@@ -103,8 +103,10 @@ impl ValidationReceiptsBuf {
         r: &'r R,
         dht_op_hash: &DhtOpHash,
     ) -> DatabaseResult<
-        impl fallible_iterator::FallibleIterator<Item = SignedValidationReceipt, Error = DatabaseError>
-        + '_,
+        impl fallible_iterator::FallibleIterator<
+                Item = SignedValidationReceipt,
+                Error = DatabaseError,
+            > + '_,
     > {
         Ok(fallible_iterator::convert(self.0.get(r, dht_op_hash)?))
     }

@@ -2,8 +2,6 @@
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use holochain_p2p::dht_arc::DhtArc;
-use holochain_serialized_bytes::prelude::*;
 use holochain_lmdb::buffer::KvBufFresh;
 use holochain_lmdb::db::INTEGRATED_DHT_OPS;
 use holochain_lmdb::error::DatabaseError;
@@ -12,6 +10,8 @@ use holochain_lmdb::prelude::BufferedStore;
 use holochain_lmdb::prelude::EnvironmentRead;
 use holochain_lmdb::prelude::GetDb;
 use holochain_lmdb::prelude::Readable;
+use holochain_p2p::dht_arc::DhtArc;
+use holochain_serialized_bytes::prelude::*;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::validate::ValidationStatus;
 use holochain_types::Timestamp;
@@ -137,28 +137,22 @@ impl IntegratedDhtOpsBuf {
             self.store
                 .iter(r)?
                 .map(move |(k, v)| Ok((DhtOpHash::from_raw_39_panicky(k.to_vec()), v)))
-                .filter_map(move |(k, v)| {
-                    match from {
-                        Some(time) if v.when_integrated >= time => Ok(Some((k, v))),
-                        None => Ok(Some((k, v))),
-                        _ => Ok(None),
-                    }
+                .filter_map(move |(k, v)| match from {
+                    Some(time) if v.when_integrated >= time => Ok(Some((k, v))),
+                    None => Ok(Some((k, v))),
+                    _ => Ok(None),
                 })
-                .filter_map(move |(k, v)| {
-                    match to {
-                        Some(time) if v.when_integrated < time => Ok(Some((k, v))),
-                        None => Ok(Some((k, v))),
-                        _ => Ok(None),
-                    }
+                .filter_map(move |(k, v)| match to {
+                    Some(time) if v.when_integrated < time => Ok(Some((k, v))),
+                    None => Ok(Some((k, v))),
+                    _ => Ok(None),
                 })
-                .filter_map(move |(k, v)| {
-                    match dht_arc {
-                        Some(dht_arc) if dht_arc.contains(v.op.dht_basis().get_loc()) => {
-                            Ok(Some((k, v)))
-                        }
-                        None => Ok(Some((k, v))),
-                        _ => Ok(None),
+                .filter_map(move |(k, v)| match dht_arc {
+                    Some(dht_arc) if dht_arc.contains(v.op.dht_basis().get_loc()) => {
+                        Ok(Some((k, v)))
                     }
+                    None => Ok(Some((k, v))),
+                    _ => Ok(None),
                 }),
         ))
     }
@@ -166,10 +160,10 @@ impl IntegratedDhtOpsBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use holo_hash::fixt::AnyDhtHashFixturator;
     use ::fixt::prelude::*;
     use chrono::Duration;
     use chrono::Utc;
+    use holo_hash::fixt::AnyDhtHashFixturator;
     use holo_hash::fixt::DhtOpHashFixturator;
     use holo_hash::fixt::HeaderHashFixturator;
     use holochain_lmdb::buffer::BufferedStore;

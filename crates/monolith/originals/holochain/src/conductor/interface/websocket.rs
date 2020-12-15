@@ -246,45 +246,45 @@ where
 /// Test items needed by other crates
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils {
-    use std::sync::Arc;
-    use holochain_types::app::InstalledCell;
-    use crate::holochain::conductor::dna_store::MockDnaStore;
-    use tempdir::TempDir;
-    use holochain_serialized_bytes::prelude::*;
-    use crate::holochain::conductor::conductor::ConductorBuilder;
-    use crate::holochain::conductor::ConductorHandle;
     use crate::holochain::conductor::api::RealAppInterfaceApi;
+    use crate::holochain::conductor::conductor::ConductorBuilder;
+    use crate::holochain::conductor::dna_store::MockDnaStore;
+    use crate::holochain::conductor::ConductorHandle;
     use holochain_lmdb::test_utils::test_environments;
-    
+    use holochain_serialized_bytes::prelude::*;
+    use holochain_types::app::InstalledCell;
+    use std::sync::Arc;
+    use tempdir::TempDir;
+
     /// One of various ways to setup an app, used somewhere...
     pub async fn setup_app(
         cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
         dna_store: MockDnaStore,
     ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
         let envs = test_environments();
-    
+
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .test(&envs)
             .await
             .unwrap();
-    
+
         conductor_handle
             .clone()
             .install_app("test app".to_string(), cell_data)
             .await
             .unwrap();
-    
+
         conductor_handle
             .activate_app("test app".to_string())
             .await
             .unwrap();
-    
+
         let errors = conductor_handle.clone().setup_cells().await.unwrap();
-    
+
         assert!(errors.is_empty());
-    
+
         let handle = conductor_handle.clone();
-    
+
         (
             envs.tempdir(),
             RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
@@ -293,11 +293,10 @@ pub mod test_utils {
     }
 }
 
-
 #[cfg(test)]
 pub mod test {
-    use super::*;
     use super::test_utils::setup_app;
+    use super::*;
     use crate::holochain::conductor::api::error::ExternalApiWireError;
     use crate::holochain::conductor::api::AdminRequest;
     use crate::holochain::conductor::api::AdminResponse;
@@ -309,20 +308,8 @@ pub mod test {
     use crate::holochain::conductor::state::ConductorState;
     use crate::holochain::conductor::Conductor;
     use crate::holochain::conductor::ConductorHandle;
-    use holochain_state::source_chain::SourceChainBuf;
     use crate::holochain::fixt::RealRibosomeFixturator;
     use crate::holochain::test_utils::conductor_setup::ConductorTestData;
-    use holochain_types::app::InstallAppDnaPayload;
-    use holochain_types::app::InstallAppPayload;
-    use holochain_types::app::InstalledCell;
-    use holochain_zome_types::cell::CellId;
-    use holochain_types::dna::DnaDef;
-    use holochain_types::dna::DnaFile;
-    use observability;
-    use holochain_types::test_utils::fake_agent_pubkey_1;
-    use holochain_types::test_utils::fake_dna_file;
-    use holochain_types::test_utils::fake_dna_zomes;
-    use holochain_wasm_test_utils::TestWasm;
     use crate::holochain_websocket::WebsocketMessage;
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
@@ -331,12 +318,24 @@ pub mod test {
     use holochain_lmdb::fresh_reader_test;
     use holochain_lmdb::test_utils::test_environments;
     use holochain_serialized_bytes::prelude::*;
+    use holochain_state::source_chain::SourceChainBuf;
+    use holochain_types::app::InstallAppDnaPayload;
+    use holochain_types::app::InstallAppPayload;
+    use holochain_types::app::InstalledCell;
+    use holochain_types::dna::DnaDef;
+    use holochain_types::dna::DnaFile;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::test_utils::fake_dna_file;
+    use holochain_types::test_utils::fake_dna_zomes;
+    use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::cell::CellId;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
     use holochain_zome_types::ExternInput;
     use kitsune_p2p::agent_store::AgentInfoSigned;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use matches::assert_matches;
     use mockall::predicate;
+    use observability;
     use std::collections::HashMap;
     use std::convert::TryInto;
     use tempdir::TempDir;

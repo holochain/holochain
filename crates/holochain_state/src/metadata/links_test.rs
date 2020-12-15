@@ -1,5 +1,10 @@
 use super::*;
 use crate::here;
+use ::fixt::prelude::*;
+use holochain_lmdb::buffer::BufferedStore;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::fresh_reader_test;
+use holochain_lmdb::test_utils::test_cell_env;
 use holochain_zome_types::fixt::CreateLinkFixturator;
 use holochain_zome_types::fixt::DeleteLinkFixturator;
 use holochain_zome_types::fixt::EntryHashFixturator;
@@ -7,11 +12,6 @@ use holochain_zome_types::fixt::KnownCreateLink;
 use holochain_zome_types::fixt::KnownDeleteLink;
 use holochain_zome_types::fixt::ZomeIdFixturator;
 use observability;
-use ::fixt::prelude::*;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::fresh_reader_test;
-use holochain_lmdb::test_utils::test_cell_env;
 
 #[derive(Clone)]
 struct TestData {

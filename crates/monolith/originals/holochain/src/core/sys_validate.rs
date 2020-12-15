@@ -2,33 +2,33 @@
 //! This module contains all the checks we run for sys validation
 
 use super::queue_consumer::TriggerSender;
-use holochain_state::metadata::ChainItemKey;
-use holochain_state::metadata::MetadataBufT;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::holochain::conductor::api::CellConductorApiT;
 use crate::holochain::conductor::entry_def_store::get_entry_def;
-use holochain_p2p::HolochainP2pCell;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::header::NewEntryHeaderRef;
-use holochain_types::Entry;
 use fallible_iterator::FallibleIterator;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_lmdb::env::EnvironmentWrite;
 use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::fresh_reader;
+use holochain_p2p::HolochainP2pCell;
+use holochain_state::metadata::ChainItemKey;
+use holochain_state::metadata::MetadataBufT;
+use holochain_types::dht_op::DhtOp;
+use holochain_types::header::NewEntryHeaderRef;
+use holochain_types::Entry;
 use holochain_zome_types::*;
 use std::convert::TryInto;
 
+pub(super) use error::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-pub(super) use error::*;
 
+pub use holo_hash::*;
 pub use holochain_types::element::Element;
 pub use holochain_types::element::ElementExt;
 pub use holochain_types::HeaderHashed;
 pub use holochain_types::Timestamp;
-pub use holo_hash::*;
 
 #[allow(missing_docs)]
 mod error;

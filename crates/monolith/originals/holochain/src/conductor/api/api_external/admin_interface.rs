@@ -16,9 +16,9 @@ use holochain_types::app::InstallAppPayload;
 use holochain_types::app::InstalledApp;
 use holochain_types::app::InstalledAppId;
 use holochain_types::app::InstalledCell;
-use holochain_zome_types::cell::CellId;
 use holochain_types::dna::DnaFile;
 use holochain_types::dna::JsonProperties;
+use holochain_zome_types::cell::CellId;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::path::PathBuf;
 use tracing::*;
@@ -248,13 +248,13 @@ mod test {
     use anyhow::Result;
     use holochain_lmdb::test_utils::test_environments;
     use holochain_types::app::InstallAppDnaPayload;
-    use observability;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_types::test_utils::write_fake_dna_file;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
+    use observability;
     use uuid::Uuid;
 
     #[tokio::test(threaded_scheduler)]
