@@ -589,9 +589,7 @@ pub mod wasm_test {
                         _,
                         _,
                         _,
-                    ) => {
-                        unreachable!()
-                    }
+                    ) => unreachable!(),
                     crate::holochain::core::ribosome::ZomeCallResponse::NetworkError(_) => {
                         unreachable!()
                     }
