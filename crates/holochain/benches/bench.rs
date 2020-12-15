@@ -28,9 +28,9 @@ static TOKIO_RUNTIME: Lazy<Mutex<tokio::runtime::Runtime>> = Lazy::new(|| {
 static REAL_RIBOSOME: Lazy<Mutex<crate::core::ribosome::real_ribosome::RealRibosome>> =
     Lazy::new(|| {
         Mutex::new(
-            crate::fixt::RealRibosomeFixturator::new(
-                crate::fixt::curve::Zomes(vec![TestWasm::Bench.into()]),
-            )
+            crate::fixt::RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![
+                TestWasm::Bench.into(),
+            ]))
             .next()
             .unwrap(),
         )

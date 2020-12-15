@@ -156,11 +156,9 @@ impl RealRibosome {
                         .map_err(|e| WasmError::Zome(format!("{:?}", e)))?
                         .try_into()?;
 
-                    Ok(
-                        $crate::holochain_wasmer_host::import::set_context_data(
-                            ctx, output_sb,
-                        ),
-                    )
+                    Ok($crate::holochain_wasmer_host::import::set_context_data(
+                        ctx, output_sb,
+                    ))
                 }
             }};
         }
@@ -522,8 +520,7 @@ pub mod wasm_test {
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
-        let workspace_lock =
-            crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
         host_access.workspace = workspace_lock;

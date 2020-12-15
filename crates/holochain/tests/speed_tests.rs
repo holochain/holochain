@@ -15,6 +15,8 @@
 //! hard to automate piping from tests stderr.
 //!
 
+use ::fixt::prelude::*;
+use hdk3::prelude::*;
 use holochain::conductor::api::AdminRequest;
 use holochain::conductor::api::AdminResponse;
 use holochain::conductor::api::AppRequest;
@@ -28,8 +30,6 @@ use holochain::conductor::dna_store::MockDnaStore;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 use holochain::fixt::*;
-use ::fixt::prelude::*;
-use hdk3::prelude::*;
 use holochain_lmdb::test_utils::test_environments;
 use holochain_lmdb::test_utils::TestEnvironments;
 use holochain_test_wasm_common::AnchorInput;

@@ -3,7 +3,6 @@
 
 use super::*;
 
-use crate::here;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::host_fn;
@@ -12,6 +11,7 @@ use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::fixt::CallContextFixturator;
 use crate::fixt::ZomeCallHostAccessFixturator;
 use crate::fixt::*;
+use crate::here;
 use crate::test_utils::test_network;
 use ::fixt::prelude::*;
 use holo_hash::*;
