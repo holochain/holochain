@@ -21,7 +21,7 @@ pub mod wasm_test {
     use crate::destructure_test_cells;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::{conductor::dna_store::MockDnaStore, test_utils::cool::MaybeElement};
-    use crate::{conductor::ConductorBuilder, test_utils::cool::CoolConductorHandle};
+    use crate::{conductor::ConductorBuilder, test_utils::cool::CoolConductor};
     use crate::{
         core::workflow::call_zome_workflow::CallZomeWorkspace, test_utils::cool::CoolDnaFile,
     };
@@ -114,7 +114,7 @@ pub mod wasm_test {
             .return_const(());
 
         let envs = test_environments();
-        let handle: CoolConductorHandle = ConductorBuilder::with_mock_dna_store(dna_store)
+        let handle: CoolConductor = ConductorBuilder::with_mock_dna_store(dna_store)
             .test(&envs)
             .await
             .unwrap()

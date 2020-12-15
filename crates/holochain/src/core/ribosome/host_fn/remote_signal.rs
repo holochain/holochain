@@ -60,7 +60,7 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use super::*;
-    use crate::test_utils::cool::{CoolAgents, CoolConductorHandle};
+    use crate::test_utils::cool::{CoolAgents, CoolConductor};
     use crate::{
         conductor::{config::ConductorConfig, p2p_store::exchange_peer_info, Conductor},
         test_utils::cool::CoolDnaFile,
@@ -145,7 +145,7 @@ mod tests {
                     override_host: None,
                     override_port: None,
                 }];
-                let conductor: CoolConductorHandle = Conductor::builder()
+                let conductor: CoolConductor = Conductor::builder()
                     .config(ConductorConfig {
                         network: Some(network),
                         ..Default::default()

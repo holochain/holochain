@@ -1,13 +1,13 @@
-use super::{CoolConductorHandle, CoolZome};
+use super::{CoolConductor, CoolZome};
 use hdk3::prelude::*;
 use holo_hash::DnaHash;
 
-/// A reference to a Cell created by a CoolConductorHandle installation function.
+/// A reference to a Cell created by a CoolConductor installation function.
 /// It has very concise methods for calling a zome on this cell
 #[derive(Clone, derive_more::Constructor)]
 pub struct CoolCell {
     pub(super) cell_id: CellId,
-    pub(super) handle: CoolConductorHandle,
+    pub(super) handle: CoolConductor,
 }
 
 impl CoolCell {

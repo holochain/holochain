@@ -7,7 +7,7 @@ use holochain::{
 };
 use holochain::{
     destructure_test_cell_vec,
-    test_utils::cool::{CoolAgents, CoolConductorHandle, MaybeElement},
+    test_utils::cool::{CoolAgents, CoolConductor, MaybeElement},
 };
 use holochain_state::test_utils::test_environments;
 use holochain_types::dna::zome::inline_zome::InlineZome;
@@ -50,7 +50,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
                 override_host: None,
                 override_port: None,
             }];
-            let conductor: CoolConductorHandle = Conductor::builder()
+            let conductor: CoolConductor = Conductor::builder()
                 .config(ConductorConfig {
                     network: Some(network),
                     ..Default::default()

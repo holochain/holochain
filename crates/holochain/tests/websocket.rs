@@ -6,7 +6,7 @@ use futures::stream;
 use futures::Future;
 use hdk3::prelude::RemoteSignal;
 use holochain::test_utils::cool::CoolAgents;
-use holochain::test_utils::cool::CoolConductorHandle;
+use holochain::test_utils::cool::CoolConductor;
 use holochain::{
     conductor::api::ZomeCall,
     conductor::{
@@ -402,7 +402,7 @@ async fn remote_signals() {
                 override_host: None,
                 override_port: None,
             }];
-            let conductor: CoolConductorHandle = Conductor::builder()
+            let conductor: CoolConductor = Conductor::builder()
                 .config(ConductorConfig {
                     network: Some(network),
                     ..Default::default()

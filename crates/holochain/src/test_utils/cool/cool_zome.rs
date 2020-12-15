@@ -1,13 +1,13 @@
-use super::CoolConductorHandle;
+use super::CoolConductor;
 use hdk3::prelude::*;
 
-/// A reference to a Zome in a Cell created by a CoolConductorHandle installation function.
+/// A reference to a Zome in a Cell created by a CoolConductor installation function.
 /// Think of it as a partially applied CoolCell, with the ZomeName baked in.
 #[derive(Clone, derive_more::Constructor)]
 pub struct CoolZome {
     cell_id: CellId,
     zome_name: ZomeName,
-    handle: CoolConductorHandle,
+    handle: CoolConductor,
 }
 
 impl CoolZome {

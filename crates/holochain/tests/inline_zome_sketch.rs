@@ -1,5 +1,5 @@
 use hdk3::prelude::*;
-use holochain::test_utils::cool::{CoolAgents, CoolConductorHandle, CoolDnaFile, MaybeElement};
+use holochain::test_utils::cool::{CoolAgents, CoolConductor, CoolDnaFile, MaybeElement};
 use holochain::{conductor::Conductor, destructure_test_cells};
 use holochain_state::test_utils::test_environments;
 use holochain_types::dna::zome::inline_zome::InlineZome;
@@ -45,7 +45,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     let (alice, bobbo) = CoolAgents::two(envs.keystore()).await;
 
     // Create a Conductor
-    let conductor: CoolConductorHandle = Conductor::builder().test(&envs).await?.into();
+    let conductor: CoolConductor = Conductor::builder().test(&envs).await?.into();
 
     // Install DNA and install and activate apps in conductor
     let ids = conductor
@@ -84,7 +84,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 #[cfg(feature = "test_utils")]
 async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     let envs = test_environments();
-    let conductor: CoolConductorHandle = Conductor::builder().test(&envs).await?.into();
+    let conductor: CoolConductor = Conductor::builder().test(&envs).await?.into();
 
     let (dna_foo, _) = CoolDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
     let (dna_bar, _) = CoolDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;

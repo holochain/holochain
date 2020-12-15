@@ -16,13 +16,13 @@ use unwrap_to::unwrap_to;
 
 #[derive(Clone, shrinkwraprs::Shrinkwrap, derive_more::From)]
 /// A wrapper around ConductorHandle with more convenient methods for testing
-pub struct CoolConductorHandle(pub Arc<CoolConductorHandleInner>);
+pub struct CoolConductor(pub Arc<CoolConductorInner>);
 
 /// Inner handle with a cleanup drop
 #[derive(shrinkwraprs::Shrinkwrap, derive_more::From)]
-pub struct CoolConductorHandleInner(pub(crate) ConductorHandle);
+pub struct CoolConductorInner(pub(crate) ConductorHandle);
 
-impl CoolConductorHandle {
+impl CoolConductor {
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
     ///
     /// All InstalledAppIds and CellNicks are auto-generated. In tests driven directly
@@ -129,7 +129,7 @@ macro_rules! destructure_test_cell_vec {
     }};
 }
 
-impl CoolConductorHandleInner {
+impl CoolConductorInner {
     /// Call a zome function with automatic de/serialization of input and output
     /// and unwrapping of nested errors.
     pub async fn call_zome_ok<'a, I, O, F, E>(&'a self, invocation: CoolZomeCall<'a, I, F, E>) -> O
@@ -248,7 +248,7 @@ where
     }
 }
 
-impl Drop for CoolConductorHandleInner {
+impl Drop for CoolConductorInner {
     fn drop(&mut self) {
         let c = self.0.clone();
         tokio::task::spawn(async move {
@@ -260,8 +260,8 @@ impl Drop for CoolConductorHandleInner {
     }
 }
 
-impl From<ConductorHandle> for CoolConductorHandle {
+impl From<ConductorHandle> for CoolConductor {
     fn from(h: ConductorHandle) -> Self {
-        CoolConductorHandle(Arc::new(CoolConductorHandleInner(h)))
+        CoolConductor(Arc::new(CoolConductorInner(h)))
     }
 }
