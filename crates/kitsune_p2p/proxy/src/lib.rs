@@ -27,14 +27,10 @@ pub use proxy_url::*;
 pub mod wire;
 pub(crate) use wire::*;
 
-#[allow(dead_code)]
 mod wire_read;
-#[allow(dead_code)]
 mod wire_write;
 
-#[allow(dead_code)]
 mod tls_cli;
-#[allow(dead_code)]
 mod tls_srv;
 
 #[cfg(test)]
