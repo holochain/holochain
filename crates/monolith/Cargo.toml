@@ -136,8 +136,13 @@ test_utils = [
     "holochain_zome_types/test_utils",
 ]
 slow_tests = []
-only_check_wasms = []
 fixturators = []
+
+
+# Includes the wasm build script, which we don't need when not building wasms
+build_wasms = ['holochain_wasm_test_utils/build']
+only_check_wasms = ['holochain_wasm_test_utils/only_check']
+
 
 # default = ["slow_tests", "test_utils", "only_check_wasms"]
 

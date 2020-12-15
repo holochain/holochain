@@ -1,6 +1,5 @@
 [workspace]
 members = [
-  # "crates/admin",
   "crates/dna_util",
   "crates/fixt",
   "crates/fixt/test",
@@ -17,6 +16,7 @@ members = [
   "crates/holochain_keystore",
   "crates/holochain_state",
   "crates/holochain_types",
+  "crates/holochain_websocket",
   "crates/holochain_zome_types",
 
   "crates/kitsune_p2p/kitsune_p2p",
@@ -26,7 +26,6 @@ members = [
   
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
-  # "crates/websocket",
 ]
 
 exclude = [
