@@ -10,42 +10,52 @@ use holochain_zome_types::RemoteSignalInput;
 use holochain_zome_types::RemoteSignalOutput;
 use std::convert::TryInto;
 use std::sync::Arc;
+use tracing::Instrument;
 
+#[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn remote_signal(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: RemoteSignalInput,
 ) -> RibosomeResult<RemoteSignalOutput> {
-    const FN_NAME: &'static str = "remote_signal";
+    const FN_NAME: &'static str = "recv_remote_signal";
     // it is the network's responsibility to handle timeouts and return an Err result in that case
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let network = call_context.host_access().network().clone();
-        let RemoteSignal { agents, signal } = input.into_inner();
-        let zome_name: ZomeName = call_context.zome().into();
-        let fn_name: FunctionName = FN_NAME.into();
-        let request: SerializedBytes = signal.try_into()?;
-        for agent in agents {
-            tokio::task::spawn({
-                let mut network = network.clone();
-                let zome_name = zome_name.clone();
-                let fn_name = fn_name.clone();
-                let request = request.clone();
-                async move {
-                    let result = network
-                        .call_remote(agent.clone(), zome_name, fn_name, None, request)
-                        .await;
-                    if let Err(e) = result {
-                        tracing::info!(
-                            "Failed to send remote signal to {:?} because of {:?}",
-                            agent,
-                            e
-                        );
+    tokio_safe_block_on::tokio_safe_block_forever_on(
+        async move {
+            let network = call_context.host_access().network().clone();
+            let RemoteSignal { agents, signal } = input.into_inner();
+            let zome_name: ZomeName = call_context.zome().into();
+            let fn_name: FunctionName = FN_NAME.into();
+            let request: SerializedBytes = signal.try_into()?;
+            for agent in agents {
+                tokio::task::spawn(
+                    {
+                        let mut network = network.clone();
+                        let zome_name = zome_name.clone();
+                        let fn_name = fn_name.clone();
+                        let request = request.clone();
+                        async move {
+                            tracing::debug!("sending to {:?}", agent);
+                            let result = network
+                                .call_remote(agent.clone(), zome_name, fn_name, None, request)
+                                .await;
+                            tracing::debug!("sent to {:?}", agent);
+                            if let Err(e) = result {
+                                tracing::info!(
+                                    "Failed to send remote signal to {:?} because of {:?}",
+                                    agent,
+                                    e
+                                );
+                            }
+                        }
                     }
-                }
-            });
+                    .in_current_span(),
+                );
+            }
+            Ok(())
         }
-        Ok(())
-    })
+        .in_current_span(),
+    )
     .map(RemoteSignalOutput::new)
 }
 
@@ -63,6 +73,7 @@ mod tests {
     use holochain_types::dna::{zome::inline_zome::InlineZome, DnaFile};
     use holochain_zome_types::signal::AppSignal;
     use kitsune_p2p::KitsuneP2pConfig;
+    use matches::assert_matches;
 
     #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
     #[serde(transparent)]
@@ -75,22 +86,25 @@ mod tests {
         InlineZome::new_unique(vec![entry_def.clone()])
             .callback("signal_others", move |api, ()| {
                 let signal = AppSignal::new(AppString("Hey".to_string()).try_into().unwrap());
-                let remote_signal = RemoteSignal {
+                let signal = RemoteSignal {
                     agents: agents.clone(),
                     signal,
                 };
                 tracing::debug!("sending signal to {:?}", agents);
-                api.remote_signal(remote_signal)?;
+                api.remote_signal(signal)?;
                 Ok(())
             })
-            .callback("remote_signal", move |api, signal: AppSignal| {
+            .callback("recv_remote_signal", move |api, signal: AppSignal| {
                 tracing::debug!("remote signal");
                 num_signals.fetch_add(1, Ordering::SeqCst);
                 api.emit_signal(signal).map_err(Into::into)
             })
             .callback("init", move |api, ()| {
                 let mut functions: GrantedFunctions = HashSet::new();
-                functions.insert((api.zome_info(()).unwrap().zome_name, "remote_signal".into()));
+                functions.insert((
+                    api.zome_info(()).unwrap().zome_name,
+                    "recv_remote_signal".into(),
+                ));
                 let cap_grant_entry = CapGrantEntry {
                     tag: "".into(),
                     // empty access converts to unrestricted
@@ -125,7 +139,6 @@ mod tests {
 
         let conductors = future::join_all(
             std::iter::repeat_with(|| async move {
-                // let envs = test_environments();
                 let i = index_ref.fetch_add(1, Ordering::SeqCst);
                 let envs = envs_ref[i].clone();
                 let mut network = KitsuneP2pConfig::default();
@@ -176,10 +189,27 @@ mod tests {
         let p2p_envs = data.iter().map(|(_, envs)| envs.p2p()).collect();
         exchange_peer_info(p2p_envs);
 
-        let _: () = data[0].0[0].1[0].call("zome1", "signal_others", ()).await;
+        let cells: Vec<_> = data
+            .iter()
+            .flat_map(|(cells, _)| cells.iter().flat_map(|(_, c)| c.iter()))
+            .collect();
+
+        let mut signals = Vec::new();
+        for h in conductors.iter().map(|(c, _)| c) {
+            signals.push(h.signal_broadcaster().await.subscribe())
+        }
+        let signals = signals.into_iter().flatten().collect::<Vec<_>>();
+
+        let _: () = cells[0].call("zome1", "signal_others", ()).await;
 
         tokio::time::delay_for(std::time::Duration::from_millis(1000)).await;
         assert_eq!(num_signals.load(Ordering::SeqCst), NUM_CONDUCTORS);
+
+        for mut signal in signals {
+            let r = signal.try_recv();
+            // Each handle should recv a signal
+            assert_matches!(r, Ok(_))
+        }
 
         Ok(())
     }

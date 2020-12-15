@@ -1,3 +1,4 @@
+use super::host_fn::remote_signal::remote_signal;
 use super::{
     guest_callback::{
         entry_defs::EntryDefsHostAccess, init::InitHostAccess,
@@ -274,8 +275,13 @@ impl RealRibosome {
         } = host_fn_access
         {
             ns.insert("__call_remote", func!(invoke_host_function!(call_remote)));
+            ns.insert(
+                "__remote_signal",
+                func!(invoke_host_function!(remote_signal)),
+            );
         } else {
             ns.insert("__call_remote", func!(invoke_host_function!(unreachable)));
+            ns.insert("__remote_signal", func!(invoke_host_function!(unreachable)));
         }
 
         if let HostFnAccess {

@@ -37,7 +37,7 @@ fn add_valid_link_inner() -> ExternResult<HeaderHash> {
     Ok(create_link(
         always_linkable_entry_hash.clone(),
         always_linkable_entry_hash,
-        ()
+        (),
     )?)
 }
 
@@ -62,7 +62,7 @@ fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
     Ok(create_link(
         never_linkable_entry_hash,
         always_linkable_entry_hash,
-        ()
+        (),
     )?)
 }
 
@@ -82,14 +82,15 @@ fn validate_delete_link(
     validate_delete_link: ValidateDeleteLinkData,
 ) -> ExternResult<ValidateLinkCallbackResult> {
     let delete_link = validate_delete_link.delete_link;
-    let base: Option<MaybeLinkable> = match get(delete_link.base_address.clone(), GetOptions::content())? {
-        Some(b) => b.entry().to_app_option()?,
-        None => {
-            return Ok(ValidateLinkCallbackResult::UnresolvedDependencies(vec![
-                delete_link.base_address.into(),
-            ]))
-        }
-    };
+    let base: Option<MaybeLinkable> =
+        match get(delete_link.base_address.clone(), GetOptions::content())? {
+            Some(b) => b.entry().to_app_option()?,
+            None => {
+                return Ok(ValidateLinkCallbackResult::UnresolvedDependencies(vec![
+                    delete_link.base_address.into(),
+                ]))
+            }
+        };
     let base = match base {
         Some(b) => b,
         None => {
