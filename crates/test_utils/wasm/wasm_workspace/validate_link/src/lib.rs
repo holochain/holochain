@@ -82,7 +82,7 @@ fn validate_delete_link(
     validate_delete_link: ValidateDeleteLinkData,
 ) -> ExternResult<ValidateLinkCallbackResult> {
     let delete_link = validate_delete_link.delete_link;
-    let base: Option<MaybeLinkable> = match get(delete_link.base_address.clone(), GetOptions)? {
+    let base: Option<MaybeLinkable> = match get(delete_link.base_address.clone(), GetOptions::content())? {
         Some(b) => b.entry().to_app_option()?,
         None => {
             return Ok(ValidateLinkCallbackResult::UnresolvedDependencies(vec![

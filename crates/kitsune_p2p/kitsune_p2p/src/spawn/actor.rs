@@ -35,6 +35,7 @@ pub(crate) struct KitsuneP2pActor {
 
 fn build_transport(
     t_conf: TransportConfig,
+    tls_config: Arc<kitsune_p2p_proxy::TlsConfig>,
 ) -> must_future::MustBoxFuture<
     'static,
     TransportResult<(
@@ -62,18 +63,19 @@ fn build_transport(
                 sub_transport,
                 proxy_config,
             } => {
-                let (sub_lstn, sub_evt) = build_transport(*sub_transport).await?;
+                let (sub_lstn, sub_evt) =
+                    build_transport(*sub_transport, tls_config.clone()).await?;
                 let sub_conf = match proxy_config {
                     ProxyConfig::RemoteProxyClient { proxy_url } => {
                         kitsune_p2p_proxy::ProxyConfig::remote_proxy_client(
-                            kitsune_p2p_proxy::TlsConfig::new_ephemeral().await?,
+                            (*tls_config).clone(),
                             proxy_url.into(),
                         )
                     }
                     ProxyConfig::LocalProxyServer {
                         proxy_accept_config,
                     } => kitsune_p2p_proxy::ProxyConfig::local_proxy_server(
-                        kitsune_p2p_proxy::TlsConfig::new_ephemeral().await?,
+                        (*tls_config).clone(),
                         match proxy_accept_config {
                             Some(ProxyAcceptConfig::AcceptAll) => {
                                 kitsune_p2p_proxy::AcceptProxyCallback::accept_all()
@@ -96,20 +98,24 @@ fn build_transport(
 impl KitsuneP2pActor {
     pub async fn new(
         config: KitsuneP2pConfig,
+        tls_config: kitsune_p2p_proxy::TlsConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         internal_sender: ghost_actor::GhostSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ) -> KitsuneP2pResult<Self> {
-        let (t_pool, transport, mut t_event) = spawn_transport_pool().await?;
+        let tls_config = Arc::new(tls_config);
+        let (t_pool, transport, t_event) = spawn_transport_pool().await?;
         for t_conf in config.transport_pool.clone() {
-            let (l, e) = build_transport(t_conf).await?;
+            let (l, e) = build_transport(t_conf, tls_config.clone()).await?;
             t_pool.push_sub_transport(l, e).await?;
         }
 
         tokio::task::spawn({
             let evt_sender = evt_sender.clone();
-            async move {
-                while let Some(event) = t_event.next().await {
+            t_event.for_each_concurrent(/* limit */ 10, move |event| {
+                let evt_sender = evt_sender.clone();
+                async move {
+                    let evt_sender = &evt_sender;
                     match event {
                         TransportEvent::IncomingChannel(_url, mut write, read) => {
                             let read = read.read_to_end().await;
@@ -119,7 +125,7 @@ impl KitsuneP2pActor {
                                     let reason = format!("{:?}", err);
                                     let fail = wire::Wire::failure(reason).encode_vec().unwrap();
                                     let _ = write.write_and_close(fail).await;
-                                    continue;
+                                    return;
                                 }
                                 Ok((_, r)) => r,
                             };
@@ -140,7 +146,7 @@ impl KitsuneP2pActor {
                                             let fail =
                                                 wire::Wire::failure(reason).encode_vec().unwrap();
                                             let _ = write.write_and_close(fail).await;
-                                            continue;
+                                            return;
                                         }
                                         Ok(r) => r,
                                     };
@@ -163,7 +169,7 @@ impl KitsuneP2pActor {
                                         let fail =
                                             wire::Wire::failure(reason).encode_vec().unwrap();
                                         let _ = write.write_and_close(fail).await;
-                                        continue;
+                                        return;
                                     }
                                     let resp = wire::Wire::notify_resp().encode_vec().unwrap();
                                     let _ = write.write_and_close(resp).await;
@@ -195,7 +201,7 @@ impl KitsuneP2pActor {
                                             let fail =
                                                 wire::Wire::failure(reason).encode_vec().unwrap();
                                             let _ = write.write_and_close(fail).await;
-                                            continue;
+                                            return;
                                         }
                                         Ok(r) => r,
                                     };
@@ -226,7 +232,7 @@ impl KitsuneP2pActor {
                                                     .encode_vec()
                                                     .unwrap();
                                                 let _ = write.write_and_close(fail).await;
-                                                continue;
+                                                return;
                                             }
                                             Ok(r) => r,
                                         };
@@ -254,12 +260,38 @@ impl KitsuneP2pActor {
                                         }
                                     }
                                 }
+                                wire::Wire::Gossip(wire::Gossip {
+                                    space,
+                                    from_agent,
+                                    to_agent,
+                                    ops,
+                                    agents,
+                                }) => {
+                                    let input = GossipEvt::new(
+                                        from_agent,
+                                        to_agent,
+                                        ops.into_iter().map(|(k, v)| (k, v.into())).collect(),
+                                        agents,
+                                    );
+                                    if let Err(err) =
+                                        local_gossip_ops(&evt_sender, space, input).await
+                                    {
+                                        let reason = format!("{:?}", err);
+                                        tracing::error!("got err: {}", reason);
+                                        let fail =
+                                            wire::Wire::failure(reason).encode_vec().unwrap();
+                                        let _ = write.write_and_close(fail).await;
+                                        return;
+                                    }
+                                    let resp = wire::Wire::gossip_resp().encode_vec().unwrap();
+                                    let _ = write.write_and_close(resp).await;
+                                }
                                 _ => unimplemented!("{:?}", read),
                             }
                         }
                     }
                 }
-            }
+            })
         });
 
         Ok(Self {

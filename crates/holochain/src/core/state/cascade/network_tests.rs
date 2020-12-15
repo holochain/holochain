@@ -21,7 +21,7 @@ use ghost_actor::GhostControlSender;
 use hdk3::prelude::EntryVisibility;
 use holo_hash::{hash_type, hash_type::AnyDht, AnyDhtHash, EntryHash, HasHash, HeaderHash};
 use holochain_p2p::{
-    actor::{GetLinksOptions, GetMetaOptions, GetOptions},
+    actor::{GetLinksOptions, GetMetaOptions},
     HolochainP2pCell, HolochainP2pRef,
 };
 use holochain_serialized_bytes::SerializedBytes;
@@ -44,6 +44,7 @@ use holochain_types::{
     Entry, EntryHashed, HeaderHashed, Timestamp,
 };
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::{
     element::SignedHeaderHashed,
     header::*,
@@ -216,14 +217,7 @@ async fn get_from_another_agent() {
     )
     .await;
 
-    let options = GetOptions {
-        remote_agent_count: None,
-        timeout_ms: None,
-        as_race: false,
-        race_timeout_ms: None,
-        follow_redirects: false,
-        all_live_headers_with_metadata: false,
-    };
+    let options = GetOptions::latest();
 
     // Bob store element
     let entry = Post("Bananas are good for you".into());
@@ -602,7 +596,7 @@ async fn generate_fixt_store() -> (
 async fn fake_authority(hash: AnyDhtHash, call_data: &HostFnCaller) {
     // Check bob can get the entry
     let element = call_data
-        .get(hash.clone().into(), GetOptions::default())
+        .get(hash.clone().into(), GetOptions::content())
         .await
         .unwrap();
 

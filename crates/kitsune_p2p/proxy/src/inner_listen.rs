@@ -6,10 +6,10 @@ use std::collections::HashMap;
 
 /// How often should NAT nodes refresh their proxy contract?
 /// Note - ProxyTo entries will be expired at double this time.
-const PROXY_KEEPALIVE_MS: u64 = 30000;
+const PROXY_KEEPALIVE_MS: u64 = 15000;
 /// How much longer the proxy should wait to remove the contract
 /// if no keep alive is received.
-const KEEPALIVE_MULTIPLIER: u64 = 2;
+const KEEPALIVE_MULTIPLIER: u64 = 3;
 
 /// Wrap a transport listener sender/receiver in kitsune proxy logic.
 pub async fn spawn_kitsune_proxy_listener(
@@ -77,15 +77,18 @@ pub async fn spawn_kitsune_proxy_listener(
             loop {
                 tokio::time::delay_for(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS)).await;
 
-                if i_s_c.req_proxy(proxy_url.clone()).await.is_err() {
-                    tracing::error!("renewing proxy failed");
+                if let Err(e) = i_s_c.req_proxy(proxy_url.clone()).await {
+                    tracing::error!(msg = "renewing proxy failed", ?proxy_url, ?e);
                     // either we failed because the actor is already shutdown
                     // or the remote end rejected us.
                     // if it's the latter - shut down our ghost actor : )
-                    let _ = i_s_c.ghost_actor_shutdown().await;
-                    break;
+                    if !i_s_c.ghost_actor_is_active() {
+                        tracing::debug!("Ghost actor has closed so exiting keep alive");
+                        break;
+                    }
+                } else {
+                    tracing::info!("Proxy renewed for {:?}", proxy_url);
                 }
-                tracing::info!("Proxy renewed for {:?}", proxy_url);
             }
             tracing::error!("Keep alive closed");
         });
@@ -209,6 +212,8 @@ ghost_actor::ghost_chan! {
             futures::channel::mpsc::Sender<ProxyWire>,
             futures::channel::mpsc::Receiver<ProxyWire>,
         );
+
+        fn prune_bad_proxy_to(proxy_url: ProxyUrl) -> ();
 
         fn register_proxy_to(proxy_url: ProxyUrl, base_url: url2::Url2) -> ();
 
@@ -371,14 +376,38 @@ impl InternalHandler for InnerListen {
         // and the channel create will re-use that.
         // If it is not, it will try to create a new connection that may fail.
         let fut = match proxy_to {
-            None => self
-                .i_s
-                .create_low_level_channel(dest_proxy_url.as_base().clone()),
+            None => {
+                tracing::warn!("Dropping message for {}", dest_proxy_url.as_full_str());
+                return Ok(async move {
+                    write
+                        .send(ProxyWire::failure(format!(
+                            "Dropped message to {}",
+                            dest_proxy_url.as_full_str()
+                        )))
+                        .await
+                        .map_err(TransportError::other)?;
+                    Ok(())
+                }
+                .boxed()
+                .into());
+            }
             Some(proxy_to) => self.i_s.create_low_level_channel(proxy_to),
         };
+        let i_s = self.i_s.clone();
         Ok(async move {
-            let (mut fwd_write, fwd_read) = match fut.await {
+            let url = dest_proxy_url.clone();
+            let res = async move {
+                let (mut fwd_write, fwd_read) = fut.await?;
+                fwd_write
+                    .send(ProxyWire::chan_new(url.into()))
+                    .await
+                    .map_err(TransportError::other)?;
+                TransportResult::Ok((fwd_write, fwd_read))
+            }
+            .await;
+            let (fwd_write, fwd_read) = match res {
                 Err(e) => {
+                    let _ = i_s.prune_bad_proxy_to(dest_proxy_url).await;
                     write
                         .send(ProxyWire::failure(format!("{:?}", e)))
                         .await
@@ -387,10 +416,6 @@ impl InternalHandler for InnerListen {
                 }
                 Ok(t) => t,
             };
-            fwd_write
-                .send(ProxyWire::chan_new(dest_proxy_url.clone().into()))
-                .await
-                .map_err(TransportError::other)?;
             cross_join_channel_forward(fwd_write, read);
             cross_join_channel_forward(write, fwd_read);
             Ok(())
@@ -415,6 +440,11 @@ impl InternalHandler for InnerListen {
         }
         .boxed()
         .into())
+    }
+
+    fn handle_prune_bad_proxy_to(&mut self, proxy_url: ProxyUrl) -> InternalHandlerResult<()> {
+        self.proxy_list.remove(&proxy_url);
+        Ok(async move { Ok(()) }.boxed().into())
     }
 
     #[tracing::instrument(skip(self))]

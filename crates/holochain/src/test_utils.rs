@@ -222,10 +222,14 @@ async fn test_network_inner<F>(
 where
     F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
 {
-    let (network, mut recv) =
-        spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
+    let (network, mut recv) = spawn_holochain_p2p(
+        holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
+        holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral()
             .await
-            .unwrap();
+            .unwrap(),
+    )
+    .await
+    .unwrap();
     let respond_task = tokio::task::spawn(async move {
         use futures::future::FutureExt;
         use tokio::stream::StreamExt;
@@ -348,6 +352,53 @@ pub fn warm_wasm_tests() {
             .unwrap();
     }
 }
+
+/// Number of ops per sourechain change
+pub struct WaitOps;
+
+#[allow(missing_docs)]
+impl WaitOps {
+    pub const GENESIS: usize = 7;
+    pub const INIT: usize = 2;
+    pub const CAP_TOKEN: usize = 2;
+    pub const ENTRY: usize = 3;
+    pub const LINK: usize = 3;
+    pub const DELETE_LINK: usize = 2;
+    pub const UPDATE: usize = 5;
+    pub const DELETE: usize = 4;
+
+    /// Added the app but haven't made any zome calls
+    /// so init hasn't happened.
+    pub const fn cold_start() -> usize {
+        Self::GENESIS
+    }
+
+    /// Genesis and init.
+    pub const fn start() -> usize {
+        Self::GENESIS + Self::INIT
+    }
+
+    /// Start but there's a cap grant in init.
+    pub const fn start_with_cap() -> usize {
+        Self::GENESIS + Self::INIT + Self::CAP_TOKEN
+    }
+
+    /// Path to a set depth.
+    /// This doesn't take into account paths
+    /// with sharding strategy.
+    pub const fn path(depth: usize) -> usize {
+        Self::ENTRY + (Self::LINK + Self::ENTRY) * depth
+    }
+}
+
+/// Same as wait_for_integration but with a default wait time of 10 seconds
+#[tracing::instrument(skip(env))]
+pub async fn wait_for_integration_10s(env: &EnvironmentWrite, expected_count: usize) {
+    const NUM_ATTEMPTS: usize = 100;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
+    wait_for_integration(env, expected_count, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
+}
+
 /// Exit early if the expected number of ops
 /// have been integrated or wait for num_attempts * delay
 #[tracing::instrument(skip(env))]
@@ -357,64 +408,169 @@ pub async fn wait_for_integration(
     num_attempts: usize,
     delay: Duration,
 ) {
-    for _ in 0..num_attempts {
-        let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
-
-        let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
-            workspace
-                .validation_limbo
-                .iter(&r)
-                .unwrap()
-                .map(|(_, v)| Ok(v))
-                .collect()
-                .unwrap()
-        });
-        tracing::debug!(?val_limbo);
-
-        let int_limbo: Vec<_> = fresh_reader_test!(env, |r| {
-            workspace
-                .integration_limbo
-                .iter(&r)
-                .unwrap()
-                .map(|(_, v)| Ok(v))
-                .collect()
-                .unwrap()
-        });
-        tracing::debug!(?int_limbo);
-
-        let int: Vec<_> = fresh_reader_test!(env, |r| {
-            workspace
-                .integrated_dht_ops
-                .iter(&r)
-                .unwrap()
-                .map(|(_, v)| Ok(v))
-                .collect()
-                .unwrap()
-        });
-        let count = int.len();
-
-        {
-            let s = tracing::trace_span!("wait_for_integration_deep");
-            let _g = s.enter();
-            let element_integrated = ElementBuf::vault(env.clone().into(), false).unwrap();
-            let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
-            let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
-            let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
-            let mut cascade = Cascade::empty()
-                .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
-                .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
-            for iv in int {
-                tracing::trace!(op = ?iv.op, el = ?cascade.retrieve(iv.op.header_hash().clone().into(), Default::default()).await.unwrap());
-            }
-        }
-
+    for i in 0..num_attempts {
+        let count = display_integration(env).await;
         if count == expected_count {
             return;
         } else {
-            tracing::debug!(?count);
+            let total_time_waited = delay * i as u32;
+            tracing::debug!(?count, ?total_time_waited);
         }
         tokio::time::delay_for(delay).await;
     }
+}
+
+#[tracing::instrument(skip(env, others))]
+/// Same as wait for integration but can print other states at the same time
+pub async fn wait_for_integration_with_others(
+    env: &EnvironmentWrite,
+    others: &[&EnvironmentWrite],
+    expected_count: usize,
+    num_attempts: usize,
+    delay: Duration,
+) {
+    let mut last_total = 0;
+    for i in 0..num_attempts {
+        let count = count_integration(env).await;
+        let counts = get_counts(others).await;
+        let total: usize = counts.clone().into_iter().map(|(_, _, i)| i).sum();
+        let change = total.checked_sub(last_total).expect("LOST A VALUE");
+        last_total = total;
+        if count.2 == expected_count {
+            return;
+        } else {
+            let total_time_waited = delay * i as u32;
+            tracing::debug!(
+                "Count: {}, val: {}, int: {}\nTime waited: {:?},\nCounts: {:?}\nTotal: {} change:{}\n",
+                count.2,
+                count.1,
+                count.0,
+                total_time_waited,
+                counts,
+                total,
+                change,
+            );
+        }
+        tokio::time::delay_for(delay).await;
+    }
+}
+
+async fn get_counts(envs: &[&EnvironmentWrite]) -> Vec<(usize, usize, usize)> {
+    let mut output = Vec::new();
+    for env in envs {
+        let env = *env;
+        output.push(count_integration(env).await);
+    }
+    output
+}
+
+async fn count_integration(env: &EnvironmentWrite) -> (usize, usize, usize) {
+    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
+    let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+        workspace
+            .validation_limbo
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v))
+            .collect()
+            .unwrap()
+    });
+
+    let val_len = val_limbo.len();
+
+    let int_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+        workspace
+            .integration_limbo
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v))
+            .collect()
+            .unwrap()
+    });
+    let int_limbo_len = int_limbo.len();
+
+    let int: Vec<_> = fresh_reader_test!(env, |r| {
+        workspace
+            .integrated_dht_ops
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v))
+            .collect()
+            .unwrap()
+    });
+    let int_len = int.len();
+    (val_len, int_limbo_len, int_len)
+}
+
+async fn display_integration(env: &EnvironmentWrite) -> usize {
+    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
+
+    let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+        workspace
+            .validation_limbo
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v))
+            .collect()
+            .unwrap()
+    });
+    tracing::debug!(?val_limbo);
+
+    let int_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+        workspace
+            .integration_limbo
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v))
+            .collect()
+            .unwrap()
+    });
+    tracing::debug!(?int_limbo);
+
+    let int: Vec<_> = fresh_reader_test!(env, |r| {
+        workspace
+            .integrated_dht_ops
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v))
+            .collect()
+            .unwrap()
+    });
+    let count = int.len();
+
+    {
+        let s = tracing::trace_span!("wait_for_integration_deep");
+        let _g = s.enter();
+        let element_integrated = ElementBuf::vault(env.clone().into(), false).unwrap();
+        let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
+        let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
+        let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
+        let mut cascade = Cascade::empty()
+            .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
+            .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
+        let mut headers_to_display = Vec::with_capacity(int.len());
+        for iv in int {
+            let el = cascade
+                .retrieve(iv.op.header_hash().clone().into(), Default::default())
+                .await
+                .unwrap()
+                .unwrap();
+            tracing::trace!(op = ?iv.op, ?el);
+            let header = el.header();
+            let entry = format!("{:?}", el.entry());
+            headers_to_display.push((
+                header.header_seq(),
+                header.header_type(),
+                iv.op.to_string(),
+                entry,
+            ))
+        }
+        headers_to_display.sort_by_key(|i| i.0);
+        for (i, h) in headers_to_display.into_iter().enumerate() {
+            tracing::debug!(?i, seq_num = %h.0, header_type = ?h.1, op_type = %h.2, entry = ?h.3);
+        }
+    }
+    count
 }
 
 /// Helper to create a zome invocation for tests

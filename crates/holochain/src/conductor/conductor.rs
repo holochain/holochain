@@ -51,7 +51,10 @@ use crate::{
 };
 pub use builder::*;
 use fallible_iterator::FallibleIterator;
-use futures::{future, future::TryFutureExt};
+use futures::{
+    future::{self, TryFutureExt},
+    StreamExt,
+};
 use holo_hash::DnaHash;
 use holochain_keystore::{
     lair_keystore::spawn_lair_keystore, test_keystore::spawn_test_keystore, KeystoreSender,
@@ -745,10 +748,10 @@ where
                     match iter.next() {
                         Ok(Some((k, v))) => {
                             let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
-                            if info.signed_at_ms() + info.expires_after_ms() <= now {
-                                expired.push(AgentKvKey::from(k));
-                            } else {
-                                out.push(v);
+                            let expires = info.signed_at_ms().checked_add(info.expires_after_ms());
+                            match expires {
+                                Some(expires) if expires > now => out.push(v),
+                                _ => expired.push(AgentKvKey::from(k)),
                             }
                         }
                         Ok(None) => break,
@@ -919,6 +922,8 @@ mod builder {
     use super::*;
     use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
     use holochain_state::env::EnvironmentKind;
+
+    #[cfg(any(test, feature = "test_utils"))]
     use holochain_state::test_utils::TestEnvironments;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
@@ -1016,8 +1021,16 @@ mod builder {
                 None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
                 Some(config) => config.clone(),
             };
+            let (cert_digest, cert, cert_priv_key) =
+                keystore.get_or_create_first_tls_cert().await?;
+            let tls_config =
+                holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig {
+                    cert,
+                    cert_priv_key,
+                    cert_digest,
+                };
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(network_config).await?;
+                holochain_p2p::spawn_holochain_p2p(network_config, tls_config).await?;
 
             let conductor = Conductor::new(
                 environment,
@@ -1112,7 +1125,7 @@ mod builder {
         pub async fn test(self, envs: &TestEnvironments) -> ConductorResult<ConductorHandle> {
             let keystore = envs.conductor().keystore();
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default())
+                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
                     .await?;
             let conductor = Conductor::new(
                 envs.conductor(),
@@ -1133,20 +1146,30 @@ mod builder {
     }
 }
 
+#[instrument(skip(p2p_evt, handle))]
 async fn p2p_event_task(
-    mut p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
+    p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,
 ) {
-    use tokio::stream::StreamExt;
-    while let Some(evt) = p2p_evt.next().await {
-        let cell_id = CellId::new(evt.dna_hash().clone(), evt.as_to_agent().clone());
-        if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
-            tracing::error!(
-                message = "error dispatching network event",
-                error = ?e,
-            );
-        }
-    }
+    /// The number of events we allow to run in parallel before
+    /// starting to await on the join handles.
+    const NUM_PARALLEL_EVTS: usize = 100;
+    p2p_evt
+        .for_each_concurrent(NUM_PARALLEL_EVTS, |evt| {
+            let handle = handle.clone();
+            async move {
+                let cell_id = CellId::new(evt.dna_hash().clone(), evt.as_to_agent().clone());
+                if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
+                    tracing::error!(
+                        message = "error dispatching network event",
+                        error = ?e,
+                    );
+                }
+            }
+            .in_current_span()
+        })
+        .await;
+
     tracing::warn!("p2p_event_task has ended");
 }
 
