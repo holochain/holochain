@@ -3,13 +3,14 @@ use hdk3::prelude::*;
 use holochain::{
     conductor::{config::ConductorConfig, p2p_store::exchange_peer_info, Conductor},
     destructure_test_cells,
+    test_utils::cool::CoolDnaFile,
 };
 use holochain::{
     destructure_test_cell_vec,
     test_utils::cool::{CoolAgents, CoolConductorHandle, MaybeElement},
 };
 use holochain_state::test_utils::test_environments;
-use holochain_types::dna::{zome::inline_zome::InlineZome, DnaFile};
+use holochain_types::dna::zome::inline_zome::InlineZome;
 use holochain_zome_types::element::ElementEntry;
 use kitsune_p2p::KitsuneP2pConfig;
 
@@ -64,7 +65,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
     )
     .await;
 
-    let (dna_file, _) = DnaFile::unique_from_inline_zome("zome1", simple_crud_zome())
+    let (dna_file, _) = CoolDnaFile::unique_from_inline_zome("zome1", simple_crud_zome())
         .await
         .unwrap();
 

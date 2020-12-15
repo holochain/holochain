@@ -5,7 +5,6 @@ use futures::future;
 use futures::stream;
 use futures::Future;
 use hdk3::prelude::RemoteSignal;
-use holochain::conductor::p2p_store::exchange_peer_info;
 use holochain::test_utils::cool::CoolAgents;
 use holochain::test_utils::cool::CoolConductorHandle;
 use holochain::{
@@ -19,8 +18,8 @@ use holochain::{
     core::signal::Signal,
     fixt::*,
 };
+use holochain::{conductor::p2p_store::exchange_peer_info, test_utils::cool::CoolDnaFile};
 use holochain_state::test_utils::test_environments;
-use holochain_types::dna::DnaFile;
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
     cell::CellId,
@@ -423,7 +422,7 @@ async fn remote_signals() {
     )
     .await;
 
-    let dna_file = DnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
+    let dna_file = CoolDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
         .unwrap()
         .0;

@@ -60,12 +60,15 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use super::*;
-    use crate::conductor::{config::ConductorConfig, p2p_store::exchange_peer_info, Conductor};
     use crate::test_utils::cool::{CoolAgents, CoolConductorHandle};
+    use crate::{
+        conductor::{config::ConductorConfig, p2p_store::exchange_peer_info, Conductor},
+        test_utils::cool::CoolDnaFile,
+    };
     use futures::future;
     use hdk3::prelude::*;
     use holochain_state::test_utils::test_environments;
-    use holochain_types::dna::{zome::inline_zome::InlineZome, DnaFile};
+    use holochain_types::dna::zome::inline_zome::InlineZome;
     use holochain_zome_types::signal::AppSignal;
     use kitsune_p2p::KitsuneP2pConfig;
     use matches::assert_matches;
@@ -157,7 +160,7 @@ mod tests {
         )
         .await;
 
-        let (dna_file, _) = DnaFile::unique_from_inline_zome(
+        let (dna_file, _) = CoolDnaFile::unique_from_inline_zome(
             "zome1",
             zome(all_agents.clone(), num_signals.clone()),
         )
@@ -173,7 +176,7 @@ mod tests {
                     .setup_app_for_agents_with_no_membrane_proof(
                         "app",
                         &[agents_ref[i].clone()],
-                        &[dna_file.clone()],
+                        &[dna_file.clone().into()],
                     )
                     .await;
                 (data, envs)

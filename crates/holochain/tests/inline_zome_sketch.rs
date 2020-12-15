@@ -1,8 +1,8 @@
 use hdk3::prelude::*;
-use holochain::test_utils::cool::{CoolAgents, CoolConductorHandle, MaybeElement};
+use holochain::test_utils::cool::{CoolAgents, CoolConductorHandle, CoolDnaFile, MaybeElement};
 use holochain::{conductor::Conductor, destructure_test_cells};
 use holochain_state::test_utils::test_environments;
-use holochain_types::dna::{zome::inline_zome::InlineZome, DnaFile};
+use holochain_types::dna::zome::inline_zome::InlineZome;
 use holochain_zome_types::element::ElementEntry;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
@@ -39,7 +39,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     let envs = test_environments();
 
     // Bundle the single zome into a DnaFile
-    let (dna_file, _) = DnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
+    let (dna_file, _) = CoolDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
 
     // Get two agents
     let (alice, bobbo) = CoolAgents::two(envs.keystore()).await;
@@ -86,8 +86,8 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     let envs = test_environments();
     let conductor: CoolConductorHandle = Conductor::builder().test(&envs).await?.into();
 
-    let (dna_foo, _) = DnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
-    let (dna_bar, _) = DnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
+    let (dna_foo, _) = CoolDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
+    let (dna_bar, _) = CoolDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
 
     let agents = CoolAgents::get(envs.keystore(), 3).await;
 
