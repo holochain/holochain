@@ -222,10 +222,14 @@ async fn test_network_inner<F>(
 where
     F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
 {
-    let (network, mut recv) =
-        spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
+    let (network, mut recv) = spawn_holochain_p2p(
+        holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
+        holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral()
             .await
-            .unwrap();
+            .unwrap(),
+    )
+    .await
+    .unwrap();
     let respond_task = tokio::task::spawn(async move {
         use futures::future::FutureExt;
         use tokio::stream::StreamExt;
