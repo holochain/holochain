@@ -61,7 +61,7 @@ mod tests {
 
     use super::*;
     use crate::conductor::{config::ConductorConfig, p2p_store::exchange_peer_info, Conductor};
-    use crate::test_utils::test_conductor::{TestAgents, TestConductorHandle};
+    use crate::test_utils::cool::{CoolAgents, CoolConductorHandle};
     use futures::future;
     use hdk3::prelude::*;
     use holochain_state::test_utils::test_environments;
@@ -123,7 +123,7 @@ mod tests {
         let mut all_agents = Vec::with_capacity(NUM_CONDUCTORS);
         for _ in 0..NUM_CONDUCTORS {
             let envs = test_environments();
-            let agent = TestAgents::one(envs.keystore()).await;
+            let agent = CoolAgents::one(envs.keystore()).await;
             all_envs.push(envs);
             all_agents.push(agent);
         }
@@ -142,7 +142,7 @@ mod tests {
                     override_host: None,
                     override_port: None,
                 }];
-                let conductor: TestConductorHandle = Conductor::builder()
+                let conductor: CoolConductorHandle = Conductor::builder()
                     .config(ConductorConfig {
                         network: Some(network),
                         ..Default::default()

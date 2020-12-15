@@ -16,27 +16,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee2a4ec343196209d6594e19543ae87a39f96d5534d7174822a3ad825dd6ed7e"
 
 [[package]]
-name = "admin"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "holochain",
- "holochain_p2p",
- "holochain_types",
- "holochain_websocket",
- "nanoid",
- "observability",
- "portpicker",
- "serde_yaml",
- "structopt",
- "tokio",
- "tracing",
- "unwrap_to",
- "url2",
-]
-
-[[package]]
 name = "aead"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2806,15 +2785,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "portpicker"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b497d05c16fe00939445c00a4fe2fa4f3d3dfc9c0401a3ab5c577afda2debb9"
-dependencies = [
- "rand 0.6.5",
-]
-
-[[package]]
 name = "ppv-lite86"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3321,7 +3291,7 @@ dependencies = [
 [[package]]
 name = "rkv"
 version = "0.10.4"
-source = "git+https://github.com/holochain/rkv.git?branch=master#6f6b4b5adc1eb6fe4a8f9587f3a3083cafadf0a1"
+source = "git+https://github.com/holochain/rkv.git#6f6b4b5adc1eb6fe4a8f9587f3a3083cafadf0a1"
 dependencies = [
  "arrayref",
  "bincode",

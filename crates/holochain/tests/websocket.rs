@@ -6,8 +6,8 @@ use futures::stream;
 use futures::Future;
 use hdk3::prelude::RemoteSignal;
 use holochain::conductor::p2p_store::exchange_peer_info;
-use holochain::test_utils::test_conductor::TestAgents;
-use holochain::test_utils::test_conductor::TestConductorHandle;
+use holochain::test_utils::cool::CoolAgents;
+use holochain::test_utils::cool::CoolConductorHandle;
 use holochain::{
     conductor::api::ZomeCall,
     conductor::{
@@ -403,7 +403,7 @@ async fn remote_signals() {
                 override_host: None,
                 override_port: None,
             }];
-            let conductor: TestConductorHandle = Conductor::builder()
+            let conductor: CoolConductorHandle = Conductor::builder()
                 .config(ConductorConfig {
                     network: Some(network),
                     ..Default::default()
@@ -419,7 +419,7 @@ async fn remote_signals() {
     .await;
 
     let all_agents: Vec<HoloHash<hash_type::Agent>> = futures::StreamExt::collect(
-        stream::iter(conductors.iter().map(|(_, e)| e)).then(|e| TestAgents::one(e.keystore())),
+        stream::iter(conductors.iter().map(|(_, e)| e)).then(|e| CoolAgents::one(e.keystore())),
     )
     .await;
 

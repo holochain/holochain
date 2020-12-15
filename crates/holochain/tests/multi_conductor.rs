@@ -6,7 +6,7 @@ use holochain::{
 };
 use holochain::{
     destructure_test_cell_vec,
-    test_utils::test_conductor::{MaybeElement, TestAgents, TestConductorHandle},
+    test_utils::cool::{CoolAgents, CoolConductorHandle, MaybeElement},
 };
 use holochain_state::test_utils::test_environments;
 use holochain_types::dna::{zome::inline_zome::InlineZome, DnaFile};
@@ -49,7 +49,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
                 override_host: None,
                 override_port: None,
             }];
-            let conductor: TestConductorHandle = Conductor::builder()
+            let conductor: CoolConductorHandle = Conductor::builder()
                 .config(ConductorConfig {
                     network: Some(network),
                     ..Default::default()
@@ -74,7 +74,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
             let data = conductor
                 .setup_app_for_agents_with_no_membrane_proof(
                     "app",
-                    &[TestAgents::one(envs.keystore()).await],
+                    &[CoolAgents::one(envs.keystore()).await],
                     &[dna_file.clone()],
                 )
                 .await;

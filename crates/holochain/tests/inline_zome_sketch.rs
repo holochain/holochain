@@ -1,5 +1,5 @@
 use hdk3::prelude::*;
-use holochain::test_utils::test_conductor::{MaybeElement, TestAgents, TestConductorHandle};
+use holochain::test_utils::cool::{CoolAgents, CoolConductorHandle, MaybeElement};
 use holochain::{conductor::Conductor, destructure_test_cells};
 use holochain_state::test_utils::test_environments;
 use holochain_types::dna::{zome::inline_zome::InlineZome, DnaFile};
@@ -42,10 +42,10 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     let (dna_file, _) = DnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
 
     // Get two agents
-    let (alice, bobbo) = TestAgents::two(envs.keystore()).await;
+    let (alice, bobbo) = CoolAgents::two(envs.keystore()).await;
 
     // Create a Conductor
-    let conductor: TestConductorHandle = Conductor::builder().test(&envs).await?.into();
+    let conductor: CoolConductorHandle = Conductor::builder().test(&envs).await?.into();
 
     // Install DNA and install and activate apps in conductor
     let ids = conductor
@@ -84,12 +84,12 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 #[cfg(feature = "test_utils")]
 async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     let envs = test_environments();
-    let conductor: TestConductorHandle = Conductor::builder().test(&envs).await?.into();
+    let conductor: CoolConductorHandle = Conductor::builder().test(&envs).await?.into();
 
     let (dna_foo, _) = DnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
     let (dna_bar, _) = DnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
 
-    let agents = TestAgents::get(envs.keystore(), 3).await;
+    let agents = CoolAgents::get(envs.keystore(), 3).await;
 
     let ids = conductor
         .setup_app_for_agents_with_no_membrane_proof("app", &agents, &[dna_foo, dna_bar])
@@ -128,7 +128,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     // Verify that carol can run "read" on her cell and get alice's Header
     // on the "bar" DNA
-    // Let's do it with the TestZome instead of the TestCell too, for fun
+    // Let's do it with the CoolZome instead of the CoolCell too, for fun
     let element: MaybeElement = carol_bar.zome("barzome").call("read", hash_bar).await;
     let element = element
         .0

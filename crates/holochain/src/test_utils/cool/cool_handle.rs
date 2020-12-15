@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use super::test_cell::TestCell;
+use super::CoolCell;
 use crate::{
     conductor::{api::ZomeCall, handle::ConductorHandle},
     core::ribosome::ZomeCallInvocation,
@@ -16,13 +16,13 @@ use unwrap_to::unwrap_to;
 
 #[derive(Clone, shrinkwraprs::Shrinkwrap, derive_more::From)]
 /// A wrapper around ConductorHandle with more convenient methods for testing
-pub struct TestConductorHandle(pub Arc<TestConductorHandleInner>);
+pub struct CoolConductorHandle(pub Arc<CoolConductorHandleInner>);
 
 /// Inner handle with a cleanup drop
 #[derive(shrinkwraprs::Shrinkwrap, derive_more::From)]
-pub struct TestConductorHandleInner(pub(crate) ConductorHandle);
+pub struct CoolConductorHandleInner(pub(crate) ConductorHandle);
 
-impl TestConductorHandle {
+impl CoolConductorHandle {
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
     ///
     /// All InstalledAppIds and CellNicks are auto-generated. In tests driven directly
@@ -37,7 +37,7 @@ impl TestConductorHandle {
         app_id_prefix: &str,
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
-    ) -> SetupOutput {
+    ) -> CoolInstalledApps {
         for dna_file in dna_files {
             self.0
                 .install_dna(dna_file.clone())
@@ -49,10 +49,10 @@ impl TestConductorHandle {
 
         for agent in agents {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
-            let cell_ids: Vec<TestCell> = dna_files
+            let cell_ids: Vec<CoolCell> = dna_files
                 .iter()
                 .map(|f| CellId::new(f.dna_hash().clone(), agent.clone()))
-                .map(|cell_id| TestCell {
+                .map(|cell_id| CoolCell {
                     cell_id,
                     handle: self.clone(),
                 })
@@ -97,7 +97,7 @@ impl TestConductorHandle {
 }
 
 /// Return type of opinionated setup function
-pub type SetupOutput = Vec<(InstalledAppId, Vec<TestCell>)>;
+pub type CoolInstalledApps = Vec<(InstalledAppId, Vec<CoolCell>)>;
 
 /// Helper to destructure the nested app setup return value as nested tuples.
 /// Each level of nesting can contain 1-4 items, i.e. up to 4 agents with 4 DNAs each.
@@ -106,7 +106,7 @@ pub type SetupOutput = Vec<(InstalledAppId, Vec<TestCell>)>;
 macro_rules! destructure_test_cells {
     ($blob:expr) => {{
         use itertools::Itertools;
-        let blob: $crate::test_utils::test_conductor::SetupOutput = $blob;
+        let blob: $crate::test_utils::cool::CoolInstalledApps = $blob;
         blob.into_iter()
             .map(|(_, v)| {
                 v.into_iter()
@@ -121,7 +121,7 @@ macro_rules! destructure_test_cells {
 macro_rules! destructure_test_cell_vec {
     ($vec:expr) => {{
         use itertools::Itertools;
-        let vec: Vec<$crate::test_utils::test_conductor::SetupOutput> = $vec;
+        let vec: Vec<$crate::test_utils::cool::CoolInstalledApps> = $vec;
         vec.into_iter()
             .map(|blob| destructure_test_cells!(blob))
             .collect_tuple()
@@ -129,10 +129,10 @@ macro_rules! destructure_test_cell_vec {
     }};
 }
 
-impl TestConductorHandleInner {
+impl CoolConductorHandleInner {
     /// Call a zome function with automatic de/serialization of input and output
     /// and unwrapping of nested errors.
-    pub async fn call_zome_ok<'a, I, O, F, E>(&'a self, invocation: TestZomeCall<'a, I, F, E>) -> O
+    pub async fn call_zome_ok<'a, I, O, F, E>(&'a self, invocation: CoolZomeCall<'a, I, F, E>) -> O
     where
         E: std::fmt::Debug,
         FunctionName: From<F>,
@@ -186,7 +186,7 @@ impl TestConductorHandleInner {
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface
 #[derive(Clone, Debug)]
-pub struct TestZomeCall<'a, P, F, E>
+pub struct CoolZomeCall<'a, P, F, E>
 where
     SerializedBytes: TryFrom<P, Error = E>,
     E: std::fmt::Debug,
@@ -209,14 +209,14 @@ where
     pub provenance: Option<AgentPubKey>,
 }
 
-impl<'a, P, F, E> From<TestZomeCall<'a, P, F, E>> for ZomeCallInvocation
+impl<'a, P, F, E> From<CoolZomeCall<'a, P, F, E>> for ZomeCallInvocation
 where
     SerializedBytes: TryFrom<P, Error = E>,
     E: std::fmt::Debug,
     FunctionName: From<F>,
 {
-    fn from(tzci: TestZomeCall<'a, P, F, E>) -> Self {
-        let TestZomeCall {
+    fn from(tzci: CoolZomeCall<'a, P, F, E>) -> Self {
+        let CoolZomeCall {
             cell_id,
             zome,
             fn_name,
@@ -237,18 +237,18 @@ where
     }
 }
 
-impl<'a, P, F, E> From<TestZomeCall<'a, P, F, E>> for ZomeCall
+impl<'a, P, F, E> From<CoolZomeCall<'a, P, F, E>> for ZomeCall
 where
     SerializedBytes: TryFrom<P, Error = E>,
     E: std::fmt::Debug,
     FunctionName: From<F>,
 {
-    fn from(tzci: TestZomeCall<'a, P, F, E>) -> Self {
+    fn from(tzci: CoolZomeCall<'a, P, F, E>) -> Self {
         ZomeCallInvocation::from(tzci).into()
     }
 }
 
-impl Drop for TestConductorHandleInner {
+impl Drop for CoolConductorHandleInner {
     fn drop(&mut self) {
         let c = self.0.clone();
         tokio::task::spawn(async move {
@@ -260,8 +260,8 @@ impl Drop for TestConductorHandleInner {
     }
 }
 
-impl From<ConductorHandle> for TestConductorHandle {
+impl From<ConductorHandle> for CoolConductorHandle {
     fn from(h: ConductorHandle) -> Self {
-        TestConductorHandle(Arc::new(TestConductorHandleInner(h)))
+        CoolConductorHandle(Arc::new(CoolConductorHandleInner(h)))
     }
 }

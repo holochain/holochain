@@ -1,16 +1,16 @@
-use super::TestConductorHandle;
+use super::CoolConductorHandle;
 use hdk3::prelude::*;
 
-/// A reference to a Zome in a Cell created by a TestConductorHandle installation function.
-/// Think of it as a partially applied TestCell, with the ZomeName baked in.
+/// A reference to a Zome in a Cell created by a CoolConductorHandle installation function.
+/// Think of it as a partially applied CoolCell, with the ZomeName baked in.
 #[derive(Clone, derive_more::Constructor)]
-pub struct TestZome {
+pub struct CoolZome {
     cell_id: CellId,
     zome_name: ZomeName,
-    handle: TestConductorHandle,
+    handle: CoolConductorHandle,
 }
 
-impl TestZome {
+impl CoolZome {
     /// Call a function as if from another Agent.
     /// The provenance and optional CapSecret must be provided.
     pub async fn call_from<I, O, F, E>(
