@@ -92,7 +92,7 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
 fixturator!(
     DnaWasm;
     // note that an empty wasm will not compile
-    curve Empty DnaWasm { code: Arc::new(vec![]) };
+    curve Empty DnaWasm { code: Default::default() };
     curve Unpredictable TestWasm::iter().choose(&mut thread_rng()).unwrap().into();
     curve Predictable TestWasm::iter().cycle().nth(get_fixt_index!()).unwrap().into();
 );
@@ -111,8 +111,7 @@ fixturator!(
             wasms.insert(
                 tokio_safe_block_on::tokio_safe_block_forever_on(
                     async { WasmHash::with_data(&wasm).await },
-                )
-                .into(),
+                ),
                 wasm,
             );
         }
@@ -126,8 +125,7 @@ fixturator!(
             wasms.insert(
                 tokio_safe_block_on::tokio_safe_block_forever_on(
                     async { WasmHash::with_data(&wasm).await },
-                )
-                .into(),
+                ),
                 wasm,
             );
         }
@@ -227,7 +225,7 @@ fixturator!(
         let mut hashes: Vec<HeaderHash> = vec![];
         let mut header_hash_fixturator = HeaderHashFixturator::new(Unpredictable);
         for _ in 0..number_of_hashes {
-            hashes.push(header_hash_fixturator.next().unwrap().into());
+            hashes.push(header_hash_fixturator.next().unwrap());
         }
         hashes.into()
     },
@@ -236,7 +234,7 @@ fixturator!(
         let mut header_hash_fixturator =
             HeaderHashFixturator::new_indexed(Predictable, get_fixt_index!());
         for _ in 0..3 {
-            hashes.push(header_hash_fixturator.next().unwrap().into());
+            hashes.push(header_hash_fixturator.next().unwrap());
         }
         hashes.into()
     }
@@ -393,7 +391,7 @@ fixturator!(
         let mut c = ValidateCreateLinkInvocationFixturator::new(Empty)
             .next()
             .unwrap();
-        c.zome = get_fixt_curve!().clone();
+        c.zome = get_fixt_curve!();
         ValidateLinkInvocationCreate::new(c)
     };
 );
