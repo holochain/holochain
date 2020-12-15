@@ -42,6 +42,7 @@ pub(crate) struct KitsuneP2pActor {
 
 fn build_transport(
     t_conf: TransportConfig,
+    tls_config: Arc<kitsune_p2p_proxy::TlsConfig>,
 ) -> must_future::MustBoxFuture<
     'static,
     TransportResult<(
@@ -69,18 +70,19 @@ fn build_transport(
                 sub_transport,
                 proxy_config,
             } => {
-                let (sub_lstn, sub_evt) = build_transport(*sub_transport).await?;
+                let (sub_lstn, sub_evt) =
+                    build_transport(*sub_transport, tls_config.clone()).await?;
                 let sub_conf = match proxy_config {
                     ProxyConfig::RemoteProxyClient { proxy_url } => {
                         kitsune_p2p_proxy::ProxyConfig::remote_proxy_client(
-                            kitsune_p2p_proxy::TlsConfig::new_ephemeral().await?,
+                            (*tls_config).clone(),
                             proxy_url.into(),
                         )
                     }
                     ProxyConfig::LocalProxyServer {
                         proxy_accept_config,
                     } => kitsune_p2p_proxy::ProxyConfig::local_proxy_server(
-                        kitsune_p2p_proxy::TlsConfig::new_ephemeral().await?,
+                        (*tls_config).clone(),
                         match proxy_accept_config {
                             Some(ProxyAcceptConfig::AcceptAll) => {
                                 kitsune_p2p_proxy::AcceptProxyCallback::accept_all()
@@ -103,13 +105,15 @@ fn build_transport(
 impl KitsuneP2pActor {
     pub async fn new(
         config: KitsuneP2pConfig,
+        tls_config: kitsune_p2p_proxy::TlsConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         internal_sender: ghost_actor::GhostSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ) -> KitsuneP2pResult<Self> {
+        let tls_config = Arc::new(tls_config);
         let (t_pool, transport, mut t_event) = spawn_transport_pool().await?;
         for t_conf in config.transport_pool.clone() {
-            let (l, e) = build_transport(t_conf).await?;
+            let (l, e) = build_transport(t_conf, tls_config.clone()).await?;
             t_pool.push_sub_transport(l, e).await?;
         }
 
