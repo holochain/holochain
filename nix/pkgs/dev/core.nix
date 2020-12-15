@@ -14,6 +14,7 @@ rec {
   # TODO: potentially remove these
   hnRustClippy = builtins.elemAt (callPackage "${holonixPath}/rust/clippy" {}).buildInputs 0;
   hnRustFmtCheck = builtins.elemAt (callPackage "${holonixPath}/rust/fmt/check" {}).buildInputs 0;
+  hnRustFmtFmt = builtins.elemAt (callPackage "${holonixPath}/rust/fmt/fmt" {}).buildInputs 0;
 
   hcTest = writeShellScriptBin "hc-test" ''
     set -euxo pipefail

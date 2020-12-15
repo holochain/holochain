@@ -22,6 +22,8 @@ let
     export CARGO_CACHE_RUSTC_INFO=1
     export CARGO_HOME="$HC_TARGET_PREFIX/.cargo"
     export CARGO_INSTALL_ROOT="$HC_TARGET_PREFIX/.cargo"
+    # FIXME: we currently rely on lair-keystore being installed and found here by `holochain`
+    export PATH="$PATH:$CARGO_INSTALL_ROOT/bin"
 
     export HC_TEST_WASM_DIR="$HC_TARGET_PREFIX/.wasm_target"
     mkdir -p $HC_TEST_WASM_DIR
