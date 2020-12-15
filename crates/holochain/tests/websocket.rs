@@ -509,6 +509,13 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
 
 #[tokio::test(threaded_scheduler)]
 async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
+    if let Err(e) = conductor_admin_interface_ends_with_shutdown_inner().await {
+        panic!("{:#?}", e);
+    }
+    Ok(())
+}
+
+async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     observability::test_run().ok();
 
     info!("creating config");

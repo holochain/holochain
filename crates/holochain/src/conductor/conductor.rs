@@ -1048,8 +1048,16 @@ mod builder {
                 None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
                 Some(config) => config.clone(),
             };
+            let (cert_digest, cert, cert_priv_key) =
+                keystore.get_or_create_first_tls_cert().await?;
+            let tls_config =
+                holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig {
+                    cert,
+                    cert_priv_key,
+                    cert_digest,
+                };
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(network_config).await?;
+                holochain_p2p::spawn_holochain_p2p(network_config, tls_config).await?;
 
             let conductor = Conductor::new(
                 environment,
@@ -1147,7 +1155,7 @@ mod builder {
         pub async fn test(self, envs: &TestEnvironments) -> ConductorResult<ConductorHandle> {
             let keystore = envs.conductor().keystore();
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default())
+                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
                     .await?;
             let conductor = Conductor::new(
                 envs.conductor(),

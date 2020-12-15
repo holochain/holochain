@@ -31,7 +31,11 @@ pub(crate) async fn spawn_test_agent(
     ),
     KitsuneP2pError,
 > {
-    let (p2p, evt) = spawn_kitsune_p2p(config).await?;
+    let (p2p, evt) = spawn_kitsune_p2p(
+        config,
+        kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap(),
+    )
+    .await?;
 
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
 
