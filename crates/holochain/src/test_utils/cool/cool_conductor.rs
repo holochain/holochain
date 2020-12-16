@@ -93,6 +93,79 @@ impl CoolConductor {
         self.envs.keystore()
     }
 
+    /// TODO: make this take a more flexible config for specifying things like
+    /// membrane proofs
+    async fn setup_app_inner(
+        &self,
+        installed_app_id: &str,
+        agent: AgentPubKey,
+        dna_files: &[DnaFile],
+    ) -> CoolApp {
+        let installed_app_id = installed_app_id.to_string();
+
+        for dna_file in dna_files {
+            self.handle
+                .install_dna(dna_file.clone())
+                .await
+                .expect("Could not install DNA")
+        }
+
+        let cool_cells: Vec<CoolCell> = dna_files
+            .iter()
+            .map(|f| CellId::new(f.dna_hash().clone(), agent.clone()))
+            .map(|cell_id| CoolCell {
+                cell_id,
+                handle: self.clone(),
+            })
+            .collect();
+        let installed_cells = cool_cells
+            .iter()
+            .map(|cell| {
+                (
+                    InstalledCell::new(
+                        cell.cell_id().clone(),
+                        format!("{}", cell.cell_id().dna_hash()),
+                    ),
+                    None,
+                )
+            })
+            .collect();
+        self.handle
+            .0
+            .clone()
+            .install_app(installed_app_id.clone(), installed_cells)
+            .await
+            .expect("Could not install app");
+        CoolApp::new(installed_app_id, cool_cells)
+    }
+
+    /// Opinionated app setup. Creates an app for the given agent, using the given DnaFiles,
+    /// with no extra configuration.
+    pub async fn setup_app_for_agent_with_no_membrane_proof(
+        &self,
+        installed_app_id: &str,
+        agent: AgentPubKey,
+        dna_files: &[DnaFile],
+    ) -> CoolApp {
+        let app = self
+            .setup_app_inner(installed_app_id, agent, dna_files)
+            .await;
+
+        self.handle
+            .activate_app(app.installed_app_id().clone())
+            .await
+            .expect("Could not activate app");
+
+        self.handle
+            .0
+            .clone()
+            .setup_cells()
+            .await
+            .expect("Could not setup cells");
+
+        app
+    }
+
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
     ///
     /// All InstalledAppIds and CellNicks are auto-generated. In tests driven directly
@@ -101,54 +174,23 @@ impl CoolConductor {
     /// - InstalledAppId: {app_id_prefix}-{agent_pub_key}
     /// - CellNick: {dna_hash}
     ///
-    /// Returns the list of generated InstalledAppIds, in the same order as Agents passed in.
+    /// Returns a collection of CoolApps, sorted in the same order as Agents passed in.
     pub async fn setup_app_for_agents_with_no_membrane_proof(
         &self,
         app_id_prefix: &str,
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
     ) -> CoolApps {
-        for dna_file in dna_files {
-            self.handle
-                .install_dna(dna_file.clone())
-                .await
-                .expect("Could not install DNA")
-        }
-
-        let mut info = Vec::new();
-
-        for agent in agents {
+        let mut apps = Vec::new();
+        for agent in agents.to_vec() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
-            let cell_ids: Vec<CoolCell> = dna_files
-                .iter()
-                .map(|f| CellId::new(f.dna_hash().clone(), agent.clone()))
-                .map(|cell_id| CoolCell {
-                    cell_id,
-                    handle: self.clone(),
-                })
-                .collect();
-            let cells = cell_ids
-                .iter()
-                .map(|cell| {
-                    (
-                        InstalledCell::new(
-                            cell.cell_id().clone(),
-                            format!("{}", cell.cell_id().dna_hash()),
-                        ),
-                        None,
-                    )
-                })
-                .collect();
-            self.handle
-                .0
-                .clone()
-                .install_app(installed_app_id.clone(), cells)
-                .await
-                .expect("Could not install app");
-            info.push(CoolApp::new(installed_app_id, cell_ids));
+            let app = self
+                .setup_app_inner(&installed_app_id, agent, dna_files)
+                .await;
+            apps.push(app);
         }
 
-        for app in info.iter() {
+        for app in apps.iter() {
             self.handle
                 .activate_app(app.installed_app_id().clone())
                 .await
@@ -162,7 +204,7 @@ impl CoolConductor {
             .await
             .expect("Could not setup cells");
 
-        CoolApps(info)
+        CoolApps(apps)
     }
 }
 
