@@ -27,6 +27,7 @@ use crate::error::HoloHashResult;
 use crate::has_hash::HasHash;
 use crate::HashType;
 use crate::PrimitiveHashType;
+use crate::encode;
 
 /// Length of the prefix bytes (3)
 pub const HOLO_HASH_PREFIX_LEN: usize = 3;
@@ -138,11 +139,34 @@ impl<T: HashType> HoloHash<T> {
     }
 }
 
+impl<T: HashType> HoloHash<T> {
+    /// Construct a HoloHash from a 32-byte hash.
+    /// The 3 prefix bytes will be added based on the provided HashType,
+    /// and the 4 location bytes will be computed.
+    ///
+    /// For convenience, 36 bytes can also be passed in, in which case
+    /// the location bytes will used as provided, not computed.
+    pub fn from_raw_32_and_type(mut hash: Vec<u8>, hash_type: T) -> Self {
+        if hash.len() == HOLO_HASH_CORE_LEN {
+            hash.append(&mut encode::holo_dht_location_bytes(&hash));
+        }
+
+        assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
+
+        HoloHash::from_raw_36_and_type(hash, hash_type)
+    }
+}
+
 impl<P: PrimitiveHashType> HoloHash<P> {
     /// Construct from 36 raw bytes, using the known PrimitiveHashType
     pub fn from_raw_36(hash: Vec<u8>) -> Self {
         assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
         Self::from_raw_36_and_type(hash, P::new())
+    }
+    /// Construct a HoloHash from a prehashed raw 32-byte slice.
+    /// The location bytes will be calculated.
+    pub fn from_raw_32(hash: Vec<u8>) -> Self {
+        Self::from_raw_32_and_type(hash, P::new())
     }
 }
 

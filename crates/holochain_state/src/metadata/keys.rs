@@ -1,6 +1,6 @@
 use super::*;
 use holo_hash::HOLO_HASH_FULL_LEN;
-use holochain_zome_types::validate::ValidationStatus;
+use holochain_zome_types::{timestamp::Timestamp, validate::ValidationStatus};
 pub(super) use misc::*;
 
 mod misc;
@@ -105,12 +105,11 @@ pub enum ChainItemKey {
 }
 
 impl LinkMetaVal {
-    /// Turn into a zome friendly type
+    /// Turn into a zome friendly type, infallibly (timestamp cannot be validated)
     pub fn into_link(self) -> holochain_zome_types::link::Link {
-        let timestamp: chrono::DateTime<chrono::Utc> = self.timestamp.into();
         holochain_zome_types::link::Link {
             target: self.target,
-            timestamp: timestamp.into(),
+            timestamp: self.timestamp,
             tag: self.tag,
             create_link_hash: self.link_add_hash,
         }

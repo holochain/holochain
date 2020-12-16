@@ -1,6 +1,7 @@
 //! Types for getting and storing metadata
 
 use crate::Timestamp;
+use crate::timestamp;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 pub use holochain_zome_types::metadata::EntryDhtStatus;
@@ -49,7 +50,7 @@ impl From<HeaderHashed> for TimedHeaderHash {
 impl From<HeaderHash> for TimedHeaderHash {
     fn from(h: HeaderHash) -> Self {
         TimedHeaderHash {
-            timestamp: Timestamp::now(),
+            timestamp: timestamp::now(),
             header_hash: h,
         }
     }

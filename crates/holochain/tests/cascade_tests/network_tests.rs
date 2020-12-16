@@ -35,6 +35,7 @@ use holochain_state::metadata::MetadataBuf;
 use holochain_state::metadata::MetadataBufT;
 use holochain_types::prelude::*;
 use holochain_types::prelude::*;
+
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Entry;
 use holochain_zome_types::HeaderHashed;
@@ -576,7 +577,7 @@ async fn generate_fixt_store() -> (
     meta_store.insert(
         entry_hash.into(),
         TimedHeaderHash {
-            timestamp: Timestamp::now(),
+            timestamp: timestamp::now(),
             header_hash: hash.clone(),
         },
     );

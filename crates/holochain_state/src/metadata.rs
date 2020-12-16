@@ -849,7 +849,7 @@ where
             let key = ChainItemKey::Full(agent.clone(), validation_status, seq, hash);
             let key = MiscMetaKey::chain_item(&key).into();
             // TODO: Remove timestamp value as headers are already ordered
-            let value = MiscMetaValue::ChainItem(Timestamp::now());
+            let value = MiscMetaValue::ChainItem(timestamp::now());
             self.misc_meta.put(key, value)?;
         }
         self.update_activity_status(agent)
