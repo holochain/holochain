@@ -8,47 +8,89 @@ use crate::{
 };
 use futures::future;
 use hdk3::prelude::*;
+use holochain_keystore::KeystoreSender;
 use holochain_state::test_utils::{test_environments, TestEnvironments};
 use holochain_types::app::{InstalledAppId, InstalledCell};
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
+use kitsune_p2p::KitsuneP2pConfig;
 use std::sync::Arc;
 use unwrap_to::unwrap_to;
 
 #[derive(Clone, shrinkwraprs::Shrinkwrap, derive_more::From)]
 /// A wrapper around ConductorHandle with more convenient methods for testing
-pub struct CoolConductor(pub Arc<CoolConductorInner>);
+pub struct CoolConductor {
+    #[shrinkwrap(main_field)]
+    handle: Arc<CoolConductorInner>,
+    envs: TestEnvironments,
+}
 
 /// Inner handle with a cleanup drop
 #[derive(shrinkwraprs::Shrinkwrap, derive_more::From)]
 pub struct CoolConductorInner(pub(crate) ConductorHandle);
 
+fn standard_config() -> ConductorConfig {
+    let mut network = KitsuneP2pConfig::default();
+    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+        bind_to: None,
+        override_host: None,
+        override_port: None,
+    }];
+    ConductorConfig {
+        network: Some(network),
+        ..Default::default()
+    }
+}
+
 impl CoolConductor {
+    /// Create a CoolConductor from an already-build ConductorHandle and environments
+    pub fn new(handle: ConductorHandle, envs: TestEnvironments) -> CoolConductor {
+        let handle = Arc::new(CoolConductorInner(handle));
+        Self { handle, envs }
+    }
+
     /// Create a CoolConductor with a new set of TestEnvironments from the given config
-    pub async fn from_config(config: ConductorConfig) -> (CoolConductor, TestEnvironments) {
+    pub async fn from_config(config: ConductorConfig) -> CoolConductor {
         let envs = test_environments();
-        let cc = Conductor::builder()
+        let handle = Conductor::builder()
             .config(config)
             .test(&envs)
             .await
             .unwrap()
             .into();
-        (cc, envs)
+        Self::new(handle, envs)
+    }
+
+    /// Create a CoolConductor with a new set of TestEnvironments from the given config
+    pub async fn from_standard_config() -> CoolConductor {
+        Self::from_config(standard_config()).await
     }
 
     /// Map the given ConductorConfigs into CoolConductors, each with its own new TestEnvironments
     pub async fn multi_from_configs<I: IntoIterator<Item = ConductorConfig>>(
         configs: I,
-    ) -> Vec<(CoolConductor, TestEnvironments)> {
+    ) -> Vec<CoolConductor> {
         future::join_all(configs.into_iter().map(Self::from_config)).await
     }
 
     /// Create the given number of new CoolConductors, each with its own new TestEnvironments
-    pub async fn multi_from_config(
-        num: usize,
-        config: ConductorConfig,
-    ) -> Vec<(CoolConductor, TestEnvironments)> {
+    pub async fn multi_from_config(num: usize, config: ConductorConfig) -> Vec<CoolConductor> {
         Self::multi_from_configs(std::iter::repeat(config).take(num)).await
+    }
+
+    /// Create the given number of new CoolConductors, each with its own new TestEnvironments
+    pub async fn multi_from_standard_config(num: usize) -> Vec<CoolConductor> {
+        Self::multi_from_configs(std::iter::repeat_with(standard_config).take(num)).await
+    }
+
+    /// Access the TestEnvironments for this conductor
+    pub fn envs(&self) -> &TestEnvironments {
+        &self.envs
+    }
+
+    /// Access the KeystoreSender for this conductor
+    pub fn keystore(&self) -> KeystoreSender {
+        self.envs.keystore()
     }
 
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
@@ -67,7 +109,7 @@ impl CoolConductor {
         dna_files: &[DnaFile],
     ) -> CoolInstalledApps {
         for dna_file in dna_files {
-            self.0
+            self.handle
                 .install_dna(dna_file.clone())
                 .await
                 .expect("Could not install DNA")
@@ -97,8 +139,8 @@ impl CoolConductor {
                     )
                 })
                 .collect();
-            self.0
-                 .0
+            self.handle
+                .0
                 .clone()
                 .install_app(installed_app_id.clone(), cells)
                 .await
@@ -107,14 +149,14 @@ impl CoolConductor {
         }
 
         for (installed_app_id, _) in info.iter() {
-            self.0
+            self.handle
                 .activate_app(installed_app_id.clone())
                 .await
                 .expect("Could not activate app");
         }
 
-        self.0
-             .0
+        self.handle
+            .0
             .clone()
             .setup_cells()
             .await
@@ -298,8 +340,8 @@ impl Drop for CoolConductorInner {
     }
 }
 
-impl From<ConductorHandle> for CoolConductor {
-    fn from(h: ConductorHandle) -> Self {
-        CoolConductor(Arc::new(CoolConductorInner(h)))
-    }
-}
+// impl From<ConductorHandle> for CoolConductor {
+//     fn from(h: ConductorHandle) -> Self {
+//         CoolConductor(Arc::new(CoolConductorInner(h)))
+//     }
+// }

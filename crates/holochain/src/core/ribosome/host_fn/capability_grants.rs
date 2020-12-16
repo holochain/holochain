@@ -114,11 +114,13 @@ pub mod wasm_test {
             .return_const(());
 
         let envs = test_environments();
-        let handle: CoolConductor = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(&envs)
-            .await
-            .unwrap()
-            .into();
+        let handle = CoolConductor::new(
+            ConductorBuilder::with_mock_dna_store(dna_store)
+                .test(&envs)
+                .await
+                .unwrap(),
+            envs,
+        );
 
         let setup_data = handle
             .setup_app_for_agents_with_no_membrane_proof(

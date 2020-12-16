@@ -5,8 +5,8 @@ use futures::future;
 use futures::stream;
 use futures::Future;
 use hdk3::prelude::RemoteSignal;
-use holochain::test_utils::cool::CoolAgents;
 use holochain::test_utils::cool::CoolConductor;
+use holochain::test_utils::cool::{CoolAgents, CoolCell};
 use holochain::{
     conductor::api::ZomeCall,
     conductor::{
@@ -393,34 +393,10 @@ async fn remote_signals() {
     observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 5;
 
-    let conductors = future::join_all(
-        std::iter::repeat_with(|| async move {
-            let envs = test_environments();
-            let mut network = KitsuneP2pConfig::default();
-            network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
-                bind_to: None,
-                override_host: None,
-                override_port: None,
-            }];
-            let conductor: CoolConductor = Conductor::builder()
-                .config(ConductorConfig {
-                    network: Some(network),
-                    ..Default::default()
-                })
-                .test(&envs)
-                .await
-                .unwrap()
-                .into();
-            (conductor, envs)
-        })
-        .take(NUM_CONDUCTORS),
-    )
-    .await;
+    let conductors = CoolConductor::multi_from_standard_config(NUM_CONDUCTORS).await;
 
-    let all_agents: Vec<HoloHash<hash_type::Agent>> = futures::StreamExt::collect(
-        stream::iter(conductors.iter().map(|(_, e)| e)).then(|e| CoolAgents::one(e.keystore())),
-    )
-    .await;
+    let all_agents: Vec<HoloHash<hash_type::Agent>> =
+        future::join_all(conductors.iter().map(|c| CoolAgents::one(c.keystore()))).await;
 
     let dna_file = CoolDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
@@ -430,7 +406,7 @@ async fn remote_signals() {
     let agents_ref = &all_agents;
 
     let data: Vec<_> = futures::StreamExt::collect(
-        futures::stream::iter(conductors.iter().enumerate()).then(|(i, (conductor, envs))| {
+        futures::stream::iter(conductors.iter().enumerate()).then(|(i, conductor)| {
             let dna_file = dna_file.clone();
             async move {
                 let data = conductor
@@ -440,22 +416,23 @@ async fn remote_signals() {
                         &[dna_file.clone()],
                     )
                     .await;
-                (data.into_inner(), envs)
+                data.into_inner()
             }
         }),
     )
     .await;
 
-    let p2p_envs = data.iter().map(|(_, envs)| envs.p2p()).collect();
+    let p2p_envs = conductors.iter().map(|c| c.envs().p2p()).collect();
     exchange_peer_info(p2p_envs);
 
-    let cells: Vec<_> = data
+    // TODO: write helper
+    let cells: Vec<CoolCell> = data
         .iter()
-        .flat_map(|(cells, _)| cells.iter().flat_map(|(_, c)| c.iter()))
+        .flat_map(|cells| cells.into_iter().flat_map(|(_, c)| c.clone()))
         .collect();
 
     let mut rxs = Vec::new();
-    for h in conductors.iter().map(|(c, _)| c) {
+    for h in conductors.iter().map(|c| c) {
         rxs.push(h.signal_broadcaster().await.subscribe())
     }
     let rxs = rxs.into_iter().flatten().collect::<Vec<_>>();
