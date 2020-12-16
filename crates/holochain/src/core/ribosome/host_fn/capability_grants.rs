@@ -107,10 +107,7 @@ pub mod wasm_test {
             .return_const(Some(dna_file.clone().into()));
         dna_store.expect_add_dna().return_const(());
         dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store
-            .expect_add_entry_defs::<Vec<_>>()
-            .times(2)
-            .return_const(());
+        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
 
         let envs = test_environments();
         let handle = CoolConductor::new(
