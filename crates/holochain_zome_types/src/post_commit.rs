@@ -20,9 +20,6 @@ impl From<ExternOutput> for PostCommitCallbackResult {
 
 impl CallbackResult for PostCommitCallbackResult {
     fn is_definitive(&self) -> bool {
-        match self {
-            PostCommitCallbackResult::Fail(_, _) => true,
-            _ => false,
-        }
+        matches!(self, PostCommitCallbackResult::Fail(_, _))
     }
 }
