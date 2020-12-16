@@ -1,7 +1,7 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
 // TODO [ B-03669 ] move to own crate
 
-use super::CoolCell;
+use super::{CoolApps, CoolCell};
 use crate::{
     conductor::{api::ZomeCall, config::ConductorConfig, handle::ConductorHandle, Conductor},
     core::ribosome::ZomeCallInvocation,
@@ -10,10 +10,9 @@ use futures::future;
 use hdk3::prelude::*;
 use holochain_keystore::KeystoreSender;
 use holochain_state::test_utils::{test_environments, TestEnvironments};
-use holochain_types::app::{InstalledAppId, InstalledCell};
+use holochain_types::app::InstalledCell;
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
-use itertools::traits::HomogeneousTuple;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::sync::Arc;
 use unwrap_to::unwrap_to;
@@ -108,7 +107,7 @@ impl CoolConductor {
         app_id_prefix: &str,
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
-    ) -> CoolInstalledApps {
+    ) -> CoolApps {
         for dna_file in dna_files {
             self.handle
                 .install_dna(dna_file.clone())
@@ -163,56 +162,8 @@ impl CoolConductor {
             .await
             .expect("Could not setup cells");
 
-        CoolInstalledApps(info)
+        CoolApps(info)
     }
-}
-
-/// Return type of opinionated setup function
-pub struct CoolInstalledApps(CoolInstalledAppsRaw);
-
-type CoolInstalledAppsRaw = Vec<(InstalledAppId, Vec<CoolCell>)>;
-
-impl CoolInstalledApps {
-    /// Get the underlying data
-    pub fn into_inner(self) -> CoolInstalledAppsRaw {
-        self.0
-    }
-
-    /// Helper to destructure the nested app setup return value as nested tuples.
-    /// Each level of nesting can contain 1-4 items, i.e. up to 4 agents with 4 DNAs each.
-    /// Beyond 4, and this will PANIC! (But it's just for tests so it's fine.)
-    pub fn into_tuples<Outer, Inner>(self) -> Outer
-    where
-        Outer: HomogeneousTuple<Item = Inner>,
-        Inner: HomogeneousTuple<Item = CoolCell>,
-        Outer::Buffer: std::convert::AsRef<[Option<Inner>]>,
-        Outer::Buffer: std::convert::AsMut<[Option<Inner>]>,
-        Inner::Buffer: std::convert::AsRef<[Option<CoolCell>]>,
-        Inner::Buffer: std::convert::AsMut<[Option<CoolCell>]>,
-    {
-        use itertools::Itertools;
-        self.into_inner()
-            .into_iter()
-            .map(|(_, v)| {
-                v.into_iter()
-                    .collect_tuple::<Inner>()
-                    .expect("Can't destructure more than 4 DNAs")
-            })
-            .collect_tuple::<Outer>()
-            .expect("Can't destructure more than 4 Agents")
-    }
-}
-
-#[macro_export]
-macro_rules! destructure_test_cell_vec {
-    ($vec:expr) => {{
-        use itertools::Itertools;
-        let vec: Vec<$crate::test_utils::cool::CoolInstalledApps> = $vec;
-        vec.into_iter()
-            .map(|blob| blob.into_tuples())
-            .collect_tuple()
-            .expect("Can't destructure more than 4 Conductors")
-    }};
 }
 
 impl CoolConductorInner {

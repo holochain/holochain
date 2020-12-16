@@ -1,7 +1,6 @@
 use hdk3::prelude::*;
 use holochain::conductor::Conductor;
 use holochain::test_utils::cool::{CoolAgents, CoolConductor, CoolDnaFile, MaybeElement};
-use holochain_state::test_utils::test_environments;
 use holochain_types::dna::zome::inline_zome::InlineZome;
 use holochain_zome_types::element::ElementEntry;
 
@@ -28,7 +27,7 @@ fn simple_crud_zome() -> InlineZome {
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {
-            api.get((hash.into(), GetOptions::default()))
+            api.get((hash.into(), GetOptions::default()))InstalledAppId, 
                 .map_err(Into::into)
         })
 }

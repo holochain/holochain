@@ -2,7 +2,7 @@ use futures::future;
 use hdk3::prelude::*;
 use holochain::{
     conductor::{config::ConductorConfig, p2p_store::exchange_peer_info, Conductor},
-    test_utils::cool::{CoolDnaFile, CoolInstalledApps},
+    test_utils::cool::{CoolApps, CoolDnaFile},
 };
 use holochain::{
     destructure_test_cell_vec,
@@ -47,7 +47,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
         .unwrap();
 
     // TODO: write helper
-    let apps: Vec<CoolInstalledApps> = future::join_all(conductors.iter().map(|(conductor)| {
+    let apps: Vec<CoolApps> = future::join_all(conductors.iter().map(|(conductor)| {
         let dna_file = dna_file.clone();
         async move {
             let apps = conductor
