@@ -60,7 +60,7 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use super::*;
-    use crate::test_utils::cool::{CoolAgents, CoolConductor, CoolConductorBatch};
+    use crate::test_utils::cool::{CoolAgents, CoolConductorBatch};
     use crate::{conductor::p2p_store::exchange_peer_info, test_utils::cool::CoolDnaFile};
     use futures::future;
     use hdk3::prelude::*;

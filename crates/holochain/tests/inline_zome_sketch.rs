@@ -1,5 +1,4 @@
 use hdk3::prelude::*;
-use holochain::conductor::Conductor;
 use holochain::test_utils::cool::{CoolAgents, CoolConductor, CoolDnaFile, MaybeElement};
 use holochain_types::dna::zome::inline_zome::InlineZome;
 use holochain_zome_types::element::ElementEntry;

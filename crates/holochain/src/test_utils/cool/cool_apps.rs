@@ -44,7 +44,7 @@ impl CoolApp {
     }
 }
 
-/// Return type of opinionated setup function
+/// A collection of installed apps
 #[derive(
     Clone, derive_more::From, derive_more::Into, derive_more::AsRef, derive_more::IntoIterator,
 )]
@@ -56,8 +56,10 @@ impl CoolApps {
         self.0
     }
 
-    /// Helper to destructure the nested app setup return value as nested tuples.
-    /// Each level of nesting can contain 1-4 items, i.e. up to 4 agents with 4 DNAs each.
+    /// Helper to destructure the nested cell data as nested tuples.
+    /// The outer tuple contains the apps, the inner layer contains the cells in each app.
+    ///
+    /// Each level of nesting can contain 1-4 items, i.e. up to 4 apps with 4 DNAs each.
     /// Beyond 4, and this will PANIC! (But it's just for tests so it's fine.)
     pub fn into_tuples<Outer, Inner>(self) -> Outer
     where

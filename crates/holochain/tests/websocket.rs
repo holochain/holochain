@@ -2,11 +2,10 @@ use ::fixt::prelude::*;
 use anyhow::Result;
 use assert_cmd::prelude::*;
 use futures::future;
-use futures::stream;
 use futures::Future;
 use hdk3::prelude::RemoteSignal;
+use holochain::test_utils::cool::CoolConductorBatch;
 use holochain::test_utils::cool::{CoolAgents, CoolCell};
-use holochain::test_utils::cool::{CoolConductor, CoolConductorBatch};
 use holochain::{
     conductor::api::ZomeCall,
     conductor::{
@@ -19,7 +18,6 @@ use holochain::{
     fixt::*,
 };
 use holochain::{conductor::p2p_store::exchange_peer_info, test_utils::cool::CoolDnaFile};
-use holochain_state::test_utils::test_environments;
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
     cell::CellId,
@@ -30,7 +28,6 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use holochain_zome_types::{signal::AppSignal, *};
-use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
 use std::{path::PathBuf, process::Stdio, sync::Arc, time::Duration};
 use tempdir::TempDir;
@@ -389,7 +386,6 @@ async fn call_zome() {
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "slow_tests")]
 async fn remote_signals() {
-    use futures::StreamExt;
     observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 5;
 

@@ -1,14 +1,11 @@
-use futures::future;
 use hdk3::prelude::*;
-use holochain::test_utils::cool::{CoolAgents, CoolConductor, MaybeElement};
+use holochain::test_utils::cool::MaybeElement;
 use holochain::{
-    conductor::{config::ConductorConfig, p2p_store::exchange_peer_info, Conductor},
-    test_utils::cool::{CoolApps, CoolConductorBatch, CoolDnaFile},
+    conductor::p2p_store::exchange_peer_info,
+    test_utils::cool::{CoolConductorBatch, CoolDnaFile},
 };
-use holochain_state::test_utils::test_environments;
 use holochain_types::dna::zome::inline_zome::InlineZome;
 use holochain_zome_types::element::ElementEntry;
-use kitsune_p2p::KitsuneP2pConfig;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
 #[serde(transparent)]
