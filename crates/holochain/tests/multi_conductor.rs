@@ -2,7 +2,6 @@ use futures::future;
 use hdk3::prelude::*;
 use holochain::{
     conductor::{config::ConductorConfig, p2p_store::exchange_peer_info, Conductor},
-    destructure_test_cells,
     test_utils::cool::{CoolDnaFile, CoolInstalledApps},
 };
 use holochain::{
@@ -48,17 +47,17 @@ async fn multi_conductor() -> anyhow::Result<()> {
         .unwrap();
 
     // TODO: write helper
-    let data: Vec<CoolInstalledApps> = future::join_all(conductors.iter().map(|(conductor)| {
+    let apps: Vec<CoolInstalledApps> = future::join_all(conductors.iter().map(|(conductor)| {
         let dna_file = dna_file.clone();
         async move {
-            let data = conductor
+            let apps = conductor
                 .setup_app_for_agents_with_no_membrane_proof(
                     "app",
                     &[CoolAgents::one(conductor.keystore()).await],
                     &[dna_file.clone()],
                 )
                 .await;
-            data
+            apps
         }
     }))
     .await;
@@ -67,7 +66,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
     exchange_peer_info(p2p_envs);
 
     // TODO: write better helper
-    let (((alice,),), ((bobbo,),), ((_carol,),)) = destructure_test_cell_vec!(data);
+    let (((alice,),), ((bobbo,),), ((_carol,),)) = destructure_test_cell_vec!(apps);
 
     // Call the "create" zome fn on Alice's app
     let hash: HeaderHash = alice.call("zome1", "create", ()).await;

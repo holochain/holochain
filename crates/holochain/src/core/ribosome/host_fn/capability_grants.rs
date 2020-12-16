@@ -18,7 +18,6 @@ pub fn capability_grants(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::destructure_test_cells;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::{conductor::dna_store::MockDnaStore, test_utils::cool::MaybeElement};
     use crate::{conductor::ConductorBuilder, test_utils::cool::CoolConductor};
@@ -122,7 +121,7 @@ pub mod wasm_test {
             envs,
         );
 
-        let setup_data = handle
+        let apps = handle
             .setup_app_for_agents_with_no_membrane_proof(
                 "app-",
                 &[alice_agent_id.clone(), bob_agent_id.clone()],
@@ -130,7 +129,7 @@ pub mod wasm_test {
             )
             .await;
 
-        let ((alice,), (bobbo,)) = destructure_test_cells!(setup_data);
+        let ((alice,), (bobbo,)) = apps.into_tuples();
         // There's only one zome to call, so let's peel that off now.
         let alice = alice.zome(TestWasm::Capability);
         let bobbo = bobbo.zome(TestWasm::Capability);

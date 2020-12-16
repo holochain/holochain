@@ -7,12 +7,14 @@ mod cool_cell;
 mod cool_conductor;
 mod cool_dna;
 mod cool_zome;
+mod cool_apps;
 
 pub use cool_agents::*;
 pub use cool_cell::*;
 pub use cool_conductor::*;
 pub use cool_dna::*;
 pub use cool_zome::*;
+pub use cool_apps::*;
 
 use hdk3::prelude::Element;
 use holochain_serialized_bytes::prelude::*;

@@ -1,6 +1,6 @@
 use hdk3::prelude::*;
+use holochain::conductor::Conductor;
 use holochain::test_utils::cool::{CoolAgents, CoolConductor, CoolDnaFile, MaybeElement};
-use holochain::{conductor::Conductor, destructure_test_cells};
 use holochain_state::test_utils::test_environments;
 use holochain_types::dna::zome::inline_zome::InlineZome;
 use holochain_zome_types::element::ElementEntry;
@@ -36,8 +36,6 @@ fn simple_crud_zome() -> InlineZome {
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
 async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
-    let envs = test_environments();
-
     // Bundle the single zome into a DnaFile
     let (dna_file, _) = CoolDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
 
@@ -48,7 +46,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     let (alice, bobbo) = CoolAgents::two(conductor.keystore()).await;
 
     // Install DNA and install and activate apps in conductor
-    let ids = conductor
+    let apps = conductor
         .setup_app_for_agents_with_no_membrane_proof(
             "app",
             &[alice.clone(), bobbo.clone()],
@@ -56,7 +54,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
         )
         .await;
 
-    let ((alice,), (bobbo,)) = destructure_test_cells!(ids);
+    let ((alice,), (bobbo,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
     let hash: HeaderHash = alice.call("zome1", "create_unit", ()).await;
@@ -83,20 +81,19 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
 async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
-    let envs = test_environments();
     let conductor = CoolConductor::from_standard_config().await;
 
     let (dna_foo, _) = CoolDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
     let (dna_bar, _) = CoolDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
 
-    let agents = CoolAgents::get(envs.keystore(), 3).await;
+    let agents = CoolAgents::get(conductor.keystore(), 3).await;
 
-    let ids = conductor
+    let apps = conductor
         .setup_app_for_agents_with_no_membrane_proof("app", &agents, &[dna_foo, dna_bar])
         .await;
 
     let ((alice_foo, alice_bar), (bobbo_foo, bobbo_bar), (_carol_foo, carol_bar)) =
-        destructure_test_cells!(ids);
+        apps.into_tuples();
 
     assert_eq!(alice_foo.agent_pubkey(), alice_bar.agent_pubkey());
     assert_eq!(bobbo_foo.agent_pubkey(), bobbo_bar.agent_pubkey());
