@@ -93,7 +93,7 @@ impl CoolConductorBatch {
         let apps = self
             .0
             .iter()
-            .zip(agents.into_iter())
+            .zip(agents.iter())
             .map(|(conductor, agent)| {
                 conductor.setup_app_for_agent(installed_app_id, agent.clone(), dna_files)
             })
@@ -142,8 +142,7 @@ impl CoolConductor {
             .config(config)
             .test(&envs)
             .await
-            .unwrap()
-            .into();
+            .unwrap();
         Self::new(handle, envs)
     }
 
