@@ -450,7 +450,7 @@ fn zome_id_to_zome(zome_id: ZomeId, dna_def: &DnaDef) -> AppValidationResult<Zom
     Ok(dna_def
         .zomes
         .get(zome_index)
-        .ok_or_else(|| AppValidationError::ZomeId(zome_id))?
+        .ok_or(AppValidationError::ZomeId(zome_id))?
         .clone()
         .into())
 }

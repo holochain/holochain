@@ -159,9 +159,12 @@ impl SourceChainBuf {
     /// If this returns None, the chain was not initialized.
     pub fn agent_pubkey(&self) -> SourceChainResult<Option<AgentPubKey>> {
         if let Some(element) = self.get_at_index(2)? {
-            match element.entry().as_option().ok_or_else(|| {
-                SourceChainError::InvalidStructure(ChainInvalidReason::GenesisDataMissing)
-            })? {
+            match element
+                .entry()
+                .as_option()
+                .ok_or(SourceChainError::InvalidStructure(
+                    ChainInvalidReason::GenesisDataMissing,
+                ))? {
                 Entry::Agent(agent_pubkey) => Ok(Some(agent_pubkey.clone())),
                 _ => Err(SourceChainError::InvalidStructure(
                     ChainInvalidReason::MalformedGenesisData,

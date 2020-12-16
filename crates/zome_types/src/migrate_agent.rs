@@ -24,9 +24,6 @@ impl From<ExternOutput> for MigrateAgentCallbackResult {
 
 impl CallbackResult for MigrateAgentCallbackResult {
     fn is_definitive(&self) -> bool {
-        match self {
-            MigrateAgentCallbackResult::Fail(_) => true,
-            _ => false,
-        }
+        matches!(self, MigrateAgentCallbackResult::Fail(_))
     }
 }

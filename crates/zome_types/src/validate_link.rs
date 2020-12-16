@@ -28,10 +28,7 @@ pub enum ValidateLinkCallbackResult {
 
 impl CallbackResult for ValidateLinkCallbackResult {
     fn is_definitive(&self) -> bool {
-        match self {
-            ValidateLinkCallbackResult::Invalid(_) => true,
-            _ => false,
-        }
+        matches!(self, ValidateLinkCallbackResult::Invalid(_))
     }
 }
 
