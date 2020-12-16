@@ -89,7 +89,7 @@ mod tests {
             .callback("recv_remote_signal", move |api, signal: SerializedBytes| {
                 tracing::debug!("remote signal");
                 num_signals.fetch_add(1, Ordering::SeqCst);
-                api.emit_signal(signal).map_err(Into::into)
+                api.emit_signal(AppSignal::new(signal)).map_err(Into::into)
             })
             .callback("init", move |api, ()| {
                 let mut functions: GrantedFunctions = HashSet::new();
