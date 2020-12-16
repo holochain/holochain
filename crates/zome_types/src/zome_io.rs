@@ -90,9 +90,18 @@ wasm_io_types! {
     // @todo Get the capability for the current zome call.
     fn capability_info (()) -> ();
 
-    // The EntryDefId determines how a create is handled on the host side.
-    // CapGrant and CapClaim are handled natively.
-    // App entries are referenced by entry defs then SerializedBytes stuffed into an Entry::App.
+    fn x_salsa20_poly1305_encrypt((
+        crate::x_salsa20_poly1305::key::XSalsa20Poly1305Key,
+        crate::x_salsa20_poly1305::nonce::XSalsa20Poly1305Nonce,
+        crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
+    )) -> crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    fn x_salsa20_poly1305_decrypt((
+        crate::x_salsa20_poly1305::key::XSalsa20Poly1305Key,
+        crate::x_salsa20_poly1305::nonce::XSalsa20Poly1305Nonce,
+        crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
+    )) -> Option<crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
+
     // Returns HeaderHash of the newly created element.
     fn create ((zt::entry_def::EntryDefId, zt::entry::Entry)) -> holo_hash::HeaderHash;
 
@@ -106,16 +115,10 @@ wasm_io_types! {
     fn create_link ((holo_hash::EntryHash, holo_hash::EntryHash, zt::link::LinkTag)) -> holo_hash::HeaderHash;
 
     // @todo
-    fn decrypt (()) -> ();
-
-    // @todo
     fn delete (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
 
     // Header hash of the CreateLink element.
     fn delete_link (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
-
-    // @todo
-    fn encrypt (()) -> ();
 
     // @todo
     fn entry_type_properties (()) -> ();
@@ -189,6 +192,10 @@ wasm_io_types! {
     fn zome_info (()) -> zt::zome_info::ZomeInfo;
 }
 
+pub type SecretBoxInput = XSalsa20Poly1305EncryptInput;
+pub type SecretBoxOutput = XSalsa20Poly1305EncryptOutput;
+pub type SecretBoxOpenInput = XSalsa20Poly1305DecryptInput;
+pub type SecretBoxOpenOutput = XSalsa20Poly1305DecryptOutput;
 /// We probably actually want to use RibosomeError for HostApiFn errors, but
 /// RibosomeError is downstream of this crate. So, we'd need to make an
 /// associated Error type for HostFnApiT, which would infect everything from

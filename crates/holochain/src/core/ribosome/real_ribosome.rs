@@ -32,6 +32,59 @@ use crate::core::ribosome::{
     },
     CallContext, Invocation, RibosomeT, ZomeCallInvocation,
 };
+use crate::core::ribosome::error::RibosomeError;
+use crate::core::ribosome::error::RibosomeResult;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::core::ribosome::guest_callback::init::InitInvocation;
+use crate::core::ribosome::guest_callback::init::InitResult;
+use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
+use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
+use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
+use crate::core::ribosome::guest_callback::validate::ValidateResult;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
+use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
+use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
+use crate::core::ribosome::guest_callback::CallIterator;
+use crate::core::ribosome::host_fn::agent_info::agent_info;
+use crate::core::ribosome::host_fn::call::call;
+use crate::core::ribosome::host_fn::call_remote::call_remote;
+use crate::core::ribosome::host_fn::capability_claims::capability_claims;
+use crate::core::ribosome::host_fn::capability_grants::capability_grants;
+use crate::core::ribosome::host_fn::capability_info::capability_info;
+use crate::core::ribosome::host_fn::create::create;
+use crate::core::ribosome::host_fn::create_link::create_link;
+use crate::core::ribosome::host_fn::debug::debug;
+use crate::core::ribosome::host_fn::delete::delete;
+use crate::core::ribosome::host_fn::delete_link::delete_link;
+use crate::core::ribosome::host_fn::emit_signal::emit_signal;
+use crate::core::ribosome::host_fn::get::get;
+use crate::core::ribosome::host_fn::get_details::get_details;
+use crate::core::ribosome::host_fn::get_link_details::get_link_details;
+use crate::core::ribosome::host_fn::get_links::get_links;
+use crate::core::ribosome::host_fn::hash_entry::hash_entry;
+use crate::core::ribosome::host_fn::property::property;
+use crate::core::ribosome::host_fn::query::query;
+use crate::core::ribosome::host_fn::random_bytes::random_bytes;
+use crate::core::ribosome::host_fn::schedule::schedule;
+use crate::core::ribosome::host_fn::show_env::show_env;
+use crate::core::ribosome::host_fn::sign::sign;
+use crate::core::ribosome::host_fn::sys_time::sys_time;
+use crate::core::ribosome::host_fn::unreachable::unreachable;
+use crate::core::ribosome::host_fn::update::update;
+use crate::core::ribosome::host_fn::verify_signature::verify_signature;
+use crate::core::ribosome::host_fn::x_salsa20_poly1305_decrypt::x_salsa20_poly1305_decrypt;
+use crate::core::ribosome::host_fn::x_salsa20_poly1305_encrypt::x_salsa20_poly1305_encrypt;
+use crate::core::ribosome::host_fn::zome_info::zome_info;
+use crate::core::ribosome::CallContext;
+use crate::core::ribosome::Invocation;
+use crate::core::ribosome::RibosomeT;
+use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::ribosome::ZomesToInvoke;
 use fallible_iterator::FallibleIterator;
 use holochain_types::dna::{
     zome::{HostFnAccess, Permission, Zome, ZomeDef},
@@ -164,16 +217,28 @@ impl RealRibosome {
                 func!(invoke_host_function!(verify_signature)),
             );
             ns.insert("__sign", func!(invoke_host_function!(sign)));
-            ns.insert("__decrypt", func!(invoke_host_function!(decrypt)));
-            ns.insert("__encrypt", func!(invoke_host_function!(encrypt)));
+            ns.insert(
+                "__x_salsa20_poly1305_encrypt",
+                func!(invoke_host_function!(x_salsa20_poly1305_encrypt)),
+            );
+            ns.insert(
+                "__x_salsa20_poly1305_decrypt",
+                func!(invoke_host_function!(x_salsa20_poly1305_decrypt)),
+            );
         } else {
             ns.insert(
                 "__verify_signature",
                 func!(invoke_host_function!(unreachable)),
             );
             ns.insert("__sign", func!(invoke_host_function!(unreachable)));
-            ns.insert("__decrypt", func!(invoke_host_function!(unreachable)));
-            ns.insert("__encrypt", func!(invoke_host_function!(unreachable)));
+            ns.insert(
+                "__x_salsa20_poly1305_encrypt",
+                func!(invoke_host_function!(unreachable)),
+            );
+            ns.insert(
+                "__x_salsa20_poly1305_decrypt",
+                func!(invoke_host_function!(unreachable)),
+            );
         }
 
         if let HostFnAccess {
