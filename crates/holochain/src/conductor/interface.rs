@@ -6,9 +6,9 @@
 //! implementation can be found in the `websocket` module here.
 
 use crate::conductor::api::*;
-use crate::core::signal::Signal;
 use error::InterfaceError;
 use error::InterfaceResult;
+use holochain_types::signal::Signal;
 use serde::Deserialize;
 use serde::Serialize;
 use std::convert::TryInto;

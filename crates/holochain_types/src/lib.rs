@@ -23,6 +23,7 @@ pub mod link;
 mod macros;
 pub mod metadata;
 pub mod prelude;
+pub mod signal;
 pub mod timestamp;
 pub mod validate;
 
@@ -48,5 +49,6 @@ pub use header::*;
 pub use link::*;
 pub use metadata::*;
 pub use prelude::*;
+pub use signal::*;
 pub use timestamp::*;
 pub use validate::*;

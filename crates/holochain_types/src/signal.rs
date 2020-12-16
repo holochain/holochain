@@ -3,8 +3,8 @@
 //! - App-defined signals are produced via the `emit_signal` host function.
 //! - System-defined signals are produced in various places in the system
 
+use crate::impl_from;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::impl_from;
 use holochain_zome_types::cell::CellId;
 use holochain_zome_types::signal::AppSignal;
 
@@ -30,6 +30,7 @@ pub enum SystemSignal {
     Test(String),
 }
 
+/// Create a test signal
 pub fn test_signal(s: &str) -> Signal {
     SystemSignal::Test(s.to_string()).into()
 }

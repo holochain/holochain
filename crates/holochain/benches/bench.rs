@@ -1,13 +1,13 @@
-use crate::core::ribosome::RibosomeT;
-use crate::core::ribosome::ZomeCallInvocation;
+use ::fixt::prelude::*;
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::Throughput;
-use fixt::prelude::*;
 use hdk3::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
+use holochain::core::ribosome::RibosomeT;
+use holochain::core::ribosome::ZomeCallInvocation;
 use holochain_types::dna::zome::Zome;
 use holochain_types::fixt::CapSecretFixturator;
 use holochain_wasm_test_utils::TestWasm;
@@ -25,10 +25,10 @@ static TOKIO_RUNTIME: Lazy<Mutex<tokio::runtime::Runtime>> = Lazy::new(|| {
     )
 });
 
-static REAL_RIBOSOME: Lazy<Mutex<crate::core::ribosome::real_ribosome::RealRibosome>> =
+static REAL_RIBOSOME: Lazy<Mutex<holochain::core::ribosome::real_ribosome::RealRibosome>> =
     Lazy::new(|| {
         Mutex::new(
-            crate::fixt::RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![
+            holochain::fixt::RealRibosomeFixturator::new(holochain::fixt::curve::Zomes(vec![
                 TestWasm::Bench.into(),
             ]))
             .next()
@@ -51,9 +51,9 @@ static AGENT_KEY: Lazy<Mutex<AgentPubKey>> =
     Lazy::new(|| Mutex::new(AgentPubKeyFixturator::new(Unpredictable).next().unwrap()));
 
 static HOST_ACCESS_FIXTURATOR: Lazy<
-    Mutex<crate::fixt::ZomeCallHostAccessFixturator<Unpredictable>>,
+    Mutex<holochain::fixt::ZomeCallHostAccessFixturator<Unpredictable>>,
 > = Lazy::new(|| {
-    Mutex::new(crate::fixt::ZomeCallHostAccessFixturator::new(
+    Mutex::new(holochain::fixt::ZomeCallHostAccessFixturator::new(
         Unpredictable,
     ))
 });
