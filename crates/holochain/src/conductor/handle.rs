@@ -99,6 +99,10 @@ pub trait ConductorHandleT: Send + Sync {
         configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<()>;
 
+    /// Start up persisted app interfaces.
+    /// Should only be run once at Conductor initialization.
+    async fn startup_app_interfaces(self: Arc<Self>) -> ConductorResult<()>;
+
     /// Add an app interface
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16>;
 
@@ -252,6 +256,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     ) -> ConductorResult<()> {
         let mut lock = self.conductor.write().await;
         lock.add_admin_interfaces_via_handle(configs, self.clone())
+            .await
+    }
+
+    async fn startup_app_interfaces(self: Arc<Self>) -> ConductorResult<()> {
+        self.conductor
+            .write()
+            .await
+            .startup_app_interfaces_via_handle(self.clone())
             .await
     }
 

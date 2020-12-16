@@ -31,7 +31,7 @@ use super::{
     p2p_store::get_single_agent_info,
     p2p_store::inject_agent_infos,
     paths::EnvironmentRootPath,
-    state::{AppInterfaceId, ConductorState},
+    state::{AppInterfaceConfig, AppInterfaceId, ConductorState},
     CellError,
 };
 use crate::{
@@ -324,8 +324,35 @@ where
         // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
         self.manage_task(ManagedTaskAdd::dont_handle(task)).await?;
         self.app_interface_signal_broadcasters
-            .insert(interface_id, signal_broadcaster);
+            .insert(interface_id.clone(), signal_broadcaster);
+        let config = AppInterfaceConfig::websocket(port);
+        self.update_state(|mut state| {
+            state.app_interfaces.insert(interface_id, config);
+            Ok(state)
+        })
+        .await?;
         Ok(port)
+    }
+
+    /// Start all app interfaces currently in state.
+    /// This should only be run at conductor initialization.
+    #[allow(irrefutable_let_patterns)]
+    pub(super) async fn startup_app_interfaces_via_handle(
+        &mut self,
+        handle: ConductorHandle,
+    ) -> ConductorResult<()> {
+        for i in self.get_state().await?.app_interfaces.values() {
+            tracing::debug!("Starting up app interface: {:?}", i);
+            let port = if let InterfaceDriver::Websocket { port } = i.driver {
+                port
+            } else {
+                unreachable!()
+            };
+            let _ = self
+                .add_app_interface_via_handle(port, handle.clone())
+                .await?;
+        }
+        Ok(())
     }
 
     pub(super) fn signal_broadcaster(&self) -> SignalBroadcaster {
@@ -1083,6 +1110,9 @@ mod builder {
             if let Some(configs) = conductor_config.admin_interfaces {
                 handle.clone().add_admin_interfaces(configs).await?;
             }
+
+            // Create app interfaces
+            handle.clone().startup_app_interfaces().await?;
 
             Ok(handle)
         }
