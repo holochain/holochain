@@ -185,8 +185,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.50"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=remote_signal#b00aa2ccaa4b9333271f0a58cfcec9e5a107ba2d"
+version = "0.0.51"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91072cf378f2b92d344de68d36e558167ba31f7b3bdb7767d01232fcc49757b8"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -195,8 +196,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.50"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=remote_signal#b00aa2ccaa4b9333271f0a58cfcec9e5a107ba2d"
+version = "0.0.51"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4774d4c3ed42f6c7579877237713a7d5bde98a6d4e08c02acc617a844ac5e87"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
