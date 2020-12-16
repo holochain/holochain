@@ -1,7 +1,7 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
 // TODO [ B-03669 ] move to own crate
 
-use super::{CoolApp, CoolApps, CoolCell};
+use super::{CoolAgents, CoolApp, CoolApps, CoolCell};
 use crate::{
     conductor::{api::ZomeCall, config::ConductorConfig, handle::ConductorHandle, Conductor},
     core::ribosome::ZomeCallInvocation,
@@ -16,6 +16,92 @@ use holochain_types::dna::DnaFile;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::sync::Arc;
 use unwrap_to::unwrap_to;
+
+/// A collection of CoolConductors, with methods for operating on the entire collection
+#[derive(
+    Clone, derive_more::AsRef, derive_more::From, derive_more::Into, derive_more::IntoIterator,
+)]
+pub struct CoolConductorBatch(Vec<CoolConductor>);
+
+impl CoolConductorBatch {
+    /// Map the given ConductorConfigs into CoolConductors, each with its own new TestEnvironments
+    pub async fn from_configs<I: IntoIterator<Item = ConductorConfig>>(
+        configs: I,
+    ) -> CoolConductorBatch {
+        future::join_all(configs.into_iter().map(CoolConductor::from_config))
+            .await
+            .into()
+    }
+
+    /// Create the given number of new CoolConductors, each with its own new TestEnvironments
+    pub async fn from_config(num: usize, config: ConductorConfig) -> CoolConductorBatch {
+        Self::from_configs(std::iter::repeat(config).take(num)).await
+    }
+
+    /// Create the given number of new CoolConductors, each with its own new TestEnvironments
+    pub async fn from_standard_config(num: usize) -> CoolConductorBatch {
+        Self::from_configs(std::iter::repeat_with(standard_config).take(num)).await
+    }
+
+    /// Get the underlying data
+    pub fn iter(&self) -> impl Iterator<Item = &CoolConductor> {
+        self.0.iter()
+    }
+
+    /// Get the underlying data
+    pub fn into_inner(self) -> Vec<CoolConductor> {
+        self.0
+    }
+
+    /// Opinionated app setup.
+    /// Creates one app on each Conductor in this batch, creating a new AgentPubKey for each.
+    /// The created AgentPubKeys can be retrieved via each CoolApp.
+    pub async fn setup_app(&self, installed_app_id: &str, dna_files: &[DnaFile]) -> CoolApps {
+        let apps = self
+            .0
+            .iter()
+            .map(|conductor| async move {
+                let agent = CoolAgents::one(conductor.keystore()).await;
+                conductor
+                    .setup_app_for_agent(installed_app_id, agent, dna_files)
+                    .await
+            })
+            .collect::<Vec<_>>();
+
+        future::join_all(apps).await.into()
+    }
+
+    /// Opinionated app setup. Creates one app on each Conductor in this batch,
+    /// using the given agents and DnaFiles.
+    ///
+    /// The number of Agents passed in must be the same as the number of Conductors
+    /// in this batch. Each Agent will be used to create one app on one Conductor,
+    /// hence the "zipped" in the function name
+    ///
+    /// Returns a collection of CoolApps, sorted in the same order as the Conductors in
+    /// this batch.
+    pub async fn setup_app_for_zipped_agents(
+        &self,
+        installed_app_id: &str,
+        agents: &[AgentPubKey],
+        dna_files: &[DnaFile],
+    ) -> CoolApps {
+        if agents.len() != self.0.len() {
+            panic!("setup_app_for_zipped_agents must take as many Agents as there are Conductors in this batch.")
+        }
+
+        let apps = self
+            .0
+            .iter()
+            .zip(agents.into_iter())
+            .map(|(conductor, agent)| {
+                conductor.setup_app_for_agent(installed_app_id, agent.clone(), dna_files)
+            })
+            .collect::<Vec<_>>();
+
+        future::join_all(apps).await.into()
+    }
+}
 
 #[derive(Clone, shrinkwraprs::Shrinkwrap, derive_more::From)]
 /// A wrapper around ConductorHandle with more convenient methods for testing
@@ -64,23 +150,6 @@ impl CoolConductor {
     /// Create a CoolConductor with a new set of TestEnvironments from the given config
     pub async fn from_standard_config() -> CoolConductor {
         Self::from_config(standard_config()).await
-    }
-
-    /// Map the given ConductorConfigs into CoolConductors, each with its own new TestEnvironments
-    pub async fn multi_from_configs<I: IntoIterator<Item = ConductorConfig>>(
-        configs: I,
-    ) -> Vec<CoolConductor> {
-        future::join_all(configs.into_iter().map(Self::from_config)).await
-    }
-
-    /// Create the given number of new CoolConductors, each with its own new TestEnvironments
-    pub async fn multi_from_config(num: usize, config: ConductorConfig) -> Vec<CoolConductor> {
-        Self::multi_from_configs(std::iter::repeat(config).take(num)).await
-    }
-
-    /// Create the given number of new CoolConductors, each with its own new TestEnvironments
-    pub async fn multi_from_standard_config(num: usize) -> Vec<CoolConductor> {
-        Self::multi_from_configs(std::iter::repeat_with(standard_config).take(num)).await
     }
 
     /// Access the TestEnvironments for this conductor
@@ -139,9 +208,9 @@ impl CoolConductor {
         CoolApp::new(installed_app_id, cool_cells)
     }
 
-    /// Opinionated app setup. Creates an app for the given agent, using the given DnaFiles,
-    /// with no extra configuration.
-    pub async fn setup_app_for_agent_with_no_membrane_proof(
+    /// Opinionated app setup.
+    /// Creates an app for the given agent, using the given DnaFiles, with no extra configuration.
+    pub async fn setup_app_for_agent(
         &self,
         installed_app_id: &str,
         agent: AgentPubKey,
@@ -166,6 +235,15 @@ impl CoolConductor {
         app
     }
 
+    /// Opinionated app setup.
+    /// Creates an app using the given DnaFiles, with no extra configuration.
+    /// An AgentPubKey will be generated, and is accessible via the returned CoolApp.
+    pub async fn setup_app(&self, installed_app_id: &str, dna_files: &[DnaFile]) -> CoolApp {
+        let agent = CoolAgents::one(self.keystore()).await;
+        self.setup_app_for_agent(installed_app_id, agent, dna_files)
+            .await
+    }
+
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
     ///
     /// All InstalledAppIds and CellNicks are auto-generated. In tests driven directly
@@ -175,7 +253,7 @@ impl CoolConductor {
     /// - CellNick: {dna_hash}
     ///
     /// Returns a collection of CoolApps, sorted in the same order as Agents passed in.
-    pub async fn setup_app_for_agents_with_no_membrane_proof(
+    pub async fn setup_app_for_agents(
         &self,
         app_id_prefix: &str,
         agents: &[AgentPubKey],

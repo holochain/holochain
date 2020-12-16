@@ -60,7 +60,7 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use super::*;
-    use crate::test_utils::cool::{CoolAgents, CoolConductor};
+    use crate::test_utils::cool::{CoolAgents, CoolConductor, CoolConductorBatch};
     use crate::{conductor::p2p_store::exchange_peer_info, test_utils::cool::CoolDnaFile};
     use futures::future;
     use hdk3::prelude::*;
@@ -120,7 +120,7 @@ mod tests {
 
         let num_signals = Arc::new(AtomicUsize::new(0));
 
-        let conductors = CoolConductor::multi_from_standard_config(NUM_CONDUCTORS).await;
+        let conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
         let agents =
             future::join_all(conductors.iter().map(|c| CoolAgents::one(c.keystore()))).await;
 
@@ -138,7 +138,7 @@ mod tests {
             let dna_file = dna_file.clone();
             async move {
                 let apps = conductor
-                    .setup_app_for_agents_with_no_membrane_proof(
+                    .setup_app_for_agents(
                         "app",
                         &[agents_ref[i].clone()],
                         &[dna_file.clone().into()],
@@ -159,7 +159,7 @@ mod tests {
             .collect();
 
         let mut signals = Vec::new();
-        for h in conductors.iter() {
+        for h in conductors {
             signals.push(h.signal_broadcaster().await.subscribe())
         }
         let signals = signals.into_iter().flatten().collect::<Vec<_>>();

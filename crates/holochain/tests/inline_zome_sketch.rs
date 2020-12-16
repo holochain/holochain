@@ -46,11 +46,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 
     // Install DNA and install and activate apps in conductor
     let apps = conductor
-        .setup_app_for_agents_with_no_membrane_proof(
-            "app",
-            &[alice.clone(), bobbo.clone()],
-            &[dna_file],
-        )
+        .setup_app_for_agents("app", &[alice.clone(), bobbo.clone()], &[dna_file])
         .await;
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
@@ -88,7 +84,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     let agents = CoolAgents::get(conductor.keystore(), 3).await;
 
     let apps = conductor
-        .setup_app_for_agents_with_no_membrane_proof("app", &agents, &[dna_foo, dna_bar])
+        .setup_app_for_agents("app", &agents, &[dna_foo, dna_bar])
         .await;
 
     let ((alice_foo, alice_bar), (bobbo_foo, bobbo_bar), (_carol_foo, carol_bar)) =

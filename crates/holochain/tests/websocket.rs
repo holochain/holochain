@@ -5,8 +5,8 @@ use futures::future;
 use futures::stream;
 use futures::Future;
 use hdk3::prelude::RemoteSignal;
-use holochain::test_utils::cool::CoolConductor;
 use holochain::test_utils::cool::{CoolAgents, CoolCell};
+use holochain::test_utils::cool::{CoolConductor, CoolConductorBatch};
 use holochain::{
     conductor::api::ZomeCall,
     conductor::{
@@ -393,8 +393,9 @@ async fn remote_signals() {
     observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 5;
 
-    let conductors = CoolConductor::multi_from_standard_config(NUM_CONDUCTORS).await;
+    let conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
+    // TODO: write helper for agents across conductors
     let all_agents: Vec<HoloHash<hash_type::Agent>> =
         future::join_all(conductors.iter().map(|c| CoolAgents::one(c.keystore()))).await;
 
@@ -403,33 +404,15 @@ async fn remote_signals() {
         .unwrap()
         .0;
 
-    let agents_ref = &all_agents;
-
-    let data: Vec<_> = futures::StreamExt::collect(
-        futures::stream::iter(conductors.iter().enumerate()).then(|(i, conductor)| {
-            let dna_file = dna_file.clone();
-            async move {
-                let data = conductor
-                    .setup_app_for_agents_with_no_membrane_proof(
-                        "app",
-                        &[agents_ref[i].clone()],
-                        &[dna_file.clone()],
-                    )
-                    .await;
-                data.into_inner()
-            }
-        }),
-    )
-    .await;
+    let apps = conductors
+        .setup_app_for_zipped_agents("app", &all_agents, &[dna_file])
+        .await;
 
     let p2p_envs = conductors.iter().map(|c| c.envs().p2p()).collect();
     exchange_peer_info(p2p_envs);
 
     // TODO: write helper
-    let cells: Vec<CoolCell> = data
-        .iter()
-        .flat_map(|cells| cells.into_iter().flat_map(|app| app.cells().clone()))
-        .collect();
+    let cells: Vec<CoolCell> = apps.iter().flat_map(|app| app.cells().clone()).collect();
 
     let mut rxs = Vec::new();
     for h in conductors.iter().map(|c| c) {

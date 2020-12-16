@@ -2,7 +2,7 @@ use futures::future;
 use hdk3::prelude::*;
 use holochain::{
     conductor::{config::ConductorConfig, p2p_store::exchange_peer_info, Conductor},
-    test_utils::cool::{CoolApps, CoolDnaFile},
+    test_utils::cool::{CoolApps, CoolConductorBatch, CoolDnaFile},
 };
 use holochain::{
     destructure_test_cell_vec,
@@ -40,7 +40,7 @@ fn simple_crud_zome() -> InlineZome {
 async fn multi_conductor() -> anyhow::Result<()> {
     const NUM_CONDUCTORS: usize = 3;
 
-    let conductors = CoolConductor::multi_from_standard_config(NUM_CONDUCTORS).await;
+    let conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
     let (dna_file, _) = CoolDnaFile::unique_from_inline_zome("zome1", simple_crud_zome())
         .await
@@ -51,7 +51,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
         let dna_file = dna_file.clone();
         async move {
             let apps = conductor
-                .setup_app_for_agents_with_no_membrane_proof(
+                .setup_app_for_agents(
                     "app",
                     &[CoolAgents::one(conductor.keystore()).await],
                     &[dna_file.clone()],

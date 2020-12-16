@@ -1,6 +1,8 @@
 use super::CoolCell;
+use holo_hash::AgentPubKey;
 use holochain_types::app::InstalledAppId;
 use itertools::traits::HomogeneousTuple;
+use itertools::Itertools;
 
 /// An installed app, with prebuilt CoolCells
 #[derive(Clone)]
@@ -12,6 +14,8 @@ pub struct CoolApp {
 impl CoolApp {
     /// Constructor
     pub(super) fn new(installed_app_id: InstalledAppId, cells: Vec<CoolCell>) -> Self {
+        // Ensure that all Agents are the same
+        assert!(cells.iter().map(|c| c.agent_pubkey()).dedup().count() == 1);
         Self {
             installed_app_id,
             cells,
@@ -32,10 +36,18 @@ impl CoolApp {
     pub fn into_cells(self) -> Vec<CoolCell> {
         self.cells
     }
+
+    /// Returns the AgentPubKey associated with this app.
+    /// All Cells in this app will have the same Agent, so we just return the first.
+    pub fn agent(&self) -> &AgentPubKey {
+        self.cells[0].agent_pubkey()
+    }
 }
 
 /// Return type of opinionated setup function
-#[derive(Clone)]
+#[derive(
+    Clone, derive_more::From, derive_more::Into, derive_more::AsRef, derive_more::IntoIterator,
+)]
 pub struct CoolApps(pub(super) Vec<CoolApp>);
 
 impl CoolApps {
@@ -56,7 +68,6 @@ impl CoolApps {
         Inner::Buffer: std::convert::AsRef<[Option<CoolCell>]>,
         Inner::Buffer: std::convert::AsMut<[Option<CoolCell>]>,
     {
-        use itertools::Itertools;
         self.into_inner()
             .into_iter()
             .map(|a| {
@@ -68,6 +79,11 @@ impl CoolApps {
             .collect_tuple::<Outer>()
             .expect("Can't destructure more than 4 Agents")
     }
+
+    /// Get the underlying data
+    pub fn iter(&self) -> impl Iterator<Item = &CoolApp> {
+        self.0.iter()
+    }
 }
 
 #[macro_export]
@@ -76,7 +92,7 @@ macro_rules! destructure_test_cell_vec {
         use itertools::Itertools;
         let vec: Vec<$crate::test_utils::cool::CoolApps> = $vec;
         vec.into_iter()
-            .map(|blob| blob.into_tuples())
+            .map(|apps| apps.into_tuples())
             .collect_tuple()
             .expect("Can't destructure more than 4 Conductors")
     }};
