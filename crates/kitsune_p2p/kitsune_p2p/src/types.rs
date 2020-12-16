@@ -18,7 +18,7 @@ pub enum KitsuneP2pError {
 
     /// DecodingError
     #[error("Decoding Error: {0}")]
-    DecodingError(Arc<String>),
+    DecodingError(Box<str>),
 
     /// TransportError
     #[error(transparent)]
@@ -34,7 +34,7 @@ pub enum KitsuneP2pError {
 
     /// Bootstrap call failed.
     #[error("Bootstrap Error: {0}")]
-    Bootstrap(Arc<String>),
+    Bootstrap(Box<str>),
 
     /// SystemTime call failed.
     #[error(transparent)]
@@ -57,7 +57,7 @@ impl KitsuneP2pError {
 
     /// generate a decoding error from a string
     pub fn decoding_error(s: String) -> Self {
-        Self::DecodingError(Arc::new(s))
+        Self::DecodingError(s.into_boxed_str())
     }
 }
 

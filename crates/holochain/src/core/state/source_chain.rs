@@ -121,16 +121,15 @@ impl SourceChain {
                 .iter_fail(&r)?
                 .filter(|header| {
                     Ok(match header.as_content().header() {
-                        Header::Create(create) => match create.entry_type {
-                            EntryType::CapGrant => true,
+                        Header::Create(create) => {
                             // filter out authorship and everything else
-                            _ => false,
-                        },
-                        Header::Update(update) => match update.entry_type {
-                            EntryType::CapGrant => true,
+                            matches!(create.entry_type, EntryType::CapGrant,)
+                        }
+                        Header::Update(update) => matches!(
+                            update.entry_type,
                             // filter out authorship and everything else
-                            _ => false,
-                        },
+                            EntryType::CapGrant,
+                        ),
                         Header::Delete(_) => true,
                         // no other headers are relevant
                         _ => false,

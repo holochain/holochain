@@ -37,7 +37,7 @@ pub struct SignNetworkDataEvt {
     /// The "agent" context.
     pub agent: Arc<super::KitsuneAgent>,
     /// The data to sign.
-    pub data: Arc<Vec<u8>>,
+    pub data: Box<[u8]>,
 }
 
 #[derive(Debug)]
