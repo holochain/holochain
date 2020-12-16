@@ -10,7 +10,6 @@ use error::InterfaceError;
 use error::InterfaceResult;
 use holochain_types::signal::Signal;
 
-
 use std::convert::TryInto;
 use tokio::sync::broadcast;
 

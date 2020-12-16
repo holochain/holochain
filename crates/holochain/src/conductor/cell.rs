@@ -63,7 +63,6 @@ use holochain_zome_types::cell::CellId;
 use holochain_zome_types::*;
 use observability::OpenSpanExt;
 
-
 use std::convert::TryInto;
 use std::hash::Hash;
 use std::hash::Hasher;
