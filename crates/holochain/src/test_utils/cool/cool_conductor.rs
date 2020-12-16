@@ -1,7 +1,7 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
 // TODO [ B-03669 ] move to own crate
 
-use super::{CoolApps, CoolCell};
+use super::{CoolApp, CoolApps, CoolCell};
 use crate::{
     conductor::{api::ZomeCall, config::ConductorConfig, handle::ConductorHandle, Conductor},
     core::ribosome::ZomeCallInvocation,
@@ -145,12 +145,12 @@ impl CoolConductor {
                 .install_app(installed_app_id.clone(), cells)
                 .await
                 .expect("Could not install app");
-            info.push((installed_app_id, cell_ids));
+            info.push(CoolApp::new(installed_app_id, cell_ids));
         }
 
-        for (installed_app_id, _) in info.iter() {
+        for app in info.iter() {
             self.handle
-                .activate_app(installed_app_id.clone())
+                .activate_app(app.installed_app_id().clone())
                 .await
                 .expect("Could not activate app");
         }

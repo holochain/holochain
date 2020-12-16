@@ -27,7 +27,7 @@ fn simple_crud_zome() -> InlineZome {
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {
-            api.get((hash.into(), GetOptions::default()))InstalledAppId, 
+            api.get((hash.into(), GetOptions::default()))
                 .map_err(Into::into)
         })
 }

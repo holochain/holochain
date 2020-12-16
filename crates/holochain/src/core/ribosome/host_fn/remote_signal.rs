@@ -134,17 +134,17 @@ mod tests {
         let agents_ref = &agents;
 
         // TODO: write helper
-        let data = future::join_all(conductors.iter().enumerate().map(|(i, conductor)| {
+        let apps = future::join_all(conductors.iter().enumerate().map(|(i, conductor)| {
             let dna_file = dna_file.clone();
             async move {
-                let data = conductor
+                let apps = conductor
                     .setup_app_for_agents_with_no_membrane_proof(
                         "app",
                         &[agents_ref[i].clone()],
                         &[dna_file.clone().into()],
                     )
                     .await;
-                data.into_inner()
+                apps.into_inner()
             }
         }))
         .await;
@@ -153,9 +153,9 @@ mod tests {
         exchange_peer_info(p2p_envs);
 
         // TODO: write helper
-        let cells: Vec<_> = data
+        let cells: Vec<_> = apps
             .iter()
-            .flat_map(|cells| cells.iter().flat_map(|(_, c)| c.iter()))
+            .flat_map(|cells| cells.iter().flat_map(|app| app.cells().iter()))
             .collect();
 
         let mut signals = Vec::new();

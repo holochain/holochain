@@ -428,7 +428,7 @@ async fn remote_signals() {
     // TODO: write helper
     let cells: Vec<CoolCell> = data
         .iter()
-        .flat_map(|cells| cells.into_iter().flat_map(|(_, c)| c.clone()))
+        .flat_map(|cells| cells.into_iter().flat_map(|app| app.cells().clone()))
         .collect();
 
     let mut rxs = Vec::new();
