@@ -48,9 +48,9 @@ impl CoolApp {
 #[derive(
     Clone, derive_more::From, derive_more::Into, derive_more::AsRef, derive_more::IntoIterator,
 )]
-pub struct CoolApps(pub(super) Vec<CoolApp>);
+pub struct CoolAppBatch(pub(super) Vec<CoolApp>);
 
-impl CoolApps {
+impl CoolAppBatch {
     /// Get the underlying data
     pub fn into_inner(self) -> Vec<CoolApp> {
         self.0
@@ -80,6 +80,11 @@ impl CoolApps {
             })
             .collect_tuple::<Outer>()
             .expect("Can't destructure more than 4 Agents")
+    }
+
+    /// Access all Cells across all Apps, with Cells from the same App being contiguous
+    pub fn cells_flattened(&self) -> Vec<&CoolCell> {
+        self.0.iter().flat_map(|app| app.cells().iter()).collect()
     }
 
     /// Get the underlying data

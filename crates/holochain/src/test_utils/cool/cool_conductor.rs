@@ -1,7 +1,7 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
 // TODO [ B-03669 ] move to own crate
 
-use super::{CoolAgents, CoolApp, CoolApps, CoolCell};
+use super::{CoolAgents, CoolApp, CoolAppBatch, CoolCell};
 use crate::{
     conductor::{api::ZomeCall, config::ConductorConfig, handle::ConductorHandle, Conductor},
     core::ribosome::ZomeCallInvocation,
@@ -56,7 +56,7 @@ impl CoolConductorBatch {
     /// Opinionated app setup.
     /// Creates one app on each Conductor in this batch, creating a new AgentPubKey for each.
     /// The created AgentPubKeys can be retrieved via each CoolApp.
-    pub async fn setup_app(&self, installed_app_id: &str, dna_files: &[DnaFile]) -> CoolApps {
+    pub async fn setup_app(&self, installed_app_id: &str, dna_files: &[DnaFile]) -> CoolAppBatch {
         let apps = self
             .0
             .iter()
@@ -78,14 +78,14 @@ impl CoolConductorBatch {
     /// in this batch. Each Agent will be used to create one app on one Conductor,
     /// hence the "zipped" in the function name
     ///
-    /// Returns a collection of CoolApps, sorted in the same order as the Conductors in
+    /// Returns a batch of CoolApps, sorted in the same order as the Conductors in
     /// this batch.
     pub async fn setup_app_for_zipped_agents(
         &self,
         installed_app_id: &str,
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
-    ) -> CoolApps {
+    ) -> CoolAppBatch {
         if agents.len() != self.0.len() {
             panic!("setup_app_for_zipped_agents must take as many Agents as there are Conductors in this batch.")
         }
@@ -251,13 +251,13 @@ impl CoolConductor {
     /// - InstalledAppId: {app_id_prefix}-{agent_pub_key}
     /// - CellNick: {dna_hash}
     ///
-    /// Returns a collection of CoolApps, sorted in the same order as Agents passed in.
+    /// Returns a batch of CoolApps, sorted in the same order as Agents passed in.
     pub async fn setup_app_for_agents(
         &self,
         app_id_prefix: &str,
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
-    ) -> CoolApps {
+    ) -> CoolAppBatch {
         let mut apps = Vec::new();
         for agent in agents.to_vec() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
@@ -281,7 +281,7 @@ impl CoolConductor {
             .await
             .expect("Could not setup cells");
 
-        CoolApps(apps)
+        CoolAppBatch(apps)
     }
 }
 

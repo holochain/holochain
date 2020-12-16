@@ -111,7 +111,6 @@ mod tests {
             })
     }
 
-    // TODO [ B-03669 ]: make much less verbose
     #[tokio::test(threaded_scheduler)]
     #[cfg(feature = "test_utils")]
     async fn remote_signal_test() -> anyhow::Result<()> {
@@ -131,32 +130,14 @@ mod tests {
         .await
         .unwrap();
 
-        let agents_ref = &agents;
-
-        // TODO: write helper
-        let apps = future::join_all(conductors.iter().enumerate().map(|(i, conductor)| {
-            let dna_file = dna_file.clone();
-            async move {
-                let apps = conductor
-                    .setup_app_for_agents(
-                        "app",
-                        &[agents_ref[i].clone()],
-                        &[dna_file.clone().into()],
-                    )
-                    .await;
-                apps.into_inner()
-            }
-        }))
-        .await;
+        let apps = conductors
+            .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone().into()])
+            .await;
 
         let p2p_envs = conductors.iter().map(|c| c.envs().p2p()).collect();
         exchange_peer_info(p2p_envs);
 
-        // TODO: write helper
-        let cells: Vec<_> = apps
-            .iter()
-            .flat_map(|cells| cells.iter().flat_map(|app| app.cells().iter()))
-            .collect();
+        let cells: Vec<_> = apps.cells_flattened();
 
         let mut signals = Vec::new();
         for h in conductors {
