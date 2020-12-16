@@ -4,7 +4,6 @@ use holochain::conductor::interactive;
 use holochain::conductor::paths::ConfigFilePath;
 use holochain::conductor::Conductor;
 use holochain::conductor::ConductorHandle;
-use observability;
 use observability::Output;
 use std::error::Error;
 use std::path::PathBuf;
