@@ -180,7 +180,7 @@ impl CoolConductor {
 
         let cool_cells: Vec<CoolCell> = dna_files
             .iter()
-            .map(|f| CellId::new(f.dna_hash().clone(), agent.clone()))
+            .map(|dna| CellId::new(dna.dna_hash().clone(), agent.clone()))
             .map(|cell_id| CoolCell {
                 cell_id,
                 handle: self.clone(),

@@ -60,7 +60,7 @@ use holochain_types::{
     app::{InstalledApp, InstalledAppId, InstalledCell, MembraneProof},
     autonomic::AutonomicCue,
     cell::CellId,
-    dna::DnaFile,
+    dna::{zome::ZomeDef, DnaFile},
     prelude::*,
 };
 use holochain_zome_types::entry_def::EntryDef;
@@ -261,10 +261,23 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-        let entry_defs = self.conductor.read().await.put_wasm(dna.clone()).await?;
+        let is_full_wasm_dna = dna
+            .dna_def()
+            .zomes
+            .iter()
+            .all(|(_, zome_def)| match zome_def {
+                ZomeDef::Wasm(_) => true,
+                _ => false,
+            });
+
         let mut store = self.conductor.write().await;
-        store.dna_store_mut().add_dna(dna);
-        store.dna_store_mut().add_entry_defs(entry_defs);
+        store.dna_store_mut().add_dna(dna.clone());
+
+        // Only install the DNA if it contains only Wasm (no InlineZomes)
+        if is_full_wasm_dna {
+            let entry_defs = self.conductor.read().await.put_wasm(dna).await?;
+            store.dna_store_mut().add_entry_defs(entry_defs);
+        }
         Ok(())
     }
 

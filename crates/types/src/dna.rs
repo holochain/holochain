@@ -239,6 +239,6 @@ impl DnaFile {
 
 impl std::fmt::Debug for DnaFile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("DnaFile(dna_hash = {})", self.dna_hash()))
+        f.write_fmt(format_args!("DnaFile(dna = {:?})", self.dna))
     }
 }
