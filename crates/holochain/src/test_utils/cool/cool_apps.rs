@@ -85,15 +85,3 @@ impl CoolApps {
         self.0.iter()
     }
 }
-
-#[macro_export]
-macro_rules! destructure_test_cell_vec {
-    ($vec:expr) => {{
-        use itertools::Itertools;
-        let vec: Vec<$crate::test_utils::cool::CoolApps> = $vec;
-        vec.into_iter()
-            .map(|apps| apps.into_tuples())
-            .collect_tuple()
-            .expect("Can't destructure more than 4 Conductors")
-    }};
-}

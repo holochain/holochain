@@ -1,12 +1,9 @@
 use futures::future;
 use hdk3::prelude::*;
+use holochain::test_utils::cool::{CoolAgents, CoolConductor, MaybeElement};
 use holochain::{
     conductor::{config::ConductorConfig, p2p_store::exchange_peer_info, Conductor},
     test_utils::cool::{CoolApps, CoolConductorBatch, CoolDnaFile},
-};
-use holochain::{
-    destructure_test_cell_vec,
-    test_utils::cool::{CoolAgents, CoolConductor, MaybeElement},
 };
 use holochain_state::test_utils::test_environments;
 use holochain_types::dna::zome::inline_zome::InlineZome;
@@ -46,27 +43,13 @@ async fn multi_conductor() -> anyhow::Result<()> {
         .await
         .unwrap();
 
-    // TODO: write helper
-    let apps: Vec<CoolApps> = future::join_all(conductors.iter().map(|(conductor)| {
-        let dna_file = dna_file.clone();
-        async move {
-            let apps = conductor
-                .setup_app_for_agents(
-                    "app",
-                    &[CoolAgents::one(conductor.keystore()).await],
-                    &[dna_file.clone()],
-                )
-                .await;
-            apps
-        }
-    }))
-    .await;
+    let apps = conductors.setup_app("app", &[dna_file]).await;
 
     let p2p_envs = conductors.iter().map(|c| c.envs().p2p()).collect();
     exchange_peer_info(p2p_envs);
 
     // TODO: write better helper
-    let (((alice,),), ((bobbo,),), ((_carol,),)) = destructure_test_cell_vec!(apps);
+    let ((alice,), (bobbo,), (_carol,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
     let hash: HeaderHash = alice.call("zome1", "create", ()).await;
