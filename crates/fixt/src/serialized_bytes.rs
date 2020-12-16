@@ -43,11 +43,15 @@ fixturator!(
 
         // serialize a thing based on a delegated fixturator
         match thing_to_serialize {
-            ThingsToSerialize::Unit => UnitFixturator::new(Unpredictable)
-                .next()
-                .unwrap()
-                .try_into()
-                .unwrap(),
+            ThingsToSerialize::Unit =>
+            {
+                #[allow(clippy::unit_arg)]
+                UnitFixturator::new(Unpredictable)
+                    .next()
+                    .unwrap()
+                    .try_into()
+                    .unwrap()
+            }
             ThingsToSerialize::Bool => BoolWrap(BoolFixturator::new(Unpredictable).next().unwrap())
                 .try_into()
                 .unwrap(),
@@ -73,11 +77,15 @@ fixturator!(
 
         // serialize a thing based on a delegated fixturator
         let ret: SerializedBytes = match thing_to_serialize {
-            ThingsToSerialize::Unit => UnitFixturator::new_indexed(Predictable, index)
-                .next()
-                .unwrap()
-                .try_into()
-                .unwrap(),
+            ThingsToSerialize::Unit =>
+            {
+                #[allow(clippy::unit_arg)]
+                UnitFixturator::new_indexed(Predictable, index)
+                    .next()
+                    .unwrap()
+                    .try_into()
+                    .unwrap()
+            }
             ThingsToSerialize::Bool => BoolWrap(
                 BoolFixturator::new_indexed(Predictable, index)
                     .next()

@@ -298,10 +298,10 @@ fixturator!(
         };
         let new = NewEntryHeaderFixturator::new_indexed(et, get_fixt_index!()).next().unwrap();
         let (shh, _) = ElementFixturator::new_indexed(new, get_fixt_index!()).next().unwrap().into_inner();
-        Element::new(shh, Some(get_fixt_curve!().clone()))
+        Element::new(shh, Some(get_fixt_curve!()))
     };
     curve NewEntryElement {
-        new_entry_element(get_fixt_curve!().0.clone(), get_fixt_curve!().1.clone(), get_fixt_index!())
+        new_entry_element(get_fixt_curve!().0, get_fixt_curve!().1, get_fixt_index!())
     };
 );
 
@@ -552,7 +552,7 @@ fixturator!(
     };
     curve EntryType {
         let mut ec = CreateFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap();
-        ec.entry_type = get_fixt_curve!().clone();
+        ec.entry_type = get_fixt_curve!();
         ec
     };
     curve Entry {
@@ -580,14 +580,14 @@ fixturator!(
 
     curve EntryType {
         let mut eu = UpdateFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap();
-        eu.entry_type = get_fixt_curve!().clone();
+        eu.entry_type = get_fixt_curve!();
         eu
     };
 
     curve EntryTypeEntryHash {
         let mut u = UpdateFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap();
-        u.entry_type = get_fixt_curve!().0.clone();
-        u.entry_hash = get_fixt_curve!().1.clone();
+        u.entry_type = get_fixt_curve!().0;
+        u.entry_hash = get_fixt_curve!().1;
         u
     };
 
@@ -650,11 +650,11 @@ fixturator!(
     curve EntryType {
         match fixt!(NewEntryHeader) {
             NewEntryHeader::Create(_) => {
-                let ec = CreateFixturator::new_indexed(get_fixt_curve!().clone(), get_fixt_index!()).next().unwrap();
+                let ec = CreateFixturator::new_indexed(get_fixt_curve!(), get_fixt_index!()).next().unwrap();
                 NewEntryHeader::Create(ec)
             },
             NewEntryHeader::Update(_) => {
-                let eu = UpdateFixturator::new_indexed(get_fixt_curve!().clone(), get_fixt_index!()).next().unwrap();
+                let eu = UpdateFixturator::new_indexed(get_fixt_curve!(), get_fixt_index!()).next().unwrap();
                 NewEntryHeader::Update(eu)
             },
         }

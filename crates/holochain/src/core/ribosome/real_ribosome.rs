@@ -75,7 +75,7 @@ impl RealRibosome {
     }
 
     pub fn module(&self, zome_name: &ZomeName) -> RibosomeResult<Module> {
-        let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(zome_name)?.code();
+        let wasm: Arc<Box<[u8]>> = self.dna_file.get_wasm_for_zome(zome_name)?.code();
         Ok(holochain_wasmer_host::instantiate::module(
             &self.wasm_cache_key(zome_name)?,
             &wasm,
@@ -97,7 +97,7 @@ impl RealRibosome {
 
     pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Instance> {
         let zome_name = call_context.zome.zome_name().clone();
-        let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
+        let wasm: Arc<Box<[u8]>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
         let imports: ImportObject = Self::imports(self, call_context);
         Ok(holochain_wasmer_host::instantiate::instantiate(
             self.wasm_cache_key(&zome_name)?,
