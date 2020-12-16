@@ -22,5 +22,5 @@ pub struct RemoteSignal {
     /// Agents to send the signal to.
     pub agents: Vec<AgentPubKey>,
     /// The signal to send.
-    pub signal: AppSignal,
+    pub signal: SerializedBytes,
 }

@@ -464,7 +464,7 @@ async fn remote_signals() {
     }
     let rxs = rxs.into_iter().flatten().collect::<Vec<_>>();
 
-    let signal = fixt!(AppSignal);
+    let signal = fixt!(SerializedBytes);
 
     let _: () = cells[0]
         .call(
@@ -479,9 +479,11 @@ async fn remote_signals() {
 
     tokio::time::delay_for(std::time::Duration::from_millis(2000)).await;
 
+    let signal = AppSignal::new(signal);
     for mut rx in rxs {
         let r = rx.try_recv();
         // Each handle should recv a signal
+
         assert_matches!(r, Ok(Signal::App(_, a)) if a == signal);
     }
 }

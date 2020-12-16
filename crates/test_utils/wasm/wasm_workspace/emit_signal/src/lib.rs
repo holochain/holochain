@@ -13,7 +13,7 @@ fn signal_others(signal: RemoteSignal) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-fn recv_remote_signal(signal: AppSignal) -> ExternResult<()> {
+fn recv_remote_signal(signal: SerializedBytes) -> ExternResult<()> {
     emit_signal(&signal)?;
     Ok(())
 }

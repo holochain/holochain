@@ -2,13 +2,11 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::HolochainP2pCellT;
-use holochain_serialized_bytes::prelude::SerializedBytes;
 use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::RemoteSignalInput;
 use holochain_zome_types::RemoteSignalOutput;
-use std::convert::TryInto;
 use std::sync::Arc;
 use tracing::Instrument;
 
@@ -25,14 +23,13 @@ pub fn remote_signal(
     let RemoteSignal { agents, signal } = input.into_inner();
     let zome_name: ZomeName = call_context.zome().into();
     let fn_name: FunctionName = FN_NAME.into();
-    let request: SerializedBytes = signal.try_into()?;
     for agent in agents {
         tokio::task::spawn(
             {
                 let mut network = network.clone();
                 let zome_name = zome_name.clone();
                 let fn_name = fn_name.clone();
-                let request = request.clone();
+                let request = signal.clone();
                 async move {
                     tracing::debug!("sending to {:?}", agent);
                     let result = network
@@ -80,7 +77,7 @@ mod tests {
 
         InlineZome::new_unique(vec![entry_def.clone()])
             .callback("signal_others", move |api, ()| {
-                let signal = AppSignal::new(AppString("Hey".to_string()).try_into().unwrap());
+                let signal = AppString("Hey".to_string()).try_into().unwrap();
                 let signal = RemoteSignal {
                     agents: agents.clone(),
                     signal,
@@ -89,7 +86,7 @@ mod tests {
                 api.remote_signal(signal)?;
                 Ok(())
             })
-            .callback("recv_remote_signal", move |api, signal: AppSignal| {
+            .callback("recv_remote_signal", move |api, signal: SerializedBytes| {
                 tracing::debug!("remote signal");
                 num_signals.fetch_add(1, Ordering::SeqCst);
                 api.emit_signal(signal).map_err(Into::into)

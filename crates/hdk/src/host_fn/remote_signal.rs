@@ -1,7 +1,6 @@
 //! Emit an app-defined Signal remotely on a list of agents.
 
 use crate::prelude::*;
-use holochain_zome_types::signal::AppSignal;
 
 /// ## Remote Signal
 /// Send a signal to a list of other agents.
@@ -20,7 +19,7 @@ use holochain_zome_types::signal::AppSignal;
 /// exposed by this zome with a signature like:
 /// ```ignore
 /// #[hdk_extern]
-/// fn recv_remote_signal(signal: AppSignal) -> ExternResult<()> {
+/// fn recv_remote_signal(signal: SerializedBytes) -> ExternResult<()> {
 ///     emit_signal(&signal)?;
 ///     Ok(())
 /// }
@@ -38,10 +37,7 @@ where
     #[allow(clippy::unit_arg)]
     Ok(host_call::<RemoteSignalInput, RemoteSignalOutput>(
         __remote_signal,
-        &RemoteSignalInput::new(RemoteSignal {
-            signal: AppSignal::new(sb),
-            agents,
-        }),
+        &RemoteSignalInput::new(RemoteSignal { signal: sb, agents }),
     )?
     .into_inner())
 }
