@@ -18,26 +18,26 @@ pub fn capability_grants(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::destructure_test_cells;
     use crate::conductor::dna_store::MockDnaStore;
-    use crate::conductor::interface::websocket::test_utils::setup_app;
+    
     use crate::conductor::ConductorBuilder;
-    use crate::core::ribosome::ZomeCall;
+    
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
+    use crate::destructure_test_cells;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::test_utils::test_conductor::MaybeElement;
     use crate::test_utils::test_conductor::TestConductorHandle;
-    use holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_lmdb::test_utils::test_environments;
-    use holochain_types::app::InstalledCell;
-    use holochain_types::dna::DnaDef;
+    
+    
     use holochain_types::dna::DnaFile;
     use holochain_types::fixt::CapSecretFixturator;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
-    use holochain_zome_types::cell::CellId;
+    use holochain_wasm_test_utils::TestWasm;
+    
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]
@@ -51,8 +51,7 @@ pub mod wasm_test {
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
-        let workspace_lock =
-            crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
 
@@ -71,8 +70,7 @@ pub mod wasm_test {
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
-        let workspace_lock =
-            crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
 

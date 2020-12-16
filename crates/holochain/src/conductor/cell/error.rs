@@ -11,7 +11,7 @@ use holochain_p2p::HolochainP2pError;
 use holochain_types::dna::DnaError;
 use holochain_types::header::error::HeaderError;
 use holochain_zome_types::cell::CellId;
-use holochain_zome_types::header::conversions::WrongHeaderError;
+
 use std::path::PathBuf;
 use thiserror::Error;
 

@@ -1,14 +1,10 @@
-use futures::StreamExt;
 use hdk3::prelude::*;
-use holochain::conductor::api::ZomeCall;
 use holochain::conductor::Conductor;
 use holochain::destructure_test_cells;
 use holochain::test_utils::test_conductor::MaybeElement;
 use holochain::test_utils::test_conductor::TestAgents;
 use holochain::test_utils::test_conductor::TestConductorHandle;
-use holochain_keystore::KeystoreSender;
 use holochain_lmdb::test_utils::test_environments;
-use holochain_types::app::InstalledCell;
 use holochain_types::dna::zome::inline_zome::InlineZome;
 use holochain_types::dna::DnaFile;
 use holochain_zome_types::element::ElementEntry;

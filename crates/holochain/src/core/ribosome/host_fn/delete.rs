@@ -5,7 +5,7 @@ use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeError;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
-use crate::core::SourceChainError;
+
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_zome_types::element::SignedHeaderHashed;

@@ -26,7 +26,7 @@ use holochain_state::source_chain::SourceChainError;
 use holochain_state::workspace::Workspace;
 use holochain_state::workspace::WorkspaceResult;
 use holochain_types::element::Element;
-use holochain_zome_types::entry::GetOptions;
+
 use holochain_zome_types::header::Header;
 use holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
