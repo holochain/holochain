@@ -96,6 +96,12 @@ wasm_io_types! {
     // Returns HeaderHash of the newly created element.
     fn create ((zt::entry_def::EntryDefId, zt::entry::Entry)) -> holo_hash::HeaderHash;
 
+    // Sender, Recipient, Data.
+    fn crypto_box ((holo_hash::AgentXPubKey, holo_hash::AgentXPubKey, SerializedBytes)) -> CryptoBoxEncryptedData;
+
+    // Recipient, Sender, Encrypted data.
+    fn crypto_box_open ((holo_hash::AgentXPubKey, holo_hash::AgentXPubKey, CryptoBoxEncryptedData)) -> Option<CryptoBoxData>;
+
     // Create a link between two entries.
     fn create_link ((holo_hash::EntryHash, holo_hash::EntryHash, zt::link::LinkTag)) -> holo_hash::HeaderHash;
 

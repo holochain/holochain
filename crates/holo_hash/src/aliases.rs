@@ -8,6 +8,9 @@ use crate::{hash_type, HoloHash};
 /// An Agent public signing key. Not really a hash, more of an "identity hash".
 pub type AgentPubKey = HoloHash<hash_type::Agent>;
 
+/// A pub key for ECDH x25519. Useful for e.g. `crypto_box` encryption.
+pub type AgentXPubKey = HoloHash<hash_type::AgentX>;
+
 /// The hash of a DnaDef
 pub type DnaHash = HoloHash<hash_type::Dna>;
 

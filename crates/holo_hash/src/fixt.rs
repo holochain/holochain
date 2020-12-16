@@ -76,6 +76,23 @@ fixturator!(
     };
 );
 
+// fixturator!(
+//     AgentXPubKey;
+//     curve Empty AgentXPubKey::from_raw_36(ThirtySixHashBytesFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap());
+//     curve Unpredictable AgentXPubKey::from_raw_36(ThirtySixHashBytesFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap());
+//     curve Predictable {
+//         // these agent keys match what the mock keystore spits out for the first two agents
+//         // don't mess with this unless you also update the keystore!!!
+//         let agents = vec![
+//             AgentXPubKey::try_from("uhCAkmrkoAHPVf_eufG7eC5fm6QKrW5pPMoktvG5LOC0SnJ4vV1Uv")
+//             .unwrap(),
+//             AgentXPubKey::try_from("uhCAke1j8Z2a-_min0h0pGuEMcYlo_V1l1mt9OtBuywKmHlg4L_R-")
+//                 .unwrap(),
+//         ];
+//         agents[get_fixt_index!() % agents.len()].clone()
+//     };
+// );
+
 fixturator!(
     EntryHash;
     constructor fn from_raw_36(ThirtySixHashBytes);

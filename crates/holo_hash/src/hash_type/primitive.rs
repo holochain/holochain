@@ -1,8 +1,26 @@
 use super::*;
-use crate::{error::HoloHashError, hash_type, AgentPubKey, EntryHash};
+use crate::{error::HoloHashError, hash_type, AgentPubKey, AgentXPubKey, EntryHash};
 use std::convert::TryInto;
 
+// Valid options for prefixes:
+// hCAk 4100 <Buffer 84 20 24> * AGENT
+// hCEk 4228 <Buffer 84 21 24> * ENTRY
+// hCIk 4356 <Buffer 84 22 24> * NET_ID
+// hCMk 4484 <Buffer 84 23 24> * AGENT_X
+// hCQk 4612 <Buffer 84 24 24> * DHTOP
+// hCUk 4740 <Buffer 84 25 24>
+// hCYk 4868 <Buffer 84 26 24>
+// hCck 4996 <Buffer 84 27 24>
+// hCgk 5124 <Buffer 84 28 24>
+// hCkk 5252 <Buffer 84 29 24> * HEADER
+// hCok 5380 <Buffer 84 2a 24> * WASM
+// hCsk 5508 <Buffer 84 2b 24>
+// hCwk 5636 <Buffer 84 2c 24>
+// hC0k 5764 <Buffer 84 2d 24> * DNA
+// hC4k 5892 <Buffer 84 2e 24>
+// hC8k 6020 <Buffer 84 2f 24>
 pub(crate) const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk [132, 32, 36]
+pub(crate) const AGENT_X_PREFIX: &[u8] = &[0x84, 0x23, 0x24]; // uhCMk
 pub(crate) const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk [132, 33, 36]
 pub(crate) const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk [132, 36, 36]
 pub(crate) const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k [132, 45, 36]
@@ -117,6 +135,7 @@ macro_rules! primitive_hash_type {
 }
 
 primitive_hash_type!(Agent, AgentPubKey, AgentVisitor, AGENT_PREFIX);
+primitive_hash_type!(AgentX, AgentXPubKey, AgentXVisitor, AGENT_X_PREFIX);
 primitive_hash_type!(Entry, EntryHash, EntryVisitor, ENTRY_PREFIX);
 primitive_hash_type!(Dna, DnaHash, DnaVisitor, DNA_PREFIX);
 primitive_hash_type!(DhtOp, DhtOpHash, DhtOpVisitor, DHTOP_PREFIX);
@@ -131,6 +150,18 @@ impl HashTypeSync for Header {}
 impl HashTypeAsync for Dna {}
 impl HashTypeAsync for NetId {}
 impl HashTypeAsync for Wasm {}
+
+impl From<AgentXPubKey> for EntryHash {
+    fn from(hash: AgentXPubKey) -> EntryHash {
+        hash.retype(hash_type::Entry)
+    }
+}
+
+impl From<EntryHash> for AgentXPubKey {
+    fn from(hash: EntryHash) -> AgentXPubKey {
+        hash.retype(hash_type::AgentX)
+    }
+}
 
 impl From<AgentPubKey> for EntryHash {
     fn from(hash: AgentPubKey) -> EntryHash {

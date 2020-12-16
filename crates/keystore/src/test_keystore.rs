@@ -47,6 +47,15 @@ const CERT_DIGEST: &[u8] = &[
     225, 6, 23, 207, 126, 223, 169, 142, 92, 242, 240, 239,
 ];
 
+const X25519_SEC: [u8; 32] = [
+    253, 12, 117, 61, 12, 47, 207, 107, 110, 116, 6, 194, 214, 88, 61, 161,
+    220, 6, 53, 190, 225, 254, 230, 143, 130, 70, 25, 160, 15, 168, 42, 37,
+];
+const X25519_PUB: [u8; 32] = [
+    65, 17, 71, 31, 48, 10, 48, 208, 3, 220, 71, 246, 83, 246, 74, 221, 3,
+    123, 54, 48, 160, 192, 179, 207, 115, 6, 19, 53, 233, 231, 167, 75,
+];
+
 /// Construct a new TestKeystore.
 /// DANGER! This is a mock keystore for testing, DO NOT USE THIS IN PRODUCTION!
 pub async fn spawn_test_keystore() -> KeystoreApiResult<KeystoreSender> {
@@ -67,6 +76,10 @@ pub async fn spawn_test_keystore() -> KeystoreApiResult<KeystoreSender> {
             sni: CERT_SNI.to_string(),
             cert_der: CERT.to_vec(),
             cert_digest: CERT_DIGEST.to_vec(),
+        }],
+        vec![FixtureX25519Keypair {
+            pub_key: X25519_PUB.into(),
+            priv_key: X25519_SEC.into(),
         }],
     )
     .await?;

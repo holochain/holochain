@@ -69,6 +69,12 @@ host_fn_api_impls! {
     // Returns HeaderHash of the newly created element.
     fn create ((zt::entry_def::EntryDefId, zt::entry::Entry)) -> holo_hash::HeaderHash;
 
+    // Sender, Recipient, Data.
+    fn crypto_box ((x25519::X25519PubKey, x25519::X25519PubKey, CryptoBoxData)) -> CryptoBoxEncryptedData;
+
+    // Recipient, Sender, Encrypted data.
+    fn crypto_box_open ((x25519::X25519PubKey, x25519::X25519PubKey, CryptoBoxEncryptedData)) -> Option<CryptoBoxData>;
+
     // Create a link between two entries.
     fn create_link ((holo_hash::EntryHash, holo_hash::EntryHash, zt::link::LinkTag)) -> holo_hash::HeaderHash;
 
