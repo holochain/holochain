@@ -456,7 +456,7 @@ impl SpaceInternalHandler for Space {
                 let sign_req = SignNetworkDataEvt {
                     space: space.clone(),
                     agent: agent.clone(),
-                    data: data.clone().into_boxed_slice(),
+                    data: Arc::new(data.clone()),
                 };
                 let sig = evt_sender.sign_network_data(sign_req).await?;
                 let agent_info_signed = crate::types::agent_store::AgentInfoSigned::try_new(
