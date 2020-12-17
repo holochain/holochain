@@ -1,6 +1,5 @@
 [workspace]
 members = [
-  # "crates/admin",
   "crates/dna_util",
   "crates/fixt",
   "crates/fixt/test",
@@ -21,7 +20,7 @@ members = [
 ]
 
 exclude = [
-  "pseudocode",
+  
 ]
 
 # These are the default params for RELEASE target

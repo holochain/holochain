@@ -2,17 +2,19 @@
 //! and zome calling, as well as some helpful references to Cells and Zomes
 //! which make zome interaction much less verbose
 
-mod test_agents;
-mod test_cell;
-mod test_handle;
-mod test_set;
-mod test_zome;
+mod cool_agents;
+mod cool_apps;
+mod cool_cell;
+mod cool_conductor;
+mod cool_dna;
+mod cool_zome;
 
-pub use test_agents::*;
-pub use test_cell::*;
-pub use test_handle::*;
-pub use test_set::*;
-pub use test_zome::*;
+pub use cool_agents::*;
+pub use cool_apps::*;
+pub use cool_cell::*;
+pub use cool_conductor::*;
+pub use cool_dna::*;
+pub use cool_zome::*;
 
 use hdk3::prelude::Element;
 use holochain_serialized_bytes::prelude::*;

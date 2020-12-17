@@ -5,9 +5,9 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::KeystoreSender;
 
 /// Provides simple methods for generating collections of AgentPubKeys for use in tests
-pub struct TestAgents;
+pub struct CoolAgents;
 
-impl TestAgents {
+impl CoolAgents {
     /// Get an infinite stream of AgentPubKeys
     pub fn stream(keystore: KeystoreSender) -> impl futures::Stream<Item = AgentPubKey> {
         use holochain_keystore::KeystoreSenderExt;
