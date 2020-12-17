@@ -407,8 +407,7 @@ async fn remote_signals() {
     let p2p_envs = conductors.iter().map(|c| c.envs().p2p()).collect();
     exchange_peer_info(p2p_envs);
 
-    // TODO: write helper
-    let cells: Vec<CoolCell> = apps.iter().flat_map(|app| app.cells().clone()).collect();
+    let cells: Vec<CoolCell> = apps.cells_flattened();
 
     let mut rxs = Vec::new();
     for h in conductors.iter().map(|c| c) {
