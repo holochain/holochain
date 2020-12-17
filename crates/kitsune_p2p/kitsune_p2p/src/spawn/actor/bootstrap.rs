@@ -60,9 +60,9 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
                     &mut res.bytes().await?.as_ref(),
                 )?))
             } else {
-                Err(crate::KitsuneP2pError::Bootstrap(std::sync::Arc::new(
-                    res.text().await?,
-                )))
+                Err(crate::KitsuneP2pError::Bootstrap(
+                    res.text().await?.into_boxed_str(),
+                ))
             }
         }
         None => Ok(None),

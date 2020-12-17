@@ -36,10 +36,7 @@ pub enum ValidateCallbackResult {
 
 impl CallbackResult for ValidateCallbackResult {
     fn is_definitive(&self) -> bool {
-        match self {
-            ValidateCallbackResult::Invalid(_) => true,
-            _ => false,
-        }
+        matches!(self, ValidateCallbackResult::Invalid(_))
     }
 }
 
@@ -87,10 +84,7 @@ impl From<ExternOutput> for ValidationPackageCallbackResult {
 
 impl CallbackResult for ValidationPackageCallbackResult {
     fn is_definitive(&self) -> bool {
-        match self {
-            ValidationPackageCallbackResult::Fail(_) => true,
-            _ => false,
-        }
+        matches!(self, ValidationPackageCallbackResult::Fail(_))
     }
 }
 
