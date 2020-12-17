@@ -214,7 +214,7 @@ pub fn exchange_peer_info(envs: Vec<EnvironmentWrite>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holochain_lmdb::buffer::KvStoreT;
     use holochain_lmdb::env::ReadManager;
     use holochain_lmdb::env::WriteManager;

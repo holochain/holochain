@@ -8,14 +8,14 @@ use crate::KitsuneAgent;
 use crate::KitsuneBinType;
 use crate::KitsuneSignature;
 use crate::KitsuneSpace;
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use url2::url2;
 
 fixturator!(
     Urls;
     curve Empty vec![];
     curve Unpredictable {
-        let mut rng = fixt::rng();
+        let mut rng = ::fixt::rng();
         let vec_len = rng.gen_range(0, 5);
         let mut ret = vec![];
 
@@ -25,7 +25,7 @@ fixturator!(
         ret
     };
     curve Predictable {
-        let mut rng = fixt::rng();
+        let mut rng = ::fixt::rng();
         let vec_len = rng.gen_range(0, 5);
         let mut ret = vec![];
 

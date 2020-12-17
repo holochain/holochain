@@ -10,11 +10,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::zome::Permission;
 use holochain_types::dna::zome::Zome;
-use holochain_zome_types::header::AppEntryType;
-use holochain_zome_types::validate::ValidationPackage;
-use holochain_zome_types::validate::ValidationPackageCallbackResult;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use holochain_zome_types::*;
 
 #[derive(Clone)]
 pub struct ValidationPackageInvocation {
@@ -140,7 +136,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_package_callback_result_fold() {
-        let mut rng = fixt::rng();
+        let mut rng = ::fixt::rng();
 
         let result_success = || ValidationPackageResult::Success(ValidationPackage(vec![]));
         let result_ud = || ValidationPackageResult::UnresolvedDependencies(vec![]);
@@ -182,7 +178,7 @@ mod test {
     async fn validation_package_invocation_allow_side_effects() {
         use holochain_types::dna::zome::Permission::*;
         let validation_package_host_access =
-            ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
+            ValidationPackageHostAccessFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap();
         assert_eq!(
@@ -202,7 +198,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn validation_package_invocation_zomes() {
         let validation_package_invocation =
-            ValidationPackageInvocationFixturator::new(fixt::Unpredictable)
+            ValidationPackageInvocationFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap();
         let zome = validation_package_invocation.zome.clone();
@@ -215,7 +211,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn validation_package_invocation_fn_components() {
         let validation_package_invocation =
-            ValidationPackageInvocationFixturator::new(fixt::Unpredictable)
+            ValidationPackageInvocationFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap();
 
@@ -234,7 +230,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn validation_package_invocation_host_input() {
         let validation_package_invocation =
-            ValidationPackageInvocationFixturator::new(fixt::Unpredictable)
+            ValidationPackageInvocationFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap();
 
@@ -265,14 +261,14 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validation_package_unimplemented() {
-        let host_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = ValidationPackageHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
         let mut validation_package_invocation =
-            ValidationPackageInvocationFixturator::new(fixt::Empty)
+            ValidationPackageInvocationFixturator::new(::fixt::Empty)
                 .next()
                 .unwrap();
         validation_package_invocation.zome = TestWasm::Foo.into();
@@ -285,14 +281,14 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validation_package_implemented_success() {
-        let host_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = ValidationPackageHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageSuccess]))
             .next()
             .unwrap();
         let mut validation_package_invocation =
-            ValidationPackageInvocationFixturator::new(fixt::Empty)
+            ValidationPackageInvocationFixturator::new(::fixt::Empty)
                 .next()
                 .unwrap();
         validation_package_invocation.zome = TestWasm::ValidationPackageSuccess.into();
@@ -310,14 +306,14 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validation_package_implemented_fail() {
-        let host_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = ValidationPackageHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageFail]))
             .next()
             .unwrap();
         let mut validation_package_invocation =
-            ValidationPackageInvocationFixturator::new(fixt::Empty)
+            ValidationPackageInvocationFixturator::new(::fixt::Empty)
                 .next()
                 .unwrap();
         validation_package_invocation.zome = TestWasm::ValidationPackageFail.into();

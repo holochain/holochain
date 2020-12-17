@@ -41,7 +41,7 @@ pub mod wasm_test {
         let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
-        let call_context = CallContextFixturator::new(fixt::Unpredictable)
+        let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         const LEN: usize = 10;

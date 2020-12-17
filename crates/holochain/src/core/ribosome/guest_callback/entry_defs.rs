@@ -107,11 +107,11 @@ mod test {
     #[test]
     /// this is a non-standard fold test because the result is not so simple
     fn entry_defs_callback_result_fold() {
-        let mut rng = fixt::rng();
+        let mut rng = ::fixt::rng();
 
-        let mut zome_name_fixturator = ZomeNameFixturator::new(fixt::Unpredictable);
-        let mut entry_defs_fixturator = EntryDefsFixturator::new(fixt::Unpredictable);
-        let mut string_fixturator = StringFixturator::new(fixt::Unpredictable);
+        let mut zome_name_fixturator = ZomeNameFixturator::new(::fixt::Unpredictable);
+        let mut entry_defs_fixturator = EntryDefsFixturator::new(::fixt::Unpredictable);
+        let mut string_fixturator = StringFixturator::new(::fixt::Unpredictable);
 
         // zero defs
         assert_eq!(EntryDefsResult::Defs(BTreeMap::new()), vec![].into(),);
@@ -187,7 +187,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn entry_defs_invocation_zomes() {
-        let entry_defs_invocation = EntryDefsInvocationFixturator::new(fixt::Unpredictable)
+        let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         assert_eq!(ZomesToInvoke::All, entry_defs_invocation.zomes(),);
@@ -195,7 +195,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn entry_defs_invocation_fn_components() {
-        let entry_defs_invocation = EntryDefsInvocationFixturator::new(fixt::Unpredictable)
+        let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
 
@@ -207,7 +207,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn entry_defs_invocation_host_input() {
-        let entry_defs_invocation = EntryDefsInvocationFixturator::new(fixt::Unpredictable)
+        let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
 

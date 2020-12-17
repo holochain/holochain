@@ -20,9 +20,7 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::dna::zome::ZomeDef;
 use holochain_types::dna::DnaDefHashed;
 use holochain_types::dna::DnaFile;
-use holochain_zome_types::entry_def::EntryDef;
-use holochain_zome_types::header::EntryDefIndex;
-use holochain_zome_types::header::ZomeId;
+use holochain_zome_types::*;
 use std::collections::HashMap;
 use std::convert::TryInto;
 
@@ -232,9 +230,7 @@ mod tests {
     use holochain_types::dna::zome::ZomeDef;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::crdt::CrdtType;
-    use holochain_zome_types::entry_def::EntryDef;
-    use holochain_zome_types::entry_def::EntryVisibility;
+    use holochain_zome_types::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_store_entry_defs() {

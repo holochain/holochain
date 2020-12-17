@@ -79,9 +79,7 @@ mod tests {
     use crate::fixt::ZomeFixturator;
     use fallible_iterator::FallibleIterator;
     use holochain_types::dna::zome::Zome;
-    use holochain_zome_types::init::InitCallbackResult;
-    use holochain_zome_types::zome::FunctionName;
-    use holochain_zome_types::ExternOutput;
+    use holochain_zome_types::*;
     use mockall::predicate::*;
     use mockall::Sequence;
     use std::convert::TryInto;
@@ -94,11 +92,11 @@ mod tests {
 
         let mut invocation = MockInvocation::new();
 
-        let host_access = ZomeCallHostAccessFixturator::new(fixt::Empty)
+        let host_access = ZomeCallHostAccessFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
-        let zome_fixturator = ZomeFixturator::new(fixt::Unpredictable);
-        let mut fn_components_fixturator = FnComponentsFixturator::new(fixt::Unpredictable);
+        let zome_fixturator = ZomeFixturator::new(::fixt::Unpredictable);
+        let mut fn_components_fixturator = FnComponentsFixturator::new(::fixt::Unpredictable);
 
         // let returning_init_invocation = init_invocation.clone();
         let zomes: Vec<Zome> = zome_fixturator.take(3).collect();

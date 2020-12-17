@@ -10,14 +10,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::zome::Permission;
 use holochain_types::dna::zome::Zome;
-use holochain_zome_types::entry::Entry;
-use holochain_zome_types::header::CreateLink;
-use holochain_zome_types::header::DeleteLink;
-use holochain_zome_types::validate_link::ValidateCreateLinkData;
-use holochain_zome_types::validate_link::ValidateDeleteLinkData;
-use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use holochain_zome_types::*;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -201,7 +194,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_link_add_callback_result_fold() {
-        let mut rng = fixt::rng();
+        let mut rng = ::fixt::rng();
 
         let result_valid = || ValidateLinkResult::Valid;
         let result_invalid = || ValidateLinkResult::Invalid("".into());
@@ -235,7 +228,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn validate_link_add_invocation_allow_side_effects() {
         let validate_link_add_host_access =
-            ValidateLinkHostAccessFixturator::new(fixt::Unpredictable)
+            ValidateLinkHostAccessFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap();
         let mut access = HostFnAccess::none();
@@ -247,7 +240,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn validate_link_add_invocation_zomes() {
         let validate_create_link_invocation =
-            ValidateCreateLinkInvocationFixturator::new(fixt::Unpredictable)
+            ValidateCreateLinkInvocationFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap();
         let zome = validate_create_link_invocation.zome.clone();
@@ -260,7 +253,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn validate_link_add_invocation_fn_components() {
         let validate_create_link_invocation =
-            ValidateCreateLinkInvocationFixturator::new(fixt::Unpredictable)
+            ValidateCreateLinkInvocationFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap();
 
@@ -273,7 +266,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn validate_link_add_invocation_host_input() {
         let validate_create_link_invocation =
-            ValidateCreateLinkInvocationFixturator::new(fixt::Unpredictable)
+            ValidateCreateLinkInvocationFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap();
 

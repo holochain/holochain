@@ -9,15 +9,7 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::zome::Permission;
-use holochain_zome_types::element::Element;
-use holochain_zome_types::entry::Entry;
-use holochain_zome_types::entry_def::EntryDefId;
-use holochain_zome_types::validate::ValidateCallbackResult;
-use holochain_zome_types::validate::ValidateData;
-use holochain_zome_types::validate::ValidationPackage;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
-use holochain_zome_types::Header;
+use holochain_zome_types::*;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -149,16 +141,13 @@ mod test {
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_types::dna::zome::Permission;
     use holochain_types::fixt::*;
-    use holochain_zome_types::entry::Entry;
-    use holochain_zome_types::header::HeaderType;
-    use holochain_zome_types::validate::ValidateCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::*;
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_callback_result_fold() {
-        let mut rng = fixt::rng();
+        let mut rng = ::fixt::rng();
 
         let result_valid = || ValidateResult::Valid;
         let result_ud = || ValidateResult::UnresolvedDependencies(vec![]);
@@ -197,7 +186,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_invocation_allow_side_effects() {
-        let validate_host_access = ValidateHostAccessFixturator::new(fixt::Unpredictable)
+        let validate_host_access = ValidateHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         let mut access = HostFnAccess::none();
@@ -209,7 +198,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_invocation_zomes() {
-        let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
+        let validate_invocation = ValidateInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         let zomes_to_invoke = validate_invocation.zomes_to_invoke.clone();
@@ -218,12 +207,12 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_invocation_fn_components() {
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
 
         let agent_entry = Entry::Agent(
-            AgentPubKeyFixturator::new(fixt::Unpredictable)
+            AgentPubKeyFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
@@ -236,7 +225,7 @@ mod test {
         }
 
         let agent_entry = Entry::App(
-            AppEntryBytesFixturator::new(fixt::Unpredictable)
+            AppEntryBytesFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
@@ -249,7 +238,7 @@ mod test {
         }
 
         let agent_entry = Entry::CapClaim(
-            CapClaimFixturator::new(fixt::Unpredictable)
+            CapClaimFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
@@ -262,7 +251,7 @@ mod test {
         }
 
         let agent_entry = Entry::CapGrant(
-            ZomeCallCapGrantFixturator::new(fixt::Unpredictable)
+            ZomeCallCapGrantFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
@@ -277,7 +266,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_invocation_host_input() {
-        let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
+        let validate_invocation = ValidateInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
 
@@ -314,7 +303,7 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
         validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::Foo.into());
@@ -330,7 +319,7 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
         validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateValid.into());
@@ -346,7 +335,7 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
         validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateInvalid.into());
@@ -362,11 +351,11 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
         let entry = Entry::Agent(
-            AgentPubKeyFixturator::new(fixt::Unpredictable)
+            AgentPubKeyFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),

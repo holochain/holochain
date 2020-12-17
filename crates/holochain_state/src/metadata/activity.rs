@@ -47,7 +47,7 @@ pub(super) fn add_chain_status(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holo_hash::fixt::*;
     use ChainStatus::*;
 

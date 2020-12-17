@@ -1322,8 +1322,8 @@ mod slow_tests {
     use crate::test_utils::host_fn_caller::*;
     use crate::test_utils::setup_app;
     use crate::test_utils::wait_for_integration;
+    use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
-    use fixt::prelude::*;
     use holo_hash::EntryHash;
     use holochain_lmdb::db::GetDb;
     use holochain_lmdb::db::INTEGRATED_DHT_OPS;

@@ -31,12 +31,12 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holo_hash::EntryHash;
+    use holochain_test_wasm_common::TestString;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::HashEntryInput;
     use holochain_zome_types::HashEntryOutput;
     use std::convert::TryInto;
     use std::sync::Arc;
-    use holochain_test_wasm_common::TestString;
 
     #[tokio::test(threaded_scheduler)]
     /// we can get an entry hash out of the fn directly
@@ -44,7 +44,7 @@ pub mod wasm_test {
         let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
-        let call_context = CallContextFixturator::new(fixt::Unpredictable)
+        let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();

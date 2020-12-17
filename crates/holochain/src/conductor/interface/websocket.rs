@@ -310,8 +310,8 @@ pub mod test {
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
     use crate::test_utils::conductor_setup::ConductorTestData;
+    use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
-    use fixt::prelude::*;
     use futures::future::FutureExt;
     use holochain_lmdb::buffer::KvStoreT;
     use holochain_lmdb::fresh_reader_test;
