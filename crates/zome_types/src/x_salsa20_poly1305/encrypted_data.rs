@@ -1,15 +1,28 @@
+use crate::x_salsa20_poly1305::nonce::XSalsa20Poly1305Nonce;
+
 #[derive(PartialEq, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct XSalsa20Poly1305EncryptedData(#[serde(with = "serde_bytes")] Vec<u8>);
+pub struct XSalsa20Poly1305EncryptedData {
+    nonce: XSalsa20Poly1305Nonce,
+    #[serde(with = "serde_bytes")]
+    encrypted_data: Vec<u8>,
+}
+
+impl XSalsa20Poly1305EncryptedData {
+    pub fn new(nonce: XSalsa20Poly1305Nonce, encrypted_data: Vec<u8>) -> Self {
+        Self {
+            nonce,
+            encrypted_data,
+        }
+    }
+
+    pub fn as_nonce_ref(&self) -> &XSalsa20Poly1305Nonce {
+        &self.nonce
+    }
+
+    pub fn as_encrypted_data_ref(&self) -> &[u8] {
+        &self.encrypted_data
+    }
+}
+
 pub type SecretBoxEncryptedData = XSalsa20Poly1305EncryptedData;
-
-impl From<Vec<u8>> for XSalsa20Poly1305EncryptedData {
-    fn from(v: Vec<u8>) -> Self {
-        Self(v)
-    }
-}
-
-impl AsRef<[u8]> for XSalsa20Poly1305EncryptedData {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
+pub type BoxEncryptedData = XSalsa20Poly1305EncryptedData;

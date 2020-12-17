@@ -30,15 +30,18 @@ use crate::prelude::*;
 /// @see https://doc.libsodium.org/secret-key_cryptography/secretbox
 /// @see https://nacl.cr.yp.to/secretbox.html
 pub fn x_salsa20_poly1305_encrypt(
-    key: XSalsa20Poly1305Key,
-    nonce: XSalsa20Poly1305Nonce,
+    key_ref: XSalsa20Poly1305KeyRef,
     data: XSalsa20Poly1305Data,
 ) -> HdkResult<XSalsa20Poly1305EncryptedData> {
     host_externs!(__x_salsa20_poly1305_encrypt);
     Ok(
         host_call::<XSalsa20Poly1305EncryptInput, XSalsa20Poly1305EncryptOutput>(
             __x_salsa20_poly1305_encrypt,
-            &XSalsa20Poly1305EncryptInput::new((key, nonce, data)),
+            &XSalsa20Poly1305EncryptInput::new(
+                holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Encrypt::new(
+                    key_ref, data,
+                ),
+            ),
         )?
         .into_inner(),
     )
@@ -46,9 +49,8 @@ pub fn x_salsa20_poly1305_encrypt(
 
 // Alias to secretbox as algorithm name.
 pub fn secretbox(
-    key: SecretBoxKey,
-    nonce: SecretBoxNonce,
+    key_ref: SecretBoxKeyRef,
     data: SecretBoxData,
 ) -> HdkResult<SecretBoxEncryptedData> {
-    x_salsa20_poly1305_encrypt(key, nonce, data)
+    x_salsa20_poly1305_encrypt(key_ref, data)
 }

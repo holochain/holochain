@@ -7,31 +7,6 @@ use super::{
     host_fn::{get_agent_activity::get_agent_activity, HostFnApi},
     HostAccess, ZomeCallHostAccess,
 };
-use crate::core::ribosome::{
-    error::{RibosomeError, RibosomeResult},
-    guest_callback::{
-        entry_defs::{EntryDefsInvocation, EntryDefsResult},
-        init::{InitInvocation, InitResult},
-        migrate_agent::{MigrateAgentInvocation, MigrateAgentResult},
-        post_commit::{PostCommitInvocation, PostCommitResult},
-        validate::{ValidateInvocation, ValidateResult},
-        validate_link::{ValidateLinkHostAccess, ValidateLinkInvocation, ValidateLinkResult},
-        validation_package::{ValidationPackageInvocation, ValidationPackageResult},
-        CallIterator,
-    },
-    host_fn::{
-        agent_info::agent_info, call::call, call_remote::call_remote,
-        capability_claims::capability_claims, capability_grants::capability_grants,
-        capability_info::capability_info, create::create, create_link::create_link, debug::debug,
-        decrypt::decrypt, delete::delete, delete_link::delete_link, emit_signal::emit_signal,
-        encrypt::encrypt, get::get, get_details::get_details, get_link_details::get_link_details,
-        get_links::get_links, hash_entry::hash_entry, property::property, query::query,
-        random_bytes::random_bytes, schedule::schedule, show_env::show_env, sign::sign,
-        sys_time::sys_time, unreachable::unreachable, update::update,
-        verify_signature::verify_signature, zome_info::zome_info,
-    },
-    CallContext, Invocation, RibosomeT, ZomeCallInvocation,
-};
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
@@ -84,7 +59,6 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::ribosome::ZomesToInvoke;
 use fallible_iterator::FallibleIterator;
 use holochain_types::dna::{
     zome::{HostFnAccess, Permission, Zome, ZomeDef},
@@ -225,6 +199,14 @@ impl RealRibosome {
                 "__x_salsa20_poly1305_decrypt",
                 func!(invoke_host_function!(x_salsa20_poly1305_decrypt)),
             );
+            ns.insert(
+                "__x_25519_x_salsa20_poly1305_encrypt",
+                func!(invoke_host_function!(x_salsa20_poly1305_encrypt)),
+            );
+            ns.insert(
+                "__x_25519_x_salsa20_poly1305_decrypt",
+                func!(invoke_host_function!(x_salsa20_poly1305_decrypt)),
+            );
         } else {
             ns.insert(
                 "__verify_signature",
@@ -237,6 +219,14 @@ impl RealRibosome {
             );
             ns.insert(
                 "__x_salsa20_poly1305_decrypt",
+                func!(invoke_host_function!(unreachable)),
+            );
+            ns.insert(
+                "__x_25519_x_salsa20_poly1305_encrypt",
+                func!(invoke_host_function!(unreachable)),
+            );
+            ns.insert(
+                "__x_25519_x_salsa20_poly1305_decrypt",
                 func!(invoke_host_function!(unreachable)),
             );
         }

@@ -114,6 +114,14 @@ macro_rules! fixed_array_serialization {
     };
 }
 
+/// Errors related to the secure primitive macro.
+#[derive(Debug, thiserror::Error)]
+pub enum SecurePrimitiveError {
+    /// We have the wrong number of bytes.
+    #[error("Bad sized secure primitive.")]
+    BadSize,
+}
+
 #[macro_export]
 /// Cryptographic secrets are fiddly at the best of times.
 ///
@@ -145,7 +153,7 @@ macro_rules! fixed_array_serialization {
 ///
 /// @todo implement explicit zeroing, moving and copying of memory for sensitive data.
 ///       - e.g. the secrecy crate https://crates.io/crates/secrecy
-macro_rules! crypto_secret {
+macro_rules! secure_primitive {
     ($t:ty, $len:expr) => {
         $crate::fixed_array_serialization!($t, $len);
 
@@ -184,6 +192,19 @@ macro_rules! crypto_secret {
         impl From<[u8; $len]> for $t {
             fn from(b: [u8; $len]) -> Self {
                 Self(b)
+            }
+        }
+
+        impl TryFrom<&[u8]> for $t {
+            type Error = $crate::SecurePrimitiveError;
+            fn try_from(slice: &[u8]) -> Result<$t, Self::Error> {
+                if slice.len() == $len {
+                    let mut inner = [0; $len];
+                    inner.copy_from_slice(slice);
+                    Ok(inner.into())
+                } else {
+                    Err($crate::SecurePrimitiveError::BadSize)
+                }
             }
         }
 

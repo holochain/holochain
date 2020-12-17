@@ -90,26 +90,22 @@ wasm_io_types! {
     // @todo Get the capability for the current zome call.
     fn capability_info (()) -> ();
 
-    fn x_salsa20_poly1305_encrypt((
-        crate::x_salsa20_poly1305::key::XSalsa20Poly1305Key,
-        crate::x_salsa20_poly1305::nonce::XSalsa20Poly1305Nonce,
-        crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
-    )) -> crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+    fn x_salsa20_poly1305_encrypt(
+        crate::x_salsa20_poly1305::XSalsa20Poly1305Encrypt
+    ) -> crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
 
-    fn x_salsa20_poly1305_decrypt((
-        crate::x_salsa20_poly1305::key::XSalsa20Poly1305Key,
-        crate::x_salsa20_poly1305::nonce::XSalsa20Poly1305Nonce,
-        crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
-    )) -> Option<crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
+    fn x_salsa20_poly1305_decrypt(
+        crate::x_salsa20_poly1305::XSalsa20Poly1305Decrypt
+    ) -> Option<crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
+
+    // Sender, Recipient, Data.
+    fn x_25519_x_salsa20_poly1305_encrypt(crate::x_salsa20_poly1305::X25519XSalsa20Poly1305Encrypt) -> crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    // Recipient, Sender, Encrypted data.
+    fn x_25519_x_salsa20_poly1305_decrypt(crate::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
 
     // Returns HeaderHash of the newly created element.
     fn create ((zt::entry_def::EntryDefId, zt::entry::Entry)) -> holo_hash::HeaderHash;
-
-    // Sender, Recipient, Data.
-    fn crypto_box ((holo_hash::AgentXPubKey, holo_hash::AgentXPubKey, SerializedBytes)) -> CryptoBoxEncryptedData;
-
-    // Recipient, Sender, Encrypted data.
-    fn crypto_box_open ((holo_hash::AgentXPubKey, holo_hash::AgentXPubKey, CryptoBoxEncryptedData)) -> Option<CryptoBoxData>;
 
     // Create a link between two entries.
     fn create_link ((holo_hash::EntryHash, holo_hash::EntryHash, zt::link::LinkTag)) -> holo_hash::HeaderHash;

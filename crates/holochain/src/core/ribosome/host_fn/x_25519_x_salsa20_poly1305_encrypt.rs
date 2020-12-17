@@ -2,21 +2,21 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
-use holochain_zome_types::CryptoBoxOpenInput;
-use holochain_zome_types::CryptoBoxOpenOutput;
+use holochain_zome_types::X25519XSalsa20Poly1305EncryptInput;
+use holochain_zome_types::X25519XSalsa20Poly1305EncryptOutput;
 use std::sync::Arc;
 
-pub fn crypto_box_open(
+pub fn x_25519_x_salsa20_poly1305_encrypt(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: CryptoBoxOpenInput,
-) -> RibosomeResult<CryptoBoxOpenOutput> {
-    Ok(SignOutput::new(
+    input: X25519XSalsa20Poly1305EncryptInput,
+) -> RibosomeResult<X25519XSalsa20Poly1305EncryptOutput> {
+    Ok(X25519XSalsa20Poly1305EncryptOutput::new(
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             call_context
                 .host_access
                 .keystore()
-                .crypto_box_open(input.into_inner())
+                .x_25519_x_salsa20_poly1305_encrypt(input.into_inner())
                 .await
         })?,
     ))

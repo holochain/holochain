@@ -13,15 +13,15 @@ pub fn x_salsa20_poly1305_decrypt(
     _call_context: Arc<CallContext>,
     input: XSalsa20Poly1305DecryptInput,
 ) -> RibosomeResult<XSalsa20Poly1305DecryptOutput> {
-    let (key, nonce, encrypted_data) = input.into_inner();
+    let decrypt = input.into_inner();
 
     // @todo use a libsodium wrapper instead of an ad-hoc rust implementation.
     // Note that the we're mapping any decrypting error to None here.
-    let lib_key = GenericArray::from_slice(key.as_ref());
+    let lib_key = GenericArray::from_slice(decrypt.as_key_ref_ref().as_ref());
     let cipher = XSalsa20Poly1305::new(lib_key);
-    let lib_nonce = GenericArray::from_slice(nonce.as_ref());
+    let lib_nonce = GenericArray::from_slice(decrypt.as_encrypted_data_ref().as_nonce_ref().as_ref());
     let lib_data: Option<XSalsa20Poly1305Data> =
-        match cipher.decrypt(lib_nonce, encrypted_data.as_ref()) {
+        match cipher.decrypt(lib_nonce, decrypt.as_encrypted_data_ref().as_encrypted_data_ref()) {
             Ok(data) => Some(XSalsa20Poly1305Data::from(data)),
             Err(_) => None,
         };

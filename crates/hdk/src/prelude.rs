@@ -1,39 +1,3 @@
-pub use crate::{
-    capability::{
-        create_cap_claim::create_cap_claim, create_cap_grant::create_cap_grant,
-        delete_cap_grant::delete_cap_grant, generate_cap_secret::generate_cap_secret,
-        update_cap_grant::update_cap_grant,
-    },
-    debug,
-    entry::{create_entry::create_entry, delete_entry::delete_entry, update_entry::update_entry},
-    entry_def, entry_defs,
-    error::{HdkError, HdkResult},
-    hash_path::{
-        anchor::{
-            anchor, get_anchor, list_anchor_addresses, list_anchor_tags,
-            list_anchor_type_addresses, Anchor,
-        },
-        path::Path,
-    },
-    host_fn::{
-        agent_info::agent_info, call::call, call_remote::call_remote, create::create,
-        create_link::create_link, delete::delete, delete_link::delete_link,
-        emit_signal::emit_signal, get::get, get_agent_activity::get_agent_activity,
-        get_details::get_details, get_link_details::get_link_details, get_links::get_links,
-        hash_entry::hash_entry, query::query, random_bytes::random_bytes, sign::sign,
-        sys_time::sys_time, update::update, verify_signature::verify_signature,
-        zome_info::zome_info,
-    },
-    map_extern,
-    map_extern::ExternResult,
-};
-pub use hdk3_derive::{hdk_entry, hdk_extern};
-pub use holo_hash::{
-    AgentPubKey, AnyDhtHash, EntryHash, EntryHashes, HasHash, HeaderHash, HoloHash,
-};
-pub use holochain_wasmer_guest::*;
-pub use holochain_zome_types::{self, prelude::*};
-pub use std::{collections::HashSet, convert::TryFrom};
 pub use crate::capability::create_cap_claim::create_cap_claim;
 pub use crate::capability::create_cap_grant::create_cap_grant;
 pub use crate::capability::delete_cap_grant::delete_cap_grant;
@@ -91,6 +55,7 @@ pub use holo_hash::HasHash;
 pub use holo_hash::HeaderHash;
 pub use holo_hash::HoloHash;
 pub use holochain_wasmer_guest::*;
+pub use holochain_wasmer_guest::*;
 pub use holochain_zome_types;
 pub use holochain_zome_types::agent_info::AgentInfo;
 pub use holochain_zome_types::bytes::Bytes;
@@ -112,6 +77,7 @@ pub use holochain_zome_types::metadata::Details;
 pub use holochain_zome_types::migrate_agent::MigrateAgent;
 pub use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 pub use holochain_zome_types::post_commit::PostCommitCallbackResult;
+pub use holochain_zome_types::prelude::*;
 pub use holochain_zome_types::query::ActivityRequest;
 pub use holochain_zome_types::query::AgentActivity;
 pub use holochain_zome_types::query::ChainQueryFilter as QueryFilter;
@@ -131,8 +97,8 @@ pub use holochain_zome_types::x_salsa20_poly1305::data::SecretBoxData;
 pub use holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data;
 pub use holochain_zome_types::x_salsa20_poly1305::encrypted_data::SecretBoxEncryptedData;
 pub use holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
-pub use holochain_zome_types::x_salsa20_poly1305::key::SecretBoxKey;
-pub use holochain_zome_types::x_salsa20_poly1305::key::XSalsa20Poly1305Key;
+pub use holochain_zome_types::x_salsa20_poly1305::key_ref::SecretBoxKeyRef;
+pub use holochain_zome_types::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef;
 pub use holochain_zome_types::x_salsa20_poly1305::nonce::SecretBoxNonce;
 pub use holochain_zome_types::x_salsa20_poly1305::nonce::XSalsa20Poly1305Nonce;
 pub use holochain_zome_types::zome::FunctionName;

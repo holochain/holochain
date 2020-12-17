@@ -11,24 +11,27 @@ use crate::prelude::*;
 ///
 /// @see https://www.imperialviolet.org/2015/05/16/aeads.html
 pub fn x_salsa20_poly1305_decrypt(
-    key: XSalsa20Poly1305Key,
-    nonce: XSalsa20Poly1305Nonce,
+    key_ref: XSalsa20Poly1305KeyRef,
     encrypted_data: XSalsa20Poly1305EncryptedData,
 ) -> HdkResult<Option<XSalsa20Poly1305Data>> {
     host_externs!(__x_salsa20_poly1305_decrypt);
     Ok(
         host_call::<XSalsa20Poly1305DecryptInput, XSalsa20Poly1305DecryptOutput>(
             __x_salsa20_poly1305_decrypt,
-            &XSalsa20Poly1305DecryptInput::new((key, nonce, encrypted_data)),
+            &XSalsa20Poly1305DecryptInput::new(
+                holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Decrypt::new(
+                    key_ref,
+                    encrypted_data,
+                ),
+            ),
         )?
         .into_inner(),
     )
 }
 
 pub fn secretbox_open(
-    key: SecretBoxKey,
-    nonce: SecretBoxNonce,
+    key_ref: SecretBoxKeyRef,
     encrypted_data: SecretBoxEncryptedData,
 ) -> HdkResult<Option<SecretBoxData>> {
-    x_salsa20_poly1305_decrypt(key, nonce, encrypted_data)
+    x_salsa20_poly1305_decrypt(key_ref, encrypted_data)
 }

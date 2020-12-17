@@ -17,4 +17,10 @@ pub type CapSecretBytes = [u8; CAP_SECRET_BYTES];
 #[derive(Clone, Copy, SerializedBytes)]
 pub struct CapSecret(CapSecretBytes);
 
-crate::crypto_secret!(CapSecret, CAP_SECRET_BYTES);
+// Capability secrets are not cryptographic secrets.
+// They aren't used in any cryptographic algorithm.
+// They are closer to API keys in that they may provide access to specific functions on a specific
+// device if it is accepting incoming connections. Still secret but there are mitigating factors
+// such as the ability to revoke a secret, and to assign it to specific recipients ahead of time
+// if they are a known closed set.
+crate::secure_primitive!(CapSecret, CAP_SECRET_BYTES);

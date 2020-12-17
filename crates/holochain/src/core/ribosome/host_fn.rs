@@ -69,11 +69,19 @@ host_fn_api_impls! {
     // Returns HeaderHash of the newly created element.
     fn create ((zt::entry_def::EntryDefId, zt::entry::Entry)) -> holo_hash::HeaderHash;
 
+    fn x_salsa20_poly1305_encrypt(
+        holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Encrypt
+    ) -> holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    fn x_salsa20_poly1305_decrypt(
+        holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Decrypt
+    ) -> Option<holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
+
     // Sender, Recipient, Data.
-    fn crypto_box ((x25519::X25519PubKey, x25519::X25519PubKey, CryptoBoxData)) -> CryptoBoxEncryptedData;
+    fn x_25519_x_salsa20_poly1305_encrypt (holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Encrypt) -> holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
 
     // Recipient, Sender, Encrypted data.
-    fn crypto_box_open ((x25519::X25519PubKey, x25519::X25519PubKey, CryptoBoxEncryptedData)) -> Option<CryptoBoxData>;
+    fn x_25519_x_salsa20_poly1305_decrypt (holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
 
     // Create a link between two entries.
     fn create_link ((holo_hash::EntryHash, holo_hash::EntryHash, zt::link::LinkTag)) -> holo_hash::HeaderHash;
@@ -149,18 +157,6 @@ host_fn_api_impls! {
     // There's nothing to go in or out of a noop.
     // Used to "defuse" host functions when side effects are not allowed.
     fn unreachable (()) -> ();
-
-    fn x_salsa20_poly1305_encrypt((
-        holochain_zome_types::x_salsa20_poly1305::key::XSalsa20Poly1305Key,
-        holochain_zome_types::x_salsa20_poly1305::nonce::XSalsa20Poly1305Nonce,
-        holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
-    )) -> holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
-
-    fn x_salsa20_poly1305_decrypt((
-        holochain_zome_types::x_salsa20_poly1305::key::XSalsa20Poly1305Key,
-        holochain_zome_types::x_salsa20_poly1305::nonce::XSalsa20Poly1305Nonce,
-        holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
-    )) -> Option<holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
 
     // The zome and agent info are constants specific to the current zome and chain.
     // All the information is provided by core so there is no input value.

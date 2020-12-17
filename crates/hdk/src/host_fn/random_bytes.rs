@@ -64,8 +64,8 @@ impl_try_from_random!(
     holochain_zome_types::capability::CAP_SECRET_BYTES
 );
 impl_try_from_random!(
-    SecretBoxKey,
-    holochain_zome_types::x_salsa20_poly1305::key::KEY_BYTES
+    SecretBoxKeyRef,
+    holochain_zome_types::x_salsa20_poly1305::key_ref::KEY_REF_BYTES
 );
 impl_try_from_random!(
     SecretBoxNonce,
