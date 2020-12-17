@@ -1514,8 +1514,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adca869d80860a04757af4fc011d49505594365391a6e3a04105e8f88b9c32e1"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=try_from_ref#dca61e96241c938b42b9b87d0aa1c2788b8ca705"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
@@ -1529,8 +1528,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes_derive"
 version = "0.0.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2dbbf84d56f0a0cb00e5532fd4d40b1d42ffb403a1a964d8eeedc4d40131e208"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=try_from_ref#dca61e96241c938b42b9b87d0aa1c2788b8ca705"
 dependencies = [
  "quote 0.6.13",
  "syn 0.15.44",
@@ -1627,8 +1625,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.50"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=remote_signal#b00aa2ccaa4b9333271f0a58cfcec9e5a107ba2d"
+version = "0.0.51"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91072cf378f2b92d344de68d36e558167ba31f7b3bdb7767d01232fcc49757b8"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -1637,8 +1636,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.50"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=remote_signal#b00aa2ccaa4b9333271f0a58cfcec9e5a107ba2d"
+version = "0.0.51"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4774d4c3ed42f6c7579877237713a7d5bde98a6d4e08c02acc617a844ac5e87"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -1647,9 +1647,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_host"
-version = "0.0.50"
+version = "0.0.51"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a094cb028913a2d112d2db4d54968b5380ad881ca9c7653dff699d8fb91c4759"
+checksum = "ef25bc924851e5907532cfcde70fdfd629faeb74595bfab836b1b7bb86d5dafd"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
