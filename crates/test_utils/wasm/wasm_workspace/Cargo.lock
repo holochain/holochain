@@ -160,8 +160,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes"
-version = "0.0.45"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=try_from_ref#dca61e96241c938b42b9b87d0aa1c2788b8ca705"
+version = "0.0.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b8fe6bc8c830633862ee0b7903706f6d940f7c794b3f5e768f660a7abbacbc9"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
@@ -174,8 +175,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes_derive"
-version = "0.0.45"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=try_from_ref#dca61e96241c938b42b9b87d0aa1c2788b8ca705"
+version = "0.0.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1a4c0ef882177ac63c8912ae9c1eb6285d3b50a56f2bb0cebc41012255b7734"
 dependencies = [
  "quote 0.6.13",
  "syn 0.15.44",
@@ -183,9 +185,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.51"
+version = "0.0.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91072cf378f2b92d344de68d36e558167ba31f7b3bdb7767d01232fcc49757b8"
+checksum = "5e064411f7c8cf58e08a451c2df9ab99efb5de839f74a650c1a30abbd607add8"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -194,9 +196,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.51"
+version = "0.0.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4774d4c3ed42f6c7579877237713a7d5bde98a6d4e08c02acc617a844ac5e87"
+checksum = "6c86bf521e02f8f86ea96177ef316560e66e51a192b83a302e8e4b32a6f47f02"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
