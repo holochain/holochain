@@ -100,11 +100,11 @@ mod tests {
     use holochain_types::dht_op::produce_ops_from_element;
     use holochain_types::dht_op::DhtOp;
     use holochain_types::fixt::*;
-    use holochain_types::Entry;
     use holochain_types::EntryHashed;
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::header::builder;
     use holochain_zome_types::header::EntryType;
+    use holochain_zome_types::Entry;
     use matches::assert_matches;
     use observability;
     use std::collections::HashSet;

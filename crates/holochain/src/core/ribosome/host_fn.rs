@@ -1,7 +1,6 @@
 use super::CallContext;
 use super::RibosomeT;
-use holochain_zome_types::zome_io::HostFnApiError;
-use holochain_zome_types::zome_io::HostFnApiT;
+use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 
 pub struct HostFnApi<Ribosome: RibosomeT> {

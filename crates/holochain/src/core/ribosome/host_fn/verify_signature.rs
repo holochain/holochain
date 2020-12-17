@@ -2,8 +2,7 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_zome_types::VerifySignatureInput;
-use holochain_zome_types::VerifySignatureOutput;
+use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 
 pub fn verify_signature(

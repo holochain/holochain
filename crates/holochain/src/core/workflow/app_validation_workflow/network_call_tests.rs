@@ -10,15 +10,9 @@ use holochain_p2p::HolochainP2pCellT;
 use holochain_test_wasm_common::AgentActivitySearch;
 use holochain_types::activity::AgentActivity;
 use holochain_types::activity::ChainItems;
-use holochain_types::HeaderHashed;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::query::ActivityRequest;
-use holochain_zome_types::query::ChainHead;
-use holochain_zome_types::query::ChainQueryFilter;
-use holochain_zome_types::query::ChainStatus;
-use holochain_zome_types::query::HighestObserved;
-use holochain_zome_types::validate::ValidationStatus;
-use holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::HeaderHashed;
+use holochain_zome_types::prelude::*;
 use matches::assert_matches;
 use std::convert::TryInto;
 

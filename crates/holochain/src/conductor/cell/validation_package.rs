@@ -4,7 +4,7 @@ use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::prelude::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_types::dna::DnaFile;
-use holochain_types::HeaderHashed;
+use holochain_zome_types::HeaderHashed;
 
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::RibosomeT;

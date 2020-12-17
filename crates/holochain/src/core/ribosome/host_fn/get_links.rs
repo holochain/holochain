@@ -1,10 +1,9 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_state::metadata::LinkMetaKey;
 use holochain_p2p::actor::GetLinksOptions;
-use holochain_zome_types::GetLinksInput;
-use holochain_zome_types::GetLinksOutput;
+use holochain_state::metadata::LinkMetaKey;
+use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -50,10 +49,10 @@ pub mod slow_tests {
     use crate::test_utils::new_zome_call;
     use crate::test_utils::wait_for_integration_10s;
     use crate::test_utils::WaitOps;
-    use holochain_test_wasm_common::*;
-    use holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
+    use holochain_test_wasm_common::*;
+    use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]
@@ -69,8 +68,7 @@ pub mod slow_tests {
             .await
             .unwrap();
 
-        let workspace_lock =
-            crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
 
@@ -145,8 +143,7 @@ pub mod slow_tests {
             .await
             .unwrap();
 
-        let workspace_lock =
-            crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
 

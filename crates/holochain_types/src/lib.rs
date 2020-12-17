@@ -31,24 +31,34 @@ pub mod validate;
 pub mod test_utils;
 
 #[doc(inline)]
-pub use entry::{Entry, EntryHashed};
-
-#[doc(inline)]
-pub use header::HeaderHashed;
-
 pub use activity::*;
+#[doc(inline)]
 pub use app::*;
+#[doc(inline)]
 pub use autonomic::*;
+#[doc(inline)]
 pub use chain::*;
+#[doc(inline)]
 pub use db::*;
+#[doc(inline)]
 pub use dht_op::*;
+#[doc(inline)]
 pub use dna::*;
+#[doc(inline)]
 pub use element::*;
+#[doc(inline)]
 pub use entry::*;
+#[doc(inline)]
 pub use header::*;
+#[doc(inline)]
 pub use link::*;
+#[doc(inline)]
 pub use metadata::*;
+#[doc(inline)]
 pub use prelude::*;
+#[doc(inline)]
 pub use signal::*;
+#[doc(inline)]
 pub use timestamp::*;
+#[doc(inline)]
 pub use validate::*;

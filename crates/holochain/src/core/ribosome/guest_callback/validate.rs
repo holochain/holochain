@@ -9,7 +9,7 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::zome::Permission;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -141,7 +141,7 @@ mod test {
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_types::dna::zome::Permission;
     use holochain_types::fixt::*;
-    use holochain_zome_types::*;
+    use holochain_zome_types::prelude::*;
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 

@@ -9,8 +9,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::DnaDef;
 use holochain_types::dna::DnaFile;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::ExternInput;
-use holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::prelude::*;
 use unwrap_to::unwrap_to;
 
 /// A single link with an AgentPubKey for the base and target is committed by

@@ -71,11 +71,11 @@ use holochain_types::dna::zome::ZomeDef;
 use holochain_types::dna::DnaDef;
 use holochain_types::dna::DnaDefHashed;
 use holochain_types::test_utils::which_agent;
-use holochain_types::validate::ValidationStatus;
-use holochain_types::Entry;
-use holochain_types::HeaderHashed;
 use holochain_types::Timestamp;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
+use holochain_zome_types::Entry;
+use holochain_zome_types::HeaderHashed;
+use holochain_zome_types::ValidationStatus;
 use tracing::*;
 pub use types::Outcome;
 

@@ -196,12 +196,12 @@ mod tests {
     use holochain_types::dht_op::DhtOpLight;
     use holochain_types::fixt::AppEntryTypeFixturator;
     use holochain_types::fixt::SignatureFixturator;
-    use holochain_types::HeaderHashed;
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::header::builder;
     use holochain_zome_types::header::EntryType;
     use holochain_zome_types::header::Update;
+    use holochain_zome_types::HeaderHashed;
     use matches::assert_matches;
     use observability;
     use std::collections::HashMap;

@@ -5,7 +5,7 @@ use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
@@ -231,7 +231,7 @@ mod slow_tests {
     use crate::fixt::RealRibosomeFixturator;
     use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::entry_def::EntryVisibility;
-    use holochain_zome_types::*;
+    use holochain_zome_types::prelude::*;
     use std::collections::BTreeMap;
 
     #[tokio::test(threaded_scheduler)]

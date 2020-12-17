@@ -21,13 +21,13 @@ mod tests {
     use holochain_types::fixt::AppEntryTypeFixturator;
     use holochain_types::fixt::HeaderBuilderCommonFixturator;
     use holochain_types::header::NewEntryHeader;
-    use holochain_types::HeaderHashed;
     use holochain_zome_types::header;
     use holochain_zome_types::header::builder;
     use holochain_zome_types::header::Delete;
     use holochain_zome_types::header::EntryType;
     use holochain_zome_types::header::HeaderBuilder;
     use holochain_zome_types::header::HeaderBuilderCommon;
+    use holochain_zome_types::HeaderHashed;
 
     struct TestFixtures {
         header_hashes: Box<dyn Iterator<Item = HeaderHash>>,

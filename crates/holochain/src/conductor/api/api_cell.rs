@@ -16,9 +16,7 @@ use holochain_keystore::KeystoreSender;
 use holochain_types::autonomic::AutonomicCue;
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
-use holochain_zome_types::cell::CellId;
-use holochain_zome_types::entry_def::EntryDef;
-use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::prelude::*;
 use tracing::*;
 
 /// The concrete implementation of [CellConductorApiT], which is used to give

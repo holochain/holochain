@@ -10,9 +10,9 @@ use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::test_utils::fake_agent_pubkey_2;
 use holochain_types::test_utils::fake_cell_id;
-use holochain_types::HeaderHashed;
 use holochain_types::Timestamp;
 use holochain_zome_types::header;
+use holochain_zome_types::HeaderHashed;
 use std::sync::Arc;
 use tokio::sync;
 

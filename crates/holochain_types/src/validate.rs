@@ -2,8 +2,7 @@
 //! c.f. _guest_ types for validation callbacks and packages across the wasm boudary in zome_types
 
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::validate::ValidationPackage;
-pub use holochain_zome_types::validate::ValidationStatus;
+use holochain_zome_types::prelude::*;
 
 #[derive(
     Clone,

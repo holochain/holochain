@@ -41,8 +41,6 @@ use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_types::test_utils::fake_agent_pubkey_2;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
-use holochain_zome_types::cell::CellId;
-use holochain_zome_types::ExternInput;
 use matches::assert_matches;
 use observability;
 use test_case::test_case;

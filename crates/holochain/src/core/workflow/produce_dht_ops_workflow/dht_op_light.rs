@@ -6,10 +6,7 @@ use holochain_state::element_buf::ElementBuf;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::header::NewEntryHeader;
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::header;
-use holochain_zome_types::header::Header;
-use holochain_zome_types::signature::Signature;
+use holochain_zome_types::prelude::*;
 
 pub mod error;
 

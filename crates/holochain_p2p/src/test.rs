@@ -152,8 +152,8 @@ mod tests {
     use holochain_types::element::SignedHeaderHashed;
     use holochain_types::element::WireElement;
     use holochain_types::fixt::*;
-    use holochain_types::validate::ValidationStatus;
-    use holochain_types::HeaderHashed;
+    use holochain_zome_types::HeaderHashed;
+    use holochain_zome_types::ValidationStatus;
     use kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig;
     use kitsune_p2p::KitsuneP2pConfig;
 

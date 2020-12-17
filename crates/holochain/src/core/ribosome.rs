@@ -47,8 +47,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaDefHashed;
-use holochain_zome_types::cell::CellId;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 use mockall::automock;
 use std::iter::Iterator;
 

@@ -27,8 +27,7 @@ use holochain_state::workspace::Workspace;
 use holochain_state::workspace::WorkspaceResult;
 use holochain_types::element::Element;
 
-use holochain_zome_types::header::Header;
-use holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 use tracing::instrument;
 
@@ -351,7 +350,6 @@ pub mod tests {
     use holochain_lmdb::env::ReadManager;
     use holochain_lmdb::test_utils::test_cell_env;
     use holochain_p2p::HolochainP2pCellFixturator;
-    use holochain_serialized_bytes::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::cell::CellId;

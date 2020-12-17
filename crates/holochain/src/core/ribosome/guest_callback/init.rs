@@ -10,7 +10,7 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::DnaDef;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct InitInvocation {
@@ -115,32 +115,32 @@ mod test {
         let result_pass = || InitResult::Pass;
         let result_ud = || {
             InitResult::UnresolvedDependencies(
-                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                ZomeNameFixturator::new(::fixt::Predictable).next().unwrap(),
                 vec![],
             )
         };
         let result_fail = || {
             InitResult::Fail(
-                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                ZomeNameFixturator::new(::fixt::Predictable).next().unwrap(),
                 "".into(),
             )
         };
 
         let cb_pass = || {
             (
-                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                ZomeNameFixturator::new(::fixt::Predictable).next().unwrap(),
                 InitCallbackResult::Pass,
             )
         };
         let cb_ud = || {
             (
-                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                ZomeNameFixturator::new(::fixt::Predictable).next().unwrap(),
                 InitCallbackResult::UnresolvedDependencies(vec![]),
             )
         };
         let cb_fail = || {
             (
-                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                ZomeNameFixturator::new(::fixt::Predictable).next().unwrap(),
                 InitCallbackResult::Fail("".into()),
             )
         };

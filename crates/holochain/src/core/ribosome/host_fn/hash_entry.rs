@@ -2,9 +2,7 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
-use holochain_zome_types::Entry;
-use holochain_zome_types::HashEntryInput;
-use holochain_zome_types::HashEntryOutput;
+use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 
 pub fn hash_entry(
@@ -47,7 +45,7 @@ pub mod wasm_test {
         let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
+        let entry = EntryFixturator::new(::fixt::Predictable).next().unwrap();
         let input = HashEntryInput::new(entry);
 
         let output: HashEntryOutput =
@@ -72,7 +70,7 @@ pub mod wasm_test {
 
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
-        let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
+        let entry = EntryFixturator::new(::fixt::Predictable).next().unwrap();
         let input = HashEntryInput::new(entry);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;

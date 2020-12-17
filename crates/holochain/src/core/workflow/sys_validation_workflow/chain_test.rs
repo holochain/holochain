@@ -1,6 +1,3 @@
-use std::convert::TryFrom;
-use std::time::Duration;
-
 use super::*;
 use crate::conductor::ConductorHandle;
 use crate::test_utils::setup_app;
@@ -12,10 +9,12 @@ use holochain_state::source_chain::SourceChain;
 use holochain_types::app::InstalledCell;
 use holochain_types::dna::DnaDef;
 use holochain_types::dna::DnaFile;
+use holochain_types::Timestamp;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::cell::CellId;
 use holochain_zome_types::fixt::*;
-use holochain_zome_types::test_utils::fake_agent_pubkey_1;
+use holochain_zome_types::test_utils::*;
+use std::convert::TryFrom;
+use std::time::Duration;
 
 /// Unfortunately this test doesn't do anything yet because
 /// failing a chain validation is just a log error so the only way to

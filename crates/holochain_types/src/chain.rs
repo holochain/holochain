@@ -1,8 +1,8 @@
 //! Types related to an agents for chain activity
 use crate::activity::AgentActivity;
 use crate::activity::ChainItems;
-use crate::activity::ChainStatus;
 use holo_hash::AgentPubKey;
+use holochain_zome_types::ChainStatus;
 
 /// Helpers for constructing AgentActivity
 pub trait AgentActivityExt {

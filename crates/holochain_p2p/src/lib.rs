@@ -4,10 +4,7 @@
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::activity::AgentActivity;
-use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::query::ChainQueryFilter;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 
 mod types;

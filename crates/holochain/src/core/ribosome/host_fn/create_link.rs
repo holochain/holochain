@@ -4,9 +4,7 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use crate::core::workflow::CallZomeWorkspace;
 
-use holochain_zome_types::header::builder;
-use holochain_zome_types::CreateLinkInput;
-use holochain_zome_types::CreateLinkOutput;
+use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]

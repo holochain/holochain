@@ -1,9 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::bytes::Bytes;
-use holochain_zome_types::RandomBytesInput;
-use holochain_zome_types::RandomBytesOutput;
+use holochain_zome_types::prelude::*;
 use ring::rand::SecureRandom;
 use std::sync::Arc;
 

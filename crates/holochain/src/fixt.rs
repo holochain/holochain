@@ -48,7 +48,7 @@ use holochain_types::dna::Zomes;
 pub use holochain_types::fixt::*;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;

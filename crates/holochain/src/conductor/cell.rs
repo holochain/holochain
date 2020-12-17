@@ -59,8 +59,7 @@ use holochain_types::metadata::MetadataSet;
 
 use holochain_types::validate::ValidationPackageResponse;
 use holochain_types::Timestamp;
-use holochain_zome_types::cell::CellId;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 use observability::OpenSpanExt;
 
 use std::convert::TryInto;

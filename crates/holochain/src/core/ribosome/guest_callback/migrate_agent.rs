@@ -8,7 +8,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::zome::Permission;
 use holochain_types::dna::DnaDef;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 
 #[derive(Clone)]
 pub struct MigrateAgentInvocation {
@@ -115,7 +115,7 @@ mod test {
     use crate::fixt::ZomeNameFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
-    use holochain_zome_types::*;
+    use holochain_zome_types::prelude::*;
     use rand::prelude::*;
 
     #[test]

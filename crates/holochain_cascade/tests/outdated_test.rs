@@ -22,11 +22,8 @@ use holochain_types::prelude::*;
 use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_types::test_utils::fake_agent_pubkey_2;
 use holochain_types::test_utils::fake_header_hash;
-use holochain_types::HeaderHashed;
-use holochain_zome_types::header;
-use holochain_zome_types::link::LinkTag;
-use holochain_zome_types::Entry;
-use holochain_zome_types::Header;
+use holochain_zome_types::HeaderHashed;
+use holochain_zome_types::prelude::*;
 use mockall::*;
 use observability;
 

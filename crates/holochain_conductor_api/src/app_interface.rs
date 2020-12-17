@@ -3,7 +3,7 @@ use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::app::InstalledApp;
 use holochain_types::app::InstalledAppId;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 
 /// Represents the available Conductor functions to call over an App interface
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]

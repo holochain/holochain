@@ -16,8 +16,8 @@ use holochain_state::metadata::ChainItemKey;
 use holochain_state::metadata::MetadataBufT;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::header::NewEntryHeaderRef;
-use holochain_types::Entry;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
+use holochain_zome_types::Entry;
 use std::convert::TryInto;
 
 pub(super) use error::*;
@@ -27,8 +27,8 @@ pub use holochain_state::source_chain::SourceChainResult;
 pub use holo_hash::*;
 pub use holochain_types::element::Element;
 pub use holochain_types::element::ElementExt;
-pub use holochain_types::HeaderHashed;
 pub use holochain_types::Timestamp;
+pub use holochain_zome_types::HeaderHashed;
 
 #[allow(missing_docs)]
 mod error;

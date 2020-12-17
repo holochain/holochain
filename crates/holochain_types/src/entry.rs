@@ -6,8 +6,7 @@
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
 use holo_hash::*;
-use holochain_zome_types::element::ElementEntry;
-pub use holochain_zome_types::entry::Entry;
+use holochain_zome_types::prelude::*;
 
 /// An Entry paired with its EntryHash
 pub type EntryHashed = HoloHashed<Entry>;

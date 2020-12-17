@@ -79,7 +79,7 @@ mod tests {
     use crate::fixt::ZomeFixturator;
     use fallible_iterator::FallibleIterator;
     use holochain_types::dna::zome::Zome;
-    use holochain_zome_types::*;
+    use holochain_zome_types::prelude::*;
     use mockall::predicate::*;
     use mockall::Sequence;
     use std::convert::TryInto;

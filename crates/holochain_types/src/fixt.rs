@@ -11,7 +11,7 @@ use crate::dna::Zomes;
 use crate::header::NewEntryHeader;
 use crate::Timestamp;
 use ::fixt::prelude::*;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 use rand::seq::IteratorRandom;
 use std::iter::Iterator;
 

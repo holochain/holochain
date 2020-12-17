@@ -3,9 +3,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_state::metadata::LinkMetaKey;
 use holochain_p2p::actor::GetLinksOptions;
-use holochain_zome_types::link::LinkDetails;
-use holochain_zome_types::GetLinkDetailsInput;
-use holochain_zome_types::GetLinkDetailsOutput;
+use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]

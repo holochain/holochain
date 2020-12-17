@@ -1,9 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::agent_info::AgentInfo;
-use holochain_zome_types::AgentInfoInput;
-use holochain_zome_types::AgentInfoOutput;
+use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]

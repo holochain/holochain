@@ -3,8 +3,8 @@ use ::fixt::prelude::*;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::fixt::*;
-use holochain_zome_types::test_utils::fake_agent_pubkey_1;
-use holochain_zome_types::Header;
+use holochain_zome_types::prelude::*;
+use holochain_zome_types::test_utils::*;
 
 #[tokio::test(threaded_scheduler)]
 async fn incoming_ops_to_limbo() {

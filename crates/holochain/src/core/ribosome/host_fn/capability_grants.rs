@@ -1,8 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::CapabilityGrantsInput;
-use holochain_zome_types::CapabilityGrantsOutput;
+use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 
 /// list all the grants stored locally in the chain filtered by tag

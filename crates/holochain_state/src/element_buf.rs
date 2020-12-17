@@ -29,9 +29,7 @@ use holochain_types::element::ElementGroup;
 use holochain_types::element::SignedHeader;
 use holochain_types::element::SignedHeaderHashed;
 use holochain_types::entry::EntryHashed;
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::Entry;
-use holochain_zome_types::Header;
+use holochain_zome_types::prelude::*;
 use tracing::*;
 
 /// A CasBufFresh with Entries for values

@@ -69,7 +69,7 @@ use holochain_types::dna::DnaDefHashed;
 use holochain_types::dna::DnaError;
 use holochain_types::dna::DnaFile;
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 
 /// Path to the wasm cache path

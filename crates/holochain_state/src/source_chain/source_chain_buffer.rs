@@ -16,10 +16,9 @@ use holochain_types::element::SignedHeaderHashed;
 use holochain_types::element::SignedHeaderHashedExt;
 use holochain_types::entry::EntryHashed;
 use holochain_types::prelude::*;
-use holochain_types::HeaderHashed;
-use holochain_zome_types::header;
-use holochain_zome_types::Entry;
-use holochain_zome_types::Header;
+use holochain_types::Timestamp;
+use holochain_zome_types::prelude::*;
+use holochain_zome_types::HeaderHashed;
 use tracing::*;
 
 pub struct SourceChainBuf {
@@ -326,10 +325,10 @@ pub mod tests {
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
-    use holochain_types::HeaderHashed;
     use holochain_zome_types::header;
     use holochain_zome_types::Entry;
     use holochain_zome_types::Header;
+    use holochain_zome_types::HeaderHashed;
 
     fn fixtures() -> (
         AgentPubKey,
