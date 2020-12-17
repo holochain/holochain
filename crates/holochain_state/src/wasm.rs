@@ -6,8 +6,7 @@ use holochain_lmdb::exports::SingleStore;
 use holochain_lmdb::prelude::BufferedStore;
 use holochain_lmdb::prelude::EnvironmentRead;
 use holochain_lmdb::transaction::Writer;
-use holochain_types::dna::wasm::DnaWasm;
-use holochain_types::dna::wasm::DnaWasmHashed;
+use holochain_types::prelude::*;
 
 /// This is where wasm lives
 pub struct WasmBuf(CasBufFreshAsync<DnaWasm>);

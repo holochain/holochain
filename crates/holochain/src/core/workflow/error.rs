@@ -13,7 +13,6 @@ use holochain_lmdb::error::DatabaseError;
 use holochain_p2p::HolochainP2pError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_state::workspace::WorkspaceError;
-use holochain_types::dht_op::error::DhtOpError;
 use holochain_types::prelude::*;
 use thiserror::Error;
 

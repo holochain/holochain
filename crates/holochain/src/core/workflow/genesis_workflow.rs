@@ -16,7 +16,6 @@ use holochain_lmdb::prelude::*;
 use holochain_state::source_chain::SourceChainBuf;
 use holochain_state::workspace::Workspace;
 use holochain_state::workspace::WorkspaceResult;
-use holochain_types::dna::DnaFile;
 use holochain_types::prelude::*;
 use tracing::*;
 

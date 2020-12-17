@@ -3,9 +3,7 @@ use error::DhtOpConvertResult;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_state::element_buf::ElementBuf;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::dht_op::DhtOpLight;
-use holochain_types::header::NewEntryHeader;
+use holochain_types::prelude::*;
 use holochain_zome_types::prelude::*;
 
 pub mod error;

@@ -10,13 +10,9 @@ use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
 use holochain_keystore::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::app::InstallAppDnaPayload;
-use holochain_types::app::InstallAppPayload;
-use holochain_types::app::InstalledApp;
+use holochain_types::prelude::*;
 
-use holochain_types::app::InstalledCell;
-use holochain_types::dna::DnaFile;
-use holochain_types::dna::JsonProperties;
+use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 
 use std::path::PathBuf;

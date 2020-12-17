@@ -9,16 +9,7 @@ use holochain_lmdb::buffer::BufferedStore;
 use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
-use holochain_types::dht_op::produce_ops_from_element;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::element::Element;
-use holochain_types::element::SignedHeaderHashed;
-use holochain_types::element::SignedHeaderHashedExt;
-use holochain_types::entry::EntryHashed;
 use holochain_types::prelude::*;
-use holochain_types::Timestamp;
-use holochain_zome_types::prelude::*;
-use holochain_zome_types::HeaderHashed;
 use tracing::*;
 
 pub struct SourceChainBuf {

@@ -1,8 +1,6 @@
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::app::InstallAppPayload;
-use holochain_types::app::InstalledApp;
-use holochain_types::app::InstalledAppId;
+use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 

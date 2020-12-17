@@ -3,8 +3,7 @@ use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_lmdb::error::DatabaseError;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dht_op::error::DhtOpError;
-use holochain_types::element::error::ElementGroupError;
+use holochain_types::prelude::*;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

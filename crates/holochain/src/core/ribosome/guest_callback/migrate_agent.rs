@@ -5,9 +5,7 @@ use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::HostFnAccess;
-use holochain_types::dna::zome::Permission;
-use holochain_types::dna::DnaDef;
+use holochain_types::prelude::*;
 use holochain_zome_types::prelude::*;
 
 #[derive(Clone)]

@@ -12,8 +12,7 @@ use holochain_lmdb::prelude::GetDb;
 use holochain_lmdb::prelude::Readable;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dht_op::DhtOpLight;
-use holochain_types::Timestamp;
+use holochain_types::prelude::*;
 use holochain_zome_types::validate::ValidationStatus;
 
 /// Database type for AuthoredDhtOps

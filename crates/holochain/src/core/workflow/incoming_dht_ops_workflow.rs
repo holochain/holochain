@@ -29,8 +29,7 @@ use holochain_state::validation_db::ValidationLimboStore;
 use holochain_state::validation_db::ValidationLimboValue;
 use holochain_state::workspace::Workspace;
 use holochain_state::workspace::WorkspaceResult;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::Timestamp;
+use holochain_types::prelude::*;
 use holochain_zome_types::query::HighestObserved;
 use tracing::instrument;
 

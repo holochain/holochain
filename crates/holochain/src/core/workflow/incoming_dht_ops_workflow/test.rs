@@ -1,8 +1,7 @@
 use super::*;
 use ::fixt::prelude::*;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::fixt::*;
+use holochain_types::prelude::*;
 use holochain_zome_types::prelude::*;
 use holochain_zome_types::test_utils::*;
 

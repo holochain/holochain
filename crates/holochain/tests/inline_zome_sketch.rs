@@ -5,8 +5,7 @@ use holochain::test_utils::test_conductor::MaybeElement;
 use holochain::test_utils::test_conductor::TestAgents;
 use holochain::test_utils::test_conductor::TestConductorHandle;
 use holochain_lmdb::test_utils::test_environments;
-use holochain_types::dna::zome::inline_zome::InlineZome;
-use holochain_types::dna::DnaFile;
+use holochain_types::prelude::*;
 use holochain_zome_types::element::ElementEntry;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]

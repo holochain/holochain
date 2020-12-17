@@ -8,8 +8,7 @@ use crate::core::SourceChainError;
 use holochain_cascade::error::CascadeError;
 use holochain_lmdb::error::DatabaseError;
 use holochain_p2p::HolochainP2pError;
-use holochain_types::dna::DnaError;
-use holochain_types::header::error::HeaderError;
+use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 
 use std::path::PathBuf;

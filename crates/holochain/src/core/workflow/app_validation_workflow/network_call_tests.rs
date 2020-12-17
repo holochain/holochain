@@ -8,11 +8,10 @@ use holochain_lmdb::fresh_reader_test;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_test_wasm_common::AgentActivitySearch;
-use holochain_types::activity::AgentActivity;
-use holochain_types::activity::ChainItems;
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::prelude::*;
+use holochain_zome_types::HeaderHashed;
 use matches::assert_matches;
 use std::convert::TryInto;
 
