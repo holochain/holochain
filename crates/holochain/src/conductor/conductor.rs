@@ -8,7 +8,6 @@
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
-use super::api::CellConductorApi;
 use super::api::CellConductorApiT;
 use super::api::RealAdminInterfaceApi;
 use super::api::RealAppInterfaceApi;
@@ -41,6 +40,7 @@ use super::paths::EnvironmentRootPath;
 use super::state::AppInterfaceId;
 use super::state::ConductorState;
 use super::CellError;
+use super::{api::CellConductorApi, state::AppInterfaceConfig};
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::cell::Cell;
 use crate::conductor::config::ConductorConfig;
