@@ -50,5 +50,5 @@ lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }
 # lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
 # lair_keystore_client = { path = "../lair/crates/lair_keystore_client" }
 # observability = { path = "../../rust/observability" }
-holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "try_from_ref" }
+# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "try_from_ref" }
 tokio_safe_block_on = { git = "https://github.com/neonphog/tokio_safe_block_on.git", branch = "fix_holochain_bug" }

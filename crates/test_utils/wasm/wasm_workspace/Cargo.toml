@@ -48,4 +48,4 @@ opt-level = "z"
 # holochain_wasmer_guest = { path = "../../../../../holochain-wasmer/crates/guest" }
 
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "remote_signal" }
-holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "try_from_ref" }
+# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "try_from_ref" }
