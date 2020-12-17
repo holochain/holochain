@@ -3,6 +3,7 @@ pub mod data;
 pub mod encrypted_data;
 pub mod key_ref;
 pub mod nonce;
+pub mod x25519;
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct XSalsa20Poly1305Encrypt {
@@ -29,15 +30,15 @@ impl XSalsa20Poly1305Encrypt {
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct X25519XSalsa20Poly1305Encrypt {
-    sender: holo_hash::AgentXPubKey,
-    recipient: holo_hash::AgentXPubKey,
+    sender: X25519PubKey,
+    recipient: X25519PubKey,
     data: crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
 }
 
 impl X25519XSalsa20Poly1305Encrypt {
     pub fn new(
-        sender: holo_hash::AgentXPubKey,
-        recipient: holo_hash::AgentXPubKey,
+        sender: X25519PubKey,
+        recipient: X25519PubKey,
         data: crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
     ) -> Self {
         Self {
@@ -47,15 +48,15 @@ impl X25519XSalsa20Poly1305Encrypt {
         }
     }
 
-    pub fn as_sender_ref(&self) -> &holo_hash::AgentXPubKey {
+    pub fn as_sender_ref(&self) -> &X25519PubKey {
         &self.sender
     }
 
-    pub fn as_recipient_ref(&self) -> &holo_hash::AgentXPubKey {
+    pub fn as_recipient_ref(&self) -> &X25519PubKey {
         &self.recipient
     }
 
-    pub fn as_data_ref(&self) -> &crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data {
+    pub fn as_data_ref(&self) -> &XSalsa20Poly1305Data {
         &self.data
     }
 }
@@ -90,23 +91,33 @@ impl XSalsa20Poly1305Decrypt {
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct X25519XSalsa20Poly1305Decrypt {
-    sender: holo_hash::AgentXPubKey,
-    recipient: holo_hash::AgentXPubKey,
-    encrypted_data: crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
+    sender: X25519PubKey,
+    recipient: X25519PubKey,
+    encrypted_data: XSalsa20Poly1305EncryptedData,
 }
 
 impl X25519XSalsa20Poly1305Decrypt {
-    pub fn as_sender_ref(&self) -> &holo_hash::AgentXPubKey {
+    pub fn new(
+        sender: X25519PubKey,
+        recipient: X25519PubKey,
+        encrypted_data: XSalsa20Poly1305EncryptedData,
+    ) -> Self {
+        Self {
+            sender,
+            recipient,
+            encrypted_data,
+        }
+    }
+
+    pub fn as_sender_ref(&self) -> &X25519PubKey {
         &self.sender
     }
 
-    pub fn as_recipient_ref(&self) -> &holo_hash::AgentXPubKey {
+    pub fn as_recipient_ref(&self) -> &X25519PubKey {
         &self.recipient
     }
 
-    pub fn as_encrypted_data_ref(
-        &self,
-    ) -> &crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData {
+    pub fn as_encrypted_data_ref(&self) -> &XSalsa20Poly1305EncryptedData {
         &self.encrypted_data
     }
 }

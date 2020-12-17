@@ -33,6 +33,7 @@ use crate::core::ribosome::host_fn::capability_grants::capability_grants;
 use crate::core::ribosome::host_fn::capability_info::capability_info;
 use crate::core::ribosome::host_fn::create::create;
 use crate::core::ribosome::host_fn::create_link::create_link;
+use crate::core::ribosome::host_fn::create_x25519_keypair::create_x25519_keypair;
 use crate::core::ribosome::host_fn::debug::debug;
 use crate::core::ribosome::host_fn::delete::delete;
 use crate::core::ribosome::host_fn::delete_link::delete_link;
@@ -52,6 +53,8 @@ use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::unreachable::unreachable;
 use crate::core::ribosome::host_fn::update::update;
 use crate::core::ribosome::host_fn::verify_signature::verify_signature;
+use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_encrypt::x_25519_x_salsa20_poly1305_encrypt;
+use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_decrypt::x_25519_x_salsa20_poly1305_decrypt;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_decrypt::x_salsa20_poly1305_decrypt;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_encrypt::x_salsa20_poly1305_encrypt;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
@@ -192,6 +195,10 @@ impl RealRibosome {
             );
             ns.insert("__sign", func!(invoke_host_function!(sign)));
             ns.insert(
+                "__create_x25519_keypair",
+                func!(invoke_host_function!(create_x25519_keypair)),
+            );
+            ns.insert(
                 "__x_salsa20_poly1305_encrypt",
                 func!(invoke_host_function!(x_salsa20_poly1305_encrypt)),
             );
@@ -201,11 +208,11 @@ impl RealRibosome {
             );
             ns.insert(
                 "__x_25519_x_salsa20_poly1305_encrypt",
-                func!(invoke_host_function!(x_salsa20_poly1305_encrypt)),
+                func!(invoke_host_function!(x_25519_x_salsa20_poly1305_encrypt)),
             );
             ns.insert(
                 "__x_25519_x_salsa20_poly1305_decrypt",
-                func!(invoke_host_function!(x_salsa20_poly1305_decrypt)),
+                func!(invoke_host_function!(x_25519_x_salsa20_poly1305_decrypt)),
             );
         } else {
             ns.insert(
@@ -213,6 +220,10 @@ impl RealRibosome {
                 func!(invoke_host_function!(unreachable)),
             );
             ns.insert("__sign", func!(invoke_host_function!(unreachable)));
+            ns.insert(
+                "__create_x25519_keypair",
+                func!(invoke_host_function!(unreachable)),
+            );
             ns.insert(
                 "__x_salsa20_poly1305_encrypt",
                 func!(invoke_host_function!(unreachable)),

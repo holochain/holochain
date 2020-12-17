@@ -90,6 +90,8 @@ wasm_io_types! {
     // @todo Get the capability for the current zome call.
     fn capability_info (()) -> ();
 
+    fn create_x25519_keypair(()) -> crate::x_salsa20_poly1305::x25519::X25519PubKey;
+
     fn x_salsa20_poly1305_encrypt(
         crate::x_salsa20_poly1305::XSalsa20Poly1305Encrypt
     ) -> crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;

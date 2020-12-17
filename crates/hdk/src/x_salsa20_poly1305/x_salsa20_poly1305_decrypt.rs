@@ -28,10 +28,3 @@ pub fn x_salsa20_poly1305_decrypt(
         .into_inner(),
     )
 }
-
-pub fn secretbox_open(
-    key_ref: SecretBoxKeyRef,
-    encrypted_data: SecretBoxEncryptedData,
-) -> HdkResult<Option<SecretBoxData>> {
-    x_salsa20_poly1305_decrypt(key_ref, encrypted_data)
-}

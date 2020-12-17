@@ -69,6 +69,8 @@ host_fn_api_impls! {
     // Returns HeaderHash of the newly created element.
     fn create ((zt::entry_def::EntryDefId, zt::entry::Entry)) -> holo_hash::HeaderHash;
 
+    fn create_x25519_keypair(()) -> holochain_zome_types::x_salsa20_poly1305::x25519::X25519PubKey;
+
     fn x_salsa20_poly1305_encrypt(
         holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Encrypt
     ) -> holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;

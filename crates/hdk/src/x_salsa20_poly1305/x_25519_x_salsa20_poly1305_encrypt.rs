@@ -29,28 +29,21 @@ use crate::prelude::*;
 ///
 /// @see https://doc.libsodium.org/secret-key_cryptography/secretbox
 /// @see https://nacl.cr.yp.to/secretbox.html
-pub fn x_salsa20_poly1305_encrypt(
-    key_ref: XSalsa20Poly1305KeyRef,
+pub fn x_25519_x_salsa20_poly1305_encrypt(
+    sender: X25519PubKey,
+    recipient: X25519PubKey,
     data: XSalsa20Poly1305Data,
 ) -> HdkResult<XSalsa20Poly1305EncryptedData> {
-    host_externs!(__x_salsa20_poly1305_encrypt);
+    host_externs!(__x_25519_x_salsa20_poly1305_encrypt);
     Ok(
-        host_call::<XSalsa20Poly1305EncryptInput, XSalsa20Poly1305EncryptOutput>(
-            __x_salsa20_poly1305_encrypt,
-            &XSalsa20Poly1305EncryptInput::new(
-                holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Encrypt::new(
-                    key_ref, data,
+        host_call::<X25519XSalsa20Poly1305EncryptInput, X25519XSalsa20Poly1305EncryptOutput>(
+            __x_25519_x_salsa20_poly1305_encrypt,
+            &X25519XSalsa20Poly1305EncryptInput::new(
+                holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Encrypt::new(
+                    sender, recipient, data,
                 ),
             ),
         )?
         .into_inner(),
     )
-}
-
-// Alias to secretbox as algorithm name.
-pub fn secretbox(
-    key_ref: SecretBoxKeyRef,
-    data: SecretBoxData,
-) -> HdkResult<SecretBoxEncryptedData> {
-    x_salsa20_poly1305_encrypt(key_ref, data)
 }

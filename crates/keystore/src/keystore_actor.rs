@@ -38,6 +38,11 @@ pub trait KeystoreSenderExt {
     /// otherwise, generate a TLS cert and return it
     fn get_or_create_first_tls_cert(&self) -> KeystoreApiFuture<(CertDigest, Cert, CertPrivKey)>;
 
+    /// Generate a new x25519 keypair in lair and get the pubkey back for general usage.
+    fn create_x25519_keypair(
+        &self,
+    ) -> KeystoreApiFuture<holochain_zome_types::x_salsa20_poly1305::x25519::X25519PubKey>;
+
     /// If we have an X25519 pub key in lair use it to ECDH negotiate a shared key and then
     /// Salsa20Poly1305 encrypt the data with that and a random nonce.
     /// a.k.a. libsodium crypto_box()
@@ -118,6 +123,19 @@ impl KeystoreSenderExt for KeystoreSender {
         .into()
     }
 
+    fn create_x25519_keypair(
+        &self,
+    ) -> KeystoreApiFuture<holochain_zome_types::x_salsa20_poly1305::x25519::X25519PubKey> {
+        let this = self.clone();
+        async move {
+            let fut = this.x25519_new_from_entropy();
+            let (_, pubkey) = fut.await?;
+            Ok(AsRef::<[u8]>::as_ref(&pubkey).try_into()?)
+        }
+        .boxed()
+        .into()
+    }
+
     fn x_25519_x_salsa20_poly1305_encrypt(
         &self,
         input: X25519XSalsa20Poly1305Encrypt,
@@ -127,9 +145,9 @@ impl KeystoreSenderExt for KeystoreSender {
         let this = self.clone();
         async move {
             let fut = this.crypto_box_by_pub_key(
-                input.as_sender_ref().as_ref()[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN]
+                input.as_sender_ref().as_ref()
                     .try_into()?,
-                input.as_recipient_ref().as_ref()[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN]
+                input.as_recipient_ref().as_ref()
                     .try_into()?,
                 std::sync::Arc::new(lair_keystore_api::internal::crypto_box::CryptoBoxData {
                     data: std::sync::Arc::new(input.as_data_ref().as_ref().to_owned())
@@ -155,10 +173,8 @@ impl KeystoreSenderExt for KeystoreSender {
         async move {
             let fut = this.crypto_box_open_by_pub_key(
                 input.as_recipient_ref().as_ref()
-                    [HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN]
                     .try_into()?,
                 input.as_sender_ref().as_ref()
-                    [HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN]
                     .try_into()?,
                 std::sync::Arc::new(
                     lair_keystore_api::internal::crypto_box::CryptoBoxEncryptedData {
