@@ -101,6 +101,12 @@ impl CoolConductorBatch {
 
         future::join_all(apps).await.into()
     }
+
+    /// Let each conductor know about each others' agents so they can do networking
+    pub async fn exchange_peer_info(&self) {
+        let envs = self.0.iter().map(|c| c.envs().p2p()).collect();
+        crate::conductor::p2p_store::exchange_peer_info(envs);
+    }
 }
 
 #[derive(Clone, shrinkwraprs::Shrinkwrap, derive_more::From)]

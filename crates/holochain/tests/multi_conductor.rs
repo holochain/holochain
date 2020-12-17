@@ -1,9 +1,6 @@
 use hdk3::prelude::*;
 use holochain::test_utils::cool::MaybeElement;
-use holochain::{
-    conductor::p2p_store::exchange_peer_info,
-    test_utils::cool::{CoolConductorBatch, CoolDnaFile},
-};
+use holochain::test_utils::cool::{CoolConductorBatch, CoolDnaFile};
 use holochain_types::dna::zome::inline_zome::InlineZome;
 use holochain_zome_types::element::ElementEntry;
 
@@ -41,9 +38,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
         .unwrap();
 
     let apps = conductors.setup_app("app", &[dna_file]).await;
-
-    let p2p_envs = conductors.iter().map(|c| c.envs().p2p()).collect();
-    exchange_peer_info(p2p_envs);
+    conductors.exchange_peer_info().await;
 
     // TODO: write better helper
     let ((alice,), (bobbo,), (_carol,)) = apps.into_tuples();

@@ -4,8 +4,9 @@ use assert_cmd::prelude::*;
 use futures::future;
 use futures::Future;
 use hdk3::prelude::RemoteSignal;
+use holochain::test_utils::cool::CoolAgents;
 use holochain::test_utils::cool::CoolConductorBatch;
-use holochain::test_utils::cool::{CoolAgents, CoolCell};
+use holochain::test_utils::cool::CoolDnaFile;
 use holochain::{
     conductor::api::ZomeCall,
     conductor::{
@@ -17,7 +18,6 @@ use holochain::{
     core::signal::Signal,
     fixt::*,
 };
-use holochain::{conductor::p2p_store::exchange_peer_info, test_utils::cool::CoolDnaFile};
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
     cell::CellId,
@@ -407,10 +407,9 @@ async fn remote_signals() {
         .setup_app_for_zipped_agents("app", &all_agents, &[dna_file])
         .await;
 
-    let p2p_envs = conductors.iter().map(|c| c.envs().p2p()).collect();
-    exchange_peer_info(p2p_envs);
+    conductors.exchange_peer_info().await;
 
-    let cells: Vec<CoolCell> = apps.cells_flattened();
+    let cells = apps.cells_flattened();
 
     let mut rxs = Vec::new();
     for h in conductors.iter().map(|c| c) {

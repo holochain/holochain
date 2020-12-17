@@ -57,8 +57,8 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use super::*;
+    use crate::test_utils::cool::CoolDnaFile;
     use crate::test_utils::cool::{CoolAgents, CoolConductorBatch};
-    use crate::{conductor::p2p_store::exchange_peer_info, test_utils::cool::CoolDnaFile};
     use futures::future;
     use hdk3::prelude::*;
     use holochain_types::dna::zome::inline_zome::InlineZome;
@@ -131,8 +131,7 @@ mod tests {
             .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone().into()])
             .await;
 
-        let p2p_envs = conductors.iter().map(|c| c.envs().p2p()).collect();
-        exchange_peer_info(p2p_envs);
+        conductors.exchange_peer_info().await;
 
         let cells: Vec<_> = apps.cells_flattened();
 

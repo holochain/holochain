@@ -282,15 +282,15 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 _ => false,
             });
 
-        let mut store = self.conductor.write().await;
+        let mut lock = self.conductor.write().await;
 
         // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
         if is_full_wasm_dna {
-            let entry_defs = self.conductor.read().await.put_wasm(dna.clone()).await?;
-            store.dna_store_mut().add_entry_defs(entry_defs);
+            let entry_defs = lock.put_wasm(dna.clone()).await?;
+            lock.dna_store_mut().add_entry_defs(entry_defs);
         }
 
-        store.dna_store_mut().add_dna(dna);
+        lock.dna_store_mut().add_dna(dna);
 
         Ok(())
     }
@@ -302,9 +302,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
             .load_wasms_into_dna_files()
             .await?;
-        let mut store = self.conductor.write().await;
-        store.dna_store_mut().add_dnas(dnas);
-        store.dna_store_mut().add_entry_defs(entry_defs);
+        let mut lock = self.conductor.write().await;
+        lock.dna_store_mut().add_dnas(dnas);
+        lock.dna_store_mut().add_entry_defs(entry_defs);
         Ok(())
     }
 
