@@ -137,20 +137,17 @@ impl ArcRange {
     /// Show if the bound is empty
     /// Useful before using as an index
     pub fn is_empty(&self) -> bool {
-        match (self.start_bound(), self.end_bound()) {
-            (Bound::Excluded(a), Bound::Excluded(b)) if a == b => true,
-            _ => false,
-        }
+        matches!((self.start_bound(), self.end_bound()), (Bound::Excluded(a), Bound::Excluded(b)) if a == b)
     }
 
     #[cfg(test)]
-    fn to_inc(self: ArcRange) -> RangeInclusive<usize> {
+    fn into_inc(self: ArcRange) -> RangeInclusive<usize> {
         match self {
             ArcRange {
                 start: Bound::Included(a),
                 end: Bound::Included(b),
             } if a <= b => RangeInclusive::new(a as usize, b as usize),
-            arc @ _ => panic!(
+            arc => panic!(
                 "This range goes all the way around the arc from {:?} to {:?}",
                 arc.start_bound(),
                 arc.end_bound()
@@ -265,28 +262,28 @@ mod tests {
         };
 
         assert!(DhtArc::new(0, 0).range().is_empty());
-        assert_eq!(DhtArc::new(0, 1).range().to_inc(), 0..=0);
-        assert_eq!(DhtArc::new(1, 2).range().to_inc(), 0..=2);
+        assert_eq!(DhtArc::new(0, 1).range().into_inc(), 0..=0);
+        assert_eq!(DhtArc::new(1, 2).range().into_inc(), 0..=2);
         assert_eq!(
-            DhtArc::new(quarter, quarter + 1).range().to_inc(),
+            DhtArc::new(quarter, quarter + 1).range().into_inc(),
             0..=(half as usize)
         );
         check_bounds(quarter, quarter + 1, 0, half);
 
         assert_eq!(
-            DhtArc::new(half, quarter + 1).range().to_inc(),
+            DhtArc::new(half, quarter + 1).range().into_inc(),
             (quarter as usize)..=((quarter * 3) as usize)
         );
         check_bounds(half, quarter + 1, quarter, quarter * 3);
 
         assert_eq!(
-            DhtArc::new(half, MAX_HALF_LENGTH).range().to_inc(),
+            DhtArc::new(half, MAX_HALF_LENGTH).range().into_inc(),
             0..=(u32::MAX as usize)
         );
         check_bounds_full(half, MAX_HALF_LENGTH, 0, u32::MAX);
 
         assert_eq!(
-            DhtArc::new(half, MAX_HALF_LENGTH - 2).range().to_inc(),
+            DhtArc::new(half, MAX_HALF_LENGTH - 2).range().into_inc(),
             2..=((u32::MAX - 1) as usize)
         );
         check_bounds(half, MAX_HALF_LENGTH - 2, 2, u32::MAX - 1);

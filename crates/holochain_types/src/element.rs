@@ -275,6 +275,7 @@ pub trait SignedHeaderHashedExt {
     /// Create a hash from data
     fn from_content_sync(signed_header: SignedHeader) -> SignedHeaderHashed;
     /// Sign some content
+    #[allow(clippy::new_ret_no_self)]
     async fn new(
         keystore: &KeystoreSender,
         header: HeaderHashed,

@@ -3,7 +3,7 @@
 , makeRustPlatform
 , rustChannelOf
 
-, version ? "1.45.2"
+, version ? "1.48.0"
 , targets ? [ "wasm32-unknown-unknown" ]
 }:
 

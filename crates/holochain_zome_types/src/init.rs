@@ -21,9 +21,6 @@ impl From<ExternOutput> for InitCallbackResult {
 
 impl CallbackResult for InitCallbackResult {
     fn is_definitive(&self) -> bool {
-        match self {
-            InitCallbackResult::Fail(_) => true,
-            _ => false,
-        }
+        matches!(self, InitCallbackResult::Fail(_))
     }
 }
