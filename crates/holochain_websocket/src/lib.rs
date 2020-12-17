@@ -19,8 +19,7 @@
 //! ```
 //! # async fn doc_test() {
 //! #
-//! use crate::*;
-//! use crate::*;
+//! use holochain_websocket::*;
 //!
 //! use url2::prelude::*;
 //! use tokio::stream::StreamExt;
@@ -28,7 +27,7 @@
 //!
 //! #[derive(serde::Serialize, serde::Deserialize, Debug)]
 //! struct TestMessage(pub String);
-//! crate::try_from_serialized_bytes!(TestMessage);
+//! holochain_websocket::try_from_serialized_bytes!(TestMessage);
 //!
 //! let mut server = websocket_bind(
 //!     url2!("ws://127.0.0.1:0"),
