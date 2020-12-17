@@ -72,7 +72,6 @@ use holochain_lmdb::prelude::*;
 use holochain_state::source_chain::SourceChainBuf;
 use holochain_state::wasm::WasmBuf;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashMap;
 use std::convert::TryFrom;

@@ -28,7 +28,6 @@ use holochain_state::metadata::LinkMetaKey;
 use holochain_state::metadata::MetadataBuf;
 use holochain_state::metadata::MetadataBufT;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use tracing::*;

@@ -6,7 +6,6 @@ use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
 
 #[derive(Clone)]
 pub struct MigrateAgentInvocation {

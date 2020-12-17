@@ -14,7 +14,6 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::ZomeCall;
 use holochain_keystore::KeystoreSender;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
 use tracing::*;
 
 /// The concrete implementation of [CellConductorApiT], which is used to give

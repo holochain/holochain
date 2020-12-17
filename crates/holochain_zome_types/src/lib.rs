@@ -58,37 +58,12 @@ pub mod zome_io;
 #[cfg(feature = "fixturators")]
 pub mod fixt;
 
+#[cfg(feature = "test_utils")]
 pub mod test_utils;
 
-pub use agent_info::*;
-pub use bytes::*;
-pub use call::*;
-pub use call_remote::*;
-pub use capability::*;
-pub use cell::*;
-pub use crdt::*;
-pub use debug::*;
-pub use element::*;
-pub use entry::*;
-pub use entry_def::*;
-pub use header::*;
-pub use init::*;
-pub use link::*;
-pub use metadata::*;
-pub use migrate_agent::*;
-pub use post_commit::*;
+pub use entry::Entry;
+pub use header::Header;
 pub use prelude::*;
-pub use query::*;
-pub use request::*;
-pub use signal::*;
-pub use signature::*;
-pub use timestamp::*;
-pub use validate::*;
-pub use validate_link::*;
-pub use warrant::*;
-pub use zome::*;
-pub use zome_info::*;
-pub use zome_io::*;
 
 #[allow(missing_docs)]
 pub trait CallbackResult {

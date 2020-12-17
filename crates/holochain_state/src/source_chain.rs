@@ -11,7 +11,6 @@ use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
 use shrinkwraprs::Shrinkwrap;
 pub use source_chain_buffer::*;
 use std::collections::HashSet;

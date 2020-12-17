@@ -15,17 +15,12 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_state::metadata::ChainItemKey;
 use holochain_state::metadata::MetadataBufT;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
-use holochain_zome_types::Entry;
 use std::convert::TryInto;
 
 pub(super) use error::*;
+pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-
-pub use holo_hash::*;
-pub use holochain_types::element::Element;
-pub use holochain_types::element::ElementExt;
 pub use holochain_types::Timestamp;
 pub use holochain_zome_types::HeaderHashed;
 

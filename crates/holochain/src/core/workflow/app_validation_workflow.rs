@@ -64,7 +64,6 @@ use holochain_state::validation_db::ValidationLimboValue;
 use holochain_state::workspace::Workspace;
 use holochain_state::workspace::WorkspaceResult;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
 use holochain_zome_types::Entry;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::ValidationStatus;

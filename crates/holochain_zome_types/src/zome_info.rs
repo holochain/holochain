@@ -12,5 +12,5 @@ pub struct ZomeInfo {
     pub zome_name: ZomeName,
     /// The position of this zome in the `dna.json`
     pub zome_id: ZomeId,
-    pub properties: crate::SerializedBytes,
+    pub properties: SerializedBytes,
 }

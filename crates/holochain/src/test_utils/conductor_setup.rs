@@ -20,7 +20,6 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::prelude::*;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::collections::HashMap;
 use std::convert::TryFrom;

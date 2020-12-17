@@ -2,7 +2,6 @@ use super::*;
 use ::fixt::prelude::*;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
 use holochain_zome_types::test_utils::*;
 
 #[tokio::test(threaded_scheduler)]

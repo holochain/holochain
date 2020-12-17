@@ -16,7 +16,6 @@ use holo_hash::*;
 use holochain_lmdb::test_utils::test_cell_env;
 use holochain_state::element_buf::ElementBuf;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
 use holochain_zome_types::Entry;
 use holochain_zome_types::HeaderHashed;
 use observability;

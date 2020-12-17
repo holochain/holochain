@@ -9,7 +9,6 @@ use crate::fixt::*;
 use crate::prelude::*;
 use crate::Timestamp;
 use crate::{dna::wasm::DnaWasm, EntryHashed};
-use holochain_zome_types::prelude::*;
 use std::path::PathBuf;
 
 pub use holochain_zome_types::test_utils::*;

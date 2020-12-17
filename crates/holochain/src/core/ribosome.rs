@@ -45,7 +45,6 @@ use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
 use mockall::automock;
 use std::iter::Iterator;
 

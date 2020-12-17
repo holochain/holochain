@@ -58,7 +58,6 @@ use derive_more::From;
 use futures::future::FutureExt;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::sync::Arc;
 use tokio::sync::RwLock;

@@ -8,7 +8,6 @@ use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 
 #[derive(Clone)]

@@ -4,7 +4,6 @@
 //!
 //! [DhtOp]: enum.DhtOp.html
 
-use crate::element::Element;
 use crate::element::ElementGroup;
 use crate::header::NewEntryHeader;
 use crate::prelude::*;

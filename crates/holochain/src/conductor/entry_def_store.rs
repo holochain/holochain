@@ -18,7 +18,6 @@ use holochain_lmdb::prelude::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
 use std::collections::HashMap;
 use std::convert::TryInto;
 

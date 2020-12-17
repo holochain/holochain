@@ -40,13 +40,14 @@ use holochain_p2p::HolochainP2pCellFixturator;
 use holochain_state::metadata::LinkMetaVal;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::prelude::*;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
+
+pub use holochain_types::fixt::*;
 
 wasm_io_fixturator!(ExternInput<SerializedBytes>);
 

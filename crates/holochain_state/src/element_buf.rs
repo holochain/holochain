@@ -25,7 +25,6 @@ use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::exports::SingleStore;
 use holochain_lmdb::prelude::*;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
 use tracing::*;
 
 /// A CasBufFresh with Entries for values

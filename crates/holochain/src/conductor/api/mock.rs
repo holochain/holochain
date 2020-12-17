@@ -11,7 +11,6 @@ use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
 use mockall::mock;
 
 // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.

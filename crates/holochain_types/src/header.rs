@@ -7,7 +7,6 @@
 #![allow(missing_docs)]
 
 use crate::element::ElementStatus;
-use crate::element::SignedHeaderHashed;
 use crate::element::SignedHeaderHashedExt;
 use crate::prelude::*;
 use conversions::WrongHeaderError;

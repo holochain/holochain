@@ -18,14 +18,21 @@ pub use crate::dht_op::error::*;
 pub use crate::dht_op::*;
 pub use crate::dna::error::*;
 pub use crate::dna::wasm::*;
+pub use crate::dna::zome::inline_zome::*;
 pub use crate::dna::zome::*;
 pub use crate::dna::*;
 pub use crate::element::error::*;
 pub use crate::element::*;
 pub use crate::entry::*;
+pub use crate::header::error::*;
 pub use crate::header::*;
 pub use crate::link::*;
 pub use crate::metadata::*;
 pub use crate::signal::*;
 pub use crate::timestamp::*;
 pub use crate::validate::*;
+
+#[cfg(feature = "fixturators")]
+pub use crate::fixt::*;
+#[cfg(feature = "test_utils")]
+pub use crate::test_utils::*;

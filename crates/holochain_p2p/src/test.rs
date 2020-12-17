@@ -147,11 +147,8 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use holochain_types::element::Element;
-    use holochain_types::element::ElementStatus;
-    use holochain_types::element::SignedHeaderHashed;
-    use holochain_types::element::WireElement;
     use holochain_types::fixt::*;
+    use holochain_types::prelude::*;
     use holochain_zome_types::HeaderHashed;
     use holochain_zome_types::ValidationStatus;
     use kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig;

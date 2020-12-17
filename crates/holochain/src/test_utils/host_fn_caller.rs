@@ -30,7 +30,6 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::metadata::LinkMetaKey;
 use holochain_state::workspace::Workspace;
 use holochain_types::prelude::*;
-use holochain_zome_types::prelude::*;
 use holochain_zome_types::Entry;
 use std::sync::Arc;
 use tracing::*;

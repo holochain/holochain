@@ -10,9 +10,6 @@ use error::ElementGroupError;
 use error::ElementGroupResult;
 use holochain_keystore::KeystoreError;
 use holochain_serialized_bytes::prelude::*;
-pub use holochain_zome_types::element::*;
-use holochain_zome_types::prelude::*;
-use holochain_zome_types::HeaderHashed;
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 
@@ -374,7 +371,7 @@ impl WireElement {
 mod tests {
     use super::SignedHeader;
     use super::SignedHeaderHashed;
-    use crate::fixt::*;
+    use crate::prelude::*;
     use ::fixt::prelude::*;
     use holo_hash::HasHash;
     use holo_hash::HoloHashed;
