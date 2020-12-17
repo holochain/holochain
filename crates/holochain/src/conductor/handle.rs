@@ -277,10 +277,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .dna_def()
             .zomes
             .iter()
-            .all(|(_, zome_def)| match zome_def {
-                ZomeDef::Wasm(_) => true,
-                _ => false,
-            });
+            .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
 
         let mut lock = self.conductor.write().await;
 
