@@ -1,6 +1,13 @@
+use ::fixt::prelude::*;
 use anyhow::Result;
 use assert_cmd::prelude::*;
+use futures::future;
+use futures::stream;
 use futures::Future;
+use hdk3::prelude::RemoteSignal;
+use holochain::conductor::p2p_store::exchange_peer_info;
+use holochain::test_utils::test_conductor::TestAgents;
+use holochain::test_utils::test_conductor::TestConductorHandle;
 use holochain::{
     conductor::api::ZomeCall,
     conductor::{
@@ -12,6 +19,8 @@ use holochain::{
     core::signal::Signal,
     fixt::*,
 };
+use holochain_state::test_utils::test_environments;
+use holochain_types::dna::DnaFile;
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
     cell::CellId,
@@ -22,6 +31,7 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use holochain_zome_types::{signal::AppSignal, *};
+use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
 use std::{path::PathBuf, process::Stdio, sync::Arc, time::Duration};
 use tempdir::TempDir;
@@ -378,6 +388,104 @@ async fn call_zome() {
 
     // Shutdown holochain
     holochain.kill().expect("Failed to kill holochain");
+}
+
+#[tokio::test(threaded_scheduler)]
+#[cfg(feature = "slow_tests")]
+async fn remote_signals() {
+    use futures::StreamExt;
+    observability::test_run().ok();
+    const NUM_CONDUCTORS: usize = 5;
+
+    let conductors = future::join_all(
+        std::iter::repeat_with(|| async move {
+            let envs = test_environments();
+            let mut network = KitsuneP2pConfig::default();
+            network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+                bind_to: None,
+                override_host: None,
+                override_port: None,
+            }];
+            let conductor: TestConductorHandle = Conductor::builder()
+                .config(ConductorConfig {
+                    network: Some(network),
+                    ..Default::default()
+                })
+                .test(&envs)
+                .await
+                .unwrap()
+                .into();
+            (conductor, envs)
+        })
+        .take(NUM_CONDUCTORS),
+    )
+    .await;
+
+    let all_agents: Vec<HoloHash<hash_type::Agent>> = futures::StreamExt::collect(
+        stream::iter(conductors.iter().map(|(_, e)| e)).then(|e| TestAgents::one(e.keystore())),
+    )
+    .await;
+
+    let dna_file = DnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
+        .await
+        .unwrap()
+        .0;
+
+    let agents_ref = &all_agents;
+
+    let data: Vec<_> = futures::StreamExt::collect(
+        futures::stream::iter(conductors.iter().enumerate()).then(|(i, (conductor, envs))| {
+            let dna_file = dna_file.clone();
+            async move {
+                let data = conductor
+                    .setup_app_for_agents_with_no_membrane_proof(
+                        "app",
+                        &[agents_ref[i].clone()],
+                        &[dna_file.clone()],
+                    )
+                    .await;
+                (data, envs)
+            }
+        }),
+    )
+    .await;
+
+    let p2p_envs = data.iter().map(|(_, envs)| envs.p2p()).collect();
+    exchange_peer_info(p2p_envs);
+
+    let cells: Vec<_> = data
+        .iter()
+        .flat_map(|(cells, _)| cells.iter().flat_map(|(_, c)| c.iter()))
+        .collect();
+
+    let mut rxs = Vec::new();
+    for h in conductors.iter().map(|(c, _)| c) {
+        rxs.push(h.signal_broadcaster().await.subscribe())
+    }
+    let rxs = rxs.into_iter().flatten().collect::<Vec<_>>();
+
+    let signal = fixt!(SerializedBytes);
+
+    let _: () = cells[0]
+        .call(
+            TestWasm::EmitSignal,
+            "signal_others",
+            RemoteSignal {
+                signal: signal.clone(),
+                agents: all_agents,
+            },
+        )
+        .await;
+
+    tokio::time::delay_for(std::time::Duration::from_millis(2000)).await;
+
+    let signal = AppSignal::new(signal);
+    for mut rx in rxs {
+        let r = rx.try_recv();
+        // Each handle should recv a signal
+
+        assert_matches!(r, Ok(Signal::App(_, a)) if a == signal);
+    }
 }
 
 #[tokio::test(threaded_scheduler)]

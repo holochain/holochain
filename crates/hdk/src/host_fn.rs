@@ -19,6 +19,7 @@ pub mod hash_entry;
 pub mod property;
 pub mod query;
 pub mod random_bytes;
+pub mod remote_signal;
 pub mod schedule;
 pub mod show_env;
 pub mod sign;

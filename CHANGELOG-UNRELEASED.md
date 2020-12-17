@@ -11,6 +11,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - get_details on a HeaderHash now returns the updates if it's an entry header
 - call host fn (This is an actual function not a macro). Allows you to call a zome that is installed on the same conductor. [#453](https://github.com/holochain/holochain/pull/453)
 - Added create link HeaderHash to the Link type
+- `remote_signal` host function to send a signal to a list of agents without blocking on the responses.
+See [#546](https://github.com/holochain/holochain/pull/546) or the docs for the hdk.
 
 ### Changed
 

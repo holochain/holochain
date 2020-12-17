@@ -19,6 +19,7 @@ pub use crate::{
     migrate_agent::{MigrateAgent, MigrateAgentCallbackResult},
     post_commit::PostCommitCallbackResult,
     query::{ActivityRequest, AgentActivity, ChainQueryFilter, ChainQueryFilter as QueryFilter},
+    signal::{AppSignal, RemoteSignal},
     signature::{Sign, Signature, VerifySignature},
     validate::{
         RequiredValidationType, ValidateCallbackResult, ValidateData, ValidationPackage,

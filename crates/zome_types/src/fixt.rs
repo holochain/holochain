@@ -5,7 +5,7 @@ use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 
 use crate::{
-    entry_def::EntryVisibility, header::*, link::LinkTag, timestamp::Timestamp,
+    entry_def::EntryVisibility, header::*, link::LinkTag, signal::AppSignal, timestamp::Timestamp,
     validate::RequiredValidationType,
 };
 
@@ -138,6 +138,11 @@ fixturator!(
 
 fixturator!(
     LinkTag; from Bytes;
+);
+
+fixturator!(
+    AppSignal;
+    constructor fn new(SerializedBytes);
 );
 
 pub struct KnownCreateLink {
