@@ -9,7 +9,7 @@ use crate::conductor::ConductorHandle;
 
 use holochain_serialized_bytes::prelude::*;
 
-use holochain_zome_types::prelude::*;
+use holochain_types::prelude::*;
 
 pub use holochain_conductor_api::*;
 

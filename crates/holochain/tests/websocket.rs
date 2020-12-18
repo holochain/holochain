@@ -14,7 +14,7 @@ use holochain::*;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
-use holochain_zome_types::prelude::*;
+use holochain_types::prelude::*;
 use matches::assert_matches;
 use observability;
 use std::path::PathBuf;

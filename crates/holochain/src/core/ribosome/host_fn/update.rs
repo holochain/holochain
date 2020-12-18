@@ -7,7 +7,7 @@ use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use crate::core::workflow::CallZomeWorkspace;
 
 use holo_hash::HasHash;
-use holochain_zome_types::prelude::*;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]

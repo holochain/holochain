@@ -7,7 +7,7 @@ use holochain_zome_types::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// An agents chain elements returned from a agent_activity_query
-pub struct AgentActivity<T = SignedHeaderHashed> {
+pub struct AgentActivityResponse<T = SignedHeaderHashed> {
     /// The agent this activity is for
     pub agent: AgentPubKey,
     /// Valid headers on this chain.
@@ -33,8 +33,8 @@ pub enum ChainItems<T = SignedHeaderHashed> {
     NotRequested,
 }
 
-impl From<AgentActivity<Element>> for holochain_zome_types::query::AgentActivity {
-    fn from(a: AgentActivity<Element>) -> Self {
+impl From<AgentActivityResponse<Element>> for holochain_zome_types::query::AgentActivity {
+    fn from(a: AgentActivityResponse<Element>) -> Self {
         let valid_activity = match a.valid_activity {
             ChainItems::Full(elements) => elements
                 .into_iter()

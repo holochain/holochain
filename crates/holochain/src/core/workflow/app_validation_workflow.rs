@@ -699,7 +699,7 @@ async fn get_validation_package_remote(
                 cascade.get_agent_activity(agent_id, query, options).await?
             };
             match activity {
-                AgentActivity {
+                AgentActivityResponse {
                     status: ChainStatus::Valid(_),
                     valid_activity: ChainItems::Full(elements),
                     ..

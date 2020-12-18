@@ -559,7 +559,7 @@ impl Cell {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: holochain_p2p::event::GetActivityOptions,
-    ) -> CellResult<AgentActivity> {
+    ) -> CellResult<AgentActivityResponse> {
         let env = self.env.clone();
         authority::handle_get_agent_activity(env.into(), agent, query, options).map_err(Into::into)
     }

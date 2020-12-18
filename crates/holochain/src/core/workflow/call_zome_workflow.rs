@@ -25,9 +25,9 @@ use holochain_state::source_chain::SourceChain;
 use holochain_state::source_chain::SourceChainError;
 use holochain_state::workspace::Workspace;
 use holochain_state::workspace::WorkspaceResult;
-use holochain_types::element::Element;
+use holochain_zome_types::element::Element;
 
-use holochain_zome_types::prelude::*;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 use tracing::instrument;
 

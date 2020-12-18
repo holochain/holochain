@@ -8,7 +8,7 @@ use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 
 use holo_hash::HasHash;
-use holochain_zome_types::prelude::*;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 /// create element

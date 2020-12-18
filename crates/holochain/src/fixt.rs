@@ -38,6 +38,7 @@ use holochain_keystore::keystore_actor::KeystoreSender;
 use holochain_lmdb::test_utils::test_keystore;
 use holochain_p2p::HolochainP2pCellFixturator;
 use holochain_state::metadata::LinkMetaVal;
+use holochain_types::fixt::TimestampFixturator;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use rand::seq::IteratorRandom;

@@ -15,8 +15,9 @@ use holochain_zome_types::prelude::*;
 use rand::seq::IteratorRandom;
 use std::iter::Iterator;
 
-pub use holochain_zome_types::fixt::TimestampFixturator as ZomeTimestampFixturator;
 pub use holochain_zome_types::fixt::*;
+
+pub use holochain_zome_types::fixt::TimestampFixturator as ZomeTimestampFixturator;
 
 fixturator!(
     Timestamp;

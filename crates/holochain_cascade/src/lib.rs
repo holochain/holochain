@@ -299,10 +299,10 @@ where
     /// We can't produce all the ops because we don't have the entry.
     async fn update_agent_activity_stores(
         &mut self,
-        agent_activity: AgentActivity,
+        agent_activity: AgentActivityResponse,
     ) -> CascadeResult<()> {
         let cache_data = ok_or_return!(self.cache_data.as_mut());
-        let AgentActivity {
+        let AgentActivityResponse {
             agent,
             // Cache the chain status in the metadata
             // Any invalid overwrites valid.
@@ -1769,15 +1769,18 @@ where
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
-    ) -> CascadeResult<AgentActivity<Element>> {
+    ) -> CascadeResult<AgentActivityResponse<Element>> {
         // Fetch the activity from the network
         // TODO: Maybe this could short circuit in full sharding? But I'm not sure.
         // Skipping this for now.
         self.fetch_agent_activity(agent.clone(), query.clone(), options)
             .await?;
 
-        let cache_data = ok_or_return!(self.cache_data.as_ref(), AgentActivity::empty(&agent));
-        let env = ok_or_return!(self.env.as_ref(), AgentActivity::empty(&agent));
+        let cache_data = ok_or_return!(
+            self.cache_data.as_ref(),
+            AgentActivityResponse::empty(&agent)
+        );
+        let env = ok_or_return!(self.env.as_ref(), AgentActivityResponse::empty(&agent));
         // Now try getting the latest activity from cache
         let hashes = Self::get_agent_activity_from_cache(
             agent.clone(),
@@ -1800,12 +1803,15 @@ where
         &self,
         agent: AgentPubKey,
         hashes: Vec<(u32, HeaderHash)>,
-    ) -> CascadeResult<AgentActivity<Element>> {
-        let cache_data = ok_or_return!(self.cache_data.as_ref(), AgentActivity::empty(&agent));
+    ) -> CascadeResult<AgentActivityResponse<Element>> {
+        let cache_data = ok_or_return!(
+            self.cache_data.as_ref(),
+            AgentActivityResponse::empty(&agent)
+        );
         // Now try getting the latest activity from cache
         let highest_observed = cache_data.meta.get_activity_observed(&agent)?;
         match cache_data.meta.get_activity_status(&agent)? {
-            Some(status) => Ok(AgentActivity {
+            Some(status) => Ok(AgentActivityResponse {
                 agent,
                 valid_activity: ChainItems::Hashes(hashes),
                 rejected_activity: ChainItems::NotRequested,
@@ -1813,7 +1819,7 @@ where
                 highest_observed,
             }),
             // If we don't have any status then we must return an empty chain
-            None => Ok(AgentActivity {
+            None => Ok(AgentActivityResponse {
                 agent,
                 valid_activity: ChainItems::NotRequested,
                 rejected_activity: ChainItems::NotRequested,
@@ -1842,7 +1848,7 @@ where
         agent: AgentPubKey,
         query: ChainQueryFilter,
         mut options: GetActivityOptions,
-    ) -> CascadeResult<AgentActivity<Element>> {
+    ) -> CascadeResult<AgentActivityResponse<Element>> {
         const DEFAULT_ACTIVITY_TIMEOUT_MS: u64 = 1000;
         // Get the request options
         let requester_options = options.clone();
@@ -1889,13 +1895,13 @@ where
         // Check if we are done
         match &activity {
             // ChainItems is empty so nothing else to do.
-            AgentActivity {
+            AgentActivityResponse {
                 status: ChainStatus::Empty,
                 ..
             } => return Ok(activity),
             // ChainItems has a status but there are no hashes
             // so nothing else to do.
-            AgentActivity {
+            AgentActivityResponse {
                 valid_activity: ChainItems::Hashes(h),
                 ..
             } if h.is_empty() => {
@@ -1925,7 +1931,7 @@ where
                             .await?;
                     }
                     let elements = elements.unwrap_or_else(Vec::new);
-                    Ok(AgentActivity {
+                    Ok(AgentActivityResponse {
                         valid_activity: ChainItems::Full(elements),
                         ..activity
                     })
@@ -1944,7 +1950,7 @@ where
                             .await?;
                     }
                     let elements = elements.unwrap_or_else(Vec::new);
-                    Ok(AgentActivity {
+                    Ok(AgentActivityResponse {
                         valid_activity: ChainItems::Full(elements),
                         ..activity
                     })

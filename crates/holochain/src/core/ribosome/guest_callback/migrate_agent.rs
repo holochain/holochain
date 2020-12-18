@@ -112,7 +112,7 @@ mod test {
     use crate::fixt::ZomeNameFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
-    use holochain_zome_types::prelude::*;
+    use holochain_types::prelude::*;
     use rand::prelude::*;
 
     #[test]

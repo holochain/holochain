@@ -252,7 +252,7 @@ pub fn handle_get_agent_activity(
     agent: AgentPubKey,
     query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
-) -> CascadeResult<AgentActivity> {
+) -> CascadeResult<AgentActivityResponse> {
     // Databases
     let element_integrated = ElementBuf::vault(env.clone(), false)?;
     let meta_integrated = MetadataBuf::vault(env.clone())?;
@@ -296,7 +296,7 @@ pub fn handle_get_agent_activity(
         ChainItems::NotRequested
     };
 
-    Ok(AgentActivity {
+    Ok(AgentActivityResponse {
         valid_activity,
         rejected_activity,
         agent,

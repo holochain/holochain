@@ -10,8 +10,6 @@ use holochain_p2p::HolochainP2pCellT;
 use holochain_test_wasm_common::AgentActivitySearch;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::prelude::*;
-use holochain_zome_types::HeaderHashed;
 use matches::assert_matches;
 use std::convert::TryInto;
 
@@ -227,7 +225,7 @@ async fn get_agent_activity_test() {
             hash: vec![last.header_address().clone()],
         });
 
-        AgentActivity {
+        AgentActivityResponse {
             valid_activity: ChainItems::Full(valid_activity),
             rejected_activity: ChainItems::NotRequested,
             status,
@@ -247,8 +245,8 @@ async fn get_agent_activity_test() {
         activity
     };
 
-    // Helper closure for changing to AgentActivity<Element> type
-    let get_expected_cascade = |activity: AgentActivity| {
+    // Helper closure for changing to AgentActivityResponse<Element> type
+    let get_expected_cascade = |activity: AgentActivityResponse| {
         let valid_activity = match activity.valid_activity {
             ChainItems::Full(headers) => ChainItems::Full(
                 headers
@@ -269,7 +267,7 @@ async fn get_agent_activity_test() {
             ChainItems::Hashes(h) => ChainItems::Hashes(h),
             ChainItems::NotRequested => ChainItems::NotRequested,
         };
-        let activity: AgentActivity<Element> = AgentActivity {
+        let activity: AgentActivityResponse<Element> = AgentActivityResponse {
             agent: activity.agent,
             valid_activity,
             rejected_activity,

@@ -763,7 +763,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> HolochainP2pHandlerResult<Vec<AgentActivity>> {
+    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse>> {
         let space = dna_hash.into_kitsune();
         let from_agent = from_agent.into_kitsune();
         // Convert the agent key to an any dht hash so it can be used

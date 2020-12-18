@@ -1,5 +1,5 @@
 //! Types related to an agents for chain activity
-use crate::activity::AgentActivity;
+use crate::activity::AgentActivityResponse;
 use crate::activity::ChainItems;
 use holo_hash::AgentPubKey;
 use holochain_zome_types::prelude::ChainStatus;
@@ -7,8 +7,8 @@ use holochain_zome_types::prelude::ChainStatus;
 /// Helpers for constructing AgentActivity
 pub trait AgentActivityExt {
     /// Create an empty chain status
-    fn empty<T>(agent: &AgentPubKey) -> AgentActivity<T> {
-        AgentActivity {
+    fn empty<T>(agent: &AgentPubKey) -> AgentActivityResponse<T> {
+        AgentActivityResponse {
             agent: agent.clone(),
             valid_activity: ChainItems::NotRequested,
             rejected_activity: ChainItems::NotRequested,
@@ -19,4 +19,4 @@ pub trait AgentActivityExt {
     }
 }
 
-impl AgentActivityExt for AgentActivity {}
+impl AgentActivityExt for AgentActivityResponse {}

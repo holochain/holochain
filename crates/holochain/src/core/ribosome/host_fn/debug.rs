@@ -1,7 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::prelude::*;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 use tracing::*;
 

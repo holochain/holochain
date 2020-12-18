@@ -138,8 +138,7 @@ mod test {
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_types::dna::zome::Permission;
-    use holochain_types::fixt::*;
-    use holochain_zome_types::prelude::*;
+    use holochain_types::prelude::*;
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
@@ -291,9 +290,8 @@ mod slow_tests {
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_state::source_chain::SourceChainResult;
+    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::CreateOutput;
-    use holochain_zome_types::Entry;
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]

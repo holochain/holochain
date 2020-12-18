@@ -227,7 +227,7 @@ mod tests {
     use holochain_types::dna::zome::ZomeDef;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::prelude::*;
+    use holochain_types::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_store_entry_defs() {

@@ -3,7 +3,6 @@
 
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::activity::AgentActivity;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
@@ -92,7 +91,7 @@ pub trait HolochainP2pCellT {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivity>>;
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>>;
 
     /// Send a validation receipt to a remote node.
     async fn send_validation_receipt(
@@ -250,7 +249,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivity>> {
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>> {
         self.sender
             .get_agent_activity(
                 (*self.dna_hash).clone(),

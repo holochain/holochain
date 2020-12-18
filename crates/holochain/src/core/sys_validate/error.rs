@@ -12,7 +12,7 @@ use holochain_cascade::error::CascadeError;
 use holochain_keystore::KeystoreError;
 use holochain_lmdb::error::DatabaseError;
 use holochain_state::workspace::WorkspaceError;
-use holochain_zome_types::prelude::*;
+use holochain_types::prelude::*;
 use thiserror::Error;
 
 /// Validation can result in either

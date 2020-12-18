@@ -35,7 +35,7 @@ use holochain_state::metadata::MetadataBuf;
 use holochain_state::metadata::MetadataBufT;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::prelude::*;
+use holochain_types::prelude::*;
 use holochain_zome_types::Entry;
 use holochain_zome_types::HeaderHashed;
 use maplit::btreeset;

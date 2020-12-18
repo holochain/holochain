@@ -1,6 +1,5 @@
 //! reexport some common things
 
-pub use crate::activity::AgentActivity;
 pub use crate::Timestamp;
 pub use holochain_keystore::AgentPubKeyExt;
 pub use holochain_keystore::KeystoreSender;
@@ -18,6 +17,7 @@ pub use crate::dht_op::error::*;
 pub use crate::dht_op::*;
 pub use crate::dna::error::*;
 pub use crate::dna::wasm::*;
+pub use crate::dna::zome::inline_zome::error::*;
 pub use crate::dna::zome::inline_zome::*;
 pub use crate::dna::zome::*;
 pub use crate::dna::*;
@@ -32,6 +32,7 @@ pub use crate::signal::*;
 pub use crate::timestamp::*;
 pub use crate::validate::*;
 
+pub use crate::fixt::TimestampFixturator;
 #[cfg(feature = "fixturators")]
 pub use crate::fixt::*;
 #[cfg(feature = "test_utils")]

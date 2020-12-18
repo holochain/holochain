@@ -91,7 +91,7 @@ impl HolochainP2pHandler for StubNetwork {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> HolochainP2pHandlerResult<Vec<AgentActivity>> {
+    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse>> {
         Err("stub".into())
     }
     fn handle_send_validation_receipt(
@@ -147,7 +147,6 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use holochain_types::fixt::*;
     use holochain_types::prelude::*;
     use holochain_zome_types::HeaderHashed;
     use holochain_zome_types::ValidationStatus;
