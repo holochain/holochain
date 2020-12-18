@@ -1,16 +1,16 @@
-use super::{TestConductorHandle, TestZome};
+use super::{CoolConductor, CoolZome};
 use hdk3::prelude::*;
 use holo_hash::DnaHash;
 
-/// A reference to a Cell created by a TestConductorHandle installation function.
+/// A reference to a Cell created by a CoolConductor installation function.
 /// It has very concise methods for calling a zome on this cell
 #[derive(Clone, derive_more::Constructor)]
-pub struct TestCell {
+pub struct CoolCell {
     pub(super) cell_id: CellId,
-    pub(super) handle: TestConductorHandle,
+    pub(super) handle: CoolConductor,
 }
 
-impl TestCell {
+impl CoolCell {
     /// Accessor for CellId
     pub fn cell_id(&self) -> &CellId {
         &self.cell_id
@@ -26,16 +26,16 @@ impl TestCell {
         &self.cell_id.dna_hash()
     }
 
-    /// Get a TestZome with the given name
-    pub fn zome<Z: Into<ZomeName>>(&self, zome_name: Z) -> TestZome {
-        TestZome::new(
+    /// Get a CoolZome with the given name
+    pub fn zome<Z: Into<ZomeName>>(&self, zome_name: Z) -> CoolZome {
+        CoolZome::new(
             self.cell_id().clone(),
             zome_name.into(),
             self.handle.clone(),
         )
     }
 
-    /// Call a zome function on this TestCell as if from another Agent.
+    /// Call a zome function on this CoolCell as if from another Agent.
     /// The provenance and optional CapSecret must be provided.
     pub async fn call_from<I, O, Z, F, E>(
         &self,
@@ -64,7 +64,7 @@ impl TestCell {
             .await
     }
 
-    /// Call a zome function on this TestCell.
+    /// Call a zome function on this CoolCell.
     /// No CapGrant is provided, since the authorship capability will be granted.
     pub async fn call<I, O, Z, F, E>(&self, zome_name: Z, fn_name: F, payload: I) -> O
     where

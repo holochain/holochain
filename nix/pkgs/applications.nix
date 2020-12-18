@@ -2,6 +2,8 @@
 , runCommand
 , openssl
 , pkg-config
+, stdenv
+, darwin
 
 , gnutar
 , hcRustPlatform
@@ -31,7 +33,9 @@ let
 
     buildInputs = [
       openssl.dev
-    ];
+    ] ++ lib.optionals stdenv.isDarwin (with darwin.apple_sdk.frameworks; [
+      Security CoreFoundation CoreServices
+    ]);
 
     cargoBuildFlags = [
       "--manifest-path=crates/${package}/Cargo.toml"

@@ -57,14 +57,12 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use super::*;
-    use crate::conductor::{config::ConductorConfig, p2p_store::exchange_peer_info, Conductor};
-    use crate::test_utils::test_conductor::{TestAgents, TestConductorHandle};
+    use crate::test_utils::cool::CoolDnaFile;
+    use crate::test_utils::cool::{CoolAgents, CoolConductorBatch};
     use futures::future;
     use hdk3::prelude::*;
-    use holochain_state::test_utils::test_environments;
-    use holochain_types::dna::{zome::inline_zome::InlineZome, DnaFile};
+    use holochain_types::dna::zome::inline_zome::InlineZome;
     use holochain_zome_types::signal::AppSignal;
-    use kitsune_p2p::KitsuneP2pConfig;
     use matches::assert_matches;
 
     #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
@@ -110,84 +108,35 @@ mod tests {
             })
     }
 
-    // TODO [ B-03669 ]: make much less verbose
     #[tokio::test(threaded_scheduler)]
     #[cfg(feature = "test_utils")]
     async fn remote_signal_test() -> anyhow::Result<()> {
         observability::test_run().ok();
         const NUM_CONDUCTORS: usize = 5;
-        let mut all_envs = Vec::with_capacity(NUM_CONDUCTORS);
-        let mut all_agents = Vec::with_capacity(NUM_CONDUCTORS);
-        for _ in 0..NUM_CONDUCTORS {
-            let envs = test_environments();
-            let agent = TestAgents::one(envs.keystore()).await;
-            all_envs.push(envs);
-            all_agents.push(agent);
-        }
-        let index = AtomicUsize::new(0);
-        let index_ref = &index;
-        let envs_ref = &all_envs;
+
         let num_signals = Arc::new(AtomicUsize::new(0));
 
-        let conductors = future::join_all(
-            std::iter::repeat_with(|| async move {
-                let i = index_ref.fetch_add(1, Ordering::SeqCst);
-                let envs = envs_ref[i].clone();
-                let mut network = KitsuneP2pConfig::default();
-                network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
-                    bind_to: None,
-                    override_host: None,
-                    override_port: None,
-                }];
-                let conductor: TestConductorHandle = Conductor::builder()
-                    .config(ConductorConfig {
-                        network: Some(network),
-                        ..Default::default()
-                    })
-                    .test(&envs)
-                    .await
-                    .unwrap()
-                    .into();
-                (conductor, envs)
-            })
-            .take(NUM_CONDUCTORS),
-        )
-        .await;
+        let conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
+        let agents =
+            future::join_all(conductors.iter().map(|c| CoolAgents::one(c.keystore()))).await;
 
-        let (dna_file, _) = DnaFile::unique_from_inline_zome(
+        let (dna_file, _) = CoolDnaFile::unique_from_inline_zome(
             "zome1",
-            zome(all_agents.clone(), num_signals.clone()),
+            zome(agents.clone(), num_signals.clone()),
         )
         .await
         .unwrap();
 
-        let agents_ref = &all_agents;
+        let apps = conductors
+            .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone().into()])
+            .await;
 
-        let data = future::join_all(conductors.iter().enumerate().map(|(i, (conductor, envs))| {
-            let dna_file = dna_file.clone();
-            async move {
-                let data = conductor
-                    .setup_app_for_agents_with_no_membrane_proof(
-                        "app",
-                        &[agents_ref[i].clone()],
-                        &[dna_file.clone()],
-                    )
-                    .await;
-                (data, envs)
-            }
-        }))
-        .await;
+        conductors.exchange_peer_info().await;
 
-        let p2p_envs = data.iter().map(|(_, envs)| envs.p2p()).collect();
-        exchange_peer_info(p2p_envs);
-
-        let cells: Vec<_> = data
-            .iter()
-            .flat_map(|(cells, _)| cells.iter().flat_map(|(_, c)| c.iter()))
-            .collect();
+        let cells: Vec<_> = apps.cells_flattened();
 
         let mut signals = Vec::new();
-        for h in conductors.iter().map(|(c, _)| c) {
+        for h in conductors {
             signals.push(h.signal_broadcaster().await.subscribe())
         }
         let signals = signals.into_iter().flatten().collect::<Vec<_>>();
