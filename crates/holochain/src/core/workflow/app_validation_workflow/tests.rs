@@ -19,7 +19,7 @@ use holochain_state::element_buf::ElementBuf;
 use holochain_state::validation_db::ValidationLimboValue;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_types::prelude::*;
+
 use holochain_zome_types::Entry;
 use holochain_zome_types::ValidationStatus;
 use std::convert::TryFrom;

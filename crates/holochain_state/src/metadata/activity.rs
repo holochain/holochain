@@ -48,7 +48,7 @@ pub(super) fn add_chain_status(
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use holo_hash::fixt::*;
+
     use ChainStatus::*;
 
     /// TEST: The following chain status transitions have the proper precedence

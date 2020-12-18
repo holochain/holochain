@@ -229,9 +229,9 @@ mod slow_tests {
     use crate::fixt::curve::Zomes;
     use crate::fixt::EntryDefsInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
+    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::entry_def::EntryVisibility;
-    use holochain_types::prelude::*;
     use std::collections::BTreeMap;
 
     #[tokio::test(threaded_scheduler)]

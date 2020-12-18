@@ -52,7 +52,6 @@ use holochain_state::source_chain::SourceChain;
 use holochain_state::source_chain::SourceChainBuf;
 use holochain_types::prelude::*;
 
-use holochain_types::prelude::*;
 use observability::OpenSpanExt;
 
 use std::convert::TryInto;

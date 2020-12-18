@@ -3,8 +3,8 @@ use std::convert::TryInto;
 use std::time::Duration;
 
 use holo_hash::EntryHash;
-use holochain_zome_types::Entry;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::Entry;
 
 use holochain::test_utils::conductor_setup::ConductorTestData;
 use holochain::test_utils::host_fn_caller::*;

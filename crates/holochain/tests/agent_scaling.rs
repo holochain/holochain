@@ -8,7 +8,7 @@ use holochain_lmdb::test_utils::test_environments;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_types::prelude::*;
+
 use unwrap_to::unwrap_to;
 
 /// A single link with an AgentPubKey for the base and target is committed by

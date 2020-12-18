@@ -5,7 +5,7 @@ use holochain_lmdb::buffer::BufferedStore;
 use holochain_lmdb::env::EnvironmentWrite;
 use holochain_lmdb::fresh_reader_test;
 use holochain_lmdb::test_utils::test_cell_env;
-use holochain_types::prelude::*;
+
 use observability;
 
 #[derive(Clone)]

@@ -6,10 +6,9 @@ use ::fixt::prelude::*;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::source_chain::SourceChain;
-use holochain_types::prelude::*;
+
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::fixt::*;
-use holochain_zome_types::test_utils::*;
+
 use std::convert::TryFrom;
 use std::time::Duration;
 

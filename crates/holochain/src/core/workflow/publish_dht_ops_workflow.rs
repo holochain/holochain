@@ -179,7 +179,7 @@ mod tests {
     use crate::test_utils::TestNetwork;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
-    use holo_hash::fixt::*;
+
     use holochain_lmdb::buffer::BufferedStore;
     use holochain_lmdb::env::EnvironmentWrite;
     use holochain_lmdb::env::ReadManager;

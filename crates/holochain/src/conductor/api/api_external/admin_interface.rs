@@ -12,7 +12,6 @@ use holochain_keystore::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 
-use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 
 use std::path::PathBuf;

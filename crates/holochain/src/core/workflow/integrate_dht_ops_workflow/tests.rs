@@ -14,7 +14,7 @@ use crate::fixt::*;
 use crate::here;
 use crate::test_utils::test_network;
 use ::fixt::prelude::*;
-use holo_hash::*;
+
 use holochain_lmdb::env::EnvironmentWrite;
 use holochain_lmdb::env::ReadManager;
 use holochain_lmdb::env::WriteManager;
@@ -23,7 +23,7 @@ use holochain_lmdb::test_utils::test_cell_env;
 use holochain_state::metadata::ChainItemKey;
 use holochain_state::metadata::LinkMetaKey;
 use holochain_state::workspace::WorkspaceError;
-use holochain_types::prelude::*;
+
 use holochain_zome_types::Entry;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::ValidationStatus;
@@ -1294,7 +1294,6 @@ mod slow_tests {
     use std::convert::TryInto;
     use std::time::Duration;
 
-    use crate::fixt::*;
     use crate::test_utils::host_fn_caller::*;
     use crate::test_utils::setup_app;
     use crate::test_utils::wait_for_integration;

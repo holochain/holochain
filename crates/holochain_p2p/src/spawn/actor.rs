@@ -8,7 +8,7 @@ use crate::types::AgentPubKeyExt;
 
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
-use holochain_types::prelude::*;
+
 use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;

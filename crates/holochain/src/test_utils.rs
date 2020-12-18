@@ -31,7 +31,7 @@ use holochain_serialized_bytes::SerializedBytesError;
 use holochain_state::element_buf::ElementBuf;
 use holochain_state::metadata::MetadataBuf;
 use holochain_types::prelude::*;
-use holochain_types::prelude::*;
+
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::convert::TryInto;

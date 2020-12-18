@@ -1,6 +1,6 @@
 use ::fixt::prelude::*;
 use hdk3::prelude::*;
-use holo_hash::fixt::*;
+
 use holochain::conductor::api::AppInterfaceApi;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
@@ -9,7 +9,7 @@ use holochain::conductor::api::ZomeCall;
 use holochain::conductor::dna_store::MockDnaStore;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
-use holochain::fixt::*;
+
 use holochain_lmdb::test_utils::test_environments;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;

@@ -62,7 +62,7 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
-use holochain_types::prelude::*;
+
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 

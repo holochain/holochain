@@ -34,7 +34,6 @@ use holochain_state::workspace::Workspace;
 use holochain_state::workspace::WorkspaceResult;
 use holochain_types::prelude::*;
 
-use holochain_types::prelude::*;
 use holochain_zome_types::Entry;
 use holochain_zome_types::ValidationStatus;
 

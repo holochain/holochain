@@ -345,8 +345,7 @@ pub mod tests {
     use crate::core::workflow::genesis_workflow::tests::fake_genesis;
     use crate::fixt::*;
     use ::fixt::prelude::*;
-    use holo_hash::fixt::*;
-    use holo_hash::*;
+
     use holochain_lmdb::env::ReadManager;
     use holochain_lmdb::test_utils::test_cell_env;
     use holochain_p2p::HolochainP2pCellFixturator;

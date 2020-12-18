@@ -324,7 +324,7 @@ pub mod tests {
     use holochain_types::test_utils::fake_dna_hash;
     use holochain_zome_types::capability::CapAccess;
     use holochain_zome_types::capability::ZomeCallCapGrant;
-    use holochain_zome_types::fixt::*;
+
     use std::collections::HashSet;
 
     #[tokio::test(threaded_scheduler)]
