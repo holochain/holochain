@@ -26,7 +26,6 @@ pub mod wasm_test {
     };
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use holochain_state::test_utils::test_environments;
     use holochain_types::fixt::CapSecretFixturator;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
@@ -109,16 +108,10 @@ pub mod wasm_test {
         dna_store.expect_add_dnas::<Vec<_>>().return_const(());
         dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
 
-        let envs = test_environments();
-        let handle = CoolConductor::new(
-            ConductorBuilder::with_mock_dna_store(dna_store)
-                .test(&envs)
-                .await
-                .unwrap(),
-            envs,
-        );
+        let conductor =
+            CoolConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
 
-        let apps = handle
+        let apps = conductor
             .setup_app_for_agents(
                 "app-",
                 &[alice_agent_id.clone(), bob_agent_id.clone()],
@@ -227,8 +220,9 @@ pub mod wasm_test {
         // the inner response should be unauthorized
         assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _));
 
-        let shutdown = handle.take_shutdown_handle().await.unwrap();
-        handle.shutdown().await;
+        let mut conductor = conductor;
+        let shutdown = conductor.take_shutdown_handle().await.unwrap();
+        conductor.shutdown().await;
         shutdown.await.unwrap();
     }
 }

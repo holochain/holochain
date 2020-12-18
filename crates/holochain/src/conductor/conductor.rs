@@ -956,13 +956,18 @@ mod builder {
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
     pub struct ConductorBuilder<DS = RealDnaStore> {
-        config: ConductorConfig,
-        dna_store: DS,
-        keystore: Option<KeystoreSender>,
+        /// The configuration
+        pub config: ConductorConfig,
+        /// The DnaStore (mockable)
+        pub dna_store: DS,
+        /// Optional keystore override
+        pub keystore: Option<KeystoreSender>,
         #[cfg(any(test, feature = "test_utils"))]
-        state: Option<ConductorState>,
+        /// Optional state override (for testing)
+        pub state: Option<ConductorState>,
         #[cfg(any(test, feature = "test_utils"))]
-        mock_handle: Option<MockConductorHandleT>,
+        /// Optional handle mock (for testing)
+        pub mock_handle: Option<MockConductorHandleT>,
     }
 
     impl ConductorBuilder {

@@ -3,7 +3,10 @@
 
 use super::{CoolAgents, CoolApp, CoolAppBatch, CoolCell};
 use crate::{
-    conductor::{api::ZomeCall, config::ConductorConfig, handle::ConductorHandle, Conductor},
+    conductor::{
+        api::ZomeCall, config::ConductorConfig, dna_store::DnaStore, handle::ConductorHandle,
+        Conductor, ConductorBuilder,
+    },
     core::ribosome::ZomeCallInvocation,
 };
 use futures::future;
@@ -114,20 +117,20 @@ impl CoolConductorBatch {
     }
 }
 
-// #[derive(Clone, shrinkwraprs::Shrinkwrap, derive_more::From)]
+/// A useful Conductor abstraction for testing, allowing startup and shutdown as well
+/// as easy installation of apps across multiple Conductors and Agents.
 #[derive(Clone, derive_more::From)]
-/// A wrapper around ConductorHandle with more convenient methods for testing
 pub struct CoolConductor {
-    // #[shrinkwrap(main_field)]
-    handle: Option<Arc<CoolConductorInner>>,
+    handle: Option<Arc<CoolConductorHandle>>,
     envs: TestEnvironments,
     config: ConductorConfig,
     dnas: Arc<std::sync::Mutex<Vec<DnaFile>>>,
 }
 
-/// Inner handle with a cleanup drop
+/// A wrapper around ConductorHandle with more convenient methods for testing
+/// and a cleanup drop
 #[derive(shrinkwraprs::Shrinkwrap, derive_more::From)]
-pub struct CoolConductorInner(pub(crate) ConductorHandle);
+pub struct CoolConductorHandle(pub(crate) ConductorHandle);
 
 fn standard_config() -> ConductorConfig {
     let mut network = KitsuneP2pConfig::default();
@@ -149,7 +152,7 @@ impl CoolConductor {
         envs: TestEnvironments,
         config: ConductorConfig,
     ) -> CoolConductor {
-        let handle = Arc::new(CoolConductorInner(handle));
+        let handle = Arc::new(CoolConductorHandle(handle));
         Self {
             handle: Some(handle),
             envs,
@@ -162,6 +165,16 @@ impl CoolConductor {
     pub async fn from_config(config: ConductorConfig) -> CoolConductor {
         let envs = test_environments();
         let handle = Self::from_existing(&envs, &config).await;
+        Self::new(handle, envs, config)
+    }
+
+    /// Create a CoolConductor from a partially-configured ConductorBuilder
+    pub async fn from_builder<DS: DnaStore + 'static>(
+        builder: ConductorBuilder<DS>,
+    ) -> CoolConductor {
+        let envs = test_environments();
+        let config = builder.config.clone();
+        let handle = builder.test(&envs).await.unwrap();
         Self::new(handle, envs, config)
     }
 
@@ -211,7 +224,7 @@ impl CoolConductor {
             .map(|dna| CellId::new(dna.dna_hash().clone(), agent.clone()))
             .map(|cell_id| CoolCell {
                 cell_id,
-                handle: self.clone(),
+                handle: Arc::downgrade(&self.handle()),
             })
             .collect();
         let installed_cells = cool_cells
@@ -226,9 +239,7 @@ impl CoolConductor {
                 )
             })
             .collect();
-        self.handle
-            .as_ref()
-            .expect("Tried to use a conductor that is offline")
+        self.handle()
             .0
             .clone()
             .install_app(installed_app_id.clone(), installed_cells)
@@ -253,9 +264,7 @@ impl CoolConductor {
             .await
             .expect("Could not activate app");
 
-        self.handle
-            .as_ref()
-            .expect("Tried to use a conductor that is offline")
+        self.handle()
             .0
             .clone()
             .setup_cells()
@@ -304,9 +313,7 @@ impl CoolConductor {
                 .expect("Could not activate app");
         }
 
-        self.handle
-            .as_ref()
-            .expect("Tried to use a conductor that is offline")
+        self.handle()
             .0
             .clone()
             .setup_cells()
@@ -324,30 +331,44 @@ impl CoolConductor {
     pub async fn shutdown(&mut self) {
         if let Some(handle) = self.handle.take() {
             handle.wait_for_shutdown().await;
+        } else {
+            panic!("Attempted to shutdown conductor which was already shutdown");
         }
     }
 
     /// Start up this conductor if it's not already running.
     pub async fn startup(&mut self) {
         if self.handle.is_none() {
-            self.handle = Some(Arc::new(CoolConductorInner(
+            self.handle = Some(Arc::new(CoolConductorHandle(
                 Self::from_existing(&self.envs, &self.config).await,
             )));
+
+            // MD: this feels wrong, why should we have to reinstall DNAs on restart?
+
             for dna_file in self.dnas.lock().unwrap().iter() {
                 self.install_dna(dna_file.clone())
                     .await
                     .expect("Could not install DNA");
             }
+        } else {
+            panic!("Attempted to start conductor which was already started");
         }
     }
 
     /// Check if this conductor is running
-    pub async fn is_running(&self) -> bool {
+    pub fn is_running(&self) -> bool {
         self.handle.is_some()
+    }
+
+    // NB: keep this private to prevent leaking out owned references
+    fn handle(&self) -> Arc<CoolConductorHandle> {
+        self.handle
+            .clone()
+            .expect("Tried to use a conductor that is offline")
     }
 }
 
-impl CoolConductorInner {
+impl CoolConductorHandle {
     /// Call a zome function with automatic de/serialization of input and output
     /// and unwrapping of nested errors.
     pub async fn call_zome_ok<'a, I, O, F, E>(&'a self, invocation: CoolZomeCall<'a, I, F, E>) -> O
@@ -477,7 +498,7 @@ where
     }
 }
 
-impl Drop for CoolConductorInner {
+impl Drop for CoolConductorHandle {
     fn drop(&mut self) {
         let c = self.0.clone();
         tokio::task::spawn(async move {
@@ -492,19 +513,19 @@ impl Drop for CoolConductorInner {
 
 // impl From<ConductorHandle> for CoolConductor {
 //     fn from(h: ConductorHandle) -> Self {
-//         CoolConductor(Arc::new(CoolConductorInner(h)))
+//         CoolConductor(Arc::new(CoolConductorHandle(h)))
 //     }
 // }
 
-impl AsRef<Arc<CoolConductorInner>> for CoolConductor {
-    fn as_ref(&self) -> &Arc<CoolConductorInner> {
+impl AsRef<Arc<CoolConductorHandle>> for CoolConductor {
+    fn as_ref(&self) -> &Arc<CoolConductorHandle> {
         self.handle
             .as_ref()
             .expect("Tried to use a conductor that is offline")
     }
 }
 impl std::ops::Deref for CoolConductor {
-    type Target = Arc<CoolConductorInner>;
+    type Target = Arc<CoolConductorHandle>;
 
     fn deref(&self) -> &Self::Target {
         self.handle
@@ -512,8 +533,8 @@ impl std::ops::Deref for CoolConductor {
             .expect("Tried to use a conductor that is offline")
     }
 }
-impl std::borrow::Borrow<Arc<CoolConductorInner>> for CoolConductor {
-    fn borrow(&self) -> &Arc<CoolConductorInner> {
+impl std::borrow::Borrow<Arc<CoolConductorHandle>> for CoolConductor {
+    fn borrow(&self) -> &Arc<CoolConductorHandle> {
         self.handle
             .as_ref()
             .expect("Tried to use a conductor that is offline")

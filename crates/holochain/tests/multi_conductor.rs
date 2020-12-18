@@ -116,21 +116,12 @@ async fn invalid_cell() -> anyhow::Result<()> {
     let bob_env = bobbo.env().await;
     let carol_env = carol.env().await;
     let envs = vec![&alice_env, &bob_env, &carol_env];
-    let alice_cell_id = alice.cell_id().clone();
-    let bobbo_cell_id = bobbo.cell_id().clone();
-    let carol_cell_id = carol.cell_id().clone();
-    // Thought maybe I could drop the apps to actually kill the
-    // conductors and their networks but then I can't make any zome calls.
-    // drop(apps);
-    // drop(alice);
-    // drop(bobbo);
-    // drop(carol);
 
     dbg!();
     conductors[1].shutdown().await;
 
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = alice.call("zome1", "create", Post(1.to_string())).await;
+    let hash: HeaderHash = alice.call("zome1", "create", Post("1".to_string())).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
     let element: MaybeElement = alice.call("zome1", "read", hash.clone()).await;
@@ -142,7 +133,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
     assert_eq!(element.header().author(), alice.agent_pubkey());
     assert_eq!(
         *element.entry(),
-        ElementEntry::Present(Entry::app(Post(1.to_string()).try_into().unwrap()).unwrap())
+        ElementEntry::Present(Entry::app(Post("1".to_string()).try_into().unwrap()).unwrap())
     );
     conductors[1].startup().await;
     let _: MaybeElement = bobbo.call("zome1", "read", hash).await;
@@ -153,7 +144,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
     conductors[0].shutdown().await;
     conductors[2].shutdown().await;
 
-    let hash: HeaderHash = bobbo.call("zome1", "create", Post(2.to_string())).await;
+    let hash: HeaderHash = bobbo.call("zome1", "create", Post("2".to_string())).await;
     dbg!();
     conductors[1].shutdown().await;
     dbg!();
@@ -165,9 +156,9 @@ async fn invalid_cell() -> anyhow::Result<()> {
     assert!(r.0.is_none());
     conductors[1].startup().await;
 
-    let _: HeaderHash = alice.call("zome1", "create", Post(3.to_string())).await;
-    let _: HeaderHash = bobbo.call("zome1", "create", Post(4.to_string())).await;
-    let _: HeaderHash = carol.call("zome1", "create", Post(5.to_string())).await;
+    let _: HeaderHash = alice.call("zome1", "create", Post("3".to_string())).await;
+    let _: HeaderHash = bobbo.call("zome1", "create", Post("4".to_string())).await;
+    let _: HeaderHash = carol.call("zome1", "create", Post("5".to_string())).await;
 
     let expected_count = WaitOps::start() * 3 + WaitOps::ENTRY * 5;
     // wait_for_integration_10s(&alice.env().await, expected_count).await;

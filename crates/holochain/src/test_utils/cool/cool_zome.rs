@@ -1,5 +1,6 @@
-use super::CoolConductor;
+use super::CoolConductorHandle;
 use hdk3::prelude::*;
+use std::sync::{Arc, Weak};
 
 /// A reference to a Zome in a Cell created by a CoolConductor installation function.
 /// Think of it as a partially applied CoolCell, with the ZomeName baked in.
@@ -7,7 +8,7 @@ use hdk3::prelude::*;
 pub struct CoolZome {
     cell_id: CellId,
     zome_name: ZomeName,
-    handle: CoolConductor,
+    handle: Weak<CoolConductorHandle>,
 }
 
 impl CoolZome {
@@ -26,7 +27,7 @@ impl CoolZome {
         SerializedBytes: TryFrom<I, Error = E>,
         O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
     {
-        self.handle
+        self.handle()
             .call_zome_ok_flat(
                 &self.cell_id,
                 self.zome_name.clone(),
@@ -49,5 +50,13 @@ impl CoolZome {
     {
         self.call_from(self.cell_id.agent_pubkey().clone(), None, fn_name, payload)
             .await
+    }
+
+    fn handle(&self) -> Arc<CoolConductorHandle> {
+        if let Some(handle) = self.handle.upgrade() {
+            handle
+        } else {
+            panic!(format!("Attempted to access conductor handle for zome {} in CellId {}, but the conductor is shutdown", self.zome_name, self.cell_id));
+        }
     }
 }
