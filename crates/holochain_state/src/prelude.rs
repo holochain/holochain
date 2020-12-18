@@ -8,3 +8,5 @@ pub use crate::validation_receipts_db::*;
 pub use crate::wasm::*;
 pub use crate::workspace::*;
 pub use crate::*;
+
+pub use holochain_lmdb::prelude::*;

@@ -23,7 +23,10 @@ fn create_entry(_: ()) -> ExternResult<HeaderHash> {
 
 #[hdk_extern]
 fn get_entry(_: ()) -> ExternResult<GetOutput> {
-    Ok(GetOutput::new(get(hash_entry(&post())?, GetOptions::latest())?))
+    Ok(GetOutput::new(get(
+        hash_entry(&post())?,
+        GetOptions::latest(),
+    )?))
 }
 
 #[hdk_extern]

@@ -48,6 +48,7 @@ use crate::core::ribosome::host_fn::hash_entry::hash_entry;
 use crate::core::ribosome::host_fn::property::property;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
+use crate::core::ribosome::host_fn::remote_signal::remote_signal;
 use crate::core::ribosome::host_fn::schedule::schedule;
 use crate::core::ribosome::host_fn::show_env::show_env;
 use crate::core::ribosome::host_fn::sign::sign;
@@ -290,8 +291,13 @@ impl RealRibosome {
         } = host_fn_access
         {
             ns.insert("__call_remote", func!(invoke_host_function!(call_remote)));
+            ns.insert(
+                "__remote_signal",
+                func!(invoke_host_function!(remote_signal)),
+            );
         } else {
             ns.insert("__call_remote", func!(invoke_host_function!(unreachable)));
+            ns.insert("__remote_signal", func!(invoke_host_function!(unreachable)));
         }
 
         if let HostFnAccess {

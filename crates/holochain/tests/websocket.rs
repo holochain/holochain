@@ -1,20 +1,28 @@
+use ::fixt::prelude::*;
 use anyhow::Result;
 use assert_cmd::prelude::*;
+use futures::future;
 use futures::Future;
-use holochain::conductor::api::AdminRequest;
-use holochain::conductor::api::AdminResponse;
-use holochain::conductor::api::AppRequest;
-use holochain::conductor::api::AppResponse;
-use holochain::conductor::api::ZomeCall;
-use holochain::conductor::config::*;
-use holochain::conductor::error::ConductorError;
-use holochain::conductor::Conductor;
-use holochain::fixt::*;
-use holochain::*;
-use holochain_types::prelude::*;
+use hdk3::prelude::RemoteSignal;
+use holochain::test_utils::cool::CoolAgents;
+use holochain::test_utils::cool::CoolConductorBatch;
+use holochain::test_utils::cool::CoolDnaFile;
+use holochain::{
+    conductor::api::ZomeCall,
+    conductor::{
+        api::{AdminRequest, AdminResponse, AppRequest, AppResponse},
+        config::*,
+        error::ConductorError,
+        Conductor,
+    },
+    fixt::*,
+};
+use holochain_types::{
+    prelude::*,
+    test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
+};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
-
 use matches::assert_matches;
 use observability;
 use std::path::PathBuf;
@@ -375,6 +383,61 @@ async fn call_zome() {
 
     // Shutdown holochain
     holochain.kill().expect("Failed to kill holochain");
+}
+
+#[tokio::test(threaded_scheduler)]
+#[cfg(feature = "slow_tests")]
+async fn remote_signals() {
+    observability::test_run().ok();
+    const NUM_CONDUCTORS: usize = 5;
+
+    let conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
+
+    // TODO: write helper for agents across conductors
+    let all_agents: Vec<HoloHash<hash_type::Agent>> =
+        future::join_all(conductors.iter().map(|c| CoolAgents::one(c.keystore()))).await;
+
+    let dna_file = CoolDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
+        .await
+        .unwrap()
+        .0;
+
+    let apps = conductors
+        .setup_app_for_zipped_agents("app", &all_agents, &[dna_file])
+        .await;
+
+    conductors.exchange_peer_info().await;
+
+    let cells = apps.cells_flattened();
+
+    let mut rxs = Vec::new();
+    for h in conductors.iter().map(|c| c) {
+        rxs.push(h.signal_broadcaster().await.subscribe())
+    }
+    let rxs = rxs.into_iter().flatten().collect::<Vec<_>>();
+
+    let signal = fixt!(SerializedBytes);
+
+    let _: () = cells[0]
+        .call(
+            TestWasm::EmitSignal,
+            "signal_others",
+            RemoteSignal {
+                signal: signal.clone(),
+                agents: all_agents,
+            },
+        )
+        .await;
+
+    tokio::time::delay_for(std::time::Duration::from_millis(2000)).await;
+
+    let signal = AppSignal::new(signal);
+    for mut rx in rxs {
+        let r = rx.try_recv();
+        // Each handle should recv a signal
+
+        assert_matches!(r, Ok(Signal::App(_, a)) if a == signal);
+    }
 }
 
 #[tokio::test(threaded_scheduler)]

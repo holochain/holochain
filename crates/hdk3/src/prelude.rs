@@ -34,6 +34,7 @@ pub use crate::host_fn::get_links::get_links;
 pub use crate::host_fn::hash_entry::hash_entry;
 pub use crate::host_fn::query::query;
 pub use crate::host_fn::random_bytes::random_bytes;
+pub use crate::host_fn::remote_signal::remote_signal;
 pub use crate::host_fn::sign::sign;
 pub use crate::host_fn::sys_time::sys_time;
 pub use crate::host_fn::update::update;

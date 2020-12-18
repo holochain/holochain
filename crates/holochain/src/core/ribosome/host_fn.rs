@@ -125,6 +125,9 @@ host_fn_api_impls! {
     // the length of random bytes to create
     fn random_bytes (u32) -> zt::bytes::Bytes;
 
+    // Remotely signal many agents without waiting for responses
+    fn remote_signal (zt::signal::RemoteSignal) -> ();
+
     // // @todo
     // fn send (()) -> ();
 
