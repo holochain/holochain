@@ -1304,10 +1304,7 @@ mod slow_tests {
     use holochain_lmdb::db::INTEGRATED_DHT_OPS;
     use holochain_lmdb::env::ReadManager;
     use holochain_serialized_bytes::SerializedBytes;
-    use holochain_state::dht_op_integration::IntegratedDhtOpsStore;
-    use holochain_state::metadata::LinkMetaKey;
-    use holochain_state::metadata::MetadataBuf;
-    use holochain_state::metadata::MetadataBufT;
+    use holochain_state::prelude::*;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use observability;
