@@ -176,28 +176,8 @@ mod tests {
     use crate::test_utils::TestNetwork;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
-
-    use holochain_lmdb::buffer::BufferedStore;
-    use holochain_lmdb::env::EnvironmentWrite;
-    use holochain_lmdb::env::ReadManager;
-    use holochain_lmdb::env::WriteManager;
-    use holochain_lmdb::error::DatabaseError;
-    use holochain_lmdb::test_utils::test_cell_env;
     use holochain_p2p::actor::HolochainP2pSender;
     use holochain_p2p::HolochainP2pRef;
-    use holochain_state::dht_op_integration::AuthoredDhtOpsValue;
-    use holochain_state::source_chain::SourceChain;
-    use holochain_types::dht_op::DhtOp;
-    use holochain_types::dht_op::DhtOpHashed;
-    use holochain_types::dht_op::DhtOpLight;
-    use holochain_types::fixt::AppEntryTypeFixturator;
-    use holochain_types::fixt::SignatureFixturator;
-    use holochain_zome_types::element::SignedHeaderHashed;
-    use holochain_zome_types::entry_def::EntryVisibility;
-    use holochain_zome_types::header::builder;
-    use holochain_zome_types::header::EntryType;
-    use holochain_zome_types::header::Update;
-    use holochain_zome_types::HeaderHashed;
     use matches::assert_matches;
     use observability;
     use std::collections::HashMap;
