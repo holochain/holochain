@@ -193,10 +193,6 @@ wasm_io_types! {
     fn zome_info (()) -> zt::zome_info::ZomeInfo;
 }
 
-pub type SecretBoxInput = XSalsa20Poly1305EncryptInput;
-pub type SecretBoxOutput = XSalsa20Poly1305EncryptOutput;
-pub type SecretBoxOpenInput = XSalsa20Poly1305DecryptInput;
-pub type SecretBoxOpenOutput = XSalsa20Poly1305DecryptOutput;
 /// We probably actually want to use RibosomeError for HostApiFn errors, but
 /// RibosomeError is downstream of this crate. So, we'd need to make an
 /// associated Error type for HostFnApiT, which would infect everything from
