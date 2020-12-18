@@ -23,6 +23,3 @@ impl XSalsa20Poly1305EncryptedData {
         &self.encrypted_data
     }
 }
-
-pub type SecretBoxEncryptedData = XSalsa20Poly1305EncryptedData;
-pub type BoxEncryptedData = XSalsa20Poly1305EncryptedData;
