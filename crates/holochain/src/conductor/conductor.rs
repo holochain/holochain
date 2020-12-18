@@ -31,7 +31,7 @@ use super::{
     p2p_store::get_single_agent_info,
     p2p_store::inject_agent_infos,
     paths::EnvironmentRootPath,
-    state::{AppInterfaceId, ConductorState},
+    state::{AppInterfaceConfig, AppInterfaceId, ConductorState},
     CellError,
 };
 use crate::{
@@ -324,8 +324,35 @@ where
         // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
         self.manage_task(ManagedTaskAdd::dont_handle(task)).await?;
         self.app_interface_signal_broadcasters
-            .insert(interface_id, signal_broadcaster);
+            .insert(interface_id.clone(), signal_broadcaster);
+        let config = AppInterfaceConfig::websocket(port);
+        self.update_state(|mut state| {
+            state.app_interfaces.insert(interface_id, config);
+            Ok(state)
+        })
+        .await?;
         Ok(port)
+    }
+
+    /// Start all app interfaces currently in state.
+    /// This should only be run at conductor initialization.
+    #[allow(irrefutable_let_patterns)]
+    pub(super) async fn startup_app_interfaces_via_handle(
+        &mut self,
+        handle: ConductorHandle,
+    ) -> ConductorResult<()> {
+        for i in self.get_state().await?.app_interfaces.values() {
+            tracing::debug!("Starting up app interface: {:?}", i);
+            let port = if let InterfaceDriver::Websocket { port } = i.driver {
+                port
+            } else {
+                unreachable!()
+            };
+            let _ = self
+                .add_app_interface_via_handle(port, handle.clone())
+                .await?;
+        }
+        Ok(())
     }
 
     pub(super) fn signal_broadcaster(&self) -> SignalBroadcaster {
@@ -1084,6 +1111,9 @@ mod builder {
                 handle.clone().add_admin_interfaces(configs).await?;
             }
 
+            // Create app interfaces
+            handle.clone().startup_app_interfaces().await?;
+
             Ok(handle)
         }
 
@@ -1174,112 +1204,4 @@ async fn p2p_event_task(
 }
 
 #[cfg(test)]
-pub mod tests {
-    use super::{Conductor, ConductorState, *};
-    use crate::conductor::dna_store::MockDnaStore;
-    use holochain_state::test_utils::test_environments;
-    use holochain_types::test_utils::fake_cell_id;
-    use matches::assert_matches;
-
-    #[tokio::test(threaded_scheduler)]
-    async fn can_update_state() {
-        let envs = test_environments();
-        let dna_store = MockDnaStore::new();
-        let keystore = envs.conductor().keystore().clone();
-        let holochain_p2p = holochain_p2p::stub_network().await;
-        let conductor = Conductor::new(
-            envs.conductor(),
-            envs.wasm(),
-            envs.p2p(),
-            dna_store,
-            keystore,
-            envs.tempdir().path().to_path_buf().into(),
-            holochain_p2p,
-        )
-        .await
-        .unwrap();
-        let state = conductor.get_state().await.unwrap();
-        assert_eq!(state, ConductorState::default());
-
-        let cell_id = fake_cell_id(1);
-        let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
-
-        conductor
-            .update_state(|mut state| {
-                state
-                    .inactive_apps
-                    .insert("fake app".to_string(), vec![installed_cell]);
-                Ok(state)
-            })
-            .await
-            .unwrap();
-        let state = conductor.get_state().await.unwrap();
-        assert_eq!(
-            state.inactive_apps.values().collect::<Vec<_>>()[0]
-                .into_iter()
-                .map(|c| c.as_id().clone())
-                .collect::<Vec<_>>()
-                .as_slice(),
-            &[cell_id]
-        );
-    }
-
-    /// App can't be installed if another app is already installed under the
-    /// same InstalledAppId
-    #[tokio::test(threaded_scheduler)]
-    async fn app_ids_are_unique() {
-        let environments = test_environments();
-        let dna_store = MockDnaStore::new();
-        let holochain_p2p = holochain_p2p::stub_network().await;
-        let mut conductor = Conductor::new(
-            environments.conductor(),
-            environments.wasm(),
-            environments.p2p(),
-            dna_store,
-            environments.keystore().clone(),
-            environments.tempdir().path().to_path_buf().into(),
-            holochain_p2p,
-        )
-        .await
-        .unwrap();
-
-        let cell_id = fake_cell_id(1);
-        let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
-        let app = InstalledApp {
-            installed_app_id: "id".to_string(),
-            cell_data: vec![installed_cell],
-        };
-
-        conductor.add_inactive_app_to_db(app.clone()).await.unwrap();
-
-        assert_matches!(
-            conductor.add_inactive_app_to_db(app.clone()).await,
-            Err(ConductorError::AppAlreadyInstalled(id))
-            if id == "id".to_string()
-        );
-
-        //- it doesn't matter whether the app is active or inactive
-        conductor
-            .activate_app_in_db("id".to_string())
-            .await
-            .unwrap();
-
-        assert_matches!(
-            conductor.add_inactive_app_to_db(app.clone()).await,
-            Err(ConductorError::AppAlreadyInstalled(id))
-            if id == "id".to_string()
-        );
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    async fn can_set_fake_state() {
-        let envs = test_environments();
-        let state = ConductorState::default();
-        let conductor = ConductorBuilder::new()
-            .fake_state(state.clone())
-            .test(&envs)
-            .await
-            .unwrap();
-        assert_eq!(state, conductor.get_state_from_handle().await.unwrap());
-    }
-}
+pub mod tests;

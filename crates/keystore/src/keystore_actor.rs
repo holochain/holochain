@@ -113,9 +113,9 @@ impl KeystoreSenderExt for KeystoreSender {
                 return Ok(r);
             }
 
-            let _ = this
-                .tls_cert_new_self_signed_from_entropy(TlsCertOptions::default())
-                .await?;
+            let mut tls_opt = TlsCertOptions::default();
+            tls_opt.alg = lair_keystore_api::actor::TlsCertAlg::PkcsEcdsaP256Sha256;
+            let _ = this.tls_cert_new_self_signed_from_entropy(tls_opt).await?;
 
             this.get_first_tls_cert().await
         }

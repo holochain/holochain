@@ -888,7 +888,7 @@ name = "dna_util"
 version = "0.0.1"
 dependencies = [
  "holo_hash",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.46",
  "holochain_types",
  "holochain_zome_types",
  "serde",
@@ -1015,7 +1015,7 @@ checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 name = "fixt"
 version = "0.0.1"
 dependencies = [
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.46",
  "lazy_static",
  "parking_lot",
  "paste 1.0.3",
@@ -1390,7 +1390,7 @@ dependencies = [
  "blake2b_simd",
  "fixt",
  "futures",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.46",
  "must_future",
  "rand 0.7.3",
  "serde",
@@ -1423,7 +1423,7 @@ dependencies = [
  "holo_hash",
  "holochain_keystore",
  "holochain_p2p",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.46",
  "holochain_state",
  "holochain_types",
  "holochain_wasm_test_utils",
@@ -1477,7 +1477,7 @@ version = "0.0.1"
 dependencies = [
  "ghost_actor",
  "holo_hash",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.46",
  "holochain_zome_types",
  "lair_keystore_api",
  "lair_keystore_client",
@@ -1498,7 +1498,7 @@ dependencies = [
  "ghost_actor",
  "holo_hash",
  "holochain_keystore",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.46",
  "holochain_types",
  "holochain_zome_types",
  "kitsune_p2p",
@@ -1518,7 +1518,22 @@ version = "0.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adca869d80860a04757af4fc011d49505594365391a6e3a04105e8f88b9c32e1"
 dependencies = [
- "holochain_serialized_bytes_derive",
+ "holochain_serialized_bytes_derive 0.0.45",
+ "rmp-serde",
+ "serde",
+ "serde-transcode",
+ "serde_bytes",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "holochain_serialized_bytes"
+version = "0.0.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b8fe6bc8c830633862ee0b7903706f6d940f7c794b3f5e768f660a7abbacbc9"
+dependencies = [
+ "holochain_serialized_bytes_derive 0.0.46",
  "rmp-serde",
  "serde",
  "serde-transcode",
@@ -1532,6 +1547,16 @@ name = "holochain_serialized_bytes_derive"
 version = "0.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2dbbf84d56f0a0cb00e5532fd4d40b1d42ffb403a1a964d8eeedc4d40131e208"
+dependencies = [
+ "quote 0.6.13",
+ "syn 0.15.44",
+]
+
+[[package]]
+name = "holochain_serialized_bytes_derive"
+version = "0.0.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1a4c0ef882177ac63c8912ae9c1eb6285d3b50a56f2bb0cebc41012255b7734"
 dependencies = [
  "quote 0.6.13",
  "syn 0.15.44",
@@ -1552,7 +1577,7 @@ dependencies = [
  "futures",
  "holo_hash",
  "holochain_keystore",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.46",
  "holochain_types",
  "lazy_static",
  "must_future",
@@ -1588,7 +1613,7 @@ dependencies = [
  "futures",
  "holo_hash",
  "holochain_keystore",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.46",
  "holochain_zome_types",
  "lazy_static",
  "maplit",
@@ -1628,33 +1653,33 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.50"
+version = "0.0.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edfcc07f0ff0aa409a6f7b1fd4766c3c31c6e47a0a7b74563bff5e8791378277"
+checksum = "5e064411f7c8cf58e08a451c2df9ab99efb5de839f74a650c1a30abbd607add8"
 dependencies = [
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.46",
  "serde",
  "thiserror",
 ]
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.50"
+version = "0.0.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "924a5024a73c73d8835594db1978a4c830ebd51c396920f91a58d7c9ef85641b"
+checksum = "6c86bf521e02f8f86ea96177ef316560e66e51a192b83a302e8e4b32a6f47f02"
 dependencies = [
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.46",
  "holochain_wasmer_common",
  "serde",
 ]
 
 [[package]]
 name = "holochain_wasmer_host"
-version = "0.0.50"
+version = "0.0.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a094cb028913a2d112d2db4d54968b5380ad881ca9c7653dff699d8fb91c4759"
+checksum = "2148dc74f406813bd43ea16424aee613c1150cac9585cf4aad2f54ec9aa08461"
 dependencies = [
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.46",
  "holochain_wasmer_common",
  "lazy_static",
  "serde",
@@ -1667,7 +1692,7 @@ name = "holochain_websocket"
 version = "0.0.1"
 dependencies = [
  "futures",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.46",
  "holochain_types",
  "linefeed",
  "nanoid",
@@ -1688,7 +1713,7 @@ version = "0.0.1"
 dependencies = [
  "fixt",
  "holo_hash",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.46",
  "paste 1.0.3",
  "serde",
  "serde_bytes",
@@ -2020,9 +2045,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.0.1-alpha.9"
+version = "0.0.1-alpha.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a38db42dd22cb1a1feb5702a2c0678dc46f5ea66a67dd96709e953685031edf"
+checksum = "9e29ec57903c6fcac8d0994f03b9d6cdcd7f879748ee02de653b8a161302060e"
 dependencies = [
  "blake2b_simd",
  "block-padding 0.2.1",
@@ -2047,9 +2072,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_client"
-version = "0.0.1-alpha.9"
+version = "0.0.1-alpha.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2cd5305159baed80a29b5ad56f45f34edf46314b05ffc564374eef67e76d06c"
+checksum = "61ee943659739a639033086b421eb19c155c9a8a64c64a6e37e1025ce5651bb2"
 dependencies = [
  "ghost_actor",
  "lair_keystore_api",
@@ -2473,7 +2498,7 @@ checksum = "9b7f7ad81f5735063ff3efaf54fe1a503b64f34aefa5452d0543c71a722a03e7"
 dependencies = [
  "chrono",
  "derive_more",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.45",
  "inferno",
  "once_cell",
  "opentelemetry",
@@ -3915,7 +3940,7 @@ name = "test_wasm_common"
 version = "0.0.1"
 dependencies = [
  "hdk3",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.46",
  "serde",
  "serde_bytes",
 ]

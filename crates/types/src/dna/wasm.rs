@@ -16,7 +16,7 @@ use tracing::*;
 #[derive(Serialize, Deserialize, Clone, Eq)]
 pub struct DnaWasm {
     /// the wasm bytes from a .wasm file
-    pub code: Arc<Vec<u8>>,
+    pub code: Arc<Box<[u8]>>,
 }
 
 /// A DnaWasm paired with its WasmHash
@@ -41,7 +41,7 @@ impl TryFrom<&DnaWasm> for SerializedBytes {
     type Error = SerializedBytesError;
     fn try_from(dna_wasm: &DnaWasm) -> Result<Self, Self::Error> {
         Ok(SerializedBytes::from(UnsafeBytes::from(
-            (*dna_wasm.code).to_owned(),
+            dna_wasm.code.to_vec(),
         )))
     }
 }
@@ -56,7 +56,7 @@ impl TryFrom<SerializedBytes> for DnaWasm {
     type Error = SerializedBytesError;
     fn try_from(serialized_bytes: SerializedBytes) -> Result<Self, Self::Error> {
         Ok(DnaWasm {
-            code: Arc::new(serialized_bytes.bytes().to_vec()),
+            code: Arc::new(serialized_bytes.bytes().to_owned().into_boxed_slice()),
         })
     }
 }
@@ -69,12 +69,12 @@ impl DnaWasm {
             Backtrace::new()
         );
         DnaWasm {
-            code: Arc::new(vec![]),
+            code: Arc::new(Box::new([])),
         }
     }
 
     /// get a new Arc to the Vec<u8> bytes for the wasm
-    pub fn code(&self) -> Arc<Vec<u8>> {
+    pub fn code(&self) -> Arc<Box<[u8]>> {
         Arc::clone(&self.code)
     }
 }
@@ -100,7 +100,7 @@ impl Hash for DnaWasm {
 impl From<Vec<u8>> for DnaWasm {
     fn from(wasm: Vec<u8>) -> Self {
         Self {
-            code: Arc::new(wasm),
+            code: Arc::new(wasm.into_boxed_slice()),
         }
     }
 }

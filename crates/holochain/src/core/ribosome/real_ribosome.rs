@@ -1,3 +1,4 @@
+use super::host_fn::remote_signal::remote_signal;
 use super::{
     guest_callback::{
         entry_defs::EntryDefsHostAccess, init::InitHostAccess,
@@ -105,7 +106,7 @@ impl RealRibosome {
     }
 
     pub fn module(&self, zome_name: &ZomeName) -> RibosomeResult<Module> {
-        let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(zome_name)?.code();
+        let wasm: Arc<Box<[u8]>> = self.dna_file.get_wasm_for_zome(zome_name)?.code();
         Ok(holochain_wasmer_host::instantiate::module(
             &self.wasm_cache_key(zome_name)?,
             &wasm,
@@ -127,7 +128,7 @@ impl RealRibosome {
 
     pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Instance> {
         let zome_name = call_context.zome.zome_name().clone();
-        let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
+        let wasm: Arc<Box<[u8]>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
         let imports: ImportObject = Self::imports(self, call_context);
         Ok(holochain_wasmer_host::instantiate::instantiate(
             self.wasm_cache_key(&zome_name)?,
@@ -340,8 +341,13 @@ impl RealRibosome {
         } = host_fn_access
         {
             ns.insert("__call_remote", func!(invoke_host_function!(call_remote)));
+            ns.insert(
+                "__remote_signal",
+                func!(invoke_host_function!(remote_signal)),
+            );
         } else {
             ns.insert("__call_remote", func!(invoke_host_function!(unreachable)));
+            ns.insert("__remote_signal", func!(invoke_host_function!(unreachable)));
         }
 
         if let HostFnAccess {

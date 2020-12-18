@@ -95,6 +95,7 @@ impl TestEnvironment {
     }
 }
 
+#[derive(Clone)]
 /// A container for all three non-cell environments
 pub struct TestEnvironments {
     /// A test conductor environment

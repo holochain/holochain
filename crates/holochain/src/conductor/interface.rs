@@ -41,6 +41,12 @@ impl SignalBroadcaster {
     pub fn noop() -> Self {
         Self(Vec::new())
     }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    /// Subscribe to all the signal senders
+    pub fn subscribe(&self) -> Vec<broadcast::Receiver<Signal>> {
+        self.0.iter().map(|s| s.subscribe()).collect()
+    }
 }
 
 /// Configuration for interfaces, specifying the means by which an interface

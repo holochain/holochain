@@ -26,9 +26,6 @@ impl DisputedStatus {
     /// Resolves the status considering an absence
     /// of status as valid.
     pub fn is_valid(&self) -> bool {
-        match self.resolve() {
-            Some(ValidationStatus::Valid) | None => true,
-            _ => false,
-        }
+        matches!(self.resolve(), Some(ValidationStatus::Valid) | None)
     }
 }

@@ -60,7 +60,7 @@ use holochain_types::{
     app::{InstalledApp, InstalledAppId, InstalledCell, MembraneProof},
     autonomic::AutonomicCue,
     cell::CellId,
-    dna::DnaFile,
+    dna::{zome::ZomeDef, DnaFile},
     prelude::*,
 };
 use holochain_zome_types::entry_def::EntryDef;
@@ -98,6 +98,10 @@ pub trait ConductorHandleT: Send + Sync {
         self: Arc<Self>,
         configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<()>;
+
+    /// Start up persisted app interfaces.
+    /// Should only be run once at Conductor initialization.
+    async fn startup_app_interfaces(self: Arc<Self>) -> ConductorResult<()>;
 
     /// Add an app interface
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16>;
@@ -255,16 +259,36 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
     }
 
+    async fn startup_app_interfaces(self: Arc<Self>) -> ConductorResult<()> {
+        self.conductor
+            .write()
+            .await
+            .startup_app_interfaces_via_handle(self.clone())
+            .await
+    }
+
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16> {
         let mut lock = self.conductor.write().await;
         lock.add_app_interface_via_handle(port, self.clone()).await
     }
 
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-        let entry_defs = self.conductor.read().await.put_wasm(dna.clone()).await?;
-        let mut store = self.conductor.write().await;
-        store.dna_store_mut().add_dna(dna);
-        store.dna_store_mut().add_entry_defs(entry_defs);
+        let is_full_wasm_dna = dna
+            .dna_def()
+            .zomes
+            .iter()
+            .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
+
+        let mut lock = self.conductor.write().await;
+
+        // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
+        if is_full_wasm_dna {
+            let entry_defs = lock.put_wasm(dna.clone()).await?;
+            lock.dna_store_mut().add_entry_defs(entry_defs);
+        }
+
+        lock.dna_store_mut().add_dna(dna);
+
         Ok(())
     }
 
@@ -275,9 +299,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
             .load_wasms_into_dna_files()
             .await?;
-        let mut store = self.conductor.write().await;
-        store.dna_store_mut().add_dnas(dnas);
-        store.dna_store_mut().add_entry_defs(entry_defs);
+        let mut lock = self.conductor.write().await;
+        lock.dna_store_mut().add_dnas(dnas);
+        lock.dna_store_mut().add_entry_defs(entry_defs);
         Ok(())
     }
 

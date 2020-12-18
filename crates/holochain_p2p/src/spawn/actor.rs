@@ -438,6 +438,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         .into())
     }
 
+    #[allow(clippy::needless_collect)]
     #[tracing::instrument(skip(self), level = "trace")]
     fn handle_fetch_op_hash_data(
         &mut self,
@@ -455,6 +456,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         let op_hashes = op_hashes
             .into_iter()
             .map(|h| DhtOpHash::from_kitsune(&h))
+            // the allowance of clippy::needless_collcect refers to the following call
             .collect::<Vec<_>>();
 
         let evt_sender = self.evt_sender.clone();
