@@ -17,6 +17,7 @@ pub fn x_salsa20_poly1305_decrypt(
 
     // @todo use a libsodium wrapper instead of an ad-hoc rust implementation.
     // Note that the we're mapping any decrypting error to None here.
+    // @todo this decrypt should be in lair and key refs should be refs to keys in lair
     let lib_key = GenericArray::from_slice(decrypt.as_key_ref_ref().as_ref());
     let cipher = XSalsa20Poly1305::new(lib_key);
     let lib_nonce = GenericArray::from_slice(decrypt.as_encrypted_data_ref().as_nonce_ref().as_ref());

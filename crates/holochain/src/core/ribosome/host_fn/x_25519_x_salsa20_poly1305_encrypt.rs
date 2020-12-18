@@ -11,7 +11,6 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
     call_context: Arc<CallContext>,
     input: X25519XSalsa20Poly1305EncryptInput,
 ) -> RibosomeResult<X25519XSalsa20Poly1305EncryptOutput> {
-    dbg!(&input);
     Ok(X25519XSalsa20Poly1305EncryptOutput::new(
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             call_context
@@ -110,13 +109,31 @@ pub mod wasm_test {
             encrypt_input
         );
 
-        // let key_ref = XSalsa20Poly1305KeyRef::from([1; 32]);
-        let decrypt_input = X25519XSalsa20Poly1305DecryptInput::new(holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(bob.clone(), alice.clone(), encrypt_output.into_inner()));
+        let decrypt_input = X25519XSalsa20Poly1305DecryptInput::new(holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(bob.clone(), alice.clone(), encrypt_output.clone().into_inner()));
         let decrypt_output: X25519XSalsa20Poly1305DecryptOutput = crate::call_test_ribosome!(
             host_access,
             TestWasm::XSalsa20Poly1305,
             "x_25519_x_salsa20_poly1305_decrypt",
             decrypt_input
         );
+
+        assert_eq!(
+            decrypt_output.into_inner(),
+            Some(data.clone()),
+        );
+
+        let bad_decrypt_input = X25519XSalsa20Poly1305DecryptInput::new(holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(carol.clone(), alice.clone(), encrypt_output.into_inner()));
+        let bad_decrypt_output: X25519XSalsa20Poly1305DecryptOutput = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::XSalsa20Poly1305,
+            "x_25519_x_salsa20_poly1305_decrypt",
+            bad_decrypt_input
+        );
+
+        assert_eq!(
+            bad_decrypt_output.into_inner(),
+            None,
+        );
+
     }
 }

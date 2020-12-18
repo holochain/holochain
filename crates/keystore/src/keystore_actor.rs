@@ -172,10 +172,8 @@ impl KeystoreSenderExt for KeystoreSender {
         let this = self.clone();
         async move {
             let fut = this.crypto_box_open_by_pub_key(
-                input.as_recipient_ref().as_ref()
-                    .try_into()?,
-                input.as_sender_ref().as_ref()
-                    .try_into()?,
+                input.as_recipient_ref().as_ref().try_into()?,
+                input.as_sender_ref().as_ref().try_into()?,
                 std::sync::Arc::new(
                     lair_keystore_api::internal::crypto_box::CryptoBoxEncryptedData {
                         nonce: AsRef::<[u8]>::as_ref(&input.as_encrypted_data_ref().as_nonce_ref())

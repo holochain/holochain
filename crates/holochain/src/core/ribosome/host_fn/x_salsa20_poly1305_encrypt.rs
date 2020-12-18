@@ -18,12 +18,13 @@ pub fn x_salsa20_poly1305_encrypt(
     let encrypt = input.into_inner();
 
     let system_random = ring::rand::SystemRandom::new();
-    let mut nonce_bytes = [0; 24];
+    let mut nonce_bytes = [0; holochain_zome_types::x_salsa20_poly1305::nonce::NONCE_BYTES];
     system_random.fill(&mut nonce_bytes)?;
 
     // @todo use the real libsodium somehow instead of this rust crate.
     // The main issue here is dependency management - it's not necessarily simple to get libsodium
     // reliably on consumer devices, e.g. we might want to statically link it somewhere.
+    // @todo this key ref should be an opaque ref to lair and the encrypt should happen in lair.
     let lib_key = GenericArray::from_slice(encrypt.as_key_ref_ref().as_ref());
     let cipher = XSalsa20Poly1305::new(lib_key);
     let lib_nonce = GenericArray::from_slice(&nonce_bytes);
@@ -60,7 +61,7 @@ pub mod wasm_test {
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        let key_ref = XSalsa20Poly1305KeyRef::from([1; 32]);
+        let key_ref = XSalsa20Poly1305KeyRef::from([1; holochain_zome_types::x_salsa20_poly1305::key_ref::KEY_REF_BYTES]);
         let data = XSalsa20Poly1305Data::from(vec![1, 2, 3, 4]);
         let input = XSalsa20Poly1305EncryptInput::new(holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Encrypt::new(key_ref, data.clone()));
         let output: XSalsa20Poly1305EncryptOutput = crate::call_test_ribosome!(

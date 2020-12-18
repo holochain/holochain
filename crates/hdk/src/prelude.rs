@@ -1,8 +1,13 @@
+pub use crate::host_fn::random_bytes::TryFromRandom;
+pub use crate::x_salsa20_poly1305::create_x25519_keypair::create_x25519_keypair;
+pub use crate::x_salsa20_poly1305::x_25519_x_salsa20_poly1305_decrypt::x_25519_x_salsa20_poly1305_decrypt;
+pub use crate::x_salsa20_poly1305::x_25519_x_salsa20_poly1305_encrypt::x_25519_x_salsa20_poly1305_encrypt;
+pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_decrypt::x_salsa20_poly1305_decrypt;
+pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_encrypt::x_salsa20_poly1305_encrypt;
 pub use crate::{
     capability::{
         create_cap_claim::create_cap_claim, create_cap_grant::create_cap_grant,
-        delete_cap_grant::delete_cap_grant, generate_cap_secret::generate_cap_secret,
-        update_cap_grant::update_cap_grant,
+        delete_cap_grant::delete_cap_grant, update_cap_grant::update_cap_grant,
     },
     debug,
     entry::{create_entry::create_entry, delete_entry::delete_entry, update_entry::update_entry},
