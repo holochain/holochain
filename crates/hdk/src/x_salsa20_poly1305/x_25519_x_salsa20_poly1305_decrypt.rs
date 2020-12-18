@@ -1,34 +1,15 @@
 use crate::prelude::*;
 
-/// Libsodium secret-key authenticated encryption: secretbox.
+/// Libsodium keypair based authenticated encryption: box_open
 ///
-/// Libsodium symmetric encryption (a shared key to encrypt/decrypt) is called secretbox.
-/// Secretbox can be used directly to hide data and is part of cryptographic systems such as
-/// [saltpack](https://saltpack.org/).
+/// Opens encrypted data created by box.
 ///
-/// Important information about secretbox:
-///  - Wasm memory is NOT secure, a compromised host can steal the key.
-///  - The key is SECRET, anyone with the key and nonce can read the encrypted message.
-///  - The nonce is PUBLIC and UNIQUE, it must NEVER be re-used.
-///  - It is STRONGLY RECOMMENDED to use `TryFromRandom` for the key and nonce for every message.
-///  - Secretbox is designed for 'small' data, break large data into chunks with unique nonces.
-///  - Secretbox is NOT quantum resistant.
+/// If the encrypted data fails authentication and cannot be decrypted this function returns None.
 ///
-/// If you want to hide data:
-///  - Consider using capability tokens and/or dedicated DHT networks to control access.
-///  - Consider how the shared key is being distributed, e.g. maybe use a key exchange protocol.
-///  - Consider that a hybrid approach between network access + encryption might be best.
-///  - Consider that encrypted data cannot be validated effectively by the public DHT.
+/// This means that if any decrypted data is returned by this function it was created by _either_
+/// keypair and has not been tampered with.
 ///
-/// The main use-case is to control access to data that may be broadcast across a semi-trusted or
-/// untrusted context, where the intended recipients have all negotiated or shared a key outside
-/// that context.
-///
-/// If you want to encrypt content so that a _specific_ recipient (i.e. public key) can decrypt it
-/// then see the libsodium `box` algorithm or similar.
-///
-/// @see https://doc.libsodium.org/secret-key_cryptography/secretbox
-/// @see https://nacl.cr.yp.to/secretbox.html
+/// @see https://www.imperialviolet.org/2015/05/16/aeads.html
 pub fn x_25519_x_salsa20_poly1305_decrypt(
     recipient: X25519PubKey,
     sender: X25519PubKey,

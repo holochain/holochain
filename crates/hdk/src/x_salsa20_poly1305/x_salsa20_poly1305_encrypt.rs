@@ -9,10 +9,12 @@ use crate::prelude::*;
 /// Important information about secretbox:
 ///  - Wasm memory is NOT secure, a compromised host can steal the key.
 ///  - The key is SECRET, anyone with the key and nonce can read the encrypted message.
-///  - The nonce is PUBLIC and UNIQUE, it must NEVER be re-used.
-///  - It is STRONGLY RECOMMENDED to use `TryFromRandom` for the key and nonce for every message.
+///  - The nonce is PUBLIC and UNIQUE, it must NEVER be re-used (so we don't allow it to be set).
+///  - It is STRONGLY RECOMMENDED to use `TryFromRandom` for the key for every message.
 ///  - Secretbox is designed for 'small' data, break large data into chunks with unique nonces.
 ///  - Secretbox is NOT quantum resistant.
+///
+/// @todo shift all the secret handling into lair so that we only work with opaque key references.
 ///
 /// If you want to hide data:
 ///  - Consider using capability tokens and/or dedicated DHT networks to control access.

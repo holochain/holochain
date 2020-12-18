@@ -6,8 +6,8 @@ use crate::prelude::*;
 ///
 /// If the encrypted data fails authentication and cannot be decrypted this function returns None.
 ///
-/// This means that if any decrypted data is returned by this function it is not only created by
-/// a holder of the shared key but it also has not been tampered with.
+/// This means that if any decrypted data is returned by this function it was created by a holder
+/// of the shared key and has not been tampered with.
 ///
 /// @see https://www.imperialviolet.org/2015/05/16/aeads.html
 pub fn x_salsa20_poly1305_decrypt(
