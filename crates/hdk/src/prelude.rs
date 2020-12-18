@@ -77,7 +77,6 @@ pub use holochain_zome_types::validate_link::ValidateDeleteLinkData;
 pub use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
 pub use holochain_zome_types::x_salsa20_poly1305::data::SecretBoxData;
 pub use holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data;
-pub use holochain_zome_types::x_salsa20_poly1305::encrypted_data::SecretBoxEncryptedData;
 pub use holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
 pub use holochain_zome_types::x_salsa20_poly1305::key_ref::SecretBoxKeyRef;
 pub use holochain_zome_types::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef;
