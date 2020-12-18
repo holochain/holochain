@@ -1,6 +1,7 @@
 use super::{CoolConductor, CoolZome};
 use hdk3::prelude::*;
 use holo_hash::DnaHash;
+use holochain_state::env::EnvironmentWrite;
 
 /// A reference to a Cell created by a CoolConductor installation function.
 /// It has very concise methods for calling a zome on this cell
@@ -82,5 +83,18 @@ impl CoolCell {
             payload,
         )
         .await
+    }
+
+    /// Get the environment for this cell
+    pub async fn env(&self) -> EnvironmentWrite {
+        self.handle
+            .get_cell_env(&self.cell_id)
+            .await
+            .expect("Failed to get cell environment")
+    }
+
+    /// Replace the conductor handle with a new handle after restart
+    pub fn replace_conductor(&mut self, handle: CoolConductor) {
+        self.handle = handle;
     }
 }

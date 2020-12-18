@@ -19,7 +19,12 @@ use unwrap_to::unwrap_to;
 
 /// A collection of CoolConductors, with methods for operating on the entire collection
 #[derive(
-    Clone, derive_more::AsRef, derive_more::From, derive_more::Into, derive_more::IntoIterator,
+    Clone,
+    derive_more::AsRef,
+    derive_more::From,
+    derive_more::Into,
+    derive_more::IntoIterator,
+    derive_more::AsMut,
 )]
 pub struct CoolConductorBatch(Vec<CoolConductor>);
 
@@ -109,12 +114,15 @@ impl CoolConductorBatch {
     }
 }
 
-#[derive(Clone, shrinkwraprs::Shrinkwrap, derive_more::From)]
+// #[derive(Clone, shrinkwraprs::Shrinkwrap, derive_more::From)]
+#[derive(Clone, derive_more::From)]
 /// A wrapper around ConductorHandle with more convenient methods for testing
 pub struct CoolConductor {
-    #[shrinkwrap(main_field)]
-    handle: Arc<CoolConductorInner>,
+    // #[shrinkwrap(main_field)]
+    handle: Option<Arc<CoolConductorInner>>,
     envs: TestEnvironments,
+    config: ConductorConfig,
+    dnas: Arc<std::sync::Mutex<Vec<DnaFile>>>,
 }
 
 /// Inner handle with a cleanup drop
@@ -136,20 +144,34 @@ fn standard_config() -> ConductorConfig {
 
 impl CoolConductor {
     /// Create a CoolConductor from an already-build ConductorHandle and environments
-    pub fn new(handle: ConductorHandle, envs: TestEnvironments) -> CoolConductor {
+    pub fn new(
+        handle: ConductorHandle,
+        envs: TestEnvironments,
+        config: ConductorConfig,
+    ) -> CoolConductor {
         let handle = Arc::new(CoolConductorInner(handle));
-        Self { handle, envs }
+        Self {
+            handle: Some(handle),
+            envs,
+            config,
+            dnas: Arc::new(std::sync::Mutex::new(Vec::new())),
+        }
     }
 
     /// Create a CoolConductor with a new set of TestEnvironments from the given config
     pub async fn from_config(config: ConductorConfig) -> CoolConductor {
         let envs = test_environments();
-        let handle = Conductor::builder()
-            .config(config)
-            .test(&envs)
+        let handle = Self::from_existing(&envs, &config).await;
+        Self::new(handle, envs, config)
+    }
+
+    /// Create a handle from an existing environment and config
+    async fn from_existing(envs: &TestEnvironments, config: &ConductorConfig) -> ConductorHandle {
+        Conductor::builder()
+            .config(config.clone())
+            .test(envs)
             .await
-            .unwrap();
-        Self::new(handle, envs)
+            .unwrap()
     }
 
     /// Create a CoolConductor with a new set of TestEnvironments from the given config
@@ -178,10 +200,10 @@ impl CoolConductor {
         let installed_app_id = installed_app_id.to_string();
 
         for dna_file in dna_files {
-            self.handle
-                .install_dna(dna_file.clone())
+            self.install_dna(dna_file.clone())
                 .await
-                .expect("Could not install DNA")
+                .expect("Could not install DNA");
+            self.dnas.lock().unwrap().push(dna_file.clone());
         }
 
         let cool_cells: Vec<CoolCell> = dna_files
@@ -205,6 +227,8 @@ impl CoolConductor {
             })
             .collect();
         self.handle
+            .as_ref()
+            .expect("Tried to use a conductor that is offline")
             .0
             .clone()
             .install_app(installed_app_id.clone(), installed_cells)
@@ -225,12 +249,13 @@ impl CoolConductor {
             .setup_app_inner(installed_app_id, agent, dna_files)
             .await;
 
-        self.handle
-            .activate_app(app.installed_app_id().clone())
+        self.activate_app(app.installed_app_id().clone())
             .await
             .expect("Could not activate app");
 
         self.handle
+            .as_ref()
+            .expect("Tried to use a conductor that is offline")
             .0
             .clone()
             .setup_cells()
@@ -274,13 +299,14 @@ impl CoolConductor {
         }
 
         for app in apps.iter() {
-            self.handle
-                .activate_app(app.installed_app_id().clone())
+            self.activate_app(app.installed_app_id().clone())
                 .await
                 .expect("Could not activate app");
         }
 
         self.handle
+            .as_ref()
+            .expect("Tried to use a conductor that is offline")
             .0
             .clone()
             .setup_cells()
@@ -288,6 +314,36 @@ impl CoolConductor {
             .expect("Could not setup cells");
 
         CoolAppBatch(apps)
+    }
+
+    /// Shutdown this conductor.
+    /// This will wait for the conductor to shutdown but
+    /// keep the inner state to restart it.
+    ///
+    /// Using this conductor without starting it up again will panic.
+    pub async fn shutdown(&mut self) {
+        if let Some(handle) = self.handle.take() {
+            handle.wait_for_shutdown().await;
+        }
+    }
+
+    /// Start up this conductor if it's not already running.
+    pub async fn startup(&mut self) {
+        if self.handle.is_none() {
+            self.handle = Some(Arc::new(CoolConductorInner(
+                Self::from_existing(&self.envs, &self.config).await,
+            )));
+            for dna_file in self.dnas.lock().unwrap().iter() {
+                self.install_dna(dna_file.clone())
+                    .await
+                    .expect("Could not install DNA");
+            }
+        }
+    }
+
+    /// Check if this conductor is running
+    pub async fn is_running(&self) -> bool {
+        self.handle.is_some()
     }
 }
 
@@ -342,6 +398,17 @@ impl CoolConductorInner {
             .into_inner()
             .try_into()
             .expect("Couldn't deserialize zome call output")
+    }
+
+    /// Manually await shutting down the conductor.
+    /// Conductors are already cleaned up on drop but this
+    /// is useful if you need to know when it's finished cleaning up.
+    pub async fn wait_for_shutdown(&self) {
+        let c = &self.0;
+        if let Some(shutdown) = c.take_shutdown_handle().await {
+            c.shutdown().await;
+            shutdown.await.expect("Failed to await shutdown handle");
+        }
     }
 }
 
@@ -415,9 +482,10 @@ impl Drop for CoolConductorInner {
         let c = self.0.clone();
         tokio::task::spawn(async move {
             // Shutdown the conductor
-            let shutdown = c.take_shutdown_handle().await.unwrap();
-            c.shutdown().await;
-            shutdown.await.unwrap();
+            if let Some(shutdown) = c.take_shutdown_handle().await {
+                c.shutdown().await;
+                shutdown.await.expect("Failed to await shutdown handle");
+            }
         });
     }
 }
@@ -427,3 +495,40 @@ impl Drop for CoolConductorInner {
 //         CoolConductor(Arc::new(CoolConductorInner(h)))
 //     }
 // }
+
+impl AsRef<Arc<CoolConductorInner>> for CoolConductor {
+    fn as_ref(&self) -> &Arc<CoolConductorInner> {
+        self.handle
+            .as_ref()
+            .expect("Tried to use a conductor that is offline")
+    }
+}
+impl std::ops::Deref for CoolConductor {
+    type Target = Arc<CoolConductorInner>;
+
+    fn deref(&self) -> &Self::Target {
+        self.handle
+            .as_ref()
+            .expect("Tried to use a conductor that is offline")
+    }
+}
+impl std::borrow::Borrow<Arc<CoolConductorInner>> for CoolConductor {
+    fn borrow(&self) -> &Arc<CoolConductorInner> {
+        self.handle
+            .as_ref()
+            .expect("Tried to use a conductor that is offline")
+    }
+}
+
+impl std::ops::Index<usize> for CoolConductorBatch {
+    type Output = CoolConductor;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+impl std::ops::IndexMut<usize> for CoolConductorBatch {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
+    }
+}
