@@ -20,6 +20,10 @@ pub enum KeystoreError {
     #[error("Invalid signature {0:?}, for {1}")]
     InvalidSignature(Signature, String),
 
+    /// Used in TryFrom implementations for some zome types.
+    #[error("Secure primitive error: {0}")]
+    SecurePrimitiveError(#[from] holochain_zome_types::SecurePrimitiveError),
+
     /// Unexpected Internal Error.
     #[error("Other: {0}")]
     Other(String),
