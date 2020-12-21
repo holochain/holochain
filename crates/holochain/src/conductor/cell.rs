@@ -133,7 +133,7 @@ impl Cell {
         id: CellId,
         conductor_handle: ConductorHandle,
         env: EnvironmentWrite,
-        mut holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+        holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<Self> {
@@ -146,7 +146,6 @@ impl Cell {
         };
 
         if has_genesis {
-            holochain_p2p_cell.join().await?;
             let queue_triggers = spawn_queue_consumer_tasks(
                 &env,
                 holochain_p2p_cell.clone(),
@@ -173,6 +172,11 @@ impl Cell {
     /// multiple times.
     pub fn initialize_workflows(&mut self) {
         self.queue_triggers.initialize_workflows();
+    }
+
+    /// Join the network for this cell
+    pub async fn join_network(&mut self) -> CellResult<()> {
+        Ok(self.holochain_p2p_cell.join().await?)
     }
 
     /// Performs the Genesis workflow the Cell, ensuring that its initial

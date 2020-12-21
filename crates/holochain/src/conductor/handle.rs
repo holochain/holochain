@@ -481,7 +481,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .filter_map(|r| r)
             .collect();
         {
-            self.conductor.write().await.initialize_cell_workflows();
+            self.conductor.write().await.initialize_cells().await?;
         }
         Ok(r)
     }

@@ -618,10 +618,12 @@ where
         }
     }
 
-    pub(super) fn initialize_cell_workflows(&mut self) {
+    pub(super) async fn initialize_cells(&mut self) -> ConductorResult<()> {
         for cell in self.cells.values_mut() {
+            cell.cell.join_network().await?;
             cell.cell.initialize_workflows();
         }
+        Ok(())
     }
 
     pub(super) async fn load_wasms_into_dna_files(
