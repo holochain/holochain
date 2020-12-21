@@ -636,3 +636,29 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 
     Ok(())
 }
+
+#[tokio::test(threaded_scheduler)]
+async fn too_many_open() {
+    observability::test_run().ok();
+
+    info!("creating config");
+    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let environment_path = tmp_dir.path().to_path_buf();
+    let config = create_config(0, environment_path);
+    let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
+    let port = admin_port(&conductor_handle).await;
+    info!("building conductor");
+    for i in 0..1000 {
+        dbg!(i);
+        let (_client, _rx): (WebsocketSender, WebsocketReceiver) = websocket_connect(
+            url2!("ws://127.0.0.1:{}", port),
+            Arc::new(WebsocketConfig {
+                default_request_timeout_s: 1,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+    }
+    conductor_handle.shutdown().await;
+}

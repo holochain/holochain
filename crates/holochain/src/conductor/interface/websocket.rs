@@ -17,6 +17,8 @@ use holochain_websocket::{
 };
 use std::convert::TryFrom;
 
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::{stream::StreamExt, sync::broadcast, task::JoinHandle};
 use tracing::*;
@@ -26,6 +28,7 @@ use url2::url2;
 /// Number of signals in buffer before applying
 /// back pressure.
 pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
+const MAX_CONNECTIONS: usize = 400;
 
 /// Create a WebsocketListener to be used in interfaces
 pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketListener> {
@@ -49,6 +52,7 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
     Ok(tokio::task::spawn(async move {
         let mut listener_handles = Vec::new();
         let mut send_sockets = Vec::new();
+        let num_connections = Arc::new(AtomicUsize::new(0));
         loop {
             tokio::select! {
                 // break if we receive on the stop channel
@@ -57,11 +61,19 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
                 // establish a new connection to a client
                 maybe_con = listener.next() => if let Some(connection) = maybe_con {
                     match connection {
-                        Ok((tx_to_iface, rx_from_iface)) => {
-                            send_sockets.push(tx_to_iface);
+                        Ok((mut tx_to_iface, rx_from_iface)) => {
+                            if num_connections.fetch_add(1, Ordering::Relaxed) > MAX_CONNECTIONS {
+                                if let Err(e) = WebsocketSender::close(&mut tx_to_iface, 1000, "Connections Full".into()).await {
+                                    warn!("Admin socket full failed to close: {}", e);
+                                }
+                                continue;
+                            };
+                            send_sockets.push(tx_to_iface.clone());
                             listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
                                 api.clone(),
                                 rx_from_iface,
+                                tx_to_iface,
+                                num_connections.clone(),
                             )));
                         }
                         Err(err) => {
@@ -169,11 +181,28 @@ async fn handle_shutdown(listener_handles: Vec<JoinHandle<InterfaceResult<()>>>)
 
 /// Polls for messages coming in from the external client.
 /// Used by Admin interface.
-async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, mut rx_from_iface: WebsocketReceiver) {
+async fn recv_incoming_admin_msgs<A: InterfaceApi>(
+    api: A,
+    mut rx_from_iface: WebsocketReceiver,
+    mut tx_to_iface: WebsocketSender,
+    num_connections: Arc<AtomicUsize>,
+) {
     while let Some(msg) = rx_from_iface.next().await {
         match handle_incoming_message(msg, api.clone()).await {
-            Err(InterfaceError::Closed) => break,
-            Err(e) => error!(error = &e as &dyn std::error::Error),
+            Err(InterfaceError::Closed) => {
+                if let Err(e) =
+                    WebsocketSender::close(&mut tx_to_iface, 1000, "Shutting down".into()).await
+                {
+                    warn!("Admin socket failed to close: {}", e);
+                }
+                if num_connections.load(Ordering::SeqCst) > 0 {
+                    num_connections.fetch_sub(1, Ordering::SeqCst);
+                }
+                break;
+            }
+            Err(e) => {
+                error!(error = &e as &dyn std::error::Error)
+            }
             Ok(()) => {}
         }
     }
