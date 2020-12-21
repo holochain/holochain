@@ -1468,6 +1468,7 @@ dependencies = [
  "url2",
  "url_serde",
  "uuid 0.7.4",
+ "xsalsa20poly1305",
 ]
 
 [[package]]
