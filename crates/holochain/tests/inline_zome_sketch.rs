@@ -132,3 +132,59 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test(threaded_scheduler)]
+#[cfg(feature = "test_utils")]
+async fn invalid_cell() -> anyhow::Result<()> {
+    observability::test_run().ok();
+    let conductor = CoolConductor::from_standard_config().await;
+
+    let (dna_foo, _) = CoolDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
+    let (dna_bar, _) = CoolDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
+
+    // let agents = CoolAgents::get(conductor.keystore(), 2).await;
+
+    let app_foo = conductor.setup_app("foo", &[dna_foo]).await;
+
+    let app_bar = conductor.setup_app("bar", &[dna_bar]).await;
+
+    tokio::time::delay_for(std::time::Duration::from_millis(5000)).await;
+    //////////////////////
+    // END SETUP
+
+    // let hash_foo: HeaderHash = app_foo.call("foozome", "create_unit", ()).await;
+    // let hash_bar: HeaderHash = app_bar.call("barzome", "create_unit", ()).await;
+
+    // // Two different DNAs, so HeaderHashes should be different.
+    // assert_ne!(hash_foo, hash_bar);
+
+    // // Wait long enough for others to receive gossip (TODO: make deterministic)
+    // tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
+
+    // // Verify that bobbo can run "read" on his cell and get alice's Header
+    // // on the "foo" DNA
+    // let element: MaybeElement = bobbo_foo.call("foozome", "read", hash_foo).await;
+    // let element = element
+    //     .0
+    //     .expect("Element was None: bobbo couldn't `get` it");
+    // assert_eq!(element.header().author(), alice_foo.agent_pubkey());
+    // assert_eq!(
+    //     *element.entry(),
+    //     ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+    // );
+
+    // // Verify that carol can run "read" on her cell and get alice's Header
+    // // on the "bar" DNA
+    // // Let's do it with the CoolZome instead of the CoolCell too, for fun
+    // let element: MaybeElement = carol_bar.zome("barzome").call("read", hash_bar).await;
+    // let element = element
+    //     .0
+    //     .expect("Element was None: carol couldn't `get` it");
+    // assert_eq!(element.header().author(), alice_bar.agent_pubkey());
+    // assert_eq!(
+    //     *element.entry(),
+    //     ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+    // );
+
+    Ok(())
+}
