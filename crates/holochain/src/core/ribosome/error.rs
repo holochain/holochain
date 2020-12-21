@@ -95,6 +95,20 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     DhtOpConvertError(#[from] Box<DhtOpConvertError>),
+
+    /// ident
+    #[error("xsalsa20poly1305 error {0}")]
+    Aead(String),
+
+    /// ident
+    #[error(transparent)]
+    SecurePrimitive(#[from] holochain_zome_types::SecurePrimitiveError),
+}
+
+impl From<xsalsa20poly1305::aead::Error> for RibosomeError {
+    fn from(error: xsalsa20poly1305::aead::Error) -> Self {
+        Self::Aead(error.to_string())
+    }
 }
 
 impl From<ring::error::Unspecified> for RibosomeError {

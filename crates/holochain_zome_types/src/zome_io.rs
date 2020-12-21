@@ -89,9 +89,22 @@ wasm_io_types! {
     // @todo Get the capability for the current zome call.
     fn capability_info (()) -> ();
 
-    // The EntryDefId determines how a create is handled on the host side.
-    // CapGrant and CapClaim are handled natively.
-    // App entries are referenced by entry defs then SerializedBytes stuffed into an Entry::App.
+    fn create_x25519_keypair(()) -> crate::x_salsa20_poly1305::x25519::X25519PubKey;
+
+    fn x_salsa20_poly1305_encrypt(
+        crate::x_salsa20_poly1305::XSalsa20Poly1305Encrypt
+    ) -> crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    fn x_salsa20_poly1305_decrypt(
+        crate::x_salsa20_poly1305::XSalsa20Poly1305Decrypt
+    ) -> Option<crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
+
+    // Sender, Recipient, Data.
+    fn x_25519_x_salsa20_poly1305_encrypt(crate::x_salsa20_poly1305::X25519XSalsa20Poly1305Encrypt) -> crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    // Recipient, Sender, Encrypted data.
+    fn x_25519_x_salsa20_poly1305_decrypt(crate::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
+
     // Returns HeaderHash of the newly created element.
     fn create ((zt::entry_def::EntryDefId, zt::entry::Entry)) -> holo_hash::HeaderHash;
 
@@ -99,16 +112,10 @@ wasm_io_types! {
     fn create_link ((holo_hash::EntryHash, holo_hash::EntryHash, zt::link::LinkTag)) -> holo_hash::HeaderHash;
 
     // @todo
-    fn decrypt (()) -> ();
-
-    // @todo
     fn delete (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
 
     // Header hash of the CreateLink element.
     fn delete_link (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
-
-    // @todo
-    fn encrypt (()) -> ();
 
     // @todo
     fn entry_type_properties (()) -> ();
