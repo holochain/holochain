@@ -55,7 +55,7 @@ fn invalid_cell_zome() -> InlineZome {
 async fn multi_conductor() -> anyhow::Result<()> {
     const NUM_CONDUCTORS: usize = 3;
 
-    let conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
+    let mut conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
     let (dna_file, _) = CoolDnaFile::unique_from_inline_zome("zome1", simple_crud_zome())
         .await

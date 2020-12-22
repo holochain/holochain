@@ -108,7 +108,7 @@ pub mod wasm_test {
         dna_store.expect_add_dnas::<Vec<_>>().return_const(());
         dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
 
-        let conductor =
+        let mut conductor =
             CoolConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
 
         let apps = conductor

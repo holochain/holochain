@@ -54,10 +54,14 @@ impl CoolConductorBatch {
     /// Opinionated app setup.
     /// Creates one app on each Conductor in this batch, creating a new AgentPubKey for each.
     /// The created AgentPubKeys can be retrieved via each CoolApp.
-    pub async fn setup_app(&self, installed_app_id: &str, dna_files: &[DnaFile]) -> CoolAppBatch {
+    pub async fn setup_app(
+        &mut self,
+        installed_app_id: &str,
+        dna_files: &[DnaFile],
+    ) -> CoolAppBatch {
         let apps = self
             .0
-            .iter()
+            .iter_mut()
             .map(|conductor| async move {
                 let agent = CoolAgents::one(conductor.keystore()).await;
                 conductor
@@ -79,7 +83,7 @@ impl CoolConductorBatch {
     /// Returns a batch of CoolApps, sorted in the same order as the Conductors in
     /// this batch.
     pub async fn setup_app_for_zipped_agents(
-        &self,
+        &mut self,
         installed_app_id: &str,
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
@@ -90,7 +94,7 @@ impl CoolConductorBatch {
 
         let apps = self
             .0
-            .iter()
+            .iter_mut()
             .zip(agents.iter())
             .map(|(conductor, agent)| {
                 conductor.setup_app_for_agent(installed_app_id, agent.clone(), dna_files)
@@ -109,12 +113,13 @@ impl CoolConductorBatch {
 
 /// A useful Conductor abstraction for testing, allowing startup and shutdown as well
 /// as easy installation of apps across multiple Conductors and Agents.
+// TODO: think more about the fact that shutdown gets messy if this is cloned
 #[derive(Clone, derive_more::From)]
 pub struct CoolConductor {
     handle: Option<Arc<CoolConductorHandle>>,
     envs: TestEnvironments,
     config: ConductorConfig,
-    dnas: Arc<std::sync::Mutex<Vec<DnaFile>>>,
+    dnas: Vec<DnaFile>,
 }
 
 /// A wrapper around ConductorHandle with more convenient methods for testing
@@ -147,7 +152,7 @@ impl CoolConductor {
             handle: Some(handle),
             envs,
             config,
-            dnas: Arc::new(std::sync::Mutex::new(Vec::new())),
+            dnas: Vec::new(),
         }
     }
 
@@ -195,7 +200,7 @@ impl CoolConductor {
     /// TODO: make this take a more flexible config for specifying things like
     /// membrane proofs
     async fn setup_app_inner(
-        &self,
+        &mut self,
         installed_app_id: &str,
         agent: AgentPubKey,
         dna_files: &[DnaFile],
@@ -206,7 +211,7 @@ impl CoolConductor {
             self.install_dna(dna_file.clone())
                 .await
                 .expect("Could not install DNA");
-            self.dnas.lock().unwrap().push(dna_file.clone());
+            self.dnas.push(dna_file.clone());
         }
 
         let mut cool_cells = Vec::new();
@@ -245,7 +250,7 @@ impl CoolConductor {
     /// Opinionated app setup.
     /// Creates an app for the given agent, using the given DnaFiles, with no extra configuration.
     pub async fn setup_app_for_agent(
-        &self,
+        &mut self,
         installed_app_id: &str,
         agent: AgentPubKey,
         dna_files: &[DnaFile],
@@ -271,7 +276,7 @@ impl CoolConductor {
     /// Opinionated app setup.
     /// Creates an app using the given DnaFiles, with no extra configuration.
     /// An AgentPubKey will be generated, and is accessible via the returned CoolApp.
-    pub async fn setup_app(&self, installed_app_id: &str, dna_files: &[DnaFile]) -> CoolApp {
+    pub async fn setup_app(&mut self, installed_app_id: &str, dna_files: &[DnaFile]) -> CoolApp {
         let agent = CoolAgents::one(self.keystore()).await;
         self.setup_app_for_agent(installed_app_id, agent, dna_files)
             .await
@@ -287,7 +292,7 @@ impl CoolConductor {
     ///
     /// Returns a batch of CoolApps, sorted in the same order as Agents passed in.
     pub async fn setup_app_for_agents(
-        &self,
+        &mut self,
         app_id_prefix: &str,
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
@@ -339,7 +344,7 @@ impl CoolConductor {
 
             // MD: this feels wrong, why should we have to reinstall DNAs on restart?
 
-            for dna_file in self.dnas.lock().unwrap().iter() {
+            for dna_file in self.dnas.iter() {
                 self.install_dna(dna_file.clone())
                     .await
                     .expect("Could not install DNA");
@@ -441,6 +446,7 @@ impl AsRef<Arc<CoolConductorHandle>> for CoolConductor {
             .expect("Tried to use a conductor that is offline")
     }
 }
+
 impl std::ops::Deref for CoolConductor {
     type Target = Arc<CoolConductorHandle>;
 
@@ -450,6 +456,7 @@ impl std::ops::Deref for CoolConductor {
             .expect("Tried to use a conductor that is offline")
     }
 }
+
 impl std::borrow::Borrow<Arc<CoolConductorHandle>> for CoolConductor {
     fn borrow(&self) -> &Arc<CoolConductorHandle> {
         self.handle
@@ -465,6 +472,7 @@ impl std::ops::Index<usize> for CoolConductorBatch {
         &self.0[index]
     }
 }
+
 impl std::ops::IndexMut<usize> for CoolConductorBatch {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.0[index]

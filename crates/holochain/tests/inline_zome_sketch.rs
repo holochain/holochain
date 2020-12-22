@@ -38,7 +38,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     let (dna_file, _) = CoolDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
 
     // Create a Conductor
-    let conductor = CoolConductor::from_standard_config().await;
+    let mut conductor = CoolConductor::from_standard_config().await;
 
     // Get two agents
     let (alice, bobbo) = CoolAgents::two(conductor.keystore()).await;
@@ -77,7 +77,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
 async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
-    let conductor = CoolConductor::from_standard_config().await;
+    let mut conductor = CoolConductor::from_standard_config().await;
 
     let (dna_foo, _) = CoolDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
     let (dna_bar, _) = CoolDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;

@@ -116,7 +116,7 @@ mod tests {
 
         let num_signals = Arc::new(AtomicUsize::new(0));
 
-        let conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
+        let mut conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
         let agents =
             future::join_all(conductors.iter().map(|c| CoolAgents::one(c.keystore()))).await;
 
