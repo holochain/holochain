@@ -55,8 +55,8 @@ tokio_safe_block_on = { git = "https://github.com/neonphog/tokio_safe_block_on.g
 # vvv MERGE DOWNSTREAM, AND REMOVE BEFORE MERGING vvv
 #holochain_json_api                = { git = "https://github.com/pjkundert/holochain-serialization.git", branch = "update-syn" }
 #holochain_json_derive             = { git = "https://github.com/pjkundert/holochain-serialization.git", branch = "update-syn" }
-holochain_serialized_bytes        = { git = "https://github.com/pjkundert/holochain-serialization.git", branch = "update-syn" }
-holochain_serialized_bytes_derive = { git = "https://github.com/pjkundert/holochain-serialization.git", branch = "update-syn" }
+#holochain_serialized_bytes        = { git = "https://github.com/pjkundert/holochain-serialization.git", branch = "update-syn" }
+#holochain_serialized_bytes_derive = { git = "https://github.com/pjkundert/holochain-serialization.git", branch = "update-syn" }
 
 holochain_wasmer_guest            = { git = "https://github.com/pjkundert/holochain-wasmer.git",        branch = "update-syn" }
 holochain_wasmer_common           = { git = "https://github.com/pjkundert/holochain-wasmer.git",        branch = "update-syn" }

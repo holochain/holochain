@@ -1019,7 +1019,7 @@ dependencies = [
  "lazy_static",
  "parking_lot",
  "paste 1.0.4",
- "rand 0.8.0",
+ "rand 0.7.3",
  "rand_core 0.5.1",
  "serde",
  "strum",
@@ -1392,7 +1392,7 @@ dependencies = [
  "futures",
  "holochain_serialized_bytes",
  "must_future",
- "rand 0.8.0",
+ "rand 0.7.3",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -1445,7 +1445,7 @@ dependencies = [
  "parking_lot",
  "predicates",
  "pretty_assertions",
- "rand 0.8.0",
+ "rand 0.7.3",
  "ring",
  "serde",
  "serde_json",
@@ -1515,7 +1515,8 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.47"
-source = "git+https://github.com/pjkundert/holochain-serialization.git?branch=update-syn#80871f0b78d653117ff175ae28972e9514870cdc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80e1f2f82c9ac6dc7bc7c2e06e892d4bd1f29b4681cbfa4886edeb25ee8cdfe3"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
@@ -1529,7 +1530,8 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes_derive"
 version = "0.0.47"
-source = "git+https://github.com/pjkundert/holochain-serialization.git?branch=update-syn#80871f0b78d653117ff175ae28972e9514870cdc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0119b7cd2aa14e4bc7129a212ff570bcba295ae19392067b2b0deeba780729e9"
 dependencies = [
  "quote",
  "syn",
@@ -1556,7 +1558,7 @@ dependencies = [
  "must_future",
  "nanoid",
  "parking_lot",
- "rand 0.8.0",
+ "rand 0.7.3",
  "rkv",
  "rmp-serde",
  "serde",
@@ -1616,7 +1618,7 @@ dependencies = [
  "holo_hash",
  "holochain_types",
  "holochain_zome_types",
- "rand 0.8.0",
+ "rand 0.7.3",
  "strum",
  "strum_macros",
  "tokio_safe_block_on",
@@ -1627,7 +1629,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.53"
-source = "git+https://github.com/pjkundert/holochain-wasmer.git?branch=update-syn#46e6f429e84575e6fe094d450fe83e13ce1eda30"
+source = "git+https://github.com/pjkundert/holochain-wasmer.git?branch=update-syn#528627d176a0b5195f080e02a8a56eba52e49d58"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -1637,7 +1639,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_guest"
 version = "0.0.53"
-source = "git+https://github.com/pjkundert/holochain-wasmer.git?branch=update-syn#46e6f429e84575e6fe094d450fe83e13ce1eda30"
+source = "git+https://github.com/pjkundert/holochain-wasmer.git?branch=update-syn#528627d176a0b5195f080e02a8a56eba52e49d58"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -1647,7 +1649,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_host"
 version = "0.0.53"
-source = "git+https://github.com/pjkundert/holochain-wasmer.git?branch=update-syn#46e6f429e84575e6fe094d450fe83e13ce1eda30"
+source = "git+https://github.com/pjkundert/holochain-wasmer.git?branch=update-syn#528627d176a0b5195f080e02a8a56eba52e49d58"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -1942,7 +1944,7 @@ dependencies = [
  "lair_keystore_api",
  "observability",
  "once_cell",
- "rand 0.8.0",
+ "rand 0.7.3",
  "reqwest",
  "serde",
  "serde_bytes",
