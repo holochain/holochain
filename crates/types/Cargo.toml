@@ -29,7 +29,7 @@ lazy_static = "1.4.0"
 must_future = "0.1.1"
 nanoid = "0.3"
 observability = "0.1"
-rand = "0.7"
+rand = "0.8"
 regex = "1.1.2"
 serde = { version = "1.0.104", features = [ "derive", "rc" ] }
 serde_bytes = "0.11"

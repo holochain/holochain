@@ -20,7 +20,7 @@ fixt = { path = "../../fixt" }
 holo_hash = { path = "../../holo_hash" }
 holochain_types = { path = "../../types" }
 holochain_zome_types = { path = "../../zome_types" }
-rand = "0.7"
+rand = "0.8"
 strum = "0.18.0"
 strum_macros = "0.18.0"
 tokio_safe_block_on = "0.1.2"

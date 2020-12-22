@@ -43,7 +43,7 @@ num_cpus = "1.8"
 observability = "0.1"
 parking_lot = "0.10"
 predicates = "1.0.4"
-rand = "0.7"
+rand = "0.8"
 serde = { version = "1.0.104", features = [ "derive" ] }
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 serde_yaml = "0.8"
@@ -61,7 +61,7 @@ unwrap_to = "0.1.0"
 url = "1.7.2"
 url2 = "0.0.6"
 url_serde = "0.2.0"
-uuid = { version = "0.7", features = [ "serde", "v4" ] }
+uuid = { version = "0.8", features = [ "serde", "v4" ] }
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 xsalsa20poly1305 = "0.6.0"
 

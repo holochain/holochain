@@ -61,5 +61,3 @@ holochain_serialized_bytes_derive = { git = "https://github.com/pjkundert/holoch
 holochain_wasmer_guest            = { git = "https://github.com/pjkundert/holochain-wasmer.git",        branch = "update-syn" }
 holochain_wasmer_common           = { git = "https://github.com/pjkundert/holochain-wasmer.git",        branch = "update-syn" }
 holochain_wasmer_host             = { git = "https://github.com/pjkundert/holochain-wasmer.git",        branch = "update-syn" }
-
-observability                     = { git = "https://github.com/pjkundert/observability.git",           branch = "update-syn" }
