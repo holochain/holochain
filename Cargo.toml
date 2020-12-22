@@ -51,7 +51,6 @@ lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "remote_signal" }
 # ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 # ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "add_observability" }
-holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "no-rmp-error" }
 # lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "bump_ga" }
 # lair_keystore_client = { git = "https://github.com/holochain/lair.git", branch = "bump_ga" }
 # lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
