@@ -1,5 +1,6 @@
 use hdk3::prelude::*;
 use holochain::test_utils::cool::{CoolAgents, CoolConductor, CoolDnaFile, MaybeElement};
+use holochain::test_utils::display_agent_infos;
 use holochain_types::dna::zome::inline_zome::InlineZome;
 use holochain_zome_types::element::ElementEntry;
 
@@ -144,47 +145,21 @@ async fn invalid_cell() -> anyhow::Result<()> {
 
     // let agents = CoolAgents::get(conductor.keystore(), 2).await;
 
-    let app_foo = conductor.setup_app("foo", &[dna_foo]).await;
+    let _app_foo = conductor.setup_app("foo", &[dna_foo]).await;
 
-    let app_bar = conductor.setup_app("bar", &[dna_bar]).await;
+    let _app_bar = conductor.setup_app("bar", &[dna_bar]).await;
 
-    tokio::time::delay_for(std::time::Duration::from_millis(5000)).await;
-    //////////////////////
-    // END SETUP
+    // Give small amount of time for cells to join the network
+    tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
 
-    // let hash_foo: HeaderHash = app_foo.call("foozome", "create_unit", ()).await;
-    // let hash_bar: HeaderHash = app_bar.call("barzome", "create_unit", ()).await;
+    tracing::debug!(dnas = ?conductor.list_dnas().await.unwrap());
+    tracing::debug!(cell_ids = ?conductor.list_cell_ids().await.unwrap());
+    tracing::debug!(apps = ?conductor.list_active_apps().await.unwrap());
 
-    // // Two different DNAs, so HeaderHashes should be different.
-    // assert_ne!(hash_foo, hash_bar);
+    display_agent_infos(&conductor).await;
 
-    // // Wait long enough for others to receive gossip (TODO: make deterministic)
-    // tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
-
-    // // Verify that bobbo can run "read" on his cell and get alice's Header
-    // // on the "foo" DNA
-    // let element: MaybeElement = bobbo_foo.call("foozome", "read", hash_foo).await;
-    // let element = element
-    //     .0
-    //     .expect("Element was None: bobbo couldn't `get` it");
-    // assert_eq!(element.header().author(), alice_foo.agent_pubkey());
-    // assert_eq!(
-    //     *element.entry(),
-    //     ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
-    // );
-
-    // // Verify that carol can run "read" on her cell and get alice's Header
-    // // on the "bar" DNA
-    // // Let's do it with the CoolZome instead of the CoolCell too, for fun
-    // let element: MaybeElement = carol_bar.zome("barzome").call("read", hash_bar).await;
-    // let element = element
-    //     .0
-    //     .expect("Element was None: carol couldn't `get` it");
-    // assert_eq!(element.header().author(), alice_bar.agent_pubkey());
-    // assert_eq!(
-    //     *element.entry(),
-    //     ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
-    // );
+    // Can't finish this test because there's no way to construct HolochainP2pEvents
+    // and I can't directly call query on the conductor because it's private.
 
     Ok(())
 }
