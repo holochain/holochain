@@ -1,6 +1,4 @@
-
 use hdk3::prelude::*;
-
 
 /// A reference to a Zome in a Cell created by a CoolConductor installation function.
 /// Think of it as a partially applied CoolCell, with the ZomeName baked in.
