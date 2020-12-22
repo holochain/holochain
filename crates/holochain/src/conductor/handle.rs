@@ -324,6 +324,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         cell_id: &CellId,
         event: holochain_p2p::event::HolochainP2pEvent,
     ) -> ConductorResult<()> {
+        trace!(agent = ?cell_id.agent_pubkey(), dispatch_event = ?event);
         let lock = self.conductor.read().await;
         match event {
             PutAgentInfoSigned {
@@ -366,7 +367,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             }
             _ => {
                 let cell: &Cell = lock.cell_by_id(cell_id)?;
-                trace!(agent = ?cell_id.agent_pubkey(), event = ?event);
                 cell.handle_holochain_p2p_event(event).await?;
             }
         }
