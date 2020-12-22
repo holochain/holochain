@@ -5,7 +5,7 @@ use holochain::test_utils::cool::MaybeElement;
 use holochain::test_utils::cool::{CoolConductorBatch, CoolDnaFile};
 use holochain::test_utils::host_fn_caller::Post;
 use holochain::test_utils::show_authored;
-use holochain::test_utils::wait_for_integration_10s;
+
 use holochain::test_utils::wait_for_integration_with_others_10s;
 use holochain::test_utils::WaitOps;
 use holochain_types::dna::zome::inline_zome::InlineZome;

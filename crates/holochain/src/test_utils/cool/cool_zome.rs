@@ -1,6 +1,6 @@
-use super::CoolConductorHandle;
+
 use hdk3::prelude::*;
-use std::sync::{Arc, Weak};
+
 
 /// A reference to a Zome in a Cell created by a CoolConductor installation function.
 /// Think of it as a partially applied CoolCell, with the ZomeName baked in.
