@@ -426,16 +426,17 @@ impl CoolConductorHandle {
     }
 }
 
-impl Drop for CoolConductorHandle {
+impl Drop for CoolConductor {
     fn drop(&mut self) {
-        let c = self.0.clone();
-        tokio::task::spawn(async move {
-            // Shutdown the conductor
-            if let Some(shutdown) = c.take_shutdown_handle().await {
-                c.shutdown().await;
-                shutdown.await.expect("Failed to await shutdown handle");
-            }
-        });
+        if let Some(handle) = self.handle.take() {
+            tokio::task::spawn(async move {
+                // Shutdown the conductor
+                if let Some(shutdown) = handle.take_shutdown_handle().await {
+                    handle.shutdown().await;
+                    shutdown.await.expect("Failed to await shutdown handle");
+                }
+            });
+        }
     }
 }
 
