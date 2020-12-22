@@ -51,13 +51,15 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = alice.call("zome1", "create_unit", ()).await;
+    let hash: HeaderHash = conductor
+        .call(&alice.zome("zome1"), "create_unit", ())
+        .await;
 
     // Wait long enough for Bob to receive gossip (TODO: make deterministic)
     tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
-    let element: MaybeElement = bobbo.call("zome1", "read", hash).await;
+    let element: MaybeElement = conductor.call(&bobbo.zome("zome1"), "read", hash).await;
     let element = element
         .0
         .expect("Element was None: bobbo couldn't `get` it");
@@ -96,8 +98,12 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     //////////////////////
     // END SETUP
 
-    let hash_foo: HeaderHash = alice_foo.call("foozome", "create_unit", ()).await;
-    let hash_bar: HeaderHash = alice_bar.call("barzome", "create_unit", ()).await;
+    let hash_foo: HeaderHash = conductor
+        .call(&alice_foo.zome("foozome"), "create_unit", ())
+        .await;
+    let hash_bar: HeaderHash = conductor
+        .call(&alice_bar.zome("barzome"), "create_unit", ())
+        .await;
 
     // Two different DNAs, so HeaderHashes should be different.
     assert_ne!(hash_foo, hash_bar);
@@ -107,7 +113,9 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
     // on the "foo" DNA
-    let element: MaybeElement = bobbo_foo.call("foozome", "read", hash_foo).await;
+    let element: MaybeElement = conductor
+        .call(&bobbo_foo.zome("foozome"), "read", hash_foo)
+        .await;
     let element = element
         .0
         .expect("Element was None: bobbo couldn't `get` it");
@@ -120,7 +128,9 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     // Verify that carol can run "read" on her cell and get alice's Header
     // on the "bar" DNA
     // Let's do it with the CoolZome instead of the CoolCell too, for fun
-    let element: MaybeElement = carol_bar.zome("barzome").call("read", hash_bar).await;
+    let element: MaybeElement = conductor
+        .call(&carol_bar.zome("barzome"), "read", hash_bar)
+        .await;
     let element = element
         .0
         .expect("Element was None: carol couldn't `get` it");

@@ -419,9 +419,9 @@ async fn remote_signals() {
 
     let signal = fixt!(SerializedBytes);
 
-    let _: () = cells[0]
+    let _: () = conductors[0]
         .call(
-            TestWasm::EmitSignal,
+            &cells[0].zome(TestWasm::EmitSignal),
             "signal_others",
             RemoteSignal {
                 signal: signal.clone(),

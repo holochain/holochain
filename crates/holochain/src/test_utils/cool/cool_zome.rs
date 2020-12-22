@@ -7,56 +7,17 @@ use std::sync::{Arc, Weak};
 #[derive(Clone, derive_more::Constructor)]
 pub struct CoolZome {
     cell_id: CellId,
-    zome_name: ZomeName,
-    handle: Weak<CoolConductorHandle>,
+    name: ZomeName,
 }
 
 impl CoolZome {
-    /// Call a function as if from another Agent.
-    /// The provenance and optional CapSecret must be provided.
-    pub async fn call_from<I, O, F, E>(
-        &self,
-        provenance: AgentPubKey,
-        cap: Option<CapSecret>,
-        fn_name: F,
-        payload: I,
-    ) -> O
-    where
-        E: std::fmt::Debug,
-        FunctionName: From<F>,
-        SerializedBytes: TryFrom<I, Error = E>,
-        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
-    {
-        self.handle()
-            .call_zome_ok_flat(
-                &self.cell_id,
-                self.zome_name.clone(),
-                fn_name,
-                cap,
-                Some(provenance),
-                payload,
-            )
-            .await
+    /// Accessor
+    pub fn cell_id(&self) -> &CellId {
+        &self.cell_id
     }
 
-    /// Call a function on this zome.
-    /// No CapGrant is provided; the authorship capability will be granted.
-    pub async fn call<I, O, F, E>(&self, fn_name: F, payload: I) -> O
-    where
-        E: std::fmt::Debug,
-        FunctionName: From<F>,
-        SerializedBytes: TryFrom<I, Error = E>,
-        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
-    {
-        self.call_from(self.cell_id.agent_pubkey().clone(), None, fn_name, payload)
-            .await
-    }
-
-    fn handle(&self) -> Arc<CoolConductorHandle> {
-        if let Some(handle) = self.handle.upgrade() {
-            handle
-        } else {
-            panic!(format!("Attempted to access conductor handle for zome {} in CellId {}, but the conductor is shutdown", self.zome_name, self.cell_id));
-        }
+    /// Accessor
+    pub fn name(&self) -> &ZomeName {
+        &self.name
     }
 }

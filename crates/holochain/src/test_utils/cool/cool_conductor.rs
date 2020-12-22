@@ -1,7 +1,7 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
 // TODO [ B-03669 ] move to own crate
 
-use super::{CoolAgents, CoolApp, CoolAppBatch, CoolCell};
+use super::{CoolAgents, CoolApp, CoolAppBatch, CoolCell, CoolZome};
 use crate::{
     conductor::{
         api::ZomeCall, config::ConductorConfig, dna_store::DnaStore, handle::ConductorHandle,
@@ -21,14 +21,7 @@ use std::sync::Arc;
 use unwrap_to::unwrap_to;
 
 /// A collection of CoolConductors, with methods for operating on the entire collection
-#[derive(
-    Clone,
-    derive_more::AsRef,
-    derive_more::From,
-    derive_more::Into,
-    derive_more::IntoIterator,
-    derive_more::AsMut,
-)]
+#[derive(Clone, derive_more::From, derive_more::Into, derive_more::IntoIterator)]
 pub struct CoolConductorBatch(Vec<CoolConductor>);
 
 impl CoolConductorBatch {
@@ -219,14 +212,18 @@ impl CoolConductor {
             self.dnas.lock().unwrap().push(dna_file.clone());
         }
 
-        let cool_cells: Vec<CoolCell> = dna_files
-            .iter()
-            .map(|dna| CellId::new(dna.dna_hash().clone(), agent.clone()))
-            .map(|cell_id| CoolCell {
-                cell_id,
-                handle: Arc::downgrade(&self.handle()),
-            })
-            .collect();
+        let mut cool_cells = Vec::new();
+        for dna in dna_files.iter() {
+            let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
+            let cell_env = self
+                .handle()
+                .0
+                .get_cell_env(&cell_id)
+                .await
+                .expect("Couldn't get cell environment");
+            let cell = CoolCell { cell_id, cell_env };
+            cool_cells.push(cell);
+        }
         let installed_cells = cool_cells
             .iter()
             .map(|cell| {
@@ -371,14 +368,14 @@ impl CoolConductor {
 impl CoolConductorHandle {
     /// Call a zome function with automatic de/serialization of input and output
     /// and unwrapping of nested errors.
-    pub async fn call_zome_ok<'a, I, O, F, E>(&'a self, invocation: CoolZomeCall<'a, I, F, E>) -> O
+    async fn call_inner<I, O, F, E>(&self, invocation: ZomeCall) -> O
     where
         E: std::fmt::Debug,
         FunctionName: From<F>,
         SerializedBytes: TryFrom<I, Error = E>,
         O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
     {
-        let response = self.0.call_zome(invocation.into()).await.unwrap().unwrap();
+        let response = self.0.call_zome(invocation).await.unwrap().unwrap();
         unwrap_to!(response => ZomeCallResponse::Ok)
             .clone()
             .into_inner()
@@ -386,31 +383,42 @@ impl CoolConductorHandle {
             .expect("Couldn't deserialize zome call output")
     }
 
-    /// `call_zome_ok`, but with arguments provided individually
-    pub async fn call_zome_ok_flat<I, O, Z, F, E>(
+    /// Make a zome call to a Cell, as if that Cell were the caller. Most common case.
+    /// No capability is necessary, since the authorship capability is automatically granted.
+    pub async fn call<I, O, F, E>(&self, zome: &CoolZome, fn_name: F, payload: I) -> O
+    where
+        E: std::fmt::Debug,
+        FunctionName: From<F>,
+        SerializedBytes: TryFrom<I, Error = E>,
+        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
+    {
+        self.call_from(zome.cell_id().agent_pubkey(), None, zome, fn_name, payload)
+            .await
+    }
+
+    /// Make a zome call to a Cell, as if some other Cell were the caller. More general case.
+    /// Can optionally provide a capability.
+    pub async fn call_from<I, O, F, E>(
         &self,
-        cell_id: &CellId,
-        zome_name: Z,
-        fn_name: F,
+        provenance: &AgentPubKey,
         cap: Option<CapSecret>,
-        provenance: Option<AgentPubKey>,
+        zome: &CoolZome,
+        fn_name: F,
         payload: I,
     ) -> O
     where
         E: std::fmt::Debug,
-        ZomeName: From<Z>,
         FunctionName: From<F>,
         SerializedBytes: TryFrom<I, Error = E>,
         O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
     {
         let payload = ExternInput::new(payload.try_into().expect("Couldn't serialize payload"));
-        let provenance = provenance.unwrap_or_else(|| cell_id.agent_pubkey().clone());
         let call = ZomeCall {
-            cell_id: cell_id.clone(),
-            zome_name: zome_name.into(),
+            cell_id: zome.cell_id().clone(),
+            zome_name: zome.name().clone(),
             fn_name: fn_name.into(),
             cap,
-            provenance,
+            provenance: provenance.clone(),
             payload,
         };
         let response = self.0.call_zome(call).await.unwrap().unwrap();
@@ -433,70 +441,70 @@ impl CoolConductorHandle {
     }
 }
 
-/// A top-level call into a zome function,
-/// i.e. coming from outside the Cell from an external Interface
-#[derive(Clone, Debug)]
-pub struct CoolZomeCall<'a, P, F, E>
-where
-    SerializedBytes: TryFrom<P, Error = E>,
-    E: std::fmt::Debug,
-    FunctionName: From<F>,
-{
-    /// The Id of the `Cell` in which this Zome-call would be invoked
-    pub cell_id: &'a CellId,
-    /// The Zome containing the function that would be invoked
-    pub zome: &'a Zome,
-    /// The capability request authorization.
-    /// This can be `None` and still succeed in the case where the function
-    /// in the zome being called has been given an Unrestricted status
-    /// via a `CapGrant`. Otherwise, it will be necessary to provide a `CapSecret` for every call.
-    pub cap: Option<CapSecret>,
-    /// The name of the Zome function to call
-    pub fn_name: F,
-    /// The data to be serialized and passed as an argument to the Zome call
-    pub payload: P,
-    /// If None, the AgentPubKey from the CellId is used (a common case)
-    pub provenance: Option<AgentPubKey>,
-}
+// /// A top-level call into a zome function,
+// /// i.e. coming from outside the Cell from an external Interface
+// #[derive(Clone, Debug)]
+// pub struct CoolZomeCall<'a, P, F, E>
+// where
+//     SerializedBytes: TryFrom<P, Error = E>,
+//     E: std::fmt::Debug,
+//     FunctionName: From<F>,
+// {
+//     /// The Id of the `Cell` in which this Zome-call would be invoked
+//     pub cell_id: &'a CellId,
+//     /// The Zome containing the function that would be invoked
+//     pub zome: &'a Zome,
+//     /// The capability request authorization.
+//     /// This can be `None` and still succeed in the case where the function
+//     /// in the zome being called has been given an Unrestricted status
+//     /// via a `CapGrant`. Otherwise, it will be necessary to provide a `CapSecret` for every call.
+//     pub cap: Option<CapSecret>,
+//     /// The name of the Zome function to call
+//     pub fn_name: F,
+//     /// The data to be serialized and passed as an argument to the Zome call
+//     pub payload: P,
+//     /// If None, the AgentPubKey from the CellId is used (a common case)
+//     pub provenance: Option<AgentPubKey>,
+// }
 
-impl<'a, P, F, E> From<CoolZomeCall<'a, P, F, E>> for ZomeCallInvocation
-where
-    SerializedBytes: TryFrom<P, Error = E>,
-    E: std::fmt::Debug,
-    FunctionName: From<F>,
-{
-    fn from(czc: CoolZomeCall<'a, P, F, E>) -> Self {
-        let CoolZomeCall {
-            cell_id,
-            zome,
-            fn_name,
-            cap,
-            provenance,
-            payload,
-        } = czc;
-        let payload = ExternInput::new(payload.try_into().expect("Couldn't serialize payload"));
-        let provenance = provenance.unwrap_or_else(|| cell_id.agent_pubkey().clone());
-        ZomeCallInvocation {
-            cell_id: cell_id.clone(),
-            zome: zome.clone(),
-            fn_name: fn_name.into(),
-            cap,
-            provenance,
-            payload,
-        }
-    }
-}
+// impl<'a, P, F, E> From<CoolZomeCall<'a, P, F, E>> for ZomeCallInvocation
+// where
+//     SerializedBytes: TryFrom<P, Error = E>,
+//     E: std::fmt::Debug,
+//     FunctionName: From<F>,
+// {
+//     fn from(czc: CoolZomeCall<'a, P, F, E>) -> Self {
+//         let CoolZomeCall {
+//             cell_id,
+//             zome,
+//             fn_name,
+//             cap,
+//             provenance,
+//             payload,
+//         } = czc;
+//         let payload = ExternInput::new(payload.try_into().expect("Couldn't serialize payload"));
+//         let provenance = provenance.unwrap_or_else(|| cell_id.agent_pubkey().clone());
+//         ZomeCallInvocation {
+//             cell_id: cell_id.clone(),
+//             zome: zome.clone(),
+//             fn_name: fn_name.into(),
+//             cap,
+//             provenance,
+//             payload,
+//         }
+//     }
+// }
 
-impl<'a, P, F, E> From<CoolZomeCall<'a, P, F, E>> for ZomeCall
-where
-    SerializedBytes: TryFrom<P, Error = E>,
-    E: std::fmt::Debug,
-    FunctionName: From<F>,
-{
-    fn from(czc: CoolZomeCall<'a, P, F, E>) -> Self {
-        ZomeCallInvocation::from(czc).into()
-    }
-}
+// impl<'a, P, F, E> From<CoolZomeCall<'a, P, F, E>> for ZomeCall
+// where
+//     SerializedBytes: TryFrom<P, Error = E>,
+//     E: std::fmt::Debug,
+//     FunctionName: From<F>,
+// {
+//     fn from(czc: CoolZomeCall<'a, P, F, E>) -> Self {
+//         ZomeCallInvocation::from(czc).into()
+//     }
+// }
 
 impl Drop for CoolConductorHandle {
     fn drop(&mut self) {
