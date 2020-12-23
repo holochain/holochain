@@ -2,9 +2,7 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::actor::GetActivityOptions;
-use holochain_zome_types::query::ActivityRequest;
-use holochain_zome_types::GetAgentActivityInput;
-use holochain_zome_types::GetAgentActivityOutput;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 pub fn get_agent_activity(

@@ -1,13 +1,13 @@
 //! A mem-only transport - largely for testing
 
 use crate::transport::*;
-use futures::{future::FutureExt, sink::SinkExt};
+use futures::future::FutureExt;
+use futures::sink::SinkExt;
 
 use once_cell::sync::Lazy;
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    sync::Arc,
-};
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
 const SCHEME: &str = "kitsune-mem";

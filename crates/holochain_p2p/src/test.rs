@@ -1,9 +1,11 @@
-use crate::{actor::*, HolochainP2pCell, *};
+use crate::actor::*;
+use crate::HolochainP2pCell;
+use crate::*;
 use ::fixt::prelude::*;
-use holo_hash::{
-    fixt::{AgentPubKeyFixturator, DnaHashFixturator},
-    AgentPubKey, DnaHash,
-};
+use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::fixt::DnaHashFixturator;
+use holo_hash::AgentPubKey;
+use holo_hash::DnaHash;
 
 struct StubNetwork;
 
@@ -89,7 +91,7 @@ impl HolochainP2pHandler for StubNetwork {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> HolochainP2pHandlerResult<Vec<AgentActivity>> {
+    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse>> {
         Err("stub".into())
     }
     fn handle_send_validation_receipt(
@@ -145,12 +147,9 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use holochain_types::{
-        element::{Element, ElementStatus, SignedHeaderHashed, WireElement},
-        fixt::*,
-        validate::ValidationStatus,
-        HeaderHashed,
-    };
+
+    use holochain_zome_types::HeaderHashed;
+    use holochain_zome_types::ValidationStatus;
     use kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig;
     use kitsune_p2p::KitsuneP2pConfig;
 

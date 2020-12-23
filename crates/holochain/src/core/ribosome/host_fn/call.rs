@@ -1,8 +1,7 @@
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCall;
 use crate::core::ribosome::{error::RibosomeResult, CallContext};
-use holochain_zome_types::{CallInput, ZomeCallResponse};
-use holochain_zome_types::{CallOutput, ExternInput};
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 pub fn call(
@@ -65,10 +64,10 @@ pub mod wasm_test {
     use matches::assert_matches;
 
     use crate::conductor::{api::ZomeCall, ConductorHandle};
-    use crate::core::state::element_buf::ElementBuf;
     use crate::test_utils::conductor_setup::ConductorTestData;
     use crate::test_utils::install_app;
     use crate::test_utils::new_zome_call;
+    use holochain_state::element_buf::ElementBuf;
 
     #[tokio::test(threaded_scheduler)]
     async fn call_test() {

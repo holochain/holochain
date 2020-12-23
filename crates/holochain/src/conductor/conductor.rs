@@ -8,79 +8,77 @@
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
-use super::{
-    api::{CellConductorApi, CellConductorApiT, RealAdminInterfaceApi, RealAppInterfaceApi},
-    config::{AdminInterfaceConfig, InterfaceDriver},
-    dna_store::{DnaDefBuf, DnaStore, RealDnaStore},
-    entry_def_store::{get_entry_defs, EntryDefBuf, EntryDefBufferKey},
-    error::{ConductorError, CreateAppError},
-    handle::ConductorHandleImpl,
-    interface::{
-        error::InterfaceResult,
-        websocket::{
-            spawn_admin_interface_task, spawn_app_interface_task, spawn_websocket_listener,
-            SIGNAL_BUFFER_SIZE,
-        },
-        SignalBroadcaster,
-    },
-    manager::{
-        keep_alive_task, spawn_task_manager, ManagedTaskAdd, ManagedTaskHandle,
-        TaskManagerRunHandle,
-    },
-    p2p_store::all_agent_infos,
-    p2p_store::get_single_agent_info,
-    p2p_store::inject_agent_infos,
-    paths::EnvironmentRootPath,
-    state::{AppInterfaceConfig, AppInterfaceId, ConductorState},
-    CellError,
-};
-use crate::{
-    conductor::{
-        api::error::ConductorApiResult,
-        cell::Cell,
-        config::ConductorConfig,
-        dna_store::MockDnaStore,
-        error::ConductorResult,
-        handle::ConductorHandle,
-        p2p_store::{AgentKv, AgentKvKey},
-    },
-    core::{
-        signal::Signal,
-        state::{source_chain::SourceChainBuf, wasm::WasmBuf},
-    },
-};
+use super::api::CellConductorApiT;
+use super::api::RealAdminInterfaceApi;
+use super::api::RealAppInterfaceApi;
+use super::config::AdminInterfaceConfig;
+use super::config::InterfaceDriver;
+use super::dna_store::DnaDefBuf;
+use super::dna_store::DnaStore;
+use super::dna_store::RealDnaStore;
+use super::entry_def_store::get_entry_defs;
+use super::entry_def_store::EntryDefBuf;
+use super::entry_def_store::EntryDefBufferKey;
+use super::error::ConductorError;
+use super::error::CreateAppError;
+use super::handle::ConductorHandleImpl;
+use super::interface::error::InterfaceResult;
+use super::interface::websocket::spawn_admin_interface_task;
+use super::interface::websocket::spawn_app_interface_task;
+use super::interface::websocket::spawn_websocket_listener;
+use super::interface::websocket::SIGNAL_BUFFER_SIZE;
+use super::interface::SignalBroadcaster;
+use super::manager::keep_alive_task;
+use super::manager::spawn_task_manager;
+use super::manager::ManagedTaskAdd;
+use super::manager::ManagedTaskHandle;
+use super::manager::TaskManagerRunHandle;
+use super::p2p_store::all_agent_infos;
+use super::p2p_store::get_single_agent_info;
+use super::p2p_store::inject_agent_infos;
+use super::paths::EnvironmentRootPath;
+use super::state::AppInterfaceId;
+use super::state::ConductorState;
+use super::CellError;
+use super::{api::CellConductorApi, state::AppInterfaceConfig};
+use crate::conductor::api::error::ConductorApiResult;
+use crate::conductor::cell::Cell;
+use crate::conductor::config::ConductorConfig;
+use crate::conductor::dna_store::MockDnaStore;
+use crate::conductor::error::ConductorResult;
+use crate::conductor::handle::ConductorHandle;
+use crate::conductor::p2p_store::AgentKv;
+use crate::conductor::p2p_store::AgentKvKey;
 pub use builder::*;
 use fallible_iterator::FallibleIterator;
-use futures::{
-    future::{self, TryFutureExt},
-    StreamExt,
-};
+use futures::future;
+use futures::future::TryFutureExt;
+use futures::stream::StreamExt;
 use holo_hash::DnaHash;
-use holochain_keystore::{
-    lair_keystore::spawn_lair_keystore, test_keystore::spawn_test_keystore, KeystoreSender,
-    KeystoreSenderExt,
-};
-use holochain_state::{
-    buffer::{BufferedStore, KvStore, KvStoreT},
-    db,
-    env::{EnvironmentKind, EnvironmentWrite, ReadManager},
-    exports::SingleStore,
-    fresh_reader,
-    prelude::*,
-};
-use holochain_types::{
-    app::{InstalledApp, InstalledAppId, InstalledCell, MembraneProof},
-    cell::CellId,
-    dna::{wasm::DnaWasmHashed, DnaFile},
-};
-use holochain_zome_types::entry_def::EntryDef;
+use holochain_keystore::lair_keystore::spawn_lair_keystore;
+use holochain_keystore::test_keystore::spawn_test_keystore;
+use holochain_keystore::KeystoreSender;
+use holochain_keystore::KeystoreSenderExt;
+use holochain_lmdb::buffer::BufferedStore;
+use holochain_lmdb::buffer::KvStore;
+use holochain_lmdb::buffer::KvStoreT;
+use holochain_lmdb::db;
+use holochain_lmdb::env::EnvironmentKind;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::env::ReadManager;
+use holochain_lmdb::exports::SingleStore;
+use holochain_lmdb::fresh_reader;
+use holochain_lmdb::prelude::*;
+use holochain_state::source_chain::SourceChainBuf;
+use holochain_state::wasm::WasmBuf;
+use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use std::{
-    collections::HashMap,
-    convert::{TryFrom, TryInto},
-    sync::Arc,
-};
-use tokio::sync::{mpsc, RwLock};
+use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::convert::TryInto;
+use std::sync::Arc;
+use tokio::sync::mpsc;
+use tokio::sync::RwLock;
 use tracing::*;
 
 #[cfg(any(test, feature = "test_utils"))]
@@ -631,9 +629,9 @@ where
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
         let environ = &self.wasm_env;
-        let wasm = environ.get_db(&*holochain_state::db::WASM)?;
-        let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
-        let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
+        let wasm = environ.get_db(&*holochain_lmdb::db::WASM)?;
+        let dna_def_db = environ.get_db(&*holochain_lmdb::db::DNA_DEF)?;
+        let entry_def_db = environ.get_db(&*holochain_lmdb::db::ENTRY_DEF)?;
 
         let wasm_buf = Arc::new(WasmBuf::new(environ.clone().into(), wasm)?);
         let dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
@@ -808,9 +806,9 @@ where
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
         let environ = self.wasm_env.clone();
-        let wasm = environ.get_db(&*holochain_state::db::WASM)?;
-        let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
-        let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
+        let wasm = environ.get_db(&*holochain_lmdb::db::WASM)?;
+        let dna_def_db = environ.get_db(&*holochain_lmdb::db::DNA_DEF)?;
+        let entry_def_db = environ.get_db(&*holochain_lmdb::db::ENTRY_DEF)?;
 
         let zome_defs = get_entry_defs(dna.clone())?;
 
@@ -951,11 +949,11 @@ pub type ConductorStateDb = KvStore<UnitDbKey, ConductorState>;
 
 mod builder {
     use super::*;
-    use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
-    use holochain_state::env::EnvironmentKind;
-
+    use crate::conductor::dna_store::RealDnaStore;
+    use crate::conductor::ConductorHandle;
+    use holochain_lmdb::env::EnvironmentKind;
     #[cfg(any(test, feature = "test_utils"))]
-    use holochain_state::test_utils::TestEnvironments;
+    use holochain_lmdb::test_utils::TestEnvironments;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]

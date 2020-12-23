@@ -1,4 +1,5 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 use std::path::PathBuf;
 
 /// The default passphrase service is `Cmd` which will ask for a passphrase via stdout stdin.

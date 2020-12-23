@@ -1,6 +1,10 @@
 //! Defines default paths for various resources
 
-use derive_more::{AsRef, Display, From, FromStr, Into};
+use derive_more::AsRef;
+use derive_more::Display;
+use derive_more::From;
+use derive_more::FromStr;
+use derive_more::Into;
 use std::path::PathBuf;
 
 const QUALIFIER: &str = "org";

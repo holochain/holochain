@@ -1,54 +1,44 @@
 //! The workflow and queue consumer for DhtOp integration
 
 use super::*;
-use crate::core::{
-    queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
-    state::{
-        cascade::{error::CascadeResult, Cascade, DbPair},
-        dht_op_integration::{
-            IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationLimboStore,
-            IntegrationLimboValue,
-        },
-        element_buf::ElementBuf,
-        metadata::{MetadataBuf, MetadataBufT},
-        validation_db::ValidationLimboStore,
-        workspace::{Workspace, WorkspaceResult},
-    },
-    validation::{DhtOpOrder, OrderedOp},
-};
+use crate::core::queue_consumer::OneshotWriter;
+use crate::core::queue_consumer::TriggerSender;
+use crate::core::queue_consumer::WorkComplete;
+use crate::core::validation::DhtOpOrder;
+use crate::core::validation::OrderedOp;
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::{DhtOpHash, EntryHash, HeaderHash};
-use holochain_state::{
-    buffer::{BufferedStore, KvBufFresh},
-    db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
-    error::DatabaseResult,
-    fresh_reader,
-    prelude::*,
-};
-use holochain_types::{
-    dht_op::{produce_op_lights_from_elements, DhtOp, DhtOpLight, UniqueForm},
-    element::{Element, SignedHeaderHashed, SignedHeaderHashedExt},
-    header::NewEntryHeader,
-    validate::ValidationStatus,
-    Entry, EntryHashed, Timestamp,
-};
-use holochain_zome_types::{
-    element::{ElementEntry, SignedHeader},
-    query::{ChainHead, ChainStatus},
-    signature::Signature,
-    Header,
-};
-use produce_dht_ops_workflow::dht_op_light::{
-    error::{DhtOpConvertError, DhtOpConvertResult},
-    light_to_op,
-};
-use std::{collections::BinaryHeap, convert::TryInto};
+use holo_hash::DhtOpHash;
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
+use holochain_cascade::error::CascadeError;
+use holochain_cascade::error::CascadeResult;
+use holochain_cascade::Cascade;
+use holochain_cascade::DbPair;
+use holochain_lmdb::buffer::BufferedStore;
+use holochain_lmdb::buffer::KvBufFresh;
+use holochain_lmdb::db::INTEGRATED_DHT_OPS;
+use holochain_lmdb::db::INTEGRATION_LIMBO;
+use holochain_lmdb::error::DatabaseResult;
+use holochain_lmdb::fresh_reader;
+use holochain_lmdb::prelude::*;
+use holochain_state::prelude::*;
+use holochain_types::prelude::*;
+
+use holochain_zome_types::Entry;
+use holochain_zome_types::ValidationStatus;
+
+use produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
+use produce_dht_ops_workflow::dht_op_light::light_to_op;
+use std::collections::BinaryHeap;
+use std::convert::TryInto;
 use tracing::*;
 
 pub use disintegrate::*;
 
 mod disintegrate;
+
+#[cfg(feature = "test_utils")]
 mod tests;
 
 #[instrument(skip(workspace, writer, trigger_sys))]
@@ -352,7 +342,7 @@ async fn header_with_entry_is_stored(
     {
         Some(el) => match el.entry() {
             ElementEntry::Present(_) | ElementEntry::Hidden => Ok(true),
-            ElementEntry::NotApplicable => Err(DhtOpConvertError::HeaderEntryMismatch.into()),
+            ElementEntry::NotApplicable => Err(CascadeError::EntryMissing(hash.clone())),
             // This means we have just the header (probably through register agent activity)
             ElementEntry::NotStored => Ok(false),
         },
@@ -384,54 +374,8 @@ async fn header_is_stored(hash: &HeaderHash, mut cascade: Cascade<'_>) -> Cascad
     }
 }
 
-pub fn integrate_single_metadata<C, P>(
-    op: DhtOpLight,
-    element_store: &ElementBuf<P>,
-    meta_store: &mut C,
-) -> DhtOpConvertResult<()>
-where
-    P: PrefixType,
-    C: MetadataBufT<P>,
-{
-    match op {
-        DhtOpLight::StoreElement(hash, _, _) => {
-            let header = get_header(hash, element_store)?;
-            meta_store.register_element_header(&header)?;
-        }
-        DhtOpLight::StoreEntry(hash, _, _) => {
-            let new_entry_header = get_header(hash, element_store)?.try_into()?;
-            if let NewEntryHeader::Update(update) = &new_entry_header {
-                meta_store.register_update(update.clone())?;
-            }
-            // Reference to headers
-            meta_store.register_header(new_entry_header)?;
-        }
-        DhtOpLight::RegisterAgentActivity(hash, _) => {
-            let header = get_header(hash, element_store)?;
-            // register agent activity on this agents pub key
-            meta_store.register_activity(&header, ValidationStatus::Valid)?;
-        }
-        DhtOpLight::RegisterUpdatedContent(hash, _, _)
-        | DhtOpLight::RegisterUpdatedElement(hash, _, _) => {
-            let header = get_header(hash, element_store)?.try_into()?;
-            meta_store.register_update(header)?;
-        }
-        DhtOpLight::RegisterDeletedEntryHeader(hash, _)
-        | DhtOpLight::RegisterDeletedBy(hash, _) => {
-            let header = get_header(hash, element_store)?.try_into()?;
-            meta_store.register_delete(header)?
-        }
-        DhtOpLight::RegisterAddLink(hash, _) => {
-            let header = get_header(hash, element_store)?.try_into()?;
-            meta_store.add_link(header)?;
-        }
-        DhtOpLight::RegisterRemoveLink(hash, _) => {
-            let header = get_header(hash, element_store)?.try_into()?;
-            meta_store.delete_link(header)?;
-        }
-    }
-    Ok(())
-}
+/// Re-export for convenience [ TK-06690 ]
+pub use holochain_cascade::integrate_single_metadata;
 
 /// Store a DhtOp's data in an element buf
 pub fn integrate_single_data<P: PrefixType>(
@@ -488,17 +432,8 @@ fn put_data<P: PrefixType>(
     Ok(())
 }
 
-fn get_header<P: PrefixType>(
-    hash: HeaderHash,
-    element_store: &ElementBuf<P>,
-) -> DhtOpConvertResult<Header> {
-    Ok(element_store
-        .get_header(&hash)?
-        .ok_or_else(|| DhtOpConvertError::MissingData(hash.into()))?
-        .into_header_and_signature()
-        .0
-        .into_content())
-}
+/// Re-export for convenience [ TK-06690 ]
+pub use holochain_cascade::get_header;
 
 /// After writing an Element to our chain, we want to integrate the meta ops
 /// inline, so that they are immediately available in the authored metadata.

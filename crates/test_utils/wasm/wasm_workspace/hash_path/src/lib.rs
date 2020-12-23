@@ -1,6 +1,6 @@
 use hdk3::prelude::*;
-use test_wasm_common::TestBool;
-use test_wasm_common::TestString;
+use holochain_test_wasm_common::TestBool;
+use holochain_test_wasm_common::TestString;
 
 entry_defs![Path::entry_def()];
 

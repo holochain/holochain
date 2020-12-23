@@ -23,7 +23,10 @@
 //!
 //! The complete 39 bytes together are known as the "full" hash
 
-use crate::{error::HoloHashResult, has_hash::HasHash, HashType, PrimitiveHashType};
+use crate::error::HoloHashResult;
+use crate::has_hash::HasHash;
+use crate::HashType;
+use crate::PrimitiveHashType;
 
 /// Length of the prefix bytes (3)
 pub const HOLO_HASH_PREFIX_LEN: usize = 3;

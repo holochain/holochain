@@ -9,7 +9,7 @@ use crate::{
 use futures::future;
 use hdk3::prelude::*;
 use holochain_keystore::KeystoreSender;
-use holochain_state::test_utils::{test_environments, TestEnvironments};
+use holochain_lmdb::test_utils::{test_environments, TestEnvironments};
 use holochain_types::app::InstalledCell;
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
