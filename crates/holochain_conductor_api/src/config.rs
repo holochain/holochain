@@ -1,6 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+pub mod conductor;
+
 /// Information neeeded to spawn an Admin interface
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 pub struct AdminInterfaceConfig {
