@@ -10,16 +10,14 @@ mod error;
 pub use error::*;
 
 use futures::stream::FuturesUnordered;
-use std::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
-use tokio::{
-    stream::StreamExt,
-    sync::{broadcast, mpsc},
-    task::JoinHandle,
-};
+use std::future::Future;
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
+use tokio::stream::StreamExt;
+use tokio::sync::broadcast;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tracing::*;
 
 const CHANNEL_SIZE: usize = 1000;
@@ -130,7 +128,7 @@ mod test {
     use super::*;
     use crate::conductor::error::ConductorError;
     use anyhow::Result;
-    use holochain_types::observability;
+    use observability;
 
     #[tokio::test]
     async fn spawn_and_handle_dying_task() -> Result<()> {

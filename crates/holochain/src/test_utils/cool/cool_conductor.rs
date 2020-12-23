@@ -9,7 +9,7 @@ use crate::conductor::{
 use futures::future;
 use hdk3::prelude::*;
 use holochain_keystore::KeystoreSender;
-use holochain_state::test_utils::{test_environments, TestEnvironments};
+use holochain_lmdb::test_utils::{test_environments, TestEnvironments};
 use holochain_types::app::InstalledCell;
 
 use holochain_types::dna::DnaFile;
@@ -214,6 +214,22 @@ impl CoolConductor {
             self.dnas.push(dna_file.clone());
         }
 
+        let installed_cells = dna_files
+            .iter()
+            .map(|dna| {
+                let cell_handle = format!("{}", dna.dna_hash());
+                let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
+                dbg!("Installed cell_id", &cell_id);
+                (InstalledCell::new(cell_id, cell_handle), None)
+            })
+            .collect();
+        self.handle()
+            .0
+            .clone()
+            .install_app(installed_app_id.clone(), installed_cells)
+            .await
+            .expect("Could not install app");
+
         let mut cool_cells = Vec::new();
         for dna in dna_files.iter() {
             let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
@@ -226,24 +242,7 @@ impl CoolConductor {
             let cell = CoolCell { cell_id, cell_env };
             cool_cells.push(cell);
         }
-        let installed_cells = cool_cells
-            .iter()
-            .map(|cell| {
-                (
-                    InstalledCell::new(
-                        cell.cell_id().clone(),
-                        format!("{}", cell.cell_id().dna_hash()),
-                    ),
-                    None,
-                )
-            })
-            .collect();
-        self.handle()
-            .0
-            .clone()
-            .install_app(installed_app_id.clone(), installed_cells)
-            .await
-            .expect("Could not install app");
+
         CoolApp::new(installed_app_id, cool_cells)
     }
 

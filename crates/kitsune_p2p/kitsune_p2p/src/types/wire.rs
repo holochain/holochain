@@ -1,6 +1,7 @@
 //! KitsuneP2p Wire Protocol Encoding Decoding
 
-use crate::{agent_store::AgentInfoSigned, types::*};
+use crate::agent_store::AgentInfoSigned;
+use crate::types::*;
 use derive_more::*;
 use kitsune_p2p_types::dht_arc::DhtArc;
 use std::sync::Arc;

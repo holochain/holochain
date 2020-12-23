@@ -21,7 +21,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 
 #[hdk_extern]
 pub fn cap_secret(_: ()) -> ExternResult<CapSecret> {
-    Ok(generate_cap_secret()?)
+    Ok(CapSecret::try_from_random()?)
 }
 
 fn cap_grant_entry(secret: CapSecret) -> ExternResult<CapGrantEntry> {
@@ -42,7 +42,7 @@ pub fn transferable_cap_grant(secret: CapSecret) -> ExternResult<HeaderHash> {
 
 #[hdk_extern]
 pub fn roll_cap_grant(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
-    let secret = generate_cap_secret()?;
+    let secret = CapSecret::try_from_random()?;
     Ok(update_cap_grant(header_hash, cap_grant_entry(secret)?)?)
 }
 
@@ -96,7 +96,7 @@ fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
     let tag = String::from("has_cap_claim");
 
     // make a new secret
-    let secret = generate_cap_secret()?;
+    let secret = CapSecret::try_from_random()?;
 
     // grant the secret as assigned (can only be used by the intended agent)
     let mut functions: GrantedFunctions = HashSet::new();

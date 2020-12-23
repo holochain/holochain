@@ -1,5 +1,6 @@
-use super::{CallContext, RibosomeT};
-use holochain_zome_types::zome_io::{HostFnApiErrorPlaceholder, HostFnApiT};
+use super::CallContext;
+use super::RibosomeT;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 pub struct HostFnApi<Ribosome: RibosomeT> {
@@ -24,13 +25,12 @@ macro_rules! host_fn_api_impls {
 
         impl<Ribosome: RibosomeT> HostFnApiT for HostFnApi<Ribosome> {
             $(
-                fn $f(&self, input: $input) -> Result<$output, HostFnApiErrorPlaceholder> {
-                    let out = $f::$f(
+                fn $f(&self, input: $input) -> Result<$output, HostFnApiError> {
+                    $f::$f(
                         self.ribosome.clone(),
                         self.call_context.clone(),
                         input.into()
-                    ).map(|r| r.into_inner());
-                    Ok(out.expect("TODO, handle after crate re-org [B-03640]"))
+                    ).map(|r| r.into_inner()).map_err(|e| HostFnApiError::RibosomeError(Box::new(e)))
                 }
             )*
         }
@@ -69,20 +69,30 @@ host_fn_api_impls! {
     // Returns HeaderHash of the newly created element.
     fn create ((zt::entry_def::EntryDefId, zt::entry::Entry)) -> holo_hash::HeaderHash;
 
+    fn create_x25519_keypair(()) -> holochain_zome_types::x_salsa20_poly1305::x25519::X25519PubKey;
+
+    fn x_salsa20_poly1305_encrypt(
+        holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Encrypt
+    ) -> holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    fn x_salsa20_poly1305_decrypt(
+        holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Decrypt
+    ) -> Option<holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
+
+    // Sender, Recipient, Data.
+    fn x_25519_x_salsa20_poly1305_encrypt (holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Encrypt) -> holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    // Recipient, Sender, Encrypted data.
+    fn x_25519_x_salsa20_poly1305_decrypt (holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
+
     // Create a link between two entries.
     fn create_link ((holo_hash::EntryHash, holo_hash::EntryHash, zt::link::LinkTag)) -> holo_hash::HeaderHash;
-
-    // @todo
-    fn decrypt (()) -> ();
 
     // @todo
     fn delete (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
 
     // Header hash of the CreateLink element.
     fn delete_link (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
-
-    // @todo
-    fn encrypt (()) -> ();
 
     // @todo
     fn entry_type_properties (()) -> ();

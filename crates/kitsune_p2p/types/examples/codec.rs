@@ -1,4 +1,5 @@
-use kitsune_p2p_types::{codec::*, *};
+use kitsune_p2p_types::codec::*;
+use kitsune_p2p_types::*;
 
 write_codec_enum! {
     /// My codec is awesome.

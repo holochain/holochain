@@ -1,8 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::CapabilityGrantsInput;
-use holochain_zome_types::CapabilityGrantsOutput;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 /// list all the grants stored locally in the chain filtered by tag
@@ -26,17 +25,19 @@ pub mod wasm_test {
     };
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
+    use holochain_lmdb::test_utils::test_environments;
     use holochain_types::fixt::CapSecretFixturator;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
+
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_capability_secret_test<'a>() {
-        holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
         // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
@@ -53,9 +54,9 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_transferable_cap_grant<'a>() {
-        holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
         // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 

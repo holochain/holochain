@@ -1,4 +1,5 @@
-use crate::{actor::*, event::*};
+use crate::actor::*;
+use crate::event::*;
 
 mod actor;
 use actor::*;

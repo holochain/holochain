@@ -4,77 +4,58 @@
 //! Elements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
-use super::{api::ZomeCall, interface::SignalBroadcaster, manager::ManagedTaskAdd};
-use crate::{
-    conductor::{
-        api::{error::ConductorApiError, CellConductorApi, CellConductorApiT},
-        cell::error::CellResult,
-        entry_def_store::get_entry_def_from_ids,
-        handle::ConductorHandle,
-    },
-    core::{
-        queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers},
-        ribosome::{
-            guest_callback::init::InitResult, real_ribosome::RealRibosome, ZomeCallInvocation,
-        },
-        state::{
-            dht_op_integration::IntegratedDhtOpsBuf,
-            element_buf::ElementBuf,
-            metadata::{MetadataBuf, MetadataBufT},
-            source_chain::{SourceChain, SourceChainBuf},
-        },
-        workflow::{
-            call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
-            incoming_dht_ops_workflow::incoming_dht_ops_workflow, initialize_zomes_workflow,
-            produce_dht_ops_workflow::dht_op_light::light_to_op, CallZomeWorkflowArgs,
-            CallZomeWorkspace, GenesisWorkflowArgs, GenesisWorkspace, InitializeZomesWorkflowArgs,
-            ZomeCallResult,
-        },
-    },
-};
+use super::api::ZomeCall;
+use super::interface::SignalBroadcaster;
+use super::manager::ManagedTaskAdd;
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::api::CellConductorApi;
+use crate::conductor::api::CellConductorApiT;
+use crate::conductor::cell::error::CellResult;
+use crate::conductor::entry_def_store::get_entry_def_from_ids;
+use crate::conductor::handle::ConductorHandle;
+use crate::core::queue_consumer::spawn_queue_consumer_tasks;
+use crate::core::queue_consumer::InitialQueueTriggers;
+use crate::core::ribosome::guest_callback::init::InitResult;
+use crate::core::ribosome::real_ribosome::RealRibosome;
+use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::workflow::call_zome_workflow;
+use crate::core::workflow::error::WorkflowError;
+use crate::core::workflow::genesis_workflow::genesis_workflow;
+use crate::core::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
+use crate::core::workflow::initialize_zomes_workflow;
+use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op;
+use crate::core::workflow::CallZomeWorkflowArgs;
+use crate::core::workflow::CallZomeWorkspace;
+use crate::core::workflow::GenesisWorkflowArgs;
+use crate::core::workflow::GenesisWorkspace;
+use crate::core::workflow::InitializeZomesWorkflowArgs;
+use crate::core::workflow::ZomeCallResult;
 use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
 use error::CellError;
 use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
+use holochain_lmdb::db::GetDb;
+use holochain_lmdb::env::EnvironmentRead;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::env::ReadManager;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{
-    db::GetDb,
-    env::{EnvironmentRead, EnvironmentWrite, ReadManager},
-};
-use holochain_types::{
-    activity::AgentActivity,
-    autonomic::AutonomicProcess,
-    cell::CellId,
-    element::GetElementResponse,
-    link::{GetLinksResponse, WireLinkMetaKey},
-    metadata::MetadataSet,
-    validate::ValidationPackageResponse,
-    Timestamp,
-};
-use holochain_zome_types::{
-    capability::CapSecret,
-    header::EntryType,
-    query::ChainQueryFilter,
-    signature::Signature,
-    validate::{RequiredValidationType, ValidationPackage, ValidationStatus},
-    zome::{FunctionName, ZomeName},
-    ExternInput,
-};
+use holochain_state::prelude::*;
+use holochain_types::prelude::*;
 use observability::OpenSpanExt;
-use std::{
-    convert::TryInto,
-    hash::{Hash, Hasher},
-};
+use std::convert::TryInto;
+use std::hash::Hash;
+use std::hash::Hasher;
 use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
 use validation_package::ValidationPackageDb;
 
-#[allow(missing_docs)]
-pub mod authority;
+/// Re-export for convenience [ TK-06690 ]
+pub use holochain_cascade::authority;
+
 mod validation_package;
 
 #[allow(missing_docs)]
@@ -528,13 +509,13 @@ impl Cell {
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<GetElementResponse> {
         let env = self.env.clone();
-        authority::handle_get_entry(env, hash, options)
+        authority::handle_get_entry(env, hash, options).map_err(Into::into)
     }
 
     #[tracing::instrument(skip(self))]
     async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
         let env = self.env.clone();
-        authority::handle_get_element(env, hash)
+        authority::handle_get_element(env, hash).map_err(Into::into)
     }
 
     #[instrument(skip(self, _dht_hash, _options))]
@@ -559,7 +540,7 @@ impl Cell {
     ) -> CellResult<GetLinksResponse> {
         debug!(id = ?self.id());
         let env = self.env.clone();
-        authority::handle_get_links(env.into(), link_key, options)
+        authority::handle_get_links(env.into(), link_key, options).map_err(Into::into)
     }
 
     #[instrument(skip(self, options))]
@@ -568,9 +549,9 @@ impl Cell {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: holochain_p2p::event::GetActivityOptions,
-    ) -> CellResult<AgentActivity> {
+    ) -> CellResult<AgentActivityResponse> {
         let env = self.env.clone();
-        authority::handle_get_agent_activity(env.into(), agent, query, options)
+        authority::handle_get_agent_activity(env.into(), agent, query, options).map_err(Into::into)
     }
 
     /// a remote agent is sending us a validation receipt.

@@ -1,9 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::bytes::Bytes;
-use holochain_zome_types::RandomBytesInput;
-use holochain_zome_types::RandomBytesOutput;
+use holochain_types::prelude::*;
 use ring::rand::SecureRandom;
 use std::sync::Arc;
 
@@ -41,7 +39,7 @@ pub mod wasm_test {
         let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
-        let call_context = CallContextFixturator::new(fixt::Unpredictable)
+        let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         const LEN: usize = 10;
@@ -58,7 +56,7 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     /// we can get some random data out of the fn via. a wasm call
     async fn ribosome_random_bytes_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();

@@ -1,7 +1,7 @@
 use super::CoolZome;
 use hdk3::prelude::*;
 use holo_hash::DnaHash;
-use holochain_state::env::EnvironmentWrite;
+use holochain_lmdb::env::EnvironmentWrite;
 
 /// A reference to a Cell created by a CoolConductor installation function.
 /// It has very concise methods for calling a zome on this cell

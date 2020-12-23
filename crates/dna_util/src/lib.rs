@@ -38,9 +38,10 @@
 //! ```
 
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::{wasm::DnaWasm, zome::WasmZome, DnaDef, DnaFile};
+use holochain_types::prelude::*;
 use holochain_zome_types::zome::ZomeName;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 /// DnaUtilError type.
 #[derive(Debug, thiserror::Error)]

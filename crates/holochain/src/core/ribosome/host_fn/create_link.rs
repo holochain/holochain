@@ -3,10 +3,8 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use crate::core::workflow::CallZomeWorkspace;
-use crate::core::SourceChainResult;
-use holochain_zome_types::header::builder;
-use holochain_zome_types::CreateLinkInput;
-use holochain_zome_types::CreateLinkOutput;
+
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -39,7 +37,7 @@ pub fn create_link<'a>(
                 &mut workspace.meta_authored,
             )
             .map_err(Box::new)?;
-            SourceChainResult::Ok(header_hash)
+            RibosomeResult::Ok(header_hash)
         }))??;
 
     // return the hash of the committed link
