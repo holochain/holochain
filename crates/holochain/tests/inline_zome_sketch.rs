@@ -1,5 +1,6 @@
 use hdk3::prelude::*;
 use holochain::test_utils::cool::{CoolAgents, CoolConductor, CoolDnaFile, MaybeElement};
+use holochain::test_utils::display_agent_infos;
 use holochain_types::dna::zome::inline_zome::InlineZome;
 use holochain_zome_types::element::ElementEntry;
 
@@ -129,6 +130,37 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
         *element.entry(),
         ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
+
+    Ok(())
+}
+
+#[tokio::test(threaded_scheduler)]
+#[cfg(feature = "test_utils")]
+#[ignore = "Needs to be completed when HolochainP2pEvents is accessible"]
+async fn invalid_cell() -> anyhow::Result<()> {
+    observability::test_run().ok();
+    let conductor = CoolConductor::from_standard_config().await;
+
+    let (dna_foo, _) = CoolDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
+    let (dna_bar, _) = CoolDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
+
+    // let agents = CoolAgents::get(conductor.keystore(), 2).await;
+
+    let _app_foo = conductor.setup_app("foo", &[dna_foo]).await;
+
+    let _app_bar = conductor.setup_app("bar", &[dna_bar]).await;
+
+    // Give small amount of time for cells to join the network
+    tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
+
+    tracing::debug!(dnas = ?conductor.list_dnas().await.unwrap());
+    tracing::debug!(cell_ids = ?conductor.list_cell_ids().await.unwrap());
+    tracing::debug!(apps = ?conductor.list_active_apps().await.unwrap());
+
+    display_agent_infos(&conductor).await;
+
+    // Can't finish this test because there's no way to construct HolochainP2pEvents
+    // and I can't directly call query on the conductor because it's private.
 
     Ok(())
 }
