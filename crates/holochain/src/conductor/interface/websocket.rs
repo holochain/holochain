@@ -197,8 +197,20 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
                 {
                     warn!("Admin socket failed to close: {}", e);
                 }
-                if num_connections.load(Ordering::SeqCst) > 0 {
-                    num_connections.fetch_sub(1, Ordering::SeqCst);
+                // Do an atomic checked sub.
+                // This can still fail to decrement but won't overflow.
+                // This is ok because we really only need a rough idea if of the number of connections
+                // and failing to decrement should be rare.
+                let old_value = num_connections.load(Ordering::SeqCst);
+                if old_value > 0 {
+                    let prev_value = num_connections.compare_and_swap(
+                        old_value,
+                        old_value - 1,
+                        Ordering::SeqCst,
+                    );
+                    if prev_value != old_value {
+                        warn!(msg = "Websocket didn't successfully decrement connections on close");
+                    }
                 }
                 break;
             }
