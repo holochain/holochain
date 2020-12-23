@@ -281,7 +281,7 @@ impl CoolConductor {
             .await
             .expect("Could not setup cells");
 
-        let dna_files = dna_files.into_iter().map(|d| d.dna_hash().clone());
+        let dna_files = dna_files.iter().map(|d| d.dna_hash().clone());
         self.setup_app_part_2(installed_app_id, agent, dna_files)
             .await
     }
@@ -310,13 +310,10 @@ impl CoolConductor {
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
     ) -> CoolAppBatch {
-        let mut apps = Vec::new();
         for agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
-            let app = self
-                .setup_app_part_1(&installed_app_id, agent.clone(), dna_files)
+            self.setup_app_part_1(&installed_app_id, agent.clone(), dna_files)
                 .await;
-            apps.push(app);
         }
 
         self.handle()
@@ -333,7 +330,7 @@ impl CoolConductor {
                 self.setup_app_part_2(
                     &installed_app_id,
                     agent.clone(),
-                    dna_files.into_iter().map(|d| d.dna_hash().clone()),
+                    dna_files.iter().map(|d| d.dna_hash().clone()),
                 )
                 .await,
             );
