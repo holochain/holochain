@@ -1,12 +1,11 @@
-use crate::core::ribosome::{FnComponents, HostAccess, Invocation, ZomesToInvoke};
+use crate::core::ribosome::FnComponents;
+use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::Invocation;
+use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
-use holochain_zome_types::{
-    entry_def::{EntryDefs, EntryDefsCallbackResult},
-    zome::ZomeName,
-    ExternInput,
-};
+use holochain_types::prelude::*;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
@@ -91,25 +90,28 @@ impl From<Vec<(ZomeName, EntryDefsCallbackResult)>> for EntryDefsResult {
 
 #[cfg(test)]
 mod test {
-    use super::{EntryDefsHostAccess, EntryDefsResult};
-    use crate::{
-        core::ribosome::{Invocation, ZomesToInvoke},
-        fixt::{EntryDefsFixturator, EntryDefsInvocationFixturator, ZomeNameFixturator},
-    };
+    use super::EntryDefsHostAccess;
+    use super::EntryDefsResult;
+    use crate::core::ribosome::Invocation;
+    use crate::core::ribosome::ZomesToInvoke;
+    use crate::fixt::EntryDefsFixturator;
+    use crate::fixt::EntryDefsInvocationFixturator;
+    use crate::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
-    use holochain_zome_types::{entry_def::EntryDefsCallbackResult, ExternInput};
+    use holochain_zome_types::entry_def::EntryDefsCallbackResult;
+    use holochain_zome_types::ExternInput;
     use std::collections::BTreeMap;
 
     #[test]
     /// this is a non-standard fold test because the result is not so simple
     fn entry_defs_callback_result_fold() {
-        let mut rng = fixt::rng();
+        let mut rng = ::fixt::rng();
 
-        let mut zome_name_fixturator = ZomeNameFixturator::new(fixt::Unpredictable);
-        let mut entry_defs_fixturator = EntryDefsFixturator::new(fixt::Unpredictable);
-        let mut string_fixturator = StringFixturator::new(fixt::Unpredictable);
+        let mut zome_name_fixturator = ZomeNameFixturator::new(::fixt::Unpredictable);
+        let mut entry_defs_fixturator = EntryDefsFixturator::new(::fixt::Unpredictable);
+        let mut string_fixturator = StringFixturator::new(::fixt::Unpredictable);
 
         // zero defs
         assert_eq!(EntryDefsResult::Defs(BTreeMap::new()), vec![].into(),);
@@ -185,7 +187,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn entry_defs_invocation_zomes() {
-        let entry_defs_invocation = EntryDefsInvocationFixturator::new(fixt::Unpredictable)
+        let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         assert_eq!(ZomesToInvoke::All, entry_defs_invocation.zomes(),);
@@ -193,7 +195,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn entry_defs_invocation_fn_components() {
-        let entry_defs_invocation = EntryDefsInvocationFixturator::new(fixt::Unpredictable)
+        let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
 
@@ -205,7 +207,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn entry_defs_invocation_host_input() {
-        let entry_defs_invocation = EntryDefsInvocationFixturator::new(fixt::Unpredictable)
+        let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
 
@@ -221,20 +223,15 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-    use crate::{
-        core::ribosome::{
-            guest_callback::entry_defs::{EntryDefsHostAccess, EntryDefsResult},
-            RibosomeT,
-        },
-        fixt::{curve::Zomes, EntryDefsInvocationFixturator, RealRibosomeFixturator},
-    };
+    use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
+    use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+    use crate::core::ribosome::RibosomeT;
+    use crate::fixt::curve::Zomes;
+    use crate::fixt::EntryDefsInvocationFixturator;
+    use crate::fixt::RealRibosomeFixturator;
+    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::entry_def::EntryVisibility;
-    use holochain_zome_types::{
-        crdt::CrdtType,
-        entry_def::{EntryDef, EntryDefs},
-        zome::ZomeName,
-    };
     use std::collections::BTreeMap;
 
     #[tokio::test(threaded_scheduler)]
@@ -242,7 +239,7 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
-        let entry_defs_invocation = EntryDefsInvocationFixturator::new(fixt::Empty)
+        let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
 
@@ -257,7 +254,7 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::EntryDefs]))
             .next()
             .unwrap();
-        let entry_defs_invocation = EntryDefsInvocationFixturator::new(fixt::Empty)
+        let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
 

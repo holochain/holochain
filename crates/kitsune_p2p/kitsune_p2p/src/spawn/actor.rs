@@ -1,12 +1,18 @@
 // this is largely a passthrough that routes to a specific space handler
 
-use crate::{actor, actor::*, event::*, gossip::*, *};
-use futures::{future::FutureExt, stream::StreamExt};
-use kitsune_p2p_types::{async_lazy::AsyncLazy, transport::*, transport_pool::*};
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    sync::Arc,
-};
+use crate::actor;
+use crate::actor::*;
+use crate::event::*;
+use crate::gossip::*;
+use crate::*;
+use futures::future::FutureExt;
+use futures::stream::StreamExt;
+use kitsune_p2p_types::async_lazy::AsyncLazy;
+use kitsune_p2p_types::transport::*;
+use kitsune_p2p_types::transport_pool::*;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// The bootstrap service is much more thoroughly documented in the default service implementation.
 /// @see https://github.com/holochain/bootstrap
@@ -14,7 +20,8 @@ mod bootstrap;
 mod discover;
 mod gossip;
 mod space;
-use ghost_actor::dependencies::{must_future, tracing};
+use ghost_actor::dependencies::must_future;
+use ghost_actor::dependencies::tracing;
 use space::*;
 
 ghost_actor::ghost_chan! {

@@ -5,9 +5,11 @@
 //! Currently the only InterfaceDriver is a Websocket-based one, whose
 //! implementation can be found in the `websocket` module here.
 
-use crate::{conductor::api::*, core::signal::Signal};
-use error::{InterfaceError, InterfaceResult};
-use serde::{Deserialize, Serialize};
+use crate::conductor::api::*;
+use error::InterfaceError;
+use error::InterfaceResult;
+use holochain_types::signal::Signal;
+
 use std::convert::TryInto;
 use tokio::sync::broadcast;
 
@@ -49,18 +51,4 @@ impl SignalBroadcaster {
     }
 }
 
-/// Configuration for interfaces, specifying the means by which an interface
-/// should be opened.
-///
-/// NB: This struct is used in both [ConductorConfig] and [ConductorState], so
-/// any change to the serialization strategy is a **breaking change**.
-#[derive(Clone, Deserialize, Serialize, Debug)]
-#[cfg_attr(test, derive(PartialEq))]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum InterfaceDriver {
-    /// An interface implemented via Websockets
-    Websocket {
-        /// The port on which to establish the WebsocketListener
-        port: u16,
-    },
-}
+pub use holochain_conductor_api::config::InterfaceDriver;

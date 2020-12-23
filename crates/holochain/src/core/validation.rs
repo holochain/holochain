@@ -5,9 +5,10 @@ use derivative::Derivative;
 use holo_hash::DhtOpHash;
 use holochain_types::dht_op::DhtOp;
 
-use super::{
-    workflow::error::WorkflowResult, SourceChainError, SysValidationError, ValidationOutcome,
-};
+use super::workflow::error::WorkflowResult;
+use super::SourceChainError;
+use super::SysValidationError;
+use super::ValidationOutcome;
 
 /// Exit early with either an outcome or an error
 pub enum OutcomeOrError<T, E> {

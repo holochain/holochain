@@ -1,20 +1,13 @@
-use crate::core::{
-    ribosome::{FnComponents, HostAccess, Invocation, ZomesToInvoke},
-    workflow::CallZomeWorkspaceLock,
-};
+use crate::core::ribosome::FnComponents;
+use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::Invocation;
+use crate::core::ribosome::ZomesToInvoke;
+use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::{HostFnAccess, Permission};
-use holochain_zome_types::{
-    element::Element,
-    entry::Entry,
-    entry_def::EntryDefId,
-    validate::{ValidateCallbackResult, ValidateData, ValidationPackage},
-    zome::ZomeName,
-    ExternInput, Header,
-};
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -134,29 +127,24 @@ impl From<ValidateInvocation> for ValidateData {
 
 #[cfg(test)]
 mod test {
-    use super::{ValidateData, ValidateResult};
-    use crate::{
-        core::ribosome::Invocation,
-        fixt::{
-            ValidateHostAccessFixturator, ValidateInvocationFixturator, ZomeCallCapGrantFixturator,
-        },
-    };
+    use super::ValidateData;
+    use super::ValidateResult;
+    use crate::core::ribosome::Invocation;
+    use crate::fixt::ValidateHostAccessFixturator;
+    use crate::fixt::ValidateInvocationFixturator;
+    use crate::fixt::ZomeCallCapGrantFixturator;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::{
-        dna::zome::{HostFnAccess, Permission},
-        fixt::*,
-    };
-    use holochain_zome_types::{
-        entry::Entry, header::HeaderType, validate::ValidateCallbackResult, ExternInput,
-    };
+    use holochain_types::dna::zome::HostFnAccess;
+    use holochain_types::dna::zome::Permission;
+    use holochain_types::prelude::*;
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_callback_result_fold() {
-        let mut rng = fixt::rng();
+        let mut rng = ::fixt::rng();
 
         let result_valid = || ValidateResult::Valid;
         let result_ud = || ValidateResult::UnresolvedDependencies(vec![]);
@@ -195,7 +183,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_invocation_allow_side_effects() {
-        let validate_host_access = ValidateHostAccessFixturator::new(fixt::Unpredictable)
+        let validate_host_access = ValidateHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         let mut access = HostFnAccess::none();
@@ -207,7 +195,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_invocation_zomes() {
-        let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
+        let validate_invocation = ValidateInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         let zomes_to_invoke = validate_invocation.zomes_to_invoke.clone();
@@ -216,12 +204,12 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_invocation_fn_components() {
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
 
         let agent_entry = Entry::Agent(
-            AgentPubKeyFixturator::new(fixt::Unpredictable)
+            AgentPubKeyFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
@@ -234,7 +222,7 @@ mod test {
         }
 
         let agent_entry = Entry::App(
-            AppEntryBytesFixturator::new(fixt::Unpredictable)
+            AppEntryBytesFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
@@ -247,7 +235,7 @@ mod test {
         }
 
         let agent_entry = Entry::CapClaim(
-            CapClaimFixturator::new(fixt::Unpredictable)
+            CapClaimFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
@@ -260,7 +248,7 @@ mod test {
         }
 
         let agent_entry = Entry::CapGrant(
-            ZomeCallCapGrantFixturator::new(fixt::Unpredictable)
+            ZomeCallCapGrantFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
@@ -275,7 +263,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_invocation_host_input() {
-        let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
+        let validate_invocation = ValidateInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
 
@@ -294,18 +282,16 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::ValidateResult;
-    use crate::{
-        core::{
-            ribosome::{RibosomeT, ZomesToInvoke},
-            state::source_chain::SourceChainResult,
-            workflow::call_zome_workflow::CallZomeWorkspace,
-        },
-        fixt::{curve::Zomes, *},
-    };
+    use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::ZomesToInvoke;
+    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
+    use crate::fixt::curve::Zomes;
+    use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
+    use holochain_state::source_chain::SourceChainResult;
+    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::{CreateOutput, Entry};
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
@@ -313,7 +299,7 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
         validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::Foo.into());
@@ -329,7 +315,7 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
         validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateValid.into());
@@ -345,7 +331,7 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
         validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateInvalid.into());
@@ -361,11 +347,11 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
         let entry = Entry::Agent(
-            AgentPubKeyFixturator::new(fixt::Unpredictable)
+            AgentPubKeyFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
@@ -385,7 +371,7 @@ mod slow_tests {
     #[tokio::test(threaded_scheduler)]
     async fn pass_validate_test<'a>() {
         // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
@@ -420,7 +406,7 @@ mod slow_tests {
     #[tokio::test(threaded_scheduler)]
     async fn fail_validate_test<'a>() {
         // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 

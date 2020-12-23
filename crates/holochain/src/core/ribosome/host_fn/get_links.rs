@@ -1,10 +1,9 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use crate::core::state::metadata::LinkMetaKey;
 use holochain_p2p::actor::GetLinksOptions;
-use holochain_zome_types::GetLinksInput;
-use holochain_zome_types::GetLinksOutput;
+use holochain_state::metadata::LinkMetaKey;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -45,21 +44,20 @@ pub fn get_links<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::{
-        fixt::ZomeCallHostAccessFixturator,
-        test_utils::{
-            conductor_setup::ConductorTestData, new_zome_call, wait_for_integration_10s, WaitOps,
-        },
-    };
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::test_utils::conductor_setup::ConductorTestData;
+    use crate::test_utils::new_zome_call;
+    use crate::test_utils::wait_for_integration_10s;
+    use crate::test_utils::WaitOps;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
+    use holochain_test_wasm_common::*;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
-    use test_wasm_common::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_entry_hash_path_children() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
 
         let mut workspace =
@@ -134,7 +132,7 @@ pub mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn hash_path_anchor_get_anchor() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
 
         let mut workspace =

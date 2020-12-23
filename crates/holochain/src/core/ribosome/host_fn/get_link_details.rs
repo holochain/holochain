@@ -1,11 +1,9 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use crate::core::state::metadata::LinkMetaKey;
+use holochain_state::metadata::LinkMetaKey;
 use holochain_p2p::actor::GetLinksOptions;
-use holochain_zome_types::link::LinkDetails;
-use holochain_zome_types::GetLinkDetailsInput;
-use holochain_zome_types::GetLinkDetailsOutput;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -53,11 +51,11 @@ pub mod slow_tests {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::Header;
-    use test_wasm_common::*;
+    use holochain_test_wasm_common::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_entry_hash_path_children_details() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
 
         let mut workspace =

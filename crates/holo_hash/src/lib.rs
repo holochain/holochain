@@ -11,7 +11,8 @@ pub mod hash_type;
 pub use aliases::*;
 pub use has_hash::HasHash;
 pub use hash::*;
-pub use hash_type::{HashType, PrimitiveHashType};
+pub use hash_type::HashType;
+pub use hash_type::PrimitiveHashType;
 
 /// By default, disable string encoding and just display raw bytes
 #[cfg(not(feature = "string-encoding"))]

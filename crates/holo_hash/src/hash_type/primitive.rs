@@ -1,5 +1,8 @@
 use super::*;
-use crate::{error::HoloHashError, hash_type, AgentPubKey, EntryHash};
+use crate::error::HoloHashError;
+use crate::hash_type;
+use crate::AgentPubKey;
+use crate::EntryHash;
 use std::convert::TryInto;
 
 // Valid options for prefixes:

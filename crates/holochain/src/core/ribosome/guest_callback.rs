@@ -6,7 +6,10 @@ pub mod validate;
 pub mod validate_link;
 pub mod validation_package;
 use super::HostAccess;
-use crate::core::ribosome::{error::RibosomeError, FnComponents, Invocation, RibosomeT};
+use crate::core::ribosome::error::RibosomeError;
+use crate::core::ribosome::FnComponents;
+use crate::core::ribosome::Invocation;
+use crate::core::ribosome::RibosomeT;
 use fallible_iterator::FallibleIterator;
 use holochain_types::dna::zome::Zome;
 use holochain_zome_types::ExternOutput;
@@ -67,14 +70,18 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
 #[cfg(feature = "slow_tests")]
 mod tests {
     use super::CallIterator;
-    use crate::{
-        core::ribosome::{FnComponents, MockInvocation, MockRibosomeT, ZomesToInvoke},
-        fixt::{FnComponentsFixturator, ZomeCallHostAccessFixturator, ZomeFixturator},
-    };
+    use crate::core::ribosome::FnComponents;
+    use crate::core::ribosome::MockInvocation;
+    use crate::core::ribosome::MockRibosomeT;
+    use crate::core::ribosome::ZomesToInvoke;
+    use crate::fixt::FnComponentsFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::fixt::ZomeFixturator;
     use fallible_iterator::FallibleIterator;
     use holochain_types::dna::zome::Zome;
-    use holochain_zome_types::{init::InitCallbackResult, zome::FunctionName, ExternOutput};
-    use mockall::{predicate::*, Sequence};
+    use holochain_types::prelude::*;
+    use mockall::predicate::*;
+    use mockall::Sequence;
     use std::convert::TryInto;
 
     #[tokio::test(threaded_scheduler)]
@@ -85,11 +92,11 @@ mod tests {
 
         let mut invocation = MockInvocation::new();
 
-        let host_access = ZomeCallHostAccessFixturator::new(fixt::Empty)
+        let host_access = ZomeCallHostAccessFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
-        let zome_fixturator = ZomeFixturator::new(fixt::Unpredictable);
-        let mut fn_components_fixturator = FnComponentsFixturator::new(fixt::Unpredictable);
+        let zome_fixturator = ZomeFixturator::new(::fixt::Unpredictable);
+        let mut fn_components_fixturator = FnComponentsFixturator::new(::fixt::Unpredictable);
 
         // let returning_init_invocation = init_invocation.clone();
         let zomes: Vec<Zome> = zome_fixturator.take(3).collect();
