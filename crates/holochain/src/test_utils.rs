@@ -536,6 +536,45 @@ async fn display_integration(env: &EnvironmentWrite) -> usize {
     count
 }
 
+/// Helper for displaying agent infos stored on a conductor
+pub async fn display_agent_infos(conductor: &ConductorHandle) {
+    let agent_info = conductor.get_agent_infos(None).await.unwrap();
+    for info in agent_info {
+        let cell_info = conductor.list_cell_ids().await.unwrap();
+        let agents = cell_info
+            .iter()
+            .map(|c| c.agent_pubkey().clone())
+            .map(|a| (a.clone(), holochain_p2p::agent_holo_to_kit(a)))
+            .collect::<Vec<_>>();
+
+        let dnas = cell_info
+            .iter()
+            .map(|c| c.dna_hash().clone())
+            .map(|d| (d.clone(), holochain_p2p::space_holo_to_kit(d)))
+            .collect::<Vec<_>>();
+
+        let info: kitsune_p2p::agent_store::AgentInfo = (&info).try_into().unwrap();
+        let this_agent = agents.iter().find(|a| *info.as_agent_ref() == a.1).unwrap();
+        let this_dna = dnas.iter().find(|d| *info.as_space_ref() == d.1).unwrap();
+        tracing::debug!("This Agent {:?} is {:?}", this_agent.0, this_agent.1);
+        tracing::debug!("This DNA {:?} is {:?}", this_dna.0, this_dna.1);
+
+        use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+        let duration = Duration::milliseconds(info.signed_at_ms() as i64);
+        let s = duration.num_seconds() as i64;
+        let n = duration.clone().to_std().unwrap().subsec_nanos();
+        let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
+        let exp = dt + Duration::milliseconds(info.expires_after_ms() as i64);
+        let now = Utc::now();
+
+        tracing::debug!("signed at {}", dt);
+        tracing::debug!("expires at {} in {}mins", exp, (exp - now).num_minutes());
+        tracing::debug!("space: {:?}", info.as_space_ref());
+        tracing::debug!("agent: {:?}", info.as_agent_ref());
+        tracing::debug!("urls: {:?}", info.as_urls_ref());
+    }
+}
+
 /// Helper to create a zome invocation for tests
 pub fn new_zome_call<P, Z: Into<ZomeName>>(
     cell_id: &CellId,

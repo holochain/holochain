@@ -750,7 +750,7 @@ where
 
     pub(super) fn query_agent_info_signed(
         &self,
-        _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+        kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     ) -> ConductorResult<Vec<AgentInfoSigned>> {
         let environ = self.p2p_env.clone();
 
@@ -775,7 +775,11 @@ where
                             let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
                             let expires = info.signed_at_ms().checked_add(info.expires_after_ms());
                             match expires {
-                                Some(expires) if expires > now => out.push(v),
+                                Some(expires) if expires > now => {
+                                    if info.as_space_ref() == kitsune_space.as_ref() {
+                                        out.push(v);
+                                    }
+                                }
                                 _ => expired.push(AgentKvKey::from(k)),
                             }
                         }
