@@ -41,6 +41,9 @@
 //! types for testing. If we did not have a way of hiding this type genericity,
 //! code which interacted with the Conductor would also have to be highly generic.
 
+use super::p2p_store::get_agent_info_signed;
+use super::p2p_store::put_agent_info_signed;
+use super::p2p_store::query_agent_info_signed;
 use super::{
     api::error::ConductorApiResult,
     api::ZomeCall,
@@ -72,7 +75,7 @@ use tracing::*;
 #[cfg(any(test, feature = "test_utils"))]
 use super::state::ConductorState;
 #[cfg(any(test, feature = "test_utils"))]
-use crate::core::queue_consumer::InitialQueueTriggers;
+use crate::core::queue_consumer::QueueTriggers;
 #[cfg(any(test, feature = "test_utils"))]
 use holochain_state::env::EnvironmentWrite;
 
@@ -126,7 +129,7 @@ pub trait ConductorHandleT: Send + Sync {
         &self,
         cell_id: &CellId,
         event: holochain_p2p::event::HolochainP2pEvent,
-    ) -> ConductorResult<()>;
+    ) -> ConductorApiResult<()>;
 
     /// Invoke a zome function on a Cell
     async fn call_zome(&self, invocation: ZomeCall) -> ConductorApiResult<ZomeCallResult>;
@@ -221,8 +224,7 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Retrieve Senders for triggering workflows. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
-    async fn get_cell_triggers(&self, cell_id: &CellId)
-        -> ConductorApiResult<InitialQueueTriggers>;
+    async fn get_cell_triggers(&self, cell_id: &CellId) -> ConductorApiResult<QueueTriggers>;
 
     /// Retrieve the ConductorState. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -323,17 +325,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self,
         cell_id: &CellId,
         event: holochain_p2p::event::HolochainP2pEvent,
-    ) -> ConductorResult<()> {
+    ) -> ConductorApiResult<()> {
         trace!(agent = ?cell_id.agent_pubkey(), dispatch_event = ?event);
-        let lock = self.conductor.read().await;
         match event {
             PutAgentInfoSigned {
                 agent_info_signed,
                 respond,
                 ..
             } => {
-                let res = lock
-                    .put_agent_info_signed(agent_info_signed)
+                let env = { self.conductor.read().await.p2p_env() };
+                let res = put_agent_info_signed(env, agent_info_signed)
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
@@ -343,8 +344,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond,
                 ..
             } => {
-                let res = lock
-                    .get_agent_info_signed(kitsune_space, kitsune_agent)
+                let env = { self.conductor.read().await.p2p_env() };
+                let res = get_agent_info_signed(env, kitsune_space, kitsune_agent)
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
@@ -353,8 +354,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond,
                 ..
             } => {
-                let res = lock
-                    .query_agent_info_signed(kitsune_space)
+                let env = { self.conductor.read().await.p2p_env() };
+                let res = query_agent_info_signed(env, kitsune_space)
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
@@ -366,7 +367,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
             _ => {
-                let cell: &Cell = lock.cell_by_id(cell_id)?;
+                let cell = self.cell_by_id(cell_id).await?;
                 cell.handle_holochain_p2p_event(event).await?;
             }
         }
@@ -374,12 +375,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn call_zome(&self, call: ZomeCall) -> ConductorApiResult<ZomeCallResult> {
-        // FIXME: D-01058: We are holding this read lock for
-        // the entire call to call_zome and blocking
-        // any writes to the conductor
-        let lock = self.conductor.read().await;
-        debug!(cell_id = ?call.cell_id);
-        let cell: &Cell = lock.cell_by_id(&call.cell_id)?;
+        let cell = self.cell_by_id(&call.cell_id).await?;
         Ok(cell.call_zome(call, None).await?)
     }
 
@@ -388,18 +384,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         call: ZomeCall,
         workspace_lock: CallZomeWorkspaceLock,
     ) -> ConductorApiResult<ZomeCallResult> {
-        // FIXME: D-01058: We are holding this read lock for
-        // the entire call to call_zome and blocking
-        // any writes to the conductor
-        let lock = self.conductor.read().await;
         debug!(cell_id = ?call.cell_id);
-        let cell: &Cell = lock.cell_by_id(&call.cell_id)?;
+        let cell = self.cell_by_id(&call.cell_id).await?;
         Ok(cell.call_zome(call, Some(workspace_lock)).await?)
     }
 
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()> {
-        let lock = self.conductor.write().await;
-        let cell = lock.cell_by_id(cell_id)?;
+        let cell = self.cell_by_id(cell_id).await?;
         let _ = cell.handle_autonomic_process(cue.into()).await;
         Ok(())
     }
@@ -480,9 +471,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             // Remove successful and collect the errors
             .filter_map(|r| r)
             .collect();
-        {
-            self.conductor.write().await.initialize_cell_workflows();
-        }
         Ok(r)
     }
 
@@ -553,24 +541,19 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
-        let lock = self.conductor.read().await;
-        let cell = lock.cell_by_id(cell_id)?;
+        let cell = self.cell_by_id(cell_id).await?;
         Ok(cell.env().clone())
     }
 
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_p2p_env(&self) -> EnvironmentWrite {
         let lock = self.conductor.read().await;
-        lock.get_p2p_env()
+        lock.p2p_env()
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    async fn get_cell_triggers(
-        &self,
-        cell_id: &CellId,
-    ) -> ConductorApiResult<InitialQueueTriggers> {
-        let lock = self.conductor.read().await;
-        let cell = lock.cell_by_id(cell_id)?;
+    async fn get_cell_triggers(&self, cell_id: &CellId) -> ConductorApiResult<QueueTriggers> {
+        let cell = self.cell_by_id(cell_id).await?;
         Ok(cell.triggers().clone())
     }
 
@@ -578,5 +561,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
         let lock = self.conductor.read().await;
         Ok(lock.get_state_from_handle().await?)
+    }
+}
+
+impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
+    async fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<Arc<Cell>> {
+        let lock = self.conductor.read().await;
+        Ok(lock.cell_by_id(cell_id)?)
     }
 }

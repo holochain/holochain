@@ -34,15 +34,11 @@ use super::{
     state::{AppInterfaceConfig, AppInterfaceId, ConductorState},
     CellError,
 };
+use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::{
     conductor::{
-        api::error::ConductorApiResult,
-        cell::Cell,
-        config::ConductorConfig,
-        dna_store::MockDnaStore,
-        error::ConductorResult,
-        handle::ConductorHandle,
-        p2p_store::{AgentKv, AgentKvKey},
+        api::error::ConductorApiResult, cell::Cell, config::ConductorConfig,
+        dna_store::MockDnaStore, error::ConductorResult, handle::ConductorHandle,
     },
     core::{
         signal::Signal,
@@ -75,11 +71,7 @@ use holochain_types::{
 };
 use holochain_zome_types::entry_def::EntryDef;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use std::{
-    collections::HashMap,
-    convert::{TryFrom, TryInto},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
@@ -100,7 +92,7 @@ struct CellItem<CA>
 where
     CA: CellConductorApiT,
 {
-    cell: Cell<CA>,
+    cell: Arc<Cell<CA>>,
     _state: CellState,
 }
 
@@ -192,12 +184,12 @@ impl<DS> Conductor<DS>
 where
     DS: DnaStore + 'static,
 {
-    pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<&Cell> {
+    pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
         let item = self
             .cells
             .get(cell_id)
             .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
-        Ok(&item.cell)
+        Ok(item.cell.clone())
     }
 
     /// A gate to put at the top of public functions to ensure that work is not
@@ -431,7 +423,7 @@ where
     pub(super) async fn create_active_app_cells(
         &self,
         conductor_handle: ConductorHandle,
-    ) -> ConductorResult<Vec<Result<Vec<Cell>, CreateAppError>>> {
+    ) -> ConductorResult<Vec<Result<Vec<(Cell, InitialQueueTriggers)>, CreateAppError>>> {
         // Only create the active apps
         let active_apps = self.get_state().await?.active_apps;
 
@@ -504,7 +496,7 @@ where
                     if !errors.is_empty() {
                         for cell in success {
                             // Error needs to capture which app failed
-                            cell.destroy().await.map_err(|e| CreateAppError::Failed {
+                            cell.0.destroy().await.map_err(|e| CreateAppError::Failed {
                                 installed_app_id: installed_app_id.clone(),
                                 errors: vec![e],
                             })?;
@@ -604,23 +596,19 @@ where
     }
 
     /// Add fully constructed cells to the cell map in the Conductor
-    pub(super) fn add_cells(&mut self, cells: Vec<Cell>) {
-        for cell in cells {
+    pub(super) fn add_cells(&mut self, cells: Vec<(Cell, InitialQueueTriggers)>) {
+        for (cell, trigger) in cells {
             let cell_id = cell.id().clone();
             tracing::info!(?cell_id, "ADD CELL");
             self.cells.insert(
                 cell_id,
                 CellItem {
-                    cell,
+                    cell: Arc::new(cell),
                     _state: CellState { _active: false },
                 },
             );
-        }
-    }
 
-    pub(super) fn initialize_cell_workflows(&mut self) {
-        for cell in self.cells.values_mut() {
-            cell.cell.initialize_workflows();
+            trigger.initialize_workflows();
         }
     }
 
@@ -675,22 +663,6 @@ where
         }
     }
 
-    pub(super) fn put_agent_info_signed(
-        &self,
-        agent_info_signed: kitsune_p2p::agent_store::AgentInfoSigned,
-    ) -> ConductorResult<()> {
-        let environ = self.p2p_env.clone();
-        let p2p_kv = AgentKv::new(environ.clone().into())?;
-        let env = environ.guard();
-        Ok(env.with_commit(|writer| {
-            p2p_kv.as_store_ref().put(
-                writer,
-                &(&agent_info_signed).try_into()?,
-                &agent_info_signed,
-            )
-        })?)
-    }
-
     pub(super) fn add_agent_infos(
         &self,
         agent_infos: Vec<AgentInfoSigned>,
@@ -711,92 +683,6 @@ where
             }
             None => Ok(all_agent_infos(self.p2p_env.clone().into())?),
         }
-    }
-
-    pub(super) fn get_agent_info_signed(
-        &self,
-        kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
-        kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
-    ) -> ConductorResult<Option<AgentInfoSigned>> {
-        let environ = self.p2p_env.clone();
-
-        let p2p_kv = AgentKv::new(environ.clone().into())?;
-        let env = environ.guard();
-
-        env.with_commit(|writer| {
-            let res = p2p_kv
-                .as_store_ref()
-                .get(writer, &(&*kitsune_space, &*kitsune_agent).into())?;
-
-            let res = match res {
-                None => return Ok(None),
-                Some(res) => res,
-            };
-
-            let info = kitsune_p2p::agent_store::AgentInfo::try_from(&res)?;
-            let now: u64 = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64;
-
-            if info.signed_at_ms() + info.expires_after_ms() <= now {
-                p2p_kv
-                    .as_store_ref()
-                    .delete(writer, &(&*kitsune_space, &*kitsune_agent).into())?;
-                return Ok(None);
-            }
-
-            Ok(Some(res))
-        })
-    }
-
-    pub(super) fn query_agent_info_signed(
-        &self,
-        _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
-    ) -> ConductorResult<Vec<AgentInfoSigned>> {
-        let environ = self.p2p_env.clone();
-
-        let p2p_kv = AgentKv::new(environ.clone().into())?;
-        let env = environ.guard();
-
-        let mut out = Vec::new();
-        env.with_commit(|writer| {
-            let mut expired = Vec::new();
-
-            {
-                let mut iter = p2p_kv.as_store_ref().iter(writer)?;
-
-                let now: u64 = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64;
-
-                loop {
-                    match iter.next() {
-                        Ok(Some((k, v))) => {
-                            let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
-                            let expires = info.signed_at_ms().checked_add(info.expires_after_ms());
-                            match expires {
-                                Some(expires) if expires > now => out.push(v),
-                                _ => expired.push(AgentKvKey::from(k)),
-                            }
-                        }
-                        Ok(None) => break,
-                        Err(e) => return Err(e.into()),
-                    }
-                }
-            }
-
-            if !expired.is_empty() {
-                for exp in expired {
-                    p2p_kv.as_store_ref().delete(writer, &exp)?;
-                }
-            }
-
-            ConductorResult::Ok(())
-        })?;
-
-        Ok(out)
     }
 
     pub(super) async fn put_wasm(
@@ -857,14 +743,13 @@ where
         Ok(source_chain.dump_as_json().await?)
     }
 
-    #[cfg(any(test, feature = "test_utils"))]
-    pub(super) async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
-        self.get_state().await
+    pub(super) fn p2p_env(&self) -> EnvironmentWrite {
+        self.p2p_env.clone()
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    pub(super) fn get_p2p_env(&self) -> EnvironmentWrite {
-        self.p2p_env.clone()
+    pub(super) async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
+        self.get_state().await
     }
 }
 

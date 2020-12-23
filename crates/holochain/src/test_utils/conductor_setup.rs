@@ -7,7 +7,7 @@ use crate::{
         interface::SignalBroadcaster,
         ConductorHandle,
     },
-    core::{queue_consumer::InitialQueueTriggers, ribosome::real_ribosome::RealRibosome},
+    core::{queue_consumer::QueueTriggers, ribosome::real_ribosome::RealRibosome},
 };
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_keystore::KeystoreSender;
@@ -37,7 +37,7 @@ pub struct CellHostFnCaller {
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
     pub signal_tx: SignalBroadcaster,
-    pub triggers: InitialQueueTriggers,
+    pub triggers: QueueTriggers,
     pub cell_conductor_api: CellConductorApi,
 }
 

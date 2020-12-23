@@ -5,6 +5,7 @@
 //! SourceChain which has already undergone Genesis.
 
 use super::{api::ZomeCall, interface::SignalBroadcaster, manager::ManagedTaskAdd};
+use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::{
     conductor::{
         api::{error::ConductorApiError, CellConductorApi, CellConductorApiT},
@@ -13,7 +14,7 @@ use crate::{
         handle::ConductorHandle,
     },
     core::{
-        queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers},
+        queue_consumer::{spawn_queue_consumer_tasks, QueueTriggers},
         ribosome::{
             guest_callback::init::InitResult, real_ribosome::RealRibosome, ZomeCallInvocation,
         },
@@ -122,7 +123,7 @@ where
     conductor_api: Api,
     env: EnvironmentWrite,
     holochain_p2p_cell: P2pCell,
-    queue_triggers: InitialQueueTriggers,
+    queue_triggers: QueueTriggers,
 }
 
 impl Cell {
@@ -136,7 +137,7 @@ impl Cell {
         mut holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
-    ) -> CellResult<Self> {
+    ) -> CellResult<(Self, InitialQueueTriggers)> {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
 
         // check if genesis has been run
@@ -147,7 +148,7 @@ impl Cell {
 
         if has_genesis {
             holochain_p2p_cell.join().await?;
-            let queue_triggers = spawn_queue_consumer_tasks(
+            let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 &env,
                 holochain_p2p_cell.clone(),
                 conductor_api.clone(),
@@ -156,23 +157,19 @@ impl Cell {
             )
             .await;
 
-            Ok(Self {
-                id,
-                conductor_api,
-                env,
-                holochain_p2p_cell,
-                queue_triggers,
-            })
+            Ok((
+                Self {
+                    id,
+                    conductor_api,
+                    env,
+                    holochain_p2p_cell,
+                    queue_triggers,
+                },
+                initial_queue_triggers,
+            ))
         } else {
             Err(CellError::CellWithoutGenesis(id))
         }
-    }
-
-    /// Initialize all the workflows once.
-    /// This will run only once even if called
-    /// multiple times.
-    pub fn initialize_workflows(&mut self) {
-        self.queue_triggers.initialize_workflows();
     }
 
     /// Performs the Genesis workflow the Cell, ensuring that its initial
@@ -797,7 +794,7 @@ impl Cell {
     /// Get the triggers for the cell
     /// Useful for testing when you want to
     /// Cause workflows to trigger
-    pub(crate) fn triggers(&self) -> &InitialQueueTriggers {
+    pub(crate) fn triggers(&self) -> &QueueTriggers {
         &self.queue_triggers
     }
 }

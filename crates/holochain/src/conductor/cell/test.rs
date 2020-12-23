@@ -42,7 +42,7 @@ async fn test_cell_handle_publish() {
     let (add_task_sender, shutdown) = spawn_task_manager();
     let (stop_tx, _) = sync::broadcast::channel(1);
 
-    let cell = super::Cell::create(
+    let (cell, _) = super::Cell::create(
         cell_id,
         mock_handler,
         env.clone(),

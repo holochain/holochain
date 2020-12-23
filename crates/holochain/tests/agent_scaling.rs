@@ -165,7 +165,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
 
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
-#[ignore = "Will freeze CI"]
+#[ignore = "Slow test for CI that is only useful for timing"]
 async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
     observability::test_run().ok();
     // Bundle the single zome into a DnaFile
@@ -194,13 +194,13 @@ async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
     tracing::debug!("starting slow fn");
 
     let mut handles = Vec::new();
-    for i in 0..50 {
+    for i in 0..1000 {
         let h = tokio::task::spawn({
             let alice = alice.clone();
             async move {
                 let now = std::time::Instant::now();
                 tracing::debug!("starting slow fn {}", i);
-                let _: () = alice.call("slow_fn", TwoInt(i, 100)).await;
+                let _: () = alice.call("slow_fn", TwoInt(i, 5)).await;
                 tracing::debug!("finished slow fn {} in {}", i, now.elapsed().as_secs());
             }
         });
