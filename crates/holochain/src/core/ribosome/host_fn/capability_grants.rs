@@ -25,7 +25,6 @@ pub mod wasm_test {
     };
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use holochain_lmdb::test_utils::test_environments;
     use holochain_types::fixt::CapSecretFixturator;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;

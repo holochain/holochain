@@ -8,6 +8,7 @@ use crate::conductor::{
 };
 use futures::future;
 use hdk3::prelude::*;
+use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
 use holochain_lmdb::test_utils::{test_environments, TestEnvironments};
 use holochain_types::app::InstalledCell;
@@ -197,14 +198,15 @@ impl CoolConductor {
         self.envs.keystore()
     }
 
-    /// TODO: make this take a more flexible config for specifying things like
-    /// membrane proofs
-    async fn setup_app_inner(
+    /// Install the app and activate it
+    // TODO: make this take a more flexible config for specifying things like
+    // membrane proofs
+    async fn setup_app_part_1(
         &mut self,
         installed_app_id: &str,
         agent: AgentPubKey,
         dna_files: &[DnaFile],
-    ) -> CoolApp {
+    ) {
         let installed_app_id = installed_app_id.to_string();
 
         for dna_file in dna_files {
@@ -219,7 +221,6 @@ impl CoolConductor {
             .map(|dna| {
                 let cell_handle = format!("{}", dna.dna_hash());
                 let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
-                dbg!("Installed cell_id", &cell_id);
                 (InstalledCell::new(cell_id, cell_handle), None)
             })
             .collect();
@@ -230,9 +231,25 @@ impl CoolConductor {
             .await
             .expect("Could not install app");
 
+        self.activate_app(installed_app_id)
+            .await
+            .expect("Could not activate app");
+    }
+
+    /// Build the CoolCells after `setup_cells` has been run
+    /// The setup is split into two parts because the Cell environments
+    /// are not available until after `setup_cells` has run, and it is
+    /// better to do that once for all apps in the case of multiple apps being
+    /// set up at once.
+    async fn setup_app_part_2(
+        &self,
+        installed_app_id: &str,
+        agent: AgentPubKey,
+        dna_hashes: impl Iterator<Item = DnaHash>,
+    ) -> CoolApp {
         let mut cool_cells = Vec::new();
-        for dna in dna_files.iter() {
-            let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
+        for dna_hash in dna_hashes {
+            let cell_id = CellId::new(dna_hash, agent.clone());
             let cell_env = self
                 .handle()
                 .0
@@ -243,7 +260,7 @@ impl CoolConductor {
             cool_cells.push(cell);
         }
 
-        CoolApp::new(installed_app_id, cool_cells)
+        CoolApp::new(installed_app_id.into(), cool_cells)
     }
 
     /// Opinionated app setup.
@@ -254,13 +271,8 @@ impl CoolConductor {
         agent: AgentPubKey,
         dna_files: &[DnaFile],
     ) -> CoolApp {
-        let app = self
-            .setup_app_inner(installed_app_id, agent, dna_files)
+        self.setup_app_part_1(installed_app_id, agent.clone(), dna_files)
             .await;
-
-        self.activate_app(app.installed_app_id().clone())
-            .await
-            .expect("Could not activate app");
 
         self.handle()
             .0
@@ -269,7 +281,9 @@ impl CoolConductor {
             .await
             .expect("Could not setup cells");
 
-        app
+        let dna_files = dna_files.into_iter().map(|d| d.dna_hash().clone());
+        self.setup_app_part_2(installed_app_id, agent, dna_files)
+            .await
     }
 
     /// Opinionated app setup.
@@ -297,18 +311,12 @@ impl CoolConductor {
         dna_files: &[DnaFile],
     ) -> CoolAppBatch {
         let mut apps = Vec::new();
-        for agent in agents.to_vec() {
+        for agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             let app = self
-                .setup_app_inner(&installed_app_id, agent, dna_files)
+                .setup_app_part_1(&installed_app_id, agent.clone(), dna_files)
                 .await;
             apps.push(app);
-        }
-
-        for app in apps.iter() {
-            self.activate_app(app.installed_app_id().clone())
-                .await
-                .expect("Could not activate app");
         }
 
         self.handle()
@@ -317,6 +325,19 @@ impl CoolConductor {
             .setup_cells()
             .await
             .expect("Could not setup cells");
+
+        let mut apps = Vec::new();
+        for agent in agents {
+            let installed_app_id = format!("{}{}", app_id_prefix, agent);
+            apps.push(
+                self.setup_app_part_2(
+                    &installed_app_id,
+                    agent.clone(),
+                    dna_files.into_iter().map(|d| d.dna_hash().clone()),
+                )
+                .await,
+            );
+        }
 
         CoolAppBatch(apps)
     }
