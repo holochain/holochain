@@ -1,9 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::agent_info::AgentInfo;
-use holochain_zome_types::AgentInfoInput;
-use holochain_zome_types::AgentInfoOutput;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -35,7 +33,7 @@ pub mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_agent_info_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();

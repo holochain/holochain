@@ -1,7 +1,10 @@
 //! Defines the serialization rules for HoloHashes
 
-use crate::{HashType, HoloHash};
-use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
+use crate::HashType;
+use crate::HoloHash;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_serialized_bytes::SerializedBytesError;
+use holochain_serialized_bytes::UnsafeBytes;
 
 impl<T: HashType> serde::Serialize for HoloHash<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

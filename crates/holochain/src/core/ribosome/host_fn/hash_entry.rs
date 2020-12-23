@@ -2,9 +2,7 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
-use holochain_zome_types::Entry;
-use holochain_zome_types::HashEntryInput;
-use holochain_zome_types::HashEntryOutput;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 pub fn hash_entry(
@@ -31,12 +29,12 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holo_hash::EntryHash;
+    use holochain_test_wasm_common::TestString;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::HashEntryInput;
     use holochain_zome_types::HashEntryOutput;
     use std::convert::TryInto;
     use std::sync::Arc;
-    use test_wasm_common::TestString;
 
     #[tokio::test(threaded_scheduler)]
     /// we can get an entry hash out of the fn directly
@@ -44,10 +42,10 @@ pub mod wasm_test {
         let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
-        let call_context = CallContextFixturator::new(fixt::Unpredictable)
+        let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
+        let entry = EntryFixturator::new(::fixt::Predictable).next().unwrap();
         let input = HashEntryInput::new(entry);
 
         let output: HashEntryOutput =
@@ -62,7 +60,7 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     /// we can get an entry hash out of the fn via. a wasm call
     async fn ribosome_hash_entry_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
@@ -72,7 +70,7 @@ pub mod wasm_test {
 
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
-        let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
+        let entry = EntryFixturator::new(::fixt::Predictable).next().unwrap();
         let input = HashEntryInput::new(entry);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
@@ -87,7 +85,7 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     /// the hash path underlying anchors wraps entry_hash
     async fn ribosome_hash_path_pwd_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();

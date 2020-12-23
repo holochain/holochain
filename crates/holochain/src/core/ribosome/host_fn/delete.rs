@@ -2,17 +2,13 @@ use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use crate::core::state::cascade::error::CascadeError;
+use holochain_cascade::error::CascadeError;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
-use crate::core::SourceChainError;
+
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_zome_types::element::SignedHeaderHashed;
-use holochain_zome_types::entry::GetOptions;
-use holochain_zome_types::header::builder;
-use holochain_zome_types::DeleteInput;
-use holochain_zome_types::DeleteOutput;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -47,8 +43,7 @@ pub fn delete<'a>(
             workspace.source_chain.elements(),
             &mut workspace.meta_authored,
         )
-        .map_err(Box::new)
-        .map_err(SourceChainError::from)?;
+        .map_err(Box::new)?;
         Ok(DeleteOutput::new(header_hash))
     })
 }
@@ -96,17 +91,17 @@ pub(crate) fn get_original_address<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
+    use hdk3::prelude::*;
     use crate::core::workflow::CallZomeWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
-    use hdk3::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
+    use ::fixt::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_delete_entry_test<'a>() {
-        holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
 
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
@@ -114,7 +109,8 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();

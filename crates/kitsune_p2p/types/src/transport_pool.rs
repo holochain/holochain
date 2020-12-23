@@ -1,11 +1,12 @@
 //! Unify multiple sub-transports into one pool.
 
 use crate::transport::*;
-use futures::{future::FutureExt, sink::SinkExt, stream::StreamExt};
-use ghost_actor::{
-    dependencies::{must_future::MustBoxFuture, tracing},
-    GhostControlSender,
-};
+use futures::future::FutureExt;
+use futures::sink::SinkExt;
+use futures::stream::StreamExt;
+use ghost_actor::dependencies::must_future::MustBoxFuture;
+use ghost_actor::dependencies::tracing;
+use ghost_actor::GhostControlSender;
 use std::collections::HashMap;
 
 ghost_actor::ghost_chan! {

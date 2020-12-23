@@ -1,36 +1,32 @@
 use fallible_iterator::FallibleIterator;
-use hdk3::prelude::{Element, EntryType, ValidationPackage};
+use hdk3::prelude::Element;
+use hdk3::prelude::EntryType;
+use hdk3::prelude::ValidationPackage;
 use holo_hash::HeaderHash;
-use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCellT};
-use holochain_state::{env::EnvironmentRead, fresh_reader_test};
-use holochain_types::{
-    activity::{AgentActivity, ChainItems},
-    HeaderHashed,
-};
+use holochain_lmdb::env::EnvironmentRead;
+use holochain_lmdb::fresh_reader_test;
+use holochain_p2p::actor::GetActivityOptions;
+use holochain_p2p::HolochainP2pCellT;
+use holochain_test_wasm_common::AgentActivitySearch;
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{
-    query::{ActivityRequest, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved},
-    validate::ValidationStatus,
-    ZomeCallResponse,
-};
 use matches::assert_matches;
 use std::convert::TryInto;
-use test_wasm_common::AgentActivitySearch;
 
-use crate::{
-    conductor::ConductorHandle,
-    core::state::{
-        cascade::{Cascade, DbPair, DbPairMut},
-        element_buf::ElementBuf,
-        metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
-        source_chain::SourceChain,
-    },
-    test_utils::{
-        conductor_setup::{CellHostFnCaller, ConductorTestData},
-        host_fn_caller::Post,
-        new_zome_call, wait_for_integration,
-    },
-};
+use crate::conductor::ConductorHandle;
+use crate::test_utils::conductor_setup::CellHostFnCaller;
+use crate::test_utils::conductor_setup::ConductorTestData;
+use crate::test_utils::host_fn_caller::Post;
+use crate::test_utils::new_zome_call;
+use crate::test_utils::wait_for_integration;
+use holochain_cascade::Cascade;
+use holochain_cascade::DbPair;
+use holochain_cascade::DbPairMut;
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::metadata::ChainItemKey;
+use holochain_state::metadata::MetadataBuf;
+use holochain_state::metadata::MetadataBufT;
+use holochain_state::source_chain::SourceChain;
 
 const NUM_COMMITS: usize = 5;
 const GET_AGENT_ACTIVITY_TIMEOUT_MS: u64 = 1000;
@@ -229,7 +225,7 @@ async fn get_agent_activity_test() {
             hash: vec![last.header_address().clone()],
         });
 
-        AgentActivity {
+        AgentActivityResponse {
             valid_activity: ChainItems::Full(valid_activity),
             rejected_activity: ChainItems::NotRequested,
             status,
@@ -249,8 +245,8 @@ async fn get_agent_activity_test() {
         activity
     };
 
-    // Helper closure for changing to AgentActivity<Element> type
-    let get_expected_cascade = |activity: AgentActivity| {
+    // Helper closure for changing to AgentActivityResponse<Element> type
+    let get_expected_cascade = |activity: AgentActivityResponse| {
         let valid_activity = match activity.valid_activity {
             ChainItems::Full(headers) => ChainItems::Full(
                 headers
@@ -271,7 +267,7 @@ async fn get_agent_activity_test() {
             ChainItems::Hashes(h) => ChainItems::Hashes(h),
             ChainItems::NotRequested => ChainItems::NotRequested,
         };
-        let activity: AgentActivity<Element> = AgentActivity {
+        let activity: AgentActivityResponse<Element> = AgentActivityResponse {
             agent: activity.agent,
             valid_activity,
             rejected_activity,

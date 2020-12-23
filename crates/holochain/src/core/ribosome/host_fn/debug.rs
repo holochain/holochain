@@ -1,9 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::debug::DebugMsg;
-use holochain_zome_types::DebugInput;
-use holochain_zome_types::DebugOutput;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 use tracing::*;
 
@@ -45,7 +43,7 @@ pub mod wasm_test {
         let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
-        let call_context = CallContextFixturator::new(fixt::Unpredictable)
+        let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         let input = DebugInput::new(debug_msg!(format!("ribosome debug {}", "works!")));
@@ -57,7 +55,7 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn wasm_line_numbers_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
