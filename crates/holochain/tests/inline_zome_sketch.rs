@@ -136,6 +136,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
+#[ignore("Needs to be completed when HolochainP2pEvents is accessible")]
 async fn invalid_cell() -> anyhow::Result<()> {
     observability::test_run().ok();
     let conductor = CoolConductor::from_standard_config().await;
