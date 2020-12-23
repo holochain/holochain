@@ -2,16 +2,10 @@ use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use crate::core::state::cascade::error::CascadeResult;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
-use crate::core::SourceChainError;
-use holochain_types::element::SignedHeaderHashed;
-use holochain_zome_types::entry::GetOptions;
-use holochain_zome_types::header::builder;
-use holochain_zome_types::DeleteLinkInput;
-use holochain_zome_types::DeleteLinkOutput;
-use holochain_zome_types::Header;
+use holochain_cascade::error::CascadeResult;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -87,8 +81,7 @@ pub fn delete_link<'a>(
             workspace.source_chain.elements(),
             &mut workspace.meta_authored,
         )
-        .map_err(Box::new)
-        .map_err(SourceChainError::from)?;
+        .map_err(Box::new)?;
         Ok(DeleteLinkOutput::new(header_hash))
     })
 }
@@ -105,7 +98,7 @@ pub mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_delete_link_add_remove() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
 
         let mut workspace =

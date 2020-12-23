@@ -1,9 +1,12 @@
-use holochain::conductor::{
-    config::ConductorConfig, error::ConductorError, interactive, paths::ConfigFilePath, Conductor,
-    ConductorHandle,
-};
-use holochain_types::observability::{self, Output};
-use std::{error::Error, path::PathBuf};
+use holochain::conductor::config::ConductorConfig;
+use holochain::conductor::error::ConductorError;
+use holochain::conductor::interactive;
+use holochain::conductor::paths::ConfigFilePath;
+use holochain::conductor::Conductor;
+use holochain::conductor::ConductorHandle;
+use observability::Output;
+use std::error::Error;
+use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::*;
 

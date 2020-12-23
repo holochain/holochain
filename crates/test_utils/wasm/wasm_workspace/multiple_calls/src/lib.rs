@@ -1,6 +1,6 @@
 use hdk3::prelude::*;
-use test_wasm_common::TestBytes;
-use test_wasm_common::TestInt;
+use holochain_test_wasm_common::TestBytes;
+use holochain_test_wasm_common::TestInt;
 
 #[hdk_entry(id = "post")]
 struct Val(u32);

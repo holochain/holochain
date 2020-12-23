@@ -2,8 +2,7 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_zome_types::VerifySignatureInput;
-use holochain_zome_types::VerifySignatureOutput;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 pub fn verify_signature(
@@ -34,7 +33,7 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_verify_signature_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
@@ -150,7 +149,7 @@ pub mod wasm_test {
                     host_access,
                     TestWasm::Sign,
                     "verify_signature",
-                    hdk3::prelude::holochain_zome_types::zome_io::VerifySignatureInput::new(
+                    holochain_zome_types::zome_io::VerifySignatureInput::new(
                         VerifySignature::new_raw(k.clone(), sig.clone().into(), data.clone())
                     )
                 );

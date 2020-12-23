@@ -1,15 +1,15 @@
 #![deny(missing_docs)]
 //! Errors occurring during a [Ribosome] call
 
-use crate::{
-    conductor::{api::error::ConductorApiError, interface::error::InterfaceError},
-    core::state::{cascade::error::CascadeError, source_chain::SourceChainError},
-};
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::interface::error::InterfaceError;
+use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use holo_hash::AnyDhtHash;
+use holochain_cascade::error::CascadeError;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
-use holochain_types::dna::{error::DnaError, zome::inline_zome::error::InlineZomeError};
+use holochain_state::source_chain::SourceChainError;
+use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
-use holochain_zome_types::zome::{FunctionName, ZomeName};
 use thiserror::Error;
 use tokio::task::JoinError;
 use tokio_safe_block_on::BlockOnError;
@@ -58,7 +58,7 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
-    DatabaseError(#[from] holochain_state::error::DatabaseError),
+    DatabaseError(#[from] holochain_lmdb::error::DatabaseError),
 
     /// ident
     #[error(transparent)]
@@ -91,6 +91,10 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     P2pError(#[from] holochain_p2p::HolochainP2pError),
+
+    /// ident
+    #[error(transparent)]
+    DhtOpConvertError(#[from] Box<DhtOpConvertError>),
 
     /// ident
     #[error("xsalsa20poly1305 error {0}")]

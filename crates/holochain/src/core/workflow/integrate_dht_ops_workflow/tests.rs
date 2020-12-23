@@ -1,53 +1,39 @@
 #![cfg(test)]
+#![cfg(feature = "test_utils")]
 
 use super::*;
 
-use crate::{
-    core::{
-        queue_consumer::TriggerSender,
-        ribosome::{guest_callback::entry_defs::EntryDefsResult, host_fn, MockRibosomeT},
-        state::{
-            metadata::{ChainItemKey, LinkMetaKey},
-            workspace::WorkspaceError,
-        },
-        workflow::CallZomeWorkspaceLock,
-    },
-    fixt::{CallContextFixturator, ZomeCallHostAccessFixturator, *},
-    here,
-    test_utils::test_network,
-};
+use crate::core::queue_consumer::TriggerSender;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::core::ribosome::host_fn;
+use crate::core::ribosome::MockRibosomeT;
+use crate::core::workflow::CallZomeWorkspaceLock;
+use crate::fixt::CallContextFixturator;
+use crate::fixt::ZomeCallHostAccessFixturator;
+use crate::fixt::*;
+use crate::here;
+use crate::test_utils::test_network;
 use ::fixt::prelude::*;
-use holo_hash::*;
-use holochain_state::{
-    env::{EnvironmentWrite, ReadManager, WriteManager},
-    error::DatabaseError,
-    test_utils::test_cell_env,
-};
-use holochain_types::{
-    dht_op::{DhtOp, DhtOpHashed},
-    dna::{zome::Zome, DnaDefHashed},
-    fixt::*,
-    header::NewEntryHeader,
-    metadata::TimedHeaderHash,
-    observability,
-    validate::ValidationStatus,
-    Entry, EntryHashed, HeaderHashed,
-};
-use holochain_zome_types::{
-    entry::GetOptions,
-    entry_def::EntryDefs,
-    header::{builder, CreateLink, Delete, DeleteLink, Update, ZomeId},
-    link::{LinkTag, Links},
-    signature::Signature,
-    zome::ZomeName,
-    CreateInput, CreateLinkInput, GetInput, GetLinksInput, Header,
-};
-use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
-use std::{
-    collections::BTreeMap,
-    convert::{TryFrom, TryInto},
-    sync::Arc,
-};
+
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::env::ReadManager;
+use holochain_lmdb::env::WriteManager;
+use holochain_lmdb::error::DatabaseError;
+use holochain_lmdb::test_utils::test_cell_env;
+use holochain_state::metadata::ChainItemKey;
+use holochain_state::metadata::LinkMetaKey;
+use holochain_state::workspace::WorkspaceError;
+
+use holochain_zome_types::Entry;
+use holochain_zome_types::HeaderHashed;
+use holochain_zome_types::ValidationStatus;
+use observability;
+use produce_dht_ops_workflow::produce_dht_ops_workflow;
+use produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
+use std::collections::BTreeMap;
+use std::convert::TryFrom;
+use std::convert::TryInto;
+use std::sync::Arc;
 
 #[derive(Clone)]
 struct TestData {
@@ -1081,7 +1067,7 @@ async fn get_links(
 async fn test_metadata_from_wasm_api() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let test_env = holochain_state::test_utils::test_cell_env();
+    let test_env = holochain_lmdb::test_utils::test_cell_env();
     let env = test_env.env();
     clear_dbs(env.clone());
 
@@ -1147,7 +1133,7 @@ async fn test_metadata_from_wasm_api() {
 async fn test_wasm_api_without_integration_links() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let test_env = holochain_state::test_utils::test_cell_env();
+    let test_env = holochain_lmdb::test_utils::test_cell_env();
     let env = test_env.env();
     clear_dbs(env.clone());
 
@@ -1199,7 +1185,7 @@ async fn test_wasm_api_without_integration_links() {
 async fn test_wasm_api_without_integration_delete() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let test_env = holochain_state::test_utils::test_cell_env();
+    let test_env = holochain_lmdb::test_utils::test_cell_env();
     let env = test_env.env();
     let env_ref = env.guard();
     clear_dbs(env.clone());
@@ -1304,38 +1290,24 @@ async fn test_integrate_single_register_delete_link() {
 
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-    use holochain_zome_types::entry::GetOptions;
-    use std::{
-        convert::{TryFrom, TryInto},
-        time::Duration,
-    };
+    use std::convert::TryFrom;
+    use std::convert::TryInto;
+    use std::time::Duration;
 
-    use crate::{
-        core::state::{
-            dht_op_integration::IntegratedDhtOpsStore,
-            metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
-        },
-        fixt::*,
-        test_utils::{host_fn_caller::*, setup_app, wait_for_integration},
-    };
+    use crate::test_utils::host_fn_caller::*;
+    use crate::test_utils::setup_app;
+    use crate::test_utils::wait_for_integration;
+    use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
-    use fixt::prelude::*;
     use holo_hash::EntryHash;
+    use holochain_lmdb::db::GetDb;
+    use holochain_lmdb::db::INTEGRATED_DHT_OPS;
+    use holochain_lmdb::env::ReadManager;
     use holochain_serialized_bytes::SerializedBytes;
-    use holochain_state::{
-        db::{GetDb, INTEGRATED_DHT_OPS},
-        env::ReadManager,
-    };
-    use holochain_types::{
-        app::InstalledCell,
-        cell::CellId,
-        dna::{DnaDef, DnaFile},
-        observability,
-        test_utils::fake_agent_pubkey_1,
-        Entry,
-    };
+    use holochain_state::prelude::*;
+    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::test_utils::fake_agent_pubkey_2;
+    use observability;
     use tracing::*;
 
     /// The aim of this test is to show from a high level that committing

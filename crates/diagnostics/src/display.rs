@@ -1,4 +1,4 @@
-use holochain_state::{error::DatabaseResult, prelude::IntKey, transaction::Reader};
+use holochain_lmdb::{error::DatabaseResult, prelude::IntKey, transaction::Reader};
 
 const BYTE_SIZE_MARKERS: [char; 6] = [' ', 'K', 'M', 'G', 'T', 'P'];
 

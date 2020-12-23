@@ -1,9 +1,15 @@
 #![allow(missing_docs)]
 
-use crate::{
-    encode::holo_dht_location_bytes, hash_type, AgentPubKey, AnyDhtHash, DhtOpHash, DnaHash,
-    EntryHash, HeaderHash, NetIdHash, WasmHash,
-};
+use crate::encode::holo_dht_location_bytes;
+use crate::hash_type;
+use crate::AgentPubKey;
+use crate::AnyDhtHash;
+use crate::DhtOpHash;
+use crate::DnaHash;
+use crate::EntryHash;
+use crate::HeaderHash;
+use crate::NetIdHash;
+use crate::WasmHash;
 use ::fixt::prelude::*;
 use std::convert::TryFrom;
 

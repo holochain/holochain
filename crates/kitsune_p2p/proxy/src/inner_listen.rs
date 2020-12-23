@@ -1,5 +1,6 @@
 use crate::*;
-use futures::{sink::SinkExt, stream::StreamExt};
+use futures::sink::SinkExt;
+use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::dependencies::serde_json;
 use std::collections::HashMap;

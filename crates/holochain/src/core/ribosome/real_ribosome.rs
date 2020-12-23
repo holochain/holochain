@@ -1,13 +1,13 @@
-use super::host_fn::remote_signal::remote_signal;
-use super::{
-    guest_callback::{
-        entry_defs::EntryDefsHostAccess, init::InitHostAccess,
-        migrate_agent::MigrateAgentHostAccess, post_commit::PostCommitHostAccess,
-        validate::ValidateHostAccess, validation_package::ValidationPackageHostAccess,
-    },
-    host_fn::{get_agent_activity::get_agent_activity, HostFnApi},
-    HostAccess, ZomeCallHostAccess,
-};
+use super::guest_callback::entry_defs::EntryDefsHostAccess;
+use super::guest_callback::init::InitHostAccess;
+use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
+use super::guest_callback::post_commit::PostCommitHostAccess;
+use super::guest_callback::validate::ValidateHostAccess;
+use super::guest_callback::validation_package::ValidationPackageHostAccess;
+use super::host_fn::get_agent_activity::get_agent_activity;
+use super::host_fn::HostFnApi;
+use super::HostAccess;
+use super::ZomeCallHostAccess;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
@@ -47,6 +47,7 @@ use crate::core::ribosome::host_fn::hash_entry::hash_entry;
 use crate::core::ribosome::host_fn::property::property;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
+use crate::core::ribosome::host_fn::remote_signal::remote_signal;
 use crate::core::ribosome::host_fn::schedule::schedule;
 use crate::core::ribosome::host_fn::show_env::show_env;
 use crate::core::ribosome::host_fn::sign::sign;
@@ -64,21 +65,9 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
-use holochain_types::dna::{
-    zome::{HostFnAccess, Permission, Zome, ZomeDef},
-    DnaDefHashed, DnaError, DnaFile,
-};
+use holochain_types::prelude::*;
+
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::{
-    entry_def::EntryDefsCallbackResult,
-    init::InitCallbackResult,
-    migrate_agent::MigrateAgentCallbackResult,
-    post_commit::PostCommitCallbackResult,
-    validate::{ValidateCallbackResult, ValidationPackageCallbackResult},
-    validate_link::ValidateLinkCallbackResult,
-    zome::{FunctionName, ZomeName},
-    CallbackResult, ExternOutput, ZomeCallResponse,
-};
 use std::sync::Arc;
 
 /// Path to the wasm cache path
@@ -556,14 +545,14 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
+    use holochain_test_wasm_common::TestString;
     use holochain_wasm_test_utils::TestWasm;
-    use test_wasm_common::TestString;
 
     #[tokio::test(threaded_scheduler)]
     /// Basic checks that we can call externs internally and externally the way we want using the
     /// hdk macros rather than low level rust extern syntax.
     async fn ribosome_extern_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();

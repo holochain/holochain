@@ -7,7 +7,7 @@
 //!
 //! ```rust, no_run
 //! async fn async_main () {
-//! use holochain_state::test_utils::{test_environments, TestEnvironment};
+//! use holochain_lmdb::test_utils::{test_environments, TestEnvironment};
 //! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
 //! let envs = test_environments();
 //! let handle: ConductorHandle = ConductorBuilder::new()
@@ -41,32 +41,26 @@
 //! types for testing. If we did not have a way of hiding this type genericity,
 //! code which interacted with the Conductor would also have to be highly generic.
 
+use super::api::error::ConductorApiResult;
+use super::api::ZomeCall;
+use super::config::AdminInterfaceConfig;
+use super::dna_store::DnaStore;
+use super::entry_def_store::EntryDefBufferKey;
+use super::error::ConductorResult;
+use super::error::CreateAppError;
+use super::interface::SignalBroadcaster;
+use super::manager::TaskManagerRunHandle;
 use super::p2p_store::get_agent_info_signed;
 use super::p2p_store::put_agent_info_signed;
 use super::p2p_store::query_agent_info_signed;
-use super::{
-    api::error::ConductorApiResult,
-    api::ZomeCall,
-    config::AdminInterfaceConfig,
-    dna_store::DnaStore,
-    entry_def_store::EntryDefBufferKey,
-    error::{ConductorResult, CreateAppError},
-    interface::SignalBroadcaster,
-    manager::TaskManagerRunHandle,
-    Cell, Conductor,
-};
-use crate::core::workflow::{CallZomeWorkspaceLock, ZomeCallResult};
+use super::Cell;
+use super::Conductor;
+use crate::core::workflow::CallZomeWorkspaceLock;
+use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
 use holochain_p2p::event::HolochainP2pEvent::*;
-use holochain_types::{
-    app::{InstalledApp, InstalledAppId, InstalledCell, MembraneProof},
-    autonomic::AutonomicCue,
-    cell::CellId,
-    dna::{zome::ZomeDef, DnaFile},
-    prelude::*,
-};
-use holochain_zome_types::entry_def::EntryDef;
+use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -77,7 +71,7 @@ use super::state::ConductorState;
 #[cfg(any(test, feature = "test_utils"))]
 use crate::core::queue_consumer::QueueTriggers;
 #[cfg(any(test, feature = "test_utils"))]
-use holochain_state::env::EnvironmentWrite;
+use holochain_lmdb::env::EnvironmentWrite;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;

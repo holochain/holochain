@@ -25,13 +25,15 @@
 //! Implicitly, every workflow also writes to its own source queue, i.e. to
 //! remove the item it has just processed.
 
-use derive_more::{Constructor, Display, From};
+use derive_more::Constructor;
+use derive_more::Display;
+use derive_more::From;
 use futures::future::Either;
-use holochain_state::{
-    env::{EnvironmentWrite, WriteManager},
-    prelude::Writer,
-};
-use tokio::{sync, sync::mpsc};
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::env::WriteManager;
+use holochain_lmdb::prelude::Writer;
+use tokio::sync;
+use tokio::sync::mpsc;
 
 // TODO: move these to workflow mod
 mod integrate_dht_ops_consumer;
@@ -43,9 +45,10 @@ use app_validation_consumer::*;
 mod produce_dht_ops_consumer;
 use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
-use super::state::workspace::WorkspaceError;
-use crate::conductor::{api::CellConductorApiT, manager::ManagedTaskAdd};
+use crate::conductor::api::CellConductorApiT;
+use crate::conductor::manager::ManagedTaskAdd;
 use holochain_p2p::HolochainP2pCell;
+use holochain_state::workspace::WorkspaceError;
 use publish_dht_ops_consumer::*;
 
 /// Spawns several long-running tasks which are responsible for processing work

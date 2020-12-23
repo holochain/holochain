@@ -6,15 +6,9 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
-use crate::core::SourceChainError;
+
 use holo_hash::HasHash;
-use holochain_zome_types::entry_def::EntryDefId;
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::header::builder;
-use holochain_zome_types::header::AppEntryType;
-use holochain_zome_types::header::EntryType;
-use holochain_zome_types::CreateInput;
-use holochain_zome_types::CreateOutput;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 /// create element
@@ -73,8 +67,7 @@ pub fn create<'a>(
             workspace.source_chain.elements(),
             &mut workspace.meta_authored,
         )
-        .map_err(Box::new)
-        .map_err(SourceChainError::from)?;
+        .map_err(Box::new)?;
         Ok(CreateOutput::new(header_hash))
     })
 }
@@ -118,45 +111,34 @@ pub fn extract_entry_def(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::create;
-    use crate::core::state::source_chain::ChainInvalidReason;
-    use crate::core::state::source_chain::SourceChainError;
-    use crate::core::state::source_chain::SourceChainResult;
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-    use crate::fixt::CallContextFixturator;
-    use crate::fixt::EntryFixturator;
-    use crate::fixt::RealRibosomeFixturator;
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::fixt::*;
     use crate::test_utils::setup_app;
     use crate::{conductor::api::ZomeCall, core::ribosome::error::RibosomeError};
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holo_hash::AnyDhtHash;
     use holo_hash::EntryHash;
+    use holochain_state::source_chain::ChainInvalidReason;
+    use holochain_state::source_chain::SourceChainError;
+    use holochain_state::source_chain::SourceChainResult;
+    use holochain_test_wasm_common::TestBytes;
+    use holochain_test_wasm_common::TestInt;
     use holochain_types::app::InstalledCell;
-    use holochain_types::cell::CellId;
     use holochain_types::dna::DnaDef;
     use holochain_types::dna::DnaFile;
     use holochain_types::fixt::AppEntry;
-    use holochain_types::observability;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::entry::EntryError;
-    use holochain_zome_types::entry_def::EntryDefId;
-    use holochain_zome_types::CreateInput;
-    use holochain_zome_types::CreateOutput;
-    use holochain_zome_types::Entry;
-    use holochain_zome_types::ExternInput;
-    use holochain_zome_types::GetOutput;
+    use observability;
     use std::sync::Arc;
-    use test_wasm_common::TestBytes;
-    use test_wasm_common::TestInt;
 
     #[tokio::test(threaded_scheduler)]
     /// we cannot commit before genesis
     async fn create_pre_genesis_test() {
         // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
@@ -192,7 +174,7 @@ pub mod wasm_test {
     /// we can get an entry hash out of the fn directly
     async fn create_entry_test<'a>() {
         // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
@@ -236,9 +218,9 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_create_entry_test<'a>() {
-        holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
         // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
@@ -405,7 +387,7 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_serialize_bytes_hash() {
-        holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
         #[derive(Default, SerializedBytes, Serialize, Deserialize)]
         #[repr(transparent)]
         #[serde(transparent)]
