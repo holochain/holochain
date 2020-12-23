@@ -89,21 +89,21 @@ wasm_io_types! {
     // @todo Get the capability for the current zome call.
     fn capability_info (()) -> ();
 
-    fn create_x25519_keypair(()) -> crate::x_salsa20_poly1305::x25519::X25519PubKey;
+    fn create_x25519_keypair(()) -> zt::x_salsa20_poly1305::x25519::X25519PubKey;
 
     fn x_salsa20_poly1305_encrypt(
-        crate::x_salsa20_poly1305::XSalsa20Poly1305Encrypt
-    ) -> crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+        zt::x_salsa20_poly1305::XSalsa20Poly1305Encrypt
+    ) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
 
     fn x_salsa20_poly1305_decrypt(
-        crate::x_salsa20_poly1305::XSalsa20Poly1305Decrypt
-    ) -> Option<crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
+        zt::x_salsa20_poly1305::XSalsa20Poly1305Decrypt
+    ) -> Option<zt::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
 
     // Sender, Recipient, Data.
-    fn x_25519_x_salsa20_poly1305_encrypt(crate::x_salsa20_poly1305::X25519XSalsa20Poly1305Encrypt) -> crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+    fn x_25519_x_salsa20_poly1305_encrypt(zt::x_salsa20_poly1305::X25519XSalsa20Poly1305Encrypt) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
 
     // Recipient, Sender, Encrypted data.
-    fn x_25519_x_salsa20_poly1305_decrypt(crate::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
+    fn x_25519_x_salsa20_poly1305_decrypt(zt::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<zt::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
 
     // Returns HeaderHash of the newly created element.
     fn create ((zt::entry_def::EntryDefId, zt::entry::Entry)) -> holo_hash::HeaderHash;
