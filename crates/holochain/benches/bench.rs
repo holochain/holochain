@@ -1,9 +1,14 @@
 use ::fixt::prelude::*;
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::criterion_group;
+use criterion::criterion_main;
+use criterion::BenchmarkId;
+use criterion::Criterion;
+use criterion::Throughput;
 use hdk3::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
-use holochain::core::ribosome::{RibosomeT, ZomeCallInvocation};
-use holochain_types::{dna::zome::Zome, fixt::CapSecretFixturator};
+use holochain::core::ribosome::RibosomeT;
+use holochain::core::ribosome::ZomeCallInvocation;
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::ExternInput;
 use once_cell::sync::Lazy;
@@ -30,7 +35,7 @@ static REAL_RIBOSOME: Lazy<Mutex<holochain::core::ribosome::real_ribosome::RealR
         )
     });
 
-static CELL_ID: Lazy<Mutex<holochain_types::cell::CellId>> = Lazy::new(|| {
+static CELL_ID: Lazy<Mutex<holochain_zome_types::cell::CellId>> = Lazy::new(|| {
     Mutex::new(
         holochain_types::fixt::CellIdFixturator::new(Unpredictable)
             .next()
@@ -64,7 +69,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
 
         group.bench_function(BenchmarkId::from_parameter(n), |b| {
             // bytes
-            let bytes = test_wasm_common::TestBytes::from(vec![0; n]);
+            let bytes = holochain_test_wasm_common::TestBytes::from(vec![0; n]);
             let sb: SerializedBytes = bytes.try_into().unwrap();
 
             TOKIO_RUNTIME.lock().unwrap().enter(move || {

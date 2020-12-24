@@ -141,7 +141,7 @@ ghost_actor::ghost_chan! {
             agent: AgentPubKey,
             query: ChainQueryFilter,
             options: GetActivityOptions,
-        ) -> AgentActivity;
+        ) -> AgentActivityResponse;
 
         /// A remote node has sent us a validation receipt.
         fn validation_receipt_received(

@@ -1,55 +1,46 @@
 //! Utils for Holochain tests
 
-use crate::{
-    conductor::{
-        api::{RealAppInterfaceApi, ZomeCall},
-        config::{AdminInterfaceConfig, ConductorConfig, InterfaceDriver},
-        ConductorBuilder, ConductorHandle,
-    },
-    core::{
-        ribosome::ZomeCallInvocation,
-        state::{
-            cascade::{Cascade, DbPair},
-            element_buf::ElementBuf,
-            metadata::MetadataBuf,
-        },
-        workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
-    },
-};
+use crate::conductor::api::RealAppInterfaceApi;
+use crate::conductor::api::ZomeCall;
+use crate::conductor::config::AdminInterfaceConfig;
+use crate::conductor::config::ConductorConfig;
+use crate::conductor::config::InterfaceDriver;
+use crate::conductor::ConductorBuilder;
+use crate::conductor::ConductorHandle;
+use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use hdk3::prelude::ZomeName;
-use holo_hash::{fixt::*, *};
-use holochain_keystore::KeystoreSender;
-use holochain_p2p::{
-    actor::HolochainP2pRefToCell, event::HolochainP2pEvent, spawn_holochain_p2p, HolochainP2pCell,
-    HolochainP2pRef, HolochainP2pSender,
-};
-use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
-use holochain_state::{
-    env::EnvironmentWrite,
-    fresh_reader_test,
-    test_utils::{test_environments, TestEnvironments},
-};
-use holochain_types::{
-    app::InstalledCell,
-    cell::CellId,
-    dna::{zome::Zome, DnaFile},
-    element::{SignedHeaderHashed, SignedHeaderHashedExt},
-    fixt::CapSecretFixturator,
-    test_utils::fake_header_hash,
-    Entry, EntryHashed, HeaderHashed, Timestamp,
-};
+use holo_hash::fixt::*;
+use holo_hash::*;
+use holochain_cascade::Cascade;
+use holochain_cascade::DbPair;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::fresh_reader_test;
+use holochain_lmdb::test_utils::test_environments;
+use holochain_lmdb::test_utils::TestEnvironments;
+use holochain_p2p::actor::HolochainP2pRefToCell;
+use holochain_p2p::event::HolochainP2pEvent;
+use holochain_p2p::spawn_holochain_p2p;
+use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pRef;
+use holochain_p2p::HolochainP2pSender;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_serialized_bytes::SerializedBytesError;
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::metadata::MetadataBuf;
+use holochain_types::prelude::*;
+
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{
-    entry_def::EntryVisibility,
-    header::{Create, EntryType, Header},
-    ExternInput,
-};
 use kitsune_p2p::KitsuneP2pConfig;
-use std::{convert::TryInto, sync::Arc, time::Duration};
+use std::convert::TryInto;
+use std::sync::Arc;
+use std::time::Duration;
 use tempdir::TempDir;
 use tokio::sync::mpsc;
+
+pub use itertools;
 
 pub mod conductor_setup;
 pub mod cool;
@@ -68,14 +59,14 @@ macro_rules! here {
 #[macro_export]
 macro_rules! meta_mock {
     () => {{
-        $crate::core::state::metadata::MockMetadataBuf::new()
+        holochain_state::metadata::MockMetadataBuf::new()
     }};
     ($fun:ident) => {{
         let d: Vec<holochain_types::metadata::TimedHeaderHash> = Vec::new();
         meta_mock!($fun, d)
     }};
     ($fun:ident, $data:expr) => {{
-        let mut metadata = $crate::core::state::metadata::MockMetadataBuf::new();
+        let mut metadata = holochain_state::metadata::MockMetadataBuf::new();
         metadata.$fun().returning({
             move |_| {
                 Ok(Box::new(fallible_iterator::convert(
@@ -90,7 +81,7 @@ macro_rules! meta_mock {
         metadata
     }};
     ($fun:ident, $data:expr, $match_fn:expr) => {{
-        let mut metadata = $crate::core::state::metadata::MockMetadataBuf::new();
+        let mut metadata = holochain_state::metadata::MockMetadataBuf::new();
         metadata.$fun().returning({
             move |a| {
                 if $match_fn(a) {
@@ -114,34 +105,6 @@ macro_rules! meta_mock {
         });
         metadata
     }};
-}
-
-/// Create a fake SignedHeaderHashed and EntryHashed pair with random content
-pub async fn fake_unique_element(
-    keystore: &KeystoreSender,
-    agent_key: AgentPubKey,
-    visibility: EntryVisibility,
-) -> anyhow::Result<(SignedHeaderHashed, EntryHashed)> {
-    let content: SerializedBytes =
-        UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned()).into();
-    let entry = EntryHashed::from_content_sync(Entry::App(content.try_into().unwrap()));
-    let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
-        .next()
-        .unwrap();
-    let header_1 = Header::Create(Create {
-        author: agent_key,
-        timestamp: Timestamp::now().into(),
-        header_seq: 0,
-        prev_header: fake_header_hash(1),
-
-        entry_type: EntryType::App(app_entry_type),
-        entry_hash: entry.as_hash().to_owned(),
-    });
-
-    Ok((
-        SignedHeaderHashed::new(&keystore, HeaderHashed::from_content_sync(header_1)).await?,
-        entry,
-    ))
 }
 
 /// A running test network with a joined cell.
@@ -571,6 +534,45 @@ async fn display_integration(env: &EnvironmentWrite) -> usize {
         }
     }
     count
+}
+
+/// Helper for displaying agent infos stored on a conductor
+pub async fn display_agent_infos(conductor: &ConductorHandle) {
+    let agent_info = conductor.get_agent_infos(None).await.unwrap();
+    for info in agent_info {
+        let cell_info = conductor.list_cell_ids().await.unwrap();
+        let agents = cell_info
+            .iter()
+            .map(|c| c.agent_pubkey().clone())
+            .map(|a| (a.clone(), holochain_p2p::agent_holo_to_kit(a)))
+            .collect::<Vec<_>>();
+
+        let dnas = cell_info
+            .iter()
+            .map(|c| c.dna_hash().clone())
+            .map(|d| (d.clone(), holochain_p2p::space_holo_to_kit(d)))
+            .collect::<Vec<_>>();
+
+        let info: kitsune_p2p::agent_store::AgentInfo = (&info).try_into().unwrap();
+        let this_agent = agents.iter().find(|a| *info.as_agent_ref() == a.1).unwrap();
+        let this_dna = dnas.iter().find(|d| *info.as_space_ref() == d.1).unwrap();
+        tracing::debug!("This Agent {:?} is {:?}", this_agent.0, this_agent.1);
+        tracing::debug!("This DNA {:?} is {:?}", this_dna.0, this_dna.1);
+
+        use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+        let duration = Duration::milliseconds(info.signed_at_ms() as i64);
+        let s = duration.num_seconds() as i64;
+        let n = duration.clone().to_std().unwrap().subsec_nanos();
+        let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
+        let exp = dt + Duration::milliseconds(info.expires_after_ms() as i64);
+        let now = Utc::now();
+
+        tracing::debug!("signed at {}", dt);
+        tracing::debug!("expires at {} in {}mins", exp, (exp - now).num_minutes());
+        tracing::debug!("space: {:?}", info.as_space_ref());
+        tracing::debug!("agent: {:?}", info.as_agent_ref());
+        tracing::debug!("urls: {:?}", info.as_urls_ref());
+    }
 }
 
 /// Helper to create a zome invocation for tests

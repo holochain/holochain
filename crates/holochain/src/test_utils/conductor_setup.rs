@@ -1,32 +1,29 @@
 #![allow(missing_docs)]
 
-use super::{host_fn_caller::HostFnCaller, install_app, setup_app_inner};
-use crate::{
-    conductor::{
-        api::{CellConductorApi, CellConductorApiT},
-        interface::SignalBroadcaster,
-        ConductorHandle,
-    },
-    core::{queue_consumer::InitialQueueTriggers, ribosome::real_ribosome::RealRibosome},
-};
-use holo_hash::{AgentPubKey, DnaHash};
+use super::host_fn_caller::HostFnCaller;
+use super::install_app;
+use super::setup_app_inner;
+use crate::conductor::api::CellConductorApi;
+use crate::conductor::api::CellConductorApiT;
+use crate::conductor::interface::SignalBroadcaster;
+use crate::conductor::ConductorHandle;
+use crate::core::queue_consumer::QueueTriggers;
+use crate::core::ribosome::real_ribosome::RealRibosome;
+use holo_hash::AgentPubKey;
+use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
-use holochain_p2p::{actor::HolochainP2pRefToCell, HolochainP2pCell};
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::test_utils::test_environments;
+use holochain_lmdb::test_utils::TestEnvironments;
+use holochain_p2p::actor::HolochainP2pRefToCell;
+use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{
-    env::EnvironmentWrite,
-    test_utils::{test_environments, TestEnvironments},
-};
-use holochain_types::{
-    app::InstalledCell,
-    cell::CellId,
-    dna::{DnaDef, DnaFile},
-    test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2},
-};
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::zome::ZomeName;
 use kitsune_p2p::KitsuneP2pConfig;
-use std::{collections::HashMap, convert::TryFrom, sync::Arc};
+use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::sync::Arc;
 use tempdir::TempDir;
 
 /// A "factory" for HostFnCaller, which will produce them when given a ZomeName
@@ -37,7 +34,7 @@ pub struct CellHostFnCaller {
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
     pub signal_tx: SignalBroadcaster,
-    pub triggers: InitialQueueTriggers,
+    pub triggers: QueueTriggers,
     pub cell_conductor_api: CellConductorApi,
 }
 

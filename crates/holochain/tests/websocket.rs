@@ -15,27 +15,26 @@ use holochain::{
         error::ConductorError,
         Conductor,
     },
-    core::signal::Signal,
     fixt::*,
 };
 use holochain_types::{
-    app::{InstallAppDnaPayload, InstallAppPayload},
-    cell::CellId,
-    observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
-use holochain_zome_types::{signal::AppSignal, *};
 use matches::assert_matches;
-use std::{path::PathBuf, process::Stdio, sync::Arc, time::Duration};
+use observability;
+use std::path::PathBuf;
+use std::process::Stdio;
+use std::sync::Arc;
+use std::time::Duration;
 use tempdir::TempDir;
-use tokio::{
-    io::{AsyncBufReadExt, BufReader},
-    process::{Child, Command},
-    stream::StreamExt,
-};
+use tokio::io::AsyncBufReadExt;
+use tokio::io::BufReader;
+use tokio::process::Child;
+use tokio::process::Command;
+use tokio::stream::StreamExt;
 use tracing::*;
 use url2::prelude::*;
 
@@ -635,4 +634,30 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     assert_matches!(response, Ok(Err(_)));
 
     Ok(())
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn too_many_open() {
+    observability::test_run().ok();
+
+    info!("creating config");
+    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let environment_path = tmp_dir.path().to_path_buf();
+    let config = create_config(0, environment_path);
+    let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
+    let port = admin_port(&conductor_handle).await;
+    info!("building conductor");
+    for i in 0..1000 {
+        dbg!(i);
+        let (_client, _rx): (WebsocketSender, WebsocketReceiver) = websocket_connect(
+            url2!("ws://127.0.0.1:{}", port),
+            Arc::new(WebsocketConfig {
+                default_request_timeout_s: 1,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+    }
+    conductor_handle.shutdown().await;
 }

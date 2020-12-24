@@ -1,18 +1,26 @@
 //! A simple KvBuf for AgentInfoSigned.
 
 use fallible_iterator::FallibleIterator;
-use holo_hash::{AgentPubKey, DnaHash};
-use holochain_p2p::kitsune_p2p::agent_store::{AgentInfo, AgentInfoSigned};
-use holochain_state::{
-    buffer::{KvStore, KvStoreT},
-    db::GetDb,
-    env::{EnvironmentRead, EnvironmentWrite, WriteManager},
-    error::{DatabaseError, DatabaseResult},
-    fresh_reader,
-    key::BufKey,
-    prelude::Readable,
-};
+use holo_hash::AgentPubKey;
+use holo_hash::DnaHash;
+use holochain_lmdb::buffer::KvStore;
+use holochain_lmdb::buffer::KvStoreT;
+use holochain_lmdb::db::GetDb;
+use holochain_lmdb::env::EnvironmentRead;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::env::WriteManager;
+use holochain_lmdb::error::DatabaseError;
+use holochain_lmdb::error::DatabaseResult;
+use holochain_lmdb::fresh_reader;
+use holochain_lmdb::key::BufKey;
+use holochain_lmdb::prelude::Readable;
+use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
+use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
+use std::convert::TryFrom;
 use std::convert::TryInto;
+use std::sync::Arc;
+
+use super::error::ConductorResult;
 
 const AGENT_KEY_LEN: usize = 64;
 const AGENT_KEY_COMPONENT_LEN: usize = 32;
@@ -48,11 +56,11 @@ impl Ord for AgentKvKey {
 }
 
 impl std::convert::TryFrom<&AgentInfoSigned> for AgentKvKey {
-    type Error = holochain_state::error::DatabaseError;
+    type Error = holochain_lmdb::error::DatabaseError;
     fn try_from(agent_info_signed: &AgentInfoSigned) -> Result<Self, Self::Error> {
         let agent_info: AgentInfo = agent_info_signed
             .try_into()
-            .map_err(|_| holochain_state::error::DatabaseError::KeyConstruction)?;
+            .map_err(|_| holochain_lmdb::error::DatabaseError::KeyConstruction)?;
         Ok((&agent_info).into())
     }
 }
@@ -122,7 +130,7 @@ impl AsRef<KvStore<AgentKvKey, AgentInfoSigned>> for AgentKv {
 impl AgentKv {
     /// Constructor.
     pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let db = env.get_db(&*holochain_state::db::AGENT)?;
+        let db = env.get_db(&*holochain_lmdb::db::AGENT)?;
         Ok(Self(KvStore::new(db)))
     }
 
@@ -207,20 +215,122 @@ pub fn exchange_peer_info(envs: Vec<EnvironmentWrite>) {
     }
 }
 
+/// Get agent info for a single agent
+pub fn get_agent_info_signed(
+    environ: EnvironmentWrite,
+    kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+    kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
+) -> ConductorResult<Option<AgentInfoSigned>> {
+    let p2p_kv = AgentKv::new(environ.clone().into())?;
+    let env = environ.guard();
+
+    env.with_commit(|writer| {
+        let res = p2p_kv
+            .as_store_ref()
+            .get(writer, &(&*kitsune_space, &*kitsune_agent).into())?;
+
+        let res = match res {
+            None => return Ok(None),
+            Some(res) => res,
+        };
+
+        let info = kitsune_p2p::agent_store::AgentInfo::try_from(&res)?;
+        let now: u64 = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        if info.signed_at_ms() + info.expires_after_ms() <= now {
+            p2p_kv
+                .as_store_ref()
+                .delete(writer, &(&*kitsune_space, &*kitsune_agent).into())?;
+            return Ok(None);
+        }
+
+        Ok(Some(res))
+    })
+}
+
+/// Get agent info for a single space
+pub fn query_agent_info_signed(
+    environ: EnvironmentWrite,
+    kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+) -> ConductorResult<Vec<AgentInfoSigned>> {
+    let p2p_kv = AgentKv::new(environ.clone().into())?;
+    let env = environ.guard();
+
+    let mut out = Vec::new();
+    env.with_commit(|writer| {
+        let mut expired = Vec::new();
+
+        {
+            let mut iter = p2p_kv.as_store_ref().iter(writer)?;
+
+            let now: u64 = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+
+            loop {
+                match iter.next() {
+                    Ok(Some((k, v))) => {
+                        let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
+                        let expires = info.signed_at_ms().checked_add(info.expires_after_ms());
+                        match expires {
+                            Some(expires) if expires > now => {
+                                if info.as_space_ref() == kitsune_space.as_ref() {
+                                    out.push(v);
+                                }
+                            }
+                            _ => expired.push(AgentKvKey::from(k)),
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(e) => return Err(e.into()),
+                }
+            }
+        }
+
+        if !expired.is_empty() {
+            for exp in expired {
+                p2p_kv.as_store_ref().delete(writer, &exp)?;
+            }
+        }
+
+        ConductorResult::Ok(())
+    })?;
+
+    Ok(out)
+}
+
+/// Put single agent info into store
+pub fn put_agent_info_signed(
+    environ: EnvironmentWrite,
+    agent_info_signed: kitsune_p2p::agent_store::AgentInfoSigned,
+) -> ConductorResult<()> {
+    let p2p_kv = AgentKv::new(environ.clone().into())?;
+    let env = environ.guard();
+    Ok(env.with_commit(|writer| {
+        p2p_kv.as_store_ref().put(
+            writer,
+            &(&agent_info_signed).try_into()?,
+            &agent_info_signed,
+        )
+    })?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fixt::prelude::*;
-    use holochain_state::{
-        buffer::KvStoreT,
-        env::{ReadManager, WriteManager},
-        fresh_reader_test,
-        test_utils::test_p2p_env,
-    };
-    use kitsune_p2p::{
-        fixt::{AgentInfoFixturator, AgentInfoSignedFixturator},
-        KitsuneBinType,
-    };
+    use ::fixt::prelude::*;
+    use holochain_lmdb::buffer::KvStoreT;
+    use holochain_lmdb::env::ReadManager;
+    use holochain_lmdb::env::WriteManager;
+    use holochain_lmdb::fresh_reader_test;
+    use holochain_lmdb::test_utils::test_p2p_env;
+    use kitsune_p2p::fixt::AgentInfoFixturator;
+    use kitsune_p2p::fixt::AgentInfoSignedFixturator;
+    use kitsune_p2p::KitsuneBinType;
     use std::convert::TryInto;
 
     #[test]
@@ -238,7 +348,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_store_agent_info_signed() {
-        holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
 
         let test_env = test_p2p_env();
         let environ = test_env.env();

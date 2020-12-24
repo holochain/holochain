@@ -1,12 +1,5 @@
-use holochain_types::dna::{
-    wasm::DnaWasm,
-    zome::{WasmZome, ZomeDef},
-};
-pub extern crate strum;
-#[macro_use]
-extern crate strum_macros;
-use holochain_types::dna::zome::Zome;
-use holochain_zome_types::zome::ZomeName;
+use holochain_types::prelude::*;
+use strum_macros::EnumIter;
 
 const WASM_WORKSPACE_TARGET: &str = "wasm_workspace/target";
 

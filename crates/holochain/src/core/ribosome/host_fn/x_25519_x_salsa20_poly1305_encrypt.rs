@@ -33,7 +33,7 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_x_25519_x_salsa20_poly1305_encrypt_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
@@ -96,11 +96,9 @@ pub mod wasm_test {
 
         let data = XSalsa20Poly1305Data::from(vec![1, 2, 3, 4]);
 
-        let encrypt_input = X25519XSalsa20Poly1305EncryptInput::new(X25519XSalsa20Poly1305Encrypt::new(
-            alice.clone(),
-            bob.clone(),
-            data.clone(),
-        ));
+        let encrypt_input = X25519XSalsa20Poly1305EncryptInput::new(
+            X25519XSalsa20Poly1305Encrypt::new(alice.clone(), bob.clone(), data.clone()),
+        );
 
         let encrypt_output: X25519XSalsa20Poly1305EncryptOutput = crate::call_test_ribosome!(
             host_access,
@@ -109,7 +107,13 @@ pub mod wasm_test {
             encrypt_input
         );
 
-        let decrypt_input = X25519XSalsa20Poly1305DecryptInput::new(holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(bob.clone(), alice.clone(), encrypt_output.clone().into_inner()));
+        let decrypt_input = X25519XSalsa20Poly1305DecryptInput::new(
+            holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(
+                bob.clone(),
+                alice.clone(),
+                encrypt_output.clone().into_inner(),
+            ),
+        );
         let decrypt_output: X25519XSalsa20Poly1305DecryptOutput = crate::call_test_ribosome!(
             host_access,
             TestWasm::XSalsa20Poly1305,
@@ -117,12 +121,15 @@ pub mod wasm_test {
             decrypt_input
         );
 
-        assert_eq!(
-            decrypt_output.into_inner(),
-            Some(data.clone()),
-        );
+        assert_eq!(decrypt_output.into_inner(), Some(data.clone()),);
 
-        let bad_decrypt_input = X25519XSalsa20Poly1305DecryptInput::new(holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(carol.clone(), alice.clone(), encrypt_output.into_inner()));
+        let bad_decrypt_input = X25519XSalsa20Poly1305DecryptInput::new(
+            holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(
+                carol.clone(),
+                alice.clone(),
+                encrypt_output.into_inner(),
+            ),
+        );
         let bad_decrypt_output: X25519XSalsa20Poly1305DecryptOutput = crate::call_test_ribosome!(
             host_access,
             TestWasm::XSalsa20Poly1305,
@@ -130,10 +137,6 @@ pub mod wasm_test {
             bad_decrypt_input
         );
 
-        assert_eq!(
-            bad_decrypt_output.into_inner(),
-            None,
-        );
-
+        assert_eq!(bad_decrypt_output.into_inner(), None,);
     }
 }

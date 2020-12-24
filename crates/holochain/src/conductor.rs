@@ -17,6 +17,7 @@ mod cell;
 #[allow(clippy::module_inception)]
 #[allow(missing_docs)]
 mod conductor;
+#[allow(missing_docs)]
 pub mod config;
 #[allow(missing_docs)]
 pub mod dna_store;
@@ -31,8 +32,12 @@ pub mod p2p_store;
 pub mod paths;
 pub mod state;
 
-pub use cell::{authority, error::CellError, Cell};
-pub use conductor::{Conductor, ConductorBuilder, ConductorStateDb};
+pub use cell::authority;
+pub use cell::error::CellError;
+pub use cell::Cell;
+pub use conductor::Conductor;
+pub use conductor::ConductorBuilder;
+pub use conductor::ConductorStateDb;
 pub use handle::ConductorHandle;
 
 /// setup a tokio runtime that meets the conductor's needs

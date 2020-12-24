@@ -1,5 +1,5 @@
 use hdk3::prelude::*;
-use test_wasm_common::*;
+use holochain_test_wasm_common::*;
 
 entry_defs![Anchor::entry_def()];
 

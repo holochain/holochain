@@ -1,13 +1,16 @@
 #![cfg(feature = "test_utils")]
 
 use hdk3::prelude::Links;
-use holochain::{conductor::api::ZomeCall, test_utils::conductor_setup::ConductorTestData};
+use holochain::conductor::api::ZomeCall;
+use holochain::test_utils::conductor_setup::ConductorTestData;
+use holochain::test_utils::cool::CoolConductor;
+use holochain::test_utils::cool::CoolDnaFile;
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
+use holochain_lmdb::test_utils::test_environments;
 use holochain_serialized_bytes::prelude::*;
-use holochain_state::test_utils::test_environments;
-use holochain_types::dna::{DnaDef, DnaFile};
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{ExternInput, ZomeCallResponse};
+
 use unwrap_to::unwrap_to;
 
 /// A single link with an AgentPubKey for the base and target is committed by
@@ -159,4 +162,57 @@ async fn many_agents_can_reach_consistency_normal_links() {
     }
 
     assert_eq!(num_seen, num_agents);
+}
+
+#[tokio::test(threaded_scheduler)]
+#[cfg(feature = "test_utils")]
+#[ignore = "Slow test for CI that is only useful for timing"]
+async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
+    observability::test_run().ok();
+    // Bundle the single zome into a DnaFile
+    let (dna_file, _) = CoolDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await?;
+
+    // Create a Conductor
+    let conductor = CoolConductor::from_standard_config().await;
+
+    // Install DNA and install and activate apps in conductor
+    let alice = conductor
+        .setup_app("app", &[dna_file])
+        .await
+        .into_cells()
+        .into_iter()
+        .next()
+        .unwrap();
+    let alice = alice.zome(TestWasm::MultipleCalls);
+
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+    pub struct TwoInt(pub u32, pub u32);
+
+    // Make init run to avoid head moved errors
+    let _: () = alice.call("slow_fn", TwoInt(0, 0)).await;
+
+    let all_now = std::time::Instant::now();
+    tracing::debug!("starting slow fn");
+
+    let mut handles = Vec::new();
+    for i in 0..1000 {
+        let h = tokio::task::spawn({
+            let alice = alice.clone();
+            async move {
+                let now = std::time::Instant::now();
+                tracing::debug!("starting slow fn {}", i);
+                let _: () = alice.call("slow_fn", TwoInt(i, 5)).await;
+                tracing::debug!("finished slow fn {} in {}", i, now.elapsed().as_secs());
+            }
+        });
+        handles.push(h);
+    }
+
+    for h in handles {
+        h.await.unwrap();
+    }
+
+    tracing::debug!("finished all slow fn in {}", all_now.elapsed().as_secs());
+
+    Ok(())
 }

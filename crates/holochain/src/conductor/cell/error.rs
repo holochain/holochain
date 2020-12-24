@@ -1,18 +1,16 @@
-use crate::{
-    conductor::{api::error::ConductorApiError, entry_def_store::error::EntryDefStoreError},
-    core::{
-        ribosome::{error::RibosomeError, guest_callback::init::InitResult},
-        state::cascade::error::CascadeError,
-        workflow::{
-            error::WorkflowError, produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError,
-        },
-        SourceChainError,
-    },
-};
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::entry_def_store::error::EntryDefStoreError;
+use crate::core::ribosome::error::RibosomeError;
+use crate::core::ribosome::guest_callback::init::InitResult;
+use crate::core::workflow::error::WorkflowError;
+use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
+use crate::core::SourceChainError;
+use holochain_cascade::error::CascadeError;
+use holochain_lmdb::error::DatabaseError;
 use holochain_p2p::HolochainP2pError;
-use holochain_state::error::DatabaseError;
-use holochain_types::{cell::CellId, dna::DnaError, header::error::HeaderError};
-use holochain_zome_types::header::conversions::WrongHeaderError;
+use holochain_types::prelude::*;
+use holochain_zome_types::cell::CellId;
+
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -43,7 +41,7 @@ pub enum CellError {
     #[error(transparent)]
     WorkflowError(#[from] Box<WorkflowError>),
     #[error(transparent)]
-    WorkspaceError(#[from] crate::core::state::workspace::WorkspaceError),
+    WorkspaceError(#[from] holochain_state::workspace::WorkspaceError),
     #[error(transparent)]
     RibosomeError(#[from] RibosomeError),
     #[error(transparent)]
@@ -58,36 +56,11 @@ pub enum CellError {
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
     #[error(transparent)]
     DhtOpConvertError(#[from] DhtOpConvertError),
-    #[error("Cell is an authority for is missing or incorrect: {0}")]
-    AuthorityDataError(#[from] AuthorityDataError),
     #[error("Todo")]
     Todo,
 }
 
 pub type CellResult<T> = Result<T, CellError>;
 
-#[derive(Error, Debug)]
-pub enum AuthorityDataError {
-    #[error(transparent)]
-    DhtOpConvertError(#[from] DhtOpConvertError),
-    #[error(transparent)]
-    WrongHeaderError(#[from] WrongHeaderError),
-    #[error(transparent)]
-    HeaderError(#[from] HeaderError),
-    #[error("Missing element data: {0:?}")]
-    MissingData(String),
-    #[error("Missing metadata: {0:?}")]
-    MissingMetadata(String),
-}
-
-impl AuthorityDataError {
-    pub fn missing_data<T: std::fmt::Debug>(data: T) -> CellError {
-        Self::MissingData(format!("Missing header {:?}", data)).into()
-    }
-    pub fn missing_data_entry<T: std::fmt::Debug>(data: T) -> CellError {
-        Self::MissingData(format!("Missing entry for header {:?}", data)).into()
-    }
-    pub fn missing_metadata<T: std::fmt::Debug>(data: T) -> CellError {
-        Self::MissingMetadata(format!("{:?}", data)).into()
-    }
-}
+/// Re-export for convenience [ TK-06690 ]
+pub use holochain_cascade::error::AuthorityDataError;

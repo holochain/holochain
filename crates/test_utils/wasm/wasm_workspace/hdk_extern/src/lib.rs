@@ -1,5 +1,5 @@
 use hdk3::prelude::*;
-use test_wasm_common::TestString;
+use holochain_test_wasm_common::TestString;
 
 #[hdk_extern]
 fn foo(_: ()) -> ExternResult<TestString> {

@@ -1,11 +1,12 @@
 //! Helper functions for interacting with the user when running a Conductor
 //! with the --interactive flag
 
-use crate::conductor::{
-    config::ConductorConfig,
-    error::{ConductorError, ConductorResult},
-    paths::ConfigFilePath,
-};
+use holochain_conductor_api::conductor::ConductorConfigError;
+
+use crate::conductor::config::ConductorConfig;
+use crate::conductor::error::ConductorError;
+use crate::conductor::error::ConductorResult;
+use crate::conductor::paths::ConfigFilePath;
 use std::path::Path;
 
 /// Prompt the user to answer Y or N.
@@ -65,7 +66,7 @@ pub fn load_config_or_prompt_for_default(
     config_path: ConfigFilePath,
 ) -> ConductorResult<Option<ConductorConfig>> {
     ConductorConfig::load_yaml(config_path.as_ref()).map(Some).or_else(|err| {
-        if let ConductorError::ConfigMissing(_) = err {
+        if let ConductorConfigError::ConfigMissing(_) = err {
             let prompt = format!(
                 "There is no conductor config YAML file at the path specified ({})\nWould you like to create a default config file at this location?",
                 config_path
@@ -78,7 +79,7 @@ pub fn load_config_or_prompt_for_default(
                 Ok(None)
             }
         } else {
-            Err(err)
+            Err(err.into())
         }
     })
 }
