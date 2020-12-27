@@ -235,6 +235,8 @@ pub mod wasm_test {
         let mut conductor = conductor;
         let shutdown = conductor.take_shutdown_handle().await.unwrap();
         conductor.shutdown().await;
+        dbg!("The next line hangs.");
         shutdown.await.unwrap();
+        dbg!("This never runs.");
     }
 }
