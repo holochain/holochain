@@ -216,8 +216,15 @@ where
         &mut self.dna_store
     }
 
+    /// Broadcasts the shutdown signal to all managed tasks.
+    /// To actually wait for these tasks to complete, be sure to
+    /// `take_shutdown_handle` to await for completion.
     pub(super) fn shutdown(&mut self) {
         self.shutting_down = true;
+        tracing::info!(
+            "Sending shutdown signal to {} managed tasks.",
+            self.managed_task_stop_broadcaster.receiver_count(),
+        );
         self.managed_task_stop_broadcaster
             .send(())
             .map(|_| ())
@@ -226,6 +233,7 @@ where
             })
     }
 
+    /// Return the handle which waits for the task manager task to complete
     pub(super) fn take_shutdown_handle(&mut self) -> Option<TaskManagerRunHandle> {
         self.task_manager_run_handle.take()
     }

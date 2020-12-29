@@ -343,10 +343,10 @@ impl CoolConductor {
     /// This will wait for the conductor to shutdown but
     /// keep the inner state to restart it.
     ///
-    /// Using this conductor without starting it up again will panic.
+    /// Attempting to use this conductor without starting it up again will cause a panic.
     pub async fn shutdown(&mut self) {
         if let Some(handle) = self.handle.take() {
-            handle.wait_for_shutdown().await;
+            handle.shutdown_and_wait().await;
         } else {
             panic!("Attempted to shutdown conductor which was already shutdown");
         }
@@ -434,7 +434,7 @@ impl CoolConductorHandle {
     /// Manually await shutting down the conductor.
     /// Conductors are already cleaned up on drop but this
     /// is useful if you need to know when it's finished cleaning up.
-    pub async fn wait_for_shutdown(&self) {
+    pub async fn shutdown_and_wait(&self) {
         let c = &self.0;
         if let Some(shutdown) = c.take_shutdown_handle().await {
             c.shutdown().await;

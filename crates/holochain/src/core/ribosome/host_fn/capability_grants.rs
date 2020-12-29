@@ -93,6 +93,7 @@ pub mod wasm_test {
     // TODO: [ B-03669 ] can move this to an integration test (may need to switch to using a RealDnaStore)
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_authorized_call() {
+        observability::test_run().ok();
         let (dna_file, _) = CoolDnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
             .await
             .unwrap();
@@ -233,10 +234,6 @@ pub mod wasm_test {
         assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _));
 
         let mut conductor = conductor;
-        let shutdown = conductor.take_shutdown_handle().await.unwrap();
         conductor.shutdown().await;
-        dbg!("The next line hangs.");
-        shutdown.await.unwrap();
-        dbg!("This never runs.");
     }
 }
