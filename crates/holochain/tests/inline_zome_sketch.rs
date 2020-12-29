@@ -149,7 +149,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 #[ignore = "Needs to be completed when HolochainP2pEvents is accessible"]
 async fn invalid_cell() -> anyhow::Result<()> {
     observability::test_run().ok();
-    let conductor = CoolConductor::from_standard_config().await;
+    let mut conductor = CoolConductor::from_standard_config().await;
 
     let (dna_foo, _) = CoolDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
     let (dna_bar, _) = CoolDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;

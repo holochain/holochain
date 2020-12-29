@@ -19,7 +19,7 @@ use std::sync::Arc;
 use unwrap_to::unwrap_to;
 
 /// A collection of CoolConductors, with methods for operating on the entire collection
-#[derive(Clone, derive_more::From, derive_more::Into, derive_more::IntoIterator)]
+#[derive(derive_more::From, derive_more::Into, derive_more::IntoIterator)]
 pub struct CoolConductorBatch(Vec<CoolConductor>);
 
 impl CoolConductorBatch {
@@ -114,8 +114,11 @@ impl CoolConductorBatch {
 
 /// A useful Conductor abstraction for testing, allowing startup and shutdown as well
 /// as easy installation of apps across multiple Conductors and Agents.
-// TODO: think more about the fact that shutdown gets messy if this is cloned
-#[derive(Clone, derive_more::From)]
+///
+/// This is intentionally NOT `Clone`, because the drop handle triggers a shutdown of
+/// the conductor handle, which would render all other cloned instances useless.
+/// If you need multiple references to a CoolConductor, put it in an Arc
+#[derive(derive_more::From)]
 pub struct CoolConductor {
     handle: Option<Arc<CoolConductorHandle>>,
     envs: TestEnvironments,
