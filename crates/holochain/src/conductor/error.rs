@@ -2,10 +2,10 @@ use super::entry_def_store::error::EntryDefStoreError;
 use super::interface::error::InterfaceError;
 use crate::conductor::cell::error::CellError;
 use crate::core::workflow::error::WorkflowError;
+use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_lmdb::error::DatabaseError;
 use holochain_types::app::InstalledAppId;
 use holochain_zome_types::cell::CellId;
-use std::path::PathBuf;
 use thiserror::Error;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
@@ -30,8 +30,8 @@ pub enum ConductorError {
     #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
     CellMissing(CellId),
 
-    #[error("No conductor config found at this path: {0}")]
-    ConfigMissing(PathBuf),
+    #[error(transparent)]
+    ConductorConfigError(#[from] ConductorConfigError),
 
     #[error("Configuration consistency error: {0}")]
     ConfigError(String),

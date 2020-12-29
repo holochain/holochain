@@ -17,6 +17,7 @@ mod cell;
 #[allow(clippy::module_inception)]
 #[allow(missing_docs)]
 mod conductor;
+#[allow(missing_docs)]
 pub mod config;
 #[allow(missing_docs)]
 pub mod dna_store;
