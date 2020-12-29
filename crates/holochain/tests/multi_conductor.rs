@@ -116,7 +116,6 @@ async fn invalid_cell() -> anyhow::Result<()> {
     let carol_env = carol.env().await;
     let envs = vec![alice_env, bob_env, carol_env];
 
-    dbg!();
     conductors[1].shutdown().await;
 
     // Call the "create" zome fn on Alice's app
@@ -143,16 +142,13 @@ async fn invalid_cell() -> anyhow::Result<()> {
 
     // Take both other conductors offline and commit a hash they don't have
     // then bring them back with the original offline.
-    dbg!();
     conductors[0].shutdown().await;
     conductors[2].shutdown().await;
 
-    let hash: HeaderHash = conductors[0]
+    let hash: HeaderHash = conductors[1]
         .call(&bobbo.zome("zome1"), "create", Post("2".to_string()))
         .await;
-    dbg!();
     conductors[1].shutdown().await;
-    dbg!();
     conductors[0].startup().await;
     let r: MaybeElement = conductors[0]
         .call(&alice.zome("zome1"), "read", hash.clone())
