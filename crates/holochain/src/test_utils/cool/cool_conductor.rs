@@ -126,11 +126,6 @@ pub struct CoolConductor {
     dnas: Vec<DnaFile>,
 }
 
-/// A wrapper around ConductorHandle with more convenient methods for testing
-/// and a cleanup drop
-#[derive(shrinkwraprs::Shrinkwrap, derive_more::From)]
-pub struct CoolConductorHandle(pub(crate) ConductorHandle);
-
 fn standard_config() -> ConductorConfig {
     let mut network = KitsuneP2pConfig::default();
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
@@ -386,6 +381,10 @@ impl CoolConductor {
             .expect("Tried to use a conductor that is offline")
     }
 }
+/// A wrapper around ConductorHandle with more convenient methods for testing
+/// and a cleanup drop
+#[derive(shrinkwraprs::Shrinkwrap, derive_more::From)]
+pub struct CoolConductorHandle(pub(crate) ConductorHandle);
 
 impl CoolConductorHandle {
     /// Make a zome call to a Cell, as if that Cell were the caller. Most common case.

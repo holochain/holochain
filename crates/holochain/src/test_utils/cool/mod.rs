@@ -3,7 +3,7 @@
 //! which make zome interaction much less verbose
 
 mod cool_agents;
-mod cool_apps;
+mod cool_app;
 mod cool_cell;
 mod cool_conductor;
 mod cool_dna;
@@ -11,7 +11,7 @@ mod cool_network;
 mod cool_zome;
 
 pub use cool_agents::*;
-pub use cool_apps::*;
+pub use cool_app::*;
 pub use cool_cell::*;
 pub use cool_conductor::*;
 pub use cool_dna::*;
