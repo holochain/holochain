@@ -36,7 +36,7 @@ use crate::prelude::*;
 /// ```ignore
 /// let foo_hash = hash_entry(foo)?;
 /// ```
-pub fn hash_entry<'a, I: 'a>(input: &'a I) -> HdkResult<EntryHash>
+pub fn hash_entry<'a, I: 'static>(input: &'a I) -> HdkResult<EntryHash>
 where
     SerializedBytes: TryFrom<&'a I, Error = SerializedBytesError>,
 {

@@ -29,7 +29,7 @@ use crate::prelude::*;
 /// let foo: Foo = call_remote(bob, "foo_zome", "do_it", secret, serialized_payload)?;
 /// ...
 /// ```
-pub fn call_remote<'a, I: 'a, O>(
+pub fn call_remote<'a, I: 'static, O>(
     agent: AgentPubKey,
     zome: ZomeName,
     fn_name: FunctionName,

@@ -27,7 +27,7 @@ use crate::prelude::*;
 /// @see create_entry
 /// @see update
 /// @see delete_entry
-pub fn update_entry<'a, I: 'a>(hash: HeaderHash, input: &'a I) -> HdkResult<HeaderHash>
+pub fn update_entry<'a, I: 'static>(hash: HeaderHash, input: &'a I) -> HdkResult<HeaderHash>
 where
     EntryDefId: From<&'a I>,
     SerializedBytes: TryFrom<&'a I, Error = SerializedBytesError>,

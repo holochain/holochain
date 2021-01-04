@@ -11,7 +11,7 @@ use crate::prelude::*;
 /// - fn_name: The name of the function in the zome you are calling.
 /// - cap_secret: The capability secret if required.
 /// - payload: The arguments to the function you are calling.
-pub fn call<'a, I: 'a, O>(
+pub fn call<'a, I: 'static, O>(
     to_cell: Option<CellId>,
     zome_name: ZomeName,
     fn_name: FunctionName,
