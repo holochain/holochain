@@ -11,10 +11,10 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::DhtOpHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_cascade::error::CascadeError;
 use holochain_cascade::error::CascadeResult;
 use holochain_cascade::Cascade;
 use holochain_cascade::DbPair;
+use holochain_cascade::{error::CascadeError, integrate_single_metadata};
 use holochain_lmdb::buffer::BufferedStore;
 use holochain_lmdb::buffer::KvBufFresh;
 use holochain_lmdb::db::INTEGRATED_DHT_OPS;
@@ -374,9 +374,6 @@ async fn header_is_stored(hash: &HeaderHash, mut cascade: Cascade<'_>) -> Cascad
     }
 }
 
-/// Re-export for convenience [ TK-06690 ]
-pub use holochain_cascade::integrate_single_metadata;
-
 /// Store a DhtOp's data in an element buf
 pub fn integrate_single_data<P: PrefixType>(
     op: DhtOp,
@@ -431,9 +428,6 @@ fn put_data<P: PrefixType>(
     element_store.put(signed_header, maybe_entry_hashed)?;
     Ok(())
 }
-
-/// Re-export for convenience [ TK-06690 ]
-pub use holochain_cascade::get_header;
 
 /// After writing an Element to our chain, we want to integrate the meta ops
 /// inline, so that they are immediately available in the authored metadata.

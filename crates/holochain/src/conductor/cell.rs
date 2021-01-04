@@ -37,6 +37,7 @@ use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
+use holochain_cascade::authority;
 use holochain_lmdb::db::GetDb;
 use holochain_lmdb::env::EnvironmentRead;
 use holochain_lmdb::env::EnvironmentWrite;
@@ -53,9 +54,6 @@ use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
 use validation_package::ValidationPackageDb;
-
-/// Re-export for convenience [ TK-06690 ]
-pub use holochain_cascade::authority;
 
 mod validation_package;
 

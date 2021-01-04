@@ -2,12 +2,12 @@
 
 use super::error::WorkflowResult;
 use super::integrate_dht_ops_workflow::integrate_single_data;
-use super::integrate_dht_ops_workflow::integrate_single_metadata;
 use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
 use super::sys_validation_workflow::counterfeit_check;
 use crate::core::queue_consumer::TriggerSender;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
+use holochain_cascade::integrate_single_metadata;
 use holochain_lmdb::buffer::BufferedStore;
 use holochain_lmdb::buffer::KvBufFresh;
 use holochain_lmdb::db::INTEGRATED_DHT_OPS;

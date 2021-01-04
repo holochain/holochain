@@ -2157,7 +2157,6 @@ pub fn get_header<P: PrefixType>(
 ) -> CascadeResult<Header> {
     Ok(element_store
         .get_header(&hash)?
-        // TODO: is this the right error type? [ TK-06690 ]
         .ok_or_else(|| AuthorityDataError::MissingData(format!("{}", hash)))?
         .into_header_and_signature()
         .0

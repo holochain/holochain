@@ -60,9 +60,6 @@ pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempd
     Ok((path, tmp_dir))
 }
 
-/// Re-export for convenience [ TK-06690 ]
-pub use holochain_zome_types::test_utils::fake_cell_id;
-
 /// Keeping with convention if Alice is pubkey 1
 /// and bob is pubkey 2 the this helps make test
 /// logging easier to read.
