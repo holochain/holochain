@@ -36,14 +36,14 @@ use crate::prelude::*;
 /// ```ignore
 /// let foo_hash = hash_entry(foo)?;
 /// ```
-pub fn hash_entry<'a, I: 'a>(input: &'a I) -> HdkResult<EntryHash>
+pub fn hash_entry<I, E>(input: I) -> HdkResult<EntryHash>
 where
-    SerializedBytes: TryFrom<&'a I, Error = SerializedBytesError>,
+    HdkError: From<E>,
+    Entry: TryFrom<I, Error = E>,
 {
-    let sb = SerializedBytes::try_from(input)?;
     Ok(host_call::<HashEntryInput, HashEntryOutput>(
         __hash_entry,
-        &HashEntryInput::new(Entry::App(sb.try_into()?)),
+        &HashEntryInput::new(input.try_into()?),
     )?
     .into_inner())
 }

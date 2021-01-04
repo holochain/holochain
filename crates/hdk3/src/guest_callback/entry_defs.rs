@@ -84,6 +84,20 @@ macro_rules! entry_def {
             }
         }
 
+        impl TryFrom<&$t> for $crate::prelude::Entry {
+            type Error = $crate::prelude::HdkError;
+            fn try_from(t: &$t) -> Result<Self, Self::Error> {
+                Ok(Self::App(SerializedBytes::try_from(t)?.try_into()?))
+            }
+        }
+
+        impl TryFrom<$t> for $crate::prelude::Entry {
+            type Error = $crate::prelude::HdkError;
+            fn try_from(t: $t) -> Result<Self, Self::Error> {
+                Self::try_from(&t)
+            }
+        }
+
         impl From<$t> for $crate::prelude::EntryDef {
             fn from(_: $t) -> Self {
                 $t::entry_def()
