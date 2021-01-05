@@ -1,23 +1,47 @@
+#![cfg(feature = "test_utils")]
+
 use hdk3::prelude::*;
-use holochain::test_utils::display_agent_infos;
-use holochain::test_utils::sweetest::{MaybeElement, SweetAgents, SweetConductor, SweetDnaFile};
-use holochain::test_utils::wait_for_integration_10s;
 use holochain::test_utils::WaitOps;
+use holochain::{
+    conductor::api::error::ConductorApiResult,
+    test_utils::sweetest::{MaybeElement, SweetAgents, SweetConductor, SweetDnaFile},
+};
+use holochain::{
+    core::ribosome::guest_callback::validate::ValidateResult, test_utils::wait_for_integration_10s,
+};
+use holochain::{core::SourceChainError, test_utils::display_agent_infos};
 use holochain_types::{dna::zome::inline_zome::InlineZome, signal::Signal};
 use holochain_zome_types::element::ElementEntry;
 use tokio::stream::StreamExt;
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+    SerializedBytes,
+    derive_more::From,
+)]
 #[serde(transparent)]
 #[repr(transparent)]
 struct AppString(String);
 
+impl AppString {
+    fn new<S: Into<String>>(s: S) -> Self {
+        AppString(s.into())
+    }
+}
+
+/// An InlineZome with simple Create and Read operations
 fn simple_crud_zome() -> InlineZome {
     let string_entry_def = EntryDef::default_with_id("string");
     let unit_entry_def = EntryDef::default_with_id("unit");
 
     InlineZome::new_unique(vec![string_entry_def.clone(), unit_entry_def.clone()])
-        .callback("create_string", move |api, s: String| {
+        .callback("create_string", move |api, s: AppString| {
             let entry_def_id: EntryDefId = string_entry_def.id.clone();
             let entry = Entry::app(AppString::from(s).try_into().unwrap()).unwrap();
             let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
@@ -48,6 +72,7 @@ fn simple_crud_zome() -> InlineZome {
         })
 }
 
+/// Simple scenario involving two agents using the same DNA
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
 async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
@@ -95,6 +120,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Simple scenario involving three agents using an app with two DNAs
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
 async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
@@ -261,11 +287,13 @@ async fn get_deleted() -> anyhow::Result<()> {
 
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
-async fn signal_subscription() -> anyhow::Result<()> {
+async fn signal_subscription() {
     observability::test_run().ok();
     const N: usize = 10;
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
+    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_crud_zome())
+        .await
+        .unwrap();
     let mut conductor = SweetConductor::from_config(Default::default()).await;
     let app = conductor.setup_app("app", &[dna_file]).await;
     let zome = &app.cells()[0].zome("zome1");
@@ -280,6 +308,77 @@ async fn signal_subscription() -> anyhow::Result<()> {
     // Ensure that we can receive all signals
     let signals: Vec<Signal> = signals.collect().await;
     assert_eq!(signals.len(), N);
+}
+
+/// Simple zome which contains a validation rule which can fail
+fn simple_validation_zome() -> InlineZome {
+    let entry_def = EntryDef::default_with_id("string");
+
+    InlineZome::new_unique(vec![entry_def.clone()])
+        .callback("create", move |api, s: AppString| {
+            let entry_def_id: EntryDefId = entry_def.id.clone();
+            let entry = Entry::app(s.try_into().unwrap()).unwrap();
+            let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
+            Ok(hash)
+        })
+        .callback("read", |api, hash: HeaderHash| {
+            api.get(GetInput::new(hash.into(), GetOptions::default()))
+                .map_err(Into::into)
+        })
+        .callback("validate_create_entry", |_api, data: ValidateData| {
+            let s: AppString = data.element.entry().to_app_option().unwrap().unwrap();
+            if &s.0 == "" {
+                Ok(ValidateResult::Invalid("No empty strings allowed".into()))
+            } else {
+                Ok(ValidateResult::Valid)
+            }
+        })
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn simple_validation() -> anyhow::Result<()> {
+    let (dna_file, _) =
+        SweetDnaFile::unique_from_inline_zome("zome", simple_validation_zome()).await?;
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let (alice, bobbo) = SweetAgents::two(conductor.keystore()).await;
+    let apps = conductor
+        .setup_app_for_agents("app", &[alice.clone(), bobbo.clone()], &[dna_file])
+        .await;
+    let ((alice,), (bobbo,)) = apps.into_tuples();
+
+    let alice = alice.zome("zome");
+    let _bobbo = bobbo.zome("zome");
+
+    // This call passes validation
+    let h1: HeaderHash = conductor.call(&alice, "create", AppString::new("A")).await;
+    let e1: MaybeElement = conductor.call(&alice, "read", &h1).await;
+    let s1: AppString = e1.0.unwrap().entry().to_app_option().unwrap().unwrap();
+    assert_eq!(s1, AppString::new("A"));
+
+    todo!("uncomment the following");
+
+    // // This call fails validation, and so results in an error
+    // let err: ConductorApiResult<HeaderHash> =
+    //     conductor.call(&alice, "create", AppString::new("")).await;
+
+    // // This is kind of ridiculous, but we can't use assert_matches! because
+    // // there is a Box in the mix.
+    // let correct = match err {
+    //     Err(ConductorApiError::CellError(e)) => match e {
+    //         CellError::WorkflowError(e) => match *e {
+    //             WorkflowError::SourceChainError(e) => match e {
+    //                 SourceChainError::InvalidCommit(reason) => {
+    //                     &reason == "No empty strings allowed"
+    //                 }
+    //                 _ => false,
+    //             },
+    //             _ => false,
+    //         },
+    //         _ => false,
+    //     },
+    //     _ => false,
+    // };
+    // assert!(correct);
 
     Ok(())
 }

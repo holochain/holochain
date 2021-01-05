@@ -90,7 +90,9 @@ impl SweetConductorBatch {
         dna_files: &[DnaFile],
     ) -> SweetAppBatch {
         if agents.len() != self.0.len() {
-            panic!("setup_app_for_zipped_agents must take as many Agents as there are Conductors in this batch.")
+            panic!(
+                "setup_app_for_zipped_agents must take as many Agents as there are Conductors in this batch."
+            )
         }
 
         let apps = self
