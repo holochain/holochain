@@ -1,8 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::EncryptInput;
-use holochain_zome_types::EncryptOutput;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 pub fn encrypt(

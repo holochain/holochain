@@ -1,8 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::CapabilityGrantsInput;
-use holochain_zome_types::CapabilityGrantsOutput;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 /// list all the grants stored locally in the chain filtered by tag
@@ -18,26 +17,27 @@ pub fn capability_grants(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-    use crate::destructure_test_cells;
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::{conductor::dna_store::MockDnaStore, test_utils::test_conductor::MaybeElement};
-    use crate::{conductor::ConductorBuilder, test_utils::test_conductor::TestConductorHandle};
+    use crate::{conductor::dna_store::MockDnaStore, test_utils::cool::MaybeElement};
+    use crate::{conductor::ConductorBuilder, test_utils::cool::CoolConductor};
+    use crate::{
+        core::workflow::call_zome_workflow::CallZomeWorkspace, test_utils::cool::CoolDnaFile,
+    };
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use holochain_state::test_utils::test_environments;
-    use holochain_types::dna::DnaFile;
+    use holochain_lmdb::test_utils::test_environments;
     use holochain_types::fixt::CapSecretFixturator;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
+
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_capability_secret_test<'a>() {
-        holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
         // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
@@ -54,9 +54,9 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_transferable_cap_grant<'a>() {
-        holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
         // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
@@ -94,7 +94,7 @@ pub mod wasm_test {
     // TODO: [ B-03669 ] can move this to an integration test (may need to switch to using a RealDnaStore)
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_authorized_call() {
-        let (dna_file, _) = DnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
+        let (dna_file, _) = CoolDnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
             .await
             .unwrap();
 
@@ -102,30 +102,31 @@ pub mod wasm_test {
         let bob_agent_id = fake_agent_pubkey_2();
 
         let mut dna_store = MockDnaStore::new();
-        dna_store.expect_get().return_const(Some(dna_file.clone()));
+        dna_store
+            .expect_get()
+            .return_const(Some(dna_file.clone().into()));
         dna_store.expect_add_dna().return_const(());
         dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store
-            .expect_add_entry_defs::<Vec<_>>()
-            .times(2)
-            .return_const(());
+        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
 
         let envs = test_environments();
-        let handle: TestConductorHandle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(&envs)
-            .await
-            .unwrap()
-            .into();
+        let handle = CoolConductor::new(
+            ConductorBuilder::with_mock_dna_store(dna_store)
+                .test(&envs)
+                .await
+                .unwrap(),
+            envs,
+        );
 
-        let setup_data = handle
-            .setup_app_for_agents_with_no_membrane_proof(
+        let apps = handle
+            .setup_app_for_agents(
                 "app-",
                 &[alice_agent_id.clone(), bob_agent_id.clone()],
-                &[dna_file],
+                &[dna_file.into()],
             )
             .await;
 
-        let ((alice,), (bobbo,)) = destructure_test_cells!(setup_data);
+        let ((alice,), (bobbo,)) = apps.into_tuples();
         // There's only one zome to call, so let's peel that off now.
         let alice = alice.zome(TestWasm::Capability);
         let bobbo = bobbo.zome(TestWasm::Capability);

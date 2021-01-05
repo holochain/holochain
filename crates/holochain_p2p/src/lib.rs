@@ -3,30 +3,20 @@
 
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::activity::AgentActivity;
-use holochain_zome_types::{
-    capability::CapSecret,
-    query::ChainQueryFilter,
-    zome::{FunctionName, ZomeName},
-};
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 mod types;
-pub use types::{
-    actor::{HolochainP2pRef, HolochainP2pSender},
-    *,
-};
+pub use types::actor::HolochainP2pRef;
+pub use types::actor::HolochainP2pSender;
+pub use types::*;
 
 mod spawn;
-use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
-use holochain_types::{
-    element::GetElementResponse,
-    link::{GetLinksResponse, WireLinkMetaKey},
-    metadata::MetadataSet,
-    validate::ValidationPackageResponse,
-};
+use ghost_actor::dependencies::tracing;
+use ghost_actor::dependencies::tracing_futures::Instrument;
 pub use spawn::*;
-pub use test::{stub_network, HolochainP2pCellFixturator};
+pub use test::stub_network;
+pub use test::HolochainP2pCellFixturator;
 
 pub use kitsune_p2p;
 
@@ -101,7 +91,7 @@ pub trait HolochainP2pCellT {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivity>>;
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>>;
 
     /// Send a validation receipt to a remote node.
     async fn send_validation_receipt(
@@ -259,7 +249,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivity>> {
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>> {
         self.sender
             .get_agent_activity(
                 (*self.dna_hash).clone(),

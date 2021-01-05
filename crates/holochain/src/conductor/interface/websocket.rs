@@ -1,24 +1,28 @@
 //! Module for establishing Websocket-based Interfaces,
 //! i.e. those configured with `InterfaceDriver::Websocket`
 
-use super::error::{InterfaceError, InterfaceResult};
-use crate::{
-    conductor::{
-        conductor::StopReceiver,
-        interface::*,
-        manager::{ManagedTaskHandle, ManagedTaskResult},
-    },
-    core::signal::Signal,
-};
+use super::error::InterfaceError;
+use super::error::InterfaceResult;
+use crate::conductor::conductor::StopReceiver;
+use crate::conductor::interface::*;
+use crate::conductor::manager::ManagedTaskHandle;
+use crate::conductor::manager::ManagedTaskResult;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_websocket::{
-    websocket_bind, WebsocketConfig, WebsocketListener, WebsocketMessage, WebsocketReceiver,
-    WebsocketSender,
-};
+use holochain_types::signal::Signal;
+use holochain_websocket::websocket_bind;
+use holochain_websocket::WebsocketConfig;
+use holochain_websocket::WebsocketListener;
+use holochain_websocket::WebsocketMessage;
+use holochain_websocket::WebsocketReceiver;
+use holochain_websocket::WebsocketSender;
 use std::convert::TryFrom;
 
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tokio::{stream::StreamExt, sync::broadcast, task::JoinHandle};
+use tokio::stream::StreamExt;
+use tokio::sync::broadcast;
+use tokio::task::JoinHandle;
 use tracing::*;
 use url2::url2;
 
@@ -26,6 +30,7 @@ use url2::url2;
 /// Number of signals in buffer before applying
 /// back pressure.
 pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
+const MAX_CONNECTIONS: usize = 400;
 
 /// Create a WebsocketListener to be used in interfaces
 pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketListener> {
@@ -49,6 +54,7 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
     Ok(tokio::task::spawn(async move {
         let mut listener_handles = Vec::new();
         let mut send_sockets = Vec::new();
+        let num_connections = Arc::new(AtomicUsize::new(0));
         loop {
             tokio::select! {
                 // break if we receive on the stop channel
@@ -57,11 +63,19 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
                 // establish a new connection to a client
                 maybe_con = listener.next() => if let Some(connection) = maybe_con {
                     match connection {
-                        Ok((tx_to_iface, rx_from_iface)) => {
-                            send_sockets.push(tx_to_iface);
+                        Ok((mut tx_to_iface, rx_from_iface)) => {
+                            if num_connections.fetch_add(1, Ordering::Relaxed) > MAX_CONNECTIONS {
+                                if let Err(e) = WebsocketSender::close(&mut tx_to_iface, 1000, "Connections Full".into()).await {
+                                    warn!("Admin socket full failed to close: {}", e);
+                                }
+                                continue;
+                            };
+                            send_sockets.push(tx_to_iface.clone());
                             listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
                                 api.clone(),
                                 rx_from_iface,
+                                tx_to_iface,
+                                num_connections.clone(),
                             )));
                         }
                         Err(err) => {
@@ -169,11 +183,40 @@ async fn handle_shutdown(listener_handles: Vec<JoinHandle<InterfaceResult<()>>>)
 
 /// Polls for messages coming in from the external client.
 /// Used by Admin interface.
-async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, mut rx_from_iface: WebsocketReceiver) {
+async fn recv_incoming_admin_msgs<A: InterfaceApi>(
+    api: A,
+    mut rx_from_iface: WebsocketReceiver,
+    mut tx_to_iface: WebsocketSender,
+    num_connections: Arc<AtomicUsize>,
+) {
     while let Some(msg) = rx_from_iface.next().await {
         match handle_incoming_message(msg, api.clone()).await {
-            Err(InterfaceError::Closed) => break,
-            Err(e) => error!(error = &e as &dyn std::error::Error),
+            Err(InterfaceError::Closed) => {
+                if let Err(e) =
+                    WebsocketSender::close(&mut tx_to_iface, 1000, "Shutting down".into()).await
+                {
+                    warn!("Admin socket failed to close: {}", e);
+                }
+                // Do an atomic checked sub.
+                // This can still fail to decrement but won't overflow.
+                // This is ok because we really only need a rough idea if of the number of connections
+                // and failing to decrement should be rare.
+                let old_value = num_connections.load(Ordering::SeqCst);
+                if old_value > 0 {
+                    let prev_value = num_connections.compare_and_swap(
+                        old_value,
+                        old_value - 1,
+                        Ordering::SeqCst,
+                    );
+                    if prev_value != old_value {
+                        warn!(msg = "Websocket didn't successfully decrement connections on close");
+                    }
+                }
+                break;
+            }
+            Err(e) => {
+                error!(error = &e as &dyn std::error::Error)
+            }
             Ok(()) => {}
         }
     }
@@ -241,42 +284,101 @@ where
     }
 }
 
+/// Test items needed by other crates
+#[cfg(any(test, feature = "test_utils"))]
+pub mod test_utils {
+    use crate::conductor::api::RealAppInterfaceApi;
+    use crate::conductor::conductor::ConductorBuilder;
+    use crate::conductor::dna_store::MockDnaStore;
+    use crate::conductor::ConductorHandle;
+    use holochain_lmdb::test_utils::test_environments;
+    use holochain_serialized_bytes::prelude::*;
+    use holochain_types::app::InstalledCell;
+    use std::sync::Arc;
+    use tempdir::TempDir;
+
+    /// One of various ways to setup an app, used somewhere...
+    pub async fn setup_app(
+        cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
+        dna_store: MockDnaStore,
+    ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+        let envs = test_environments();
+
+        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
+            .test(&envs)
+            .await
+            .unwrap();
+
+        conductor_handle
+            .clone()
+            .install_app("test app".to_string(), cell_data)
+            .await
+            .unwrap();
+
+        conductor_handle
+            .activate_app("test app".to_string())
+            .await
+            .unwrap();
+
+        let errors = conductor_handle.clone().setup_cells().await.unwrap();
+
+        assert!(errors.is_empty());
+
+        let handle = conductor_handle.clone();
+
+        (
+            envs.tempdir(),
+            RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+            handle,
+        )
+    }
+}
+
 #[cfg(test)]
 pub mod test {
+    use super::test_utils::setup_app;
     use super::*;
-    use crate::{conductor::p2p_store::AgentKv, core::state::source_chain::SourceChainBuf};
-    use crate::{conductor::p2p_store::AgentKvKey, fixt::RealRibosomeFixturator};
-    use crate::{
-        conductor::{
-            api::{
-                error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi,
-            },
-            conductor::ConductorBuilder,
-            dna_store::MockDnaStore,
-            state::ConductorState,
-            Conductor, ConductorHandle,
-        },
-        test_utils::conductor_setup::ConductorTestData,
-    };
+    use crate::conductor::api::error::ExternalApiWireError;
+    use crate::conductor::api::AdminRequest;
+    use crate::conductor::api::AdminResponse;
+    use crate::conductor::api::RealAdminInterfaceApi;
+    use crate::conductor::conductor::ConductorBuilder;
+    use crate::conductor::dna_store::MockDnaStore;
+    use crate::conductor::p2p_store::AgentKv;
+    use crate::conductor::p2p_store::AgentKvKey;
+    use crate::conductor::state::ConductorState;
+    use crate::conductor::Conductor;
+    use crate::conductor::ConductorHandle;
+    use crate::fixt::RealRibosomeFixturator;
+    use crate::test_utils::conductor_setup::ConductorTestData;
+    use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
-    use fixt::prelude::*;
     use futures::future::FutureExt;
+    use holochain_lmdb::buffer::KvStoreT;
+    use holochain_lmdb::fresh_reader_test;
+    use holochain_lmdb::test_utils::test_environments;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_state::{buffer::KvStoreT, fresh_reader_test, test_utils::test_environments};
-    use holochain_types::{
-        app::{InstallAppDnaPayload, InstallAppPayload, InstalledCell},
-        cell::CellId,
-        dna::{DnaDef, DnaFile},
-        observability,
-        test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes},
-    };
+    use holochain_state::source_chain::SourceChainBuf;
+    use holochain_types::app::InstallAppDnaPayload;
+    use holochain_types::app::InstallAppPayload;
+    use holochain_types::app::InstalledCell;
+    use holochain_types::dna::DnaDef;
+    use holochain_types::dna::DnaFile;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::test_utils::fake_dna_file;
+    use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
-    use holochain_zome_types::{test_utils::fake_agent_pubkey_2, ExternInput};
-    use kitsune_p2p::{agent_store::AgentInfoSigned, fixt::AgentInfoSignedFixturator};
+    use holochain_zome_types::cell::CellId;
+    use holochain_zome_types::test_utils::fake_agent_pubkey_2;
+    use holochain_zome_types::ExternInput;
+    use kitsune_p2p::agent_store::AgentInfoSigned;
+    use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use matches::assert_matches;
     use mockall::predicate;
-    use std::{collections::HashMap, convert::TryInto};
+    use observability;
+    use std::collections::HashMap;
+    use std::convert::TryInto;
     use tempdir::TempDir;
     use uuid::Uuid;
 
@@ -328,41 +430,6 @@ pub mod test {
         assert!(errors.is_empty());
 
         conductor_handle
-    }
-
-    pub async fn setup_app(
-        cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
-        dna_store: MockDnaStore,
-    ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-        let envs = test_environments();
-
-        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(&envs)
-            .await
-            .unwrap();
-
-        conductor_handle
-            .clone()
-            .install_app("test app".to_string(), cell_data)
-            .await
-            .unwrap();
-
-        conductor_handle
-            .activate_app("test app".to_string())
-            .await
-            .unwrap();
-
-        let errors = conductor_handle.clone().setup_cells().await.unwrap();
-
-        assert!(errors.is_empty());
-
-        let handle = conductor_handle.clone();
-
-        (
-            envs.tempdir(),
-            RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
-            handle,
-        )
     }
 
     #[tokio::test(threaded_scheduler)]

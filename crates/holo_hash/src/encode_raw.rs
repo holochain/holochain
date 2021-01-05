@@ -1,4 +1,5 @@
-use crate::{HashType, HoloHash};
+use crate::HashType;
+use crate::HoloHash;
 
 impl<T: HashType> std::fmt::Display for HoloHash<T> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {

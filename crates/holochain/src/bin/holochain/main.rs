@@ -1,9 +1,12 @@
-use holochain::conductor::{
-    config::ConductorConfig, error::ConductorError, interactive, paths::ConfigFilePath, Conductor,
-    ConductorHandle,
-};
-use holochain_types::observability::{self, Output};
-use std::{error::Error, path::PathBuf};
+use holochain::conductor::config::ConductorConfig;
+use holochain::conductor::interactive;
+use holochain::conductor::paths::ConfigFilePath;
+use holochain::conductor::Conductor;
+use holochain::conductor::ConductorHandle;
+use holochain_conductor_api::conductor::ConductorConfigError;
+use observability::Output;
+use std::error::Error;
+use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::*;
 
@@ -133,11 +136,11 @@ async fn conductor_handle_from_config_path(
 /// Load config, throw friendly error on failure
 fn load_config(config_path: &ConfigFilePath, config_path_default: bool) -> ConductorConfig {
     match ConductorConfig::load_yaml(config_path.as_ref()) {
-        Err(ConductorError::ConfigMissing(_)) => {
+        Err(ConductorConfigError::ConfigMissing(_)) => {
             display_friendly_missing_config_message(config_path, config_path_default);
             std::process::exit(ERROR_CODE);
         }
-        Err(ConductorError::SerializationError(err)) => {
+        Err(ConductorConfigError::SerializationError(err)) => {
             display_friendly_malformed_config_message(config_path, err);
             std::process::exit(ERROR_CODE);
         }

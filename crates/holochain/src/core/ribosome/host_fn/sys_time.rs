@@ -1,8 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::SysTimeInput;
-use holochain_zome_types::SysTimeOutput;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 pub fn sys_time(
@@ -27,7 +26,7 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_sys_time_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();

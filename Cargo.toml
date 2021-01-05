@@ -1,27 +1,34 @@
 [workspace]
 members = [
-  # "crates/admin",
   "crates/dna_util",
   "crates/fixt",
   "crates/fixt/test",
-  "crates/hdk",
+  "crates/hdk3",
+  "crates/hdk3_derive",
   "crates/holo_hash",
+  
   "crates/holochain",
+  "crates/holochain_cascade",
+  "crates/holochain_conductor_api",
+  "crates/holochain_lmdb",
   "crates/holochain_p2p",
-  "crates/keystore",
+  "crates/holochain_keystore",
+  "crates/holochain_state",
+  "crates/holochain_types",
+  "crates/holochain_websocket",
+  "crates/holochain_zome_types",
+
   "crates/kitsune_p2p/kitsune_p2p",
   "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",
   "crates/kitsune_p2p/proxy",
-  "crates/state",
+  
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
-  "crates/types",
-  "crates/websocket",
 ]
 
 exclude = [
-  "pseudocode",
+  
 ]
 
 # These are the default params for RELEASE target
@@ -37,7 +44,6 @@ codegen-units = 16
 [patch.crates-io]
 
 rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
-#rkv = { path = "../../rust/rkv" }
 lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }
 #lmdb-rkv = { path = "../../rust/lmdb-rs" }
 # holochain_wasmer_guest = { path = "../holochain-wasmer/crates/guest" }

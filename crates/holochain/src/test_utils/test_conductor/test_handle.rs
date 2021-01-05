@@ -1,26 +1,17 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
 // TODO [ B-03669 ] move to own crate
 
-use std::sync::Arc;
-
 use super::test_cell::TestCell;
-use crate::{
-    conductor::{api::ZomeCall, handle::ConductorHandle},
-    core::ribosome::ZomeCallInvocation,
-};
+use crate::conductor::api::ZomeCall;
+use crate::conductor::handle::ConductorHandle;
+use crate::core::ribosome::ZomeCallInvocation;
 use hdk3::prelude::*;
-use holochain_types::app::{InstalledAppId, InstalledCell};
-use holochain_types::dna::zome::Zome;
-use holochain_types::dna::DnaFile;
+use holochain_types::prelude::*;
 use unwrap_to::unwrap_to;
 
-#[derive(Clone, shrinkwraprs::Shrinkwrap, derive_more::From)]
 /// A wrapper around ConductorHandle with more convenient methods for testing
-pub struct TestConductorHandle(pub Arc<TestConductorHandleInner>);
-
-/// Inner handle with a cleanup drop
-#[derive(shrinkwraprs::Shrinkwrap, derive_more::From)]
-pub struct TestConductorHandleInner(pub(crate) ConductorHandle);
+#[derive(Clone, shrinkwraprs::Shrinkwrap, derive_more::From)]
+pub struct TestConductorHandle(pub(crate) ConductorHandle);
 
 impl TestConductorHandle {
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
@@ -70,7 +61,6 @@ impl TestConductorHandle {
                 })
                 .collect();
             self.0
-                 .0
                 .clone()
                 .install_app(installed_app_id.clone(), cells)
                 .await
@@ -86,7 +76,6 @@ impl TestConductorHandle {
         }
 
         self.0
-             .0
             .clone()
             .setup_cells()
             .await
@@ -105,7 +94,7 @@ pub type SetupOutput = Vec<(InstalledAppId, Vec<TestCell>)>;
 #[macro_export]
 macro_rules! destructure_test_cells {
     ($blob:expr) => {{
-        use itertools::Itertools;
+        use $crate::test_utils::itertools::Itertools;
         let blob: $crate::test_utils::test_conductor::SetupOutput = $blob;
         blob.into_iter()
             .map(|(_, v)| {
@@ -120,7 +109,7 @@ macro_rules! destructure_test_cells {
 #[macro_export]
 macro_rules! destructure_test_cell_vec {
     ($vec:expr) => {{
-        use itertools::Itertools;
+        use $crate::test_utils::itertools::Itertools;
         let vec: Vec<$crate::test_utils::test_conductor::SetupOutput> = $vec;
         vec.into_iter()
             .map(|blob| destructure_test_cells!(blob))
@@ -129,7 +118,7 @@ macro_rules! destructure_test_cell_vec {
     }};
 }
 
-impl TestConductorHandleInner {
+impl TestConductorHandle {
     /// Call a zome function with automatic de/serialization of input and output
     /// and unwrapping of nested errors.
     pub async fn call_zome_ok<'a, I, O, F, E>(&'a self, invocation: TestZomeCall<'a, I, F, E>) -> O
@@ -245,23 +234,5 @@ where
 {
     fn from(tzci: TestZomeCall<'a, P, F, E>) -> Self {
         ZomeCallInvocation::from(tzci).into()
-    }
-}
-
-impl Drop for TestConductorHandleInner {
-    fn drop(&mut self) {
-        let c = self.0.clone();
-        tokio::task::spawn(async move {
-            // Shutdown the conductor
-            let shutdown = c.take_shutdown_handle().await.unwrap();
-            c.shutdown().await;
-            shutdown.await.unwrap();
-        });
-    }
-}
-
-impl From<ConductorHandle> for TestConductorHandle {
-    fn from(h: ConductorHandle) -> Self {
-        TestConductorHandle(Arc::new(TestConductorHandleInner(h)))
     }
 }

@@ -1,29 +1,24 @@
 use super::*;
-use crate::{
-    conductor::api::{error::ConductorApiError, MockCellConductorApi},
-    meta_mock,
-};
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::api::MockCellConductorApi;
+use crate::meta_mock;
 use ::fixt::prelude::*;
 use error::SysValidationError;
-use holo_hash::fixt::*;
+
 use holochain_keystore::AgentPubKeyExt;
+use holochain_lmdb::env::EnvironmentRead;
+use holochain_lmdb::test_utils::test_cell_env;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{env::EnvironmentRead, test_utils::test_cell_env};
-use holochain_types::{
-    dna::{DnaDef, DnaFile},
-    fixt::*,
-    observability,
-    test_utils::fake_agent_pubkey_1,
-    Timestamp,
-};
+
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
 use matches::assert_matches;
+use observability;
 use std::convert::TryFrom;
 
 #[tokio::test(threaded_scheduler)]
 async fn verify_header_signature_test() {
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_lmdb::test_utils::test_keystore();
     let author = fake_agent_pubkey_1();
     let mut header = fixt!(CreateLink);
     header.author = author.clone();

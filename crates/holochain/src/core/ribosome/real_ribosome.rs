@@ -1,54 +1,73 @@
-use super::host_fn::remote_signal::remote_signal;
-use super::{
-    guest_callback::{
-        entry_defs::EntryDefsHostAccess, init::InitHostAccess,
-        migrate_agent::MigrateAgentHostAccess, post_commit::PostCommitHostAccess,
-        validate::ValidateHostAccess, validation_package::ValidationPackageHostAccess,
-    },
-    host_fn::{get_agent_activity::get_agent_activity, HostFnApi},
-    HostAccess, ZomeCallHostAccess,
-};
-use crate::core::ribosome::{
-    error::{RibosomeError, RibosomeResult},
-    guest_callback::{
-        entry_defs::{EntryDefsInvocation, EntryDefsResult},
-        init::{InitInvocation, InitResult},
-        migrate_agent::{MigrateAgentInvocation, MigrateAgentResult},
-        post_commit::{PostCommitInvocation, PostCommitResult},
-        validate::{ValidateInvocation, ValidateResult},
-        validate_link::{ValidateLinkHostAccess, ValidateLinkInvocation, ValidateLinkResult},
-        validation_package::{ValidationPackageInvocation, ValidationPackageResult},
-        CallIterator,
-    },
-    host_fn::{
-        agent_info::agent_info, call::call, call_remote::call_remote,
-        capability_claims::capability_claims, capability_grants::capability_grants,
-        capability_info::capability_info, create::create, create_link::create_link, debug::debug,
-        decrypt::decrypt, delete::delete, delete_link::delete_link, emit_signal::emit_signal,
-        encrypt::encrypt, get::get, get_details::get_details, get_link_details::get_link_details,
-        get_links::get_links, hash_entry::hash_entry, property::property, query::query,
-        random_bytes::random_bytes, schedule::schedule, show_env::show_env, sign::sign,
-        sys_time::sys_time, unreachable::unreachable, update::update,
-        verify_signature::verify_signature, zome_info::zome_info,
-    },
-    CallContext, Invocation, RibosomeT, ZomeCallInvocation,
-};
+use super::guest_callback::entry_defs::EntryDefsHostAccess;
+use super::guest_callback::init::InitHostAccess;
+use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
+use super::guest_callback::post_commit::PostCommitHostAccess;
+use super::guest_callback::validate::ValidateHostAccess;
+use super::guest_callback::validation_package::ValidationPackageHostAccess;
+use super::host_fn::get_agent_activity::get_agent_activity;
+use super::host_fn::HostFnApi;
+use super::HostAccess;
+use super::ZomeCallHostAccess;
+use crate::core::ribosome::error::RibosomeError;
+use crate::core::ribosome::error::RibosomeResult;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::core::ribosome::guest_callback::init::InitInvocation;
+use crate::core::ribosome::guest_callback::init::InitResult;
+use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
+use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
+use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
+use crate::core::ribosome::guest_callback::validate::ValidateResult;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
+use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
+use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
+use crate::core::ribosome::guest_callback::CallIterator;
+use crate::core::ribosome::host_fn::agent_info::agent_info;
+use crate::core::ribosome::host_fn::call::call;
+use crate::core::ribosome::host_fn::call_remote::call_remote;
+use crate::core::ribosome::host_fn::capability_claims::capability_claims;
+use crate::core::ribosome::host_fn::capability_grants::capability_grants;
+use crate::core::ribosome::host_fn::capability_info::capability_info;
+use crate::core::ribosome::host_fn::create::create;
+use crate::core::ribosome::host_fn::create_link::create_link;
+use crate::core::ribosome::host_fn::create_x25519_keypair::create_x25519_keypair;
+use crate::core::ribosome::host_fn::debug::debug;
+use crate::core::ribosome::host_fn::delete::delete;
+use crate::core::ribosome::host_fn::delete_link::delete_link;
+use crate::core::ribosome::host_fn::emit_signal::emit_signal;
+use crate::core::ribosome::host_fn::get::get;
+use crate::core::ribosome::host_fn::get_details::get_details;
+use crate::core::ribosome::host_fn::get_link_details::get_link_details;
+use crate::core::ribosome::host_fn::get_links::get_links;
+use crate::core::ribosome::host_fn::hash_entry::hash_entry;
+use crate::core::ribosome::host_fn::property::property;
+use crate::core::ribosome::host_fn::query::query;
+use crate::core::ribosome::host_fn::random_bytes::random_bytes;
+use crate::core::ribosome::host_fn::remote_signal::remote_signal;
+use crate::core::ribosome::host_fn::schedule::schedule;
+use crate::core::ribosome::host_fn::show_env::show_env;
+use crate::core::ribosome::host_fn::sign::sign;
+use crate::core::ribosome::host_fn::sys_time::sys_time;
+use crate::core::ribosome::host_fn::unreachable::unreachable;
+use crate::core::ribosome::host_fn::update::update;
+use crate::core::ribosome::host_fn::verify_signature::verify_signature;
+use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_decrypt::x_25519_x_salsa20_poly1305_decrypt;
+use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_encrypt::x_25519_x_salsa20_poly1305_encrypt;
+use crate::core::ribosome::host_fn::x_salsa20_poly1305_decrypt::x_salsa20_poly1305_decrypt;
+use crate::core::ribosome::host_fn::x_salsa20_poly1305_encrypt::x_salsa20_poly1305_encrypt;
+use crate::core::ribosome::host_fn::zome_info::zome_info;
+use crate::core::ribosome::CallContext;
+use crate::core::ribosome::Invocation;
+use crate::core::ribosome::RibosomeT;
+use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
-use holochain_types::dna::{
-    zome::{HostFnAccess, Permission, Zome, ZomeDef},
-    DnaDefHashed, DnaError, DnaFile,
-};
+use holochain_types::prelude::*;
+
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::{
-    entry_def::EntryDefsCallbackResult,
-    init::InitCallbackResult,
-    migrate_agent::MigrateAgentCallbackResult,
-    post_commit::PostCommitCallbackResult,
-    validate::{ValidateCallbackResult, ValidationPackageCallbackResult},
-    validate_link::ValidateLinkCallbackResult,
-    zome::{FunctionName, ZomeName},
-    CallbackResult, ExternOutput, ZomeCallResponse,
-};
 use std::sync::Arc;
 
 /// Path to the wasm cache path
@@ -165,16 +184,52 @@ impl RealRibosome {
                 func!(invoke_host_function!(verify_signature)),
             );
             ns.insert("__sign", func!(invoke_host_function!(sign)));
-            ns.insert("__decrypt", func!(invoke_host_function!(decrypt)));
-            ns.insert("__encrypt", func!(invoke_host_function!(encrypt)));
+            ns.insert(
+                "__create_x25519_keypair",
+                func!(invoke_host_function!(create_x25519_keypair)),
+            );
+            ns.insert(
+                "__x_salsa20_poly1305_encrypt",
+                func!(invoke_host_function!(x_salsa20_poly1305_encrypt)),
+            );
+            ns.insert(
+                "__x_salsa20_poly1305_decrypt",
+                func!(invoke_host_function!(x_salsa20_poly1305_decrypt)),
+            );
+            ns.insert(
+                "__x_25519_x_salsa20_poly1305_encrypt",
+                func!(invoke_host_function!(x_25519_x_salsa20_poly1305_encrypt)),
+            );
+            ns.insert(
+                "__x_25519_x_salsa20_poly1305_decrypt",
+                func!(invoke_host_function!(x_25519_x_salsa20_poly1305_decrypt)),
+            );
         } else {
             ns.insert(
                 "__verify_signature",
                 func!(invoke_host_function!(unreachable)),
             );
             ns.insert("__sign", func!(invoke_host_function!(unreachable)));
-            ns.insert("__decrypt", func!(invoke_host_function!(unreachable)));
-            ns.insert("__encrypt", func!(invoke_host_function!(unreachable)));
+            ns.insert(
+                "__create_x25519_keypair",
+                func!(invoke_host_function!(unreachable)),
+            );
+            ns.insert(
+                "__x_salsa20_poly1305_encrypt",
+                func!(invoke_host_function!(unreachable)),
+            );
+            ns.insert(
+                "__x_salsa20_poly1305_decrypt",
+                func!(invoke_host_function!(unreachable)),
+            );
+            ns.insert(
+                "__x_25519_x_salsa20_poly1305_encrypt",
+                func!(invoke_host_function!(unreachable)),
+            );
+            ns.insert(
+                "__x_25519_x_salsa20_poly1305_decrypt",
+                func!(invoke_host_function!(unreachable)),
+            );
         }
 
         if let HostFnAccess {
@@ -490,14 +545,14 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
+    use holochain_test_wasm_common::TestString;
     use holochain_wasm_test_utils::TestWasm;
-    use test_wasm_common::TestString;
 
     #[tokio::test(threaded_scheduler)]
     /// Basic checks that we can call externs internally and externally the way we want using the
     /// hdk macros rather than low level rust extern syntax.
     async fn ribosome_extern_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();

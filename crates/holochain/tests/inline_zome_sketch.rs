@@ -1,8 +1,7 @@
 use hdk3::prelude::*;
-use holochain::test_utils::test_conductor::{MaybeElement, TestAgents, TestConductorHandle};
-use holochain::{conductor::Conductor, destructure_test_cells};
-use holochain_state::test_utils::test_environments;
-use holochain_types::dna::{zome::inline_zome::InlineZome, DnaFile};
+use holochain::test_utils::cool::{CoolAgents, CoolConductor, CoolDnaFile, MaybeElement};
+use holochain::test_utils::display_agent_infos;
+use holochain_types::dna::zome::inline_zome::InlineZome;
 use holochain_zome_types::element::ElementEntry;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
@@ -36,27 +35,21 @@ fn simple_crud_zome() -> InlineZome {
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
 async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
-    let envs = test_environments();
-
     // Bundle the single zome into a DnaFile
-    let (dna_file, _) = DnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
-
-    // Get two agents
-    let (alice, bobbo) = TestAgents::two(envs.keystore()).await;
+    let (dna_file, _) = CoolDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
 
     // Create a Conductor
-    let conductor: TestConductorHandle = Conductor::builder().test(&envs).await?.into();
+    let conductor = CoolConductor::from_standard_config().await;
+
+    // Get two agents
+    let (alice, bobbo) = CoolAgents::two(conductor.keystore()).await;
 
     // Install DNA and install and activate apps in conductor
-    let ids = conductor
-        .setup_app_for_agents_with_no_membrane_proof(
-            "app",
-            &[alice.clone(), bobbo.clone()],
-            &[dna_file],
-        )
+    let apps = conductor
+        .setup_app_for_agents("app", &[alice.clone(), bobbo.clone()], &[dna_file])
         .await;
 
-    let ((alice,), (bobbo,)) = destructure_test_cells!(ids);
+    let ((alice,), (bobbo,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
     let hash: HeaderHash = alice.call("zome1", "create_unit", ()).await;
@@ -83,20 +76,19 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
 async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
-    let envs = test_environments();
-    let conductor: TestConductorHandle = Conductor::builder().test(&envs).await?.into();
+    let conductor = CoolConductor::from_standard_config().await;
 
-    let (dna_foo, _) = DnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
-    let (dna_bar, _) = DnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
+    let (dna_foo, _) = CoolDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
+    let (dna_bar, _) = CoolDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
 
-    let agents = TestAgents::get(envs.keystore(), 3).await;
+    let agents = CoolAgents::get(conductor.keystore(), 3).await;
 
-    let ids = conductor
-        .setup_app_for_agents_with_no_membrane_proof("app", &agents, &[dna_foo, dna_bar])
+    let apps = conductor
+        .setup_app_for_agents("app", &agents, &[dna_foo, dna_bar])
         .await;
 
     let ((alice_foo, alice_bar), (bobbo_foo, bobbo_bar), (_carol_foo, carol_bar)) =
-        destructure_test_cells!(ids);
+        apps.into_tuples();
 
     assert_eq!(alice_foo.agent_pubkey(), alice_bar.agent_pubkey());
     assert_eq!(bobbo_foo.agent_pubkey(), bobbo_bar.agent_pubkey());
@@ -128,7 +120,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     // Verify that carol can run "read" on her cell and get alice's Header
     // on the "bar" DNA
-    // Let's do it with the TestZome instead of the TestCell too, for fun
+    // Let's do it with the CoolZome instead of the CoolCell too, for fun
     let element: MaybeElement = carol_bar.zome("barzome").call("read", hash_bar).await;
     let element = element
         .0
@@ -138,6 +130,37 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
         *element.entry(),
         ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
+
+    Ok(())
+}
+
+#[tokio::test(threaded_scheduler)]
+#[cfg(feature = "test_utils")]
+#[ignore = "Needs to be completed when HolochainP2pEvents is accessible"]
+async fn invalid_cell() -> anyhow::Result<()> {
+    observability::test_run().ok();
+    let conductor = CoolConductor::from_standard_config().await;
+
+    let (dna_foo, _) = CoolDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
+    let (dna_bar, _) = CoolDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
+
+    // let agents = CoolAgents::get(conductor.keystore(), 2).await;
+
+    let _app_foo = conductor.setup_app("foo", &[dna_foo]).await;
+
+    let _app_bar = conductor.setup_app("bar", &[dna_bar]).await;
+
+    // Give small amount of time for cells to join the network
+    tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
+
+    tracing::debug!(dnas = ?conductor.list_dnas().await.unwrap());
+    tracing::debug!(cell_ids = ?conductor.list_cell_ids().await.unwrap());
+    tracing::debug!(apps = ?conductor.list_active_apps().await.unwrap());
+
+    display_agent_infos(&conductor).await;
+
+    // Can't finish this test because there's no way to construct HolochainP2pEvents
+    // and I can't directly call query on the conductor because it's private.
 
     Ok(())
 }
