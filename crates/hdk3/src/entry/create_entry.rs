@@ -5,9 +5,8 @@ use crate::prelude::*;
 /// An app entry is anything that the app can define a type for that matches the entry defs and
 /// that can be serialized to `SerializedBytes`.
 ///
-/// Accepts any expression that evaluates to something that implements TryInto<SerializedBytes> and
-/// Into<EntryDefId>, so the defaults from the `#[hdk_entry( .. )]` and `entry_def!()` macros
-/// make any struct/enum into an app entry.
+/// Accepts any input that implements TryInto<HdkEntry>.
+/// The default impls from the `#[hdk_entry( .. )]` and `entry_def!()` macros include this.
 ///
 /// e.g.
 /// ```ignore

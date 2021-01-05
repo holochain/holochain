@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 /// Alias to delete
 ///
-/// Takes any expression that evaluates to the HeaderHash of the deleted element.
+/// Takes the HeaderHash of the element to delete.
 ///
 /// ```ignore
 /// delete_entry(entry_hash(foo_entry)?)?;
