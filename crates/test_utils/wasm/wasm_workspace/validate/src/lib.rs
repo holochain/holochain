@@ -61,6 +61,20 @@ impl TryFrom<&Entry> for ThisWasmEntry {
     }
 }
 
+impl TryFrom<&ThisWasmEntry> for Entry {
+    type Error = HdkError;
+    fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
+        Ok(Entry::App(AppEntryBytes::try_from(SerializedBytes::try_from(this_wasm_entry)?)?))
+    }
+}
+
+impl TryFrom<&ThisWasmEntry> for HdkEntry {
+    type Error = HdkError;
+    fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
+        Ok(Self(EntryDefId::from(this_wasm_entry), Entry::try_from(this_wasm_entry)?))
+    }
+}
+
 entry_defs![
     (&ThisWasmEntry::AlwaysValidates).into(),
     (&ThisWasmEntry::NeverValidates).into()

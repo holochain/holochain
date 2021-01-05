@@ -38,8 +38,8 @@ use crate::prelude::*;
 /// ```
 pub fn hash_entry<I, E>(input: I) -> HdkResult<EntryHash>
 where
-    HdkError: From<E>,
     Entry: TryFrom<I, Error = E>,
+    HdkError: From<E>,
 {
     Ok(host_call::<HashEntryInput, HashEntryOutput>(
         __hash_entry,

@@ -27,12 +27,11 @@ use crate::prelude::*;
 /// @see create_entry
 /// @see update
 /// @see delete_entry
-pub fn update_entry<'a, I: 'a>(hash: HeaderHash, input: &'a I) -> HdkResult<HeaderHash>
+pub fn update_entry<I, E>(hash: HeaderHash, input: I) -> HdkResult<HeaderHash>
 where
-    EntryDefId: From<&'a I>,
-    SerializedBytes: TryFrom<&'a I, Error = SerializedBytesError>,
+    HdkEntry: TryFrom<I, Error = E>,
+    HdkError: From<E>,
 {
-    let entry_def_id = EntryDefId::from(input);
-    let sb = SerializedBytes::try_from(input)?;
-    update(hash, entry_def_id, Entry::App(sb.try_into()?))
+    let HdkEntry(entry_def_id, entry) = HdkEntry::try_from(input)?;
+    update(hash, entry_def_id, entry)
 }

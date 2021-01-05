@@ -32,7 +32,8 @@ fn add_valid_link(_: ()) -> ExternResult<HeaderHash> {
 
 fn add_valid_link_inner() -> ExternResult<HeaderHash> {
     let always_linkable_entry_hash = hash_entry(&MaybeLinkable::AlwaysLinkable)?;
-    create_entry(&MaybeLinkable::AlwaysLinkable)?;
+    let always_linkable = MaybeLinkable::AlwaysLinkable;
+    create_entry(&always_linkable)?;
 
     Ok(create_link(
         always_linkable_entry_hash.clone(),

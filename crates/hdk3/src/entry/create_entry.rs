@@ -17,12 +17,11 @@ use crate::prelude::*;
 /// ```
 ///
 /// @see get and get_details for more information on CRUD
-pub fn create_entry<'a, I: 'a>(input: &'a I) -> HdkResult<HeaderHash>
+pub fn create_entry<I, E>(input: I) -> HdkResult<HeaderHash>
 where
-    EntryDefId: From<&'a I>,
-    SerializedBytes: TryFrom<&'a I, Error = SerializedBytesError>,
+    HdkEntry: TryFrom<I, Error = E>,
+    HdkError: From<E>,
 {
-    let entry_def_id = EntryDefId::from(input);
-    let sb = SerializedBytes::try_from(input)?;
-    create(entry_def_id, Entry::App(sb.try_into()?))
+    let HdkEntry(entry_def_id, entry) = HdkEntry::try_from(input)?;
+    create(entry_def_id, entry)
 }

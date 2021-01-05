@@ -122,6 +122,20 @@ macro_rules! entry_def {
             }
         }
 
+        impl TryFrom<&$t> for $crate::prelude::HdkEntry {
+            type Error = $crate::prelude::HdkError;
+            fn try_from(t: &$t) -> Result<Self, Self::Error> {
+                Ok(Self($t::entry_def_id(), t.try_into()?))
+            }
+        }
+
+        impl TryFrom<$t> for $crate::prelude::HdkEntry {
+            type Error = $crate::prelude::HdkError;
+            fn try_from(t: $t) -> Result<Self, Self::Error> {
+                (&t).try_into()
+            }
+        }
+
         impl From<$t> for $crate::prelude::EntryVisibility {
             fn from(_: $t) -> Self {
                 $t::entry_visibility()

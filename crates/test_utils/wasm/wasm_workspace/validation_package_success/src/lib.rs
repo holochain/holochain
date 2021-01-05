@@ -45,13 +45,15 @@ fn validation_package(
 
 #[hdk_extern]
 fn commit_artist(_: ()) -> ExternResult<HeaderHash> {
-    Ok(create_entry(&Artist)?)
+    let artist = Artist;
+    Ok(create_entry(&artist)?)
 }
 
 #[hdk_extern]
 fn commit_songs(_: ()) -> ExternResult<()> {
     for _ in 0..NUM_SONGS {
-        create_entry(&Song)?;
+        let song = Song;
+        create_entry(&song)?;
     }
     Ok(())
 }

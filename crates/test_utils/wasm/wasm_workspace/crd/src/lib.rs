@@ -7,7 +7,8 @@ entry_defs![Thing::entry_def()];
 
 #[hdk_extern]
 fn create(_: ()) -> ExternResult<HeaderHash> {
-    Ok(create_entry(&Thing)?)
+    let thing = Thing;
+    Ok(create_entry(&thing)?)
 }
 
 #[hdk_extern]
