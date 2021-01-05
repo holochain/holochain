@@ -25,10 +25,10 @@ use holochain_zome_types::signal::AppSignal;
 
 pub fn emit_signal<D, E>(data: D) -> HdkResult<()>
 where
-    SerializedBytesError: From<E>,
+    HdkError: From<E>,
     SerializedBytes: TryFrom<D, Error = E>,
 {
-    let sb = SerializedBytes::try_from(data).map_err(SerializedBytesError::from)?;
+    let sb = SerializedBytes::try_from(data)?;
     #[allow(clippy::unit_arg)]
     Ok(host_call::<EmitSignalInput, EmitSignalOutput>(
         __emit_signal,
