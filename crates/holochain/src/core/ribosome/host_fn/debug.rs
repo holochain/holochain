@@ -12,7 +12,7 @@ pub fn debug(
     input: DebugInput,
 ) -> RibosomeResult<DebugOutput> {
     let msg: DebugMsg = input.into_inner();
-    println!(
+    debug!(
         "{}:{}:{} {}",
         msg.module_path(),
         msg.file(),

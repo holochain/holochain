@@ -17,16 +17,14 @@ fn temperature() -> Temperature {
 }
 
 #[hdk_extern]
-fn twenty_three_degrees(_: ()) -> ExternResult<Element> {
+fn twenty_three_degrees_entry_hash(_: ()) -> ExternResult<EntryHash> {
     let temp = temperature();
     let header_hash: HeaderHash = create_entry(&temp)?;
     let element: Element = get(header_hash, GetOptions::content())?.unwrap();
-    if let ElementEntry::Present(entry) = element.entry() {
-        // ElementEntry::Present(entry) => debug!("{:?}", entry),
-        debug!("{:?}", entry);
-        debug!("{:?}", hdk3::prelude::hash_entry(entry.clone()).unwrap());
+    match element.entry() {
+        ElementEntry::Present(entry) => Ok(hdk3::prelude::hash_entry(entry.clone())?),
+        _ => unreachable!(),
     }
-    Ok(element)
 }
 
 #[hdk_extern]

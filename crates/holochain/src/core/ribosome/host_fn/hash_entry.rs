@@ -81,11 +81,11 @@ pub mod wasm_test {
             holo_hash::hash_type::Entry
         );
 
-        let output: Element = crate::call_test_ribosome!(host_access, TestWasm::HashEntry, "twenty_three_degrees", ());
-        dbg!(&output);
+        let entry_hash_output: EntryHash = crate::call_test_ribosome!(host_access, TestWasm::HashEntry, "twenty_three_degrees_entry_hash", ());
 
         let hash_output: EntryHash = crate::call_test_ribosome!(host_access, TestWasm::HashEntry, "twenty_three_degrees_hash", ());
-        dbg!(&hash_output);
+
+        assert_eq!(entry_hash_output, hash_output);
     }
 
     #[tokio::test(threaded_scheduler)]
