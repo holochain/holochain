@@ -61,6 +61,3 @@ pub enum CellError {
 }
 
 pub type CellResult<T> = Result<T, CellError>;
-
-/// Re-export for convenience [ TK-06690 ]
-pub use holochain_cascade::error::AuthorityDataError;
