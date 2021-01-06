@@ -50,7 +50,7 @@ pub fn get_details<H: Into<AnyDhtHash>>(
 ) -> HdkResult<Option<Details>> {
     Ok(host_call::<GetDetailsInput, GetDetailsOutput>(
         __get_details,
-        &GetDetailsInput::new((hash.into(), options)),
+        GetDetailsInput::new((hash.into(), options)),
     )?
     .into_inner())
 }

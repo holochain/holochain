@@ -32,7 +32,7 @@ where
     #[allow(clippy::unit_arg)]
     Ok(host_call::<EmitSignalInput, EmitSignalOutput>(
         __emit_signal,
-        &EmitSignalInput::new(AppSignal::new(sb)),
+        EmitSignalInput::new(AppSignal::new(sb)),
     )?
     .into_inner())
 }

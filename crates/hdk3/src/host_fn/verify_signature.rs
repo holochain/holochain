@@ -8,7 +8,7 @@ pub fn verify_signature<K: Into<AgentPubKey>, S: Into<Signature>, D: Into<Serial
 ) -> HdkResult<bool> {
     Ok(host_call::<VerifySignatureInput, VerifySignatureOutput>(
         __verify_signature,
-        &VerifySignatureInput::new(VerifySignature {
+        VerifySignatureInput::new(VerifySignature {
             key: key.into(),
             signature: signature.into(),
             data: data.into(),

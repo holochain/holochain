@@ -19,7 +19,7 @@ macro_rules! debug {
     ( $msg:expr, $($tail:expr),* ) => {{
         host_call::<DebugInput, DebugOutput>(
             __debug,
-            &$crate::prelude::DebugInput::new(holochain_zome_types::debug_msg!($msg, $($tail),*)),
+            $crate::prelude::DebugInput::new(holochain_zome_types::debug_msg!($msg, $($tail),*)),
         ).ok();
     }};
 }

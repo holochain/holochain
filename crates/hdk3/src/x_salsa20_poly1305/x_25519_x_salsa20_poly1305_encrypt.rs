@@ -46,7 +46,7 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
     Ok(
         host_call::<X25519XSalsa20Poly1305EncryptInput, X25519XSalsa20Poly1305EncryptOutput>(
             __x_25519_x_salsa20_poly1305_encrypt,
-            &X25519XSalsa20Poly1305EncryptInput::new(
+            X25519XSalsa20Poly1305EncryptInput::new(
                 holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Encrypt::new(
                     sender, recipient, data,
                 ),

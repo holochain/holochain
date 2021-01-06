@@ -47,7 +47,7 @@ use crate::prelude::*;
 ///       be live.
 pub fn get<H: Into<AnyDhtHash>>(hash: H, options: GetOptions) -> HdkResult<Option<Element>> {
     Ok(
-        host_call::<GetInput, GetOutput>(__get, &GetInput::new((hash.into(), options)))?
+        host_call::<GetInput, GetOutput>(__get, GetInput::new((hash.into(), options)))?
             .into_inner(),
     )
 }

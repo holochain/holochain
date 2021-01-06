@@ -27,7 +27,7 @@ use crate::prelude::*;
 pub fn random_bytes(number_of_bytes: u32) -> HdkResult<Vec<u8>> {
     Ok(host_call::<RandomBytesInput, RandomBytesOutput>(
         __random_bytes,
-        &RandomBytesInput::new(number_of_bytes),
+        RandomBytesInput::new(number_of_bytes),
     )?
     .into_inner()
     .into_vec())

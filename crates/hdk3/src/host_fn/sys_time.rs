@@ -62,5 +62,5 @@ use crate::prelude::*;
 /// environment e.g. a chess game between friends with time moves that balances security/trust and
 /// flaky networking, etc.
 pub fn sys_time() -> HdkResult<core::time::Duration> {
-    Ok(host_call::<SysTimeInput, SysTimeOutput>(__sys_time, &SysTimeInput::new(()))?.into_inner())
+    Ok(host_call::<SysTimeInput, SysTimeOutput>(__sys_time, SysTimeInput::new(()))?.into_inner())
 }

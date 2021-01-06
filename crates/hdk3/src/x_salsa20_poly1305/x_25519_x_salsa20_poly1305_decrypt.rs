@@ -19,7 +19,7 @@ pub fn x_25519_x_salsa20_poly1305_decrypt(
     Ok(
         host_call::<X25519XSalsa20Poly1305DecryptInput, X25519XSalsa20Poly1305DecryptOutput>(
             __x_25519_x_salsa20_poly1305_decrypt,
-            &X25519XSalsa20Poly1305DecryptInput::new(
+            X25519XSalsa20Poly1305DecryptInput::new(
                 holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(
                     recipient,
                     sender,

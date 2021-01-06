@@ -22,7 +22,7 @@ use crate::prelude::*;
 pub fn get_link_details(base: EntryHash, link_tag: Option<LinkTag>) -> HdkResult<LinkDetails> {
     Ok(host_call::<GetLinkDetailsInput, GetLinkDetailsOutput>(
         __get_link_details,
-        &GetLinkDetailsInput::new((base, link_tag)),
+        GetLinkDetailsInput::new((base, link_tag)),
     )?
     .into_inner())
 }

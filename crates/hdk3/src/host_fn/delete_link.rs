@@ -24,7 +24,7 @@ use crate::prelude::*;
 pub fn delete_link(add_link_header: HeaderHash) -> HdkResult<HeaderHash> {
     Ok(host_call::<DeleteLinkInput, DeleteLinkOutput>(
         __delete_link,
-        &DeleteLinkInput::new(add_link_header),
+        DeleteLinkInput::new(add_link_header),
     )?
     .into_inner())
 }

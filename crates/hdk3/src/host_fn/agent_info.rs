@@ -11,7 +11,7 @@ use crate::prelude::*;
 /// and their most recent pubkey/address.
 pub fn agent_info() -> HdkResult<AgentInfo> {
     Ok(
-        host_call::<AgentInfoInput, AgentInfoOutput>(__agent_info, &AgentInfoInput::new(()))?
+        host_call::<AgentInfoInput, AgentInfoOutput>(__agent_info, AgentInfoInput::new(()))?
             .into_inner(),
     )
 }

@@ -29,7 +29,7 @@ where
     let provenance = agent_info()?.agent_latest_pubkey;
     let out: ZomeCallResponse = host_call::<CallInput, CallOutput>(
         __call,
-        &CallInput::new(Call::new(
+        CallInput::new(Call::new(
             to_cell, zome_name, fn_name, cap_secret, payload, provenance,
         )),
     )?

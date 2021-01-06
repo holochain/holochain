@@ -62,7 +62,7 @@ pub fn create_link<T: Into<LinkTag>>(
 ) -> HdkResult<HeaderHash> {
     Ok(host_call::<CreateLinkInput, CreateLinkOutput>(
         __create_link,
-        &CreateLinkInput::new((base, target, tag.into())),
+        CreateLinkInput::new((base, target, tag.into())),
     )?
     .into_inner())
 }

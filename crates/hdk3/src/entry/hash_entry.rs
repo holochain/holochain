@@ -46,7 +46,7 @@ where
 {
     Ok(host_call::<HashEntryInput, HashEntryOutput>(
         __hash_entry,
-        &HashEntryInput::new(input.try_into()?),
+        HashEntryInput::new(input.try_into()?),
     )?
     .into_inner())
 }

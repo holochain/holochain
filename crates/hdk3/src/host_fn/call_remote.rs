@@ -45,7 +45,7 @@ where
     let payload = SerializedBytes::try_from(payload)?;
     let out = host_call::<CallRemoteInput, CallRemoteOutput>(
         __call_remote,
-        &CallRemoteInput::new(CallRemote::new(agent, zome, fn_name, cap_secret, payload)),
+        CallRemoteInput::new(CallRemote::new(agent, zome, fn_name, cap_secret, payload)),
     )?
     .into_inner();
 

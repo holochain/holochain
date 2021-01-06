@@ -38,7 +38,7 @@ where
     #[allow(clippy::unit_arg)]
     Ok(host_call::<RemoteSignalInput, RemoteSignalOutput>(
         __remote_signal,
-        &RemoteSignalInput::new(RemoteSignal { signal: sb, agents }),
+        RemoteSignalInput::new(RemoteSignal { signal: sb, agents }),
     )?
     .into_inner())
 }

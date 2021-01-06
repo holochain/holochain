@@ -39,7 +39,7 @@ pub fn x_salsa20_poly1305_encrypt(
     Ok(
         host_call::<XSalsa20Poly1305EncryptInput, XSalsa20Poly1305EncryptOutput>(
             __x_salsa20_poly1305_encrypt,
-            &XSalsa20Poly1305EncryptInput::new(
+            XSalsa20Poly1305EncryptInput::new(
                 holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Encrypt::new(
                     key_ref, data,
                 ),
