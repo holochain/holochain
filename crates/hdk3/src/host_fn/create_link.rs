@@ -55,7 +55,7 @@ use crate::prelude::*;
 /// If you have the hash of the identity entry you can get all the links, if you have the entry or
 /// header hash for any of the creates or updates you can lookup the identity entry hash out of the
 /// body of the create/update entry.
-pub fn create_link<'a, T: 'a + Into<LinkTag>>(
+pub fn create_link<T: Into<LinkTag>>(
     base: EntryHash,
     target: EntryHash,
     tag: T,

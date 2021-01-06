@@ -29,9 +29,10 @@ use crate::prelude::*;
 ///
 /// This requirements will likely be removed in the future as
 /// we design a better way to grant the capability to remote signal.
-pub fn remote_signal<'a, D: 'a>(data: &'a D, agents: Vec<AgentPubKey>) -> HdkResult<()>
+pub fn remote_signal<D, E>(data: D, agents: Vec<AgentPubKey>) -> HdkResult<()>
 where
-    SerializedBytes: TryFrom<&'a D, Error = SerializedBytesError>,
+    SerializedBytes: TryFrom<D, Error = E>,
+    HdkError: From<E>,
 {
     let sb = SerializedBytes::try_from(data)?;
     #[allow(clippy::unit_arg)]

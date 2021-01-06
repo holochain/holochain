@@ -29,16 +29,18 @@ use crate::prelude::*;
 /// let foo: Foo = call_remote(bob, "foo_zome", "do_it", secret, serialized_payload)?;
 /// ...
 /// ```
-pub fn call_remote<'a, I: 'a, O>(
+pub fn call_remote<I, IE, O, OE>(
     agent: AgentPubKey,
     zome: ZomeName,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
-    payload: &'a I,
+    payload: I,
 ) -> HdkResult<O>
 where
-    SerializedBytes: TryFrom<&'a I, Error = SerializedBytesError>,
-    O: TryFrom<SerializedBytes, Error = SerializedBytesError>,
+    SerializedBytes: TryFrom<I, Error = IE>,
+    O: TryFrom<SerializedBytes, Error = OE>,
+    HdkError: From<IE>,
+    HdkError: From<OE>,
 {
     let payload = SerializedBytes::try_from(payload)?;
     let out = host_call::<CallRemoteInput, CallRemoteOutput>(

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-/// Hash anything that that implements TryInto<SerializedBytes> into an entry hash.
+/// Hash anything that that implements TryInto<Entry>.
 ///
 /// Hashes are typed in holochain, e.g. HeaderHash and EntryHash are different and yield different
 /// bytes for a given value. This ensures correctness and allows type based dispatch in various
@@ -34,16 +34,19 @@ use crate::prelude::*;
 /// different, etc.
 ///
 /// ```ignore
-/// let foo_hash = hash_entry(foo)?;
+/// #[hdk_entry(id="foo")]
+/// struct Foo;
+///
+/// let foo_hash = hash_entry(Foo)?;
 /// ```
-pub fn hash_entry<'a, I: 'a>(input: &'a I) -> HdkResult<EntryHash>
+pub fn hash_entry<I, E>(input: I) -> HdkResult<EntryHash>
 where
-    SerializedBytes: TryFrom<&'a I, Error = SerializedBytesError>,
+    Entry: TryFrom<I, Error = E>,
+    HdkError: From<E>,
 {
-    let sb = SerializedBytes::try_from(input)?;
     Ok(host_call::<HashEntryInput, HashEntryOutput>(
         __hash_entry,
-        &HashEntryInput::new(Entry::App(sb.try_into()?)),
+        &HashEntryInput::new(input.try_into()?),
     )?
     .into_inner())
 }

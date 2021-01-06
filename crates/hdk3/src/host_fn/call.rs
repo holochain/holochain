@@ -11,16 +11,18 @@ use crate::prelude::*;
 /// - fn_name: The name of the function in the zome you are calling.
 /// - cap_secret: The capability secret if required.
 /// - payload: The arguments to the function you are calling.
-pub fn call<'a, I: 'a, O>(
+pub fn call<I, IE, O, OE>(
     to_cell: Option<CellId>,
     zome_name: ZomeName,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
-    payload: &'a I,
+    payload: I,
 ) -> HdkResult<O>
 where
-    SerializedBytes: TryFrom<&'a I, Error = SerializedBytesError>,
-    O: TryFrom<SerializedBytes, Error = SerializedBytesError>,
+    SerializedBytes: TryFrom<I, Error = IE>,
+    O: TryFrom<SerializedBytes, Error = OE>,
+    HdkError: From<IE>,
+    HdkError: From<OE>,
 {
     let payload = SerializedBytes::try_from(payload)?;
     // @todo is this secure to set this in the wasm rather than have the host inject it?
