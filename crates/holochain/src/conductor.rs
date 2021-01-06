@@ -32,7 +32,6 @@ pub mod p2p_store;
 pub mod paths;
 pub mod state;
 
-pub use cell::authority;
 pub use cell::error::CellError;
 pub use cell::Cell;
 pub use conductor::Conductor;

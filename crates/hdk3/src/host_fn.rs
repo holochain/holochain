@@ -13,7 +13,6 @@ pub mod get_agent_activity;
 pub mod get_details;
 pub mod get_link_details;
 pub mod get_links;
-pub mod hash_entry;
 pub mod property;
 pub mod query;
 pub mod random_bytes;

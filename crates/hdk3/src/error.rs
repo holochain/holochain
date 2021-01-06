@@ -21,3 +21,9 @@ pub enum HdkError {
 }
 
 pub type HdkResult<T> = Result<T, HdkError>;
+
+impl From<core::convert::Infallible> for HdkError {
+    fn from(_: core::convert::Infallible) -> Self {
+        unreachable!()
+    }
+}
