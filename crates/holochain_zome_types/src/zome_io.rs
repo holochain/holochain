@@ -106,7 +106,7 @@ wasm_io_types! {
     fn x_25519_x_salsa20_poly1305_decrypt(zt::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<zt::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
 
     // Returns HeaderHash of the newly created element.
-    fn create ((zt::entry_def::EntryDefId, zt::entry::Entry)) -> holo_hash::HeaderHash;
+    fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
 
     // Create a link between two entries.
     fn create_link ((holo_hash::EntryHash, holo_hash::EntryHash, zt::link::LinkTag)) -> holo_hash::HeaderHash;
@@ -178,7 +178,7 @@ wasm_io_types! {
     fn sys_time (()) -> core::time::Duration;
 
     // Same as  but also takes the HeaderHash of the updated element.
-    fn update ((zt::entry_def::EntryDefId, zt::entry::Entry, holo_hash::HeaderHash)) -> holo_hash::HeaderHash;
+    fn update ((holo_hash::HeaderHash, zt::entry::EntryWithDefId)) -> holo_hash::HeaderHash;
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;
 

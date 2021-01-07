@@ -67,7 +67,7 @@ host_fn_api_impls! {
     // CapGrant and CapClaim are handled natively.
     // App entries are referenced by entry defs then SerializedBytes stuffed into an Entry::App.
     // Returns HeaderHash of the newly created element.
-    fn create ((zt::entry_def::EntryDefId, zt::entry::Entry)) -> holo_hash::HeaderHash;
+    fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
 
     fn create_x25519_keypair(()) -> holochain_zome_types::x_salsa20_poly1305::x25519::X25519PubKey;
 
@@ -88,7 +88,7 @@ host_fn_api_impls! {
     // Create a link between two entries.
     fn create_link ((holo_hash::EntryHash, holo_hash::EntryHash, zt::link::LinkTag)) -> holo_hash::HeaderHash;
 
-    // @todo
+    // Delete an entry.
     fn delete (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
 
     // Header hash of the CreateLink element.
@@ -155,7 +155,7 @@ host_fn_api_impls! {
     fn sys_time (()) -> core::time::Duration;
 
     // Same as  but also takes the HeaderHash of the updated element.
-    fn update ((zt::entry_def::EntryDefId, zt::entry::Entry, holo_hash::HeaderHash)) -> holo_hash::HeaderHash;
+    fn update ((holo_hash::HeaderHash, zt::entry::EntryWithDefId)) -> holo_hash::HeaderHash;
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;
 

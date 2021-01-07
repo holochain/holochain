@@ -17,13 +17,13 @@ fn simple_crud_zome() -> InlineZome {
         .callback("create_string", move |api, s: String| {
             let entry_def_id: EntryDefId = string_entry_def.id.clone();
             let entry = Entry::app(AppString::from(s).try_into().unwrap()).unwrap();
-            let hash = api.create((entry_def_id, entry))?;
+            let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
             Ok(hash)
         })
         .callback("create_unit", move |api, ()| {
             let entry_def_id: EntryDefId = unit_entry_def.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create((entry_def_id, entry))?;
+            let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {

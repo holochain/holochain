@@ -101,7 +101,7 @@ mod tests {
                     access: ().into(),
                     functions,
                 };
-                api.create((EntryDefId::CapGrant, Entry::CapGrant(cap_grant_entry)))
+                api.create(EntryWithDefId::new(EntryDefId::CapGrant, Entry::CapGrant(cap_grant_entry)))
                     .unwrap();
 
                 Ok(InitCallbackResult::Pass)

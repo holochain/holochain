@@ -169,3 +169,32 @@ impl HashableContent for Entry {
         }
     }
 }
+
+/// Data to create an entry.
+#[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct EntryWithDefId {
+    entry_def_id: crate::entry_def::EntryDefId,
+    entry: crate::entry::Entry,
+}
+
+impl EntryWithDefId {
+    /// Constructor.
+    pub fn new(entry_def_id: crate::entry_def::EntryDefId, entry: crate::entry::Entry) -> Self {
+        Self {
+            entry_def_id,
+            entry,
+        }
+    }
+}
+
+impl AsRef<crate::Entry> for EntryWithDefId {
+    fn as_ref(&self) -> &crate::Entry {
+        &self.entry
+    }
+}
+
+impl AsRef<crate::EntryDefId> for EntryWithDefId {
+    fn as_ref(&self) -> &crate::EntryDefId {
+        &self.entry_def_id
+    }
+}

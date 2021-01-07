@@ -190,7 +190,7 @@ impl HostFnCaller {
         entry_def_id: E,
     ) -> HeaderHash {
         let (env, ribosome, call_context, workspace_lock) = self.explode();
-        let input = CreateInput::new((entry_def_id.into(), entry));
+        let input = CreateInput::new(EntryWithDefId::new(entry_def_id.into(), entry));
         let output = host_fn::create::create(ribosome, call_context, input).unwrap();
 
         // Write
@@ -230,7 +230,10 @@ impl HostFnCaller {
         original_header_hash: HeaderHash,
     ) -> HeaderHash {
         let (env, ribosome, call_context, workspace_lock) = self.explode();
-        let input = UpdateInput::new((entry_def_id.into(), entry, original_header_hash));
+        let input = UpdateInput::new((
+            original_header_hash,
+            EntryWithDefId::new(entry_def_id.into(), entry),
+        ));
         let output = { host_fn::update::update(ribosome, call_context, input).unwrap() };
 
         // Write

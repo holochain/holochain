@@ -20,5 +20,8 @@ use crate::prelude::*;
 /// @see CapClaim
 /// @see cap grant functions
 pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> HdkResult<HeaderHash> {
-    create(EntryDefId::CapClaim, Entry::CapClaim(cap_claim_entry))
+    create(EntryWithDefId::new(
+        EntryDefId::CapClaim,
+        Entry::CapClaim(cap_claim_entry),
+    ))
 }

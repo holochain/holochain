@@ -122,14 +122,14 @@ macro_rules! entry_def {
             }
         }
 
-        impl TryFrom<&$t> for $crate::prelude::HdkEntry {
+        impl TryFrom<&$t> for $crate::prelude::EntryWithDefId {
             type Error = $crate::prelude::HdkError;
             fn try_from(t: &$t) -> Result<Self, Self::Error> {
-                Ok(Self($t::entry_def_id(), t.try_into()?))
+                Ok(Self::new($t::entry_def_id(), t.try_into()?))
             }
         }
 
-        impl TryFrom<$t> for $crate::prelude::HdkEntry {
+        impl TryFrom<$t> for $crate::prelude::EntryWithDefId {
             type Error = $crate::prelude::HdkError;
             fn try_from(t: $t) -> Result<Self, Self::Error> {
                 (&t).try_into()

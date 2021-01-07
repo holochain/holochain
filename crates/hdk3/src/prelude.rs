@@ -8,7 +8,6 @@ pub use crate::entry::create_entry::create_entry;
 pub use crate::entry::delete_entry::delete_entry;
 pub use crate::entry::hash_entry::hash_entry;
 pub use crate::entry::update_entry::update_entry;
-pub use crate::entry::HdkEntry;
 pub use crate::entry_def;
 pub use crate::entry_defs;
 pub use crate::error::HdkError;

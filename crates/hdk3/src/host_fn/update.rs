@@ -14,14 +14,10 @@ use crate::prelude::*;
 /// @see update_entry
 /// @see update_cap_grant!
 /// @see update_cap_claim!
-pub fn update<D: Into<EntryDefId>, E: Into<Entry>>(
-    hash: HeaderHash,
-    entry_def_id: D,
-    entry: E,
-) -> HdkResult<HeaderHash> {
+pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> HdkResult<HeaderHash> {
     Ok(host_call::<UpdateInput, UpdateOutput>(
         __update,
-        UpdateInput::new((entry_def_id.into(), entry.into(), hash)),
+        UpdateInput::new((hash, entry_with_def_id)),
     )?
     .into_inner())
 }

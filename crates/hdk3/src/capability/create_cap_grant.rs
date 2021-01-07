@@ -81,5 +81,8 @@ use crate::prelude::*;
 /// @see create_cap_claim
 /// @see generate_cap_secret
 pub fn create_cap_grant(cap_grant_entry: CapGrantEntry) -> HdkResult<HeaderHash> {
-    create(EntryDefId::CapGrant, Entry::CapGrant(cap_grant_entry))
+    create(EntryWithDefId::new(
+        EntryDefId::CapGrant,
+        Entry::CapGrant(cap_grant_entry),
+    ))
 }

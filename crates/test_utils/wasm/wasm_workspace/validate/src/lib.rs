@@ -68,10 +68,10 @@ impl TryFrom<&ThisWasmEntry> for Entry {
     }
 }
 
-impl TryFrom<&ThisWasmEntry> for HdkEntry {
+impl TryFrom<&ThisWasmEntry> for EntryWithDefId {
     type Error = HdkError;
     fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
-        Ok(Self(EntryDefId::from(this_wasm_entry), Entry::try_from(this_wasm_entry)?))
+        Ok(Self::new(EntryDefId::from(this_wasm_entry), Entry::try_from(this_wasm_entry)?))
     }
 }
 
