@@ -156,6 +156,8 @@ pub mod tests {
 
     #[test]
     fn test_config_complete_config() {
+        observability::test_run().ok();
+
         let yaml = r#"---
     environment_path: /path/to/env
     use_dangerous_test_keystore: true
@@ -185,6 +187,14 @@ pub mod tests {
           proxy_config:
             type: local_proxy_server
             proxy_accept_config: reject_all
+      tuning_params:
+        gossip_loop_iteration_delay_ms: 42
+        default_notify_remote_agent_count: 42
+        default_notify_timeout_ms: 42
+        default_rpc_single_timeout_ms: 42
+        default_rpc_multi_remote_agent_count: 42
+        default_rpc_multi_timeout_ms: 42
+        agent_info_expires_after_ms: 42
 
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
@@ -201,6 +211,16 @@ pub mod tests {
                 proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
             },
         });
+        {
+            let mut tuning_params = &mut network_config.tuning_params;
+            tuning_params.gossip_loop_iteration_delay_ms = 42;
+            tuning_params.default_notify_remote_agent_count = 42;
+            tuning_params.default_notify_timeout_ms = 42;
+            tuning_params.default_rpc_single_timeout_ms = 42;
+            tuning_params.default_rpc_multi_remote_agent_count = 42;
+            tuning_params.default_rpc_multi_timeout_ms = 42;
+            tuning_params.agent_info_expires_after_ms = 42;
+        }
         assert_eq!(
             result.unwrap(),
             ConductorConfig {
