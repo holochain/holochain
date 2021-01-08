@@ -1400,7 +1400,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.1"
+version = "0.0.100"
 dependencies = [
  "anyhow",
  "assert_cmd",
