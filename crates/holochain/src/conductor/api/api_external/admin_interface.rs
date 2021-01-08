@@ -72,6 +72,29 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AdminInterfacesAdded)
             }
+            RegisterDna(payload) => {
+                trace!(?payload);
+                let dna = match payload.source {
+                    DnaSource::Path(path) => read_parse_dna(path, payload.properties).await?,
+                    DnaSource::Wasm(dna) => match payload.properties {
+                        Some(p) => {
+                            let properties =
+                                SerializedBytes::try_from(p).map_err(SerializationError::from)?;
+                            dna.with_properties(properties).await?
+                        }
+                        None => dna,
+                    },
+                };
+                let hash = dna.dna_hash().clone();
+                let dna_list = self.conductor_handle.list_dnas().await?;
+                if dna_list.contains(&hash) {
+                    return Err(ConductorApiError::DnaReadError(
+                        "Given dna has allready been registered".to_string(),
+                    ));
+                }
+                self.conductor_handle.install_dna(dna).await?;
+                Ok(AdminResponse::DnaRegistered(hash))
+            }
             InstallApp(payload) => {
                 trace!(?payload.dnas);
                 let InstallAppPayload {
@@ -83,16 +106,39 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 // Install Dnas
                 let tasks = dnas.into_iter().map(|dna_payload| async {
                     let InstallAppDnaPayload {
-                        path,
+                        path: maybe_path,
+                        hash: maybe_hash,
                         properties,
                         membrane_proof,
                         nick,
                     } = dna_payload;
-                    let dna = read_parse_dna(path, properties).await?;
-                    let hash = dna.dna_hash().clone();
-                    let cell_id = CellId::from((hash.clone(), agent_key.clone()));
-                    self.conductor_handle.install_dna(dna).await?;
-                    ConductorApiResult::Ok((InstalledCell::new(cell_id, nick), membrane_proof))
+                    if maybe_path.is_none() && maybe_hash.is_none() {
+                        return Err(ConductorApiError::DnaReadError("Neither path nor hash specified in payload".to_string()))
+                    };
+                    if maybe_path.is_some() && maybe_hash.is_some() {
+                        return Err(ConductorApiError::DnaReadError("Both path and hash specified in payload, pick just one".to_string()))
+                    }
+                    if let Some(path) = maybe_path {
+                        // TODO: this if let will be removed after deprecation period
+                        tracing::info!("specifying dna by path with register side-effect is deprecated, please use RegisterDna and install by hash");
+                        let dna = read_parse_dna(path, properties).await?;
+                        let hash = dna.dna_hash().clone();
+                        let cell_id = CellId::from((hash.clone(), agent_key.clone()));
+                        self.conductor_handle.install_dna(dna).await?;
+                        ConductorApiResult::Ok((InstalledCell::new(cell_id, nick), membrane_proof))
+                    } else if let Some(hash) = maybe_hash {
+                        // confirm that hash has been installed
+                        // TODO: make sure this is only for real DNAs not ones that have
+                        // been installed via properties?
+                        let dna_list = self.conductor_handle.list_dnas().await?;
+                        if !dna_list.contains(&hash) {
+                            return Err(ConductorApiError::DnaReadError("Given dna has not been registered".to_string()));
+                        }
+                        let cell_id = CellId::from((hash.clone(), agent_key.clone()));
+                        ConductorApiResult::Ok((InstalledCell::new(cell_id, nick), membrane_proof))
+                    } else {
+                        Err(ConductorApiError::DnaReadError("unreachable".to_string()))
+                    }
                 });
 
                 // Join all the install tasks
@@ -252,6 +298,52 @@ mod test {
     use uuid::Uuid;
 
     #[tokio::test(threaded_scheduler)]
+    async fn register_list_dna_app() -> Result<()> {
+        observability::test_run().ok();
+        let envs = test_environments();
+        let handle = Conductor::builder().test(&envs).await?;
+        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        let admin_api = RealAdminInterfaceApi::new(handle.clone());
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna_zomes(
+            &uuid.to_string(),
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+        let dna_hash = dna.dna_hash().clone();
+        let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
+        let path_payload = RegisterDnaPayload {
+            properties: None,
+            source: DnaSource::Path(dna_path),
+        };
+        let install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload.clone())))
+            .await;
+        assert_matches!(
+            install_response,
+            AdminResponse::DnaRegistered(h) if h == dna_hash
+        );
+
+        // re-register
+        let install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload)))
+            .await;
+        assert_matches!(
+            install_response,
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Given dna has allready been registered")
+        );
+
+        let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
+        let expects = vec![dna_hash.clone()];
+        assert_matches!(dna_list, AdminResponse::DnasListed(a) if a == expects);
+
+        handle.shutdown().await;
+        tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
+            .await
+            .ok();
+        Ok(())
+    }
+
+    #[tokio::test(threaded_scheduler)]
     async fn install_list_dna_app() -> Result<()> {
         observability::test_run().ok();
         let envs = test_environments();
@@ -264,50 +356,80 @@ mod test {
             vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
         );
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-        let dna_payload = InstallAppDnaPayload::path_only(dna_path, "".to_string());
-        let dna_hash = dna.dna_hash().clone();
-        let agent_key = fake_agent_pubkey_1();
-        let cell_id = CellId::new(dna.dna_hash().clone(), agent_key.clone());
-        let expected_cell_ids = InstalledApp {
-            installed_app_id: "test".to_string(),
-            cell_data: vec![InstalledCell::new(cell_id.clone(), "".to_string())],
+        let agent_key1 = fake_agent_pubkey_1();
+
+        // attempt install with a hash before the DNA has been registered
+        let dna_hash = dna.dna_hash();
+        let hash_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
+        let hash_install_payload = InstallAppPayload {
+            dnas: vec![hash_payload],
+            installed_app_id: "test-by-hash".to_string(),
+            agent_key: agent_key1,
         };
-        let payload = InstallAppPayload {
-            dnas: vec![dna_payload],
-            installed_app_id: "test".to_string(),
-            agent_key,
+        let install_response = admin_api
+            .handle_admin_request(AdminRequest::InstallApp(Box::new(
+                hash_install_payload.clone(),
+            )))
+            .await;
+        assert_matches!(
+            install_response,
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Given dna has not been registered")
+        );
+
+        // now install it using the path which should add the dna to the database
+        let agent_key2 = fake_agent_pubkey_2();
+        let path_payload = InstallAppDnaPayload::path_only(dna_path, "".to_string());
+        let cell_id2 = CellId::new(dna_hash.clone(), agent_key2.clone());
+        let expected_cell_ids = InstalledApp {
+            installed_app_id: "test-by-path".to_string(),
+            cell_data: vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
+        };
+        let path_install_payload = InstallAppPayload {
+            dnas: vec![path_payload],
+            installed_app_id: "test-by-path".to_string(),
+            agent_key: agent_key2,
         };
 
         let install_response = admin_api
-            .handle_admin_request(AdminRequest::InstallApp(Box::new(payload)))
+            .handle_admin_request(AdminRequest::InstallApp(Box::new(path_install_payload)))
             .await;
         assert_matches!(
             install_response,
             AdminResponse::AppInstalled(cell_ids) if cell_ids == expected_cell_ids
         );
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
-        let expects = vec![dna_hash];
+        let expects = vec![dna_hash.clone()];
         assert_matches!(dna_list, AdminResponse::DnasListed(a) if a == expects);
 
         let res = admin_api
             .handle_admin_request(AdminRequest::ActivateApp {
-                installed_app_id: "test".to_string(),
+                installed_app_id: "test-by-path".to_string(),
             })
             .await;
-
         assert_matches!(res, AdminResponse::AppActivated);
 
         let res = admin_api
             .handle_admin_request(AdminRequest::ListCellIds)
             .await;
 
-        assert_matches!(res, AdminResponse::CellIdsListed(v) if v == vec![cell_id]);
+        assert_matches!(res, AdminResponse::CellIdsListed(v) if v == vec![cell_id2]);
+
+        // now try to install the happ using the hash
+        let _install_response = admin_api
+            .handle_admin_request(AdminRequest::InstallApp(Box::new(hash_install_payload)))
+            .await;
+        let _res = admin_api
+            .handle_admin_request(AdminRequest::ActivateApp {
+                installed_app_id: "test-by-hash".to_string(),
+            })
+            .await;
 
         let res = admin_api
             .handle_admin_request(AdminRequest::ListActiveApps)
             .await;
 
-        assert_matches!(res, AdminResponse::ActiveAppsListed(v) if v == vec!["test".to_string()]);
+        assert_matches!(res, AdminResponse::ActiveAppsListed(v) if v.contains(&"test-by-path".to_string()) && v.contains(&"test-by-hash".to_string())
+        );
 
         handle.shutdown().await;
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
