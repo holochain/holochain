@@ -116,7 +116,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     // Two different DNAs, so HeaderHashes should be different.
     assert_ne!(hash_foo, hash_bar);
 
-    // Wait long enough for others to receive gossip 
+    // Wait long enough for others to receive gossip
     for env in [bobbo_foo.env(), carol_bar.env()].iter() {
         wait_for_integration_10s(
             env,
