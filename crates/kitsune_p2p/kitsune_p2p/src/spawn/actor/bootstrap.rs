@@ -202,7 +202,6 @@ pub async fn random(
 mod tests {
     use super::*;
     use crate::fixt::*;
-    use crate::spawn::actor::space::AGENT_INFO_EXPIRES_AFTER_MS;
     use crate::types::agent_store::*;
     use crate::types::KitsuneAgent;
     use crate::types::KitsuneBinType;
@@ -227,7 +226,7 @@ mod tests {
             agent.clone(),
             urls,
             (millis - 100).try_into().unwrap(),
-            AGENT_INFO_EXPIRES_AFTER_MS,
+            1000 * 60 * 20,
         );
         let mut data = Vec::new();
         kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info).unwrap();
@@ -312,7 +311,7 @@ mod tests {
                 kitsune_agent.clone(),
                 fixt!(Urls),
                 now,
-                AGENT_INFO_EXPIRES_AFTER_MS,
+                1000 * 60 * 20,
             );
             let mut data = Vec::new();
             kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info).unwrap();

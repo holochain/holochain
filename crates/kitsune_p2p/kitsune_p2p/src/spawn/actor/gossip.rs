@@ -38,10 +38,10 @@ ghost_actor::ghost_chan! {
 pub type GossipEventReceiver = futures::channel::mpsc::Receiver<GossipEvent>;
 
 /// spawn a gossip module to control gossip for a space
-pub fn spawn_gossip_module() -> GossipEventReceiver {
+pub fn spawn_gossip_module(config: Arc<KitsuneP2pConfig>) -> GossipEventReceiver {
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
 
-    tokio::task::spawn(gossip_loop(evt_send));
+    tokio::task::spawn(gossip_loop(config, evt_send));
 
     evt_recv
 }
@@ -50,6 +50,7 @@ pub fn spawn_gossip_module() -> GossipEventReceiver {
 /// the gossip module is not an actor because we want to pause while
 /// awaiting requests - not process requests in parallel.
 async fn gossip_loop(
+    config: Arc<KitsuneP2pConfig>,
     evt_send: futures::channel::mpsc::Sender<GossipEvent>,
 ) -> KitsuneP2pResult<()> {
     let mut gossip_data = GossipData::new(evt_send);
@@ -65,7 +66,10 @@ async fn gossip_loop(
             Ok(_) => (),
         }
 
-        tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+        tokio::time::delay_for(std::time::Duration::from_millis(
+            config.tuning_params.gossip_loop_iteration_delay_ms as u64,
+        ))
+        .await;
     }
 }
 
