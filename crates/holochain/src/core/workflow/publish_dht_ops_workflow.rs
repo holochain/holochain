@@ -100,9 +100,9 @@ pub async fn publish_dht_ops_workflow_inner(
                     .unwrap_or(true);
                 if needs_publish {
                     r.last_publish_time = Some(now_ts);
-                    // HACK: Incrementing the receipt count to prevent publishing 
+                    // HACK: Incrementing the receipt count to prevent publishing
                     // forever although without receipts this could lead to data loss
-                    // and relies on gossip for data integrity. 
+                    // and relies on gossip for data integrity.
                     // This should be removed when receipts are implemented.
                     r.receipt_count += 1;
                     Some((DhtOpHash::from_raw_39_panicky(k.to_vec()), r))
