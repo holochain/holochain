@@ -22,6 +22,5 @@ builtins.mapAttrs (k: v:
   builtins.removeAttrs v [ "override" "overrideDerivation" ]
 ) {
   core = callPackage ./core.nix { inherit hcRunCrate; };
-  # core = {};
   happ = callPackage ./happ.nix { inherit hcRunCrate; };
 }

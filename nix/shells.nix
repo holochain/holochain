@@ -3,6 +3,7 @@
 , mkShell
 , rustup
 , coreutils
+, darwin
 
 , holonix
 , hcRustPlatform
@@ -36,6 +37,8 @@ let
     # TODO: make thinlto linking work on stable
     # export RUSTFLAGS="$RUSTFLAGS -C linker-plugin-lto -C linker=${holonix.pkgs.clang_10}/bin/clang -C link-arg=-fuse-ld=${holonix.pkgs.lld}/bin/lld"
     ;
+
+  commonPkgsInputs = [] ++ lib.optional stdenv.isDarwin [ darwin.apple_sdk.frameworks.AppKit ];
 
   applicationPkgsInputs = {
     build = mapAttrsToList (name: value:
@@ -79,6 +82,7 @@ rec {
   coreDev = mkShell {
     nativeBuildInputs = applicationPkgsInputs.nativeBuild;
     buildInputs = applicationPkgsInputs.build
+      ++ commonPkgsInputs
       ++ devPkgsLists.core
       ;
     shellHook = commonShellHook;
@@ -90,8 +94,11 @@ rec {
   happDev = mkShell {
     nativeBuildInputs = applicationPkgsInputs.nativeBuild;
     buildInputs = applicationPkgsInputs.build
-      # ++ devPkgsLists.core
+      ++ commonPkgsInputs
       ++ devPkgsLists.happ
+      # ++ lib.optional stdenv.isDarwin [
+      #   darwin.apple_sdk.frameworks.AppKit
+      # ]
       ;
     shellHook = commonShellHook;
   };

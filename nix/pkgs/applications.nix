@@ -34,7 +34,7 @@ let
     buildInputs = [
       openssl.dev
     ] ++ lib.optionals stdenv.isDarwin (with darwin.apple_sdk.frameworks; [
-      Security CoreFoundation CoreServices
+      Security CoreFoundation CoreServices AppKit
     ]);
 
     cargoBuildFlags = [

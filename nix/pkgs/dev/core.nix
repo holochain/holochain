@@ -20,6 +20,11 @@ rec {
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
+    ${lib.optionalString stdenv.isDarwin ''
+    # fix for "too many open files" that breaks tokio and lmdb
+    ulimit -n 10240
+    ''}
+
     # ensure plain build works
     cargo build --no-default-features --manifest-path=crates/holochain/Cargo.toml
 
