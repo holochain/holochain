@@ -14,6 +14,7 @@ pub type CellNick = String;
 
 /// The source of the DNA to be installed, either as binary data, or from a path
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DnaSource {
     /// register the dna loaded from a file on disk
     Path(PathBuf),
