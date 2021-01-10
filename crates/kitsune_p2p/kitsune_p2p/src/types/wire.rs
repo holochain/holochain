@@ -1,6 +1,7 @@
 //! KitsuneP2p Wire Protocol Encoding Decoding
 
 use crate::agent_store::AgentInfoSigned;
+use crate::types::gossip::{OpConsistency, OpCount};
 use crate::types::*;
 use derive_more::*;
 use kitsune_p2p_types::dht_arc::DhtArc;
@@ -53,11 +54,12 @@ kitsune_p2p_types::write_codec_enum! {
             dht_arc.3: DhtArc,
             since_utc_epoch_s.4: i64,
             until_utc_epoch_s.5: i64,
+            last_count.6: OpCount,
         },
 
         /// List of hashes response to FetchOpHashes
         FetchOpHashesResponse(0x32) {
-            hashes.0: Vec<Arc<KitsuneOpHash>>,
+            hashes.0: OpConsistency,
             peer_hashes.1: Vec<(Arc<KitsuneAgent>, u64)>,
         },
 
