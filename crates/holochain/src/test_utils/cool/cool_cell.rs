@@ -18,7 +18,7 @@ impl CoolCell {
     }
 
     /// Get the environment for this cell
-    pub async fn env(&self) -> &EnvironmentWrite {
+    pub fn env(&self) -> &EnvironmentWrite {
         &self.cell_env
     }
 

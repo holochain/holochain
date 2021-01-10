@@ -1,6 +1,8 @@
 use hdk3::prelude::*;
 use holochain::test_utils::cool::{CoolAgents, CoolConductor, CoolDnaFile, MaybeElement};
 use holochain::test_utils::display_agent_infos;
+use holochain::test_utils::wait_for_integration_10s;
+use holochain::test_utils::WaitOps;
 use holochain_types::dna::zome::inline_zome::InlineZome;
 use holochain_zome_types::element::ElementEntry;
 
@@ -56,8 +58,12 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
         .call(&alice.zome("zome1"), "create_unit", ())
         .await;
 
-    // Wait long enough for Bob to receive gossip (TODO: make deterministic)
-    tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
+    // Wait long enough for Bob to receive gossip
+    wait_for_integration_10s(
+        bobbo.env(),
+        WaitOps::start() + WaitOps::cold_start() + WaitOps::ENTRY,
+    )
+    .await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
     let element: MaybeElement = conductor.call(&bobbo.zome("zome1"), "read", hash).await;
@@ -78,6 +84,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
 async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
+    observability::test_run().ok();
     let mut conductor = CoolConductor::from_standard_config().await;
 
     let (dna_foo, _) = CoolDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
@@ -109,8 +116,14 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     // Two different DNAs, so HeaderHashes should be different.
     assert_ne!(hash_foo, hash_bar);
 
-    // Wait long enough for others to receive gossip (TODO: make deterministic)
-    tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
+    // Wait long enough for others to receive gossip
+    for env in [bobbo_foo.env(), carol_bar.env()].iter() {
+        wait_for_integration_10s(
+            env,
+            WaitOps::start() * 1 + WaitOps::cold_start() * 2 + WaitOps::ENTRY * 1,
+        )
+        .await;
+    }
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
     // on the "foo" DNA
