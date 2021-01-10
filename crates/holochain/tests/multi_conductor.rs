@@ -6,6 +6,7 @@ use holochain::test_utils::cool::{CoolConductorBatch, CoolDnaFile};
 use holochain::test_utils::host_fn_caller::Post;
 use holochain::test_utils::show_authored;
 
+use holochain::test_utils::wait_for_integration_10s;
 use holochain::test_utils::wait_for_integration_with_others_10s;
 use holochain::test_utils::WaitOps;
 use holochain_types::dna::zome::inline_zome::InlineZome;
@@ -53,6 +54,7 @@ fn invalid_cell_zome() -> InlineZome {
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
 async fn multi_conductor() -> anyhow::Result<()> {
+    let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
     let mut conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
@@ -69,8 +71,12 @@ async fn multi_conductor() -> anyhow::Result<()> {
     // Call the "create" zome fn on Alice's app
     let hash: HeaderHash = conductors[0].call(&alice.zome("zome1"), "create", ()).await;
 
-    // Wait long enough for Bob to receive gossip (TODO: make deterministic)
-    tokio::time::delay_for(std::time::Duration::from_millis(5000)).await;
+    // Wait long enough for Bob to receive gossip
+    wait_for_integration_10s(
+        bobbo.env(),
+        WaitOps::start() * 1 + WaitOps::cold_start() * 2 + WaitOps::ENTRY * 1,
+    )
+    .await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
     let element: MaybeElement = conductors[1].call(&bobbo.zome("zome1"), "read", hash).await;
@@ -111,9 +117,9 @@ async fn invalid_cell() -> anyhow::Result<()> {
     conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
-    let alice_env = alice.env().await;
-    let bob_env = bobbo.env().await;
-    let carol_env = carol.env().await;
+    let alice_env = alice.env();
+    let bob_env = bobbo.env();
+    let carol_env = carol.env();
     let envs = vec![alice_env, bob_env, carol_env];
 
     conductors[1].shutdown().await;
