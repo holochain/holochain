@@ -98,7 +98,11 @@ impl gossip::GossipEventHandler for Space {
     ) -> gossip::GossipEventHandlerResult<OpHashesAgentHashes> {
         if self.local_joined_agents.contains(&input.to_agent) {
             let fut = local_req_op_hashes(&self.evt_sender, self.space.clone(), input);
-            Ok(async move { fut.await }.boxed().into())
+            Ok(
+                async move { fut.await.map(|r| (OpConsistency::Variance(r.0), r.1)) }
+                    .boxed()
+                    .into(),
+            )
         } else {
             let ReqOpHashesEvt {
                 to_agent,
@@ -106,6 +110,7 @@ impl gossip::GossipEventHandler for Space {
                 since_utc_epoch_s,
                 until_utc_epoch_s,
                 from_agent,
+                op_count,
             } = input;
             let transport_tx = self.transport.clone();
             let evt_sender = self.evt_sender.clone();
@@ -129,6 +134,7 @@ impl gossip::GossipEventHandler for Space {
                     dht_arc,
                     since_utc_epoch_s,
                     until_utc_epoch_s,
+                    op_count,
                 )
                 .encode_vec()?;
                 let info = types::agent_store::AgentInfo::try_from(&info)?;
@@ -263,7 +269,7 @@ pub fn local_req_op_hashes(
     evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     space: Arc<KitsuneSpace>,
     input: ReqOpHashesEvt,
-) -> impl std::future::Future<Output = Result<OpHashesAgentHashes, KitsuneP2pError>> {
+) -> impl std::future::Future<Output = Result<LocalOpHashesAgentHashes, KitsuneP2pError>> {
     let ReqOpHashesEvt {
         to_agent,
         dht_arc,
