@@ -188,6 +188,7 @@ impl KitsuneP2pActor {
                                     dht_arc,
                                     since_utc_epoch_s,
                                     until_utc_epoch_s,
+                                    last_count,
                                 }) => {
                                     let input = ReqOpHashesEvt::new(
                                         from_agent,
@@ -195,6 +196,7 @@ impl KitsuneP2pActor {
                                         dht_arc,
                                         since_utc_epoch_s,
                                         until_utc_epoch_s,
+                                        Default::default(),
                                     );
                                     let (hashes, agent_hashes) = match local_req_op_hashes(
                                         &evt_sender,
@@ -211,6 +213,19 @@ impl KitsuneP2pActor {
                                             return;
                                         }
                                         Ok(r) => r,
+                                    };
+                                    let hashes = match last_count {
+                                        OpCount::Consistent(last_count) => {
+                                            // Requester is consistent,
+                                            // now check if we are consistent.
+                                            if last_count == hashes.len() as u64 {
+                                                OpConsistency::Consistent
+                                            } else {
+                                                OpConsistency::Variance(hashes)
+                                            }
+                                        }
+                                        // Requester has a variance so we must return hashes.
+                                        OpCount::Variance => OpConsistency::Variance(hashes),
                                     };
                                     let resp =
                                         wire::Wire::fetch_op_hashes_response(hashes, agent_hashes)
