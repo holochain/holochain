@@ -76,7 +76,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 trace!(?payload);
                 let dna = match payload.source {
                     DnaSource::Path(path) => read_parse_dna(path, payload.properties).await?,
-                    DnaSource::Wasm(dna) => match payload.properties {
+                    DnaSource::DnaFile(dna) => match payload.properties {
                         Some(p) => {
                             let properties =
                                 SerializedBytes::try_from(p).map_err(SerializationError::from)?;
@@ -373,7 +373,7 @@ mod test {
             .await;
         assert_matches!(
             install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Given dna has not been registered")
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == format!("Given dna has not been registered: {}", dna_hash)
         );
 
         // now install it using the path which should add the dna to the database

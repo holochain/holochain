@@ -19,7 +19,7 @@ pub enum DnaSource {
     /// register the dna loaded from a file on disk
     Path(PathBuf),
     /// register the dna as provided in the DnaFile data structure
-    Wasm(DnaFile),
+    DnaFile(DnaFile),
 }
 
 /// The instructions on how to get the DNA to be registered
