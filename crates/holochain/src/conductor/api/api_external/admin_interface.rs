@@ -120,7 +120,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     }
                     if let Some(path) = maybe_path {
                         // TODO: this if let will be removed after deprecation period
-                        tracing::info!("specifying dna by path with register side-effect is deprecated, please use RegisterDna and install by hash");
+                        tracing::warn!("specifying dna by path with register side-effect is deprecated, please use RegisterDna and install by hash");
                         let dna = read_parse_dna(path, properties).await?;
                         let hash = dna.dna_hash().clone();
                         let cell_id = CellId::from((hash.clone(), agent_key.clone()));
@@ -132,12 +132,12 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                         // been installed via properties?
                         let dna_list = self.conductor_handle.list_dnas().await?;
                         if !dna_list.contains(&hash) {
-                            return Err(ConductorApiError::DnaReadError("Given dna has not been registered".to_string()));
+                            return Err(ConductorApiError::DnaReadError(format!("Given dna has not been registered: {}", hash)));
                         }
                         let cell_id = CellId::from((hash.clone(), agent_key.clone()));
                         ConductorApiResult::Ok((InstalledCell::new(cell_id, nick), membrane_proof))
                     } else {
-                        Err(ConductorApiError::DnaReadError("unreachable".to_string()))
+                        unreachable!()
                     }
                 });
 
