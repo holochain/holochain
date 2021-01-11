@@ -20,6 +20,8 @@ pub enum DnaSource {
     Path(PathBuf),
     /// register the dna as provided in the DnaFile data structure
     DnaFile(DnaFile),
+    /// register the dna from an existing registered DNA (assumes properties will be set)
+    Hash(DnaHash),
 }
 
 /// The instructions on how to get the DNA to be registered

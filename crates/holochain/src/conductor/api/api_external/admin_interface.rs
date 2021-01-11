@@ -75,11 +75,26 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             RegisterDna(payload) => {
                 trace!(?payload);
                 let dna = match payload.source {
+                    DnaSource::Hash(ref hash) => {
+                        let props = payload.properties.ok_or(ConductorApiError::DnaReadError(
+                            "Hash Dna source requires properties to create a derived Dna"
+                                .to_string(),
+                        ))?;
+                        let dna = self.conductor_handle.get_dna(hash).await.ok_or(
+                            ConductorApiError::DnaReadError(format!(
+                                "Unable to create derived Dna: {} not registered",
+                                hash
+                            )),
+                        )?;
+                        let properties =
+                            SerializedBytes::try_from(props).map_err(SerializationError::from)?;
+                        dna.with_properties(properties).await?
+                    }
                     DnaSource::Path(path) => read_parse_dna(path, payload.properties).await?,
                     DnaSource::DnaFile(dna) => match payload.properties {
-                        Some(p) => {
-                            let properties =
-                                SerializedBytes::try_from(p).map_err(SerializationError::from)?;
+                        Some(props) => {
+                            let properties = SerializedBytes::try_from(props)
+                                .map_err(SerializationError::from)?;
                             dna.with_properties(properties).await?
                         }
                         None => dna,
@@ -335,6 +350,34 @@ mod test {
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
         let expects = vec![dna_hash.clone()];
         assert_matches!(dna_list, AdminResponse::DnasListed(a) if a == expects);
+
+        // register by hash
+        let mut hash_payload = RegisterDnaPayload {
+            properties: None,
+            source: DnaSource::Hash(dna_hash.clone()),
+        };
+
+        // without properties should throw error
+        let install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload.clone())))
+            .await;
+        assert_matches!(
+            install_response,
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Hash Dna source requires properties to create a derived Dna")
+        );
+
+        // with a property should install and produce a different hash
+        let json = serde_json::json!({
+            "uuid": "12345678900000000000000",
+        });
+        hash_payload.properties = Some(JsonProperties::new(json.clone()));
+        let install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
+            .await;
+        assert_matches!(
+            install_response,
+            AdminResponse::DnaRegistered(hash) if hash != dna_hash
+        );
 
         handle.shutdown().await;
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
