@@ -73,7 +73,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::AdminInterfacesAdded)
             }
             RegisterDna(payload) => {
-                trace!(?payload);
+                trace!(register_dna_payload = ?payload);
                 let dna = match payload.source {
                     DnaSource::Hash(ref hash) => {
                         let props = payload.properties.ok_or(ConductorApiError::DnaReadError(
@@ -143,8 +143,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                         ConductorApiResult::Ok((InstalledCell::new(cell_id, nick), membrane_proof))
                     } else if let Some(hash) = maybe_hash {
                         // confirm that hash has been installed
-                        // TODO: make sure this is only for real DNAs not ones that have
-                        // been installed via properties?
                         let dna_list = self.conductor_handle.list_dnas().await?;
                         if !dna_list.contains(&hash) {
                             return Err(ConductorApiError::DnaReadError(format!("Given dna has not been registered: {}", hash)));
