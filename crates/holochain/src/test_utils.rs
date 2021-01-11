@@ -42,6 +42,8 @@ use tokio::sync::mpsc;
 
 pub use itertools;
 
+use self::cool::CoolCell;
+
 pub mod conductor_setup;
 pub mod cool;
 pub mod host_fn_caller;
@@ -351,6 +353,40 @@ impl WaitOps {
     /// with sharding strategy.
     pub const fn path(depth: usize) -> usize {
         Self::ENTRY + (Self::LINK + Self::ENTRY) * depth
+    }
+}
+
+/// Wait for all cells to reach consistency for 10 seconds
+pub async fn consistency_10s(all_cells: &[&CoolCell]) {
+    const NUM_ATTEMPTS: usize = 100;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
+    consistency(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
+}
+
+/// Wait for all cells to reach consistency
+#[tracing::instrument(skip(all_cells))]
+pub async fn consistency(all_cells: &[&CoolCell], num_attempts: usize, delay: Duration) {
+    let all_cell_envs: Vec<_> = all_cells.iter().map(|c| c.env()).collect();
+    consistency_envs(&all_cell_envs[..], num_attempts, delay).await
+}
+
+/// Wait for all cell envs to reach consistency
+pub async fn consistency_envs(
+    all_cell_envs: &[&EnvironmentWrite],
+    num_attempts: usize,
+    delay: Duration,
+) {
+    let mut expected_count = 0;
+    let query = ChainQueryFilter::new().include_entries(true);
+    for &env in all_cell_envs.iter() {
+        let chain = SourceChain::new(env.clone().into()).unwrap();
+        let elements = chain.query(&query).unwrap();
+        let elements = elements.iter().collect::<Vec<_>>();
+        let count = produce_op_lights_from_elements(elements).unwrap().len();
+        expected_count += count;
+    }
+    for &env in all_cell_envs.iter() {
+        wait_for_integration(env, expected_count, num_attempts, delay).await
     }
 }
 
