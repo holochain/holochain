@@ -27,6 +27,8 @@ pub enum DnaSource {
 /// The instructions on how to get the DNA to be registered
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterDnaPayload {
+    /// UUID to override when installing this Dna
+    pub uuid: Option<String>,
     /// Properties to override when installing this Dna
     pub properties: Option<JsonProperties>,
     /// The dna source

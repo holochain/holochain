@@ -76,21 +76,28 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 trace!(register_dna_payload = ?payload);
                 let dna = match payload.source {
                     DnaSource::Hash(ref hash) => {
-                        let props = payload.properties.ok_or_else(|| {
-                            ConductorApiError::DnaReadError(
-                                "Hash Dna source requires properties to create a derived Dna"
+                        if payload.properties.is_none() && payload.uuid.is_none() {
+                            return Err(ConductorApiError::DnaReadError(
+                                "Hash Dna source requires properties or uuid to create a derived Dna"
                                     .to_string(),
-                            )
-                        })?;
-                        let dna = self.conductor_handle.get_dna(hash).await.ok_or_else(|| {
-                            ConductorApiError::DnaReadError(format!(
-                                "Unable to create derived Dna: {} not registered",
-                                hash
-                            ))
-                        })?;
-                        let properties =
-                            SerializedBytes::try_from(props).map_err(SerializationError::from)?;
-                        dna.with_properties(properties).await?
+                            ));
+                        }
+                        let mut dna =
+                            self.conductor_handle.get_dna(hash).await.ok_or_else(|| {
+                                ConductorApiError::DnaReadError(format!(
+                                    "Unable to create derived Dna: {} not registered",
+                                    hash
+                                ))
+                            })?;
+                        if let Some(props) = payload.properties {
+                            let properties = SerializedBytes::try_from(props)
+                                .map_err(SerializationError::from)?;
+                            dna = dna.with_properties(properties).await?;
+                        }
+                        if let Some(uuid) = payload.uuid {
+                            dna = dna.with_uuid(uuid).await?;
+                        }
+                        dna
                     }
                     DnaSource::Path(path) => read_parse_dna(path, payload.properties).await?,
                     DnaSource::DnaFile(dna) => match payload.properties {
@@ -327,6 +334,7 @@ mod test {
         let dna_hash = dna.dna_hash().clone();
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let path_payload = RegisterDnaPayload {
+            uuid: None,
             properties: None,
             source: DnaSource::Path(dna_path),
         };
@@ -353,24 +361,36 @@ mod test {
 
         // register by hash
         let mut hash_payload = RegisterDnaPayload {
+            uuid: None,
             properties: None,
             source: DnaSource::Hash(dna_hash.clone()),
         };
 
-        // without properties should throw error
+        // without properties or uuid should throw error
         let install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload.clone())))
             .await;
         assert_matches!(
             install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Hash Dna source requires properties to create a derived Dna")
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Hash Dna source requires properties or uuid to create a derived Dna")
         );
 
         // with a property should install and produce a different hash
         let json = serde_json::json!({
-            "uuid": "12345678900000000000000",
+            "some prop": "foo",
         });
         hash_payload.properties = Some(JsonProperties::new(json.clone()));
+        let install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload.clone())))
+            .await;
+        assert_matches!(
+            install_response,
+            AdminResponse::DnaRegistered(hash) if hash != dna_hash
+        );
+
+        // with a uuid should install and produce a different hash
+        hash_payload.properties = None;
+        hash_payload.uuid = Some(String::from("12345678900000000000000"));
         let install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
             .await;
