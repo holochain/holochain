@@ -31,10 +31,7 @@ pub fn print_all_metrics() {
         let mut out = String::new();
         writeln!(
             out,
-            "\n{}\n{}\n{}\n",
-            "**************************",
-            "* Kitsune Metrics Report *",
-            "**************************",
+            "\n**************************\n* Kitsune Metrics Report *\n**************************\n",
         )
         .expect("Failed to print metrics");
         for (metric, count) in KitsuneMetrics::iter() {
