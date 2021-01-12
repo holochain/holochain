@@ -76,13 +76,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 trace!(register_dna_payload = ?payload);
                 let dna = match payload.source {
                     DnaSource::Hash(ref hash) => {
-                        let props = payload.properties.ok_or(|| {
+                        let props = payload.properties.ok_or_else(|| {
                             ConductorApiError::DnaReadError(
                                 "Hash Dna source requires properties to create a derived Dna"
                                     .to_string(),
                             )
                         })?;
-                        let dna = self.conductor_handle.get_dna(hash).await.ok_or(|| {
+                        let dna = self.conductor_handle.get_dna(hash).await.ok_or_else(|| {
                             ConductorApiError::DnaReadError(format!(
                                 "Unable to create derived Dna: {} not registered",
                                 hash
