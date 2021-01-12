@@ -1,9 +1,6 @@
 //! Functions dealing with obtaining and referencing singleton LMDB environments
 
-use crate::db::get_db;
 use crate::db::initialize_databases;
-use crate::db::DbKey;
-use crate::db::GetDb;
 use crate::error::DatabaseError;
 use crate::error::DatabaseResult;
 use crate::transaction::Reader;
@@ -121,26 +118,6 @@ impl EnvironmentRead {
     /// The environments path
     pub fn path(&self) -> &PathBuf {
         &self.path
-    }
-}
-
-impl GetDb for EnvironmentWrite {
-    fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
-        get_db(&self.path, key)
-    }
-
-    fn keystore(&self) -> KeystoreSender {
-        self.keystore.clone()
-    }
-}
-
-impl GetDb for EnvironmentRead {
-    fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
-        get_db(&self.path, key)
-    }
-
-    fn keystore(&self) -> KeystoreSender {
-        self.keystore.clone()
     }
 }
 
