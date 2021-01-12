@@ -13,9 +13,9 @@ use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetMetaOptions;
@@ -1838,7 +1838,7 @@ where
     /// Get agent activity from agent activity authorities.
     /// Hashes are requested from the authority and cache for valid chains.
     /// Options:
-    /// - include_valid_activity will include the valid chain hashes.     
+    /// - include_valid_activity will include the valid chain hashes.
     /// - include_rejected_activity will include the valid chain hashes. (unimplemented)
     /// - include_full_headers will fetch the valid headers in parallel (requires include_valid_activity)
     /// Query:

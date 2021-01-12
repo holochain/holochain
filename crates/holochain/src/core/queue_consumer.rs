@@ -29,9 +29,9 @@ use derive_more::Constructor;
 use derive_more::Display;
 use derive_more::From;
 use futures::future::Either;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::env::WriteManager;
-use holochain_lmdb::prelude::Writer;
+use holochain_sqlite::env::EnvironmentWrite;
+use holochain_sqlite::env::WriteManager;
+use holochain_sqlite::prelude::Writer;
 use tokio::sync;
 use tokio::sync::mpsc;
 

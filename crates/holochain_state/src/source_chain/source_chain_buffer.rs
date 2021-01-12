@@ -5,10 +5,10 @@ use crate::element_buf::HeaderCas;
 use crate::source_chain::SourceChainError;
 use crate::source_chain::SourceChainResult;
 use fallible_iterator::FallibleIterator;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
+use holochain_sqlite::buffer::BufferedStore;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use tracing::*;
 
@@ -327,8 +327,8 @@ pub mod tests {
     use super::SourceChainBuf;
     use crate::source_chain::SourceChainResult;
     use fallible_iterator::FallibleIterator;
-    use holochain_lmdb::prelude::*;
-    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_sqlite::prelude::*;
+    use holochain_sqlite::test_utils::test_cell_env;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;

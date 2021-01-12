@@ -1,7 +1,7 @@
 use super::SweetZome;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
-use holochain_lmdb::env::EnvironmentWrite;
+use holochain_sqlite::env::EnvironmentWrite;
 
 /// A reference to a Cell created by a SweetConductor installation function.
 /// It has very concise methods for calling a zome on this cell

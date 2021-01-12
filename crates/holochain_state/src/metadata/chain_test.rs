@@ -2,9 +2,9 @@ use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
-use holochain_lmdb::env::ReadManager;
-use holochain_lmdb::test_utils::test_cell_env;
-use holochain_lmdb::test_utils::TestEnvironment;
+use holochain_sqlite::env::ReadManager;
+use holochain_sqlite::test_utils::test_cell_env;
+use holochain_sqlite::test_utils::TestEnvironment;
 use holochain_types::prelude::*;
 use holochain_zome_types::test_utils::fake_agent_pubkey_1;
 

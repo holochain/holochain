@@ -97,7 +97,7 @@ pub mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_delete_link_add_remove() {
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_sqlite::test_utils::test_cell_env();
         let env = test_env.env();
 
         let mut workspace =

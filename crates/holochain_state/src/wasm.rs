@@ -1,11 +1,11 @@
 use holo_hash::WasmHash;
-use holochain_lmdb::buffer::CasBufFreshAsync;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::exports::SingleStore;
-use holochain_lmdb::prelude::BufferedStore;
-use holochain_lmdb::prelude::EnvironmentRead;
-use holochain_lmdb::transaction::Writer;
+use holochain_sqlite::buffer::CasBufFreshAsync;
+use holochain_sqlite::error::DatabaseError;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::exports::SingleStore;
+use holochain_sqlite::prelude::BufferedStore;
+use holochain_sqlite::prelude::EnvironmentRead;
+use holochain_sqlite::transaction::Writer;
 use holochain_types::prelude::*;
 
 /// This is where wasm lives
@@ -42,14 +42,14 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn wasm_store_round_trip() -> DatabaseResult<()> {
-        use holochain_lmdb::prelude::*;
+        use holochain_sqlite::prelude::*;
         observability::test_run().ok();
 
         // all the stuff needed to have a WasmBuf
-        let env = holochain_lmdb::test_utils::test_wasm_env();
+        let env = holochain_sqlite::test_utils::test_wasm_env();
         let mut wasm_buf = WasmBuf::new(
             env.env().into(),
-            env.get_db(&*holochain_lmdb::db::WASM).unwrap(),
+            env.get_db(&*holochain_sqlite::db::WASM).unwrap(),
         )
         .unwrap();
 

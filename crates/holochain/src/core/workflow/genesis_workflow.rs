@@ -12,7 +12,7 @@ use super::error::WorkflowResult;
 use crate::conductor::api::CellConductorApiT;
 use crate::core::queue_consumer::OneshotWriter;
 use derive_more::Constructor;
-use holochain_lmdb::prelude::*;
+use holochain_sqlite::prelude::*;
 use holochain_state::source_chain::SourceChainBuf;
 use holochain_state::workspace::Workspace;
 use holochain_state::workspace::WorkspaceResult;
@@ -106,7 +106,7 @@ pub mod tests {
     use crate::conductor::api::MockCellConductorApi;
     use crate::core::SourceChainResult;
     use fallible_iterator::FallibleIterator;
-    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_sqlite::test_utils::test_cell_env;
     use holochain_state::source_chain::SourceChain;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;

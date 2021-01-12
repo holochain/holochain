@@ -54,7 +54,7 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     /// we can get an entry hash out of the fn via. a wasm call
     async fn ribosome_hash_entry_test() {
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_sqlite::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
@@ -84,7 +84,7 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     /// the hash path underlying anchors wraps entry_hash
     async fn ribosome_hash_path_pwd_test() {
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_sqlite::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();

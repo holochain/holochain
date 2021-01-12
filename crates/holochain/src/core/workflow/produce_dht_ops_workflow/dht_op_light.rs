@@ -7,7 +7,7 @@ use holochain_types::prelude::*;
 
 pub mod error;
 
-use holochain_lmdb::prelude::PrefixType;
+use holochain_sqlite::prelude::PrefixType;
 use tracing::*;
 
 #[cfg(test)]

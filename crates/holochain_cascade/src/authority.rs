@@ -5,13 +5,13 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::env::ReadManager;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::PrefixType;
-use holochain_lmdb::prelude::Readable;
+use holochain_sqlite::env::EnvironmentRead;
+use holochain_sqlite::env::EnvironmentWrite;
+use holochain_sqlite::env::ReadManager;
+use holochain_sqlite::error::DatabaseError;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::PrefixType;
+use holochain_sqlite::prelude::Readable;
 use holochain_state::element_buf::ElementBuf;
 use holochain_state::metadata::ChainItemKey;
 use holochain_state::metadata::LinkMetaKey;
@@ -369,7 +369,7 @@ fn _show_agent_activity_read_times(env: EnvironmentRead, agent: AgentPubKey) {
     }
     let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
     let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
-    holochain_lmdb::fresh_reader_test!(env, |r| {
+    holochain_sqlite::fresh_reader_test!(env, |r| {
         let now = std::time::Instant::now();
         let hashes = meta_integrated
             .get_activity_sequence(

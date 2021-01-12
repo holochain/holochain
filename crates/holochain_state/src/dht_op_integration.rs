@@ -2,16 +2,16 @@
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::db::INTEGRATED_DHT_OPS;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::prelude::BufferedStore;
-use holochain_lmdb::prelude::EnvironmentRead;
-use holochain_lmdb::prelude::GetDb;
-use holochain_lmdb::prelude::Readable;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_serialized_bytes::prelude::*;
+use holochain_sqlite::buffer::KvBufFresh;
+use holochain_sqlite::db::INTEGRATED_DHT_OPS;
+use holochain_sqlite::error::DatabaseError;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::prelude::BufferedStore;
+use holochain_sqlite::prelude::EnvironmentRead;
+use holochain_sqlite::prelude::GetDb;
+use holochain_sqlite::prelude::Readable;
 use holochain_types::prelude::*;
 use holochain_zome_types::validate::ValidationStatus;
 
@@ -73,7 +73,7 @@ impl BufferedStore for IntegratedDhtOpsBuf {
     type Error = DatabaseError;
     fn flush_to_txn_ref(
         &mut self,
-        writer: &mut holochain_lmdb::prelude::Writer,
+        writer: &mut holochain_sqlite::prelude::Writer,
     ) -> Result<(), Self::Error> {
         self.store.flush_to_txn_ref(writer)
     }
@@ -165,10 +165,10 @@ mod tests {
     use holo_hash::fixt::AnyDhtHashFixturator;
     use holo_hash::fixt::DhtOpHashFixturator;
     use holo_hash::fixt::HeaderHashFixturator;
-    use holochain_lmdb::buffer::BufferedStore;
-    use holochain_lmdb::env::ReadManager;
-    use holochain_lmdb::env::WriteManager;
-    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_sqlite::buffer::BufferedStore;
+    use holochain_sqlite::env::ReadManager;
+    use holochain_sqlite::env::WriteManager;
+    use holochain_sqlite::test_utils::test_cell_env;
     use pretty_assertions::assert_eq;
 
     #[tokio::test(threaded_scheduler)]

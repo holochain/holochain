@@ -7,7 +7,7 @@
 //!
 //! ```rust, no_run
 //! async fn async_main () {
-//! use holochain_lmdb::test_utils::{test_environments, TestEnvironment};
+//! use holochain_sqlite::test_utils::{test_environments, TestEnvironment};
 //! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
 //! let envs = test_environments();
 //! let handle: ConductorHandle = ConductorBuilder::new()
@@ -70,7 +70,7 @@ use super::state::ConductorState;
 #[cfg(any(test, feature = "test_utils"))]
 use crate::core::queue_consumer::QueueTriggers;
 #[cfg(any(test, feature = "test_utils"))]
-use holochain_lmdb::env::EnvironmentWrite;
+use holochain_sqlite::env::EnvironmentWrite;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;

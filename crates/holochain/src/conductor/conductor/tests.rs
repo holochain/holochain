@@ -3,7 +3,7 @@ use super::ConductorState;
 use super::*;
 use crate::test_utils::fake_valid_dna_file;
 use ::fixt::prelude::*;
-use holochain_lmdb::test_utils::test_environments;
+use holochain_sqlite::test_utils::test_environments;
 use holochain_types::test_utils::fake_cell_id;
 use matches::assert_matches;
 

@@ -1,6 +1,6 @@
 use crate::display::{dump_kv, dump_kvi};
+use holochain_sqlite::{db, env::EnvironmentWrite, prelude::*};
 use holochain_types::{app::CellNick, cell::CellId};
-use holochain_lmdb::{db, env::EnvironmentWrite, prelude::*};
 
 pub async fn dump_cell_state(
     env: EnvironmentWrite,

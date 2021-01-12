@@ -58,16 +58,16 @@ use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::KeystoreSender;
 use holochain_keystore::KeystoreSenderExt;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::buffer::KvStore;
-use holochain_lmdb::buffer::KvStoreT;
-use holochain_lmdb::db;
-use holochain_lmdb::env::EnvironmentKind;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::env::ReadManager;
-use holochain_lmdb::exports::SingleStore;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
+use holochain_sqlite::buffer::BufferedStore;
+use holochain_sqlite::buffer::KvStore;
+use holochain_sqlite::buffer::KvStoreT;
+use holochain_sqlite::db;
+use holochain_sqlite::env::EnvironmentKind;
+use holochain_sqlite::env::EnvironmentWrite;
+use holochain_sqlite::env::ReadManager;
+use holochain_sqlite::exports::SingleStore;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
 use holochain_state::source_chain::SourceChainBuf;
 use holochain_state::wasm::WasmBuf;
 use holochain_types::prelude::*;
@@ -706,9 +706,9 @@ where
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
         let environ = &self.wasm_env;
-        let wasm = environ.get_db(&*holochain_lmdb::db::WASM)?;
-        let dna_def_db = environ.get_db(&*holochain_lmdb::db::DNA_DEF)?;
-        let entry_def_db = environ.get_db(&*holochain_lmdb::db::ENTRY_DEF)?;
+        let wasm = environ.get_db(&*holochain_sqlite::db::WASM)?;
+        let dna_def_db = environ.get_db(&*holochain_sqlite::db::DNA_DEF)?;
+        let entry_def_db = environ.get_db(&*holochain_sqlite::db::ENTRY_DEF)?;
 
         let wasm_buf = Arc::new(WasmBuf::new(environ.clone().into(), wasm)?);
         let dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
@@ -777,9 +777,9 @@ where
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
         let environ = self.wasm_env.clone();
-        let wasm = environ.get_db(&*holochain_lmdb::db::WASM)?;
-        let dna_def_db = environ.get_db(&*holochain_lmdb::db::DNA_DEF)?;
-        let entry_def_db = environ.get_db(&*holochain_lmdb::db::ENTRY_DEF)?;
+        let wasm = environ.get_db(&*holochain_sqlite::db::WASM)?;
+        let dna_def_db = environ.get_db(&*holochain_sqlite::db::DNA_DEF)?;
+        let entry_def_db = environ.get_db(&*holochain_sqlite::db::ENTRY_DEF)?;
 
         let zome_defs = get_entry_defs(dna.clone())?;
 
@@ -971,9 +971,9 @@ mod builder {
     use super::*;
     use crate::conductor::dna_store::RealDnaStore;
     use crate::conductor::ConductorHandle;
-    use holochain_lmdb::env::EnvironmentKind;
+    use holochain_sqlite::env::EnvironmentKind;
     #[cfg(any(test, feature = "test_utils"))]
-    use holochain_lmdb::test_utils::TestEnvironments;
+    use holochain_sqlite::test_utils::TestEnvironments;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]

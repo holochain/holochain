@@ -16,7 +16,7 @@ use holochain_cascade::Cascade;
 use holochain_cascade::DbPair;
 use holochain_cascade::DbPairMut;
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::prelude::*;
+use holochain_sqlite::prelude::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::element_buf::ElementBuf;
 use holochain_state::metadata::MetadataBuf;
@@ -346,8 +346,8 @@ pub mod tests {
     use crate::fixt::*;
     use ::fixt::prelude::*;
 
-    use holochain_lmdb::env::ReadManager;
-    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_sqlite::env::ReadManager;
+    use holochain_sqlite::test_utils::test_cell_env;
     use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;

@@ -1,4 +1,4 @@
-# holochain_lmdb
+# holochain_sqlite
 
 [![Project](https://img.shields.io/badge/project-holochain-blue.svg?style=flat-square)](http://holochain.org/)
 [![Forum](https://img.shields.io/badge/chat-forum%2eholochain%2enet-blue.svg?style=flat-square)](https://forum.holochain.org)
@@ -49,7 +49,7 @@ The rkv crate provides a few abstractions for working with LMDB stores. The ones
 - IntegerStore: a key-value store with integer key and one value per key
 - MultiStore: a key-value store with arbitrary key and multiple values per key
 
-On top of these abstractions, the `holochain_lmdb` crate provides three buffered store abstractions to wrap each of the rkv store types, as well as a simple CAS abstraction:
+On top of these abstractions, the `holochain_sqlite` crate provides three buffered store abstractions to wrap each of the rkv store types, as well as a simple CAS abstraction:
 
 - [KvBuffer]: a SingleStore with a scratch space
 - [KvIntBuffer]: an IntegerStore with a scratch space

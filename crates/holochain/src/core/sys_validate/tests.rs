@@ -6,8 +6,8 @@ use ::fixt::prelude::*;
 use error::SysValidationError;
 
 use holochain_keystore::AgentPubKeyExt;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::test_utils::test_cell_env;
+use holochain_sqlite::env::EnvironmentRead;
+use holochain_sqlite::test_utils::test_cell_env;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
@@ -17,7 +17,7 @@ use std::convert::TryFrom;
 
 #[tokio::test(threaded_scheduler)]
 async fn verify_header_signature_test() {
-    let keystore = holochain_lmdb::test_utils::test_keystore();
+    let keystore = holochain_sqlite::test_utils::test_keystore();
     let author = fake_agent_pubkey_1();
     let mut header = fixt!(CreateLink);
     header.author = author.clone();

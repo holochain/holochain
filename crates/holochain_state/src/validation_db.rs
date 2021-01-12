@@ -3,11 +3,11 @@
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::DhtOpHash;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::db::VALIDATION_LIMBO;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::prelude::EnvironmentRead;
-use holochain_lmdb::prelude::GetDb;
+use holochain_sqlite::buffer::KvBufFresh;
+use holochain_sqlite::db::VALIDATION_LIMBO;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::prelude::EnvironmentRead;
+use holochain_sqlite::prelude::GetDb;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use shrinkwraprs::Shrinkwrap;

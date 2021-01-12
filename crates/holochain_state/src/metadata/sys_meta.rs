@@ -16,8 +16,8 @@ mod tests {
     use header::Create;
     use holo_hash::fixt::*;
     use holo_hash::*;
-    use holochain_lmdb::prelude::*;
-    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_sqlite::prelude::*;
+    use holochain_sqlite::test_utils::test_cell_env;
     use holochain_types::fixt::AppEntryTypeFixturator;
     use holochain_types::fixt::HeaderBuilderCommonFixturator;
     use holochain_types::header::NewEntryHeader;

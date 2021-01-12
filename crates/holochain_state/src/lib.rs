@@ -1,6 +1,6 @@
 //! # Persisted State building blocks
 //!
-//! This crate provides a few types for working with LMDB databases. The types build upon those found in [holochain_lmdb::buffer].
+//! This crate provides a few types for working with LMDB databases. The types build upon those found in [holochain_sqlite::buffer].
 //!
 //! - [ElementBuf]: the union of two CasBuffers, one for Entries, one for Headers
 //! - [ChainSequenceBuf]: database representing the chain sequence DB, which provides a special method for accessing the chain head

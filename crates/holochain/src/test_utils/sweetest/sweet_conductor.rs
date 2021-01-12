@@ -12,7 +12,7 @@ use futures::future;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::test_utils::{test_environments, TestEnvironments};
+use holochain_sqlite::test_utils::{test_environments, TestEnvironments};
 use holochain_types::prelude::*;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::sync::Arc;

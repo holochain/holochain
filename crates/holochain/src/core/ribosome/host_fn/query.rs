@@ -29,14 +29,14 @@ pub mod slow_tests {
     };
     use ::fixt::prelude::*;
     use hdk::prelude::*;
-    use holochain_lmdb::test_utils::TestEnvironment;
+    use holochain_sqlite::test_utils::TestEnvironment;
     use query::ChainQueryFilter;
 
     use holochain_wasm_test_utils::TestWasm;
 
     // TODO: use this setup function to DRY up a lot of duplicated code
     async fn setup() -> (TestEnvironment, ZomeCallHostAccess) {
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_sqlite::test_utils::test_cell_env();
         let env = test_env.env();
 
         let mut workspace =

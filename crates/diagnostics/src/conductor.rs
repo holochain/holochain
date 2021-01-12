@@ -1,6 +1,6 @@
 use crate::display::human_size;
 use crate::holochain::conductor::{state::ConductorState, ConductorStateDb};
-use holochain_lmdb::{db::CONDUCTOR_STATE, env::EnvironmentWrite, prelude::*};
+use holochain_sqlite::{db::CONDUCTOR_STATE, env::EnvironmentWrite, prelude::*};
 
 pub async fn dump_conductor_state(env: EnvironmentWrite) -> anyhow::Result<ConductorState> {
     let g = env.guard();

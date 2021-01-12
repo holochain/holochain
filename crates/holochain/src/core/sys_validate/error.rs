@@ -10,7 +10,7 @@ use holo_hash::AnyDhtHash;
 use holo_hash::HeaderHash;
 use holochain_cascade::error::CascadeError;
 use holochain_keystore::KeystoreError;
-use holochain_lmdb::error::DatabaseError;
+use holochain_sqlite::error::DatabaseError;
 use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
 use thiserror::Error;

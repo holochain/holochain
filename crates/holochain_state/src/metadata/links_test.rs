@@ -1,10 +1,10 @@
 use super::*;
 use crate::here;
 use ::fixt::prelude::*;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::fresh_reader_test;
-use holochain_lmdb::test_utils::test_cell_env;
+use holochain_sqlite::buffer::BufferedStore;
+use holochain_sqlite::env::EnvironmentWrite;
+use holochain_sqlite::fresh_reader_test;
+use holochain_sqlite::test_utils::test_cell_env;
 
 use observability;
 

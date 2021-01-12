@@ -5,17 +5,17 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_conductor_api::AgentInfoDump;
 use holochain_conductor_api::P2pStateDump;
-use holochain_lmdb::buffer::KvStore;
-use holochain_lmdb::buffer::KvStoreT;
-use holochain_lmdb::db::GetDb;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::env::WriteManager;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::key::BufKey;
-use holochain_lmdb::prelude::Readable;
+use holochain_sqlite::buffer::KvStore;
+use holochain_sqlite::buffer::KvStoreT;
+use holochain_sqlite::db::GetDb;
+use holochain_sqlite::env::EnvironmentRead;
+use holochain_sqlite::env::EnvironmentWrite;
+use holochain_sqlite::env::WriteManager;
+use holochain_sqlite::error::DatabaseError;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::key::BufKey;
+use holochain_sqlite::prelude::Readable;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_zome_types::CellId;
@@ -59,11 +59,11 @@ impl Ord for AgentKvKey {
 }
 
 impl std::convert::TryFrom<&AgentInfoSigned> for AgentKvKey {
-    type Error = holochain_lmdb::error::DatabaseError;
+    type Error = holochain_sqlite::error::DatabaseError;
     fn try_from(agent_info_signed: &AgentInfoSigned) -> Result<Self, Self::Error> {
         let agent_info: AgentInfo = agent_info_signed
             .try_into()
-            .map_err(|_| holochain_lmdb::error::DatabaseError::KeyConstruction)?;
+            .map_err(|_| holochain_sqlite::error::DatabaseError::KeyConstruction)?;
         Ok((&agent_info).into())
     }
 }
@@ -133,7 +133,7 @@ impl AsRef<KvStore<AgentKvKey, AgentInfoSigned>> for AgentKv {
 impl AgentKv {
     /// Constructor.
     pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let db = env.get_db(&*holochain_lmdb::db::AGENT)?;
+        let db = env.get_db(&*holochain_sqlite::db::AGENT)?;
         Ok(Self(KvStore::new(db)))
     }
 
@@ -398,11 +398,11 @@ pub fn dump_state(env: EnvironmentRead, cell_id: Option<CellId>) -> DatabaseResu
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use holochain_lmdb::buffer::KvStoreT;
-    use holochain_lmdb::env::ReadManager;
-    use holochain_lmdb::env::WriteManager;
-    use holochain_lmdb::fresh_reader_test;
-    use holochain_lmdb::test_utils::test_p2p_env;
+    use holochain_sqlite::buffer::KvStoreT;
+    use holochain_sqlite::env::ReadManager;
+    use holochain_sqlite::env::WriteManager;
+    use holochain_sqlite::fresh_reader_test;
+    use holochain_sqlite::test_utils::test_p2p_env;
     use kitsune_p2p::fixt::AgentInfoFixturator;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p::KitsuneBinType;

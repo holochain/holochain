@@ -288,7 +288,7 @@ pub mod test_utils {
     use crate::conductor::api::RealAppInterfaceApi;
     use crate::conductor::conductor::ConductorBuilder;
     use crate::conductor::ConductorHandle;
-    use holochain_lmdb::test_utils::test_environments;
+    use holochain_sqlite::test_utils::test_environments;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::prelude::*;
     use std::sync::Arc;
@@ -350,9 +350,9 @@ pub mod test {
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
     use futures::future::FutureExt;
-    use holochain_lmdb::buffer::KvStoreT;
-    use holochain_lmdb::fresh_reader_test;
-    use holochain_lmdb::test_utils::test_environments;
+    use holochain_sqlite::buffer::KvStoreT;
+    use holochain_sqlite::fresh_reader_test;
+    use holochain_sqlite::test_utils::test_environments;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;

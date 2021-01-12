@@ -1,5 +1,5 @@
 use holo_hash::{AnyDhtHash, HeaderHash};
-use holochain_lmdb::error::DatabaseError;
+use holochain_sqlite::error::DatabaseError;
 use holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_state::source_chain::SourceChainError;

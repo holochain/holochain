@@ -12,7 +12,7 @@ fallible-iterator = "0.2"
 
 holochain = { path = "../holochain" }
 holochain_keystore = { path = "../holochain_keystore"}
-holochain_lmdb = { path = "../holochain_lmdb"}
+holochain_sqlite = { path = "../holochain_sqlite"}
 holochain_types = { path = "../holochain_types"}
 
 rkv = "0.10.4"

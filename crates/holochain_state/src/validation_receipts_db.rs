@@ -5,13 +5,13 @@ use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::buffer::KvvBufUsed;
-use holochain_lmdb::db::GetDb;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::prelude::Readable;
-use holochain_lmdb::prelude::Writer;
+use holochain_sqlite::buffer::BufferedStore;
+use holochain_sqlite::buffer::KvvBufUsed;
+use holochain_sqlite::db::GetDb;
+use holochain_sqlite::error::DatabaseError;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::prelude::Readable;
+use holochain_sqlite::prelude::Writer;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::signature::Signature;
 
@@ -92,7 +92,7 @@ impl ValidationReceiptsBuf {
     /// Constructor given read-only transaction and db ref.
     pub fn new(dbs: &impl GetDb) -> DatabaseResult<ValidationReceiptsBuf> {
         Ok(Self(KvvBufUsed::new_opts(
-            dbs.get_db(&*holochain_lmdb::db::VALIDATION_RECEIPTS)?,
+            dbs.get_db(&*holochain_sqlite::db::VALIDATION_RECEIPTS)?,
             true, // set to no_dup_data mode
         )))
     }
@@ -153,8 +153,8 @@ impl BufferedStore for ValidationReceiptsBuf {
 mod tests {
     use super::*;
     use holochain_keystore::KeystoreSenderExt;
-    use holochain_lmdb::env::ReadManager;
-    use holochain_lmdb::prelude::*;
+    use holochain_sqlite::env::ReadManager;
+    use holochain_sqlite::prelude::*;
     use holochain_types::test_utils::fake_dht_op_hash;
 
     async fn fake_vr(
@@ -178,9 +178,9 @@ mod tests {
     async fn test_validation_receipts_db_populate_and_list() -> DatabaseResult<()> {
         observability::test_run().ok();
 
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_sqlite::test_utils::test_cell_env();
         let env = test_env.env();
-        let keystore = holochain_lmdb::test_utils::test_keystore();
+        let keystore = holochain_sqlite::test_utils::test_keystore();
 
         let test_op_hash = fake_dht_op_hash(1);
         let vr1 = fake_vr(&test_op_hash, &keystore).await;

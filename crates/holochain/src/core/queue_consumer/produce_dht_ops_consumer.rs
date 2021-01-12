@@ -4,7 +4,7 @@ use super::*;
 use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::produce_dht_ops_workflow::produce_dht_ops_workflow;
 use crate::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
-use holochain_lmdb::env::EnvironmentWrite;
+use holochain_sqlite::env::EnvironmentWrite;
 
 use tokio::task::JoinHandle;
 use tracing::*;

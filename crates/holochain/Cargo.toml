@@ -28,7 +28,7 @@ holochain_cascade = { version = "0.0.1", path = "../holochain_cascade" }
 holochain_conductor_api = { version = "0.0.1", path = "../holochain_conductor_api" }
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
-holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }
+holochain_sqlite = { version = "0.0.1", path = "../holochain_sqlite" }
 holochain_serialized_bytes = "=0.0.50"
 holochain_state = { version = "0.0.1", path = "../holochain_state" }
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
@@ -113,7 +113,7 @@ default = ["slow_tests", "test_utils", "only_check_wasms"]
 # This feature should be turned off for production builds.
 test_utils = [
   "hdk",
-  "holochain_lmdb/test_utils",
+  "holochain_sqlite/test_utils",
   "holochain_state/test_utils",
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",
