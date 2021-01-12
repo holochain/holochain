@@ -106,7 +106,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let dna_list = self.conductor_handle.list_dnas().await?;
                 if dna_list.contains(&hash) {
                     return Err(ConductorApiError::DnaReadError(
-                        "Given dna has allready been registered".to_string(),
+                        "Given dna has already been registered".to_string(),
                     ));
                 }
                 self.conductor_handle.install_dna(dna).await?;
@@ -344,7 +344,7 @@ mod test {
             .await;
         assert_matches!(
             install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Given dna has allready been registered")
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Given dna has already been registered")
         );
 
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
