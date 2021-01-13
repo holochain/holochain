@@ -10,19 +10,25 @@ pub(super) struct Bundle {
     dnas: Vec<BundleDnas>,
 }
 
+/// Description of a Dna referenced by this Bundle
 pub(super) struct BundleDna {
     /// The CellNick which will be given to the installed Cell for this Dna
     nick: CellNick,
 
-    /// The hash of the Dna
-    hash: DnaHash,
+    /// The hash of the Dna.
+    ///
+    /// In "dev" mode (to be defined), the hash can be omitted when installing
+    /// a bundle, since it may be frequently changing. Otherwise, it is required
+    /// for "real" bundles.
+    hash: Option<DnaHash>,
 
-    /// Optional Dna location.
-    /// If None, it is assumed that the Dna with this hash is present in the bundle.
-    /// If Some, specifies an external location to fetch this Dna from.
-    location: Option<BundleDnaLocation>,
+    /// Where to find this Dna
+    location: BundleDnaLocation,
 }
 
+/// Where to find this Dna.
+/// If Local, the path may refer to a Dna which is bundled with the manifest,
+/// or it may be to some other absolute or relative file path.
 pub(super) enum BundleDnaLocation {
     /// Get Dna from local filesystem
     Local(PathBuf),
