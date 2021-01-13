@@ -15,6 +15,7 @@ pub mod chain;
 pub mod db;
 pub mod dht_op;
 pub mod dna;
+pub mod dna_bundle;
 pub mod element;
 pub mod entry;
 pub mod fixt;

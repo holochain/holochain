@@ -1,5 +1,11 @@
+use std::path::PathBuf;
+
+use holo_hash::DnaHash;
+
+use crate::prelude::CellNick;
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub(super) struct Bundle {
+pub struct Bundle {
     /// Name of the bundle, just for context
     name: String,
 
@@ -7,11 +13,12 @@ pub(super) struct Bundle {
     version: u8,
 
     /// The Dnas that make up this bundle
-    dnas: Vec<BundleDnas>,
+    dnas: Vec<BundleDna>,
 }
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 /// Description of a Dna referenced by this Bundle
-pub(super) struct BundleDna {
+pub struct BundleDna {
     /// The CellNick which will be given to the installed Cell for this Dna
     nick: CellNick,
 
@@ -26,10 +33,11 @@ pub(super) struct BundleDna {
     location: BundleDnaLocation,
 }
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 /// Where to find this Dna.
 /// If Local, the path may refer to a Dna which is bundled with the manifest,
 /// or it may be to some other absolute or relative file path.
-pub(super) enum BundleDnaLocation {
+pub enum BundleDnaLocation {
     /// Get Dna from local filesystem
     Local(PathBuf),
 
