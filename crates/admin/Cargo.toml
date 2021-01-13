@@ -1,0 +1,41 @@
+[package]
+name = "holochain_admin"
+version = "0.1.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://github.com/holochain/holochain"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo" ]
+categories = [ "command-line-utilities", "development-tools::build-utils", "filesystem" ]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "hc-admin"
+path = "src/main.rs"
+
+[lib]
+name = "holochain_admin"
+path = "src/lib.rs"
+
+[dependencies]
+ansi_term = "0.12"
+holochain_conductor_api = { path = "../holochain_conductor_api" }
+holochain_types = { path = "../holochain_types" }
+holochain_websocket = { path = "../holochain_websocket" }
+holochain_p2p = { path = "../holochain_p2p" }
+serde_yaml = "0.8"
+tokio = { version = "0.2.11", features = [ "full" ] }
+structopt = "0.3"
+anyhow = "1.0"
+tracing = "0.1"
+url2 = "0.0.6"
+portpicker = "0.1.0"
+nanoid = "0.3"
+# unwrap_to = { version = "0.1.0", optional = false }
+observability = "0.1"
+chrono = "0.4.6"
+
+[dev-dependencies]
+assert_cmd = "1.0.1"
+matches = "0.1"

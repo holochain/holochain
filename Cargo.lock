@@ -1474,6 +1474,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_admin"
+version = "0.1.0"
+dependencies = [
+ "ansi_term 0.12.1",
+ "anyhow",
+ "assert_cmd",
+ "chrono",
+ "holochain_conductor_api",
+ "holochain_p2p",
+ "holochain_types",
+ "holochain_websocket",
+ "matches",
+ "nanoid",
+ "observability",
+ "portpicker",
+ "serde_yaml",
+ "structopt",
+ "tokio",
+ "tracing",
+ "url2",
+]
+
+[[package]]
 name = "holochain_cascade"
 version = "0.0.1"
 dependencies = [
@@ -2883,6 +2906,15 @@ checksum = "4b7456bc1ad2d4cf82b3a016be4c2ac48daf11bf990c1603ebd447fe6f30fca8"
 dependencies = [
  "cpuid-bool",
  "universal-hash",
+]
+
+[[package]]
+name = "portpicker"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b497d05c16fe00939445c00a4fe2fa4f3d3dfc9c0401a3ab5c577afda2debb9"
+dependencies = [
+ "rand 0.6.5",
 ]
 
 [[package]]
