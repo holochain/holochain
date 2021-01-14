@@ -8,6 +8,7 @@ use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures;
 use ghost_actor::GhostError;
 use kitsune_p2p_types::dht_arc::DhtArc;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::sync::Arc;
@@ -38,10 +39,10 @@ ghost_actor::ghost_chan! {
 pub type GossipEventReceiver = futures::channel::mpsc::Receiver<GossipEvent>;
 
 /// spawn a gossip module to control gossip for a space
-pub fn spawn_gossip_module() -> GossipEventReceiver {
+pub fn spawn_gossip_module(config: Arc<KitsuneP2pConfig>) -> GossipEventReceiver {
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
 
-    tokio::task::spawn(gossip_loop(evt_send));
+    tokio::task::spawn(gossip_loop(config, evt_send));
 
     evt_recv
 }
@@ -50,6 +51,7 @@ pub fn spawn_gossip_module() -> GossipEventReceiver {
 /// the gossip module is not an actor because we want to pause while
 /// awaiting requests - not process requests in parallel.
 async fn gossip_loop(
+    config: Arc<KitsuneP2pConfig>,
     evt_send: futures::channel::mpsc::Sender<GossipEvent>,
 ) -> KitsuneP2pResult<()> {
     let mut gossip_data = GossipData::new(evt_send);
@@ -65,13 +67,17 @@ async fn gossip_loop(
             Ok(_) => (),
         }
 
-        tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+        tokio::time::delay_for(std::time::Duration::from_millis(
+            config.tuning_params.gossip_loop_iteration_delay_ms as u64,
+        ))
+        .await;
     }
 }
 
 struct GossipData {
     evt_send: futures::channel::mpsc::Sender<GossipEvent>,
     pending_gossip_list: Vec<(Arc<KitsuneAgent>, Arc<KitsuneAgent>)>,
+    last_counts: HashMap<Arc<KitsuneAgent>, (u64, u64)>,
 }
 
 impl GossipData {
@@ -79,6 +85,7 @@ impl GossipData {
         Self {
             evt_send,
             pending_gossip_list: Vec::new(),
+            last_counts: HashMap::new(),
         }
     }
 
@@ -115,6 +122,9 @@ impl GossipData {
         let (from_agent, to_agent) = self.pending_gossip_list.remove(0);
         let span = tracing::debug_span!("next_gossip", ?from_agent, ?to_agent);
 
+        // Get the last count for this interaction
+        let last_count = self.last_counts.entry(to_agent.clone()).or_insert((0, 0));
+
         // required so from_iters below know the build_hasher type
         type S = HashSet<Arc<KitsuneOpHash>>;
         type A = HashSet<(Arc<KitsuneAgent>, u64)>;
@@ -128,8 +138,29 @@ impl GossipData {
                 DhtArc::new(0, u32::MAX),
                 i64::MIN,
                 i64::MAX,
+                Default::default(), // This is ignored because requesting from self
             ))
             .await?;
+        let op_hashes_from = match op_hashes_from {
+            OpConsistency::Variance(h) => h,
+            // Not currently used
+            OpConsistency::Consistent => {
+                unreachable!("We don't track consistency of hashes for local requests")
+            }
+        };
+        let op_count = if last_count.0 == op_hashes_from.len() as u64 {
+            // We have nothing new for them but
+            // they might still have something new
+            // for us.
+            OpCount::Consistent(last_count.1)
+        } else {
+            // We have new gossip for them so
+            // they need to tell us what they have
+            // so we can compute the difference.
+            OpCount::Variance
+        };
+        last_count.0 = op_hashes_from.len() as u64;
+
         let op_hashes_from: S = HashSet::from_iter(op_hashes_from);
         let agent_info_from: A = HashSet::from_iter(agent_info_from);
         span.in_scope(|| {
@@ -145,8 +176,20 @@ impl GossipData {
                 DhtArc::new(0, u32::MAX),
                 i64::MIN,
                 i64::MAX,
+                op_count,
             ))
             .await?;
+        let op_hashes_to = match op_hashes_to {
+            OpConsistency::Variance(h) => {
+                last_count.1 = h.len() as u64;
+                h
+            }
+            // There's no new gossip from us or them
+            // so our job is done.
+            OpConsistency::Consistent => {
+                return Ok(());
+            }
+        };
         let op_hashes_to: S = HashSet::from_iter(op_hashes_to);
         let agent_info_to: A = HashSet::from_iter(agent_info_to);
         span.in_scope(|| {

@@ -213,8 +213,15 @@ where
         &mut self.dna_store
     }
 
+    /// Broadcasts the shutdown signal to all managed tasks.
+    /// To actually wait for these tasks to complete, be sure to
+    /// `take_shutdown_handle` to await for completion.
     pub(super) fn shutdown(&mut self) {
         self.shutting_down = true;
+        tracing::info!(
+            "Sending shutdown signal to {} managed tasks.",
+            self.managed_task_stop_broadcaster.receiver_count(),
+        );
         self.managed_task_stop_broadcaster
             .send(())
             .map(|_| ())
@@ -223,6 +230,7 @@ where
             })
     }
 
+    /// Return the handle which waits for the task manager task to complete
     pub(super) fn take_shutdown_handle(&mut self) -> Option<TaskManagerRunHandle> {
         self.task_manager_run_handle.take()
     }
@@ -844,13 +852,18 @@ mod builder {
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
     pub struct ConductorBuilder<DS = RealDnaStore> {
-        config: ConductorConfig,
-        dna_store: DS,
-        keystore: Option<KeystoreSender>,
+        /// The configuration
+        pub config: ConductorConfig,
+        /// The DnaStore (mockable)
+        pub dna_store: DS,
+        /// Optional keystore override
+        pub keystore: Option<KeystoreSender>,
         #[cfg(any(test, feature = "test_utils"))]
-        state: Option<ConductorState>,
+        /// Optional state override (for testing)
+        pub state: Option<ConductorState>,
         #[cfg(any(test, feature = "test_utils"))]
-        mock_handle: Option<MockConductorHandleT>,
+        /// Optional handle mock (for testing)
+        pub mock_handle: Option<MockConductorHandleT>,
     }
 
     impl ConductorBuilder {

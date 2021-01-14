@@ -160,7 +160,8 @@ async fn call_admin() {
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
     let dna_payload = InstallAppDnaPayload {
-        path: fake_dna_path,
+        path: Some(fake_dna_path),
+        hash: None,
         nick: "nick".into(),
         properties: Some(properties.clone()),
         membrane_proof: None,
@@ -391,7 +392,7 @@ async fn remote_signals() {
     observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 5;
 
-    let conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
+    let mut conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
     // TODO: write helper for agents across conductors
     let all_agents: Vec<HoloHash<hash_type::Agent>> =
@@ -418,9 +419,9 @@ async fn remote_signals() {
 
     let signal = fixt!(SerializedBytes);
 
-    let _: () = cells[0]
+    let _: () = conductors[0]
         .call(
-            TestWasm::EmitSignal,
+            &cells[0].zome(TestWasm::EmitSignal),
             "signal_others",
             RemoteSignal {
                 signal: signal.clone(),

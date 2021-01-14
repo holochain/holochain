@@ -5,27 +5,9 @@ use kitsune_p2p_types::codec::Codec;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 
-/// if the user specifies None or zero (0) for remote_agent_count
-const DEFAULT_NOTIFY_REMOTE_AGENT_COUNT: u8 = 5;
-
-/// if the user specifies None or zero (0) for timeout_ms
-const DEFAULT_NOTIFY_TIMEOUT_MS: u64 = 1000;
-
-/// if the user specifies None or zero (0) for timeout_ms
-const DEFAULT_RPC_SINGLE_TIMEOUT_MS: u64 = 2000;
-
-/// if the user specifies None or zero (0) for remote_agent_count
-const DEFAULT_RPC_MULTI_REMOTE_AGENT_COUNT: u8 = 2;
-
-/// if the user specifies None or zero (0) for timeout_ms
-const DEFAULT_RPC_MULTI_TIMEOUT_MS: u64 = 2000;
-
 /// if the user specifies None or zero (0) for race_timeout_ms
+/// (david.b) this is not currently used
 const DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS: u64 = 200;
-
-/// Agent info can expire 20 minutes after it is signed.
-/// This is somewhat arbitrary and open to tweaking.
-pub const AGENT_INFO_EXPIRES_AFTER_MS: u64 = 60 * 1000 * 20;
 
 ghost_actor::ghost_chan! {
     pub(crate) chan SpaceInternal<crate::KitsuneP2pError> {
@@ -53,7 +35,7 @@ pub(crate) async fn spawn_space(
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
 
     // initialize gossip module
-    let gossip_recv = gossip::spawn_gossip_module();
+    let gossip_recv = gossip::spawn_gossip_module(config.clone());
     builder
         .channel_factory()
         .attach_receiver(gossip_recv)
@@ -116,7 +98,11 @@ impl gossip::GossipEventHandler for Space {
     ) -> gossip::GossipEventHandlerResult<OpHashesAgentHashes> {
         if self.local_joined_agents.contains(&input.to_agent) {
             let fut = local_req_op_hashes(&self.evt_sender, self.space.clone(), input);
-            Ok(async move { fut.await }.boxed().into())
+            Ok(
+                async move { fut.await.map(|r| (OpConsistency::Variance(r.0), r.1)) }
+                    .boxed()
+                    .into(),
+            )
         } else {
             let ReqOpHashesEvt {
                 to_agent,
@@ -124,6 +110,7 @@ impl gossip::GossipEventHandler for Space {
                 since_utc_epoch_s,
                 until_utc_epoch_s,
                 from_agent,
+                op_count,
             } = input;
             let transport_tx = self.transport.clone();
             let evt_sender = self.evt_sender.clone();
@@ -147,6 +134,7 @@ impl gossip::GossipEventHandler for Space {
                     dht_arc,
                     since_utc_epoch_s,
                     until_utc_epoch_s,
+                    op_count,
                 )
                 .encode_vec()?;
                 let info = types::agent_store::AgentInfo::try_from(&info)?;
@@ -281,7 +269,7 @@ pub fn local_req_op_hashes(
     evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     space: Arc<KitsuneSpace>,
     input: ReqOpHashesEvt,
-) -> impl std::future::Future<Output = Result<OpHashesAgentHashes, KitsuneP2pError>> {
+) -> impl std::future::Future<Output = Result<LocalOpHashesAgentHashes, KitsuneP2pError>> {
     let ReqOpHashesEvt {
         to_agent,
         dht_arc,
@@ -439,6 +427,7 @@ impl SpaceInternalHandler for Space {
         let bound_url = self.transport.bound_url();
         let evt_sender = self.evt_sender.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
+        let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         Ok(async move {
             let bound_url = bound_url.await?;
             let urls = bound_url
@@ -451,7 +440,7 @@ impl SpaceInternalHandler for Space {
                     (*agent).clone(),
                     urls.clone(),
                     crate::spawn::actor::bootstrap::now_once(None).await?,
-                    AGENT_INFO_EXPIRES_AFTER_MS,
+                    expires_after,
                 );
                 let mut data = Vec::new();
                 kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info)?;
@@ -564,7 +553,7 @@ impl KitsuneP2pHandler for Space {
         let evt_sender = self.evt_sender.clone();
 
         let timeout_ms = match timeout_ms {
-            None | Some(0) => DEFAULT_RPC_SINGLE_TIMEOUT_MS,
+            None | Some(0) => self.config.tuning_params.default_rpc_single_timeout_ms as u64,
             _ => timeout_ms.unwrap(),
         };
 
@@ -610,7 +599,11 @@ impl KitsuneP2pHandler for Space {
         // if the user doesn't care about remote_agent_count, apply default
         match input.remote_agent_count {
             None | Some(0) => {
-                input.remote_agent_count = Some(DEFAULT_RPC_MULTI_REMOTE_AGENT_COUNT);
+                input.remote_agent_count = Some(
+                    self.config
+                        .tuning_params
+                        .default_rpc_multi_remote_agent_count as u8,
+                );
             }
             _ => {}
         }
@@ -618,7 +611,8 @@ impl KitsuneP2pHandler for Space {
         // if the user doesn't care about timeout_ms, apply default
         match input.timeout_ms {
             None | Some(0) => {
-                input.timeout_ms = Some(DEFAULT_RPC_MULTI_TIMEOUT_MS);
+                input.timeout_ms =
+                    Some(self.config.tuning_params.default_rpc_multi_timeout_ms as u64);
             }
             _ => {}
         }
@@ -646,7 +640,8 @@ impl KitsuneP2pHandler for Space {
         // if the user doesn't care about remote_agent_count, apply default
         match input.remote_agent_count {
             None | Some(0) => {
-                input.remote_agent_count = Some(DEFAULT_NOTIFY_REMOTE_AGENT_COUNT);
+                input.remote_agent_count =
+                    Some(self.config.tuning_params.default_notify_remote_agent_count as u8);
             }
             _ => {}
         }
@@ -656,7 +651,7 @@ impl KitsuneP2pHandler for Space {
         // spawn a task with that default timeout.
         let do_spawn = match input.timeout_ms {
             None | Some(0) => {
-                input.timeout_ms = Some(DEFAULT_NOTIFY_TIMEOUT_MS);
+                input.timeout_ms = Some(self.config.tuning_params.default_notify_timeout_ms as u64);
                 true
             }
             _ => false,
