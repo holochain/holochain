@@ -73,12 +73,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::AdminInterfacesAdded)
             }
             InstallApp(payload) => {
+                let payload = payload.normalize();
                 trace!(?payload.dnas);
-                let InstallAppPayload {
+                let InstallAppPayloadNormalized {
                     installed_app_id,
                     agent_key,
                     dnas,
-                } = *payload;
+                } = payload;
 
                 // Install Dnas
                 let tasks = dnas.into_iter().map(|dna_payload| async {
@@ -272,11 +273,12 @@ mod test {
             installed_app_id: "test".to_string(),
             cell_data: vec![InstalledCell::new(cell_id.clone(), "".to_string())],
         };
-        let payload = InstallAppPayload {
+        let payload = InstallAppPayloadNormalized {
             dnas: vec![dna_payload],
             installed_app_id: "test".to_string(),
             agent_key,
-        };
+        }
+        .into();
 
         let install_response = admin_api
             .handle_admin_request(AdminRequest::InstallApp(Box::new(payload)))

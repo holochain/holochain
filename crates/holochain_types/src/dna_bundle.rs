@@ -1,4 +1,4 @@
-// Defines the DNA Bundle manifest format. (TODO: write more)
+//! Defines the DNA Bundle manifest format.
 
 mod dna_bundle_v1;
 

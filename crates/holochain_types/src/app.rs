@@ -1,12 +1,12 @@
 //! Collection of cells to form a holochain application
-use crate::dna::JsonProperties;
+use crate::{dna::JsonProperties, dna_bundle::DnaBundle};
 use derive_more::Into;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::cell::CellId;
 use std::path::PathBuf;
 
-/// Placeholder used to identify installed apps
+/// The unique identifier for an installed app in this conductor
 pub type InstalledAppId = String;
 
 /// A friendly (nick)name used by UIs to refer to the Cells which make up the app
@@ -14,13 +14,52 @@ pub type CellNick = String;
 
 /// A collection of [DnaHash]es paired with an [AgentPubKey] and an app id
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct InstallAppPayload {
-    /// Placeholder to find the installed app
+#[serde(untagged)]
+pub enum InstallAppPayload {
+    /// Used to specify DNAs on-the-fly
+    Explicit(InstallAppPayloadNormalized),
+    /// Used to specify DNAs per a bundle file
+    Bundle {
+        /// The agent to use when creating Cells for this App
+        agent_key: AgentPubKey,
+
+        /// The DNA bundle manifest for this app
+        // TODO: this will probably actually be a file path or raw file data
+        //       that gets deserialized
+        dna_bundle: DnaBundle,
+    },
+}
+
+impl InstallAppPayload {
+    /// Collapse the two variants down to a common normalized structure
+    pub fn normalize(self) -> InstallAppPayloadNormalized {
+        match self {
+            InstallAppPayload::Explicit(payload) => payload,
+            InstallAppPayload::Bundle {
+                agent_key,
+                dna_bundle,
+            } => todo!(),
+        }
+    }
+}
+
+/// A normalized structure common to both variants of InstallAppPayload
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct InstallAppPayloadNormalized {
+    /// The unique identifier for an installed app in this conductor
     pub installed_app_id: InstalledAppId,
-    /// The agent that installed this app
+
+    /// The agent to use when creating Cells for this App
     pub agent_key: AgentPubKey,
+
     /// The Dna paths in this app
     pub dnas: Vec<InstallAppDnaPayload>,
+}
+
+impl From<InstallAppPayloadNormalized> for InstallAppPayload {
+    fn from(p: InstallAppPayloadNormalized) -> Self {
+        InstallAppPayload::Explicit(p)
+    }
 }
 
 /// Information needed to specify a Dna as part of an App

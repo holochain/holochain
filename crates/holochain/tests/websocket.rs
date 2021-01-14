@@ -166,11 +166,12 @@ async fn call_admin() {
         membrane_proof: None,
     };
     let agent_key = fake_agent_pubkey_1();
-    let payload = InstallAppPayload {
+    let payload = InstallAppPayloadNormalized {
         dnas: vec![dna_payload],
         installed_app_id: "test".to_string(),
         agent_key,
-    };
+    }
+    .into();
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 3000).await;
@@ -323,11 +324,12 @@ async fn call_zome() {
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
     let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
     let agent_key = fake_agent_pubkey_1();
-    let payload = InstallAppPayload {
+    let payload = InstallAppPayloadNormalized {
         dnas: vec![dna_payload],
         installed_app_id: "test".to_string(),
         agent_key,
-    };
+    }
+    .into();
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 3000).await;
@@ -472,11 +474,12 @@ async fn emit_signals() {
     let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
     let agent_key = fake_agent_pubkey_1();
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
-    let payload = InstallAppPayload {
+    let payload = InstallAppPayloadNormalized {
         dnas: vec![dna_payload],
         installed_app_id: "test".to_string(),
         agent_key: agent_key.clone(),
-    };
+    }
+    .into();
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = admin_tx.request(request);
     let response = check_timeout(&mut holochain, response, 3000).await;
@@ -554,11 +557,12 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
     let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
     let agent_key = fake_agent_pubkey_1();
-    let payload = InstallAppPayload {
+    let payload = InstallAppPayloadNormalized {
         dnas: vec![dna_payload],
         installed_app_id: "test".to_string(),
         agent_key,
-    };
+    }
+    .into();
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request).await;
     assert_matches!(response, Ok(AdminResponse::AppInstalled(_)));
@@ -618,11 +622,12 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
     let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
     let agent_key = fake_agent_pubkey_1();
-    let payload = InstallAppPayload {
+    let payload = InstallAppPayloadNormalized {
         dnas: vec![dna_payload],
         installed_app_id: "test".to_string(),
         agent_key,
-    };
+    }
+    .into();
     let request = AdminRequest::InstallApp(Box::new(payload));
 
     // send a request after the conductor has shutdown
