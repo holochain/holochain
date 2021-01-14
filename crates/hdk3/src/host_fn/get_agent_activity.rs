@@ -4,10 +4,9 @@ pub fn get_agent_activity(
     agent: AgentPubKey,
     query: ChainQueryFilter,
     request: ActivityRequest,
-) -> HdkResult<AgentActivity> {
-    Ok(host_call::<GetAgentActivityInput, GetAgentActivityOutput>(
+) -> ExternResult<AgentActivity> {
+    host_call::<GetAgentActivityInputInner, AgentActivity>(
         __get_agent_activity,
-        GetAgentActivityInput::new((agent, query, request)),
-    )?
-    .into_inner())
+        GetAgentActivityInputInner::new(agent, query, request),
+    )
 }

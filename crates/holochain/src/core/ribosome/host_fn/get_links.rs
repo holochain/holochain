@@ -12,7 +12,7 @@ pub fn get_links<'a>(
     call_context: Arc<CallContext>,
     input: GetLinksInput,
 ) -> RibosomeResult<GetLinksOutput> {
-    let (base_address, tag) = input.into_inner();
+    let GetLinksInputInner { base_address, tag_prefix } = input.into_inner();
 
     // Get zome id
     let zome_id = ribosome.zome_to_id(&call_context.zome)?;
@@ -22,8 +22,8 @@ pub fn get_links<'a>(
 
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         // Create the key
-        let key = match tag.as_ref() {
-            Some(tag) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag),
+        let key = match tag_prefix.as_ref() {
+            Some(tag_prefix) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag_prefix),
             None => LinkMetaKey::BaseZome(&base_address, zome_id),
         };
 

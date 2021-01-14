@@ -13,7 +13,7 @@ pub fn create_link<'a>(
     call_context: Arc<CallContext>,
     input: CreateLinkInput,
 ) -> RibosomeResult<CreateLinkOutput> {
-    let (base_address, target_address, tag) = input.into_inner();
+    let CreateLinkInputInner { base_address, target_address, tag } = input.into_inner();
 
     // extract the zome position
     let zome_id = ribosome.zome_to_id(&call_context.zome)?;

@@ -109,9 +109,9 @@ wasm_io_types! {
     fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
 
     // Create a link between two entries.
-    fn create_link ((holo_hash::EntryHash, holo_hash::EntryHash, zt::link::LinkTag)) -> holo_hash::HeaderHash;
+    fn create_link (zt::link::CreateLinkInputInner) -> holo_hash::HeaderHash;
 
-    // @todo
+    // Delete an element.
     fn delete (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
 
     // Header hash of the CreateLink element.
@@ -129,22 +129,16 @@ wasm_io_types! {
     fn debug (zt::debug::DebugMsg) -> ();
 
     // Attempt to get a live entry from the cascade.
-    fn get ((holo_hash::AnyDhtHash, zt::entry::GetOptions)) -> Option<zt::element::Element>;
+    fn get (zt::entry::GetInputInner) -> Option<zt::element::Element>;
 
-    fn get_agent_activity (
-        (
-            holo_hash::AgentPubKey,
-            zt::query::ChainQueryFilter,
-            zt::query::ActivityRequest,
-        )
-    ) -> zt::query::AgentActivity;
+    fn get_agent_activity (zt::agent_info::GetAgentActivityInputInner) -> zt::query::AgentActivity;
 
-    fn get_details ((holo_hash::AnyDhtHash, zt::entry::GetOptions)) -> Option<zt::metadata::Details>;
+    fn get_details (zt::entry::GetInputInner) -> Option<zt::metadata::Details>;
 
     // Get links by entry hash from the cascade.
-    fn get_links ((holo_hash::EntryHash, Option<zt::link::LinkTag>)) -> zt::link::Links;
+    fn get_links (zt::link::GetLinksInputInner) -> zt::link::Links;
 
-    fn get_link_details ((holo_hash::EntryHash, Option<zt::link::LinkTag>)) -> zt::link::LinkDetails;
+    fn get_link_details (zt::link::GetLinksInputInner) -> zt::link::LinkDetails;
 
     // Hash an entry on the host.
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
@@ -178,7 +172,7 @@ wasm_io_types! {
     fn sys_time (()) -> core::time::Duration;
 
     // Same as  but also takes the HeaderHash of the updated element.
-    fn update ((holo_hash::HeaderHash, zt::entry::EntryWithDefId)) -> holo_hash::HeaderHash;
+    fn update (zt::entry::UpdateInputInner) -> holo_hash::HeaderHash;
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;
 

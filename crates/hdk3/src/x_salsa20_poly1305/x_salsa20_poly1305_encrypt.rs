@@ -34,17 +34,9 @@ use crate::prelude::*;
 pub fn x_salsa20_poly1305_encrypt(
     key_ref: XSalsa20Poly1305KeyRef,
     data: XSalsa20Poly1305Data,
-) -> HdkResult<XSalsa20Poly1305EncryptedData> {
-    host_externs!(__x_salsa20_poly1305_encrypt);
-    Ok(
-        host_call::<XSalsa20Poly1305EncryptInput, XSalsa20Poly1305EncryptOutput>(
-            __x_salsa20_poly1305_encrypt,
-            XSalsa20Poly1305EncryptInput::new(
-                holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Encrypt::new(
-                    key_ref, data,
-                ),
-            ),
-        )?
-        .into_inner(),
+) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+    host_call::<XSalsa20Poly1305Encrypt, XSalsa20Poly1305EncryptedData>(
+        __x_salsa20_poly1305_encrypt,
+        holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Encrypt::new(key_ref, data),
     )
 }

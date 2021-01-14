@@ -154,9 +154,7 @@ impl RealRibosome {
                         .map_err(|e| WasmError::Zome(format!("{:?}", e)))?
                         .try_into()?;
 
-                    Ok($crate::holochain_wasmer_host::import::set_context_data(
-                        ctx, output_sb,
-                    ))
+                    $crate::holochain_wasmer_host::import::set_context_data(ctx, output_sb)
                 }
             }};
         }

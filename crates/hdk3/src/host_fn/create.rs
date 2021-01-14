@@ -13,9 +13,6 @@ use crate::prelude::*;
 /// @see create_entry
 /// @see create_cap_grant
 /// @see create_cap_claim
-pub fn create(entry_def_with_id: EntryWithDefId) -> HdkResult<HeaderHash> {
-    Ok(
-        host_call::<CreateInput, CreateOutput>(__create, CreateInput::new(entry_def_with_id))?
-            .into_inner(),
-    )
+pub fn create(entry_def_with_id: EntryWithDefId) -> ExternResult<HeaderHash> {
+    host_call::<EntryWithDefId, HeaderHash>(__create, entry_def_with_id)
 }

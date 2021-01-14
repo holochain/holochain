@@ -27,10 +27,10 @@ use crate::prelude::*;
 /// @see create_entry
 /// @see update
 /// @see delete_entry
-pub fn update_entry<I, E>(hash: HeaderHash, input: I) -> HdkResult<HeaderHash>
+pub fn update_entry<I, E>(hash: HeaderHash, input: I) -> ExternResult<HeaderHash>
 where
     EntryWithDefId: TryFrom<I, Error = E>,
-    HdkError: From<E>,
+    WasmError: From<E>,
 {
     update(hash, EntryWithDefId::try_from(input)?)
 }

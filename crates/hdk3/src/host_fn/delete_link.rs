@@ -21,10 +21,6 @@ use crate::prelude::*;
 ///   link after any previous delete of any link.
 /// All of this is bad so link creates point to entries (@see link_entries!) and deletes point to
 /// creates.
-pub fn delete_link(add_link_header: HeaderHash) -> HdkResult<HeaderHash> {
-    Ok(host_call::<DeleteLinkInput, DeleteLinkOutput>(
-        __delete_link,
-        DeleteLinkInput::new(add_link_header),
-    )?
-    .into_inner())
+pub fn delete_link(add_link_header: HeaderHash) -> ExternResult<HeaderHash> {
+    host_call::<HeaderHash, HeaderHash>(__delete_link, add_link_header)
 }

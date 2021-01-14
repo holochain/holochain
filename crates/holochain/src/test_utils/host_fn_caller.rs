@@ -230,7 +230,7 @@ impl HostFnCaller {
         original_header_hash: HeaderHash,
     ) -> HeaderHash {
         let (env, ribosome, call_context, workspace_lock) = self.explode();
-        let input = UpdateInput::new((
+        let input = UpdateInput::new(UpdateInputInner::new(
             original_header_hash,
             EntryWithDefId::new(entry_def_id.into(), entry),
         ));
@@ -247,7 +247,7 @@ impl HostFnCaller {
 
     pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Option<Element> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetInput::new((entry_hash, options));
+        let input = GetInput::new(GetInputInner::new(entry_hash, options));
         let output = { host_fn::get::get(ribosome, call_context, input).unwrap() };
         output.into_inner()
     }
@@ -258,7 +258,7 @@ impl HostFnCaller {
         options: GetOptions,
     ) -> Option<Details> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetDetailsInput::new((entry_hash, options));
+        let input = GetDetailsInput::new(GetInputInner::new(entry_hash, options));
         let output = { host_fn::get_details::get_details(ribosome, call_context, input).unwrap() };
         output.into_inner()
     }
@@ -270,7 +270,11 @@ impl HostFnCaller {
         link_tag: LinkTag,
     ) -> HeaderHash {
         let (env, ribosome, call_context, workspace_lock) = self.explode();
-        let input = CreateLinkInput::new((base.clone(), target.clone(), link_tag));
+        let input = CreateLinkInput::new(CreateLinkInputInner::new(
+            base.clone(),
+            target.clone(),
+            link_tag,
+        ));
         let output = { host_fn::create_link::create_link(ribosome, call_context, input).unwrap() };
 
         // Write
@@ -303,7 +307,7 @@ impl HostFnCaller {
         _options: GetLinksOptions,
     ) -> Vec<Link> {
         let (env, ribosome, call_context, workspace_lock) = self.explode();
-        let input = GetLinksInput::new((base.clone(), link_tag));
+        let input = GetLinksInput::new(GetLinksInputInner::new(base.clone(), link_tag));
         let output = { host_fn::get_links::get_links(ribosome, call_context, input).unwrap() };
 
         // Write
@@ -334,7 +338,11 @@ impl HostFnCaller {
         request: ActivityRequest,
     ) -> AgentActivity {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetAgentActivityInput::new((agent.clone(), query.clone(), request));
+        let input = GetAgentActivityInput::new(GetAgentActivityInputInner::new(
+            agent.clone(),
+            query.clone(),
+            request,
+        ));
         let output = {
             host_fn::get_agent_activity::get_agent_activity(ribosome, call_context, input).unwrap()
         };

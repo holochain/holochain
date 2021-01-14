@@ -199,6 +199,7 @@ version = "0.0.54"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
+ "serde_bytes",
  "thiserror",
 ]
 

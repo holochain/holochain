@@ -19,10 +19,6 @@ use crate::prelude::*;
 /// deleted c.f. get_link_details that returns all the creates and all the deletes together.
 ///
 /// @see get_link_details
-pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> HdkResult<Links> {
-    Ok(host_call::<GetLinksInput, GetLinksOutput>(
-        __get_links,
-        GetLinksInput::new((base, link_tag)),
-    )?
-    .into_inner())
+pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Links> {
+    host_call::<GetLinksInputInner, Links>(__get_links, GetLinksInputInner::new(base, link_tag))
 }

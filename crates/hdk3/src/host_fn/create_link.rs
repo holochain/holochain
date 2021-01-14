@@ -56,13 +56,12 @@ use crate::prelude::*;
 /// header hash for any of the creates or updates you can lookup the identity entry hash out of the
 /// body of the create/update entry.
 pub fn create_link<T: Into<LinkTag>>(
-    base: EntryHash,
-    target: EntryHash,
+    base_address: EntryHash,
+    target_address: EntryHash,
     tag: T,
-) -> HdkResult<HeaderHash> {
-    Ok(host_call::<CreateLinkInput, CreateLinkOutput>(
+) -> ExternResult<HeaderHash> {
+    host_call::<CreateLinkInputInner, HeaderHash>(
         __create_link,
-        CreateLinkInput::new((base, target, tag.into())),
-    )?
-    .into_inner())
+        CreateLinkInputInner::new(base_address, target_address, tag.into()),
+    )
 }

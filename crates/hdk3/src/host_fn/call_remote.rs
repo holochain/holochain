@@ -29,31 +29,20 @@ use crate::prelude::*;
 /// let foo: Foo = call_remote(bob, "foo_zome", "do_it", secret, serialized_payload)?;
 /// ...
 /// ```
-pub fn call_remote<I, IE, O, OE>(
+pub fn call_remote<I, E>(
     agent: AgentPubKey,
     zome: ZomeName,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
     payload: I,
-) -> HdkResult<O>
+) -> ExternResult<ZomeCallResponse>
 where
-    SerializedBytes: TryFrom<I, Error = IE>,
-    O: TryFrom<SerializedBytes, Error = OE>,
-    HdkError: From<IE>,
-    HdkError: From<OE>,
+    SerializedBytes: TryFrom<I, Error = E>,
+    WasmError: From<E>,
 {
     let payload = SerializedBytes::try_from(payload)?;
-    let out = host_call::<CallRemoteInput, CallRemoteOutput>(
+    host_call::<CallRemote, ZomeCallResponse>(
         __call_remote,
-        CallRemoteInput::new(CallRemote::new(agent, zome, fn_name, cap_secret, payload)),
-    )?
-    .into_inner();
-
-    match out {
-        ZomeCallResponse::Ok(o) => Ok(O::try_from(o.into_inner())?),
-        ZomeCallResponse::Unauthorized(c, z, f, p) => {
-            Err(HdkError::UnauthorizedZomeCall(c, z, f, p))
-        }
-        ZomeCallResponse::NetworkError(e) => Err(HdkError::ZomeCallNetworkError(e)),
-    }
+        CallRemote::new(agent, zome, fn_name, cap_secret, payload),
+    )
 }

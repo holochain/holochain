@@ -45,9 +45,12 @@ use crate::prelude::*;
 ///       contacts on their current network partition, there could always be an older live entry
 ///       on another partition, and of course the oldest live entry could be deleted and no longer
 ///       be live.
-pub fn get<H: Into<AnyDhtHash>>(hash: H, options: GetOptions) -> HdkResult<Option<Element>> {
-    Ok(
-        host_call::<GetInput, GetOutput>(__get, GetInput::new((hash.into(), options)))?
-            .into_inner(),
+pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Element>>
+where
+    AnyDhtHash: From<H>,
+{
+    host_call::<GetInputInner, Option<Element>>(
+        __get,
+        GetInputInner::new(AnyDhtHash::from(hash), options),
     )
 }

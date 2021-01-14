@@ -13,3 +13,25 @@ pub struct AgentInfo {
     /// The agent can revoke an old key and replace it with a new one, the latest appears here.
     pub agent_latest_pubkey: AgentPubKey,
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct GetAgentActivityInputInner {
+    pub agent_pubkey: holo_hash::AgentPubKey,
+    pub chain_query_filter: crate::query::ChainQueryFilter,
+    pub activity_request: crate::query::ActivityRequest,
+}
+
+impl GetAgentActivityInputInner {
+    /// Constructor.
+    pub fn new(
+        agent_pubkey: holo_hash::AgentPubKey,
+        chain_query_filter: crate::query::ChainQueryFilter,
+        activity_request: crate::query::ActivityRequest,
+    ) -> Self {
+        Self {
+            agent_pubkey,
+            chain_query_filter,
+            activity_request,
+        }
+    }
+}

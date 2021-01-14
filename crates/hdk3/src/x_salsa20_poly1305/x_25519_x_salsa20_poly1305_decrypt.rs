@@ -14,19 +14,13 @@ pub fn x_25519_x_salsa20_poly1305_decrypt(
     recipient: X25519PubKey,
     sender: X25519PubKey,
     encrypted_data: XSalsa20Poly1305EncryptedData,
-) -> HdkResult<Option<XSalsa20Poly1305Data>> {
-    host_externs!(__x_25519_x_salsa20_poly1305_decrypt);
-    Ok(
-        host_call::<X25519XSalsa20Poly1305DecryptInput, X25519XSalsa20Poly1305DecryptOutput>(
-            __x_25519_x_salsa20_poly1305_decrypt,
-            X25519XSalsa20Poly1305DecryptInput::new(
-                holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(
-                    recipient,
-                    sender,
-                    encrypted_data,
-                ),
-            ),
-        )?
-        .into_inner(),
+) -> ExternResult<Option<XSalsa20Poly1305Data>> {
+    host_call::<X25519XSalsa20Poly1305Decrypt, Option<XSalsa20Poly1305Data>>(
+        __x_25519_x_salsa20_poly1305_decrypt,
+        holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(
+            recipient,
+            sender,
+            encrypted_data,
+        ),
     )
 }

@@ -19,10 +19,9 @@ use crate::prelude::*;
 /// c.f. get_links that returns only the creates that have not been deleted.
 ///
 /// @see get_links
-pub fn get_link_details(base: EntryHash, link_tag: Option<LinkTag>) -> HdkResult<LinkDetails> {
-    Ok(host_call::<GetLinkDetailsInput, GetLinkDetailsOutput>(
+pub fn get_link_details(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<LinkDetails> {
+    host_call::<GetLinksInputInner, LinkDetails>(
         __get_link_details,
-        GetLinkDetailsInput::new((base, link_tag)),
-    )?
-    .into_inner())
+        GetLinksInputInner::new(base, link_tag),
+    )
 }

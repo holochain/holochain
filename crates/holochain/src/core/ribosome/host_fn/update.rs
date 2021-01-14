@@ -17,7 +17,7 @@ pub fn update<'a>(
     input: UpdateInput,
 ) -> RibosomeResult<UpdateOutput> {
     // destructure the args out into an app type def id and entry
-    let (original_header_address, entry_with_def_id) = input.into_inner();
+    let UpdateInputInner { original_header_address, entry_with_def_id } = input.into_inner();
 
     // build the entry hash
     let async_entry = AsRef::<Entry>::as_ref(&entry_with_def_id).to_owned();

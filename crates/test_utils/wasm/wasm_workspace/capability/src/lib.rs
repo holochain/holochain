@@ -21,7 +21,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 
 #[hdk_extern]
 pub fn cap_secret(_: ()) -> ExternResult<CapSecret> {
-    Ok(CapSecret::try_from_random()?)
+    CapSecret::try_from_random()
 }
 
 fn cap_grant_entry(secret: CapSecret) -> ExternResult<CapGrantEntry> {
@@ -37,30 +37,30 @@ fn cap_grant_entry(secret: CapSecret) -> ExternResult<CapGrantEntry> {
 
 #[hdk_extern]
 pub fn transferable_cap_grant(secret: CapSecret) -> ExternResult<HeaderHash> {
-    Ok(create_cap_grant(cap_grant_entry(secret)?)?)
+    create_cap_grant(cap_grant_entry(secret)?)
 }
 
 #[hdk_extern]
 pub fn roll_cap_grant(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
     let secret = CapSecret::try_from_random()?;
-    Ok(update_cap_grant(header_hash, cap_grant_entry(secret)?)?)
+    update_cap_grant(header_hash, cap_grant_entry(secret)?)
 }
 
 #[hdk_extern]
 pub fn delete_cap_grant(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
-    Ok(hdk3::prelude::delete_cap_grant(header_hash)?)
+    hdk3::prelude::delete_cap_grant(header_hash)
 }
 
 #[hdk_extern]
-fn get_entry(header_hash: HeaderHash) -> ExternResult<GetOutput> {
-    Ok(GetOutput::new(get(header_hash, GetOptions::latest())?))
+fn get_entry(header_hash: HeaderHash) -> ExternResult<Option<Element>> {
+    get(header_hash, GetOptions::latest())
 }
 
 /// accepts a cap claim and commits it to the local chain
 /// intended to
 #[hdk_extern]
 fn accept_cap_claim(claim: CapClaim) -> ExternResult<HeaderHash> {
-    Ok(create_cap_claim(claim)?)
+    create_cap_claim(claim)
 }
 
 #[hdk_extern]
@@ -69,26 +69,14 @@ fn needs_cap_claim(_: ()) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-fn try_cap_claim(cap_for: CapFor) -> ExternResult<ZomeCallResponse> {
-    let result: HdkResult<()> = call_remote(
+fn try_cap_claim(cap_for: crate::CapFor) -> ExternResult<ZomeCallResponse> {
+    Ok(call_remote(
         cap_for.1,
         zome_info()?.zome_name,
         "needs_cap_claim".to_string().into(),
         Some(cap_for.0),
         &(),
-    );
-
-    // This is an awkward thing to do.
-    // Mapping the hdk results _back_ to what the hdk already extracted them from internally.
-    // This is just so that the external test harness can assert against something.
-    // Normally we would handle errors inside the wasm directly.
-    match result {
-        Ok(v) => Ok(ZomeCallResponse::Ok(ExternOutput::new(v.try_into()?))),
-        Err(HdkError::UnauthorizedZomeCall(c, z, f, p)) => {
-            Ok(ZomeCallResponse::Unauthorized(c, z, f, p))
-        }
-        _ => unreachable!(),
-    }
+    )?)
 }
 
 #[hdk_extern]

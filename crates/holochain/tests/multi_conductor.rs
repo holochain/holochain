@@ -20,7 +20,7 @@ fn simple_crud_zome() -> InlineZome {
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {
-            api.get((hash.into(), GetOptions::default()))
+            api.get(GetInputInner::new(hash.into(), GetOptions::default()))
                 .map_err(Into::into)
         })
 }

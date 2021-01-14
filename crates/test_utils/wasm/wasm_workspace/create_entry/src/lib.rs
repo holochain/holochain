@@ -42,31 +42,34 @@ fn create_entry(_: ()) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn create_post(post: Post) -> ExternResult<HeaderHash> {
-    Ok(hdk3::prelude::create_entry(&post)?)
+fn create_post(post: crate::Post) -> ExternResult<HeaderHash> {
+    hdk3::prelude::create_entry(&post)
 }
 
 #[hdk_extern]
-fn get_entry(_: ()) -> ExternResult<GetOutput> {
-    Ok(GetOutput::new(get(
+fn get_entry(_: ()) -> ExternResult<Option<Element>> {
+    get(
         hash_entry(&post())?,
         GetOptions::content(),
-    )?))
+    )
 }
 
 #[hdk_extern]
-fn get_post(hash: HeaderHash) -> ExternResult<GetOutput> {
-    Ok(GetOutput::new(get(hash, GetOptions::content())?))
+fn get_post(hash: HeaderHash) -> ExternResult<Option<Element>> {
+    get(
+        hash,
+        GetOptions::content()
+    )
 }
 
 #[hdk_extern]
 fn create_msg(_: ()) -> ExternResult<HeaderHash> {
-    Ok(hdk3::prelude::create_entry(&msg())?)
+    hdk3::prelude::create_entry(&msg())
 }
 
 #[hdk_extern]
 fn create_priv_msg(_: ()) -> ExternResult<HeaderHash> {
-    Ok(hdk3::prelude::create_entry(&priv_msg())?)
+    hdk3::prelude::create_entry(&priv_msg())
 }
 
 #[hdk_extern]
@@ -87,7 +90,11 @@ fn validate_create_entry_post(
 fn get_activity(
     input: holochain_test_wasm_common::AgentActivitySearch,
 ) -> ExternResult<AgentActivity> {
-    Ok(get_agent_activity(input.agent, input.query, input.request)?)
+    get_agent_activity(
+        input.agent,
+        input.query,
+        input.request
+    )
 }
 
 #[hdk_extern]
@@ -113,22 +120,34 @@ fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
     // Create an entry directly via. the hdk.
     hdk3::prelude::create_entry(&post())?;
     // Create an entry via a `call`.
-    Ok(call(
+    let zome_call_response: ZomeCallResponse = call(
         None,
         "create_entry".to_string().into(),
         "create_entry".to_string().into(),
         None,
         &(),
-    )?)
+    )?;
+
+    match zome_call_response {
+        ZomeCallResponse::Ok(v) => Ok(v.into_inner().try_into()?),
+        // Should handle this in real code.
+        _ => unreachable!(),
+    }
 }
 
 #[hdk_extern]
 fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
-    Ok(call_remote(
+    let zome_call_response: ZomeCallResponse = call_remote(
         agent,
         "create_entry".to_string().into(),
         "create_entry".to_string().into(),
         None,
         &(),
-    )?)
+    )?;
+
+    match zome_call_response {
+        ZomeCallResponse::Ok(v) => Ok(v.into_inner().try_into()?),
+        // Handle this in real code.
+        _ => unreachable!(),
+    }
 }

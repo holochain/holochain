@@ -10,7 +10,7 @@ pub fn get_agent_activity(
     call_context: Arc<CallContext>,
     input: GetAgentActivityInput,
 ) -> RibosomeResult<GetAgentActivityOutput> {
-    let (agent, query, activity_request) = input.into_inner();
+    let GetAgentActivityInputInner{ agent_pubkey, chain_query_filter, activity_request } = input.into_inner();
     let options = match activity_request {
         ActivityRequest::Status => GetActivityOptions {
             include_valid_activity: false,
@@ -35,7 +35,7 @@ pub fn get_agent_activity(
             .write()
             .await
             .cascade(network)
-            .get_agent_activity(agent, query, options)
+            .get_agent_activity(agent_pubkey, chain_query_filter, options)
             .await?;
 
         Ok(GetAgentActivityOutput::new(activity.into()))

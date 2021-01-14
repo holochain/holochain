@@ -16,10 +16,10 @@ use crate::prelude::*;
 /// ```
 ///
 /// @see get and get_details for more information on CRUD
-pub fn create_entry<I, E>(input: I) -> HdkResult<HeaderHash>
+pub fn create_entry<I, E>(input: I) -> ExternResult<HeaderHash>
 where
     EntryWithDefId: TryFrom<I, Error = E>,
-    HdkError: From<E>,
+    WasmError: From<E>,
 {
     create(EntryWithDefId::try_from(input)?)
 }
