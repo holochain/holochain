@@ -29,6 +29,16 @@ pub enum AdminRequest {
     /// [`AdminResponse::AdminInterfacesAdded`]: enum.AdminResponse.html#variant.AdminInterfacesAdded
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     AddAdminInterfaces(Vec<crate::config::AdminInterfaceConfig>),
+
+    /// Register a DNA for later use in InstallApp
+    /// Stores the given DNA into the holochain dnas database and returns the hash of the DNA
+    /// Will be responded to with an [`AdminResponse::DnaRegistered`]
+    /// or an [`AdminResponse::Error`]
+    ///
+    /// [`InstallDnaPayload`]: ../../../holochain_types/app/struct.InstallDnaPayload.html
+    /// [`AdminResponse::DnaRegistered`]: enum.AdminResponse.html#variant.DnaRegistered
+    RegisterDna(Box<RegisterDnaPayload>),
+
     /// Install an app from a list of `Dna` paths.
     /// Triggers genesis to be run on all `Cell`s and to be stored.
     /// An `App` is intended for use by
@@ -56,6 +66,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::DnasListed`]: enum.AdminResponse.html#variant.DnasListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     ListDnas,
+
     /// Generate a new AgentPubKey.
     /// Takes no arguments.
     ///
@@ -65,6 +76,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::AgentPubKeyGenerated`]: enum.AdminResponse.html#variant.AgentPubKeyGenerated
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     GenerateAgentPubKey,
+
     /// List all the cell ids in the conductor.
     /// Takes no arguments.
     ///
@@ -188,7 +200,12 @@ pub enum AdminResponse {
     /// [`AdminRequest`]: enum.AdminRequest.html
     /// [`ExternalApiWireError`]: error/enum.ExternalApiWireError.html
     Error(ExternalApiWireError),
-    /// The succesful response to an [`AdminRequest::InstallApp`].
+    /// The successful response to an [`AdminRequest::RegisterDna`]
+    ///
+    /// [`AdminRequest::RegisterDna`]: enum.AdminRequest.html#variant.RegisterDna
+    DnaRegistered(DnaHash),
+
+    /// The successful response to an [`AdminRequest::InstallApp`].
     ///
     /// The resulting [`InstalledApp`] contains the App id,
     /// the [`CellNick`]s and, most usefully, the new [`CellId`]s
