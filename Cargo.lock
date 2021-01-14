@@ -1541,6 +1541,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_yaml",
+ "structopt",
  "thiserror",
  "tracing",
  "url2",

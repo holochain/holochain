@@ -18,10 +18,12 @@ macro_rules! msg {
 }
 
 mod app;
+pub mod calls;
 mod config;
 mod create;
 mod ports;
 mod run;
+pub mod scripts;
 
 pub struct CmdRunner {
     client: WebsocketSender,
@@ -47,6 +49,19 @@ macro_rules! expect_variant {
         match $var {
             $variant(v) => v,
             _ => panic!(format!("{}: Expected {} but got {:?}", $error_msg, stringify!($variant), $var)),
+        }
+    };
+    ($var:expr => $variant:path) => {
+        expect_variant!($var => $variant, "")
+    };
+}
+
+#[macro_export]
+macro_rules! expect_match {
+    ($var:expr => $variant:path, $error_msg:expr) => {
+        match $var {
+            $variant(v) => v,
+            _ => anyhow::bail!("{}: Expected {} but got {:?}", $error_msg, stringify!($variant), $var),
         }
     };
     ($var:expr => $variant:path) => {
