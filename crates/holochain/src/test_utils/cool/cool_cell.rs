@@ -37,7 +37,7 @@ impl CoolCell {
 
     /// Call a zome function on this CoolCell as if from another Agent.
     /// The provenance and optional CapSecret must be provided.
-    pub async fn call_from<I, O, Z, F, E>(
+    pub async fn call_from<I, O, Z, F>(
         &self,
         provenance: AgentPubKey,
         cap: Option<CapSecret>,
@@ -46,11 +46,10 @@ impl CoolCell {
         payload: I,
     ) -> O
     where
-        E: std::fmt::Debug,
         ZomeName: From<Z>,
         FunctionName: From<F>,
-        SerializedBytes: TryFrom<I, Error = E>,
-        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
+        I: serde::Serialize,
+        O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
         self.handle
             .call_zome_ok_flat(
@@ -66,13 +65,12 @@ impl CoolCell {
 
     /// Call a zome function on this CoolCell.
     /// No CapGrant is provided, since the authorship capability will be granted.
-    pub async fn call<I, O, Z, F, E>(&self, zome_name: Z, fn_name: F, payload: I) -> O
+    pub async fn call<I, O, Z, F>(&self, zome_name: Z, fn_name: F, payload: I) -> O
     where
-        E: std::fmt::Debug,
         ZomeName: From<Z>,
         FunctionName: From<F>,
-        SerializedBytes: TryFrom<I, Error = E>,
-        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
+        I: serde::Serialize,
+        O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
         self.call_from(
             self.agent_pubkey().clone(),

@@ -294,23 +294,20 @@ impl CoolConductor {
 impl CoolConductorInner {
     /// Call a zome function with automatic de/serialization of input and output
     /// and unwrapping of nested errors.
-    pub async fn call_zome_ok<'a, I, O, F, E>(&'a self, invocation: CoolZomeCall<'a, I, F, E>) -> O
+    pub async fn call_zome_ok<'a, I, O, F>(&'a self, invocation: CoolZomeCall<'a, I, F>) -> O
     where
-        E: std::fmt::Debug,
         FunctionName: From<F>,
-        SerializedBytes: TryFrom<I, Error = E>,
-        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
+        I: serde::Serialize,
+        O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
         let response = self.0.call_zome(invocation.into()).await.unwrap().unwrap();
         unwrap_to!(response => ZomeCallResponse::Ok)
-            .clone()
-            .into_inner()
-            .try_into()
+            .decode()
             .expect("Couldn't deserialize zome call output")
     }
 
     /// `call_zome_ok`, but with arguments provided individually
-    pub async fn call_zome_ok_flat<I, O, Z, F, E>(
+    pub async fn call_zome_ok_flat<I, O, Z, F>(
         &self,
         cell_id: &CellId,
         zome_name: Z,
@@ -320,13 +317,12 @@ impl CoolConductorInner {
         payload: I,
     ) -> O
     where
-        E: std::fmt::Debug,
         ZomeName: From<Z>,
         FunctionName: From<F>,
-        SerializedBytes: TryFrom<I, Error = E>,
-        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
+        I: Serialize,
+        O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        let payload = ExternInput::new(payload.try_into().expect("Couldn't serialize payload"));
+        let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
         let provenance = provenance.unwrap_or_else(|| cell_id.agent_pubkey().clone());
         let call = ZomeCall {
             cell_id: cell_id.clone(),
@@ -338,9 +334,7 @@ impl CoolConductorInner {
         };
         let response = self.0.call_zome(call).await.unwrap().unwrap();
         unwrap_to!(response => ZomeCallResponse::Ok)
-            .clone()
-            .into_inner()
-            .try_into()
+            .decode()
             .expect("Couldn't deserialize zome call output")
     }
 }
@@ -348,10 +342,9 @@ impl CoolConductorInner {
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface
 #[derive(Clone, Debug)]
-pub struct CoolZomeCall<'a, P, F, E>
+pub struct CoolZomeCall<'a, P, F>
 where
-    SerializedBytes: TryFrom<P, Error = E>,
-    E: std::fmt::Debug,
+    P: serde::Serialize,
     FunctionName: From<F>,
 {
     /// The Id of the `Cell` in which this Zome-call would be invoked
@@ -371,13 +364,12 @@ where
     pub provenance: Option<AgentPubKey>,
 }
 
-impl<'a, P, F, E> From<CoolZomeCall<'a, P, F, E>> for ZomeCallInvocation
+impl<'a, P, F> From<CoolZomeCall<'a, P, F>> for ZomeCallInvocation
 where
-    SerializedBytes: TryFrom<P, Error = E>,
-    E: std::fmt::Debug,
+    P: serde::Serialize,
     FunctionName: From<F>,
 {
-    fn from(czc: CoolZomeCall<'a, P, F, E>) -> Self {
+    fn from(czc: CoolZomeCall<'a, P, F>) -> Self {
         let CoolZomeCall {
             cell_id,
             zome,
@@ -386,7 +378,7 @@ where
             provenance,
             payload,
         } = czc;
-        let payload = ExternInput::new(payload.try_into().expect("Couldn't serialize payload"));
+        let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
         let provenance = provenance.unwrap_or_else(|| cell_id.agent_pubkey().clone());
         ZomeCallInvocation {
             cell_id: cell_id.clone(),
@@ -399,13 +391,12 @@ where
     }
 }
 
-impl<'a, P, F, E> From<CoolZomeCall<'a, P, F, E>> for ZomeCall
+impl<'a, P, F> From<CoolZomeCall<'a, P, F>> for ZomeCall
 where
-    SerializedBytes: TryFrom<P, Error = E>,
-    E: std::fmt::Debug,
+    P: serde::Serialize,
     FunctionName: From<F>,
 {
-    fn from(czc: CoolZomeCall<'a, P, F, E>) -> Self {
+    fn from(czc: CoolZomeCall<'a, P, F>) -> Self {
         ZomeCallInvocation::from(czc).into()
     }
 }

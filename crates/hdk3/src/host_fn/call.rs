@@ -11,7 +11,7 @@ use crate::prelude::*;
 /// - fn_name: The name of the function in the zome you are calling.
 /// - cap_secret: The capability secret if required.
 /// - payload: The arguments to the function you are calling.
-pub fn call<I, E>(
+pub fn call<I>(
     to_cell: Option<CellId>,
     zome_name: ZomeName,
     fn_name: FunctionName,
@@ -19,14 +19,19 @@ pub fn call<I, E>(
     payload: I,
 ) -> ExternResult<ZomeCallResponse>
 where
-    SerializedBytes: TryFrom<I, Error = E>,
-    WasmError: From<E>,
+    I: serde::Serialize,
 {
-    let payload = SerializedBytes::try_from(payload)?;
     // @todo is this secure to set this in the wasm rather than have the host inject it?
     let provenance = agent_info()?.agent_latest_pubkey;
     host_call::<Call, ZomeCallResponse>(
         __call,
-        Call::new(to_cell, zome_name, fn_name, cap_secret, payload, provenance),
+        Call::new(
+            to_cell,
+            zome_name,
+            fn_name,
+            cap_secret,
+            ExternIO::encode(payload)?,
+            provenance,
+        ),
     )
 }

@@ -36,7 +36,7 @@ impl CounTree {
         )
     }
 
-    /// return the GetDetailsOutput for the entry hash from the header
+    /// return the Option<Details> for the entry hash from the header
     pub fn entry_details(entry_hash: EntryHash) -> ExternResult<Option<Details>> {
         get_details(
             entry_hash,

@@ -33,7 +33,7 @@ fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
         &(),
     )?;
     match zome_call_response {
-        ZomeCallResponse::Ok(v) => Ok(v.into_inner().try_into()?),
+        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
         // This should be handled in real code.
         _ => unreachable!(),
     }
@@ -52,7 +52,7 @@ fn who_are_they_local(cell_id: CellId) -> ExternResult<AgentInfo> {
         &(),
     )?;
     match zome_call_response {
-        ZomeCallResponse::Ok(v) => Ok(v.into_inner().try_into()?),
+        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
         // This should be handled in real code.
         _ => unreachable!(),
     }
@@ -71,7 +71,7 @@ fn call_create_entry(cell_id: CellId) -> ExternResult<HeaderHash> {
         &(),
     )?;
     match zome_call_response {
-        ZomeCallResponse::Ok(v) => Ok(v.into_inner().try_into()?),
+        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
         // This should be handled in real code.
         _ => unreachable!(),
     }

@@ -126,7 +126,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
             zome_name: TestWasm::Link.into(),
             cap: None,
             fn_name: "create_link".into(),
-            payload: ExternInput::new(SerializedBytes::try_from(()).unwrap()),
+            payload: ExternIO::encode(()).unwrap(),
             provenance: cell_ids[0].agent_pubkey().clone(),
         })
         .await
@@ -145,7 +145,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
                 zome_name: TestWasm::Link.into(),
                 cap: None,
                 fn_name: "get_links".into(),
-                payload: ExternInput::new(SerializedBytes::try_from(()).unwrap()),
+                payload: ExternIO::encode(()).unwrap(),
                 provenance: cell_ids[1].agent_pubkey().clone(),
             })
             .await
@@ -153,9 +153,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
             .unwrap();
 
         let links: Links = unwrap_to!(get_output => ZomeCallResponse::Ok)
-            .clone()
-            .into_inner()
-            .try_into()
+            .decode()
             .unwrap();
 
         num_seen += links.into_inner().len();

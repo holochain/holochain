@@ -88,8 +88,8 @@ ghost_actor::ghost_chan! {
             zome_name: ZomeName,
             fn_name: FunctionName,
             cap: Option<CapSecret>,
-            request: SerializedBytes,
-        ) -> SerializedBytes;
+            request: ExternIO,
+        ) -> ExternIO;
 
         /// A remote node is publishing data in a range we claim to be holding.
         fn publish(

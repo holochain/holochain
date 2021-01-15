@@ -229,19 +229,21 @@ pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &
     app_tx.close(1000, "Shutting down".into()).await.unwrap();
 }
 
-pub async fn call_zome_fn<SB: TryInto<SerializedBytes, Error = SerializedBytesError>>(
+pub async fn call_zome_fn<S>(
     holochain: &mut Child,
     app_tx: &mut WebsocketSender,
     cell_id: CellId,
     wasm: TestWasm,
     fn_name: String,
-    input: SB,
-) {
+    input: S,
+) where
+    S: Serialize,
+{
     let call: ZomeCall = ZomeCallInvocationFixturator::new(NamedInvocation(
         cell_id,
         wasm,
         fn_name,
-        ExternInput::new(input.try_into().unwrap()),
+        ExternIO::encode(input).unwrap(),
     ))
     .next()
     .unwrap()

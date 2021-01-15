@@ -1,5 +1,4 @@
 use hdk3::prelude::*;
-use holochain_test_wasm_common::TestBytes;
 
 #[hdk_entry(id = "post")]
 struct Val(u32);
@@ -17,7 +16,7 @@ fn create_entry_multiple(n: u32) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-fn get_entry_multiple(n: u32) -> ExternResult<TestBytes> {
+fn get_entry_multiple(n: u32) -> ExternResult<hdk3::prelude::Bytes> {
     let mut bytes = vec![];
     'test_loop: for i in 0..n {
         match get(hash_entry(&Val(i))?, GetOptions::content())? {
@@ -34,7 +33,7 @@ fn get_entry_multiple(n: u32) -> ExternResult<TestBytes> {
         }
     }
 
-    Ok(TestBytes(bytes))
+    Ok(Bytes::from(bytes))
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]

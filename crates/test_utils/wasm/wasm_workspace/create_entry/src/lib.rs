@@ -129,7 +129,7 @@ fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
     )?;
 
     match zome_call_response {
-        ZomeCallResponse::Ok(v) => Ok(v.into_inner().try_into()?),
+        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
         // Should handle this in real code.
         _ => unreachable!(),
     }
@@ -146,7 +146,7 @@ fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
     )?;
 
     match zome_call_response {
-        ZomeCallResponse::Ok(v) => Ok(v.into_inner().try_into()?),
+        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
         // Handle this in real code.
         _ => unreachable!(),
     }

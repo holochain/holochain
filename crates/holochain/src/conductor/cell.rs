@@ -47,7 +47,6 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use observability::OpenSpanExt;
-use std::convert::TryInto;
 use std::hash::Hash;
 use std::hash::Hasher;
 use tokio::sync;
@@ -632,20 +631,20 @@ impl Cell {
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
-        payload: SerializedBytes,
-    ) -> CellResult<SerializedBytes> {
+        payload: ExternIO,
+    ) -> CellResult<ExternIO> {
         let invocation = ZomeCall {
             cell_id: self.id.clone(),
             zome_name,
             cap,
-            payload: ExternInput::new(payload),
+            payload,
             provenance: from_agent,
             fn_name,
         };
         // double ? because
         // - ConductorApiResult
         // - ZomeCallResult
-        Ok(self.call_zome(invocation, None).await??.try_into()?)
+        Ok(ExternIO::encode(&self.call_zome(invocation, None).await??)?)
     }
 
     /// Function called by the Conductor

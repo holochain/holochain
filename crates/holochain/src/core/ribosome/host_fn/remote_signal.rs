@@ -5,8 +5,6 @@ use holochain_p2p::HolochainP2pCellT;
 use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::RemoteSignalInput;
-use holochain_zome_types::RemoteSignalOutput;
 use std::sync::Arc;
 use tracing::Instrument;
 
@@ -14,13 +12,13 @@ use tracing::Instrument;
 pub fn remote_signal(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: RemoteSignalInput,
-) -> RibosomeResult<RemoteSignalOutput> {
+    input: RemoteSignal,
+) -> RibosomeResult<()> {
     const FN_NAME: &str = "recv_remote_signal";
     // Timeouts and errors are ignored,
     // this is a send and forget operation.
     let network = call_context.host_access().network().clone();
-    let RemoteSignal { agents, signal } = input.into_inner();
+    let RemoteSignal { agents, signal } = input;
     let zome_name: ZomeName = call_context.zome().into();
     let fn_name: FunctionName = FN_NAME.into();
     for agent in agents {
@@ -48,7 +46,7 @@ pub fn remote_signal(
             .in_current_span(),
         );
     }
-    Ok(RemoteSignalOutput::new(()))
+    Ok(())
 }
 
 #[cfg(test)]

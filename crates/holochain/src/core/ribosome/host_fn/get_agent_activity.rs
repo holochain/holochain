@@ -8,9 +8,9 @@ use std::sync::Arc;
 pub fn get_agent_activity(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: GetAgentActivityInput,
-) -> RibosomeResult<GetAgentActivityOutput> {
-    let GetAgentActivityInputInner{ agent_pubkey, chain_query_filter, activity_request } = input.into_inner();
+    input: GetAgentActivityInputInner,
+) -> RibosomeResult<AgentActivity> {
+    let GetAgentActivityInputInner{ agent_pubkey, chain_query_filter, activity_request } = input;
     let options = match activity_request {
         ActivityRequest::Status => GetActivityOptions {
             include_valid_activity: false,
@@ -38,7 +38,7 @@ pub fn get_agent_activity(
             .get_agent_activity(agent_pubkey, chain_query_filter, options)
             .await?;
 
-        Ok(GetAgentActivityOutput::new(activity.into()))
+        Ok(activity.into())
     })
 }
 

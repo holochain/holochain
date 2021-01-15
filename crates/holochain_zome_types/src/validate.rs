@@ -1,5 +1,5 @@
 use crate::element::Element;
-use crate::zome_io::ExternOutput;
+use crate::zome_io::ExternIO;
 use crate::CallbackResult;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
@@ -42,9 +42,9 @@ impl CallbackResult for ValidateCallbackResult {
     }
 }
 
-impl From<ExternOutput> for ValidateCallbackResult {
-    fn from(guest_output: ExternOutput) -> Self {
-        match guest_output.into_inner().try_into() {
+impl From<ExternIO> for ValidateCallbackResult {
+    fn from(guest_output: ExternIO) -> Self {
+        match guest_output.decode() {
             Ok(v) => v,
             Err(e) => Self::Invalid(format!("{:?}", e)),
         }
@@ -75,9 +75,9 @@ pub enum ValidationPackageCallbackResult {
     UnresolvedDependencies(Vec<AnyDhtHash>),
 }
 
-impl From<ExternOutput> for ValidationPackageCallbackResult {
-    fn from(guest_output: ExternOutput) -> Self {
-        match guest_output.into_inner().try_into() {
+impl From<ExternIO> for ValidationPackageCallbackResult {
+    fn from(guest_output: ExternIO) -> Self {
+        match guest_output.decode() {
             Ok(v) => v,
             Err(e) => ValidationPackageCallbackResult::Fail(format!("{:?}", e)),
         }

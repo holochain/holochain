@@ -8,9 +8,9 @@ use std::sync::Arc;
 pub fn get<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: GetInput,
-) -> RibosomeResult<GetOutput> {
-    let GetInputInner{ any_dht_hash, get_options } = input.into_inner();
+    input: GetInputInner,
+) -> RibosomeResult<Option<Element>> {
+    let GetInputInner{ any_dht_hash, get_options } = input;
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
@@ -26,7 +26,7 @@ pub fn get<'a>(
             .dht_get(any_dht_hash, get_options)
             .await?;
 
-        Ok(GetOutput::new(maybe_element))
+        Ok(maybe_element)
     })
 }
 

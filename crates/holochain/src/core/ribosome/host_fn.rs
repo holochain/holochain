@@ -30,7 +30,7 @@ macro_rules! host_fn_api_impls {
                         self.ribosome.clone(),
                         self.call_context.clone(),
                         input.into()
-                    ).map(|r| r.into_inner()).map_err(|e| HostFnApiError::RibosomeError(Box::new(e)))
+                    ).map_err(|e| HostFnApiError::RibosomeError(Box::new(e)))
                 }
             )*
         }

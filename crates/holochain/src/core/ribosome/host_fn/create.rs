@@ -16,13 +16,11 @@ use std::sync::Arc;
 pub fn create<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: CreateInput,
-) -> RibosomeResult<CreateOutput> {
-    // destructure the args out into an app type def id and entry
-    let entry_def_with_id: EntryWithDefId = input.into_inner();
+    input: EntryWithDefId,
+) -> RibosomeResult<HeaderHash> {
 
     // build the entry hash
-    let async_entry = AsRef::<Entry>::as_ref(&entry_def_with_id).to_owned();
+    let async_entry = AsRef::<Entry>::as_ref(&input).to_owned();
     let entry_hash =
         holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
 
@@ -30,7 +28,7 @@ pub fn create<'a>(
     let header_zome_id = ribosome.zome_to_id(&call_context.zome)?;
 
     // extract the entry defs for a zome
-    let entry_type = match AsRef::<EntryDefId>::as_ref(&entry_def_with_id) {
+    let entry_type = match AsRef::<EntryDefId>::as_ref(&input) {
         EntryDefId::App(entry_def_id) => {
             let (header_entry_def_id, entry_visibility) =
                 extract_entry_def(ribosome, call_context.clone(), entry_def_id.to_owned().into())?;
@@ -52,7 +50,7 @@ pub fn create<'a>(
     // note that validation is handled by the workflow
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
-    let entry = AsRef::<Entry>::as_ref(&entry_def_with_id).to_owned();
+    let entry = AsRef::<Entry>::as_ref(&input).to_owned();
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let mut guard = call_context.host_access.workspace().write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
@@ -69,7 +67,7 @@ pub fn create<'a>(
             &mut workspace.meta_authored,
         )
         .map_err(Box::new)?;
-        Ok(CreateOutput::new(header_hash))
+        Ok(header_hash)
     })
 }
 
@@ -123,8 +121,6 @@ pub mod wasm_test {
     use holochain_state::source_chain::ChainInvalidReason;
     use holochain_state::source_chain::SourceChainError;
     use holochain_state::source_chain::SourceChainResult;
-    use holochain_test_wasm_common::TestBytes;
-    use holochain_test_wasm_common::TestInt;
     use holochain_types::app::InstalledCell;
     use holochain_types::dna::DnaDef;
     use holochain_types::dna::DnaFile;
@@ -156,7 +152,7 @@ pub mod wasm_test {
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::App("post".into());
-        let input = CreateInput::new(EntryWithDefId::new(entry_def_id, app_entry.clone()));
+        let input = EntryWithDefId::new(entry_def_id, app_entry.clone());
 
         let output = create(Arc::new(ribosome), Arc::new(call_context), input);
 
@@ -197,7 +193,7 @@ pub mod wasm_test {
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::App("post".into());
-        let input = CreateInput::new(EntryWithDefId::new(entry_def_id, app_entry.clone()));
+        let input = EntryWithDefId::new(entry_def_id, app_entry.clone());
 
         let output = create(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
@@ -214,7 +210,7 @@ pub mod wasm_test {
         })
         .unwrap();
 
-        assert_eq!(chain_head, output.into_inner(),);
+        assert_eq!(chain_head, output);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -234,7 +230,7 @@ pub mod wasm_test {
         host_access.workspace = workspace_lock.clone();
 
         // get the result of a commit entry
-        let output: CreateOutput =
+        let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Create, "create_entry", ());
 
         // the chain head should be the committed entry header
@@ -250,17 +246,17 @@ pub mod wasm_test {
         })
         .unwrap();
 
-        assert_eq!(&chain_head, output.inner_ref());
+        assert_eq!(&chain_head, &output);
 
-        let round: GetOutput =
+        let round: Option<Element> =
             crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry", ());
 
-        let sb: SerializedBytes = match round.into_inner().and_then(|el| el.into()) {
-            Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => entry_bytes.into(),
+        let bytes: Vec<u8> = match round.and_then(|el| el.into()) {
+            Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => entry_bytes.bytes().to_vec(),
             other => panic!(format!("unexpected output: {:?}", other)),
         };
         // this should be the content "foo" of the committed post
-        assert_eq!(&vec![163, 102, 111, 111], sb.bytes(),)
+        assert_eq!(vec![163, 102, 111, 111], bytes);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -329,7 +325,7 @@ pub mod wasm_test {
 
         // ALICE DOING A CALL
 
-        let n = 50;
+        let n = 50_u32;
 
         // alice create a bunch of entries
         let output = handle
@@ -338,7 +334,7 @@ pub mod wasm_test {
                 zome_name: TestWasm::MultipleCalls.into(),
                 cap: None,
                 fn_name: "create_entry_multiple".into(),
-                payload: ExternInput::new(TestInt(n).try_into().unwrap()),
+                payload: ExternIO::encode(n).unwrap(),
                 provenance: alice_agent_id.clone(),
             })
             .await
@@ -347,9 +343,7 @@ pub mod wasm_test {
         assert_eq!(
             output,
             ZomeCallResponse::Ok(
-                ExternOutput::new(().try_into().unwrap())
-                    .try_into()
-                    .unwrap()
+                ExternIO::encode(()).unwrap()
             )
         );
 
@@ -360,7 +354,7 @@ pub mod wasm_test {
                 zome_name: TestWasm::MultipleCalls.into(),
                 cap: None,
                 fn_name: "get_entry_multiple".into(),
-                payload: ExternInput::new(TestInt(n).try_into().unwrap()),
+                payload: ExternIO::encode(n).unwrap(),
                 provenance: alice_agent_id,
             })
             .await
@@ -375,9 +369,7 @@ pub mod wasm_test {
         assert_eq!(
             output,
             ZomeCallResponse::Ok(
-                ExternOutput::new(TestBytes(expected).try_into().unwrap())
-                    .try_into()
-                    .unwrap()
+                ExternIO::encode(expected).unwrap()
             )
         );
 

@@ -5,7 +5,6 @@
 //! having to go through the heavy machinery of wasm compilation
 
 use self::error::InlineZomeResult;
-use holochain_serialized_bytes as sb;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
 use serde::de::DeserializeOwned;
@@ -55,11 +54,8 @@ impl InlineZome {
         I: DeserializeOwned,
         O: Serialize,
     {
-        let z = move |api: BoxApi, input: SerializedBytes| -> InlineZomeResult<SerializedBytes> {
-            let output = f(api, sb::decode(input.bytes())?)?;
-            Ok(SerializedBytes::from(UnsafeBytes::from(sb::encode(
-                &output,
-            )?)))
+        let z = move |api: BoxApi, input: ExternIO| -> InlineZomeResult<ExternIO> {
+            Ok(ExternIO::encode(f(api, input.decode()?)?)?)
         };
         if self.callbacks.insert(name.into(), Box::new(z)).is_some() {
             tracing::warn!("Replacing existing InlineZome callback '{}'", name);
@@ -73,10 +69,10 @@ impl InlineZome {
         &self,
         api: BoxApi,
         name: &FunctionName,
-        input: ExternInput,
-    ) -> InlineZomeResult<Option<ExternOutput>> {
+        input: ExternIO,
+    ) -> InlineZomeResult<Option<ExternIO>> {
         if let Some(f) = self.callbacks.get(name) {
-            Ok(Some(ExternOutput::new(f(api, input.into_inner())?)))
+            Ok(Some(ExternIO::encode(f(api, input)?)?))
         } else {
             Ok(None)
         }
@@ -84,9 +80,8 @@ impl InlineZome {
 }
 
 /// An inline zome function takes a Host API and an input, and produces an output.
-pub type InlineZomeFn = Box<
-    dyn Fn(BoxApi, SerializedBytes) -> InlineZomeResult<SerializedBytes> + 'static + Send + Sync,
->;
+pub type InlineZomeFn =
+    Box<dyn Fn(BoxApi, ExternIO) -> InlineZomeResult<ExternIO> + 'static + Send + Sync>;
 
 impl std::fmt::Debug for InlineZome {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

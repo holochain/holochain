@@ -13,7 +13,7 @@ pub struct CoolZome {
 impl CoolZome {
     /// Call a function as if from another Agent.
     /// The provenance and optional CapSecret must be provided.
-    pub async fn call_from<I, O, F, E>(
+    pub async fn call_from<I, O, F>(
         &self,
         provenance: AgentPubKey,
         cap: Option<CapSecret>,
@@ -21,10 +21,9 @@ impl CoolZome {
         payload: I,
     ) -> O
     where
-        E: std::fmt::Debug,
         FunctionName: From<F>,
-        SerializedBytes: TryFrom<I, Error = E>,
-        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
+        I: serde::Serialize,
+        O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
         self.handle
             .call_zome_ok_flat(
@@ -40,12 +39,11 @@ impl CoolZome {
 
     /// Call a function on this zome.
     /// No CapGrant is provided; the authorship capability will be granted.
-    pub async fn call<I, O, F, E>(&self, fn_name: F, payload: I) -> O
+    pub async fn call<I, O, F>(&self, fn_name: F, payload: I) -> O
     where
-        E: std::fmt::Debug,
         FunctionName: From<F>,
-        SerializedBytes: TryFrom<I, Error = E>,
-        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
+        I: serde::Serialize,
+        O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
         self.call_from(self.cell_id.agent_pubkey().clone(), None, fn_name, payload)
             .await

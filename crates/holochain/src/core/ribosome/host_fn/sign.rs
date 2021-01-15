@@ -8,17 +8,17 @@ use std::sync::Arc;
 pub fn sign(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: SignInput,
-) -> RibosomeResult<SignOutput> {
-    Ok(SignOutput::new(
+    input: Sign,
+) -> RibosomeResult<Signature> {
+    Ok(
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             call_context
                 .host_access
                 .keystore()
-                .sign(input.into_inner())
+                .sign(input)
                 .await
         })?,
-    ))
+    )
 }
 
 #[cfg(test)]
@@ -94,10 +94,10 @@ pub mod wasm_test {
                     host_access,
                     TestWasm::Sign,
                     "sign",
-                    holochain_zome_types::zome_io::SignInput::new(Sign::new_raw(
+                    Sign::new_raw(
                         k.clone(),
                         data.clone()
-                    ))
+                    )
                 );
 
                 assert_eq!(expect, output.as_ref().to_vec());

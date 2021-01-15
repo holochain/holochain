@@ -8,5 +8,5 @@ use crate::prelude::*;
 /// @todo do we want to return elements rather than hashes?
 /// @todo implement cap grant/claim usage in terms of query
 pub fn query(filter: ChainQueryFilter) -> ExternResult<ElementVec> {
-    host_call::<QueryInput, ElementVec>(__query, QueryInput::new(filter))
+    host_call::<ChainQueryFilter, ElementVec>(__query, filter)
 }

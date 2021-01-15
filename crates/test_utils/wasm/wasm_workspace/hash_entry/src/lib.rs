@@ -33,6 +33,6 @@ fn twenty_three_degrees_hash(_: ()) -> ExternResult<EntryHash> {
 }
 
 #[hdk_extern]
-fn hash_entry(input: HashEntryInput) -> ExternResult<EntryHash> {
-    hdk3::prelude::hash_entry(input.into_inner())
+fn hash_entry(entry: Entry) -> ExternResult<EntryHash> {
+    hdk3::prelude::hash_entry(entry)
 }

@@ -14,10 +14,10 @@ use std::sync::Arc;
 pub fn update<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: UpdateInput,
-) -> RibosomeResult<UpdateOutput> {
+    input: UpdateInputInner,
+) -> RibosomeResult<HeaderHash> {
     // destructure the args out into an app type def id and entry
-    let UpdateInputInner { original_header_address, entry_with_def_id } = input.into_inner();
+    let UpdateInputInner { original_header_address, entry_with_def_id } = input;
 
     // build the entry hash
     let async_entry = AsRef::<Entry>::as_ref(&entry_with_def_id).to_owned();
@@ -74,7 +74,7 @@ pub fn update<'a>(
             &mut workspace.meta_authored,
         )
         .map_err(Box::new)?;
-        Ok(UpdateOutput::new(header_hash))
+        Ok(header_hash)
     })
 }
 

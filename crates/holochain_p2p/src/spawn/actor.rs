@@ -51,16 +51,21 @@ impl HolochainP2pActor {
         cap: Option<CapSecret>,
         data: Vec<u8>,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
-        let data: SerializedBytes = UnsafeBytes::from(data).into();
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             let res = evt_sender
                 .call_remote(
-                    dna_hash, to_agent, from_agent, zome_name, fn_name, cap, data,
+                    dna_hash,
+                    to_agent,
+                    from_agent,
+                    zome_name,
+                    fn_name,
+                    cap,
+                    ExternIO(data),
                 )
                 .await;
             res.map_err(kitsune_p2p::KitsuneP2pError::from)
-                .map(|res| UnsafeBytes::from(res).into())
+                .map(|res| res.into_vec())
         }
         .boxed()
         .into())
