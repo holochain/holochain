@@ -1,5 +1,6 @@
 use std::convert::TryInto;
 use std::path::PathBuf;
+use std::todo;
 
 use anyhow::anyhow;
 use anyhow::ensure;
@@ -26,12 +27,16 @@ use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 pub struct Call {
-    #[structopt(short, long, conflicts_with = "running", required_unless = "running")]
+    #[structopt(short, long, conflicts_with = "running")]
     /// Run a conductor setup at this path then make the call.
     pub path: Option<PathBuf>,
-    #[structopt(short, long, required_unless = "path")]
+    #[structopt(short, long)]
     /// Call a running conductor on this port.
     pub running: Option<u16>,
+    #[structopt(short, long, conflicts_with_all = &["running", "path"])]
+    /// Call all the existing conductors.
+    /// [unimplemented]
+    pub all: bool,
     #[structopt(subcommand)]
     /// The admin request you want to make.
     pub call: AdminRequestCli,
@@ -103,14 +108,19 @@ pub async fn call(req: Call) -> anyhow::Result<()> {
     let Call {
         path,
         running,
+        all,
         call,
     } = req;
+    if all {
+        todo!("Calling all existing is coming soon");
+    }
     let (mut cmd, _h) = match (path, running) {
         (None, Some(running)) => (CmdRunner::new(running).await, None),
         (Some(path), None) => {
             let (port, holochain) = run_async(path, None).await?;
             (CmdRunner::new(port).await, Some(holochain))
         }
+        (None, None) => todo!("Calling from existing is coming soon"),
         _ => unreachable!("Can't use path to conductor and running at the same time"),
     };
     match call {

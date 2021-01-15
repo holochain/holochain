@@ -1,12 +1,13 @@
 [workspace]
 members = [
-  "crates/admin",
   "crates/dna_util",
   "crates/fixt",
   "crates/fixt/test",
   "crates/hdk3",
   "crates/hdk3_derive",
   "crates/holo_hash",
+
+  "crates/hc",
   
   "crates/holochain",
   "crates/holochain_cascade",
@@ -18,7 +19,7 @@ members = [
   "crates/holochain_types",
   "crates/holochain_websocket",
   "crates/holochain_zome_types",
-
+  
   "crates/kitsune_p2p/kitsune_p2p",
   "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",

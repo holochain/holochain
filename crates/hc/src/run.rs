@@ -8,13 +8,13 @@ use crate::ports::random_admin_port_if_busy;
 
 pub async fn run(
     path: PathBuf,
-    app_port: Option<u16>,
+    app_ports: Vec<u16>,
     force_admin_port: Option<u16>,
 ) -> anyhow::Result<()> {
     let (port, holochain) = run_async(path.clone(), force_admin_port).await?;
     msg!("Running conductor on admin port {}", port);
     tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
-    if let Some(app_port) = app_port {
+    for app_port in app_ports {
         msg!("Attaching app port {}", app_port);
         attach_app_port(app_port, port).await?;
     }

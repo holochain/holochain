@@ -1,5 +1,5 @@
 [package]
-name = "holochain_admin"
+name = "holochain_hc"
 version = "0.1.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://github.com/holochain/holochain"
@@ -11,15 +11,16 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
-name = "hc-admin"
-path = "src/main.rs"
+name = "hc"
+path = "src/bin/hc.rs"
 
 [lib]
-name = "holochain_admin"
+name = "holochain_hc"
 path = "src/lib.rs"
 
 [dependencies]
 ansi_term = "0.12"
+futures = "0.3"
 holochain_conductor_api = { path = "../holochain_conductor_api" }
 holochain_types = { path = "../holochain_types" }
 holochain_websocket = { path = "../holochain_websocket" }
@@ -35,6 +36,7 @@ nanoid = "0.3"
 # unwrap_to = { version = "0.1.0", optional = false }
 observability = "0.1"
 chrono = "0.4.6"
+walkdir = "2"
 
 [dev-dependencies]
 assert_cmd = "1.0.1"

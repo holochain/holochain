@@ -1,22 +1,32 @@
 use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
 use holochain_p2p::kitsune_p2p::TransportConfig;
 use holochain_types::prelude::InstalledAppId;
-use std::path::PathBuf;
 use structopt::StructOpt;
 use url2::Url2;
 
+const DEFAULT_APP_ID: &'static str = "test-app";
 #[derive(Debug, StructOpt, Clone)]
 pub struct Create {
-    #[structopt(required = true, min_values = 1)]
-    /// List of dnas to run.
-    pub dnas: Vec<PathBuf>,
     #[structopt(subcommand)]
     /// Add an optional network.
-    pub network: Option<Network>,
-    #[structopt(short, long, default_value = "test-app")]
+    pub network: Option<NetworkCmd>,
+    #[structopt(short, long, default_value = DEFAULT_APP_ID)]
     /// Id for the installed app.
     /// This is just a String to identify the app by.
     pub app_id: InstalledAppId,
+}
+
+#[derive(Debug, StructOpt, Clone)]
+pub enum NetworkCmd {
+    Network(Network),
+}
+
+impl NetworkCmd {
+    pub fn into_inner(self) -> Network {
+        match self {
+            NetworkCmd::Network(n) => n,
+        }
+    }
 }
 
 #[derive(Debug, StructOpt, Clone)]
@@ -102,5 +112,14 @@ impl From<Network> for KitsuneP2pConfig {
             }
         }
         kit
+    }
+}
+
+impl Default for Create {
+    fn default() -> Self {
+        Self {
+            network: None,
+            app_id: DEFAULT_APP_ID.to_string(),
+        }
     }
 }

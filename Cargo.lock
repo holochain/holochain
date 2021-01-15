@@ -1474,29 +1474,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "holochain_admin"
-version = "0.1.0"
-dependencies = [
- "ansi_term 0.12.1",
- "anyhow",
- "assert_cmd",
- "chrono",
- "holochain_conductor_api",
- "holochain_p2p",
- "holochain_types",
- "holochain_websocket",
- "matches",
- "nanoid",
- "observability",
- "portpicker",
- "serde_yaml",
- "structopt",
- "tokio",
- "tracing",
- "url2",
-]
-
-[[package]]
 name = "holochain_cascade"
 version = "0.0.1"
 dependencies = [
@@ -1545,6 +1522,31 @@ dependencies = [
  "thiserror",
  "tracing",
  "url2",
+]
+
+[[package]]
+name = "holochain_hc"
+version = "0.1.0"
+dependencies = [
+ "ansi_term 0.12.1",
+ "anyhow",
+ "assert_cmd",
+ "chrono",
+ "futures",
+ "holochain_conductor_api",
+ "holochain_p2p",
+ "holochain_types",
+ "holochain_websocket",
+ "matches",
+ "nanoid",
+ "observability",
+ "portpicker",
+ "serde_yaml",
+ "structopt",
+ "tokio",
+ "tracing",
+ "url2",
+ "walkdir",
 ]
 
 [[package]]
