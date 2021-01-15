@@ -1,80 +1,74 @@
 #![cfg(feature = "test_utils")]
 
 use hdk3::prelude::Links;
-use holochain::conductor::api::ZomeCall;
-use holochain::test_utils::conductor_setup::ConductorTestData;
+use holochain::test_utils::consistency_10s;
+use holochain::test_utils::cool::CoolAgents;
 use holochain::test_utils::cool::CoolConductor;
 use holochain::test_utils::cool::CoolDnaFile;
-use holochain_keystore::keystore_actor::KeystoreSenderExt;
-use holochain_lmdb::test_utils::test_environments;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 
-use unwrap_to::unwrap_to;
+#[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
+struct BaseTarget(EntryHash, EntryHash);
+
+fn links_zome() -> InlineZome {
+    InlineZome::new_unique(vec![])
+        .callback("create_link", move |api, base_target: BaseTarget| {
+            let hash = api.create_link((base_target.0, base_target.1, ().into()))?;
+            Ok(hash)
+        })
+        .callback("get_links", move |api, base: EntryHash| {
+            Ok(api.get_links((base, None))?)
+        })
+}
 
 /// A single link with an AgentPubKey for the base and target is committed by
 /// one agent, and after a delay, all agents can get the link
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "slow_tests")]
 async fn many_agents_can_reach_consistency_agent_links() {
+    observability::test_run().ok();
     const NUM_AGENTS: usize = 20;
-    let consistency_delay = std::time::Duration::from_secs(5);
 
-    let envs = test_environments();
-    let zomes = vec![TestWasm::Link];
+    let (dna_file, _) = CoolDnaFile::unique_from_inline_zome("links", links_zome())
+        .await
+        .unwrap();
 
-    let dna_file = DnaFile::new(
-        DnaDef {
-            name: "conductor_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-            properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: zomes.clone().into_iter().map(Into::into).collect(),
-        },
-        zomes.into_iter().map(Into::into),
-    )
-    .await
-    .unwrap();
+    // Create a Conductor
+    let mut conductor = CoolConductor::from_config(Default::default()).await;
 
-    let mut agents = Vec::with_capacity(NUM_AGENTS);
+    let agents = CoolAgents::get(conductor.keystore(), NUM_AGENTS).await;
+    let apps = conductor
+        .setup_app_for_agents("app", &agents, &[dna_file])
+        .await;
+    let cells = apps.cells_flattened();
+    let alice = cells[0].zome("links");
 
-    for _ in 0..NUM_AGENTS {
-        agents.push(
-            envs.keystore()
-                .generate_sign_keypair_from_pure_entropy()
-                .await
-                .unwrap(),
+    // Must have integrated or be able to get the agent key to link from it
+    consistency_10s(&cells[..]).await;
+
+    let base: EntryHash = cells[0].agent_pubkey().clone().into();
+    let target: EntryHash = cells[1].agent_pubkey().clone().into();
+
+    let _: HeaderHash = conductor
+        .call(
+            &alice,
+            "create_link",
+            BaseTarget(base.clone(), target.clone()),
         )
-    }
-
-    let (mut conductor, cell_ids) =
-        ConductorTestData::new(envs, vec![dna_file], agents, Default::default()).await;
-
-    let cell_ids = cell_ids.values().next().unwrap();
-    let committer = conductor.get_cell(&cell_ids[1]).unwrap();
-    let base = cell_ids[0].agent_pubkey().clone();
-    let target = cell_ids[1].agent_pubkey().clone();
-
-    committer
-        .get_api(TestWasm::Link)
-        .create_link(base.clone().into(), target.into(), ().into())
         .await;
 
-    committer.triggers.produce_dht_ops.trigger();
+    consistency_10s(&cells[..]).await;
 
-    tokio::time::delay_for(consistency_delay).await;
-    let mut seen = [0; NUM_AGENTS];
+    let mut seen = [0usize; NUM_AGENTS];
 
-    for i in 0..NUM_AGENTS {
-        let cell_id = cell_ids[i].clone();
-        let cd = conductor.get_cell(&cell_id).unwrap();
-
-        let links = cd
-            .get_api(TestWasm::Link)
-            .get_links(base.clone().into(), None, Default::default())
+    for (i, cell) in cells.iter().enumerate() {
+        // let links: Links = conductor.call(&cell.zome(TestWasm::Link), "get_links", ()).await;
+        let links: Links = conductor
+            .call(&cell.zome("links"), "get_links", base.clone())
             .await;
-
-        seen[i] = links.len();
+        seen[i] = links.into_inner().len();
     }
 
     assert_eq!(seen.to_vec(), [1; NUM_AGENTS].to_vec());
@@ -85,83 +79,37 @@ async fn many_agents_can_reach_consistency_agent_links() {
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "slow_tests")]
 async fn many_agents_can_reach_consistency_normal_links() {
-    let num_agents = 30;
-    let consistency_delay = std::time::Duration::from_secs(5);
+    observability::test_run().ok();
+    const NUM_AGENTS: usize = 30;
 
-    let envs = test_environments();
-    let zomes = vec![TestWasm::Link];
-
-    let dna_file = DnaFile::new(
-        DnaDef {
-            name: "conductor_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-            properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: zomes.clone().into_iter().map(Into::into).collect(),
-        },
-        zomes.into_iter().map(Into::into),
-    )
-    .await
-    .unwrap();
-
-    let mut agents = Vec::with_capacity(num_agents);
-
-    for _ in 0..num_agents {
-        agents.push(
-            envs.keystore()
-                .generate_sign_keypair_from_pure_entropy()
-                .await
-                .unwrap(),
-        )
-    }
-
-    let (conductor, cell_ids) =
-        ConductorTestData::new(envs, vec![dna_file], agents, Default::default()).await;
-
-    let cell_ids = cell_ids.values().next().unwrap();
-
-    let _create_output = conductor
-        .handle()
-        .call_zome(ZomeCall {
-            cell_id: cell_ids[0].clone(),
-            zome_name: TestWasm::Link.into(),
-            cap: None,
-            fn_name: "create_link".into(),
-            payload: ExternInput::new(SerializedBytes::try_from(()).unwrap()),
-            provenance: cell_ids[0].agent_pubkey().clone(),
-        })
+    let (dna_file, _) = CoolDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
         .await
-        .unwrap()
         .unwrap();
 
-    tokio::time::delay_for(consistency_delay).await;
+    // Create a Conductor
+    let mut conductor = CoolConductor::from_config(Default::default()).await;
+
+    let agents = CoolAgents::get(conductor.keystore(), NUM_AGENTS).await;
+    let apps = conductor
+        .setup_app_for_agents("app", &agents, &[dna_file])
+        .await;
+    let cells = apps.cells_flattened();
+    let alice = cells[0].zome(TestWasm::Link);
+
+    let _: HeaderHash = conductor.call(&alice, "create_link", ()).await;
+
+    consistency_10s(&cells[..]).await;
 
     let mut num_seen = 0;
 
-    for _ in 0..num_agents {
-        let get_output = conductor
-            .handle()
-            .call_zome(ZomeCall {
-                cell_id: cell_ids[1].clone(),
-                zome_name: TestWasm::Link.into(),
-                cap: None,
-                fn_name: "get_links".into(),
-                payload: ExternInput::new(SerializedBytes::try_from(()).unwrap()),
-                provenance: cell_ids[1].agent_pubkey().clone(),
-            })
-            .await
-            .unwrap()
-            .unwrap();
-
-        let links: Links = unwrap_to!(get_output => ZomeCallResponse::Ok)
-            .clone()
-            .into_inner()
-            .try_into()
-            .unwrap();
-
+    for cell in &cells {
+        let links: Links = conductor
+            .call(&cell.zome(TestWasm::Link), "get_links", ())
+            .await;
         num_seen += links.into_inner().len();
     }
 
-    assert_eq!(num_seen, num_agents);
+    assert_eq!(num_seen, NUM_AGENTS);
 }
 
 #[tokio::test(threaded_scheduler)]
