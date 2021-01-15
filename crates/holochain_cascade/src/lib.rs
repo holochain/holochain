@@ -550,9 +550,15 @@ where
                     entry_type,
                     updates,
                 } = *raw;
-                let elements = ElementGroup::from_wire_elements(live_headers, entry_type, entry)?;
-                let entry_hash = elements.entry_hash().clone();
-                self.update_stores_with_element_group(elements)?;
+                let entry_hash = if !live_headers.is_empty() {
+                    let elements =
+                        ElementGroup::from_wire_elements(live_headers, entry_type, entry)?;
+                    let entry_hash = elements.entry_hash().clone();
+                    self.update_stores_with_element_group(elements)?;
+                    entry_hash
+                } else {
+                    EntryHash::with_data_sync(&entry)
+                };
                 for delete in deletes {
                     let element_status = delete.into_element_status();
                     self.update_stores(element_status)?;
