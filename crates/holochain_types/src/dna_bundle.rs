@@ -2,5 +2,5 @@
 
 mod dna_bundle_v1;
 
-/// Alias for the current DnaBundle manifest format
-pub type DnaBundle = dna_bundle_v1::Bundle;
+/// Alias for the current DnaBundleManifest format
+pub type DnaBundleManifest = dna_bundle_v1::BundleManifest;

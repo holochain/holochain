@@ -1,5 +1,5 @@
 //! Collection of cells to form a holochain application
-use crate::{dna::JsonProperties, dna_bundle::DnaBundle};
+use crate::{dna::JsonProperties, dna_bundle::DnaBundleManifest};
 use derive_more::Into;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::SerializedBytes;
@@ -26,7 +26,7 @@ pub enum InstallAppPayload {
         /// The DNA bundle manifest for this app
         // TODO: this will probably actually be a file path or raw file data
         //       that gets deserialized
-        dna_bundle: DnaBundle,
+        dna_bundle: DnaBundleManifest,
     },
 }
 
