@@ -98,17 +98,15 @@ pub(crate) fn peer_discover(
                     let (_, mut write, read) = tx.create_channel(url).await?;
 
                     // write the query request
-                    write
-                        .write_and_close(
-                            wire::Wire::agent_info_query(
-                                space.clone(),
-                                Arc::new(info.as_agent_ref().clone()),
-                                Some(to_agent.clone()),
-                                None,
-                            )
-                            .encode_vec()?,
-                        )
-                        .await?;
+                    let msg = wire::Wire::agent_info_query(
+                        space.clone(),
+                        Arc::new(info.as_agent_ref().clone()),
+                        Some(to_agent.clone()),
+                        None,
+                    )
+                    .encode_vec()?;
+                    KitsuneMetrics::count(KitsuneMetrics::AgentInfoQuery, msg.len());
+                    write.write_and_close(msg).await?;
 
                     // parse the response
                     let res = read.read_to_end().await;
@@ -261,16 +259,19 @@ where
                         let out = out.clone();
                         tokio::task::spawn(async move {
                             let (_, mut write, read) = fut.await?;
-                            match &mut payload {
+                            let metric_type = match &mut payload {
                                 wire::Wire::Notify(n) => {
                                     n.to_agent = to_agent.clone();
+                                    KitsuneMetrics::Notify
                                 }
                                 wire::Wire::Call(c) => {
                                     c.to_agent = to_agent.clone();
+                                    KitsuneMetrics::Call
                                 }
                                 _ => panic!("cannot message {:?}", payload),
-                            }
+                            };
                             let payload = payload.encode_vec()?;
+                            KitsuneMetrics::count(metric_type, payload.len());
                             write.write_and_close(payload).await?;
                             let res = read.read_to_end().await;
                             let (_, res) = wire::Wire::decode_ref(&res)?;

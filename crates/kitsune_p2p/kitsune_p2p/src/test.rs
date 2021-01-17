@@ -28,6 +28,7 @@ mod tests {
         assert_eq!(b"echo: m1".to_vec(), r1);
         assert_eq!(b"echo: m2".to_vec(), r2);
         harness.ghost_actor_shutdown().await?;
+        crate::types::metrics::print_all_metrics();
         Ok(())
     }
 

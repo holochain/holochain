@@ -4,6 +4,8 @@ use futures::future::FutureExt;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 
+observability::metrics!(KitsuneTransportMetrics, Write, Read);
+
 /// Error related to remote communication.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -69,11 +71,18 @@ impl<T: futures::stream::Stream<Item = Vec<u8>> + Send + Unpin + 'static> Transp
         self,
     ) -> ghost_actor::dependencies::must_future::MustBoxFuture<'static, Vec<u8>> {
         async move {
-            self.fold(Vec::new(), |mut acc, x| async move {
-                acc.extend_from_slice(&x);
-                acc
-            })
-            .await
+            let r = self
+                .fold(Vec::new(), |mut acc, x| async move {
+                    acc.extend_from_slice(&x);
+                    acc
+                })
+                .await;
+            KitsuneTransportMetrics::count_filter(
+                KitsuneTransportMetrics::Read,
+                r.len(),
+                "transport",
+            );
+            r
         }
         .boxed()
         .into()
@@ -100,6 +109,11 @@ impl<T: futures::sink::Sink<Vec<u8>, Error = TransportError> + Send + Unpin + 's
         &'a mut self,
         data: Vec<u8>,
     ) -> ghost_actor::dependencies::must_future::MustBoxFuture<'a, TransportResult<()>> {
+        KitsuneTransportMetrics::count_filter(
+            KitsuneTransportMetrics::Write,
+            data.len(),
+            "transport",
+        );
         async move {
             self.send(data).await?;
             self.close().await?;
@@ -189,8 +203,19 @@ impl<T: TransportListenerSender> TransportListenerSenderExt for T {
         let fut = self.create_channel(url);
         async move {
             let (_url, mut write, read) = fut.await?;
+            KitsuneTransportMetrics::count_filter(
+                KitsuneTransportMetrics::Write,
+                data.len(),
+                "transport",
+            );
             write.write_and_close(data).await?;
-            Ok(read.read_to_end().await)
+            let r = read.read_to_end().await;
+            KitsuneTransportMetrics::count_filter(
+                KitsuneTransportMetrics::Read,
+                r.len(),
+                "transport",
+            );
+            Ok(r)
         }
         .boxed()
         .into()
