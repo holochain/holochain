@@ -24,7 +24,7 @@ pub mod cmds;
 mod config;
 mod create;
 mod ports;
-mod run;
+pub mod run;
 pub mod scripts;
 
 pub struct CmdRunner {
@@ -104,11 +104,13 @@ pub fn save(mut path: PathBuf, paths: Vec<PathBuf>) -> anyhow::Result<()> {
 
 pub fn clean(mut path: PathBuf, setups: Vec<usize>) -> anyhow::Result<()> {
     let existing = load(path.clone())?;
+    let setups_len = setups.len();
     let to_remove: Vec<_> = if setups.is_empty() {
         existing.iter().collect()
     } else {
         setups.into_iter().filter_map(|i| existing.get(i)).collect()
     };
+    let to_remove_len = to_remove.len();
     for p in to_remove {
         if p.exists() && p.is_dir() {
             if let Err(e) = std::fs::remove_dir_all(p) {
@@ -116,9 +118,11 @@ pub fn clean(mut path: PathBuf, setups: Vec<usize>) -> anyhow::Result<()> {
             }
         }
     }
-    path.push(".hc");
-    if path.exists() {
-        std::fs::remove_file(path)?;
+    if setups_len == 0 || setups_len == to_remove_len {
+        path.push(".hc");
+        if path.exists() {
+            std::fs::remove_file(path)?;
+        }
     }
     Ok(())
 }

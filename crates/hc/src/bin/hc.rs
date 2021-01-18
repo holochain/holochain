@@ -53,8 +53,10 @@ enum Op {
 
 #[derive(Debug, StructOpt)]
 struct Run {
-    #[structopt(short, long)]
+    #[structopt(short, long, value_delimiter = ",")]
     /// Optionally create an app interface.
+    /// This allows you UI to talk to the conductor.
+    /// For example `hc run -p=0,9000,0`
     ports: Vec<u16>,
     #[structopt(short, long, value_delimiter = ",")]
     /// Specify a secondary admin port so you can make admin requests while holochain is running.

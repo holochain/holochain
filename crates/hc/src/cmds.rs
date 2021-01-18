@@ -63,16 +63,17 @@ pub enum NetworkType {
 
 #[derive(Debug, StructOpt, Clone)]
 pub struct Quic {
-    #[structopt(short, parse(from_str = Url2::parse))]
+    #[structopt(short, long, parse(from_str = Url2::parse))]
     /// To which network interface / port should we bind?
     /// Default: "kitsune-quic://0.0.0.0:0".
     pub bind_to: Option<Url2>,
+    #[structopt(short, long)]
     /// If you have port-forwarding set up,
     /// or wish to apply a vanity domain name,
     /// you may need to override the local NIC ip.
     /// Default: None = use NIC ip.
     pub override_host: Option<String>,
-    #[structopt(short)]
+    #[structopt(short, long)]
     /// If you have port-forwarding set up,
     /// you may need to override the local NIC port.
     /// Default: None = use NIC port.

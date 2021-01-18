@@ -49,10 +49,11 @@ async fn check_timeout<T>(response: impl Future<Output = Result<T, std::io::Erro
 
 /// Runs holochain and creates a temp directory
 #[tokio::test(threaded_scheduler)]
+#[ignore = "Figure out how to get holochain bin in CI"]
 async fn run_holochain() {
     observability::test_run().ok();
     let port: u16 = pick_unused_port().expect("No ports free");
-    let cmd = std::process::Command::cargo_bin("hc-admin").unwrap();
+    let cmd = std::process::Command::cargo_bin("hc").unwrap();
     let mut cmd = Command::from(cmd);
     cmd.arg("run")
         .arg("-p")

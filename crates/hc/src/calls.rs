@@ -31,7 +31,7 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 pub struct Call {
     #[structopt(flatten)]
-    existing: Existing,
+    pub existing: Existing,
     #[structopt(short, long, conflicts_with_all = &["existing_paths", "existing_indices"], value_delimiter = ",")]
     /// Ports to running conductor admin interfaces.
     /// If this is empty existing setups will be used.
@@ -69,7 +69,7 @@ pub enum AdminRequestCli {
 pub struct AddAdminWs {
     /// Optional port number.
     /// Defaults to assigned by OS.
-    port: Option<u16>,
+    pub port: Option<u16>,
 }
 
 #[derive(Debug, StructOpt, Clone)]
@@ -78,7 +78,7 @@ pub struct AddAdminWs {
 pub struct AddAppWs {
     /// Optional port number.
     /// Defaults to assigned by OS.
-    port: Option<u16>,
+    pub port: Option<u16>,
 }
 
 #[derive(Debug, StructOpt, Clone)]
@@ -107,7 +107,7 @@ pub struct InstallApp {
 /// and activates the installed app.
 pub struct ActivateApp {
     /// The InstalledAppId to activate.
-    app_id: String,
+    pub app_id: String,
 }
 
 #[derive(Debug, StructOpt, Clone)]
@@ -115,7 +115,7 @@ pub struct ActivateApp {
 /// and deactivates the installed app.
 pub struct DeactivateApp {
     /// The InstalledAppId to deactivate.
-    app_id: String,
+    pub app_id: String,
 }
 
 #[derive(Debug, StructOpt, Clone)]
@@ -126,10 +126,10 @@ pub struct DeactivateApp {
 pub struct DumpState {
     #[structopt(parse(try_from_str = parse_dna_hash))]
     /// The dna hash half of the cell id to dump.
-    dna: DnaHash,
+    pub dna: DnaHash,
     #[structopt(parse(try_from_str = parse_agent_key))]
     /// The agent half of the cell id to dump.
-    agent_key: AgentPubKey,
+    pub agent_key: AgentPubKey,
 }
 #[derive(Debug, StructOpt, Clone)]
 /// Calls AdminRequest::RequestAgentInfo
@@ -138,10 +138,10 @@ pub struct DumpState {
 pub struct ListAgents {
     #[structopt(short, long, parse(try_from_str = parse_agent_key), requires = "dna")]
     /// Optionally request agent info for a particular cell id.
-    agent_key: Option<AgentPubKey>,
+    pub agent_key: Option<AgentPubKey>,
     #[structopt(short, long, parse(try_from_str = parse_dna_hash), requires = "agent_key")]
     /// Optionally request agent info for a particular cell id.
-    dna: Option<DnaHash>,
+    pub dna: Option<DnaHash>,
 }
 
 pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
