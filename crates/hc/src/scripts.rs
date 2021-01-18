@@ -1,21 +1,12 @@
 use std::path::Path;
 use std::path::PathBuf;
-use structopt::StructOpt;
 
+use crate::calls::InstallApp;
 use crate::cmds::*;
+use crate::run::run_async;
+use crate::CmdRunner;
 
-#[derive(Debug, StructOpt, Clone)]
-pub enum Script {
-    WithNetwork(Create),
-    N {
-        #[structopt(flatten)]
-        create: Create,
-        #[structopt(short, long)]
-        num_conductors: usize,
-    },
-}
-
-async fn default_with_network(
+pub async fn default_with_network(
     holochain_path: &Path,
     create: Create,
     directory: Option<PathBuf>,
@@ -28,7 +19,14 @@ async fn default_with_network(
         ..
     } = create;
     let path = crate::create(network.map(|n| n.into_inner().into()), root, directory).await?;
-    crate::install_app(holochain_path, path.clone(), dnas, app_id).await?;
+    let conductor = run_async(holochain_path, path.clone(), None).await?;
+    let mut cmd = CmdRunner::new(conductor.0).await;
+    let install_app = InstallApp {
+        app_id,
+        agent_key: None,
+        dnas,
+    };
+    crate::calls::install_app(&mut cmd, install_app).await?;
     Ok(path)
 }
 

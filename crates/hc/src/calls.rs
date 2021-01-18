@@ -91,15 +91,15 @@ pub struct AddAppWs {
 pub struct InstallApp {
     #[structopt(short, long, default_value = "test-app")]
     /// Sets the InstalledAppId.
-    app_id: String,
+    pub app_id: String,
     #[structopt(short, long, parse(try_from_str = parse_agent_key))]
     /// If not set then a key will be generated.
     /// Agent key is Base64 (same format that is used in logs).
     /// e.g. `uhCAk71wNXTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF4b_o`
-    agent_key: Option<AgentPubKey>,
+    pub agent_key: Option<AgentPubKey>,
     #[structopt(required = true, min_values = 1)]
     /// List of dnas to install.
-    dnas: Vec<PathBuf>,
+    pub dnas: Vec<PathBuf>,
 }
 
 #[derive(Debug, StructOpt, Clone)]

@@ -4,7 +4,6 @@ use holochain_conductor_api::{AdminRequest, AdminResponse};
 use holochain_websocket::WebsocketSender;
 use ports::get_admin_api;
 
-pub use app::install_app;
 pub use create::create;
 pub use create::create_default;
 pub use ports::add_secondary_admin_port;

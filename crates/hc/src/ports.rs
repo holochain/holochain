@@ -104,23 +104,6 @@ pub(crate) fn set_secondary_admin_port(config: &mut ConductorConfig, port: Optio
     msg!("Secondary admin port Admin port set to: {}", p);
 }
 
-pub async fn _get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
-    let mut ports = Vec::new();
-    for p in paths {
-        if let Some(config) = read_config(p)? {
-            if let Some(ai) = config.admin_interfaces {
-                if let Some(AdminInterfaceConfig {
-                    driver: InterfaceDriver::Websocket { port },
-                }) = ai.get(0)
-                {
-                    ports.push(*port)
-                }
-            }
-        }
-    }
-    Ok(ports)
-}
-
 pub async fn get_secondary_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
     let mut ports = Vec::new();
     for p in paths {
