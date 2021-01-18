@@ -1,8 +1,9 @@
 use std::convert::TryInto;
+use std::path::Path;
 use std::path::PathBuf;
-use std::todo;
 
 use anyhow::anyhow;
+use anyhow::bail;
 use anyhow::ensure;
 use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::AdminRequest;
@@ -20,159 +21,228 @@ use portpicker::is_free;
 use portpicker::pick_unused_port;
 use std::convert::TryFrom;
 
+use crate::cmds::Existing;
 use crate::expect_match;
+use crate::ports::get_secondary_admin_ports;
 use crate::run::run_async;
 use crate::CmdRunner;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 pub struct Call {
-    #[structopt(short, long, conflicts_with = "running")]
-    /// Run a conductor setup at this path then make the call.
-    pub path: Option<PathBuf>,
-    #[structopt(short, long)]
-    /// Call a running conductor on this port.
-    pub running: Option<u16>,
-    #[structopt(short, long, conflicts_with_all = &["running", "path"])]
-    /// Call all the existing conductors.
-    /// [unimplemented]
-    pub all: bool,
+    #[structopt(flatten)]
+    existing: Existing,
+    #[structopt(short, long, conflicts_with_all = &["existing_paths", "existing_indices"], value_delimiter = ",")]
+    /// Ports to running conductor admin interfaces.
+    /// If this is empty existing setups will be used.
+    /// Cannot be combined with existing setups.
+    pub running: Vec<u16>,
     #[structopt(subcommand)]
     /// The admin request you want to make.
     pub call: AdminRequestCli,
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Clone)]
 pub enum AdminRequestCli {
     AddAdminWs(AddAdminWs),
     AddAppWs(AddAppWs),
     InstallApp(InstallApp),
+    /// Calls AdminRequest::ListDnas.
     ListDnas,
+    /// Calls AdminRequest::GenerateAgentPubKey.
     NewAgent,
+    /// Calls AdminRequest::ListCellIds.
     ListCells,
+    /// Calls AdminRequest::ListActiveApps.
     ListActiveApps,
     ActivateApp(ActivateApp),
     DeactivateApp(DeactivateApp),
     DumpState(DumpState),
+    /// Calls AdminRequest::AddAgentInfo.
+    /// [Unimplemented].
+    AddAgents,
     ListAgents(ListAgents),
 }
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Clone)]
+/// Calls AdminRequest::AddAdminInterfaces
+/// and adds another admin interface.
 pub struct AddAdminWs {
+    /// Optional port number.
+    /// Defaults to assigned by OS.
     port: Option<u16>,
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Clone)]
+/// Calls AdminRequest::AttachAppInterface
+/// and adds another app interface.
 pub struct AddAppWs {
+    /// Optional port number.
+    /// Defaults to assigned by OS.
     port: Option<u16>,
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Clone)]
+/// Calls AdminRequest::InstallApp
+/// and installs a new app.
+///
+/// Setting properties and membrane proofs is not
+/// yet supported.
+/// CellNicks are set to `my-app-0`, `my-app-1` etc.
 pub struct InstallApp {
     #[structopt(short, long, default_value = "test-app")]
+    /// Sets the InstalledAppId.
     app_id: String,
     #[structopt(short, long, parse(try_from_str = parse_agent_key))]
     /// If not set then a key will be generated.
     /// Agent key is Base64 (same format that is used in logs).
+    /// e.g. `uhCAk71wNXTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF4b_o`
     agent_key: Option<AgentPubKey>,
     #[structopt(required = true, min_values = 1)]
     /// List of dnas to install.
     dnas: Vec<PathBuf>,
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Clone)]
+/// Calls AdminRequest::ActivateApp
+/// and activates the installed app.
 pub struct ActivateApp {
+    /// The InstalledAppId to activate.
     app_id: String,
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Clone)]
+/// Calls AdminRequest::DeactivateApp
+/// and deactivates the installed app.
 pub struct DeactivateApp {
+    /// The InstalledAppId to deactivate.
     app_id: String,
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Clone)]
+/// Calls AdminRequest::DumpState
+/// and dumps the current cell's state.
+/// TODO: Add pretty print.
+/// TODO: Default to dumping all cell state.
 pub struct DumpState {
-    #[structopt(short, long, parse(try_from_str = parse_agent_key))]
-    agent_key: AgentPubKey,
-    #[structopt(short, long, parse(try_from_str = parse_dna_hash))]
+    #[structopt(parse(try_from_str = parse_dna_hash))]
+    /// The dna hash half of the cell id to dump.
     dna: DnaHash,
+    #[structopt(parse(try_from_str = parse_agent_key))]
+    /// The agent half of the cell id to dump.
+    agent_key: AgentPubKey,
 }
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Clone)]
+/// Calls AdminRequest::RequestAgentInfo
+/// and pretty prints the agent info on
+/// this conductor.
 pub struct ListAgents {
     #[structopt(short, long, parse(try_from_str = parse_agent_key), requires = "dna")]
+    /// Optionally request agent info for a particular cell id.
     agent_key: Option<AgentPubKey>,
     #[structopt(short, long, parse(try_from_str = parse_dna_hash), requires = "agent_key")]
+    /// Optionally request agent info for a particular cell id.
     dna: Option<DnaHash>,
 }
 
-pub async fn call(req: Call) -> anyhow::Result<()> {
+pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
     let Call {
-        path,
+        existing,
         running,
-        all,
         call,
     } = req;
-    if all {
-        todo!("Calling all existing is coming soon");
-    }
-    let (mut cmd, _h) = match (path, running) {
-        (None, Some(running)) => (CmdRunner::new(running).await, None),
-        (Some(path), None) => {
-            let (port, holochain) = run_async(path, None).await?;
-            (CmdRunner::new(port).await, Some(holochain))
+    let cmds = if running.is_empty() {
+        let paths = if existing.is_empty() {
+            crate::load(std::env::current_dir()?)?
+        } else {
+            existing.load()?
+        };
+        let ports = get_secondary_admin_ports(paths.clone()).await?;
+        let mut cmds = Vec::with_capacity(ports.len());
+        for (port, path) in ports.into_iter().zip(paths.into_iter()) {
+            match CmdRunner::try_new(port).await {
+                Ok(cmd) => cmds.push((cmd, None)),
+                Err(e) => match e.kind() {
+                    std::io::ErrorKind::ConnectionRefused => {
+                        let (port, holochain) = run_async(holochain_path, path, None).await?;
+                        cmds.push((CmdRunner::new(port).await, Some(holochain)))
+                    }
+                    _ => {
+                        bail!(
+                            "Failed to connect to running conductor or start one {:?}",
+                            e
+                        )
+                    }
+                },
+            }
         }
-        (None, None) => todo!("Calling from existing is coming soon"),
-        _ => unreachable!("Can't use path to conductor and running at the same time"),
+        cmds
+    } else {
+        let mut cmds = Vec::with_capacity(running.len());
+        for port in running {
+            cmds.push((CmdRunner::new(port).await, None));
+        }
+        cmds
     };
+    for mut cmd in cmds {
+        call_inner(&mut cmd.0, call.clone()).await?;
+    }
+    Ok(())
+}
+
+async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Result<()> {
     match call {
         AdminRequestCli::AddAdminWs(args) => {
-            let port = add_admin_interface(&mut cmd, args).await?;
+            let port = add_admin_interface(cmd, args).await?;
             msg!("Added Admin port {}", port);
         }
         AdminRequestCli::AddAppWs(args) => {
-            let port = attach_app_interface(&mut cmd, args).await?;
+            let port = attach_app_interface(cmd, args).await?;
             msg!("Added App port {}", port);
         }
         AdminRequestCli::InstallApp(args) => {
             let app_id = args.app_id.clone();
-            let cells = install_app(&mut cmd, args).await?;
+            let cells = install_app(cmd, args).await?;
             msg!("Installed App: {} with cells {:?}", app_id, cells);
         }
         AdminRequestCli::ListDnas => {
-            let dnas = list_dnas(&mut cmd).await?;
+            let dnas = list_dnas(cmd).await?;
             msg!("Dnas: {:?}", dnas);
         }
         AdminRequestCli::NewAgent => {
-            let agent = generate_agent_pub_key(&mut cmd).await?;
+            let agent = generate_agent_pub_key(cmd).await?;
             msg!("Added agent {}", agent);
         }
         AdminRequestCli::ListCells => {
-            let cells = list_cell_ids(&mut cmd).await?;
+            let cells = list_cell_ids(cmd).await?;
             msg!("Cell Ids: {:?}", cells);
         }
         AdminRequestCli::ListActiveApps => {
-            let apps = list_active_apps(&mut cmd).await?;
+            let apps = list_active_apps(cmd).await?;
             msg!("Active Apps: {:?}", apps);
         }
         AdminRequestCli::ActivateApp(args) => {
             let app_id = args.app_id.clone();
-            activate_app(&mut cmd, args).await?;
+            activate_app(cmd, args).await?;
             msg!("Activated app: {:?}", app_id);
         }
         AdminRequestCli::DeactivateApp(args) => {
             let app_id = args.app_id.clone();
-            deactivate_app(&mut cmd, args).await?;
+            deactivate_app(cmd, args).await?;
             msg!("Deactivated app: {:?}", app_id);
         }
         AdminRequestCli::DumpState(args) => {
-            let state = dump_state(&mut cmd, args).await?;
+            let state = dump_state(cmd, args).await?;
             msg!("DUMP STATE \n{}", state);
+        }
+        AdminRequestCli::AddAgents => {
+            todo!("Adding agent info via cli is coming soon")
         }
         AdminRequestCli::ListAgents(args) => {
             use std::fmt::Write;
-            let agent_infos = request_agent_info(&mut cmd, args).await?;
+            let agent_infos = request_agent_info(cmd, args).await?;
             for info in agent_infos {
                 let mut out = String::new();
-                let cell_info = list_cell_ids(&mut cmd).await?;
+                let cell_info = list_cell_ids(cmd).await?;
                 let agents = cell_info
                     .iter()
                     .map(|c| c.agent_pubkey().clone())

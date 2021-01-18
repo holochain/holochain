@@ -1,10 +1,12 @@
+use std::path::PathBuf;
+
 use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
 use holochain_p2p::kitsune_p2p::TransportConfig;
 use holochain_types::prelude::InstalledAppId;
 use structopt::StructOpt;
 use url2::Url2;
 
-const DEFAULT_APP_ID: &'static str = "test-app";
+const DEFAULT_APP_ID: &str = "test-app";
 #[derive(Debug, StructOpt, Clone)]
 pub struct Create {
     #[structopt(subcommand)]
@@ -14,6 +16,17 @@ pub struct Create {
     /// Id for the installed app.
     /// This is just a String to identify the app by.
     pub app_id: InstalledAppId,
+    /// Set a root directory for conductor setups to be placed into.
+    /// Defaults to your systems temp directory.
+    /// This must already exist.
+    #[structopt(short, long)]
+    pub root: Option<PathBuf>,
+    #[structopt(short, long)]
+    /// Set a list of subdirectories for each setup that is created.
+    /// Defaults to using a random nanoid like: `kAOXQlilEtJKlTM_W403b`.
+    /// Theses will be created in the root directory if they don't exist.
+    /// For example: `hc gen -r path/to/my/chains -d=first,second,third`
+    pub directories: Vec<PathBuf>,
 }
 
 #[derive(Debug, StructOpt, Clone)]
@@ -69,6 +82,36 @@ pub struct Quic {
     pub proxy: Option<Url2>,
 }
 
+#[derive(Debug, StructOpt, Clone)]
+pub struct Existing {
+    #[structopt(short, long, conflicts_with_all = &["dnas", "gen"], value_delimiter = ",")]
+    /// Paths to existing setup directories.
+    /// For example `hc run -e /tmp/kAOXQlilEtJKlTM_W403b`.
+    pub existing_paths: Vec<PathBuf>,
+    /// Conductors that have been setup and are
+    /// available in `hc list`.
+    /// Use the index to choose which setups to use.
+    /// For example `hc run -i=1,3,5`
+    #[structopt(short = "i", long, conflicts_with_all = &["dnas", "gen"], value_delimiter = ",")]
+    pub existing_indices: Vec<usize>,
+}
+
+impl Existing {
+    pub fn load(mut self) -> anyhow::Result<Vec<PathBuf>> {
+        let setups = crate::load(std::env::current_dir()?)?;
+        let e = self
+            .existing_indices
+            .into_iter()
+            .filter_map(|i| setups.get(i).cloned());
+        self.existing_paths.extend(e);
+        Ok(self.existing_paths)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.existing_paths.is_empty() && self.existing_indices.is_empty()
+    }
+}
+
 impl From<Network> for KitsuneP2pConfig {
     fn from(n: Network) -> Self {
         let Network {
@@ -120,6 +163,8 @@ impl Default for Create {
         Self {
             network: None,
             app_id: DEFAULT_APP_ID.to_string(),
+            root: None,
+            directories: Vec::with_capacity(0),
         }
     }
 }

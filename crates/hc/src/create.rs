@@ -5,9 +5,14 @@ use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
 use crate::config::create_config;
 use crate::config::write_config;
 
-pub async fn create(network: Option<KitsuneP2pConfig>) -> anyhow::Result<PathBuf> {
-    let mut dir = std::env::temp_dir();
-    dir.push(nanoid::nanoid!());
+pub async fn create(
+    network: Option<KitsuneP2pConfig>,
+    root: Option<PathBuf>,
+    directory: Option<PathBuf>,
+) -> anyhow::Result<PathBuf> {
+    let mut dir = root.unwrap_or_else(std::env::temp_dir);
+    let directory = directory.unwrap_or_else(|| nanoid::nanoid!().into());
+    dir.push(directory);
     std::fs::create_dir(dir.clone())?;
     let mut keystore_dir = dir.clone();
     keystore_dir.push("keystore");
@@ -33,5 +38,5 @@ pub async fn create(network: Option<KitsuneP2pConfig>) -> anyhow::Result<PathBuf
 }
 
 pub async fn create_default() -> anyhow::Result<PathBuf> {
-    create(None).await
+    create(None, None, None).await
 }

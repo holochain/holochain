@@ -21,6 +21,7 @@ macro_rules! msg {
 
 pub mod app;
 pub mod calls;
+pub mod cmds;
 mod config;
 mod create;
 mod ports;
@@ -32,9 +33,18 @@ pub struct CmdRunner {
 }
 
 impl CmdRunner {
+    /// Create a new connection for calling admin interface commands.
+    /// Panics if admin port fails to connect.
     pub async fn new(port: u16) -> Self {
-        let client = get_admin_api(port).await;
-        Self { client }
+        Self::try_new(port)
+            .await
+            .expect("Failed to create CmdRunner because admin port failed to connect")
+    }
+
+    /// Create a new connection for calling admin interface commands.
+    pub async fn try_new(port: u16) -> std::io::Result<Self> {
+        let client = get_admin_api(port).await?;
+        Ok(Self { client })
     }
 
     pub async fn command(&mut self, cmd: AdminRequest) -> anyhow::Result<AdminResponse> {
@@ -86,14 +96,27 @@ pub fn save(mut path: PathBuf, paths: Vec<PathBuf>) -> anyhow::Result<()> {
         .append(true)
         .create(true)
         .open(path)?;
-    
+
     for path in paths {
         writeln!(file, "{}", path.display())?;
     }
     Ok(())
 }
 
-pub fn clean(mut path: PathBuf) -> anyhow::Result<()> {
+pub fn clean(mut path: PathBuf, setups: Vec<usize>) -> anyhow::Result<()> {
+    let existing = load(path.clone())?;
+    let to_remove: Vec<_> = if setups.is_empty() {
+        existing.iter().collect()
+    } else {
+        setups.into_iter().filter_map(|i| existing.get(i)).collect()
+    };
+    for p in to_remove {
+        if p.exists() && p.is_dir() {
+            if let Err(e) = std::fs::remove_dir_all(p) {
+                tracing::error!("Failed to remove {} because {:?}", p.display(), e);
+            }
+        }
+    }
     path.push(".hc");
     if path.exists() {
         std::fs::remove_file(path)?;
@@ -118,4 +141,31 @@ pub fn load(mut path: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
         }
     }
     Ok(paths)
+}
+
+pub fn list(verbose: usize) -> anyhow::Result<()> {
+    let out = load(std::env::current_dir()?)?
+        .into_iter()
+        .enumerate()
+        .try_fold(
+            "\nSetups contained in `.hc`\n".to_string(),
+            |out, (i, path)| {
+                let r = match verbose {
+                    0 => format!("{}{}: {}\n", out, i, path.display()),
+                    _ => {
+                        let config = config::read_config(path.clone())?;
+                        format!(
+                            "{}{}: {}\nConductor Config:\n{:?}\n",
+                            out,
+                            i,
+                            path.display(),
+                            config
+                        )
+                    }
+                };
+                anyhow::Result::<_, anyhow::Error>::Ok(r)
+            },
+        )?;
+    msg!("{}", out);
+    Ok(())
 }

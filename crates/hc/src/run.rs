@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::{path::PathBuf, process::Stdio};
 
 use tokio::process::{Child, Command};
@@ -5,13 +6,15 @@ use tokio::process::{Child, Command};
 use crate::app::attach_app_port;
 use crate::config::*;
 use crate::ports::random_admin_port_if_busy;
+use crate::ports::set_admin_port;
 
 pub async fn run(
+    holochain_path: &Path,
     path: PathBuf,
     app_ports: Vec<u16>,
     force_admin_port: Option<u16>,
 ) -> anyhow::Result<()> {
-    let (port, holochain) = run_async(path.clone(), force_admin_port).await?;
+    let (port, holochain) = run_async(holochain_path, path.clone(), force_admin_port).await?;
     msg!("Running conductor on admin port {}", port);
     tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
     for app_port in app_ports {
@@ -26,6 +29,7 @@ pub async fn run(
 }
 
 pub async fn run_async(
+    holochain_path: &Path,
     path: PathBuf,
     force_admin_port: Option<u16>,
 ) -> anyhow::Result<(u16, Child)> {
@@ -34,16 +38,19 @@ pub async fn run_async(
         None => create_config(path.clone()),
     };
     let port = match force_admin_port {
-        Some(port) => port,
+        Some(port) => {
+            set_admin_port(&mut config, port);
+            port
+        }
         None => random_admin_port_if_busy(&mut config),
     };
     let config_path = write_config(path.clone(), &config);
-    Ok((port, start_holochain(config_path).await))
+    Ok((port, start_holochain(holochain_path, config_path).await))
 }
 
-async fn start_holochain(config_path: PathBuf) -> Child {
+async fn start_holochain(holochain_path: &Path, config_path: PathBuf) -> Child {
     tracing::info!("\n\n----\nstarting holochain\n----\n\n");
-    let mut cmd = Command::new("holochain");
+    let mut cmd = Command::new(holochain_path);
     cmd.arg("--structured")
         // .env("RUST_LOG", "trace")
         .arg("--config-path")

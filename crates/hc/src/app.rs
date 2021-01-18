@@ -23,11 +23,12 @@ pub(crate) async fn attach_app_port(app_port: u16, admin_port: u16) -> anyhow::R
 }
 
 pub async fn install_app(
+    holochain_path: &Path,
     path: PathBuf,
     dnas: Vec<PathBuf>,
     app_id: InstalledAppId,
 ) -> anyhow::Result<()> {
-    let conductor = run_async(path, None).await?;
+    let conductor = run_async(holochain_path, path, None).await?;
     let mut cmd = CmdRunner::new(conductor.0).await;
     let agent_key = cmd.command(AdminRequest::GenerateAgentPubKey).await?;
     let agent_key = expect_variant!(agent_key => AdminResponse::AgentPubKeyGenerated, "Failed to generate agent");

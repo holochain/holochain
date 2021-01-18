@@ -26,14 +26,14 @@ pub fn add_secondary_admin_port(path: PathBuf, port: Option<u16>) -> anyhow::Res
     Ok(())
 }
 
-pub(crate) async fn get_admin_api(port: u16) -> WebsocketSender {
+pub(crate) async fn get_admin_api(port: u16) -> std::io::Result<WebsocketSender> {
     tracing::debug!(port);
-    websocket_client_by_port(port).await.unwrap().0
+    websocket_client_by_port(port).await.map(|p| p.0)
 }
 
 async fn websocket_client_by_port(
     port: u16,
-) -> anyhow::Result<(WebsocketSender, WebsocketReceiver)> {
+) -> std::io::Result<(WebsocketSender, WebsocketReceiver)> {
     Ok(websocket_connect(
         url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
@@ -42,23 +42,23 @@ async fn websocket_client_by_port(
 }
 
 pub(crate) fn random_admin_port_if_busy(config: &mut ConductorConfig) -> u16 {
-    let port = match config.admin_interfaces.as_ref().and_then(|i| i.first()) {
+    match config.admin_interfaces.as_mut().and_then(|i| i.first_mut()) {
         Some(AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket { port },
         }) => {
-            if is_free(*port) {
-                *port
-            } else {
-                pick_unused_port().expect("No ports free")
+            if !is_free(*port) {
+                *port = pick_unused_port().expect("No ports free");
             }
+            *port
         }
-        None => pick_unused_port().expect("No ports free"),
-    };
-    let admin_interfaces = Some(vec![AdminInterfaceConfig {
-        driver: InterfaceDriver::Websocket { port },
-    }]);
-    config.admin_interfaces = admin_interfaces;
-    port
+        None => {
+            let port = pick_unused_port().expect("No ports free");
+            config.admin_interfaces = Some(vec![AdminInterfaceConfig {
+                driver: InterfaceDriver::Websocket { port },
+            }]);
+            port
+        }
+    }
 }
 
 pub(crate) fn set_admin_port(config: &mut ConductorConfig, port: u16) {
@@ -88,12 +88,15 @@ pub(crate) fn set_secondary_admin_port(config: &mut ConductorConfig, port: Optio
     match config
         .admin_interfaces
         .as_mut()
-        .and_then(|ai| ai.get_mut(1))
+        // .and_then(|ai| ai)
     {
-        Some(admin_interface) => {
-            *admin_interface = port;
+        Some(admin_interface) if admin_interface.len() == 1 => {
+            admin_interface.push(port);
         }
-        None => {
+        Some(admin_interface) if admin_interface.len() >= 2 => {
+            admin_interface[1] = port;
+        }
+        Some(_) | None => {
             random_admin_port_if_busy(config);
             config.admin_interfaces = Some(vec![port])
         }
@@ -101,19 +104,36 @@ pub(crate) fn set_secondary_admin_port(config: &mut ConductorConfig, port: Optio
     msg!("Secondary admin port Admin port set to: {}", p);
 }
 
-// pub async fn secondary_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
-//     let mut ports = Vec::new();
-//     for p in paths {
-//         if let Some(config) = read_config(p)? {
-//             if let Some(ai) = config.admin_interfaces {
-//                 if let Some(AdminInterfaceConfig {
-//                     driver: InterfaceDriver::Websocket { port },
-//                 }) = ai.get(1).cloned()
-//                 {
-//                     ports.push(port)
-//                 }
-//             }
-//         }
-//     }
-//     Ok(ports)
-// }
+pub async fn _get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
+    let mut ports = Vec::new();
+    for p in paths {
+        if let Some(config) = read_config(p)? {
+            if let Some(ai) = config.admin_interfaces {
+                if let Some(AdminInterfaceConfig {
+                    driver: InterfaceDriver::Websocket { port },
+                }) = ai.get(0)
+                {
+                    ports.push(*port)
+                }
+            }
+        }
+    }
+    Ok(ports)
+}
+
+pub async fn get_secondary_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
+    let mut ports = Vec::new();
+    for p in paths {
+        if let Some(config) = read_config(p)? {
+            if let Some(ai) = config.admin_interfaces {
+                if let Some(AdminInterfaceConfig {
+                    driver: InterfaceDriver::Websocket { port },
+                }) = ai.get(0)
+                {
+                    ports.push(*port)
+                }
+            }
+        }
+    }
+    Ok(ports)
+}
