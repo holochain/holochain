@@ -1514,6 +1514,7 @@ dependencies = [
  "holochain_zome_types",
  "kitsune_p2p",
  "matches",
+ "observability",
  "serde",
  "serde_derive",
  "serde_yaml",

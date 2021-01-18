@@ -97,13 +97,13 @@ fixturator!(
 );
 
 fixturator!(
-    Wasms;
-    curve Empty BTreeMap::new();
+    WasmMap;
+    curve Empty BTreeMap::new().into();
     curve Unpredictable {
         let mut rng = rand::thread_rng();
         let number_of_wasms = rng.gen_range(0, 5);
 
-        let mut wasms: Wasms = BTreeMap::new();
+        let mut wasms = BTreeMap::new();
         let mut dna_wasm_fixturator = DnaWasmFixturator::new(Unpredictable);
         for _ in 0..number_of_wasms {
             let wasm = dna_wasm_fixturator.next().unwrap();
@@ -114,10 +114,10 @@ fixturator!(
                 wasm,
             );
         }
-        wasms
+        wasms.into()
     };
     curve Predictable {
-        let mut wasms: Wasms = BTreeMap::new();
+        let mut wasms = BTreeMap::new();
         let mut dna_wasm_fixturator = DnaWasmFixturator::new_indexed(Predictable, get_fixt_index!());
         for _ in 0..3 {
             let wasm = dna_wasm_fixturator.next().unwrap();
@@ -128,7 +128,7 @@ fixturator!(
                 wasm,
             );
         }
-        wasms
+        wasms.into()
     };
 );
 
@@ -139,13 +139,13 @@ fixturator!(
             dna: tokio_safe_block_on::tokio_safe_block_forever_on(async move {
                 DnaDefHashed::from_content(DnaDefFixturator::new(Empty).next().unwrap()).await
             }),
-            code: WasmsFixturator::new(Empty).next().unwrap(),
+            code: WasmMapFixturator::new(Empty).next().unwrap(),
         }
     },
     {
         // align the wasm hashes across the file and def
         let mut zome_name_fixturator = ZomeNameFixturator::new(Unpredictable);
-        let wasms = WasmsFixturator::new(Unpredictable).next().unwrap();
+        let wasms = WasmMapFixturator::new(Unpredictable).next().unwrap();
         let mut zomes: Zomes = Vec::new();
         for (hash, _) in wasms {
             zomes.push((
@@ -163,14 +163,14 @@ fixturator!(
         });
         DnaFile {
             dna,
-            code: WasmsFixturator::new(Unpredictable).next().unwrap(),
+            code: WasmMapFixturator::new(Unpredictable).next().unwrap(),
         }
     },
     {
         // align the wasm hashes across the file and def
         let mut zome_name_fixturator =
             ZomeNameFixturator::new_indexed(Predictable, get_fixt_index!());
-        let wasms = WasmsFixturator::new_indexed(Predictable, get_fixt_index!())
+        let wasms = WasmMapFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap();
         let mut zomes: Zomes = Vec::new();
@@ -192,7 +192,7 @@ fixturator!(
         });
         DnaFile {
             dna,
-            code: WasmsFixturator::new_indexed(Predictable, get_fixt_index!())
+            code: WasmMapFixturator::new_indexed(Predictable, get_fixt_index!())
                 .next()
                 .unwrap(),
         }

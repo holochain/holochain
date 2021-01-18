@@ -24,7 +24,6 @@ pub mod wasm_test {
     };
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use holochain_lmdb::test_utils::test_environments;
     use holochain_types::fixt::CapSecretFixturator;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
@@ -93,6 +92,7 @@ pub mod wasm_test {
     // TODO: [ B-03669 ] can move this to an integration test (may need to switch to using a RealDnaStore)
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_authorized_call() {
+        observability::test_run().ok();
         let (dna_file, _) = CoolDnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
             .await
             .unwrap();
@@ -108,16 +108,10 @@ pub mod wasm_test {
         dna_store.expect_add_dnas::<Vec<_>>().return_const(());
         dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
 
-        let envs = test_environments();
-        let handle = CoolConductor::new(
-            ConductorBuilder::with_mock_dna_store(dna_store)
-                .test(&envs)
-                .await
-                .unwrap(),
-            envs,
-        );
+        let mut conductor =
+            CoolConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
 
-        let apps = handle
+        let apps = conductor
             .setup_app_for_agents(
                 "app-",
                 &[alice_agent_id.clone(), bob_agent_id.clone()],
@@ -137,8 +131,9 @@ pub mod wasm_test {
 
         let original_secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
 
-        let output: ZomeCallResponse = alice
+        let output: ZomeCallResponse = conductor
             .call(
+                &alice,
                 "try_cap_claim",
                 CapFor(original_secret, bob_agent_id.clone().try_into().unwrap()),
             )
@@ -148,13 +143,15 @@ pub mod wasm_test {
 
         // BOB COMMITS A TRANSFERABLE GRANT WITH THE SECRET SHARED WITH ALICE
 
-        let original_grant_hash: HeaderHash =
-            bobbo.call("transferable_cap_grant", original_secret).await;
+        let original_grant_hash: HeaderHash = conductor
+            .call(&bobbo, "transferable_cap_grant", original_secret)
+            .await;
 
         // ALICE CAN NOW CALL THE AUTHED REMOTE FN
 
-        let response: ZomeCallResponse = alice
+        let response: ZomeCallResponse = conductor
             .call(
+                &alice,
                 "try_cap_claim",
                 CapFor(original_secret, bob_agent_id.clone()),
             )
@@ -167,10 +164,13 @@ pub mod wasm_test {
 
         // BOB ROLLS THE GRANT SO ONLY THE NEW ONE WILL WORK FOR ALICE
 
-        let new_grant_header_hash: HeaderHash =
-            bobbo.call("roll_cap_grant", original_grant_hash).await;
+        let new_grant_header_hash: HeaderHash = conductor
+            .call(&bobbo, "roll_cap_grant", original_grant_hash)
+            .await;
 
-        let output: MaybeElement = bobbo.call("get_entry", new_grant_header_hash.clone()).await;
+        let output: MaybeElement = conductor
+            .call(&bobbo, "get_entry", new_grant_header_hash.clone())
+            .await;
 
         let new_secret: CapSecret = match output.0 {
             Some(element) => match element.entry().to_grant_option() {
@@ -183,8 +183,9 @@ pub mod wasm_test {
             _ => unreachable!("Couldn't get {:?}", new_grant_header_hash),
         };
 
-        let output: ZomeCallResponse = alice
+        let output: ZomeCallResponse = conductor
             .call(
+                &alice,
                 "try_cap_claim",
                 CapFor(original_secret, bob_agent_id.clone().try_into().unwrap()),
             )
@@ -192,8 +193,9 @@ pub mod wasm_test {
 
         assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _));
 
-        let output: ZomeCallResponse = alice
+        let output: ZomeCallResponse = conductor
             .call(
+                &alice,
                 "try_cap_claim",
                 CapFor(new_secret, bob_agent_id.clone().try_into().unwrap()),
             )
@@ -205,10 +207,13 @@ pub mod wasm_test {
 
         // BOB DELETES THE GRANT SO NO SECRETS WORK
 
-        let _: HeaderHash = bobbo.call("delete_cap_grant", new_grant_header_hash).await;
+        let _: HeaderHash = conductor
+            .call(&bobbo, "delete_cap_grant", new_grant_header_hash)
+            .await;
 
-        let output: ZomeCallResponse = alice
+        let output: ZomeCallResponse = conductor
             .call(
+                &alice,
                 "try_cap_claim",
                 CapFor(original_secret, bob_agent_id.clone().try_into().unwrap()),
             )
@@ -216,8 +221,9 @@ pub mod wasm_test {
 
         assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _));
 
-        let output: ZomeCallResponse = alice
+        let output: ZomeCallResponse = conductor
             .call(
+                &alice,
                 "try_cap_claim",
                 CapFor(new_secret, bob_agent_id.clone().try_into().unwrap()),
             )
@@ -226,8 +232,7 @@ pub mod wasm_test {
         // the inner response should be unauthorized
         assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _));
 
-        let shutdown = handle.take_shutdown_handle().await.unwrap();
-        handle.shutdown().await;
-        shutdown.await.unwrap();
+        let mut conductor = conductor;
+        conductor.shutdown().await;
     }
 }

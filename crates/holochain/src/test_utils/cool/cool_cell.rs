@@ -1,19 +1,25 @@
-use super::{CoolConductor, CoolZome};
+use super::CoolZome;
 use hdk3::prelude::*;
 use holo_hash::DnaHash;
+use holochain_lmdb::env::EnvironmentWrite;
 
 /// A reference to a Cell created by a CoolConductor installation function.
 /// It has very concise methods for calling a zome on this cell
 #[derive(Clone, derive_more::Constructor)]
 pub struct CoolCell {
     pub(super) cell_id: CellId,
-    pub(super) handle: CoolConductor,
+    pub(super) cell_env: EnvironmentWrite,
 }
 
 impl CoolCell {
     /// Accessor for CellId
     pub fn cell_id(&self) -> &CellId {
         &self.cell_id
+    }
+
+    /// Get the environment for this cell
+    pub fn env(&self) -> &EnvironmentWrite {
+        &self.cell_env
     }
 
     /// Accessor for AgentPubKey
@@ -28,57 +34,6 @@ impl CoolCell {
 
     /// Get a CoolZome with the given name
     pub fn zome<Z: Into<ZomeName>>(&self, zome_name: Z) -> CoolZome {
-        CoolZome::new(
-            self.cell_id().clone(),
-            zome_name.into(),
-            self.handle.clone(),
-        )
-    }
-
-    /// Call a zome function on this CoolCell as if from another Agent.
-    /// The provenance and optional CapSecret must be provided.
-    pub async fn call_from<I, O, Z, F>(
-        &self,
-        provenance: AgentPubKey,
-        cap: Option<CapSecret>,
-        zome_name: Z,
-        fn_name: F,
-        payload: I,
-    ) -> O
-    where
-        ZomeName: From<Z>,
-        FunctionName: From<F>,
-        I: serde::Serialize,
-        O: serde::de::DeserializeOwned + std::fmt::Debug,
-    {
-        self.handle
-            .call_zome_ok_flat(
-                self.cell_id(),
-                zome_name,
-                fn_name,
-                cap,
-                Some(provenance),
-                payload,
-            )
-            .await
-    }
-
-    /// Call a zome function on this CoolCell.
-    /// No CapGrant is provided, since the authorship capability will be granted.
-    pub async fn call<I, O, Z, F>(&self, zome_name: Z, fn_name: F, payload: I) -> O
-    where
-        ZomeName: From<Z>,
-        FunctionName: From<F>,
-        I: serde::Serialize,
-        O: serde::de::DeserializeOwned + std::fmt::Debug,
-    {
-        self.call_from(
-            self.agent_pubkey().clone(),
-            None,
-            zome_name,
-            fn_name,
-            payload,
-        )
-        .await
+        CoolZome::new(self.cell_id.clone(), zome_name.into())
     }
 }

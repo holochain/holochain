@@ -1,4 +1,3 @@
-#![deny(missing_docs)]
 //! We want to have control over certain long running
 //! tasks that we care about.
 //! If a task that is added to the task manager ends
@@ -22,16 +21,21 @@ use tracing::*;
 
 const CHANNEL_SIZE: usize = 1000;
 
+/// For a task to be "managed" simply means that it will shut itself down
+/// when it receives a message on the the "stop" channel passed in
 pub(crate) type ManagedTaskHandle = JoinHandle<ManagedTaskResult>;
 pub(crate) type TaskManagerRunHandle = JoinHandle<()>;
 
 pub(crate) type OnDeath = Box<dyn Fn(ManagedTaskResult) -> Option<ManagedTaskAdd> + Send + Sync>;
 
-/// A message sent to the TaskManager, registering a closure to run upon
-/// completion of a task
+/// A message sent to the TaskManager, registering an OnDeath closure to run upon
+/// completion of a task.
+///
+/// The closure may itself return a new ManagedTaskAdd, which will cause another task to be
+/// added while this one is being removed.
 pub struct ManagedTaskAdd {
     handle: ManagedTaskHandle,
-    // TODO: B-01455: reevaluate wether this should be a callback
+    // TODO: B-01455: reevaluate whether this should be a callback
     on_death: OnDeath,
 }
 
@@ -95,7 +99,7 @@ pub(crate) async fn keep_alive_task(mut die: broadcast::Receiver<()>) -> Managed
 
 async fn run(mut new_task_channel: mpsc::Receiver<ManagedTaskAdd>) {
     let mut task_manager = TaskManager::new();
-    // Need to have at least on item in the stream or it will exit early
+    // Need to have at least one item in the stream or it will exit early
     if let Some(new_task) = new_task_channel.recv().await {
         task_manager.stream.push(new_task);
     } else {

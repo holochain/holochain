@@ -1,6 +1,8 @@
 use hdk3::prelude::*;
 use holochain::test_utils::cool::{CoolAgents, CoolConductor, CoolDnaFile, MaybeElement};
 use holochain::test_utils::display_agent_infos;
+use holochain::test_utils::wait_for_integration_10s;
+use holochain::test_utils::WaitOps;
 use holochain_types::dna::zome::inline_zome::InlineZome;
 use holochain_zome_types::element::ElementEntry;
 
@@ -39,7 +41,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     let (dna_file, _) = CoolDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
 
     // Create a Conductor
-    let conductor = CoolConductor::from_standard_config().await;
+    let mut conductor = CoolConductor::from_standard_config().await;
 
     // Get two agents
     let (alice, bobbo) = CoolAgents::two(conductor.keystore()).await;
@@ -52,13 +54,19 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = alice.call("zome1", "create_unit", ()).await;
+    let hash: HeaderHash = conductor
+        .call(&alice.zome("zome1"), "create_unit", ())
+        .await;
 
-    // Wait long enough for Bob to receive gossip (TODO: make deterministic)
-    tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
+    // Wait long enough for Bob to receive gossip
+    wait_for_integration_10s(
+        bobbo.env(),
+        WaitOps::start() + WaitOps::cold_start() + WaitOps::ENTRY,
+    )
+    .await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
-    let element: MaybeElement = bobbo.call("zome1", "read", hash).await;
+    let element: MaybeElement = conductor.call(&bobbo.zome("zome1"), "read", hash).await;
     let element = element
         .0
         .expect("Element was None: bobbo couldn't `get` it");
@@ -76,7 +84,8 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
 async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
-    let conductor = CoolConductor::from_standard_config().await;
+    observability::test_run().ok();
+    let mut conductor = CoolConductor::from_standard_config().await;
 
     let (dna_foo, _) = CoolDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
     let (dna_bar, _) = CoolDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
@@ -97,18 +106,30 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     //////////////////////
     // END SETUP
 
-    let hash_foo: HeaderHash = alice_foo.call("foozome", "create_unit", ()).await;
-    let hash_bar: HeaderHash = alice_bar.call("barzome", "create_unit", ()).await;
+    let hash_foo: HeaderHash = conductor
+        .call(&alice_foo.zome("foozome"), "create_unit", ())
+        .await;
+    let hash_bar: HeaderHash = conductor
+        .call(&alice_bar.zome("barzome"), "create_unit", ())
+        .await;
 
     // Two different DNAs, so HeaderHashes should be different.
     assert_ne!(hash_foo, hash_bar);
 
-    // Wait long enough for others to receive gossip (TODO: make deterministic)
-    tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
+    // Wait long enough for others to receive gossip
+    for env in [bobbo_foo.env(), carol_bar.env()].iter() {
+        wait_for_integration_10s(
+            env,
+            WaitOps::start() * 1 + WaitOps::cold_start() * 2 + WaitOps::ENTRY * 1,
+        )
+        .await;
+    }
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
     // on the "foo" DNA
-    let element: MaybeElement = bobbo_foo.call("foozome", "read", hash_foo).await;
+    let element: MaybeElement = conductor
+        .call(&bobbo_foo.zome("foozome"), "read", hash_foo)
+        .await;
     let element = element
         .0
         .expect("Element was None: bobbo couldn't `get` it");
@@ -121,7 +142,9 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     // Verify that carol can run "read" on her cell and get alice's Header
     // on the "bar" DNA
     // Let's do it with the CoolZome instead of the CoolCell too, for fun
-    let element: MaybeElement = carol_bar.zome("barzome").call("read", hash_bar).await;
+    let element: MaybeElement = conductor
+        .call(&carol_bar.zome("barzome"), "read", hash_bar)
+        .await;
     let element = element
         .0
         .expect("Element was None: carol couldn't `get` it");
@@ -139,7 +162,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 #[ignore = "Needs to be completed when HolochainP2pEvents is accessible"]
 async fn invalid_cell() -> anyhow::Result<()> {
     observability::test_run().ok();
-    let conductor = CoolConductor::from_standard_config().await;
+    let mut conductor = CoolConductor::from_standard_config().await;
 
     let (dna_foo, _) = CoolDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
     let (dna_bar, _) = CoolDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;

@@ -114,7 +114,7 @@ mod tests {
 
         let num_signals = Arc::new(AtomicUsize::new(0));
 
-        let conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
+        let mut conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
         let agents =
             future::join_all(conductors.iter().map(|c| CoolAgents::one(c.keystore()))).await;
 
@@ -134,12 +134,14 @@ mod tests {
         let cells: Vec<_> = apps.cells_flattened();
 
         let mut signals = Vec::new();
-        for h in conductors {
+        for h in conductors.iter() {
             signals.push(h.signal_broadcaster().await.subscribe())
         }
         let signals = signals.into_iter().flatten().collect::<Vec<_>>();
 
-        let _: () = cells[0].call("zome1", "signal_others", ()).await;
+        let _: () = conductors[0]
+            .call(&cells[0].zome("zome1"), "signal_others", ())
+            .await;
 
         tokio::time::delay_for(std::time::Duration::from_millis(1000)).await;
         assert_eq!(num_signals.load(Ordering::SeqCst), NUM_CONDUCTORS);

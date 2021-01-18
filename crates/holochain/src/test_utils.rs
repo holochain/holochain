@@ -28,8 +28,8 @@ use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_state::element_buf::ElementBuf;
 use holochain_state::metadata::MetadataBuf;
+use holochain_state::{element_buf::ElementBuf, prelude::SourceChain};
 use holochain_types::prelude::*;
 
 use holochain_wasm_test_utils::TestWasm;
@@ -383,6 +383,18 @@ pub async fn wait_for_integration(
     }
 }
 
+/// Same as wait for integration but can print other states at the same time
+pub async fn wait_for_integration_with_others_10s(
+    env: &EnvironmentWrite,
+    others: &[&EnvironmentWrite],
+    expected_count: usize,
+) {
+    const NUM_ATTEMPTS: usize = 100;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
+    wait_for_integration_with_others(env, others, expected_count, NUM_ATTEMPTS, DELAY_PER_ATTEMPT)
+        .await
+}
+
 #[tracing::instrument(skip(env, others))]
 /// Same as wait for integration but can print other states at the same time
 pub async fn wait_for_integration_with_others(
@@ -415,6 +427,25 @@ pub async fn wait_for_integration_with_others(
             );
         }
         tokio::time::delay_for(delay).await;
+    }
+}
+
+#[tracing::instrument(skip(envs))]
+/// Show authored data for each cell environment
+pub fn show_authored(envs: &[&EnvironmentWrite]) {
+    for (i, &env) in envs.iter().enumerate() {
+        let chain = SourceChain::new(env.clone().into()).unwrap();
+        let mut items = chain.iter_back().collect::<Vec<_>>().unwrap();
+        items.reverse();
+        for item in items {
+            let header = item.header();
+            let seq_num = header.header_seq();
+            let header_type = header.header_type();
+            let entry = header
+                .entry_hash()
+                .and_then(|e| chain.get_entry(e).unwrap());
+            tracing::debug!(chain = %i, %seq_num, ?header_type, ?entry);
+        }
     }
 }
 

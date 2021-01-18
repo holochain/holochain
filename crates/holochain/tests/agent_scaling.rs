@@ -171,7 +171,7 @@ async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
     let (dna_file, _) = CoolDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await?;
 
     // Create a Conductor
-    let conductor = CoolConductor::from_standard_config().await;
+    let mut conductor = CoolConductor::from_standard_config().await;
 
     // Install DNA and install and activate apps in conductor
     let alice = conductor
@@ -187,19 +187,25 @@ async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
     pub struct TwoInt(pub u32, pub u32);
 
     // Make init run to avoid head moved errors
-    let _: () = alice.call("slow_fn", TwoInt(0, 0)).await;
+    let _: () = conductor.call(&alice, "slow_fn", TwoInt(0, 0)).await;
 
     let all_now = std::time::Instant::now();
     tracing::debug!("starting slow fn");
 
+    // NB: there's currently no reason to independently create a bunch of tasks here,
+    // since they are all running in series. Hence, there is no reason to put the CoolConductor
+    // in an Arc. However, maybe this test was written to make it easy to try running some
+    // or all of the closures concurrently, in which case the Arc is indeed necessary.
+    let conductor_arc = std::sync::Arc::new(conductor);
     let mut handles = Vec::new();
     for i in 0..1000 {
         let h = tokio::task::spawn({
             let alice = alice.clone();
+            let conductor = conductor_arc.clone();
             async move {
                 let now = std::time::Instant::now();
                 tracing::debug!("starting slow fn {}", i);
-                let _: () = alice.call("slow_fn", TwoInt(i, 5)).await;
+                let _: () = conductor.call(&alice, "slow_fn", TwoInt(i, 5)).await;
                 tracing::debug!("finished slow fn {} in {}", i, now.elapsed().as_secs());
             }
         });
