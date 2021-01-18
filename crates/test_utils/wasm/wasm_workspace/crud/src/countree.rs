@@ -2,7 +2,7 @@ use hdk3::prelude::*;
 
 #[hdk_entry(id = "countree")]
 /// a tree of counters
-#[derive(Default, Clone, Copy, PartialEq)]
+#[derive(Default, Clone, Copy, PartialEq, Debug)]
 pub struct CounTree(u32);
 
 impl std::ops::Add for CounTree {

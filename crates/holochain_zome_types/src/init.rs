@@ -3,7 +3,7 @@ use crate::CallbackResult;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 
-#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
 pub enum InitCallbackResult {
     Pass,
     Fail(String),

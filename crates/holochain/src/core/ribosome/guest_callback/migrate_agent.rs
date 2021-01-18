@@ -60,7 +60,7 @@ impl Invocation for MigrateAgentInvocation {
         .into()
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(&self.migrate_agent)
+        ExternIO::encode(self.migrate_agent)
     }
 }
 

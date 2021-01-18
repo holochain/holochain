@@ -381,7 +381,7 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     async fn test_serialize_bytes_hash() {
         observability::test_run().ok();
-        #[derive(Default, SerializedBytes, Serialize, Deserialize)]
+        #[derive(Default, SerializedBytes, Serialize, Deserialize, Debug)]
         #[repr(transparent)]
         #[serde(transparent)]
         struct Post(String);

@@ -2,13 +2,13 @@ use crate::zome_io::ExternIO;
 use crate::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
 
-#[derive(Clone, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Serialize, Deserialize, SerializedBytes, Debug)]
 pub enum MigrateAgent {
     Open,
     Close,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
 pub enum MigrateAgentCallbackResult {
     Pass,
     Fail(String),

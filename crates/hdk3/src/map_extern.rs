@@ -32,17 +32,25 @@ macro_rules! map_extern {
 
                 #[no_mangle]
                 pub extern "C" fn $name(guest_ptr: GuestPtr) -> GuestPtr {
-                    let input: $input = match host_args(guest_ptr) {
+                    let extern_io: ExternIO = match host_args(guest_ptr) {
                         Ok(v) => v,
                         Err(err_ptr) => return err_ptr,
                     };
 
-                    let output: $output = match super::$f(input) {
+                    let inner: $input = match extern_io.decode() {
+                        Ok(v) => v,
+                        Err(_) => return return_err_ptr(WasmError::Deserialize(vec![0])),
+                    };
+
+                    let output: $output = match super::$f(inner) {
                         Ok(v) => Ok(v),
                         Err(wasm_error) => return return_err_ptr(wasm_error),
                     };
 
-                    return_ptr::<$output>(output)
+                    match ExternIO::encode(output.unwrap()) {
+                        Ok(v) => return_ptr::<ExternIO>(v),
+                        Err(serialized_bytes_error) => return_err_ptr(WasmError::Serialize(serialized_bytes_error)),
+                    }
                 }
             }
         }

@@ -51,13 +51,6 @@ impl Invocation for EntryDefsInvocation {
     }
 }
 
-impl TryFrom<EntryDefsInvocation> for ExternIO {
-    type Error = SerializedBytesError;
-    fn try_from(_: EntryDefsInvocation) -> Result<Self, Self::Error> {
-        Self::encode(())
-    }
-}
-
 /// the aggregate result of _all_ entry defs callbacks
 #[derive(PartialEq, Debug, Clone)]
 pub enum EntryDefsResult {

@@ -59,7 +59,7 @@ impl Invocation for ValidationPackageInvocation {
         .into()
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(&self.app_entry_type)
+        ExternIO::encode(self.app_entry_type)
     }
 }
 

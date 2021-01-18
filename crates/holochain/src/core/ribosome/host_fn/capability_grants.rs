@@ -126,7 +126,7 @@ pub mod wasm_test {
 
         // ALICE FAILING AN UNAUTHED CALL
 
-        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
         pub struct CapFor(CapSecret, AgentPubKey);
 
         let original_secret = CapSecretFixturator::new(Unpredictable).next().unwrap();

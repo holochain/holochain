@@ -6,14 +6,14 @@ use crate::CallbackResult;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
 
-#[derive(Serialize, Deserialize, SerializedBytes)]
+#[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 pub struct ValidateCreateLinkData {
     pub link_add: CreateLink,
     pub base: Entry,
     pub target: Entry,
 }
 
-#[derive(Serialize, Deserialize, SerializedBytes)]
+#[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 pub struct ValidateDeleteLinkData {
     pub delete_link: DeleteLink,
 }

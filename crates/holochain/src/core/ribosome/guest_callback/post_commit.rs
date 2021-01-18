@@ -48,7 +48,7 @@ impl Invocation for PostCommitInvocation {
         vec!["post_commit".into()].into()
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(&self.headers)
+        ExternIO::encode(self.headers)
     }
 }
 

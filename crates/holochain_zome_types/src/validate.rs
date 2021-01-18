@@ -21,7 +21,7 @@ pub enum ValidationStatus {
     Abandoned,
 }
 
-#[derive(Serialize, Deserialize, SerializedBytes)]
+#[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 pub struct ValidateData {
     pub element: Element,
     pub validation_package: Option<ValidationPackage>,
@@ -68,7 +68,7 @@ pub enum RequiredValidationType {
     Custom,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
 pub enum ValidationPackageCallbackResult {
     Success(ValidationPackage),
     Fail(String),

@@ -143,22 +143,15 @@ impl RealRibosome {
                         ctx,
                         guest_allocation_ptr,
                     )?;
-                    // this will be run in a tokio background thread
-                    // designed for doing blocking work.
-                    let output_extern_io: holochain_zome_types::prelude::ExternIO =
-                        ExternIO::encode(
-                            $host_function(
-                                std::sync::Arc::clone(&closure_self_arc),
-                                std::sync::Arc::clone(&closure_call_context_arc),
-                                input,
-                            )
-                            .map_err(|e| WasmError::Zome(format!("{:?}", e)))?,
-                        )?;
 
-                    $crate::holochain_wasmer_host::import::set_context_data(
-                        ctx,
-                        output_extern_io.into_vec(),
+                    let output = $host_function(
+                        std::sync::Arc::clone(&closure_self_arc),
+                        std::sync::Arc::clone(&closure_call_context_arc),
+                        input,
                     )
+                    .map_err(|e| WasmError::Zome(format!("{:?}", e)))?;
+
+                    $crate::holochain_wasmer_host::import::set_context_data(ctx, output)
                 }
             }};
         }
@@ -422,16 +415,16 @@ impl RibosomeT for RealRibosome {
                     // because it builds guards against memory leaks and handles imports correctly
                     let mut instance = self.instance(call_context)?;
 
-                    let result: ExternIO = holochain_wasmer_host::guest::call(
+                    let result: Result<ExternIO, WasmError> = holochain_wasmer_host::guest::call(
                         &mut instance,
                         to_call.as_ref(),
                         // be aware of this clone!
                         // the whole invocation is cloned!
                         // @todo - is this a problem for large payloads like entries?
                         invocation.to_owned().host_input()?,
-                    )?;
+                    );
 
-                    Ok(Some(result))
+                    Ok(Some(result?))
                 } else {
                     // the func doesn't exist
                     // the callback is not implemented

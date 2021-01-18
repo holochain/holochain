@@ -5,6 +5,7 @@ use hdk3::prelude::*;
     required_validations = 5,
     required_validation_type = "full"
 )]
+#[derive(Debug)]
 struct Post(String);
 
 #[hdk_entry(

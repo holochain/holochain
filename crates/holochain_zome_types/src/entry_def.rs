@@ -178,7 +178,6 @@ mod tests {
     use crate::crdt::CrdtType;
     use crate::validate::RequiredValidationType;
     use crate::zome_io::ExternIO;
-    use std::convert::TryInto;
 
     #[test]
     fn from_guest_output_test() {
@@ -192,7 +191,7 @@ mod tests {
             }]
             .into(),
         );
-        let guest_output = ExternIO::encode(defs_callback_result).unwrap();
+        let guest_output = ExternIO::encode(&defs_callback_result).unwrap();
         assert_eq!(defs_callback_result, guest_output.into(),);
     }
 }

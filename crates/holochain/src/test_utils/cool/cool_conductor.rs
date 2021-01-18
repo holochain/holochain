@@ -389,7 +389,7 @@ pub struct CoolConductorHandle(pub(crate) ConductorHandle);
 impl CoolConductorHandle {
     /// Make a zome call to a Cell, as if that Cell were the caller. Most common case.
     /// No capability is necessary, since the authorship capability is automatically granted.
-    pub async fn call<I, O, F, E>(&self, zome: &CoolZome, fn_name: F, payload: I) -> O
+    pub async fn call<I, O, F>(&self, zome: &CoolZome, fn_name: F, payload: I) -> O
     where
         FunctionName: From<F>,
         I: serde::Serialize,

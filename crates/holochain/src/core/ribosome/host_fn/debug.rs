@@ -11,6 +11,7 @@ pub fn debug(
     _call_context: Arc<CallContext>,
     input: DebugMsg,
 ) -> RibosomeResult<()> {
+    dbg!(&input);
     debug!(
         "{}:{}:{} {}",
         input.module_path(),
