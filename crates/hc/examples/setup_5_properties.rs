@@ -24,7 +24,7 @@ struct Input {
 async fn main() -> anyhow::Result<()> {
     // Get and parse any input.
     let input = Input::from_args();
-    let dnas = hc::dna::parse_dnas(input.dnas)?;
+    let dnas = hc::dna::parse_dnas(input.dnas).await?;
 
     // Using the default mem network.
     let network = KitsuneP2pConfig::default();

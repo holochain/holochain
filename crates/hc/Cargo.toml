@@ -22,14 +22,20 @@ path = "src/lib.rs"
 ansi_term = "0.12"
 futures = "0.3"
 holochain_conductor_api = { path = "../holochain_conductor_api" }
+holochain_p2p = { path = "../holochain_p2p" }
+holochain_serialized_bytes = "=0.0.47"
 holochain_types = { path = "../holochain_types" }
 holochain_websocket = { path = "../holochain_websocket" }
-holochain_p2p = { path = "../holochain_p2p" }
+holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
+holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
+serde = { version = "1.0.104", features = [ "derive" ] }
+serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 serde_yaml = "0.8"
 tokio = { version = "0.2.11", features = [ "full" ] }
 structopt = "0.3"
 anyhow = "1.0"
 tracing = "0.1"
+thiserror = "1.0.22"
 url2 = "0.0.6"
 portpicker = "0.1.0"
 nanoid = "0.3"
@@ -41,3 +47,4 @@ walkdir = "2"
 [dev-dependencies]
 assert_cmd = "1.0.1"
 matches = "0.1"
+tempdir = "0.3.7"

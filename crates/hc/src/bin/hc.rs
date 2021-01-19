@@ -50,6 +50,7 @@ enum Op {
         /// If blank all will be cleaned.
         setups: Vec<usize>,
     },
+    Dna(hc::dna::DnaUtil),
 }
 
 #[derive(Debug, StructOpt)]
@@ -172,6 +173,7 @@ async fn main() -> anyhow::Result<()> {
         Op::Task => todo!("Running custom tasks is coming soon"),
         Op::List { verbose } => hc::save::list(std::env::current_dir()?, verbose)?,
         Op::Clean { setups } => hc::save::clean(std::env::current_dir()?, setups)?,
+        Op::Dna(dna_util) => hc::dna::dna_util(dna_util).await?,
     }
 
     Ok(())
@@ -230,7 +232,7 @@ async fn generate(
     num_conductors: usize,
     create: Create,
 ) -> anyhow::Result<Vec<PathBuf>> {
-    let dnas = hc::dna::parse_dnas(dnas)?;
+    let dnas = hc::dna::parse_dnas(dnas).await?;
     let paths = hc::setups::default_n(holochain_path, num_conductors, create, dnas).await?;
     hc::save::save(std::env::current_dir()?, paths.clone())?;
     Ok(paths)
