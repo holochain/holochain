@@ -214,9 +214,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
                 }
                 break;
             }
-            Err(e) => {
-                error!(error = &e as &dyn std::error::Error)
-            }
+            Err(e) => error!(error = &e as &dyn std::error::Error),
             Ok(()) => {}
         }
     }

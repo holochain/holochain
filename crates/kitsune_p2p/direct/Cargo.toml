@@ -1,0 +1,35 @@
+[package]
+name = "kitsune_p2p_direct"
+version = "0.0.1"
+description = "kitsune-p2p application demo"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://github.com/holochain/holochain"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
+categories = [ "network-programming" ]
+edition = "2018"
+
+[dependencies]
+arc-swap = "1.1"
+arrayref = "0.3.6"
+base64 = "0.13"
+byteorder = "1.3.4"
+chrono = "0.4.19"
+ghost_actor = "0.4.0-alpha.5"
+kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p" }
+observability = "0.1"
+once_cell = "1.5.2"
+rusqlite = { version = "0.24.2", features = [
+  "blob",        # better integration with blob types (Read, Write, etc)
+  "chrono",      # integration with chrono crate
+  "sqlcipher",   # enable at-rest encryption
+] }
+serde = { version = "1", features = [ "derive", "rc" ] }
+serde_json = { version = "1", features = [ "preserve_order" ] }
+sodoken = "=0.0.1-alpha.2"
+thiserror = "1.0.22"
+tokio = { version = "0.2", features = [ "full" ] }
+
+[dev-dependencies]
+tracing-subscriber = "0.2"
