@@ -30,7 +30,7 @@ macro_rules! wasm_io_types {
 // - then the guest inflates the expected input or the host the expected output based on the
 //   callback flavour
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(transparent)]
 #[repr(transparent)]
 pub struct ExternIO(#[serde(with = "serde_bytes")] pub Vec<u8>);
@@ -71,7 +71,7 @@ impl From<Vec<u8>> for ExternIO {
 
 impl From<ExternIO> for Vec<u8> {
     fn from(extern_io: ExternIO) -> Self {
-        extern_io.into_vec()
+        extern_io.0
     }
 }
 

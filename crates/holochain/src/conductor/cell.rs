@@ -225,15 +225,16 @@ impl Cell {
                 fn_name,
                 cap,
                 respond,
-                request,
+                payload,
                 ..
             } => {
                 async {
-                    let res = self
-                        .handle_call_remote(from_agent, zome_name, fn_name, cap, request)
+                    let res: ZomeCallResponse = self
+                        .handle_call_remote(from_agent, zome_name, fn_name, cap, payload)
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
+                        .map_err(holochain_p2p::HolochainP2pError::other)?;
+                    let serialized_res = SerializedBytes::try_from(res)?;
+                    respond.respond(Ok(async move { serialized_res }.boxed().into()));
                 }
                 .instrument(debug_span!("call_remote"))
                 .await;
@@ -632,7 +633,7 @@ impl Cell {
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: ExternIO,
-    ) -> CellResult<ExternIO> {
+    ) -> CellResult<ZomeCallResponse> {
         let invocation = ZomeCall {
             cell_id: self.id.clone(),
             zome_name,
@@ -644,7 +645,7 @@ impl Cell {
         // double ? because
         // - ConductorApiResult
         // - ZomeCallResult
-        Ok(ExternIO::encode(&self.call_zome(invocation, None).await??)?)
+        Ok(self.call_zome(invocation, None).await??)
     }
 
     /// Function called by the Conductor

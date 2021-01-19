@@ -23,12 +23,10 @@ use holochain_zome_types::signal::AppSignal;
 //     .into_inner())
 // }
 
-pub fn emit_signal<D, E>(data: D) -> ExternResult<()>
+pub fn emit_signal<I>(input: I) -> ExternResult<()>
 where
-    WasmError: From<E>,
-    SerializedBytes: TryFrom<D, Error = E>,
+    I: serde::Serialize
 {
-    let sb = SerializedBytes::try_from(data)?;
     #[allow(clippy::unit_arg)]
-    host_call::<AppSignal, ()>(__emit_signal, AppSignal::new(sb))
+    host_call::<AppSignal, ()>(__emit_signal, AppSignal::new(ExternIO::encode(input)?))
 }

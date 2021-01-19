@@ -29,7 +29,7 @@ use crate::prelude::*;
 /// let foo: Foo = call_remote(bob, "foo_zome", "do_it", secret, serialized_payload)?;
 /// ...
 /// ```
-pub fn call_remote<I, E>(
+pub fn call_remote<I>(
     agent: AgentPubKey,
     zome: ZomeName,
     fn_name: FunctionName,
@@ -37,12 +37,10 @@ pub fn call_remote<I, E>(
     payload: I,
 ) -> ExternResult<ZomeCallResponse>
 where
-    SerializedBytes: TryFrom<I, Error = E>,
-    WasmError: From<E>,
+    I: serde::Serialize + std::fmt::Debug,
 {
-    let payload = SerializedBytes::try_from(payload)?;
     host_call::<CallRemote, ZomeCallResponse>(
         __call_remote,
-        CallRemote::new(agent, zome, fn_name, cap_secret, payload),
+        CallRemote::new(agent, zome, fn_name, cap_secret, ExternIO::encode(payload)?),
     )
 }

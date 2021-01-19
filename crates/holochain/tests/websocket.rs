@@ -419,7 +419,7 @@ async fn remote_signals() {
     }
     let rxs = rxs.into_iter().flatten().collect::<Vec<_>>();
 
-    let signal = fixt!(SerializedBytes);
+    let signal = fixt!(ExternIo);
 
     let _: () = conductors[0]
         .call(
@@ -529,7 +529,7 @@ async fn emit_signals() {
     let sig2: SerializedBytes = unwrap_to::unwrap_to!(msg2 => WebsocketMessage::Signal).clone();
 
     assert_eq!(
-        Signal::App(cell_id, AppSignal::new(().try_into().unwrap())),
+        Signal::App(cell_id, AppSignal::new(ExternIO::encode(()).unwrap())),
         Signal::try_from(sig1.clone()).unwrap(),
     );
     assert_eq!(sig1, sig2);

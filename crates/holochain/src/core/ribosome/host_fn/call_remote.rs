@@ -3,7 +3,6 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_types::prelude::*;
-use std::convert::TryInto;
 use std::sync::Arc;
 
 pub fn call_remote(
@@ -12,20 +11,21 @@ pub fn call_remote(
     input: CallRemote,
 ) -> RibosomeResult<ZomeCallResponse> {
     // it is the network's responsibility to handle timeouts and return an Err result in that case
-    let result = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    let result: Result<SerializedBytes, _> = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let mut network = call_context.host_access().network().clone();
         network
             .call_remote(
-                input.to_agent(),
-                input.zome_name(),
-                input.fn_name(),
-                input.cap(),
-                input.request(),
+                input.as_to_agent().to_owned(),
+                input.as_zome_name().to_owned(),
+                input.as_fn_name().to_owned(),
+                input.as_cap().to_owned(),
+                input.as_payload().to_owned(),
             )
             .await
     });
+    dbg!("call_remote", &result);
     let result = match result {
-        Ok(r) => r.try_into()?,
+        Ok(r) => ZomeCallResponse::try_from(r)?,
         Err(e) => ZomeCallResponse::NetworkError(e.to_string()),
     };
 
@@ -150,6 +150,8 @@ pub mod wasm_test {
             .await
             .unwrap()
             .unwrap();
+
+        dbg!(&output);
 
         match output {
             ZomeCallResponse::Ok(guest_output) => {

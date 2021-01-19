@@ -27,11 +27,11 @@ pub fn remote_signal(
                 let mut network = network.clone();
                 let zome_name = zome_name.clone();
                 let fn_name = fn_name.clone();
-                let request = signal.clone();
+                let payload = signal.clone();
                 async move {
                     tracing::debug!("sending to {:?}", agent);
                     let result = network
-                        .call_remote(agent.clone(), zome_name, fn_name, None, request)
+                        .call_remote(agent.clone(), zome_name, fn_name, None, payload)
                         .await;
                     tracing::debug!("sent to {:?}", agent);
                     if let Err(e) = result {
@@ -63,17 +63,12 @@ mod tests {
     use holochain_zome_types::signal::AppSignal;
     use matches::assert_matches;
 
-    #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
-    #[serde(transparent)]
-    #[repr(transparent)]
-    struct AppString(String);
-
     fn zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineZome {
         let entry_def = EntryDef::default_with_id("entrydef");
 
         InlineZome::new_unique(vec![entry_def.clone()])
             .callback("signal_others", move |api, ()| {
-                let signal = AppString("Hey".to_string()).try_into().unwrap();
+                let signal = ExternIO::encode("Hey").unwrap();
                 let signal = RemoteSignal {
                     agents: agents.clone(),
                     signal,
@@ -82,7 +77,7 @@ mod tests {
                 api.remote_signal(signal)?;
                 Ok(())
             })
-            .callback("recv_remote_signal", move |api, signal: SerializedBytes| {
+            .callback("recv_remote_signal", move |api, signal: ExternIO| {
                 tracing::debug!("remote signal");
                 num_signals.fetch_add(1, Ordering::SeqCst);
                 api.emit_signal(AppSignal::new(signal)).map_err(Into::into)

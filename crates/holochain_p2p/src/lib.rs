@@ -44,7 +44,7 @@ pub trait HolochainP2pCellT {
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
-        request: SerializedBytes,
+        payload: ExternIO,
     ) -> actor::HolochainP2pResult<SerializedBytes>;
 
     /// Publish data to the correct neighborhood.
@@ -143,7 +143,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
-        request: SerializedBytes,
+        payload: ExternIO,
     ) -> actor::HolochainP2pResult<SerializedBytes> {
         self.sender
             .call_remote(
@@ -153,7 +153,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
                 zome_name,
                 fn_name,
                 cap,
-                request,
+                payload,
             )
             .await
     }
