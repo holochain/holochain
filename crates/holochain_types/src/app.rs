@@ -1,5 +1,6 @@
 //! Collection of cells to form a holochain application
-use crate::dna::{DnaFile, JsonProperties};
+
+use crate::dna::{DnaFile, YamlProperties};
 use derive_more::Into;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::SerializedBytes;
@@ -30,7 +31,7 @@ pub struct RegisterDnaPayload {
     /// UUID to override when installing this Dna
     pub uuid: Option<String>,
     /// Properties to override when installing this Dna
-    pub properties: Option<JsonProperties>,
+    pub properties: Option<YamlProperties>,
     /// The dna source
     pub source: DnaSource,
 }
@@ -56,13 +57,13 @@ pub struct InstallAppDnaPayload {
     /// The CellNick which will be assigned to this Dna when installed
     pub nick: CellNick,
     /// Properties to override when installing this Dna
-    pub properties: Option<JsonProperties>,
+    pub properties: Option<YamlProperties>,
     /// App-specific proof-of-membrane-membership, if required by this app
     pub membrane_proof: Option<MembraneProof>,
 }
 
 impl InstallAppDnaPayload {
-    /// Create a payload with no JsonProperties or MembraneProof. Good for tests.
+    /// Create a payload with no YamlProperties or MembraneProof. Good for tests.
     pub fn path_only(path: PathBuf, nick: CellNick) -> Self {
         Self {
             path: Some(path),

@@ -62,9 +62,9 @@ pub enum DnaUtilError {
     #[error("Internal serialization error: {0}")]
     SerializedBytesError(#[from] SerializedBytesError),
 
-    /// serde_json::Error
+    /// serde_yaml::Error
     #[error("JSON serialization error: {0}")]
-    SerdeJsonError(#[from] serde_json::Error),
+    SerdeYamlError(#[from] serde_yaml::Error),
 
     /// InvalidInput
     #[error("Invalid input: {0}")]
@@ -143,12 +143,12 @@ pub async fn expand(dna_file_path: &impl AsRef<std::path::Path>) -> DnaUtilResul
 
     // Might be more efficient to extract the DnaDef / Wasm from the DnaFile
     // then pass by value here.
-    let dna_json = DnaDefJson::from_dna_def(dna_file.dna().clone().into_content())?;
-    let dna_json = serde_json::to_string_pretty(&dna_json)?;
+    let dna_yaml = DnaDefJson::from_dna_def(dna_file.dna().clone().into_content())?;
+    let dna_yaml = serde_yaml::to_string(&dna_yaml)?;
 
     let mut json_filename = dir.clone();
     json_filename.push("dna.json");
-    tokio::fs::write(json_filename, dna_json.as_bytes()).await?;
+    tokio::fs::write(json_filename, dna_yaml.as_bytes()).await?;
 
     Ok(())
 }
@@ -165,7 +165,7 @@ pub async fn compress(dna_work_dir: &impl AsRef<std::path::Path>) -> DnaUtilResu
         .await
         .map_err(move |e| DnaUtilError::PathNotFound(e, json_filename))?;
 
-    let json_file: DnaDefJson = serde_json::from_slice(&json_data)?;
+    let json_file: DnaDefJson = serde_yaml::from_slice(&json_data)?;
 
     let dna_file_content = json_file.compile_dna_file(&dna_work_dir).await?;
     let dna_file_content = dna_file_content.to_file_content().await?;
@@ -184,7 +184,7 @@ struct ZomeJson {
 
 /// Special Json Value Decode Helper
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-struct JsonValueDecodeHelper(pub serde_json::Value);
+struct JsonValueDecodeHelper(pub serde_yaml::Value);
 
 /// See `holochain_types::dna::DnaDef`.
 /// This is a helper to convert to json.
@@ -192,7 +192,7 @@ struct JsonValueDecodeHelper(pub serde_json::Value);
 struct DnaDefJson {
     pub name: String,
     pub uuid: String,
-    pub properties: serde_json::Value,
+    pub properties: serde_yaml::Value,
     pub zomes: BTreeMap<ZomeName, ZomeJson>,
 }
 
@@ -267,12 +267,18 @@ mod tests {
                 ("test-zome-2".into(), vec![5, 6, 7, 8].into()),
             ],
         );
-        let properties = JsonValueDecodeHelper(serde_json::json!({
-            "test_prop_1": ["a", 42],
-            "test_prop_2": {
-                "bool": true,
-            }
-        }));
+        let properties = JsonValueDecodeHelper(
+            serde_yaml::from_str(
+                r#"
+test_prop_1:
+    - "a"
+    - 42
+test_prop_2:
+    bool: true
+        "#,
+            )
+            .unwrap(),
+        );
         let dna_file = dna_file
             .with_properties(SerializedBytes::try_from(properties).unwrap())
             .await

@@ -3,7 +3,7 @@
 use crate::dna::zome::WasmZome;
 use crate::dna::DnaDef;
 use crate::dna::DnaFile;
-use crate::dna::JsonProperties;
+use crate::dna::YamlProperties;
 use crate::element::SignedHeaderHashedExt;
 use crate::fixt::*;
 use crate::prelude::*;
@@ -32,7 +32,7 @@ pub fn fake_dna_file(uuid: &str) -> DnaFile {
 pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     let mut dna = DnaDef {
         name: "test".to_string(),
-        properties: JsonProperties::new(serde_json::json!({"p": "hi"}))
+        properties: YamlProperties::new(serde_yaml::from_str("p: hi").unwrap())
             .try_into()
             .unwrap(),
         uuid: uuid.to_string(),

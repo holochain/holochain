@@ -18,12 +18,12 @@ pub type Zomes = Vec<(ZomeName, zome::ZomeDef)>;
 
 /// A type to allow json values to be used as [SerializedBytes]
 #[derive(Debug, Clone, derive_more::From, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct JsonProperties(serde_json::Value);
+pub struct YamlProperties(serde_yaml::Value);
 
-impl JsonProperties {
+impl YamlProperties {
     /// Create new properties from json value
-    pub fn new(properties: serde_json::Value) -> Self {
-        JsonProperties(properties)
+    pub fn new(properties: serde_yaml::Value) -> Self {
+        YamlProperties(properties)
     }
 }
 
