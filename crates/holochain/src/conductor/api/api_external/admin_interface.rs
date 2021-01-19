@@ -103,7 +103,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let hash = dna.dna_hash().clone();
                 let dna_list = self.conductor_handle.list_dnas().await?;
                 if dna_list.contains(&hash) {
-                    info!("there");
                     return Err(ConductorApiError::DnaReadError(
                         "Given dna has already been registered".to_string(),
                     ));
