@@ -231,7 +231,7 @@ async fn generate(
     create: Create,
 ) -> anyhow::Result<Vec<PathBuf>> {
     let dnas = hc::dna::parse_dnas(dnas)?;
-    let paths = hc::scripts::default_n(holochain_path, num_conductors, create, dnas).await?;
+    let paths = hc::setups::default_n(holochain_path, num_conductors, create, dnas).await?;
     hc::save::save(std::env::current_dir()?, paths.clone())?;
     Ok(paths)
 }

@@ -136,7 +136,7 @@ pub mod dna;
 pub mod generate;
 pub mod run;
 pub mod save;
-pub mod scripts;
+pub mod setups;
 
 mod ports;
 
