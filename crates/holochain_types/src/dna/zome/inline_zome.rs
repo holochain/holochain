@@ -52,7 +52,7 @@ impl InlineZome {
     where
         F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
         I: DeserializeOwned,
-        O: Serialize,
+        O: Serialize + std::fmt::Debug,
     {
         let z = move |api: BoxApi, input: ExternIO| -> InlineZomeResult<ExternIO> {
             Ok(ExternIO::encode(f(api, input.decode()?)?)?)
@@ -72,7 +72,7 @@ impl InlineZome {
         input: ExternIO,
     ) -> InlineZomeResult<Option<ExternIO>> {
         if let Some(f) = self.callbacks.get(name) {
-            Ok(Some(ExternIO::encode(f(api, input)?)?))
+            Ok(Some(f(api, input)?))
         } else {
             Ok(None)
         }

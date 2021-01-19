@@ -64,7 +64,7 @@ pub mod wasm_test {
         const LEN: u32 = 5;
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        let output: Bytes = crate::call_test_ribosome!(
+        let output: hdk3::prelude::Bytes = crate::call_test_ribosome!(
             host_access,
             TestWasm::RandomBytes,
             "random_bytes",

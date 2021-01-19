@@ -24,8 +24,8 @@ use crate::prelude::*;
 /// PRNG from there.
 ///
 /// @see the rand rust crate
-pub fn random_bytes(number_of_bytes: u32) -> ExternResult<Vec<u8>> {
-    host_call::<u32, Vec<u8>>(__random_bytes, number_of_bytes)
+pub fn random_bytes(number_of_bytes: u32) -> ExternResult<Bytes> {
+    host_call::<u32, Bytes>(__random_bytes, number_of_bytes)
 }
 
 pub trait TryFromRandom {
