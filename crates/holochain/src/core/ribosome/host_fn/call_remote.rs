@@ -23,7 +23,6 @@ pub fn call_remote(
             )
             .await
     });
-    dbg!("call_remote", &result);
     let result = match result {
         Ok(r) => ZomeCallResponse::try_from(r)?,
         Err(e) => ZomeCallResponse::NetworkError(e.to_string()),
@@ -150,8 +149,6 @@ pub mod wasm_test {
             .await
             .unwrap()
             .unwrap();
-
-        dbg!(&output);
 
         match output {
             ZomeCallResponse::Ok(guest_output) => {

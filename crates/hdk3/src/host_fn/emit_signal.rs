@@ -25,7 +25,7 @@ use holochain_zome_types::signal::AppSignal;
 
 pub fn emit_signal<I>(input: I) -> ExternResult<()>
 where
-    I: serde::Serialize
+    I: serde::Serialize,
 {
     #[allow(clippy::unit_arg)]
     host_call::<AppSignal, ()>(__emit_signal, AppSignal::new(ExternIO::encode(input)?))

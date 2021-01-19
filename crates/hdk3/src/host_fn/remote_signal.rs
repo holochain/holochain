@@ -31,8 +31,14 @@ use crate::prelude::*;
 /// we design a better way to grant the capability to remote signal.
 pub fn remote_signal<I>(input: I, agents: Vec<AgentPubKey>) -> ExternResult<()>
 where
-    I: serde::Serialize
+    I: serde::Serialize,
 {
     #[allow(clippy::unit_arg)]
-    host_call::<RemoteSignal, ()>(__remote_signal, RemoteSignal { signal: ExternIO::encode(input)?, agents })
+    host_call::<RemoteSignal, ()>(
+        __remote_signal,
+        RemoteSignal {
+            signal: ExternIO::encode(input)?,
+            agents,
+        },
+    )
 }

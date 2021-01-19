@@ -34,10 +34,7 @@ fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
     )?;
     match zome_call_response {
         // The decode() type needs to match the return type of "whoami"
-        ZomeCallResponse::Ok(v) => {
-            debug!("zome call v {:?}", &v);
-            Ok(v.decode::<AgentInfo>()?)
-        }
+        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
         // This should be handled in real code.
         _ => unreachable!(),
     }
