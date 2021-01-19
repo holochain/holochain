@@ -1,3 +1,9 @@
+//! Helpers for making [`AdminRequest`]s to the admin api.
+//!
+//! This module is designed for use in a CLI so it is more simplified
+//! then calling the [`CmdRunner`] directly.
+//! For simple calls like [`AdminRequest::ListDnas`] this is probably easier
+//! but if you want more control use [`CmdRunner::command`].
 use std::convert::TryInto;
 use std::path::Path;
 use std::path::PathBuf;
@@ -28,6 +34,7 @@ use crate::run::run_async;
 use crate::CmdRunner;
 use structopt::StructOpt;
 
+#[doc(hidden)]
 #[derive(Debug, StructOpt)]
 pub struct Call {
     #[structopt(flatten)]
@@ -42,6 +49,9 @@ pub struct Call {
     pub call: AdminRequestCli,
 }
 
+// Docs have different use for structopt
+// so documenting everything doesn't make sense.
+#[allow(missing_docs)]
 #[derive(Debug, StructOpt, Clone)]
 pub enum AdminRequestCli {
     AddAdminWs(AddAdminWs),
@@ -144,6 +154,7 @@ pub struct ListAgents {
     pub dna: Option<DnaHash>,
 }
 
+#[doc(hidden)]
 pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
     let Call {
         existing,
@@ -152,7 +163,7 @@ pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
     } = req;
     let cmds = if running.is_empty() {
         let paths = if existing.is_empty() {
-            crate::load(std::env::current_dir()?)?
+            crate::save::load(std::env::current_dir()?)?
         } else {
             existing.load()?
         };
@@ -286,6 +297,7 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
     Ok(())
 }
 
+/// Calls [`AdminRequest::AddAdminInterfaces`] and adds another admin interface.
 pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyhow::Result<u16> {
     let port = match args.port {
         Some(port) => {
@@ -309,6 +321,9 @@ pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyho
     Ok(port)
 }
 
+/// Calls [`AdminRequest::InstallApp`] and installs a new app.
+/// Creates an app per dna with the app id of `app-id-{dna-index}`
+/// e.g. `my-cool-app-3`.
 pub async fn install_app(
     cmd: &mut CmdRunner,
     args: InstallApp,
@@ -354,11 +369,13 @@ pub async fn install_app(
     Ok(installed_app.cell_data)
 }
 
+/// Calls [`AdminRequest::ListCellIds`].
 pub async fn list_dnas(cmd: &mut CmdRunner) -> anyhow::Result<Vec<DnaHash>> {
     let resp = cmd.command(AdminRequest::ListDnas).await?;
     Ok(expect_match!(resp => AdminResponse::DnasListed, "Failed to list dnas"))
 }
 
+/// Calls [`AdminRequest::GenerateAgentPubKey`].
 pub async fn generate_agent_pub_key(cmd: &mut CmdRunner) -> anyhow::Result<AgentPubKey> {
     let resp = cmd.command(AdminRequest::GenerateAgentPubKey).await?;
     Ok(
@@ -366,16 +383,19 @@ pub async fn generate_agent_pub_key(cmd: &mut CmdRunner) -> anyhow::Result<Agent
     )
 }
 
+/// Calls [`AdminRequest::ListCellIds`].
 pub async fn list_cell_ids(cmd: &mut CmdRunner) -> anyhow::Result<Vec<CellId>> {
     let resp = cmd.command(AdminRequest::ListCellIds).await?;
     Ok(expect_match!(resp => AdminResponse::CellIdsListed, "Failed to list cell ids"))
 }
 
+/// Calls [`AdminRequest::ListActiveApps`].
 pub async fn list_active_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>> {
     let resp = cmd.command(AdminRequest::ListActiveApps).await?;
     Ok(expect_match!(resp => AdminResponse::ActiveAppsListed, "Failed to list active apps"))
 }
 
+/// Calls [`AdminRequest::ActivateApp`] and activates the installed app.
 pub async fn activate_app(cmd: &mut CmdRunner, args: ActivateApp) -> anyhow::Result<()> {
     let resp = cmd
         .command(AdminRequest::ActivateApp {
@@ -390,6 +410,7 @@ pub async fn activate_app(cmd: &mut CmdRunner, args: ActivateApp) -> anyhow::Res
     Ok(())
 }
 
+/// Calls [`AdminRequest::DeactivateApp`] and deactivates the installed app.
 pub async fn deactivate_app(cmd: &mut CmdRunner, args: DeactivateApp) -> anyhow::Result<()> {
     let resp = cmd
         .command(AdminRequest::DeactivateApp {
@@ -404,6 +425,7 @@ pub async fn deactivate_app(cmd: &mut CmdRunner, args: DeactivateApp) -> anyhow:
     Ok(())
 }
 
+/// Calls [`AdminRequest::AttachAppInterface`] and adds another app interface.
 pub async fn attach_app_interface(cmd: &mut CmdRunner, args: AddAppWs) -> anyhow::Result<u16> {
     if let Some(port) = args.port {
         ensure!(is_free(port), "port {} is not free", port);
@@ -421,6 +443,9 @@ pub async fn attach_app_interface(cmd: &mut CmdRunner, args: AddAppWs) -> anyhow
     }
 }
 
+/// Calls [`AdminRequest::DumpState`] and dumps the current cell's state.
+// TODO: Add pretty print.
+// TODO: Default to dumping all cell state.
 pub async fn dump_state(cmd: &mut CmdRunner, args: DumpState) -> anyhow::Result<String> {
     let resp = cmd
         .command(AdminRequest::DumpState {
@@ -430,6 +455,7 @@ pub async fn dump_state(cmd: &mut CmdRunner, args: DumpState) -> anyhow::Result<
     Ok(expect_match!(resp => AdminResponse::StateDumped, "Failed to dump state"))
 }
 
+/// Calls [`AdminRequest::AddAgentInfo`] with and adds the list of agent info.
 pub async fn add_agent_info(cmd: &mut CmdRunner, args: Vec<AgentInfoSigned>) -> anyhow::Result<()> {
     let resp = cmd
         .command(AdminRequest::AddAgentInfo { agent_infos: args })
@@ -442,6 +468,7 @@ pub async fn add_agent_info(cmd: &mut CmdRunner, args: Vec<AgentInfoSigned>) -> 
     Ok(())
 }
 
+/// Calls [`AdminRequest::RequestAgentInfo`] and pretty prints the agent info on this conductor.
 pub async fn request_agent_info(
     cmd: &mut CmdRunner,
     args: ListAgents,

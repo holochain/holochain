@@ -1,15 +1,125 @@
+#![warn(missing_docs)]
+
+//! A library and CLI to help create, run and interact with holochain conductor setups.
+//! **Warning this is still WIP and subject to change**
+//! There's probably a few bugs. If you find one please open an [issue](https://github.com/holochain/holochain/issues)
+//! or make a PR.
+//!
+//! ## CLI
+//! The `hc` CLI makes it easy to run a dna that you are working on
+//! or someone has sent you.
+//! It has been designed to use sensible defaults but still give you
+//! the configurability when that's required.
+//! Setups are stored in tmp directories by default and the paths are
+//! persisted in a `.hc` file which is created wherever you are using
+//! the CLI.
+//! ### Install
+//! #### Requirements
+//! - [Rust](https://rustup.rs/)
+//! - [Holochain](https://github.com/holochain/holochain) binary on the path
+//! #### Building
+//! From github:
+//! ```shell
+//! cargo install holochain_hc --git https://github.com/holochain/holochain --branch admin
+//! ```
+//! From the holochain repo:
+//! ```shell
+//! cargo install --path crates/hc
+//! ```
+//! ### Common usage
+//! The best place to start is:
+//! ```shell
+//! hc -h
+//! ```
+//! This will be more up to date then this readme.
+//! #### Run
+//! This command can be used to generate and run conductor setups.
+//! ```shell
+//! hc run -h
+//! # or shorter
+//! hc r -h
+//! ```
+//!  In a folder with where your `my-dna.dna.gz` is you can generate and run
+//!  a new setup with:
+//! ```shell
+//! hc r
+//! ```
+//! If you have already created a setup previously then it will be reused
+//! (usually cleared on reboots).
+//! #### Generate
+//! Generates new conductor setups and installs apps / dnas.
+//! ```shell
+//! hc generate
+//! # or shorter
+//! hc g
+//! ```
+//! For example this will generate 5 setups with app ids set to `my-app`
+//! using the `elemental-chat.dna.gz` from the current directory with a quic
+//! network setup to localhost.
+//! _You don't need to specify dnas when they are in the directory._
+//! ```shell
+//!  hc gen -a "my-app" -n 5 ./elemental-chat.dna.gz network quic
+//! ```
+//! You can also generate and run in the same command:
+//! (Notice the number of conductors and dna path must come before the gen sub-command).
+//! ```shell
+//!  hc r -n 5 ./elemental-chat.dna.gz gen -a "my-app" network quic
+//! ```
+//! #### Call
+//! Allows calling the [`AdminRequest`] api.
+//! If the conductors are not already running they
+//! will be run to make the call.
+//!
+//! ```shell
+//! hc call list-cells
+//! ```
+//! #### List and Clean
+//! These commands allow you to list the persisted setups
+//! in the current directory (from the`.hc`) file.
+//! You can use the index from:
+//! ```shell
+//! hc list
+//! ```
+//! Output:
+//! ```shell
+//! hc-admin:
+//! Setups contained in `.hc`
+//! 0: /tmp/KOXgKVLBVvoxe8iKD4iSS
+//! 1: /tmp/m8VHwwt93Uh-nF-vr6nf6
+//! 2: /tmp/t6adQomMLI5risj8K2Tsd
+//! ```
+//! To then call or run an individual setup (or subset):
+//!
+//! ```shell
+//! hc r -i=0,2
+//! ```
+//! You can clean up these setups with:
+//! ```shell
+//! hc clean 0 2
+//! # Or clean all
+//! hc clean
+//! ```
+//! ## Library
+//! This crate can also be used as a library so you can create more
+//! complex setups / admin calls.
+//! See the docs:
+//! ```shell
+//! cargo doc --open
+//! ```
+//! and the examples.
+
+use std::path::Path;
 use std::path::PathBuf;
 
 use holochain_conductor_api::{AdminRequest, AdminResponse};
 use holochain_websocket::WebsocketSender;
 use ports::get_admin_api;
 
-pub use create::create;
-pub use create::create_default;
 pub use ports::add_secondary_admin_port;
 pub use ports::force_admin_port;
-pub use run::run;
 
+/// Print a msg with `hc-admin: ` pre-pended
+/// and ansi colors.
 macro_rules! msg {
     ($($arg:tt)*) => ({
         use ansi_term::Color::*;
@@ -18,20 +128,25 @@ macro_rules! msg {
     })
 }
 
-pub mod app;
 pub mod calls;
+#[doc(hidden)]
 pub mod cmds;
-mod config;
-mod create;
-mod ports;
+pub mod config;
+pub mod dna;
+pub mod generate;
 pub mod run;
+pub mod save;
 pub mod scripts;
 
+mod ports;
+
+/// An active connection to a running conductor.
 pub struct CmdRunner {
     client: WebsocketSender,
 }
 
 impl CmdRunner {
+    const HOLOCHAIN_PATH: &'static str = "holochain";
     /// Create a new connection for calling admin interface commands.
     /// Panics if admin port fails to connect.
     pub async fn new(port: u16) -> Self {
@@ -46,10 +161,26 @@ impl CmdRunner {
         Ok(Self { client })
     }
 
+    /// Create a command runner from a setup path.
+    /// This expects holochain to be on the path.
+    pub async fn from_setup(setup_path: PathBuf) -> anyhow::Result<(Self, tokio::process::Child)> {
+        Self::from_setup_with_bin_path(&Path::new(Self::HOLOCHAIN_PATH), setup_path).await
+    }
+
+    /// Create a command runner from a setup path and
+    /// set the path to the holochain binary.
+    pub async fn from_setup_with_bin_path(
+        holochain_bin_path: &Path,
+        setup_path: PathBuf,
+    ) -> anyhow::Result<(Self, tokio::process::Child)> {
+        let conductor = run::run_async(holochain_bin_path, setup_path, None).await?;
+        let cmd = CmdRunner::try_new(conductor.0).await?;
+        Ok((cmd, conductor.1))
+    }
+
+    /// Make an Admin request to this conductor.
     pub async fn command(&mut self, cmd: AdminRequest) -> anyhow::Result<AdminResponse> {
-        tracing::debug!(?cmd);
         let response: Result<AdminResponse, _> = self.client.request(cmd).await;
-        tracing::debug!(?response);
         Ok(response?)
     }
 }
@@ -62,6 +193,7 @@ impl Drop for CmdRunner {
 }
 
 #[macro_export]
+/// Expect that an enum matches a variant and panic if it doesn't.
 macro_rules! expect_variant {
     ($var:expr => $variant:path, $error_msg:expr) => {
         match $var {
@@ -75,6 +207,7 @@ macro_rules! expect_variant {
 }
 
 #[macro_export]
+/// Expect that an enum matches a variant and return an error if it doesn't.
 macro_rules! expect_match {
     ($var:expr => $variant:path, $error_msg:expr) => {
         match $var {
@@ -85,90 +218,4 @@ macro_rules! expect_match {
     ($var:expr => $variant:path) => {
         expect_variant!($var => $variant, "")
     };
-}
-
-pub fn save(mut path: PathBuf, paths: Vec<PathBuf>) -> anyhow::Result<()> {
-    use std::io::Write;
-    std::fs::create_dir_all(&path)?;
-    path.push(".hc");
-    let mut file = std::fs::OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open(path)?;
-
-    for path in paths {
-        writeln!(file, "{}", path.display())?;
-    }
-    Ok(())
-}
-
-pub fn clean(mut path: PathBuf, setups: Vec<usize>) -> anyhow::Result<()> {
-    let existing = load(path.clone())?;
-    let setups_len = setups.len();
-    let to_remove: Vec<_> = if setups.is_empty() {
-        existing.iter().collect()
-    } else {
-        setups.into_iter().filter_map(|i| existing.get(i)).collect()
-    };
-    let to_remove_len = to_remove.len();
-    for p in to_remove {
-        if p.exists() && p.is_dir() {
-            if let Err(e) = std::fs::remove_dir_all(p) {
-                tracing::error!("Failed to remove {} because {:?}", p.display(), e);
-            }
-        }
-    }
-    if setups_len == 0 || setups_len == to_remove_len {
-        path.push(".hc");
-        if path.exists() {
-            std::fs::remove_file(path)?;
-        }
-    }
-    Ok(())
-}
-
-pub fn load(mut path: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
-    let mut paths = Vec::new();
-    path.push(".hc");
-    if path.exists() {
-        let existing = std::fs::read_to_string(path)?;
-        for setup in existing.lines() {
-            let path = PathBuf::from(setup);
-            let mut config_path = path.clone();
-            config_path.push("conductor-config.yaml");
-            if config_path.exists() {
-                paths.push(path);
-            } else {
-                tracing::error!("Failed to load path {} from existing .hc", path.display());
-            }
-        }
-    }
-    Ok(paths)
-}
-
-pub fn list(verbose: usize) -> anyhow::Result<()> {
-    let out = load(std::env::current_dir()?)?
-        .into_iter()
-        .enumerate()
-        .try_fold(
-            "\nSetups contained in `.hc`\n".to_string(),
-            |out, (i, path)| {
-                let r = match verbose {
-                    0 => format!("{}{}: {}\n", out, i, path.display()),
-                    _ => {
-                        let config = config::read_config(path.clone())?;
-                        format!(
-                            "{}{}: {}\nConductor Config:\n{:?}\n",
-                            out,
-                            i,
-                            path.display(),
-                            config
-                        )
-                    }
-                };
-                anyhow::Result::<_, anyhow::Error>::Ok(r)
-            },
-        )?;
-    msg!("{}", out);
-    Ok(())
 }

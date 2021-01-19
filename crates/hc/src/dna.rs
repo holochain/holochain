@@ -1,21 +1,15 @@
+//! Helpers for working with dna files.
 use std::path::Path;
 use std::path::PathBuf;
 
-use crate::CmdRunner;
 use anyhow::anyhow;
 use anyhow::ensure;
-use holochain_conductor_api::AdminRequest;
 use walkdir::WalkDir;
 
-pub(crate) async fn attach_app_port(app_port: u16, admin_port: u16) -> anyhow::Result<()> {
-    let mut c = CmdRunner::new(admin_port).await;
-    let r = AdminRequest::AttachAppInterface {
-        port: Some(app_port),
-    };
-    c.command(r).await?;
-    Ok(())
-}
-
+/// Parse a list of dnas.
+/// If paths are directories then each directory
+/// will be searched for the first file that matches
+/// `*.dna.gz`.
 pub fn parse_dnas(mut dnas: Vec<PathBuf>) -> anyhow::Result<Vec<PathBuf>> {
     if dnas.is_empty() {
         dnas.push(std::env::current_dir()?);

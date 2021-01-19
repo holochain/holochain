@@ -37,6 +37,7 @@ enum Op {
     /// [WIP unimplemented]: Run custom tasks using cargo task
     Task,
     /// List setups found in `$(pwd)/.hc`.
+    /// Note that indices will change if setups are removed.
     List {
         /// Show more verbose information.
         #[structopt(short, long, parse(from_occurrences))]
@@ -148,7 +149,7 @@ async fn main() -> anyhow::Result<()> {
             ..
         }) => {
             // Check if current directory has saved existing
-            let existing = hc::load(std::env::current_dir()?)?;
+            let existing = hc::save::load(std::env::current_dir()?)?;
             // If we have existing setups and we are not trying to generate and
             // we are not trying to load specific dnas then use existing.
             let paths = if !existing.is_empty() && gen.is_none() && dnas.is_empty() {
@@ -169,8 +170,8 @@ async fn main() -> anyhow::Result<()> {
         }
         Op::Call(call) => hc::calls::call(&ops.holochain_path, call).await?,
         Op::Task => todo!("Running custom tasks is coming soon"),
-        Op::List { verbose } => hc::list(verbose)?,
-        Op::Clean { setups } => hc::clean(std::env::current_dir()?, setups)?,
+        Op::List { verbose } => hc::save::list(std::env::current_dir()?, verbose)?,
+        Op::Clean { setups } => hc::save::clean(std::env::current_dir()?, setups)?,
     }
 
     Ok(())
@@ -197,7 +198,7 @@ async fn run_n(
             };
             hc::add_secondary_admin_port(path.clone(), secondary_admin_port)?;
         }
-        hc::run(&holochain_path, path, ports, force_admin_port).await?;
+        hc::run::run(&holochain_path, path, ports, force_admin_port).await?;
         Result::<_, anyhow::Error>::Ok(())
     };
     if !disable_secondary && secondary_admin_ports.is_empty() {
@@ -229,8 +230,8 @@ async fn generate(
     num_conductors: usize,
     create: Create,
 ) -> anyhow::Result<Vec<PathBuf>> {
-    let dnas = hc::app::parse_dnas(dnas)?;
+    let dnas = hc::dna::parse_dnas(dnas)?;
     let paths = hc::scripts::default_n(holochain_path, num_conductors, create, dnas).await?;
-    hc::save(std::env::current_dir()?, paths.clone())?;
+    hc::save::save(std::env::current_dir()?, paths.clone())?;
     Ok(paths)
 }

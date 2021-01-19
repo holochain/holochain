@@ -1,3 +1,4 @@
+//! Common use setups with lots of default choices.
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -6,6 +7,9 @@ use crate::cmds::*;
 use crate::run::run_async;
 use crate::CmdRunner;
 
+/// Generates a new setup with a default [`ConductorConfig`]
+/// and optional network.
+/// Then installs the dnas with a new app per dna.
 pub async fn default_with_network(
     holochain_path: &Path,
     create: Create,
@@ -18,7 +22,7 @@ pub async fn default_with_network(
         root,
         ..
     } = create;
-    let path = crate::create(network.map(|n| n.into_inner().into()), root, directory).await?;
+    let path = crate::generate::generate(network.map(|n| n.into_inner().into()), root, directory)?;
     let conductor = run_async(holochain_path, path.clone(), None).await?;
     let mut cmd = CmdRunner::new(conductor.0).await;
     let install_app = InstallApp {
@@ -30,6 +34,8 @@ pub async fn default_with_network(
     Ok(path)
 }
 
+/// Same as [`default_with_network`] but creates n copies
+/// of this setup in thier own directory.
 pub async fn default_n(
     holochain_path: &Path,
     n: usize,

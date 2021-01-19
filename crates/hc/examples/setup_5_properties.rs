@@ -24,7 +24,7 @@ struct Input {
 async fn main() -> anyhow::Result<()> {
     // Get and parse any input.
     let input = Input::from_args();
-    let dnas = hc::app::parse_dnas(input.dnas)?;
+    let dnas = hc::dna::parse_dnas(input.dnas)?;
 
     // Using the default mem network.
     let network = KitsuneP2pConfig::default();
@@ -40,13 +40,13 @@ async fn main() -> anyhow::Result<()> {
         let properties = properties.clone();
 
         // Create a conductor config with the network.
-        let path = hc::create(Some(network.clone()), None, None).await?;
-
-        // Run the conductor in the background.
-        let conductor = hc::run::run_async(&input.holochain_path, path.clone(), None).await?;
+        let path = hc::generate::generate(Some(network.clone()), None, None)?;
 
         // Create a command runner to run admin commands.
-        let mut cmd = CmdRunner::new(conductor.0).await;
+        // This runs the conductor in the background and cleans
+        // up the process when the guard is dropped.
+        let (mut cmd, _conductor_guard) =
+            CmdRunner::from_setup_with_bin_path(&input.holochain_path, path.clone()).await?;
 
         // Generate a new agent key using the simple calls api.
         let agent_key = hc::calls::generate_agent_pub_key(&mut cmd).await?;

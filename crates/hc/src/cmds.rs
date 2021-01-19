@@ -99,7 +99,7 @@ pub struct Existing {
 
 impl Existing {
     pub fn load(mut self) -> anyhow::Result<Vec<PathBuf>> {
-        let setups = crate::load(std::env::current_dir()?)?;
+        let setups = crate::save::load(std::env::current_dir()?)?;
         let e = self
             .existing_indices
             .into_iter()

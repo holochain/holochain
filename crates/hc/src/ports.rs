@@ -1,3 +1,4 @@
+//! Helpers for working with websockets and ports.
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -12,6 +13,7 @@ use url2::prelude::*;
 use crate::config::read_config;
 use crate::config::write_config;
 
+/// Update the first admin interface to use this port.
 pub fn force_admin_port(path: PathBuf, port: u16) -> anyhow::Result<()> {
     let mut config = read_config(path.clone())?.expect("Failed to find config to force admin port");
     set_admin_port(&mut config, port);
@@ -19,11 +21,30 @@ pub fn force_admin_port(path: PathBuf, port: u16) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Add a secondary admin port to the conductor config.
 pub fn add_secondary_admin_port(path: PathBuf, port: Option<u16>) -> anyhow::Result<()> {
     let mut config = read_config(path.clone())?.expect("Failed to find config to force admin port");
     set_secondary_admin_port(&mut config, port);
     write_config(path, &config);
     Ok(())
+}
+
+/// List the secondary ports for each setup.
+pub async fn get_secondary_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
+    let mut ports = Vec::new();
+    for p in paths {
+        if let Some(config) = read_config(p)? {
+            if let Some(ai) = config.admin_interfaces {
+                if let Some(AdminInterfaceConfig {
+                    driver: InterfaceDriver::Websocket { port },
+                }) = ai.get(0)
+                {
+                    ports.push(*port)
+                }
+            }
+        }
+    }
+    Ok(ports)
 }
 
 pub(crate) async fn get_admin_api(port: u16) -> std::io::Result<WebsocketSender> {
@@ -102,21 +123,4 @@ pub(crate) fn set_secondary_admin_port(config: &mut ConductorConfig, port: Optio
         }
     }
     msg!("Secondary admin port Admin port set to: {}", p);
-}
-
-pub async fn get_secondary_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
-    let mut ports = Vec::new();
-    for p in paths {
-        if let Some(config) = read_config(p)? {
-            if let Some(ai) = config.admin_interfaces {
-                if let Some(AdminInterfaceConfig {
-                    driver: InterfaceDriver::Websocket { port },
-                }) = ai.get(0)
-                {
-                    ports.push(*port)
-                }
-            }
-        }
-    }
-    Ok(ports)
 }
