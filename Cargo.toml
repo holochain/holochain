@@ -1,6 +1,5 @@
 [workspace]
 members = [
-  "crates/dna_util",
   "crates/fixt",
   "crates/fixt/test",
   "crates/hdk3",

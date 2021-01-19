@@ -884,24 +884,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dna_util"
-version = "0.0.1"
-dependencies = [
- "holo_hash",
- "holochain",
- "holochain_serialized_bytes",
- "holochain_types",
- "holochain_zome_types",
- "serde",
- "serde_bytes",
- "serde_json",
- "structopt",
- "tempdir",
- "thiserror",
- "tokio",
-]
-
-[[package]]
 name = "doc-comment"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
