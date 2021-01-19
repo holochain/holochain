@@ -20,7 +20,7 @@ the CLI.
 ##### Building
 From github:
 ```shell
-cargo install holochain_hc --git https://github.com/holochain/holochain --branch admin
+cargo install holochain_hc --git https://github.com/holochain/holochain
 ```
 From the holochain repo:
 ```shell
