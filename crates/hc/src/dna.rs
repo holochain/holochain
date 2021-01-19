@@ -101,7 +101,6 @@ fn search_for_workdir(path: &Path) -> Option<PathBuf> {
 
 async fn try_compile(mut path: PathBuf) -> anyhow::Result<()> {
     path.push("zomes");
-    dbg!(&path);
     let zomes: Vec<_> = WalkDir::new(path)
         .max_depth(2)
         .into_iter()
