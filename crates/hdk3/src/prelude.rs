@@ -10,8 +10,6 @@ pub use crate::entry::hash_entry::hash_entry;
 pub use crate::entry::update_entry::update_entry;
 pub use crate::entry_def;
 pub use crate::entry_defs;
-pub use crate::error::HdkError;
-pub use crate::error::HdkResult;
 pub use crate::hash_path::anchor::anchor;
 pub use crate::hash_path::anchor::get_anchor;
 pub use crate::hash_path::anchor::list_anchor_addresses;

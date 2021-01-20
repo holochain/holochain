@@ -10,23 +10,17 @@ use crate::prelude::*;
 /// - cap_secret: Optional cap claim secret to allow access to the remote call.
 /// - payload: The payload to send to the remote function; receiver needs to deserialize cleanly.
 ///
-/// Response is HdkResult which can either return HdkResult::Ok with the deserialized result
-/// of the function call, HdkError::ZomeCallNetworkError if there was a network error,
-/// or HdkError::UnauthorizedZomeCall if the provided cap grant is invalid. The Unauthorized case
-/// should always be handled gracefully because gap grants can be revoked at any time and the claim
-/// holder has no way of knowing until they provide a secret for a call.
+/// Response is ExternResult which returns ZomeCallResponse of the function call.
+/// ZomeCallResponse::ZomeCallNetworkError if there was a network error.
+/// ZomeCallResponse::UnauthorizedZomeCall if the provided cap grant is invalid.
+/// The Unauthorized case should always be handled gracefully because gap grants can be revoked at
+/// any time and the claim holder has no way of knowing until they provide a secret for a call.
 ///
-/// An Ok response already includes the deserialized type. Note that this type must be specified
-/// should derive from `SerializedBytes`, and it should be the same one as the return type
-/// from the remote function call.
-///
+/// An Ok response already includes an `ExternIO` to be deserialized with `extern_io.decode()?`.
 ///
 /// ```ignore
-/// #[derive(SerializedBytes, Serialize, Deserialize)]
-/// struct Foo(String);
-///
 /// ...
-/// let foo: Foo = call_remote(bob, "foo_zome", "do_it", secret, serialized_payload)?;
+/// let foo: Foo = call_remote(bob, "foo_zome", "do_it", secret, serializable_payload)?;
 /// ...
 /// ```
 pub fn call_remote<I>(
@@ -37,7 +31,7 @@ pub fn call_remote<I>(
     payload: I,
 ) -> ExternResult<ZomeCallResponse>
 where
-    I: serde::Serialize + std::fmt::Debug,
+    I: serde::Serialize,
 {
     host_call::<CallRemote, ZomeCallResponse>(
         __call_remote,
