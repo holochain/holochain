@@ -196,23 +196,28 @@ impl CoolConductor {
         self.envs.keystore()
     }
 
-    /// Install the app and activate it
-    // TODO: make this take a more flexible config for specifying things like
-    // membrane proofs
-    async fn setup_app_part_1(
-        &mut self,
-        installed_app_id: &str,
-        agent: AgentPubKey,
-        dna_files: &[DnaFile],
-    ) {
-        let installed_app_id = installed_app_id.to_string();
-
+    /// Install the dna first.
+    /// This allows a big speed up when
+    /// installing many apps with the same dna
+    async fn setup_app_part_1(&mut self, dna_files: &[DnaFile]) {
         for dna_file in dna_files {
             self.install_dna(dna_file.clone())
                 .await
                 .expect("Could not install DNA");
             self.dnas.push(dna_file.clone());
         }
+    }
+
+    /// Install the app and activate it
+    // TODO: make this take a more flexible config for specifying things like
+    // membrane proofs
+    async fn setup_app_part_2(
+        &mut self,
+        installed_app_id: &str,
+        agent: AgentPubKey,
+        dna_files: &[DnaFile],
+    ) {
+        let installed_app_id = installed_app_id.to_string();
 
         let installed_cells = dna_files
             .iter()
@@ -239,7 +244,7 @@ impl CoolConductor {
     /// are not available until after `setup_cells` has run, and it is
     /// better to do that once for all apps in the case of multiple apps being
     /// set up at once.
-    async fn setup_app_part_2(
+    async fn setup_app_part_3(
         &self,
         installed_app_id: &str,
         agent: AgentPubKey,
@@ -269,7 +274,8 @@ impl CoolConductor {
         agent: AgentPubKey,
         dna_files: &[DnaFile],
     ) -> CoolApp {
-        self.setup_app_part_1(installed_app_id, agent.clone(), dna_files)
+        self.setup_app_part_1(dna_files).await;
+        self.setup_app_part_2(installed_app_id, agent.clone(), dna_files)
             .await;
 
         self.handle()
@@ -280,7 +286,7 @@ impl CoolConductor {
             .expect("Could not setup cells");
 
         let dna_files = dna_files.iter().map(|d| d.dna_hash().clone());
-        self.setup_app_part_2(installed_app_id, agent, dna_files)
+        self.setup_app_part_3(installed_app_id, agent, dna_files)
             .await
     }
 
@@ -308,9 +314,10 @@ impl CoolConductor {
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
     ) -> CoolAppBatch {
+        self.setup_app_part_1(dna_files).await;
         for agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
-            self.setup_app_part_1(&installed_app_id, agent.clone(), dna_files)
+            self.setup_app_part_2(&installed_app_id, agent.clone(), dna_files)
                 .await;
         }
 
@@ -325,7 +332,7 @@ impl CoolConductor {
         for agent in agents {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             apps.push(
-                self.setup_app_part_2(
+                self.setup_app_part_3(
                     &installed_app_id,
                     agent.clone(),
                     dna_files.iter().map(|d| d.dna_hash().clone()),

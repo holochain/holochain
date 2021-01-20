@@ -28,8 +28,16 @@ fn simple_crud_zome() -> InlineZome {
             let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
             Ok(hash)
         })
+        .callback("delete", move |api, header_hash: HeaderHash| {
+            let hash = api.delete(header_hash)?;
+            Ok(hash)
+        })
         .callback("read", |api, hash: HeaderHash| {
             api.get(GetInputInner::new(hash.into(), GetOptions::default()))
+                .map_err(Into::into)
+        })
+        .callback("read_entry", |api, hash: EntryHash| {
+            api.get((hash.into(), GetOptions::default()))
                 .map_err(Into::into)
         })
 }
@@ -184,6 +192,63 @@ async fn invalid_cell() -> anyhow::Result<()> {
 
     // Can't finish this test because there's no way to construct HolochainP2pEvents
     // and I can't directly call query on the conductor because it's private.
+
+    Ok(())
+}
+
+#[tokio::test(threaded_scheduler)]
+#[cfg(feature = "test_utils")]
+async fn get_deleted() -> anyhow::Result<()> {
+    observability::test_run().ok();
+    // Bundle the single zome into a DnaFile
+    let (dna_file, _) = CoolDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
+
+    // Create a Conductor
+    let mut conductor = CoolConductor::from_config(Default::default()).await;
+
+    // Install DNA and install and activate apps in conductor
+    let alice = conductor
+        .setup_app("app", &[dna_file])
+        .await
+        .into_cells()
+        .into_iter()
+        .next()
+        .unwrap();
+    // let ((alice,), (bobbo,)) = apps.into_tuples();
+
+    // Call the "create" zome fn on Alice's app
+    let hash: HeaderHash = conductor
+        .call(&alice.zome("zome1"), "create_unit", ())
+        .await;
+    let mut expected_count = WaitOps::start() + WaitOps::ENTRY;
+
+    wait_for_integration_10s(alice.env(), expected_count).await;
+
+    let element: MaybeElement = conductor
+        .call(&alice.zome("zome1"), "read", hash.clone())
+        .await;
+    let element = element
+        .0
+        .expect("Element was None: bobbo couldn't `get` it");
+
+    assert_eq!(element.header().author(), alice.agent_pubkey());
+    assert_eq!(
+        *element.entry(),
+        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+    );
+    let entry_hash = element.header().entry_hash().unwrap();
+
+    let _: HeaderHash = conductor
+        .call(&alice.zome("zome1"), "delete", hash.clone())
+        .await;
+
+    expected_count += WaitOps::DELETE;
+    wait_for_integration_10s(alice.env(), expected_count).await;
+
+    let element: MaybeElement = conductor
+        .call(&alice.zome("zome1"), "read_entry", entry_hash)
+        .await;
+    assert!(element.0.is_none());
 
     Ok(())
 }

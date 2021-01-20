@@ -1,3 +1,5 @@
+use crate::types::metrics::KitsuneMetrics;
+
 use super::*;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
@@ -140,6 +142,7 @@ impl gossip::GossipEventHandler for Space {
                 let info = types::agent_store::AgentInfo::try_from(&info)?;
                 let url = info.as_urls_ref().get(0).unwrap().clone();
                 let (_, mut write, read) = transport_tx.create_channel(url).await?;
+                KitsuneMetrics::count(KitsuneMetrics::FetchOpHashes, data.len());
                 write.write_and_close(data.to_vec()).await?;
                 let read = read.read_to_end().await;
                 let (_, read) = wire::Wire::decode_ref(&read)?;
@@ -192,6 +195,7 @@ impl gossip::GossipEventHandler for Space {
                 let info = types::agent_store::AgentInfo::try_from(&info)?;
                 let url = info.as_urls_ref().get(0).unwrap().clone();
                 let (_, mut write, read) = transport_tx.create_channel(url).await?;
+                KitsuneMetrics::count(KitsuneMetrics::FetchOpData, data.len());
                 write.write_and_close(data.to_vec()).await?;
                 let read = read.read_to_end().await;
                 let (_, read) = wire::Wire::decode_ref(&read)?;
@@ -249,6 +253,7 @@ impl gossip::GossipEventHandler for Space {
                 let info = types::agent_store::AgentInfo::try_from(&info)?;
                 let url = info.as_urls_ref().get(0).unwrap().clone();
                 let (_, mut write, read) = transport_tx.create_channel(url.clone()).await?;
+                KitsuneMetrics::count(KitsuneMetrics::Gossip, data.len());
                 write.write_and_close(data.to_vec()).await?;
                 let read = read.read_to_end().await;
                 let (_, read) = wire::Wire::decode_ref(&read)?;
@@ -576,6 +581,7 @@ impl KitsuneP2pHandler for Space {
                         payload.into(),
                     )
                     .encode_vec()?;
+                    KitsuneMetrics::count(KitsuneMetrics::Call, payload.len());
                     write.write_and_close(payload).await?;
                     let res = read.read_to_end().await;
                     let (_, res) = wire::Wire::decode_ref(&res)?;
