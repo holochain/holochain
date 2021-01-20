@@ -63,7 +63,7 @@ pub enum DnaUtilError {
     SerializedBytesError(#[from] SerializedBytesError),
 
     /// serde_yaml::Error
-    #[error("JSON serialization error: {0}")]
+    #[error("YAML serialization error: {0}")]
     SerdeYamlError(#[from] serde_yaml::Error),
 
     /// InvalidInput
@@ -143,12 +143,12 @@ pub async fn expand(dna_file_path: &impl AsRef<std::path::Path>) -> DnaUtilResul
 
     // Might be more efficient to extract the DnaDef / Wasm from the DnaFile
     // then pass by value here.
-    let dna_yaml = DnaDefJson::from_dna_def(dna_file.dna().clone().into_content())?;
+    let dna_yaml = DnaDefYaml::from_dna_def(dna_file.dna().clone().into_content())?;
     let dna_yaml = serde_yaml::to_string(&dna_yaml)?;
 
-    let mut json_filename = dir.clone();
-    json_filename.push("dna.yaml");
-    tokio::fs::write(json_filename, dna_yaml.as_bytes()).await?;
+    let mut yaml_filename = dir.clone();
+    yaml_filename.push("dna.yaml");
+    tokio::fs::write(yaml_filename, dna_yaml.as_bytes()).await?;
 
     Ok(())
 }
@@ -158,16 +158,16 @@ pub async fn compress(dna_work_dir: &impl AsRef<std::path::Path>) -> DnaUtilResu
     let dna_work_dir = dna_work_dir.as_ref().canonicalize()?;
     let dna_file_path = dna_file_path_convert(&dna_work_dir, false)?;
 
-    let mut json_filename = dna_work_dir.clone();
-    json_filename.push("dna.yaml");
+    let mut yaml_filename = dna_work_dir.clone();
+    yaml_filename.push("dna.yaml");
 
-    let json_data = tokio::fs::read(json_filename.clone())
+    let yaml_data = tokio::fs::read(yaml_filename.clone())
         .await
-        .map_err(move |e| DnaUtilError::PathNotFound(e, json_filename))?;
+        .map_err(move |e| DnaUtilError::PathNotFound(e, yaml_filename))?;
 
-    let json_file: DnaDefJson = serde_yaml::from_slice(&json_data)?;
+    let yaml_file: DnaDefYaml = serde_yaml::from_slice(&yaml_data)?;
 
-    let dna_file_content = json_file.compile_dna_file(&dna_work_dir).await?;
+    let dna_file_content = yaml_file.compile_dna_file(&dna_work_dir).await?;
     let dna_file_content = dna_file_content.to_file_content().await?;
 
     tokio::fs::write(dna_file_path, &dna_file_content).await?;
@@ -176,35 +176,35 @@ pub async fn compress(dna_work_dir: &impl AsRef<std::path::Path>) -> DnaUtilResu
 }
 
 /// See `holochain_types::dna::zome::Zome`.
-/// This is a helper to convert to json.
+/// This is a helper to convert to yaml.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct ZomeJson {
+struct ZomeYaml {
     pub wasm_path: String,
 }
 
-/// Special Json Value Decode Helper
+/// Special Yaml Value Decode Helper
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-struct JsonValueDecodeHelper(pub serde_yaml::Value);
+struct YamlValueDecodeHelper(pub serde_yaml::Value);
 
 /// See `holochain_types::dna::DnaDef`.
-/// This is a helper to convert to json.
+/// This is a helper to convert to yaml.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct DnaDefJson {
+struct DnaDefYaml {
     pub name: String,
     pub uuid: String,
     pub properties: serde_yaml::Value,
-    pub zomes: BTreeMap<ZomeName, ZomeJson>,
+    pub zomes: BTreeMap<ZomeName, ZomeYaml>,
 }
 
-impl DnaDefJson {
-    pub fn from_dna_def(dna: DnaDef) -> DnaUtilResult<DnaDefJson> {
-        let properties: JsonValueDecodeHelper = dna.properties.try_into()?;
+impl DnaDefYaml {
+    pub fn from_dna_def(dna: DnaDef) -> DnaUtilResult<DnaDefYaml> {
+        let properties: YamlValueDecodeHelper = dna.properties.try_into()?;
         let mut zomes = BTreeMap::new();
         for zome_name in dna.zomes.into_iter().map(|(name, _)| name) {
             let zome_file = format!("./{}.wasm", zome_name);
             zomes.insert(
                 zome_name.clone(),
-                ZomeJson {
+                ZomeYaml {
                     wasm_path: zome_file,
                 },
             );
@@ -224,7 +224,7 @@ impl DnaDefJson {
         let work_dir = work_dir.into();
 
         let properties: SerializedBytes =
-            JsonValueDecodeHelper(self.properties.clone()).try_into()?;
+            YamlValueDecodeHelper(self.properties.clone()).try_into()?;
 
         let mut zomes = Vec::new();
         let mut wasm_list = Vec::new();
@@ -267,7 +267,7 @@ mod tests {
                 ("test-zome-2".into(), vec![5, 6, 7, 8].into()),
             ],
         );
-        let properties = JsonValueDecodeHelper(
+        let properties = YamlValueDecodeHelper(
             serde_yaml::from_str(
                 r#"
 test_prop_1:
