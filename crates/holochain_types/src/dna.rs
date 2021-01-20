@@ -18,12 +18,12 @@ pub type Zomes = Vec<(ZomeName, zome::ZomeDef)>;
 
 /// A type to allow json values to be used as [SerializedBytes]
 #[derive(Debug, Clone, derive_more::From, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct JsonProperties(serde_json::Value);
+pub struct YamlProperties(serde_yaml::Value);
 
-impl JsonProperties {
+impl YamlProperties {
     /// Create new properties from json value
-    pub fn new(properties: serde_json::Value) -> Self {
-        JsonProperties(properties)
+    pub fn new(properties: serde_yaml::Value) -> Self {
+        YamlProperties(properties)
     }
 }
 
@@ -108,7 +108,35 @@ pub type DnaDefHashed = HoloHashed<DnaDef>;
 impl_hashable_content!(DnaDef, Dna);
 
 /// Wasms need to be an ordered map from WasmHash to a wasm::DnaWasm
-pub type Wasms = BTreeMap<holo_hash::WasmHash, wasm::DnaWasm>;
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    derive_more::AsRef,
+    derive_more::From,
+    derive_more::IntoIterator,
+)]
+#[serde(from = "WasmMapSerialized", into = "WasmMapSerialized")]
+pub struct WasmMap(BTreeMap<holo_hash::WasmHash, wasm::DnaWasm>);
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
+struct WasmMapSerialized(Vec<(holo_hash::WasmHash, wasm::DnaWasm)>);
+
+impl From<WasmMap> for WasmMapSerialized {
+    fn from(w: WasmMap) -> Self {
+        Self(w.0.into_iter().collect())
+    }
+}
+
+impl From<WasmMapSerialized> for WasmMap {
+    fn from(w: WasmMapSerialized) -> Self {
+        Self(w.0.into_iter().collect())
+    }
+}
 
 /// Represents a full DNA file including WebAssembly bytecode.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, SerializedBytes)]
@@ -117,7 +145,7 @@ pub struct DnaFile {
     pub dna: DnaDefHashed,
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
-    pub code: Wasms,
+    pub code: WasmMap,
 }
 
 impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
@@ -141,7 +169,10 @@ impl DnaFile {
             code.insert(wasm_hash, wasm);
         }
         let dna = DnaDefHashed::from_content(dna).await;
-        Ok(Self { dna, code })
+        Ok(Self {
+            dna,
+            code: code.into(),
+        })
     }
 
     /// The DnaDef along with its hash
@@ -204,13 +235,13 @@ impl DnaFile {
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
     pub fn code(&self) -> &BTreeMap<holo_hash::WasmHash, wasm::DnaWasm> {
-        &self.code
+        &self.code.0
     }
 
     /// Fetch the Webassembly byte code for a zome.
     pub fn get_wasm_for_zome(&self, zome_name: &ZomeName) -> Result<&wasm::DnaWasm, DnaError> {
         let wasm_hash = &self.dna.get_wasm_zome(zome_name)?.wasm_hash;
-        self.code.get(wasm_hash).ok_or(DnaError::InvalidWasmHash)
+        self.code.0.get(wasm_hash).ok_or(DnaError::InvalidWasmHash)
     }
 
     /// Render this dna_file as bytecode to send over the wire, or store in a file.

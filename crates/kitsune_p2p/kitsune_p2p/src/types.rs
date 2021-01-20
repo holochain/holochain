@@ -222,3 +222,6 @@ pub mod gossip;
 pub(crate) mod wire;
 
 pub use kitsune_p2p_types::dht_arc;
+
+#[allow(missing_docs)]
+pub mod metrics;

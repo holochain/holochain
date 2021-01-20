@@ -2,7 +2,7 @@ use std::{collections::HashSet, path::PathBuf};
 
 use holo_hash::DnaHash;
 
-use crate::prelude::{CellNick, JsonProperties};
+use crate::prelude::{CellNick, YamlProperties};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -28,7 +28,7 @@ pub struct BundleCell {
     location: Option<BundleDnaLocation>,
 
     /// Optional default properties. May be overridden during installation.
-    properties: Option<JsonProperties>,
+    properties: Option<YamlProperties>,
 
     /// The hash of the Dna.
     ///

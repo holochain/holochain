@@ -894,7 +894,7 @@ dependencies = [
  "holochain_zome_types",
  "serde",
  "serde_bytes",
- "serde_json",
+ "serde_yaml",
  "structopt",
  "tempdir",
  "thiserror",
@@ -1451,7 +1451,6 @@ dependencies = [
  "rand 0.7.3",
  "ring",
  "serde",
- "serde_json",
  "serde_yaml",
  "serial_test",
  "shrinkwraprs",
@@ -1696,7 +1695,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_derive",
- "serde_json",
+ "serde_yaml",
  "shrinkwraprs",
  "strum",
  "tempdir",
@@ -2105,6 +2104,7 @@ dependencies = [
  "futures",
  "ghost_actor",
  "nanoid",
+ "observability",
  "once_cell",
  "paste 1.0.3",
  "rmp-serde",
@@ -2566,8 +2566,7 @@ checksum = "8d3b63360ec3cb337817c2dbd47ab4a0f170d285d8e5a2064600f3def1402397"
 [[package]]
 name = "observability"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48a8b598bee7dbc54fff9508c722f6472f2629a25b6ea7f25c5007d7695448c9"
+source = "git+https://github.com/freesig/observability.git?branch=metrics#a7b0b6a403f462fa22decc54d1f834d505bf68b0"
 dependencies = [
  "chrono",
  "derive_more",

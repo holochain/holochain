@@ -151,16 +151,21 @@ async fn call_admin() {
     let original_dna_hash = dna.dna_hash().clone();
 
     // Make properties
-    let properties: holochain_types::dna::JsonProperties = serde_json::json!({
-        "test": "example",
-        "how_many": 42,
-    })
-    .into();
+    let properties = holochain_types::dna::YamlProperties::new(
+        serde_yaml::from_str(
+            r#"
+test: "example"
+how_many: 42
+    "#,
+        )
+        .unwrap(),
+    );
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
     let dna_payload = InstallAppDnaPayload {
-        path: fake_dna_path,
+        path: Some(fake_dna_path),
+        hash: None,
         nick: "nick".into(),
         properties: Some(properties.clone()),
         membrane_proof: None,
