@@ -121,7 +121,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
 ) -> InterfaceResult<(u16, ManagedTaskHandle)> {
     trace!("Initializing App interface");
     let mut listener = websocket_bind(
-        url2!("ws://127.0.0.1:{}", port),
+        url2!("ws://0.0.0.0:{}", port),
         Arc::new(WebsocketConfig::default()),
     )
     .await?;
@@ -214,9 +214,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
                 }
                 break;
             }
-            Err(e) => {
-                error!(error = &e as &dyn std::error::Error)
-            }
+            Err(e) => error!(error = &e as &dyn std::error::Error),
             Ok(()) => {}
         }
     }
