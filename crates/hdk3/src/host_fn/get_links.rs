@@ -20,5 +20,5 @@ use crate::prelude::*;
 ///
 /// @see get_link_details
 pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Links> {
-    host_call::<GetLinksInputInner, Links>(__get_links, GetLinksInputInner::new(base, link_tag))
+    host_call::<GetLinksInput, Links>(__get_links, GetLinksInput::new(base, link_tag))
 }

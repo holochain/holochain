@@ -201,14 +201,14 @@ impl AsRef<crate::EntryDefId> for EntryWithDefId {
 
 /// Zome IO inner for get and get_details calls.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct GetInputInner {
+pub struct GetInput {
     /// Any DHT hash to pass to get or get_details.
     pub any_dht_hash: holo_hash::AnyDhtHash,
     /// Options for the call.
     pub get_options: crate::entry::GetOptions,
 }
 
-impl GetInputInner {
+impl GetInput {
     /// Constructor.
     pub fn new(any_dht_hash: holo_hash::AnyDhtHash, get_options: crate::entry::GetOptions) -> Self {
         Self {
@@ -220,14 +220,14 @@ impl GetInputInner {
 
 /// Zome IO inner for update.
 #[derive(PartialEq, Debug, Deserialize, Serialize, Clone)]
-pub struct UpdateInputInner {
+pub struct UpdateInput {
     /// Header of the element being updated.
     pub original_header_address: holo_hash::HeaderHash,
     /// Value of the update.
     pub entry_with_def_id: EntryWithDefId,
 }
 
-impl UpdateInputInner {
+impl UpdateInput {
     /// Constructor.
     pub fn new(
         original_header_address: holo_hash::HeaderHash,

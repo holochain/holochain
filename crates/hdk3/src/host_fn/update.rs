@@ -15,8 +15,5 @@ use crate::prelude::*;
 /// @see update_cap_grant!
 /// @see update_cap_claim!
 pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-    host_call::<UpdateInputInner, HeaderHash>(
-        __update,
-        UpdateInputInner::new(hash, entry_with_def_id),
-    )
+    host_call::<UpdateInput, HeaderHash>(__update, UpdateInput::new(hash, entry_with_def_id))
 }

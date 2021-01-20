@@ -5,8 +5,8 @@ pub fn get_agent_activity(
     query: ChainQueryFilter,
     request: ActivityRequest,
 ) -> ExternResult<AgentActivity> {
-    host_call::<GetAgentActivityInputInner, AgentActivity>(
+    host_call::<GetAgentActivityInput, AgentActivity>(
         __get_agent_activity,
-        GetAgentActivityInputInner::new(agent, query, request),
+        GetAgentActivityInput::new(agent, query, request),
     )
 }

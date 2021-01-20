@@ -86,7 +86,7 @@ host_fn_api_impls! {
     fn x_25519_x_salsa20_poly1305_decrypt (holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
 
     // Create a link between two entries.
-    fn create_link (zt::link::CreateLinkInputInner) -> holo_hash::HeaderHash;
+    fn create_link (zt::link::CreateLinkInput) -> holo_hash::HeaderHash;
 
     // Delete an entry.
     fn delete (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
@@ -106,16 +106,16 @@ host_fn_api_impls! {
     fn debug (zt::debug::DebugMsg) -> ();
 
     // Attempt to get a live entry from the cascade.
-    fn get (zt::entry::GetInputInner) -> Option<zt::element::Element>;
+    fn get (zt::entry::GetInput) -> Option<zt::element::Element>;
 
-    fn get_agent_activity (zt::agent_info::GetAgentActivityInputInner) -> zt::query::AgentActivity;
+    fn get_agent_activity (zt::agent_info::GetAgentActivityInput) -> zt::query::AgentActivity;
 
-    fn get_details (zt::entry::GetInputInner) -> Option<zt::metadata::Details>;
+    fn get_details (zt::entry::GetInput) -> Option<zt::metadata::Details>;
 
     // Get links by entry hash from the cascade.
-    fn get_links (zt::link::GetLinksInputInner) -> zt::link::Links;
+    fn get_links (zt::link::GetLinksInput) -> zt::link::Links;
 
-    fn get_link_details (zt::link::GetLinksInputInner) -> zt::link::LinkDetails;
+    fn get_link_details (zt::link::GetLinksInput) -> zt::link::LinkDetails;
 
     // Hash an entry on the host.
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
@@ -149,7 +149,7 @@ host_fn_api_impls! {
     fn sys_time (()) -> core::time::Duration;
 
     // Same as  but also takes the HeaderHash of the updated element.
-    fn update (zt::entry::UpdateInputInner) -> holo_hash::HeaderHash;
+    fn update (zt::entry::UpdateInput) -> holo_hash::HeaderHash;
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;
 

@@ -48,8 +48,5 @@ pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,
 ) -> ExternResult<Option<Details>> {
-    host_call::<GetInputInner, Option<Details>>(
-        __get_details,
-        GetInputInner::new(hash.into(), options),
-    )
+    host_call::<GetInput, Option<Details>>(__get_details, GetInput::new(hash.into(), options))
 }

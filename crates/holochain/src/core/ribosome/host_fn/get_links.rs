@@ -10,9 +10,9 @@ use std::sync::Arc;
 pub fn get_links<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: GetLinksInputInner,
+    input: GetLinksInput,
 ) -> RibosomeResult<Links> {
-    let GetLinksInputInner { base_address, tag_prefix } = input;
+    let GetLinksInput { base_address, tag_prefix } = input;
 
     // Get zome id
     let zome_id = ribosome.zome_to_id(&call_context.zome)?;

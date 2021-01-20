@@ -15,7 +15,7 @@ struct BaseTarget(EntryHash, EntryHash);
 fn links_zome() -> InlineZome {
     InlineZome::new_unique(vec![])
         .callback("create_link", move |api, base_target: BaseTarget| {
-            let hash = api.create_link(CreateLinkInputInner::new(
+            let hash = api.create_link(CreateLinkInput::new(
                 base_target.0,
                 base_target.1,
                 ().into(),
@@ -23,7 +23,7 @@ fn links_zome() -> InlineZome {
             Ok(hash)
         })
         .callback("get_links", move |api, base: EntryHash| {
-            Ok(api.get_links(GetLinksInputInner::new(base, None))?)
+            Ok(api.get_links(GetLinksInput::new(base, None))?)
         })
 }
 

@@ -15,13 +15,13 @@ pub struct AgentInfo {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct GetAgentActivityInputInner {
+pub struct GetAgentActivityInput {
     pub agent_pubkey: holo_hash::AgentPubKey,
     pub chain_query_filter: crate::query::ChainQueryFilter,
     pub activity_request: crate::query::ActivityRequest,
 }
 
-impl GetAgentActivityInputInner {
+impl GetAgentActivityInput {
     /// Constructor.
     pub fn new(
         agent_pubkey: holo_hash::AgentPubKey,

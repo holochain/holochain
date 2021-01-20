@@ -29,7 +29,7 @@ fn simple_crud_zome() -> InlineZome {
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {
-            api.get(GetInputInner::new(hash.into(), GetOptions::default()))
+            api.get(GetInput::new(hash.into(), GetOptions::default()))
                 .map_err(Into::into)
         })
 }
@@ -45,7 +45,7 @@ fn invalid_cell_zome() -> InlineZome {
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {
-            api.get(GetInputInner::new(hash.into(), GetOptions::default()))
+            api.get(GetInput::new(hash.into(), GetOptions::default()))
                 .map_err(Into::into)
         })
 }

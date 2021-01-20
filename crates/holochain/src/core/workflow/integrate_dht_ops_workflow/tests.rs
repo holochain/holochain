@@ -945,7 +945,7 @@ async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
 
-    let input = GetInputInner::new(entry_hash.clone().into(), GetOptions::latest());
+    let input = GetInput::new(entry_hash.clone().into(), GetOptions::latest());
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -988,7 +988,7 @@ async fn create_link(
     call_context.zome = zome.clone();
 
     // Call create_link
-    let input = CreateLinkInputInner::new(base_address.into(), target_address.into(), link_tag);
+    let input = CreateLinkInput::new(base_address.into(), target_address.into(), link_tag);
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -1043,7 +1043,7 @@ async fn get_links(
     call_context.zome = zome.clone();
 
     // Call get links
-    let input = GetLinksInputInner::new(base_address.into(), Some(link_tag));
+    let input = GetLinksInput::new(base_address.into(), Some(link_tag));
 
     let mut host_access = fixt!(ZomeCallHostAccess);
     host_access.workspace = workspace_lock;

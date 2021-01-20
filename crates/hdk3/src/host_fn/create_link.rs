@@ -60,8 +60,8 @@ pub fn create_link<T: Into<LinkTag>>(
     target_address: EntryHash,
     tag: T,
 ) -> ExternResult<HeaderHash> {
-    host_call::<CreateLinkInputInner, HeaderHash>(
+    host_call::<CreateLinkInput, HeaderHash>(
         __create_link,
-        CreateLinkInputInner::new(base_address, target_address, tag.into()),
+        CreateLinkInput::new(base_address, target_address, tag.into()),
     )
 }

@@ -127,7 +127,7 @@ mod tests {
         let zome = InlineZome::new("", vec![]).callback("zome_fn_1", |api, a: ()| {
             let hash: AnyDhtHash = todo!();
             Ok(api
-                .get(GetInputInner::new(hash, GetOptions::default()))
+                .get(GetInput::new(hash, GetOptions::default()))
                 .expect("TODO after crate re-org"))
         });
         // let dna = InlineDna::new(hashmap! {

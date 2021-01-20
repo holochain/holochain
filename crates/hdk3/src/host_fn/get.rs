@@ -49,8 +49,5 @@ pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Element>>
 where
     AnyDhtHash: From<H>,
 {
-    host_call::<GetInputInner, Option<Element>>(
-        __get,
-        GetInputInner::new(AnyDhtHash::from(hash), options),
-    )
+    host_call::<GetInput, Option<Element>>(__get, GetInput::new(AnyDhtHash::from(hash), options))
 }

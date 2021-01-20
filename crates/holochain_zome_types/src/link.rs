@@ -71,13 +71,13 @@ pub struct Link {
 
 /// Zome IO inner type for link creation.
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub struct CreateLinkInputInner {
+pub struct CreateLinkInput {
     pub base_address: holo_hash::EntryHash,
     pub target_address: holo_hash::EntryHash,
     pub tag: LinkTag,
 }
 
-impl CreateLinkInputInner {
+impl CreateLinkInput {
     pub fn new(
         base_address: holo_hash::EntryHash,
         target_address: holo_hash::EntryHash,
@@ -92,12 +92,12 @@ impl CreateLinkInputInner {
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub struct GetLinksInputInner {
+pub struct GetLinksInput {
     pub base_address: holo_hash::EntryHash,
     pub tag_prefix: Option<crate::link::LinkTag>,
 }
 
-impl GetLinksInputInner {
+impl GetLinksInput {
     pub fn new(
         base_address: holo_hash::EntryHash,
         tag_prefix: Option<crate::link::LinkTag>,
