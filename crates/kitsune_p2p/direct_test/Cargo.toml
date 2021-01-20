@@ -11,6 +11,7 @@ categories = [ "network-programming" ]
 edition = "2018"
 
 [dependencies]
-
-[dev-dependencies]
-tracing-subscriber = "0.2"
+kitsune_p2p_direct = { version = "0.0.1", path = "../direct" }
+observability = "0.1"
+structopt = "0.3"
+tokio = { version = "0.2", features = [ "full" ] }

@@ -19,6 +19,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use url2::*;
 
+/// re-exported dependencies
+pub mod dependencies {
+    pub use kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::futures;
+    pub use sodoken;
+}
+
 mod error;
 pub use error::*;
 
@@ -81,7 +87,7 @@ pub trait AsKitsuneDirect: 'static + Send + Sync {
     fn inject_agent_info(
         &self,
         root_agent: KdHash,
-        agent_info: agent_store::AgentInfoSigned,
+        agent_info: Vec<agent_store::AgentInfoSigned>,
     ) -> ghost_actor::GhostFuture<(), KdError>;
 
     /// Activate a previously joined acting_agent
@@ -158,7 +164,7 @@ impl KitsuneDirect {
     pub fn inject_agent_info(
         &self,
         root_agent: KdHash,
-        agent_info: agent_store::AgentInfoSigned,
+        agent_info: Vec<agent_store::AgentInfoSigned>,
     ) -> ghost_actor::GhostFuture<(), KdError> {
         AsKitsuneDirect::inject_agent_info(&*self.0, root_agent, agent_info)
     }
@@ -204,6 +210,7 @@ impl KitsuneDirect {
 /// but, to bootstrap, we need two things:
 /// - the store path (or None if we shouldn't persist - i.e. for testing)
 /// - the unlock passphrase to use for encrypting / decrypting persisted data
+#[derive(Debug, Clone)]
 pub struct KdConfig {
     /// Where to store the Kd persistence data on disk
     /// (None to not persist - will keep in memory - be wary of mem usage)

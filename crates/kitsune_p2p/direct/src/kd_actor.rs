@@ -464,10 +464,18 @@ impl AsKitsuneDirect for KdActor {
     fn inject_agent_info(
         &self,
         root_agent: KdHash,
-        agent_info: agent_store::AgentInfoSigned,
+        agent_info: Vec<agent_store::AgentInfoSigned>,
     ) -> ghost_actor::GhostFuture<(), KdError> {
-        self.0
-            .invoke_async(move |inner| Ok(inner.persist.store_agent_info(root_agent, agent_info)))
+        self.0.invoke_async(move |inner| {
+            let mut all = Vec::new();
+            for i in agent_info {
+                all.push(inner.persist.store_agent_info(root_agent.clone(), i));
+            }
+            Ok(ghost_actor::resp(async move {
+                futures::future::try_join_all(all).await?;
+                Ok(())
+            }))
+        })
     }
 
     fn activate(
