@@ -1,6 +1,6 @@
 use hdk3::prelude::*;
 
-#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct CapFor(CapSecret, AgentPubKey);
 
 #[hdk_extern]
