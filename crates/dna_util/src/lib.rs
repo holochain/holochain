@@ -4,7 +4,7 @@
 //! This utility expects a working directory of the following structure:
 //! ```sh
 //! test-dna.dna.workdir/
-//! ├── dna.json
+//! ├── dna.yaml
 //! ├── test-zome-1.wasm
 //! └── test-zome-2.wasm
 //! ```
@@ -147,7 +147,7 @@ pub async fn expand(dna_file_path: &impl AsRef<std::path::Path>) -> DnaUtilResul
     let dna_yaml = serde_yaml::to_string(&dna_yaml)?;
 
     let mut json_filename = dir.clone();
-    json_filename.push("dna.json");
+    json_filename.push("dna.yaml");
     tokio::fs::write(json_filename, dna_yaml.as_bytes()).await?;
 
     Ok(())
@@ -159,7 +159,7 @@ pub async fn compress(dna_work_dir: &impl AsRef<std::path::Path>) -> DnaUtilResu
     let dna_file_path = dna_file_path_convert(&dna_work_dir, false)?;
 
     let mut json_filename = dna_work_dir.clone();
-    json_filename.push("dna.json");
+    json_filename.push("dna.yaml");
 
     let json_data = tokio::fs::read(json_filename.clone())
         .await

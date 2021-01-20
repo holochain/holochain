@@ -10,7 +10,7 @@ pub struct ZomeInfo {
     pub dna_name: String,
     pub dna_hash: DnaHash,
     pub zome_name: ZomeName,
-    /// The position of this zome in the `dna.json`
+    /// The position of this zome in the `dna.yaml`
     pub zome_id: ZomeId,
     pub properties: SerializedBytes,
 }
