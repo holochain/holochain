@@ -118,6 +118,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "695579f0f2520f3774bb40461e5adb066459d4e0af4d59d20175484fb8e9edf1"
 
 [[package]]
+name = "async-stream"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3670df70cbc01729f901f94c887814b3c68db038aad1329a418bae178bc5295c"
+dependencies = [
+ "async-stream-impl",
+ "futures-core",
+]
+
+[[package]]
+name = "async-stream-impl"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3548b8efc9f8e8a5a0a2808c5bd8451a9031b9e5b879a79590304ae928b0a70"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -898,7 +919,7 @@ dependencies = [
  "structopt",
  "tempdir",
  "thiserror",
- "tokio",
+ "tokio 0.2.24",
 ]
 
 [[package]]
@@ -1286,6 +1307,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "ghost_actor"
+version = "0.4.0-alpha.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52cb0746ab4cf003d75cdbaaae2cf95139ec9607ae46bd5c68721bda2ca0c824"
+dependencies = [
+ "futures",
+ "tracing",
+]
+
+[[package]]
+name = "ghost_websocket"
+version = "0.0.1"
+dependencies = [
+ "async-stream",
+ "futures",
+ "ghost_actor 0.4.0-alpha.5",
+ "holochain_serialized_bytes",
+ "holochain_types",
+ "linefeed",
+ "nanoid",
+ "net2",
+ "observability",
+ "serde",
+ "serde_bytes",
+ "stream-cancel",
+ "tokio 0.2.24",
+ "tokio-tungstenite",
+ "tracing",
+ "tracing-futures",
+ "tungstenite",
+ "unwrap_to",
+ "url2",
+]
+
+[[package]]
 name = "gimli"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1315,7 +1371,7 @@ dependencies = [
  "http",
  "indexmap",
  "slab",
- "tokio",
+ "tokio 0.2.24",
  "tokio-util",
  "tracing",
  "tracing-futures",
@@ -1417,7 +1473,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "hdk3",
  "holo_hash",
  "holochain_cascade",
@@ -1460,7 +1516,7 @@ dependencies = [
  "tempdir",
  "test-case",
  "thiserror",
- "tokio",
+ "tokio 0.2.24",
  "tokio_safe_block_on",
  "toml",
  "tracing",
@@ -1482,7 +1538,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "hdk3",
  "hdk3_derive",
  "holo_hash",
@@ -1496,7 +1552,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "thiserror",
- "tokio",
+ "tokio 0.2.24",
  "tracing",
  "tracing-futures",
 ]
@@ -1527,7 +1583,7 @@ dependencies = [
 name = "holochain_keystore"
 version = "0.0.1"
 dependencies = [
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "holo_hash",
  "holochain_serialized_bytes",
  "holochain_zome_types",
@@ -1536,7 +1592,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "thiserror",
- "tokio",
+ "tokio 0.2.24",
  "tracing",
 ]
 
@@ -1570,7 +1626,7 @@ dependencies = [
  "shrinkwraprs",
  "tempdir",
  "thiserror",
- "tokio",
+ "tokio 0.2.24",
  "tokio_safe_block_on",
  "tracing",
  "tracing-futures",
@@ -1583,7 +1639,7 @@ dependencies = [
  "async-trait",
  "fixt",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "holo_hash",
  "holochain_keystore",
  "holochain_serialized_bytes",
@@ -1596,7 +1652,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "thiserror",
- "tokio",
+ "tokio 0.2.24",
  "tokio_safe_block_on",
 ]
 
@@ -1652,7 +1708,7 @@ dependencies = [
  "serde_json",
  "shrinkwraprs",
  "thiserror",
- "tokio",
+ "tokio 0.2.24",
  "tokio_safe_block_on",
  "tracing",
  "tracing-futures",
@@ -1701,7 +1757,7 @@ dependencies = [
  "strum",
  "tempdir",
  "thiserror",
- "tokio",
+ "tokio 0.2.24",
  "tokio_safe_block_on",
  "tracing",
 ]
@@ -1771,7 +1827,7 @@ dependencies = [
  "observability",
  "serde",
  "serde_bytes",
- "tokio",
+ "tokio 0.2.24",
  "tokio-tungstenite",
  "tracing",
  "tracing-futures",
@@ -1861,7 +1917,7 @@ dependencies = [
  "itoa",
  "pin-project 1.0.2",
  "socket2",
- "tokio",
+ "tokio 0.2.24",
  "tower-service",
  "tracing",
  "want",
@@ -1876,7 +1932,7 @@ dependencies = [
  "bytes",
  "hyper",
  "native-tls",
- "tokio",
+ "tokio 0.2.24",
  "tokio-tls",
 ]
 
@@ -2038,7 +2094,7 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "kitsune_p2p_proxy",
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
@@ -2051,7 +2107,7 @@ dependencies = [
  "serde_bytes",
  "shrinkwraprs",
  "thiserror",
- "tokio",
+ "tokio 0.2.24",
  "tracing-subscriber",
  "url2",
 ]
@@ -2074,7 +2130,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "structopt",
- "tokio",
+ "tokio 0.2.24",
  "tracing-subscriber",
  "webpki",
 ]
@@ -2093,7 +2149,7 @@ dependencies = [
  "rcgen",
  "rustls 0.17.0",
  "serde",
- "tokio",
+ "tokio 0.2.24",
  "webpki",
 ]
 
@@ -2103,7 +2159,7 @@ version = "0.0.1"
 dependencies = [
  "derive_more",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "nanoid",
  "observability",
  "once_cell",
@@ -2112,7 +2168,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
- "tokio",
+ "tokio 0.2.24",
  "tracing-subscriber",
  "url2",
 ]
@@ -2130,7 +2186,7 @@ dependencies = [
  "derive_more",
  "directories 3.0.1",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "nanoid",
  "num_cpus",
  "once_cell",
@@ -2140,7 +2196,7 @@ dependencies = [
  "ring",
  "subtle 2.4.0",
  "thiserror",
- "tokio",
+ "tokio 0.2.24",
  "toml",
 ]
 
@@ -2150,10 +2206,10 @@ version = "0.0.1-alpha.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61ee943659739a639033086b421eb19c155c9a8a64c64a6e37e1025ce5651bb2"
 dependencies = [
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "lair_keystore_api",
  "tempfile",
- "tokio",
+ "tokio 0.2.24",
  "tracing",
 ]
 
@@ -2999,7 +3055,7 @@ dependencies = [
  "mio",
  "quinn-proto",
  "rustls 0.17.0",
- "tokio",
+ "tokio 0.2.24",
  "tracing",
  "webpki",
 ]
@@ -3338,7 +3394,7 @@ dependencies = [
  "pin-project-lite 0.2.0",
  "serde",
  "serde_urlencoded",
- "tokio",
+ "tokio 0.2.24",
  "tokio-tls",
  "url 2.2.0",
  "wasm-bindgen",
@@ -3820,6 +3876,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9091b6114800a5f2141aee1d1b9d6ca3592ac062dc5decb3764ec5895a47b4eb"
 
 [[package]]
+name = "stream-cancel"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f36848ff9e3e8af125e00ab244aca7af0a8b270d4c6afcc9ccb4e523f7972c4c"
+dependencies = [
+ "futures-core",
+ "pin-project 1.0.2",
+ "tokio 1.0.2",
+]
+
+[[package]]
 name = "strsim"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4086,6 +4153,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ca04cec6ff2474c638057b65798f60ac183e5e79d3448bb7163d36a39cff6ec"
+dependencies = [
+ "autocfg 1.0.1",
+ "pin-project-lite 0.2.0",
+]
+
+[[package]]
 name = "tokio-macros"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4103,7 +4180,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a70f4fcd7b3b24fb194f837560168208f669ca8cb70d0c4b862944452396343"
 dependencies = [
  "native-tls",
- "tokio",
+ "tokio 0.2.24",
 ]
 
 [[package]]
@@ -4116,7 +4193,7 @@ dependencies = [
  "log",
  "native-tls",
  "pin-project 0.4.27",
- "tokio",
+ "tokio 0.2.24",
  "tokio-tls",
  "tungstenite",
 ]
@@ -4132,7 +4209,7 @@ dependencies = [
  "futures-sink",
  "log",
  "pin-project-lite 0.1.11",
- "tokio",
+ "tokio 0.2.24",
 ]
 
 [[package]]
@@ -4141,7 +4218,7 @@ version = "0.1.2"
 source = "git+https://github.com/neonphog/tokio_safe_block_on.git?branch=fix_holochain_bug#927f5a809fbc383df96c20ac8546ee0d9d205e1a"
 dependencies = [
  "futures",
- "tokio",
+ "tokio 0.2.24",
 ]
 
 [[package]]
