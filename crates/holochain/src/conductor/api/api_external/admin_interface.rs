@@ -74,7 +74,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             }
             RegisterDna(payload) => {
                 trace!(register_dna_payload = ?payload);
-                let dna = match payload.source {
+                let mut dna = match payload.source {
                     DnaSource::Hash(ref hash) => {
                         if payload.properties.is_none() && payload.uuid.is_none() {
                             return Err(ConductorApiError::DnaReadError(
@@ -82,33 +82,24 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                                     .to_string(),
                             ));
                         }
-                        let mut dna =
-                            self.conductor_handle.get_dna(hash).await.ok_or_else(|| {
-                                ConductorApiError::DnaReadError(format!(
-                                    "Unable to create derived Dna: {} not registered",
-                                    hash
-                                ))
-                            })?;
-                        if let Some(props) = payload.properties {
-                            let properties = SerializedBytes::try_from(props)
-                                .map_err(SerializationError::from)?;
-                            dna = dna.with_properties(properties).await?;
-                        }
-                        if let Some(uuid) = payload.uuid {
-                            dna = dna.with_uuid(uuid).await?;
-                        }
-                        dna
+                        self.conductor_handle.get_dna(hash).await.ok_or_else(|| {
+                            ConductorApiError::DnaReadError(format!(
+                                "Unable to create derived Dna: {} not registered",
+                                hash
+                            ))
+                        })?
                     }
-                    DnaSource::Path(path) => read_parse_dna(path, payload.properties).await?,
-                    DnaSource::DnaFile(dna) => match payload.properties {
-                        Some(props) => {
-                            let properties = SerializedBytes::try_from(props)
-                                .map_err(SerializationError::from)?;
-                            dna.with_properties(properties).await?
-                        }
-                        None => dna,
-                    },
+                    DnaSource::Path(path) => read_parse_dna(path, None).await?, // properties handled below
+                    DnaSource::DnaFile(dna) => dna,
                 };
+                if let Some(props) = payload.properties {
+                    let properties =
+                        SerializedBytes::try_from(props).map_err(SerializationError::from)?;
+                    dna = dna.with_properties(properties).await?;
+                }
+                if let Some(uuid) = payload.uuid {
+                    dna = dna.with_uuid(uuid).await?;
+                }
                 let hash = dna.dna_hash().clone();
                 let dna_list = self.conductor_handle.list_dnas().await?;
                 if dna_list.contains(&hash) {
@@ -333,25 +324,25 @@ mod test {
         );
         let dna_hash = dna.dna_hash().clone();
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-        let path_payload = RegisterDnaPayload {
+        let mut path_payload = RegisterDnaPayload {
             uuid: None,
             properties: None,
             source: DnaSource::Path(dna_path),
         };
-        let install_response = admin_api
+        let path0_install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload.clone())))
             .await;
         assert_matches!(
-            install_response,
+            path0_install_response,
             AdminResponse::DnaRegistered(h) if h == dna_hash
         );
 
         // re-register
-        let install_response = admin_api
-            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload)))
+        let path1_install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload.clone())))
             .await;
         assert_matches!(
-            install_response,
+            path1_install_response,
             AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Given dna has already been registered")
         );
 
@@ -367,11 +358,11 @@ mod test {
         };
 
         // without properties or uuid should throw error
-        let install_response = admin_api
+        let hash_install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload.clone())))
             .await;
         assert_matches!(
-            install_response,
+            hash_install_response,
             AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Hash Dna source requires properties or uuid to create a derived Dna")
         );
 
@@ -391,11 +382,31 @@ mod test {
         // with a uuid should install and produce a different hash
         hash_payload.properties = None;
         hash_payload.uuid = Some(String::from("12345678900000000000000"));
-        let install_response = admin_api
+        let hash2_install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
             .await;
         assert_matches!(
-            install_response,
+            hash2_install_response,
+            AdminResponse::DnaRegistered(hash) if hash != dna_hash
+        );
+
+        // from a path with a same uuid should be already registered
+        path_payload.uuid = Some(String::from("12345678900000000000000"));
+        let path2_install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload.clone())))
+            .await;
+        assert_matches!(
+            path2_install_response,
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Given dna has already been registered")
+        );
+
+        // from a path with different uuid should produce different hash
+        path_payload.uuid = Some(String::from("foo"));
+        let path3_install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload)))
+            .await;
+        assert_matches!(
+            path3_install_response,
             AdminResponse::DnaRegistered(hash) if hash != dna_hash
         );
 
