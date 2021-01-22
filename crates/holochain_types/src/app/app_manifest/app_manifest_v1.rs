@@ -6,7 +6,7 @@ use crate::prelude::{CellNick, YamlProperties};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct BundleManifest {
+pub struct AppManifest {
     /// Name of the bundle, just for context
     name: String,
 
