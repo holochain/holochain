@@ -21,7 +21,7 @@ derive_more = "0.99.3"
 fixt = { path = "../fixt" }
 flate2 = "1.0.14"
 futures = "0.3"
-holo_hash = { version = "0.0.1", path = "../holo_hash" }
+holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["string-encoding"] }
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.47"
 holochain_zome_types = { path = "../holochain_zome_types" }

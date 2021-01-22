@@ -43,6 +43,29 @@ pub fn holo_hash_encode(data: &[u8]) -> String {
 }
 
 /// internal PARSE for holo hash REPR
+pub fn holo_hash_decode_unchecked(s: &str) -> Result<Vec<u8>, HoloHashError> {
+    if &s[..1] != "u" {
+        return Err(HoloHashError::NoU);
+    }
+    let s = match base64::decode_config(&s[1..], base64::URL_SAFE_NO_PAD) {
+        Err(_) => return Err(HoloHashError::BadBase64),
+        Ok(s) => s,
+    };
+    if s.len() != HOLO_HASH_FULL_LEN {
+        return Err(HoloHashError::BadSize);
+    }
+    let loc_bytes = holo_dht_location_bytes(
+        &s[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN],
+    );
+    let loc_bytes: &[u8] = &loc_bytes;
+    if loc_bytes != &s[HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN..] {
+        return Err(HoloHashError::BadChecksum);
+    }
+    assert_length!(HOLO_HASH_FULL_LEN, &s);
+    Ok(s.to_vec())
+}
+
+/// internal PARSE for holo hash REPR
 pub fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError> {
     if &s[..1] != "u" {
         return Err(HoloHashError::NoU);

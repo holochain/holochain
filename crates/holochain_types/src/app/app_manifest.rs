@@ -1,4 +1,5 @@
 //! Defines the DNA Bundle manifest format.
+#![warn(missing_docs)]
 
 use serde;
 

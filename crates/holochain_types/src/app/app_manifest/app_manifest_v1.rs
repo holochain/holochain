@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use holo_hash::DnaHash;
+use holo_hash::{DnaHash, DnaHashB64};
 
 use crate::prelude::{CellNick, YamlProperties};
 
@@ -24,6 +24,15 @@ pub struct CellManifest {
     /// The CellNick which will be given to the installed Cell for this Dna.
     nick: CellNick,
 
+    /// Determines whether or not a Cell will be created during installation.
+    provisioning: Option<CellProvisioning>,
+
+    dna: DnaManifest,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct DnaManifest {
     /// Where to find this Dna.
     #[serde(flatten)]
     location: Option<DnaLocation>,
@@ -38,12 +47,8 @@ pub struct CellManifest {
     /// for "real" bundles.
     version: Option<DnaVersionSpec>,
 
-    /// Determines whether or not a Cell will be created during installation.
-    provisioning: Option<CellProvisioning>,
-
-    /// If true, allow the app to trigger cloning this DNA to create a new Cell
-    /// on a distinct DHT network
-    allow_cloning: Option<bool>,
+    #[serde(default)]
+    clone_limit: u32,
 }
 
 /// Where to find this Dna.
@@ -65,38 +70,39 @@ pub enum DnaLocation {
 
 /// Defines a criterion for a DNA version to match against.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
-pub struct DnaVersionSpec(Vec<DnaHash>);
+pub struct DnaVersionSpec(Vec<DnaHashB64>);
 
 impl DnaVersionSpec {
-    /// Check if a DNA satisfies thYamlPropertiesis version spec
-    pub fn _matches(&self, hash: &DnaHash) -> bool {
-        self.0.contains(hash)
+    /// Check if a DNA satisfies this version spec
+    pub fn _matches(&self, hash: DnaHash) -> bool {
+        self.0.contains(&hash.into())
     }
 }
 
 /// Rules to determine if and how a Cell will be created for this Dna
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[serde(tag = "strategy")]
 pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
-    Create,
+    Create { deferred: bool },
     /// Always create a new Cell when installing the App,
     /// and use a unique UUID to ensure a distinct DHT network
-    CreateUnique,
+    CreateClone { deferred: bool },
     /// Require that a Cell is already installed which matches the DNA version
     /// spec, and which has an Agent that's associated with this App's agent
     /// via DPKI. If no such Cell exists, *app installation fails*.
-    UseExisting,
+    UseExisting { deferred: bool },
     /// Try `UseExisting`, and if that fails, fallback to `Create`
-    CreateIfNotExists,
+    CreateIfNotExists { deferred: bool },
     /// Don't install a Cell at all during App installation.
     /// This indicates that a Dna is only meant to be "cloned" by the app.
-    DoNothing,
+    Disable,
 }
 
 impl Default for CellProvisioning {
     fn default() -> Self {
-        Self::Create
+        Self::Create { deferred: false }
     }
 }
 
@@ -119,17 +125,24 @@ mod tests {
         let props = Props {
             salad: "bar".to_string(),
         };
-        let version = vec![fixt!(DnaHash), fixt!(DnaHash)];
+
+        let dna_hash_0 =
+            DnaHashB64::from_str("uhC0kAAD_AJfVAQBxgQHGAPQoAAHTATIAlQFk_7n_AQAB_-PDre2C").unwrap();
+        let dna_hash_1 =
+            DnaHashB64::from_str("uhC0kyiEBnw7_EsuRAAABcgH_w-zfAQ7_9gBs_wEAPJwBjf_cn8ta").unwrap();
+        let version = DnaVersionSpec::from(vec![dna_hash_0.clone(), dna_hash_1.clone()]);
 
         let cells = vec![CellManifest {
             nick: "nick".into(),
-            location: Some(DnaLocation::Local {
-                path: PathBuf::from("/tmp/test.dna.gz"),
-            }),
-            properties: Some(YamlProperties::new(serde_yaml::to_value(props).unwrap())),
-            version: Some(version.into()),
-            provisioning: Some(CellProvisioning::Create),
-            allow_cloning: Some(false),
+            dna: DnaManifest {
+                location: Some(DnaLocation::Local {
+                    path: PathBuf::from("/tmp/test.dna.gz"),
+                }),
+                properties: Some(YamlProperties::new(serde_yaml::to_value(props).unwrap())),
+                version: Some(version),
+                clone_limit: 50,
+            },
+            provisioning: Some(CellProvisioning::Create { deferred: false }),
         }];
         let manifest = AppManifest::V1(AppManifestV1 {
             name: "Test app".to_string(),
@@ -138,27 +151,44 @@ mod tests {
         });
         let manifest_yaml = serde_yaml::to_string(&manifest).unwrap();
         let manifest_roundtrip = serde_yaml::from_str(&manifest_yaml).unwrap();
+
         assert_eq!(manifest, manifest_roundtrip);
 
-        //         let manifest_yaml = r#"---
-        // manifest_version: 1
-        // name: "Test app"
-        // description: "Serialization roundtrip test"
-        // cells: []
-        //   - nick: "cell-1"
-        //     provisioning:
-        //       strategy: "create"
-        //       deferred: no
-        //     dna:
-        //       path: /tmp/test.dna.gz
-        //       version:
-        //         - "HcDxx"
-        //         - "HcDxy"
-        //       clone_limit: 50
-        //       properties:
-        //         salad: "bar"
-        //         foo: "fighters"
+        let expected_yaml = format!(
+            r#"---
+manifest_version: "1"
+name: "Test app"
+description: "Serialization roundtrip test"
+cells:
+  - nick: "nick"
+    provisioning:
+      strategy: "create"
+      deferred: false
+    dna:
+      path: /tmp/test.dna.gz
+      version:
+        - {}
+        - {}
+      clone_limit: 50
+      properties:
+        salad: "bar"
+        "#,
+            dna_hash_0, dna_hash_1
+        );
+        let actual = serde_yaml::to_value(&manifest).unwrap();
+        let expected: serde_yaml::Value = serde_yaml::from_str(&expected_yaml).unwrap();
 
-        //         "#;
+        // Check a handful of fields. Order matters in YAML, so to check the
+        // entire structure would be too fragile for testing.
+        let fields = &[
+            "cells[0].nick",
+            "cells[0].provisioning.deferred",
+            "cells[0].dna.version[1]",
+            "cells[0].dna.properties",
+        ];
+        assert_eq!(actual.get(fields[0]), expected.get(fields[0]));
+        assert_eq!(actual.get(fields[1]), expected.get(fields[1]));
+        assert_eq!(actual.get(fields[2]), expected.get(fields[2]));
+        assert_eq!(actual.get(fields[3]), expected.get(fields[3]));
     }
 }

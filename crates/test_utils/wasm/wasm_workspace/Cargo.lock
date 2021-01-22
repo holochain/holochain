@@ -151,6 +151,7 @@ version = "0.0.1"
 dependencies = [
  "base64",
  "blake2b_simd",
+ "derive_more",
  "fixt",
  "holochain_serialized_bytes",
  "rand",
