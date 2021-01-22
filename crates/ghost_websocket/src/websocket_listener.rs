@@ -137,10 +137,7 @@ async fn websocket_bind(
 }
 
 #[instrument(skip(config, socket))]
-async fn connect(
-    config: Arc<WebsocketConfig>,
-    socket: tokio::net::TcpStream,
-) -> Result<Pair> {
+async fn connect(config: Arc<WebsocketConfig>, socket: tokio::net::TcpStream) -> Result<Pair> {
     socket.set_keepalive(Some(std::time::Duration::from_secs(
         config.tcp_keepalive_s as u64,
     )))?;
