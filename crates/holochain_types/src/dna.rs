@@ -17,7 +17,16 @@ use std::collections::BTreeMap;
 pub type Zomes = Vec<(ZomeName, zome::ZomeDef)>;
 
 /// A type to allow json values to be used as [SerializedBytes]
-#[derive(Debug, Clone, derive_more::From, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    derive_more::From,
+    serde::Serialize,
+    serde::Deserialize,
+    SerializedBytes,
+)]
 pub struct YamlProperties(serde_yaml::Value);
 
 impl YamlProperties {
