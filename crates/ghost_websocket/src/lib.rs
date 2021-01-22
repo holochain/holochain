@@ -1,5 +1,4 @@
 // config for new listeners and connections
-mod websocket_config;
 use std::io::Error;
 use std::io::ErrorKind;
 use std::io::Result;
@@ -9,7 +8,12 @@ use tracing::instrument;
 use url2::Url2;
 use util::url_to_addr;
 use websocket::Websocket;
+
+mod websocket_config;
 pub use websocket_config::*;
+
+mod error;
+pub use error::*;
 
 // the listener / server socket
 mod websocket_listener;

@@ -1,18 +1,23 @@
+use holochain_serialized_bytes::SerializedBytes;
+use must_future::MustBoxFuture;
 use std::io::Result;
 
 use crate::websocket::RxFromWebsocket;
-// WebsocketReceiver // Stream (RequestData, Response)
-// RequestData // Bytes the actual message
-// Response // fn once(Message)
+use crate::WebsocketResult;
+
 pub struct WebsocketReceiver {
     rx_from_websocket: RxFromWebsocket,
 }
 
-// pub type Response = Box<dyn FnOnce(()) -> ()>;
-pub type Response = ();
+pub type Response = Box<
+    dyn FnOnce(SerializedBytes) -> MustBoxFuture<'static, WebsocketResult<()>>
+        + 'static
+        + Send
+        + Sync,
+>;
 
 pub struct WebsocketReceiverHandle;
-pub type Message = (String, Response);
+pub type IncomingMessage = (SerializedBytes, Response);
 
 impl WebsocketReceiver {
     pub(crate) fn new(rx_from_websocket: RxFromWebsocket) -> Self {
@@ -22,11 +27,10 @@ impl WebsocketReceiver {
         self,
     ) -> Result<(
         WebsocketReceiverHandle,
-        impl futures::stream::Stream<Item = Message>,
+        impl futures::stream::Stream<Item = IncomingMessage>,
     )> {
         let handle = WebsocketReceiverHandle {};
         let stream = self.rx_from_websocket;
-        // let stream = futures::stream::pending::<Result<(String, Response)>>();
         Ok((handle, stream))
     }
 }

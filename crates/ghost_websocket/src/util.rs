@@ -2,65 +2,10 @@
 
 use std::net::SocketAddr;
 
-use url2::{Url2, url2};
+use url2::{url2, Url2};
 
-use crate::*;
-use std::io::{Result, Error, ErrorKind};
+use std::io::{Error, ErrorKind, Result};
 
-/// Implements both sides of TryFrom SerializedBytes for the passed in item.
-/// See holochain_serialized_bytes::holochain_serial! macro.
-/// This is similar, but makes use of std::io::Error for the error type.
-#[macro_export]
-macro_rules! try_from_serialized_bytes {
-    ($s:ident) => {
-        impl ::std::convert::TryFrom<$s> for ::holochain_serialized_bytes::SerializedBytes {
-            type Error = ::std::io::Error;
-
-            fn try_from(t: $s) -> ::std::io::Result<::holochain_serialized_bytes::SerializedBytes> {
-                ::holochain_serialized_bytes::encode(&t)
-                    .map_err(|e| ::std::io::Error::new(::std::io::ErrorKind::Other, e))
-                    .map(|bytes| {
-                        ::holochain_serialized_bytes::SerializedBytes::from(
-                            ::holochain_serialized_bytes::UnsafeBytes::from(bytes),
-                        )
-                    })
-            }
-        }
-
-        impl ::std::convert::TryFrom<::holochain_serialized_bytes::SerializedBytes> for $s {
-            type Error = ::std::io::Error;
-
-            fn try_from(t: ::holochain_serialized_bytes::SerializedBytes) -> ::std::io::Result<$s> {
-                ::holochain_serialized_bytes::decode(t.bytes())
-                    .map_err(|e| ::std::io::Error::new(::std::io::ErrorKind::Other, e))
-            }
-        }
-    };
-}
-
-/// not sure if we should expose this or not
-/// this is the actual wire message that is sent over the websocket.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type")]
-pub(crate) enum WireMessage {
-    Signal {
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
-    },
-    Request {
-        id: String,
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
-    },
-    Response {
-        id: String,
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
-    },
-}
-try_from_serialized_bytes!(WireMessage);
-
-/// internal socket type
 pub(crate) type ToFromSocket = tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>;
 
 /// internal helper to convert addrs to urls
