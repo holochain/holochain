@@ -4,6 +4,9 @@
 use serde;
 
 mod app_manifest_v1;
+mod app_manifest_validated;
+mod current;
+mod error;
 
 /// Alias for the current AppManifest format
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

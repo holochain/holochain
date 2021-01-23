@@ -1,8 +1,12 @@
-use std::path::PathBuf;
-
-use holo_hash::{DnaHash, DnaHashB64};
-
+use super::{
+    app_manifest_validated::{AppManifestValidated, CellManifestValidated},
+    error::{AppManifestError, AppManifestResult},
+};
 use crate::prelude::{CellNick, YamlProperties};
+use holo_hash::{DnaHash, DnaHashB64};
+use std::{collections::HashMap, path::PathBuf};
+
+pub type Uuid = String;
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -33,12 +37,16 @@ pub struct CellManifest {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct DnaManifest {
-    /// Where to find this Dna.
+    /// Where to find this Dna. Note that since this is flattened,
+    /// there is no actual "location" key in the manifest.
     #[serde(flatten)]
     location: Option<DnaLocation>,
 
     /// Optional default properties. May be overridden during installation.
     properties: Option<YamlProperties>,
+
+    /// Optional fixed UUID. May be overridden during installation.
+    uuid: Option<Uuid>,
 
     /// The hash of the Dna.
     ///
@@ -97,7 +105,7 @@ pub enum CellProvisioning {
     CreateIfNotExists { deferred: bool },
     /// Don't install a Cell at all during App installation.
     /// This indicates that a Dna is only meant to be "cloned" by the app.
-    Disable,
+    Disabled,
 }
 
 impl Default for CellProvisioning {
@@ -106,13 +114,84 @@ impl Default for CellProvisioning {
     }
 }
 
+impl AppManifestV1 {
+    pub fn validate(self) -> AppManifestResult<AppManifestValidated> {
+        let AppManifestV1 {
+            name,
+            cells,
+            description: _,
+        } = self;
+        let cells = cells
+            .into_iter()
+            .map(
+                |CellManifest {
+                     nick,
+                     provisioning,
+                     dna,
+                 }| {
+                    let DnaManifest {
+                        location,
+                        properties,
+                        version,
+                        uuid,
+                        clone_limit,
+                    } = dna;
+                    let validated = match provisioning.unwrap_or_default() {
+                        CellProvisioning::Create { deferred } => CellManifestValidated::Create {
+                            deferred,
+                            clone_limit,
+                            location: Self::require(location, "cells.dna.(path|url)")?,
+                            properties,
+                            uuid,
+                            version,
+                        },
+                        CellProvisioning::CreateClone { deferred } => {
+                            CellManifestValidated::CreateClone {
+                                deferred,
+                                clone_limit,
+                                location: Self::require(location, "cells.dna.(path|url)")?,
+                                properties,
+                                version,
+                            }
+                        }
+                        CellProvisioning::UseExisting { deferred } => {
+                            CellManifestValidated::UseExisting {
+                                deferred,
+                                clone_limit,
+                                version: Self::require(version, "cells.dna.version")?,
+                            }
+                        }
+                        CellProvisioning::CreateIfNotExists { deferred } => {
+                            CellManifestValidated::CreateIfNotExists {
+                                deferred,
+                                clone_limit,
+                                location: Self::require(location, "cells.dna.(path|url)")?,
+                                version: Self::require(version, "cells.dna.version")?,
+                                properties,
+                                uuid,
+                            }
+                        }
+                        CellProvisioning::Disabled => {
+                            CellManifestValidated::Disabled { clone_limit }
+                        }
+                    };
+                    Ok((nick, validated))
+                },
+            )
+            .collect::<Result<HashMap<_, _>, _>>()?;
+        Ok(AppManifestValidated { name, cells })
+    }
+
+    fn require<T>(maybe: Option<T>, context: &str) -> AppManifestResult<T> {
+        maybe.ok_or_else(|| AppManifestError::MissingField(context.to_owned()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::app::app_manifest::AppManifest;
     use crate::prelude::YamlProperties;
-    use ::fixt::prelude::*;
-    use holochain_zome_types::DnaHashFixturator;
     use std::path::PathBuf;
 
     #[test]
@@ -139,6 +218,7 @@ mod tests {
                     path: PathBuf::from("/tmp/test.dna.gz"),
                 }),
                 properties: Some(YamlProperties::new(serde_yaml::to_value(props).unwrap())),
+                uuid: Some("uuid".into()),
                 version: Some(version),
                 clone_limit: 50,
             },
@@ -170,6 +250,7 @@ cells:
         - {}
         - {}
       clone_limit: 50
+      uuid: uuid
       properties:
         salad: "bar"
         "#,
