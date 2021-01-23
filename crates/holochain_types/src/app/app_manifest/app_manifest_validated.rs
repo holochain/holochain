@@ -9,13 +9,35 @@ use crate::app::app_manifest::current::{DnaLocation, DnaVersionSpec};
 use crate::prelude::{CellNick, YamlProperties};
 use std::collections::HashMap;
 
+use super::error::{AppManifestError, AppManifestResult};
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AppManifestValidated {
     /// Name of the App. This may be used as the installed_app_id.
-    pub(super) name: String,
+    name: String,
 
     /// The Cell manifests that make up this app.
-    pub(super) cells: HashMap<CellNick, CellManifestValidated>,
+    cells: HashMap<CellNick, CellManifestValidated>,
+}
+
+impl AppManifestValidated {
+    /// Constructor with internal consistency check.
+    ///
+    /// NB: never make this struct's fields public. This constructor should be
+    /// the only way to instantiate this type.
+    pub fn new(
+        name: String,
+        cells: HashMap<CellNick, CellManifestValidated>,
+    ) -> AppManifestResult<Self> {
+        for (nick, cell) in cells.iter() {
+            if let CellManifestValidated::Disabled { clone_limit } = cell {
+                if *clone_limit == 0 {
+                    return Err(AppManifestError::InvalidStrategyDisabled(nick.to_owned()));
+                }
+            }
+        }
+        Ok(AppManifestValidated { name, cells })
+    }
 }
 
 /// Rules to determine if and how a Cell will be created for this Dna
@@ -56,7 +78,7 @@ pub enum CellManifestValidated {
         uuid: Option<String>, // TODO: use UUID
         version: DnaVersionSpec,
     },
-    /// Don't install a Cell at all during App installation.
-    /// This indicates that a Dna is only meant to be "cloned" by the app.
+    /// Disallow provisioning altogether. In this case, we expect
+    /// `clone_limit > 0`: otherwise, no Cells will ever be created.
     Disabled { clone_limit: u32 },
 }

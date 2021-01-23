@@ -28,16 +28,21 @@ pub struct CellManifest {
     /// The CellNick which will be given to the installed Cell for this Dna.
     nick: CellNick,
 
-    /// Determines whether or not a Cell will be created during installation.
+    /// Determines if, how, and when a Cell will be provisioned.
     provisioning: Option<CellProvisioning>,
 
+    /// Declares where to find the DNA, and options to modify it before
+    /// inclusion in a Cell
     dna: DnaManifest,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct DnaManifest {
-    /// Where to find this Dna. Note that since this is flattened,
+    /// Where to find this Dna. To specify a DNA included in a hApp Bundle,
+    /// use a local relative path that corresponds with the bundle structure.
+    ///
+    /// Note that since this is flattened,
     /// there is no actual "location" key in the manifest.
     #[serde(flatten)]
     location: Option<DnaLocation>,
@@ -48,13 +53,14 @@ pub struct DnaManifest {
     /// Optional fixed UUID. May be overridden during installation.
     uuid: Option<Uuid>,
 
-    /// The hash of the Dna.
-    ///
-    /// In "dev" mode (to be defined), the hash can be omitted when installing
-    /// a bundle, since it may be frequently changing. Otherwise, it is required
-    /// for "real" bundles.
+    /// The versioning constraints for the DNA. Ensures that only a DNA that
+    /// matches the version spec will be used.
     version: Option<DnaVersionSpec>,
 
+    /// Allow up to this many "clones" to be created at runtime.
+    /// Each runtime clone is created by the `CreateClone` strategy,
+    /// regardless of the provisioning strategy set in the manifest.
+    /// Default: 0
     #[serde(default)]
     clone_limit: u32,
 }
@@ -77,6 +83,9 @@ pub enum DnaLocation {
 }
 
 /// Defines a criterion for a DNA version to match against.
+///
+/// Currently we're using the most simple possible version spec: A list of
+/// valid DnaHashes. The order of the list is from earliest to latest version.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
 pub struct DnaVersionSpec(Vec<DnaHashB64>);
 
@@ -103,8 +112,8 @@ pub enum CellProvisioning {
     UseExisting { deferred: bool },
     /// Try `UseExisting`, and if that fails, fallback to `Create`
     CreateIfNotExists { deferred: bool },
-    /// Don't install a Cell at all during App installation.
-    /// This indicates that a Dna is only meant to be "cloned" by the app.
+    /// Disallow provisioning altogether. In this case, we expect
+    /// `clone_limit > 0`: otherwise, no Cells will ever be created.
     Disabled,
 }
 
@@ -179,7 +188,7 @@ impl AppManifestV1 {
                 },
             )
             .collect::<Result<HashMap<_, _>, _>>()?;
-        Ok(AppManifestValidated { name, cells })
+        AppManifestValidated::new(name, cells)
     }
 
     fn require<T>(maybe: Option<T>, context: &str) -> AppManifestResult<T> {
