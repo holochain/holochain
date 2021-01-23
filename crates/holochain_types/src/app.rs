@@ -48,12 +48,12 @@ pub enum InstallAppPayload {
     /// Used to specify DNAs per a bundle file
     Bundle {
         /// The agent to use when creating Cells for this App
-        agent_key: AgentPubKey,
+        _agent_key: AgentPubKey,
 
         /// The DNA bundle manifest for this app
         // TODO: this will probably actually be a file path or raw file data
         //       that gets deserialized
-        dna_bundle: AppManifest,
+        _dna_bundle: AppManifest,
     },
 }
 
@@ -63,8 +63,8 @@ impl InstallAppPayload {
         match self {
             InstallAppPayload::Explicit(payload) => payload,
             InstallAppPayload::Bundle {
-                agent_key,
-                dna_bundle,
+                _agent_key,
+                _dna_bundle,
             } => todo!(),
         }
     }
