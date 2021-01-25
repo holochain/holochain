@@ -54,9 +54,7 @@ async fn sanity_inner() -> KdResult<()> {
     .await?;
 
     kd2.join(agent1.clone(), agent2.clone()).await?;
-    for info in info1 {
-        kd2.inject_agent_info(agent1.clone(), info).await?;
-    }
+    kd2.inject_agent_info(agent1.clone(), info1).await?;
 
     let mut recv = kd1.activate(agent1.clone()).await?;
     tokio::task::spawn(async move {

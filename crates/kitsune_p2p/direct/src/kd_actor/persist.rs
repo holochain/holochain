@@ -201,6 +201,8 @@ impl SqlPersist {
                 agent                   TEXT NOT NULL,
                 signature               BLOB NOT NULL,
                 agent_info              BLOB NOT NULL,
+                signed_at_epoch_ms      INTEGER NOT NULL,
+                expires_at_epoch_ms     INTEGER NOT NULL,
                 CONSTRAINT agent_info_pk PRIMARY KEY (root_agent, agent)
             );",
             NO_PARAMS,
@@ -291,13 +293,51 @@ impl AsPersist for SqlPersist {
 
             let agent: KdHash = agent_info_signed.as_agent_ref().into();
             let sig: &[u8] = &agent_info_signed.as_signature_ref().0;
-            let info: &[u8] = agent_info_signed.as_agent_info_ref();
+            let info_bytes: &[u8] = agent_info_signed.as_agent_info_ref();
 
-            {
+            use std::convert::TryInto;
+            let info: agent_store::AgentInfo = (&agent_info_signed).try_into()?;
+
+            if agent_info_signed.as_agent_ref() != info.as_agent_ref() {
+                return Err("inner/outer agent mismatch".into());
+            }
+
+            let signed_at_epoch_ms = info.signed_at_ms();
+            let expires_at_epoch_ms = signed_at_epoch_ms + info.expires_after_ms();
+
+            let exists = {
+                let mut exists = tx.prepare(
+                    "SELECT count(*) FROM agent_info
+                    WHERE root_agent = ?1
+                    AND agent = ?2;")?;
+                exists.exists(params![root_agent.as_ref(), agent.as_ref()])?
+            };
+
+            if exists {
+                let mut upd =
+                    tx.prepare(
+                        "UPDATE agent_info SET
+                            signature = ?1,
+                            agent_info = ?2,
+                            signed_at_epoch_ms = ?3,
+                            expires_at_epoch_ms = ?4
+                        WHERE root_agent = ?5
+                        AND agent = ?6")?;
+
+                upd.execute(params![sig, info_bytes, signed_at_epoch_ms as i64, expires_at_epoch_ms as i64, root_agent.as_ref(), agent.as_ref()])?;
+            } else {
                 let mut ins =
-                    tx.prepare("INSERT INTO agent_info (root_agent, agent, signature, agent_info) VALUES (?1, ?2, ?3, ?4);")?;
+                    tx.prepare(
+                        "INSERT INTO agent_info (
+                            root_agent,
+                            agent,
+                            signature,
+                            agent_info,
+                            signed_at_epoch_ms,
+                            expires_at_epoch_ms
+                        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6);")?;
 
-                ins.execute(params![root_agent.as_ref(), agent.as_ref(), sig, info,])?;
+                ins.execute(params![root_agent.as_ref(), agent.as_ref(), sig, info_bytes, signed_at_epoch_ms as i64, expires_at_epoch_ms as i64])?;
             }
 
             tx.commit()?;
@@ -379,13 +419,13 @@ impl AsPersist for SqlPersist {
                 let mut ins =
                     tx.prepare("INSERT INTO entries (root_agent, hash, created_at, dht_loc, bytes) VALUES (?1, ?2, ?3, ?4, ?5);")?;
 
-                println!("ROWS:{}", ins.execute(params![
+                ins.execute(params![
                     root_agent.as_ref(),
                     entry.hash().as_ref(),
                     entry.create(),
                     entry.hash().get_loc(),
                     entry.as_ref(),
-                ])?);
+                ])?;
             }
 
             tx.commit()?;
