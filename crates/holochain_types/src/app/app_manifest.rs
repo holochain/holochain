@@ -2,8 +2,6 @@
 
 #![warn(missing_docs)]
 
-use serde;
-
 mod app_manifest_v1;
 mod app_manifest_validated;
 mod current;
