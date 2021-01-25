@@ -15,6 +15,8 @@ pub enum WebsocketError {
     FailedToRecvResp,
     #[error("Failed to send response to request")]
     FailedToSendResp,
+    #[error("The websocket connection has shutdown")]
+    Shutdown,
 }
 
 pub type WebsocketResult<T> = Result<T, WebsocketError>;

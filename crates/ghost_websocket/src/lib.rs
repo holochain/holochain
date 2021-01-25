@@ -4,6 +4,7 @@ use std::io::ErrorKind;
 use std::io::Result;
 use std::sync::Arc;
 
+use stream_cancel::Valve;
 use tracing::instrument;
 use url2::Url2;
 use util::url_to_addr;
@@ -27,7 +28,7 @@ mod websocket_receiver;
 pub use websocket_receiver::*;
 
 #[instrument(skip(config))]
-pub async fn websocket_connect(
+pub async fn connect(
     url: Url2,
     config: Arc<WebsocketConfig>,
 ) -> Result<(WebsocketSender, WebsocketReceiver)> {
@@ -44,10 +45,13 @@ pub async fn websocket_connect(
     .await
     .map_err(|e| Error::new(ErrorKind::Other, e))?;
     tracing::debug!("Client connected");
-    Ok(Websocket::create_ends(config, socket))
-}
 
-pub struct WebsocketMessage(pub String);
+    // Noop valve because we don't have a listener to shutdown the
+    // ends when creating a client
+    let (exit, valve) = Valve::new();
+    exit.disable();
+    Ok(Websocket::create_ends(config, socket, valve))
+}
 
 mod websocket;
 

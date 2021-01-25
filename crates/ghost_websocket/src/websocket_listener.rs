@@ -6,7 +6,7 @@ use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use stream_cancel::Trigger;
-use stream_cancel::Valved;
+use stream_cancel::Valve;
 use tracing::instrument;
 
 use std::io::Result;
@@ -86,6 +86,17 @@ impl ListenerHandle {
     pub fn get_config(&self) -> Arc<WebsocketConfig> {
         self.config.clone()
     }
+
+    /// Close the listener when the future resolves to true.
+    /// If the future returns false the listener will not be closed.
+    pub async fn close_on<F>(self, f: F)
+    where
+        F: std::future::Future<Output = bool>,
+    {
+        if f.await {
+            self.close()
+        }
+    }
 }
 
 impl futures::stream::Stream for WebsocketListener {
@@ -118,16 +129,21 @@ async fn websocket_bind(
     socket.set_nonblocking(true)?;
     let socket = tokio::net::TcpListener::from_std(socket)?;
 
+    // Setup proper shutdown
+    let (shutdown, valve) = Valve::new();
+
     let local_addr = addr_to_url(socket.local_addr()?, config.scheme);
     let socket = socket
         .map_ok({
             let config = config.clone();
-            move |socket_result| connect(config.clone(), socket_result)
+            let valve = valve.clone();
+            move |socket_result| connect(config.clone(), socket_result, valve.clone())
         })
         .try_buffer_unordered(config.max_pending_connections);
     tracing::debug!(sever_listening_on = ?local_addr);
-    // .boxed();
-    let (shutdown, stream) = Valved::new(socket);
+
+    let stream = valve.wrap(socket);
+
     let listener = ListenerHandle {
         shutdown,
         config,
@@ -136,8 +152,12 @@ async fn websocket_bind(
     Ok((listener, stream))
 }
 
-#[instrument(skip(config, socket))]
-async fn connect(config: Arc<WebsocketConfig>, socket: tokio::net::TcpStream) -> Result<Pair> {
+#[instrument(skip(config, socket, valve))]
+async fn connect(
+    config: Arc<WebsocketConfig>,
+    socket: tokio::net::TcpStream,
+    valve: Valve,
+) -> Result<Pair> {
     socket.set_keepalive(Some(std::time::Duration::from_secs(
         config.tcp_keepalive_s as u64,
     )))?;
@@ -156,5 +176,5 @@ async fn connect(config: Arc<WebsocketConfig>, socket: tokio::net::TcpStream) ->
     .await
     .map_err(|e| Error::new(ErrorKind::Other, e))?;
 
-    Ok(Websocket::create_ends(config, socket))
+    Ok(Websocket::create_ends(config, socket, valve))
 }

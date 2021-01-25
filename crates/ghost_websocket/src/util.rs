@@ -8,6 +8,9 @@ use std::io::{Error, ErrorKind, Result};
 
 pub(crate) type ToFromSocket = tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>;
 
+/// Amount of time to spend waiting for channels to empty before forcing them to close.
+pub(crate) const CLOSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+
 /// internal helper to convert addrs to urls
 pub(crate) fn addr_to_url(a: SocketAddr, scheme: &str) -> Url2 {
     url2!("{}://{}", scheme, a)
