@@ -25,7 +25,7 @@ pub struct HoloHashB64<T: HashType>(HoloHash<T>);
 
 impl<T: HashType> HoloHashB64<T> {
     /// Read a HoloHash from base64 string
-    pub fn from_str(str: &str) -> HoloHashResult<Self> {
+    pub fn from_b64_str(str: &str) -> HoloHashResult<Self> {
         let bytes = holo_hash_decode_unchecked(str)?;
         HoloHash::from_raw_39(bytes).map(Into::into)
     }
