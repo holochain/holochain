@@ -247,6 +247,7 @@ mod tests {
 
         let expected_yaml = format!(
             r#"---
+
 manifest_version: "1"
 name: "Test app"
 description: "Serialization roundtrip test"
@@ -264,6 +265,7 @@ cells:
       uuid: uuid
       properties:
         salad: "bar"
+
         "#,
             dna_hash_0, dna_hash_1
         );
