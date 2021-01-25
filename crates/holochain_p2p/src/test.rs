@@ -191,9 +191,11 @@ mod tests {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
                     CallRemote { respond, .. } => {
-                        respond.r(Ok(async move { Ok(ExternIO::from(b"yada".to_vec())) }
-                            .boxed()
-                            .into()));
+                        respond.r(Ok(async move {
+                            Ok(SerializedBytes::from(UnsafeBytes::from(b"yada".to_vec())))
+                        }
+                        .boxed()
+                        .into()));
                     }
                     SignNetworkData { respond, .. } => {
                         respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
@@ -217,7 +219,7 @@ mod tests {
                 "".into(),
                 "".into(),
                 None,
-                UnsafeBytes::from(b"yippo".to_vec()).into(),
+                ExternIO::from(b"yippo".to_vec()),
             )
             .await
             .unwrap();

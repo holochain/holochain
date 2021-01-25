@@ -238,7 +238,7 @@ pub async fn call_zome_fn<S>(
     fn_name: String,
     input: S,
 ) where
-    S: Serialize,
+    S: Serialize + std::fmt::Debug,
 {
     let call: ZomeCall = ZomeCallInvocationFixturator::new(NamedInvocation(
         cell_id,

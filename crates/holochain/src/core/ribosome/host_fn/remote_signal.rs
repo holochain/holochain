@@ -1,4 +1,3 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::HolochainP2pCellT;
@@ -7,13 +6,14 @@ use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use std::sync::Arc;
 use tracing::Instrument;
+use crate::core::ribosome::RibosomeError;
 
 #[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn remote_signal(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: RemoteSignal,
-) -> RibosomeResult<()> {
+) -> Result<(), RibosomeError> {
     const FN_NAME: &str = "recv_remote_signal";
     // Timeouts and errors are ignored,
     // this is a send and forget operation.

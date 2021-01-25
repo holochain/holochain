@@ -1,14 +1,15 @@
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCall;
-use crate::core::ribosome::{error::RibosomeResult, CallContext};
+use crate::core::ribosome::CallContext;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 pub fn call(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     call: Call,
-) -> RibosomeResult<ZomeCallResponse> {
+) -> Result<ZomeCallResponse, RibosomeError> {
 
     // Get the conductor handle
     let host_access = call_context.host_access();

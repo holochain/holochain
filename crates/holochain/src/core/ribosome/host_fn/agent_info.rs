@@ -1,15 +1,15 @@
-use crate::core::ribosome::error::RibosomeResult;
+use holochain_types::prelude::*;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_types::prelude::*;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn agent_info<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
-) -> RibosomeResult<AgentInfo> {
+) -> Result<AgentInfo, RibosomeError> {
     let agent_pubkey = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let lock = call_context.host_access.workspace().read().await;
         lock.source_chain.agent_pubkey()

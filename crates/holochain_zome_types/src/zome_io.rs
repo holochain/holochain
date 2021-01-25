@@ -38,7 +38,7 @@ pub struct ExternIO(#[serde(with = "serde_bytes")] pub Vec<u8>);
 impl ExternIO {
     pub fn encode<I>(input: I) -> Result<Self, SerializedBytesError>
     where
-        I: serde::Serialize,
+        I: serde::Serialize + std::fmt::Debug,
     {
         Ok(Self(holochain_serialized_bytes::encode(&input)?))
     }

@@ -13,7 +13,7 @@ edition = "2018"
 [dependencies]
 ghost_actor = "0.3.0-alpha.1"
 holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
-holochain_serialized_bytes = "=0.0.47"
+holochain_serialized_bytes = { path = "../../../holochain-serialization/crates/holochain_serialized_bytes" }
 holochain_zome_types = { path = "../holochain_zome_types" }
 lair_keystore_api = "=0.0.1-alpha.10"
 lair_keystore_client = "=0.0.1-alpha.10"

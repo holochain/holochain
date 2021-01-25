@@ -1,11 +1,9 @@
-use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeError;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
-
+use crate::core::ribosome::RibosomeError;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_types::prelude::*;
@@ -16,10 +14,9 @@ pub fn delete<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: HeaderHash,
-) -> RibosomeResult<HeaderHash> {
+) -> Result<HeaderHash, RibosomeError> {
 
-    let deletes_entry_address =
-        get_original_address(call_context.clone(), input.clone())?;
+    let deletes_entry_address = get_original_address(call_context.clone(), input.clone())?;
 
     let host_access = call_context.host_access();
 
@@ -45,13 +42,14 @@ pub fn delete<'a>(
         .map_err(Box::new)?;
         Ok(header_hash)
     })
+
 }
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub(crate) fn get_original_address<'a>(
     call_context: Arc<CallContext>,
     address: HeaderHash,
-) -> RibosomeResult<EntryHash> {
+) -> Result<EntryHash, RibosomeError> {
     let network = call_context.host_access.network().clone();
     let workspace_lock = call_context.host_access.workspace();
 

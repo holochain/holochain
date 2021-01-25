@@ -13,7 +13,7 @@ edition = "2018"
 
 [dependencies]
 holo_hash = { path = "../holo_hash" }
-holochain_serialized_bytes = "=0.0.47"
+holochain_serialized_bytes = { path = "../../../holochain-serialization/crates/holochain_serialized_bytes" }
 paste = "=1.0.3"
 serde = { version = "1.0.104", features = [ "derive" ] }
 serde_bytes = "0.11"

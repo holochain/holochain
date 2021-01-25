@@ -1,14 +1,14 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 pub fn query(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: ChainQueryFilter,
-) -> RibosomeResult<ElementVec> {
+) -> Result<ElementVec, RibosomeError> {
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let elements: Vec<Element> = call_context
             .host_access

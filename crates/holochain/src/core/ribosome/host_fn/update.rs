@@ -1,11 +1,10 @@
 use super::create::extract_entry_def;
 use super::delete::get_original_address;
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use crate::core::workflow::CallZomeWorkspace;
-
+use crate::core::ribosome::RibosomeError;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -15,7 +14,7 @@ pub fn update<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: UpdateInput,
-) -> RibosomeResult<HeaderHash> {
+) -> Result<HeaderHash, RibosomeError> {
     // destructure the args out into an app type def id and entry
     let UpdateInput { original_header_address, entry_with_def_id } = input;
 

@@ -11,7 +11,7 @@ categories = [ "fixtures" ]
 edition = "2018"
 
 [dependencies]
-holochain_serialized_bytes = "=0.0.47"
+holochain_serialized_bytes = { path = "../../../holochain-serialization/crates/holochain_serialized_bytes" }
 lazy_static = "1.4"
 parking_lot = "0.10"
 paste = "=1.0.3"

@@ -399,7 +399,7 @@ impl CoolConductorHandle {
     pub async fn call<I, O, F>(&self, zome: &CoolZome, fn_name: F, payload: I) -> O
     where
         FunctionName: From<F>,
-        I: serde::Serialize,
+        I: serde::Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
         self.call_from(zome.cell_id().agent_pubkey(), None, zome, fn_name, payload)
@@ -418,7 +418,7 @@ impl CoolConductorHandle {
     ) -> O
     where
         FunctionName: From<F>,
-        I: Serialize,
+        I: Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
         let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");

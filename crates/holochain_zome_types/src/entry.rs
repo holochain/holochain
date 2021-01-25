@@ -12,6 +12,7 @@ use holo_hash::hash_type;
 use holo_hash::AgentPubKey;
 use holo_hash::HashableContent;
 use holo_hash::HashableContentBytes;
+use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;
@@ -238,4 +239,12 @@ impl UpdateInput {
             entry_with_def_id,
         }
     }
+}
+
+/// Possible outcomes of a delete that wasm may want to handle.
+pub enum DeleteResult {
+    /// The delete succeeded and this is the header of the delete element.
+    Ok(HeaderHash),
+    /// The header hash to be deleted pointed to an entry we could not find.
+    EntryNotFound,
 }

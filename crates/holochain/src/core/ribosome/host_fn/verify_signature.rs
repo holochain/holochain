@@ -1,15 +1,15 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 pub fn verify_signature(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     input: VerifySignature,
-) -> RibosomeResult<bool> {
+) -> Result<bool, RibosomeError> {
     Ok(
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             input

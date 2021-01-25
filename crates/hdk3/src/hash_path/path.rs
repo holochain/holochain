@@ -78,10 +78,10 @@ impl From<String> for Component {
 
 /// Restoring a String from a Component requires Vec<u8> to u32 to utf8 handling.
 impl TryFrom<&Component> for String {
-    type Error = SerializedBytesError;
+    type Error = WasmError;
     fn try_from(component: &Component) -> Result<Self, Self::Error> {
         if component.as_ref().len() % 4 != 0 {
-            return Err(SerializedBytesError::FromBytes(format!(
+            return Err(WasmError::from_guest(format!(
                 "attempted to create u32s from utf8 bytes of length not a factor of 4: length {}",
                 component.as_ref().len()
             )));
@@ -107,7 +107,7 @@ impl TryFrom<&Component> for String {
                                     build = vec![];
                                 }
                                 None => {
-                                    error = Some(Err(SerializedBytesError::FromBytes(format!(
+                                    error = Some(Err(WasmError::from_guest(format!(
                                         "unknown char for u32: {}",
                                         u
                                     ))));
@@ -165,6 +165,13 @@ impl From<Path> for Vec<Component> {
 impl AsRef<Vec<Component>> for Path {
     fn as_ref(&self) -> &Vec<Component> {
         self.0.as_ref()
+    }
+}
+
+impl Path {
+    /// Flatten all the components to a single Vec<u8>
+    pub fn into_flat_vec(self) -> Vec<u8> {
+        self.0.into_iter().map(|c| c.0).flatten().collect()
     }
 }
 
@@ -231,7 +238,7 @@ impl From<String> for Path {
 }
 
 impl TryFrom<&Path> for LinkTag {
-    type Error = SerializedBytesError;
+    type Error = WasmError;
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
         // Link tag is:
         //
@@ -240,17 +247,26 @@ impl TryFrom<&Path> for LinkTag {
         //
         // This allows the value of the target to be read/dereferenced straight from the
         // link without needing additional network calls.
-        let path_bytes: Vec<u8> = UnsafeBytes::from(SerializedBytes::try_from(path)?).into();
+        let path_bytes: Vec<u8> = holochain_serialized_bytes::encode(path).map_err(|e| {
+            WasmError::new(
+                WasmErrorType::Serialize(e),
+                "Failed to serialize a Path into a LinkTag",
+            )
+        })?;
         let link_tag_bytes: Vec<u8> = NAME.iter().chain(path_bytes.iter()).cloned().collect();
         Ok(LinkTag::new(link_tag_bytes))
     }
 }
 
 impl TryFrom<&LinkTag> for Path {
-    type Error = SerializedBytesError;
+    type Error = WasmError;
     fn try_from(link_tag: &LinkTag) -> Result<Self, Self::Error> {
-        let sb = SerializedBytes::from(UnsafeBytes::from(link_tag.as_ref()[NAME.len()..].to_vec()));
-        Ok(Self::try_from(sb)?)
+        holochain_serialized_bytes::decode(&link_tag.as_ref()[NAME.len()..]).map_err(|e| {
+            WasmError::new(
+                WasmErrorType::Deserialize(e),
+                "Failed to deserialize a Path from a LinkTag",
+            )
+        })
     }
 }
 
@@ -362,15 +378,13 @@ fn hash_path_component() {
 
     assert_eq!(
         String::try_from(&Component::from(vec![1])),
-        Err(SerializedBytesError::FromBytes(
-            "attempted to create u32s from utf8 bytes of length not a factor of 4: length 1".into()
+        Err(WasmError::from_guest(
+            "attempted to create u32s from utf8 bytes of length not a factor of 4: length 1"
         )),
     );
     assert_eq!(
         String::try_from(&Component::from(vec![9, 9, 9, 9])),
-        Err(SerializedBytesError::FromBytes(
-            "unknown char for u32: 151587081".into()
-        )),
+        Err(WasmError::from_guest("unknown char for u32: 151587081")),
     );
 }
 

@@ -1,15 +1,15 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 pub fn sign(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: Sign,
-) -> RibosomeResult<Signature> {
+) -> Result<Signature, RibosomeError> {
     Ok(
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             call_context

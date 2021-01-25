@@ -1,15 +1,15 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use std::sync::Arc;
 use holochain_zome_types::X25519PubKey;
+use crate::core::ribosome::RibosomeError;
 
 pub fn create_x25519_keypair(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
-) -> RibosomeResult<X25519PubKey> {
+) -> Result<X25519PubKey, RibosomeError> {
     Ok(
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             call_context

@@ -31,10 +31,21 @@ pub fn call_remote<I>(
     payload: I,
 ) -> ExternResult<ZomeCallResponse>
 where
-    I: serde::Serialize,
+    I: serde::Serialize + std::fmt::Debug,
 {
     host_call::<CallRemote, ZomeCallResponse>(
         __call_remote,
-        CallRemote::new(agent, zome, fn_name, cap_secret, ExternIO::encode(payload)?),
+        CallRemote::new(
+            agent,
+            zome,
+            fn_name,
+            cap_secret,
+            ExternIO::encode(payload).map_err(|e| {
+                WasmError::new(
+                    WasmErrorType::Serialize(e),
+                    "Failed to serialize the payload for a remote call.",
+                )
+            })?,
+        ),
     )
 }

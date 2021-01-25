@@ -1,9 +1,8 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use crate::core::workflow::CallZomeWorkspace;
-
+use crate::core::ribosome::RibosomeError;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
@@ -12,7 +11,7 @@ pub fn create_link<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CreateLinkInput,
-) -> RibosomeResult<HeaderHash> {
+) -> Result<HeaderHash, RibosomeError> {
     let CreateLinkInput { base_address, target_address, tag } = input;
 
     // extract the zome position
@@ -37,7 +36,7 @@ pub fn create_link<'a>(
                 &mut workspace.meta_authored,
             )
             .map_err(Box::new)?;
-            RibosomeResult::Ok(header_hash)
+            Result::<HeaderHash, RibosomeError>::Ok(header_hash)
         }))??;
 
     // return the hash of the committed link

@@ -1,16 +1,16 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 use tracing::*;
+use crate::core::ribosome::RibosomeError;
 
 #[instrument(skip(_ribosome, _call_context, input))]
 pub fn debug(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     input: DebugMsg,
-) -> RibosomeResult<()> {
+) -> Result<(), RibosomeError> {
     debug!(
         "{}:{}:{} {}",
         input.module_path(),
@@ -48,6 +48,29 @@ pub mod wasm_test {
         let output: () = debug(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
         assert_eq!((), output);
+    }
+
+    /// we can get an entry hash out of the fn directly
+    #[tokio::test(threaded_scheduler)]
+    #[should_panic]
+    async fn deserialize_debug_test() {
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let env = test_env.env();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = workspace_lock;
+
+        // this shows that we can get line numbers out of wasm
+        let output: () =
+            crate::call_test_ribosome!(host_access, TestWasm::RandomBytes, "random_bytes", "input should be an int");
+        assert_eq!(output, ());
     }
 
     #[tokio::test(threaded_scheduler)]

@@ -1,5 +1,3 @@
-use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
@@ -7,13 +5,14 @@ use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use holochain_cascade::error::CascadeResult;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn delete_link<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: HeaderHash,
-) -> RibosomeResult<HeaderHash> {
+) -> Result<HeaderHash, RibosomeError> {
 
     // get the base address from the add link header
     // don't allow the wasm developer to get this wrong

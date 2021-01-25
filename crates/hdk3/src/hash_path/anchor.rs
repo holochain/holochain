@@ -34,7 +34,7 @@ impl From<&Anchor> for Path {
 /// The obvious example would be a path of binary data that is not valid utf-8 strings or a path
 /// that is more than 2 levels deep.
 impl TryFrom<&Path> for Anchor {
-    type Error = SerializedBytesError;
+    type Error = WasmError;
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
         let components: Vec<Component> = path.as_ref().to_owned();
         if components.len() == 2 || components.len() == 3 {
@@ -49,14 +49,14 @@ impl TryFrom<&Path> for Anchor {
                     },
                 })
             } else {
-                Err(SerializedBytesError::FromBytes(format!(
+                Err(WasmError::from_guest(format!(
                     "Bad anchor path root {:0?} should be {:1?}",
                     components[0].as_ref(),
                     ROOT.as_bytes(),
                 )))
             }
         } else {
-            Err(SerializedBytesError::FromBytes(format!(
+            Err(WasmError::from_guest(format!(
                 "Bad anchor path length {}",
                 components.len()
             )))
@@ -83,7 +83,12 @@ pub fn get_anchor(anchor_address: EntryHash) -> ExternResult<Option<Anchor>> {
     Ok(
         match crate::prelude::get(anchor_address, GetOptions::content())?.and_then(|el| el.into()) {
             Some(Entry::App(eb)) => {
-                let path = Path::try_from(SerializedBytes::from(eb))?;
+                let path = Path::try_from(SerializedBytes::from(eb)).map_err(|e| {
+                    WasmError::new(
+                        WasmErrorType::Deserialize(e),
+                        "Failed to deserialize entry bytes to a Path.",
+                    )
+                })?;
                 Some(Anchor::try_from(&path)?)
             }
             _ => None,
@@ -133,7 +138,7 @@ pub fn list_anchor_tags(anchor_type: String) -> ExternResult<Vec<String>> {
     })
         .into();
     path.ensure()?;
-    let hopefully_anchor_tags: Result<Vec<String>, SerializedBytesError> = path
+    let hopefully_anchor_tags: ExternResult<Vec<String>> = path
         .children()?
         .into_inner()
         .into_iter()
@@ -141,9 +146,7 @@ pub fn list_anchor_tags(anchor_type: String) -> ExternResult<Vec<String>> {
             Ok(path) => match Anchor::try_from(&path) {
                 Ok(anchor) => match anchor.anchor_text {
                     Some(text) => Ok(text),
-                    None => Err(SerializedBytesError::FromBytes(
-                        "missing anchor text".into(),
-                    )),
+                    None => Err(WasmError::from_guest("missing anchor text")),
                 },
                 Err(e) => Err(e),
             },

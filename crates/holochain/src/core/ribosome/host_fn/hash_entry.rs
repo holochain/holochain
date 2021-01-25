@@ -1,15 +1,15 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 pub fn hash_entry(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     input: Entry,
-) -> RibosomeResult<EntryHash> {
+) -> Result<EntryHash, RibosomeError> {
     let entry_hash = holochain_types::entry::EntryHashed::from_content_sync(input).into_hash();
 
     Ok(entry_hash)

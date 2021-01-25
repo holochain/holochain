@@ -31,25 +31,39 @@ macro_rules! map_extern {
                 use std::convert::TryFrom;
 
                 #[no_mangle]
-                pub extern "C" fn $name(guest_ptr: GuestPtr) -> GuestPtr {
-                    let extern_io: ExternIO = match host_args(guest_ptr) {
+                pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr) -> $crate::prelude::GuestPtr {
+                    let extern_io: $crate::prelude::ExternIO = match $crate::prelude::host_args(guest_ptr) {
                         Ok(v) => v,
                         Err(err_ptr) => return err_ptr,
                     };
 
                     let inner: $input = match extern_io.decode() {
                         Ok(v) => v,
-                        Err(_) => return return_err_ptr(WasmError::Deserialize(vec![0])),
+                        Err(e) => return $crate::prelude::return_err_ptr($crate::prelude::WasmError::new(
+                            $crate::prelude::WasmErrorType::Deserialize(e),
+                            format!(
+                                "Failed to deserialize the input to extern named {} with type {}",
+                                stringify!($name),
+                                stringify!($input),
+                            ),
+                        )),
                     };
 
                     let output: $output = match super::$f(inner) {
                         Ok(v) => Ok(v),
-                        Err(wasm_error) => return return_err_ptr(wasm_error),
+                        Err(wasm_error) => return $crate::prelude::return_err_ptr(wasm_error),
                     };
 
-                    match ExternIO::encode(output.unwrap()) {
-                        Ok(v) => return_ptr::<ExternIO>(v),
-                        Err(serialized_bytes_error) => return_err_ptr(WasmError::Serialize(serialized_bytes_error)),
+                    match $crate::prelude::ExternIO::encode(output.unwrap()) {
+                        Ok(v) => $crate::prelude::return_ptr::<$crate::prelude::ExternIO>(v),
+                        Err(serialized_bytes_error) => $crate::prelude::return_err_ptr($crate::prelude::WasmError::new(
+                            $crate::prelude::WasmErrorType::Serialize(serialized_bytes_error),
+                            format!(
+                                "Failed to serialize the output for the host of extern named {} with type {}",
+                                stringify!($name),
+                                stringify!($output),
+                            ),
+                        )),
                     }
                 }
             }

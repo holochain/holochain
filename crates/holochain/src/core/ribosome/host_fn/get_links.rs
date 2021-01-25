@@ -1,17 +1,17 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_state::metadata::LinkMetaKey;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_links<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: GetLinksInput,
-) -> RibosomeResult<Links> {
+) -> Result<Links, RibosomeError> {
     let GetLinksInput { base_address, tag_prefix } = input;
 
     // Get zome id

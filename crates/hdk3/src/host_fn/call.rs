@@ -19,7 +19,7 @@ pub fn call<I>(
     payload: I,
 ) -> ExternResult<ZomeCallResponse>
 where
-    I: serde::Serialize,
+    I: serde::Serialize + std::fmt::Debug,
 {
     // @todo is this secure to set this in the wasm rather than have the host inject it?
     let provenance = agent_info()?.agent_latest_pubkey;
@@ -30,7 +30,12 @@ where
             zome_name,
             fn_name,
             cap_secret,
-            ExternIO::encode(payload)?,
+            ExternIO::encode(payload).map_err(|e| {
+                WasmError::new(
+                    WasmErrorType::Serialize(e),
+                    "Failed to serialize the payload for a call to the host.",
+                )
+            })?,
             provenance,
         ),
     )

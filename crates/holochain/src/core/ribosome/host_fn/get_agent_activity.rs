@@ -1,15 +1,15 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 pub fn get_agent_activity(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: GetAgentActivityInput,
-) -> RibosomeResult<AgentActivity> {
+) -> Result<AgentActivity, RibosomeError> {
     let GetAgentActivityInput{ agent_pubkey, chain_query_filter, activity_request } = input;
     let options = match activity_request {
         ActivityRequest::Status => GetActivityOptions {

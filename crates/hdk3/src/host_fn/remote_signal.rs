@@ -31,13 +31,18 @@ use crate::prelude::*;
 /// we design a better way to grant the capability to remote signal.
 pub fn remote_signal<I>(input: I, agents: Vec<AgentPubKey>) -> ExternResult<()>
 where
-    I: serde::Serialize,
+    I: serde::Serialize + std::fmt::Debug,
 {
     #[allow(clippy::unit_arg)]
     host_call::<RemoteSignal, ()>(
         __remote_signal,
         RemoteSignal {
-            signal: ExternIO::encode(input)?,
+            signal: ExternIO::encode(input).map_err(|e| {
+                WasmError::new(
+                    WasmErrorType::Serialize(e),
+                    "Failed to serialize the payload for a remote signal.",
+                )
+            })?,
             agents,
         },
     )

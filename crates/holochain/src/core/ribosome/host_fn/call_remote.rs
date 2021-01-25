@@ -1,15 +1,16 @@
-use crate::core::ribosome::error::RibosomeResult;
+use holochain_wasmer_host::prelude::*;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 pub fn call_remote(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CallRemote,
-) -> RibosomeResult<ZomeCallResponse> {
+) -> Result<ZomeCallResponse, RibosomeError> {
     // it is the network's responsibility to handle timeouts and return an Err result in that case
     let result: Result<SerializedBytes, _> = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let mut network = call_context.host_access().network().clone();

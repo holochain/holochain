@@ -1,15 +1,15 @@
-use crate::core::ribosome::error::RibosomeResult;
+use holochain_types::prelude::*;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
-use holochain_types::prelude::*;
+use crate::core::ribosome::RibosomeError;
 use std::sync::Arc;
 
 pub fn zome_info(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
-) -> RibosomeResult<ZomeInfo> {
+) -> Result<ZomeInfo, RibosomeError> {
     Ok(ZomeInfo {
         dna_name: ribosome.dna_def().name.clone(),
         zome_name: call_context.zome.zome_name().clone(),

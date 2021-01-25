@@ -65,14 +65,18 @@ macro_rules! entry_def {
             type Error = $crate::prelude::WasmError;
             fn try_from(entry: &$crate::prelude::Entry) -> Result<Self, Self::Error> {
                 match entry {
-                    $crate::prelude::Entry::App(eb) => Ok(Self::try_from(
-                        $crate::prelude::SerializedBytes::from(eb.to_owned()),
-                    )?),
-                    _ => Err($crate::prelude::SerializedBytesError::FromBytes(format!(
-                        "{:?} is not an Entry::App so has no serialized bytes",
-                        entry
-                    ))
-                    .into()),
+                    $crate::prelude::Entry::App(eb) => {
+                        Self::try_from($crate::prelude::SerializedBytes::from(eb.to_owned()))
+                            .map_err(|e| {
+                                WasmError::new(
+                                    WasmErrorType::Deserialize(e),
+                                    "Failed to decode an entry",
+                                )
+                            })
+                    }
+                    _ => Err(WasmError::from_guest(
+                        "Failed to deserialize a system entry to an app defined type",
+                    )),
                 }
             }
         }
@@ -87,15 +91,19 @@ macro_rules! entry_def {
         impl TryFrom<&$t> for $crate::prelude::Entry {
             type Error = $crate::prelude::WasmError;
             fn try_from(t: &$t) -> Result<Self, Self::Error> {
-                match AppEntryBytes::try_from(SerializedBytes::try_from(t)?) {
+                match AppEntryBytes::try_from(SerializedBytes::try_from(t).map_err(|e| {
+                    WasmError::new(
+                        WasmErrorType::Serialize(e),
+                        "Failed to serialize app data to Entry bytes.",
+                    )
+                })?) {
                     Ok(app_entry_bytes) => Ok(Self::App(app_entry_bytes)),
                     Err(entry_error) => match entry_error {
-                        EntryError::SerializedBytes(serialized_bytes_error) => {
-                            Err(WasmError::Serialize(serialized_bytes_error))
-                        }
-                        EntryError::EntryTooLarge(_) => {
-                            Err(WasmError::Zome(entry_error.to_string()))
-                        }
+                        EntryError::SerializedBytes(serialized_bytes_error) => Err(WasmError::new(
+                            WasmErrorType::Serialize(serialized_bytes_error),
+                            format!("Failed to serialize app data to Entry.",),
+                        )),
+                        EntryError::EntryTooLarge(_) => Err(WasmError::from_guest(entry_error)),
                     },
                 }
             }

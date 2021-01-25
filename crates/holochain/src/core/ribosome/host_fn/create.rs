@@ -1,15 +1,14 @@
-use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
-
+use crate::core::ribosome::RibosomeError;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 /// create element
 #[allow(clippy::extra_unused_lifetimes)]
@@ -17,7 +16,7 @@ pub fn create<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: EntryWithDefId,
-) -> RibosomeResult<HeaderHash> {
+) -> Result<HeaderHash, RibosomeError> {
 
     // build the entry hash
     let async_entry = AsRef::<Entry>::as_ref(&input).to_owned();
@@ -75,7 +74,7 @@ pub fn extract_entry_def(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     entry_def_id: EntryDefId,
-) -> RibosomeResult<(holochain_zome_types::header::EntryDefIndex, EntryVisibility)> {
+) -> Result<(holochain_zome_types::header::EntryDefIndex, EntryVisibility), RibosomeError> {
     let app_entry_type = match ribosome
         .run_entry_defs((&call_context.host_access).into(), EntryDefsInvocation)?
     {
@@ -99,10 +98,9 @@ pub fn extract_entry_def(
     };
     match app_entry_type {
         Some(app_entry_type) => Ok(app_entry_type),
-        None => Err(RibosomeError::EntryDefs(
-            call_context.zome.zome_name().clone(),
-            format!("entry def not found for {:?}", entry_def_id),
-        )),
+        None => Err(WasmError::from_host(
+            format!("entry def not found for {:?} in zome {}", entry_def_id, call_context.zome.zome_name()),
+        ).into()),
     }
 }
 

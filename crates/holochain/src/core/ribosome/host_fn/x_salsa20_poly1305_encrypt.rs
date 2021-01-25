@@ -1,4 +1,3 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use ring::rand::SecureRandom;
@@ -7,12 +6,13 @@ use std::sync::Arc;
 use xsalsa20poly1305::aead::{generic_array::GenericArray, Aead, NewAead};
 use xsalsa20poly1305::XSalsa20Poly1305;
 use holochain_types::prelude::*;
+use crate::core::ribosome::RibosomeError;
 
 pub fn x_salsa20_poly1305_encrypt(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     input: XSalsa20Poly1305Encrypt,
-) -> RibosomeResult<XSalsa20Poly1305EncryptedData> {
+) -> Result<XSalsa20Poly1305EncryptedData, RibosomeError> {
     let system_random = ring::rand::SystemRandom::new();
     let mut nonce_bytes = [0; holochain_zome_types::x_salsa20_poly1305::nonce::NONCE_BYTES];
     system_random.fill(&mut nonce_bytes)?;

@@ -14,7 +14,7 @@ derive_more = "0.99.3"
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
 holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
-holochain_serialized_bytes = "=0.0.47"
+holochain_serialized_bytes = { path = "../../../holochain-serialization/crates/holochain_serialized_bytes" }
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
 holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
 serde = { version = "1.0.104", features = [ "derive" ] }

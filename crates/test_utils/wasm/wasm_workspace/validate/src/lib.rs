@@ -2,7 +2,7 @@ use element::ElementEntry;
 use hdk3::prelude::*;
 
 /// an example inner value that can be serialized into the contents of Entry::App()
-#[derive(Deserialize, Serialize, SerializedBytes)]
+#[derive(Deserialize, Serialize, SerializedBytes, Debug)]
 enum ThisWasmEntry {
     AlwaysValidates,
     NeverValidates,
@@ -53,10 +53,8 @@ impl TryFrom<&Entry> for ThisWasmEntry {
     fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
         match entry {
             Entry::App(eb) => Ok(Self::try_from(SerializedBytes::from(eb.to_owned()))?),
-            _ => Err(
-                SerializedBytesError::FromBytes("failed to deserialize ThisWasmEntry".into())
-                    .into(),
-            ),
+            // Handle this in a real app.
+            _ => unreachable!(),
         }
     }
 }
@@ -70,10 +68,8 @@ impl TryFrom<&ThisWasmEntry> for Entry {
                     SerializedBytes::try_from(this_wasm_entry)?
                 ) {
                     Ok(app_entry_bytes) => app_entry_bytes,
-                    Err(entry_error) => match entry_error {
-                        EntryError::SerializedBytes(serialized_bytes_error) => return Err(WasmError::Serialize(serialized_bytes_error)),
-                        EntryError::EntryTooLarge(_) => return Err(WasmError::Zome(entry_error.to_string())),
-                    },
+                    // Handle this in a real app.
+                    Err(_entry_error) => unreachable!(),
                 }
             )
         )
