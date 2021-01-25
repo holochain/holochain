@@ -460,7 +460,7 @@ mod test {
         };
         let path_install_payload: InstallAppPayload = InstallAppPayloadNormalized {
             dnas: vec![path_payload],
-            installed_app_id: "test".to_string(),
+            installed_app_id: "test-by-path".to_string(),
             agent_key: agent_key2,
         }
         .into();
