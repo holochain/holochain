@@ -47,6 +47,12 @@ pub(crate) trait AsPersist: 'static + Send + Sync {
         dht_arc: dht_arc::DhtArc,
     ) -> ghost_actor::GhostFuture<Vec<KdEntry>, KdError>;
 
+    fn list_left_links(
+        &self,
+        root_agent: KdHash,
+        target: KdHash,
+    ) -> ghost_actor::GhostFuture<Vec<KdHash>, KdError>;
+
     ghost_actor::ghost_box_trait_fns!(AsPersist);
 }
 ghost_actor::ghost_box_trait!(AsPersist);
@@ -124,6 +130,14 @@ impl Persist {
             created_at_end,
             dht_arc,
         )
+    }
+
+    pub fn list_left_links(
+        &self,
+        root_agent: KdHash,
+        target: KdHash,
+    ) -> ghost_actor::GhostFuture<Vec<KdHash>, KdError> {
+        AsPersist::list_left_links(&*self.0, root_agent, target)
     }
 }
 
@@ -216,16 +230,25 @@ impl SqlPersist {
                 hash          TEXT NOT NULL,
                 created_at    TEXT NOT NULL,
                 dht_loc       INT NOT NULL,
+                left_link     TEXT NOT NULL,
                 bytes         BLOB NOT NULL,
                 CONSTRAINT entries_pk PRIMARY KEY (root_agent, hash)
             );",
             NO_PARAMS,
         )?;
 
-        // created_at + dht_loc index for queries
+        // created_at + dht_loc index for entries
         con.execute(
             "CREATE INDEX IF NOT EXISTS entries_query_idx ON entries (
                 root_agent, created_at, dht_loc
+            );",
+            NO_PARAMS,
+        )?;
+
+        // left_link index for entries
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS entries_left_link_idx ON entries (
+                root_agent, left_link
             );",
             NO_PARAMS,
         )?;
@@ -307,37 +330,52 @@ impl AsPersist for SqlPersist {
 
             let exists = {
                 let mut exists = tx.prepare(
-                    "SELECT count(*) FROM agent_info
+                    "SELECT TRUE AS 'exists' FROM agent_info
                     WHERE root_agent = ?1
-                    AND agent = ?2;")?;
+                    AND agent = ?2;",
+                )?;
                 exists.exists(params![root_agent.as_ref(), agent.as_ref()])?
             };
 
             if exists {
-                let mut upd =
-                    tx.prepare(
-                        "UPDATE agent_info SET
+                let mut upd = tx.prepare(
+                    "UPDATE agent_info SET
                             signature = ?1,
                             agent_info = ?2,
                             signed_at_epoch_ms = ?3,
                             expires_at_epoch_ms = ?4
                         WHERE root_agent = ?5
-                        AND agent = ?6")?;
+                        AND agent = ?6",
+                )?;
 
-                upd.execute(params![sig, info_bytes, signed_at_epoch_ms as i64, expires_at_epoch_ms as i64, root_agent.as_ref(), agent.as_ref()])?;
+                upd.execute(params![
+                    sig,
+                    info_bytes,
+                    signed_at_epoch_ms as i64,
+                    expires_at_epoch_ms as i64,
+                    root_agent.as_ref(),
+                    agent.as_ref()
+                ])?;
             } else {
-                let mut ins =
-                    tx.prepare(
-                        "INSERT INTO agent_info (
+                let mut ins = tx.prepare(
+                    "INSERT INTO agent_info (
                             root_agent,
                             agent,
                             signature,
                             agent_info,
                             signed_at_epoch_ms,
                             expires_at_epoch_ms
-                        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6);")?;
+                        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6);",
+                )?;
 
-                ins.execute(params![root_agent.as_ref(), agent.as_ref(), sig, info_bytes, signed_at_epoch_ms as i64, expires_at_epoch_ms as i64])?;
+                ins.execute(params![
+                    root_agent.as_ref(),
+                    agent.as_ref(),
+                    sig,
+                    info_bytes,
+                    signed_at_epoch_ms as i64,
+                    expires_at_epoch_ms as i64
+                ])?;
             }
 
             tx.commit()?;
@@ -417,13 +455,14 @@ impl AsPersist for SqlPersist {
 
             {
                 let mut ins =
-                    tx.prepare("INSERT INTO entries (root_agent, hash, created_at, dht_loc, bytes) VALUES (?1, ?2, ?3, ?4, ?5);")?;
+                    tx.prepare("INSERT OR IGNORE INTO entries (root_agent, hash, created_at, dht_loc, left_link, bytes) VALUES (?1, ?2, ?3, ?4, ?5, ?6);")?;
 
                 ins.execute(params![
                     root_agent.as_ref(),
                     entry.hash().as_ref(),
                     entry.create(),
                     entry.hash().get_loc(),
+                    entry.left_link().as_ref(),
                     entry.as_ref(),
                 ])?;
             }
@@ -544,6 +583,34 @@ impl AsPersist for SqlPersist {
 
             for r in res {
                 out.push(KdEntry::from_raw_bytes_validated(r).await?);
+            }
+
+            Ok(out)
+        })
+    }
+
+    fn list_left_links(
+        &self,
+        root_agent: KdHash,
+        target: KdHash,
+    ) -> ghost_actor::GhostFuture<Vec<KdHash>, KdError> {
+        self.0.invoke(move |inner| {
+            let mut stmt = inner.con.prepare(
+                "SELECT hash FROM entries
+                    WHERE root_agent = ?1
+                    AND left_link = ?2
+                    ;",
+            )?;
+            let res = stmt.query_map(params![root_agent.as_ref(), target.as_ref()], |row| {
+                let hash: String = row.get(0)?;
+                // TODO - move to async block && check
+                Ok(KdHash::from_str_unchecked(&hash))
+            })?;
+
+            let mut out = Vec::new();
+
+            for r in res {
+                out.push(r?);
             }
 
             Ok(out)

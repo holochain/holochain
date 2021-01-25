@@ -2116,19 +2116,10 @@ dependencies = [
  "serde",
  "serde_json",
  "sodoken",
+ "structopt",
  "thiserror",
  "tokio",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "kitsune_p2p_direct_test"
-version = "0.0.1"
-dependencies = [
- "kitsune_p2p_direct",
- "observability",
- "structopt",
- "tokio",
 ]
 
 [[package]]

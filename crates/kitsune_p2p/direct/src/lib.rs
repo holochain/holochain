@@ -113,6 +113,14 @@ pub trait AsKitsuneDirect: 'static + Send + Sync {
         new_entry: KdEntryBuilder,
     ) -> ghost_actor::GhostFuture<(), KdError>;
 
+    /// List all nodes that have a left_link pointing to target.
+    /// This will pass-through HSM nodes.
+    fn list_left_links(
+        &self,
+        root_agent: KdHash,
+        target: KdHash,
+    ) -> ghost_actor::GhostFuture<Vec<KdHash>, KdError>;
+
     ghost_actor::ghost_box_trait_fns!(AsKitsuneDirect);
 }
 ghost_actor::ghost_box_trait!(AsKitsuneDirect);
@@ -202,6 +210,16 @@ impl KitsuneDirect {
         new_entry: KdEntryBuilder,
     ) -> ghost_actor::GhostFuture<(), KdError> {
         AsKitsuneDirect::create_entry(&*self.0, root_agent, by_agent, new_entry)
+    }
+
+    /// List all nodes that have a left_link pointing to target.
+    /// This will pass-through HSM nodes.
+    pub fn list_left_links(
+        &self,
+        root_agent: KdHash,
+        target: KdHash,
+    ) -> ghost_actor::GhostFuture<Vec<KdHash>, KdError> {
+        AsKitsuneDirect::list_left_links(&*self.0, root_agent, target)
     }
 }
 

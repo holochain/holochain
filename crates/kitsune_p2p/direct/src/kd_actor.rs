@@ -537,4 +537,13 @@ impl AsKitsuneDirect for KdActor {
             Ok(())
         })
     }
+
+    fn list_left_links(
+        &self,
+        root_agent: KdHash,
+        target: KdHash,
+    ) -> ghost_actor::GhostFuture<Vec<KdHash>, KdError> {
+        self.0
+            .invoke_async(move |inner| Ok(inner.persist.list_left_links(root_agent, target)))
+    }
 }

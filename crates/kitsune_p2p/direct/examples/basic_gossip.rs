@@ -1,15 +1,22 @@
 use kitsune_p2p_direct::dependencies::*;
 use kitsune_p2p_direct::*;
+use structopt::StructOpt;
 
-pub(crate) mod commands;
+#[tokio::main]
+async fn main() {
+    observability::init_fmt(observability::Output::LogTimed).ok();
+
+    let opt = Opt::from_args();
+
+    if let Err(e) = execute(opt).await {
+        eprintln!("{:?}", e);
+    }
+}
 
 /// Option Parsing
 #[derive(structopt::StructOpt, Debug)]
-#[structopt(name = "kitsune-p2p-direct-test")]
-pub struct Opt {
-    #[structopt(subcommand)]
-    cmd: OptCmd,
-
+#[structopt(name = "basic_gossip")]
+struct Opt {
     /// Kitsune-proxy Url to connect to.
     #[structopt(
         short,
@@ -25,18 +32,10 @@ pub struct Opt {
     /// Work directory for node persistence. [default: current-dir]
     #[structopt(short, long)]
     pub work_dir: Option<std::path::PathBuf>,
-}
 
-/// Subcommands
-#[derive(structopt::StructOpt, Debug)]
-pub enum OptCmd {
-    /// Set up a group of periodically publishing nodes
-    /// && count accessibility to data.
-    BasicGossip {
-        /// Each node will publish a new entry at this interval.
-        #[structopt(short, long, default_value = "5000")]
-        publish_interval_ms: u64,
-    },
+    /// Each node will publish a new entry at this interval.
+    #[structopt(short, long, default_value = "5000")]
+    publish_interval_ms: u64,
 }
 
 struct Node {
@@ -60,7 +59,7 @@ struct TestSetup {
 }
 
 /// Execute kitsune-p2p-direct test
-pub async fn execute(opt: Opt) -> KdResult<()> {
+async fn execute(opt: Opt) -> KdResult<()> {
     // generate our config
     // NOTE - this is very wrong, need to:
     //      - have a persist path
@@ -128,14 +127,47 @@ pub async fn execute(opt: Opt) -> KdResult<()> {
         test_nodes,
     };
 
-    // execute the specific test desired by the end user
-    match opt.cmd {
-        OptCmd::BasicGossip {
-            publish_interval_ms,
-        } => {
-            commands::basic_gossip::execute(test_setup, publish_interval_ms).await?;
-        }
-    }
+    execute_basic_gossip(test_setup, opt.publish_interval_ms).await?;
 
     Ok(())
+}
+
+async fn execute_basic_gossip(test_setup: TestSetup, publish_interval_ms: u64) -> KdResult<()> {
+    let mut total_pub_count = 0_u64;
+    let root_agent = test_setup.root_node.agent.clone();
+    loop {
+        let mut avg_store_count = 0.0_f64;
+        let mut store_count_count = 0.0_f64;
+        for node in test_setup.test_nodes.iter() {
+            avg_store_count += node
+                .node
+                .list_left_links(root_agent.clone(), root_agent.clone())
+                .await?
+                .into_iter()
+                .count() as f64;
+            store_count_count += 1.0;
+        }
+
+        println!(
+            "{} / {} (Avg Store Count / Total Publish Count)",
+            avg_store_count / store_count_count,
+            total_pub_count,
+        );
+
+        for node in test_setup.test_nodes.iter() {
+            node.node
+                .create_entry(
+                    root_agent.clone(),
+                    node.agent.clone(),
+                    KdEntry::builder()
+                        .set_sys_type(SysType::Create)
+                        .set_expire(chrono::MAX_DATETIME)
+                        .set_left_link(&root_agent),
+                )
+                .await?;
+            total_pub_count += 1;
+        }
+
+        tokio::time::delay_for(std::time::Duration::from_millis(publish_interval_ms)).await;
+    }
 }
