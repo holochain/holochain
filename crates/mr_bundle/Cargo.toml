@@ -1,0 +1,16 @@
+[package]
+name = "mr_bundle"
+version = "0.1.0"
+authors = ["Michael Dougherty <maackle.d@gmail.com>"]
+edition = "2018"
+
+[workspace]
+
+[dependencies]
+rmp-serde = "0.14"
+serde = { version = "1.0", features = [ "derive" ] }
+serde_derive = "1.0"
+
+[dev-dependencies]
+maplit = "1"
+serde_yaml = "0.8"
