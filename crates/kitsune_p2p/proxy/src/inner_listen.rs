@@ -70,7 +70,13 @@ pub async fn spawn_kitsune_proxy_listener(
     // if we want to be proxied, we need to connect to our proxy
     // and manage that connection contract
     if let Some(proxy_url) = proxy_url {
-        i_s.req_proxy(proxy_url.clone()).await?;
+        if let Err(e) = i_s.req_proxy(proxy_url.clone()).await {
+            tracing::error!(
+                msg = "Request proxy failed. Check proxy_url / network status.",
+                ?proxy_url,
+                ?e
+            );
+        }
 
         // Set up a timer to refresh our proxy contract at keepalive interval
         let i_s_c = i_s.clone();
