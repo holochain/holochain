@@ -3,7 +3,7 @@ use hdk3::prelude::*;
 #[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
     // grant unrestricted access to whoami_open so random agents can call it
-    let mut functions: GrantedFunctions = HashSet::new();
+    let mut functions: GrantedFunctions = BTreeSet::new();
     functions.insert((zome_info()?.zome_name, "whoami_open".into()));
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
@@ -18,7 +18,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
     // grant unrestricted access to whoami after local agent calls set_access
-    let mut functions: GrantedFunctions = HashSet::new();
+    let mut functions: GrantedFunctions = BTreeSet::new();
     functions.insert((zome_info()?.zome_name, "whoami".into()));
     create_cap_grant(CapGrantEntry {
         tag: "".into(),

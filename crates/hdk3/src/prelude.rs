@@ -59,6 +59,8 @@ pub use holochain_wasmer_guest::*;
 pub use holochain_zome_types;
 pub use holochain_zome_types::prelude::*;
 pub use std::collections::HashSet;
+pub use std::collections::BTreeSet;
+pub use std::collections::BTreeMap;
 pub use std::convert::TryFrom;
 
 // This needs to be called at least once _somewhere_ and is idempotent.
