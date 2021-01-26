@@ -47,6 +47,7 @@ pub mod wasm_test {
 
     use hdk3::prelude::AgentInfo;
     use hdk3::prelude::CellId;
+    use hdk3::prelude::WasmError;
     use holo_hash::HeaderHash;
     use holochain_serialized_bytes::SerializedBytes;
     use holochain_types::app::InstalledCell;
@@ -58,6 +59,7 @@ pub mod wasm_test {
     use holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
 
+    use crate::core::ribosome::error::RibosomeError;
     use crate::conductor::{api::ZomeCall, ConductorHandle};
     use crate::test_utils::conductor_setup::ConductorTestData;
     use crate::test_utils::install_app;
@@ -76,6 +78,47 @@ pub mod wasm_test {
         let alice_cell_id = &alice_call_data.cell_id;
         let alice_agent_id = alice_cell_id.agent_pubkey();
         let bob_agent_id = bob_cell_id.agent_pubkey();
+
+        // ALICE CALLING Zome API requiring NO cap grant
+        let cap_init = handle
+            .call_zome(ZomeCall {
+                cell_id: alice_cell_id.clone(),
+                zome_name: TestWasm::WhoAmI.into(),
+                cap: None,
+                fn_name: "whoarethey_local_open".into(),
+                payload: ExternIO::encode(
+                    &bob_cell_id
+                ).unwrap(),
+                provenance: alice_agent_id.clone(),
+            })
+            .await;
+        assert_matches!(cap_init, Ok(Ok(ZomeCallResponse::Ok(_))));
+
+        // ALICE CALLING Zome API requiring cap grant from "set_access"
+
+        let cap_fail = handle
+            .call_zome(ZomeCall {
+                cell_id: alice_cell_id.clone(),
+                zome_name: TestWasm::WhoAmI.into(),
+                cap: None,
+                fn_name: "whoarethey_local".into(),
+                payload: ExternIO::encode(
+                    &bob_cell_id
+                ).unwrap(),
+                provenance: alice_agent_id.clone(),
+            })
+            .await;
+
+	// eg. WasmError(Zome("inner function \'whoarethey_local\' failed: UnauthorizedZomeCall(CellId(DnaHash(uhC0kCnAyTh2eEgAex-paR8zCKrmcz25tA8qkrk2UdfOJGkEjuPRb), AgentPubKey(uhCAkmrkoAHPVf_eufG7eC5fm6QKrW5pPMoktvG5LOC0SnJ4vV1Uv)), ZomeName(\"whoami\"), FunctionName(\"whoami\"), AgentPubKey(uhCAke1j8Z2a-_min0h0pGuEMcYlo_V1l1mt9OtBuywKmHlg4L_R-))")),
+
+	match cap_fail {
+            Ok(Err(RibosomeError::WasmError(WasmError::Zome(s)))) => {
+		assert!(s.contains(
+		    "inner function \'whoarethey_local\' failed: UnauthorizedZomeCall"));
+	    },
+	    other => println!("Unknown response: {:?}", other),
+	};
+
 
         // BOB INIT (to do cap grant)
 
@@ -98,7 +141,7 @@ pub mod wasm_test {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::WhoAmI.into(),
                 cap: None,
-                fn_name: "who_are_they_local".into(),
+                fn_name: "whoarethey_local".into(),
                 payload: ExternIO::encode(
                     &bob_cell_id
                 ).unwrap(),
@@ -124,9 +167,9 @@ pub mod wasm_test {
         conductor_test.shutdown_conductor().await;
     }
 
-    /// When calling the same cell we need to make sure
-    /// the "as at" doesn't cause the original zome call to fail
-    /// when they are both writing (moving the source chain forward)
+    /// When calling the same cell we need to make sure the "as at" doesn't cause the original zome
+    /// call to fail when they are both writing (moving the source chain forward).  Also tests the
+    /// case where both Zome init() functions write things (CapGrant, Entries) to the source-chain.
     #[tokio::test(threaded_scheduler)]
     async fn call_the_same_cell() {
         observability::test_run().ok();

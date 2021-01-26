@@ -1,6 +1,13 @@
 use hdk3::prelude::*;
 
 #[hdk_entry(
+    id = "setup",
+    required_validations = 5,
+    required_validation_type = "element"
+)]
+struct Setup(String);
+
+#[hdk_entry(
     id = "post",
     required_validations = 5,
     required_validation_type = "full"
@@ -100,7 +107,7 @@ fn get_activity(
 
 #[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
-    // grant unrestricted access to accept_cap_claim so other agents can send us claims
+    // grant unrestricted access to create_entry Zome API so other agents can create entries
     let mut functions: GrantedFunctions = HashSet::new();
     functions.insert((zome_info()?.zome_name, "create_entry".into()));
     create_cap_grant(CapGrantEntry {
@@ -109,6 +116,11 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
         access: ().into(),
         functions,
     })?;
+
+    // Test that the init function can also successfully commit entries to the source-chain.
+    // Until https://github.com/holochain/holochain/pull/601 is fixed, this will cause failure
+    // in test cases ...::wasm_test::bridge_call and call_the_same_cell!
+    hdk3::prelude::create_entry(&Setup(String::from("Hello, world!")))?;
 
     Ok(InitCallbackResult::Pass)
 }
