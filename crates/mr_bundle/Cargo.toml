@@ -7,10 +7,19 @@ edition = "2018"
 [workspace]
 
 [dependencies]
+bytes = "1.0"
+derive_more = "0.99"
+futures = "0.3"
+reqwest = "0.11"
 rmp-serde = "0.14"
-serde = { version = "1.0", features = [ "derive" ] }
+serde = { version = "1.0", features = [ "serde_derive", "derive" ] }
+serde_bytes = "0.11"
 serde_derive = "1.0"
+thiserror = "1.0"
 
 [dev-dependencies]
+anyhow = "1.0"
 maplit = "1"
 serde_yaml = "0.8"
+tokio = { version = "1.0", features = ["full"]}
+tempdir = "0.3"

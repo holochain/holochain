@@ -1,4 +1,8 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+use bytes::Bytes;
+
+use crate::error::MrBundleResult;
 
 /// Where to find a file.
 ///
@@ -21,37 +25,20 @@ pub enum Location {
     Url(String),
 }
 
-// #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-// #[serde(rename_all = "snake_case")]
-// #[serde(untagged)]
-// #[allow(missing_docs)]
-// pub enum LocationSerialized {
-//     /// Expect file to be part of this bundle
-//     Bundled { bundled: PathBuf },
+impl Location {
+    pub async fn resolve(&self) -> MrBundleResult<Bytes> {
+        match self {
+            Self::Bundled(path) => todo!(),
+            Self::Path(path) => resolve_local(path).await,
+            Self::Url(url) => resolve_remote(url).await,
+        }
+    }
+}
 
-//     /// Get file from local filesystem (not bundled)
-//     Local { path: PathBuf },
+async fn resolve_local(path: &Path) -> MrBundleResult<Bytes> {
+    Ok(std::fs::read(path)?.into())
+}
 
-//     /// Get file from URL
-//     Remote { url: String },
-// }
-
-// impl From<Location> for LocationSerialized {
-//     fn from(loc: Location) -> Self {
-//         match loc {
-//             Location::Bundled(bundled) => Self::Bundled { bundled },
-//             Location::Local(path) => Self::Local { path },
-//             Location::Remote(url) => Self::Remote { url },
-//         }
-//     }
-// }
-
-// impl From<LocationSerialized> for Location {
-//     fn from(loc: LocationSerialized) -> Self {
-//         match loc {
-//             LocationSerialized::Bundled { bundled } => Self::Bundled(bundled),
-//             LocationSerialized::Local { path } => Self::Local(path),
-//             LocationSerialized::Remote { url } => Self::Remote(url),
-//         }
-//     }
-// }
+async fn resolve_remote(url: &str) -> MrBundleResult<Bytes> {
+    Ok(reqwest::get(url).await?.bytes().await?)
+}
