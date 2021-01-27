@@ -41,7 +41,6 @@
 //! types for testing. If we did not have a way of hiding this type genericity,
 //! code which interacted with the Conductor would also have to be highly generic.
 
-use super::api::error::ConductorApiResult;
 use super::api::ZomeCall;
 use super::config::AdminInterfaceConfig;
 use super::dna_store::DnaStore;
@@ -55,6 +54,7 @@ use super::p2p_store::put_agent_info_signed;
 use super::p2p_store::query_agent_info_signed;
 use super::Cell;
 use super::Conductor;
+use super::{api::error::ConductorApiResult, state::AppInterfaceId};
 use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
@@ -223,6 +223,10 @@ pub trait ConductorHandleT: Send + Sync {
     /// Retrieve the ConductorState. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState>;
+
+    /// Add a "test" app interface for sending and receiving signals. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn add_test_app_interface(&self, id: AppInterfaceId) -> ConductorResult<()>;
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -555,6 +559,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
         let lock = self.conductor.read().await;
         Ok(lock.get_state_from_handle().await?)
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn add_test_app_interface(&self, id: AppInterfaceId) -> ConductorResult<()> {
+        let mut lock = self.conductor.write().await;
+        lock.add_test_app_interface(id).await
     }
 }
 

@@ -270,25 +270,16 @@ async fn signal_subscription() -> anyhow::Result<()> {
     let app = conductor.setup_app("app", &[dna_file]).await;
     let zome = &app.cells()[0].zome("zome1");
 
-    let signals_2n = conductor.signal_stream().await.take(2 * N);
+    let signals = conductor.signals().await.take(N);
 
     // Emit N signals
     for _ in 0..N {
         let _: () = conductor.call(zome, "emit_signal", ()).await;
     }
 
-    let signals_n = conductor.signal_stream().await.take(N);
-
-    for _ in 0..3 {
-        let _: () = conductor.call(zome, "emit_signal", ()).await;
-    }
-
     // Ensure that we can receive all signals
-    let signals_n: Vec<Signal> = signals_n.collect().await;
-    let signals_2n: Vec<Signal> = signals_2n.collect().await;
-
-    assert_eq!(signals_n.len(), N);
-    assert_eq!(signals_2n.len(), N);
+    let signals: Vec<Signal> = signals.collect().await;
+    assert_eq!(signals.len(), N);
 
     Ok(())
 }

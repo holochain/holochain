@@ -124,6 +124,7 @@ pub struct SweetConductor {
     envs: TestEnvironments,
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
+    signal_stream: Option<Box<dyn tokio::stream::Stream<Item = Signal> + Send + Sync + Unpin>>,
 }
 
 fn standard_config() -> ConductorConfig {
@@ -140,18 +141,30 @@ fn standard_config() -> ConductorConfig {
 }
 
 impl SweetConductor {
-    /// Create a SweetConductor from an already-build ConductorHandle and environments
-    pub fn new(
+    /// Create a SweetConductor from an already-built ConductorHandle and environments
+    ///
+    /// The conductor will be supplied with a single test AppInterface named
+    /// "sweet-interface" so that signals may be emitted
+    pub async fn new(
         handle: ConductorHandle,
         envs: TestEnvironments,
         config: ConductorConfig,
     ) -> SweetConductor {
-        let handle = Arc::new(SweetConductorHandle(handle));
+        // Automatically add a test app interface
+        handle
+            .add_test_app_interface("sweet-interface".into())
+            .await
+            .expect("Couldn't set up test app interface");
+
+        // Get a stream of all signals since conductor startup
+        let signal_stream = handle.signal_broadcaster().await.subscribe_merged();
+
         Self {
-            handle: Some(handle),
+            handle: Some(Arc::new(SweetConductorHandle(handle))),
             envs,
             config,
             dnas: Vec::new(),
+            signal_stream: Some(Box::new(signal_stream)),
         }
     }
 
@@ -159,7 +172,7 @@ impl SweetConductor {
     pub async fn from_config(config: ConductorConfig) -> SweetConductor {
         let envs = test_environments();
         let handle = Self::from_existing(&envs, &config).await;
-        Self::new(handle, envs, config)
+        Self::new(handle, envs, config).await
     }
 
     /// Create a SweetConductor from a partially-configured ConductorBuilder
@@ -169,7 +182,7 @@ impl SweetConductor {
         let envs = test_environments();
         let config = builder.config.clone();
         let handle = builder.test(&envs).await.unwrap();
-        Self::new(handle, envs, config)
+        Self::new(handle, envs, config).await
     }
 
     /// Create a handle from an existing environment and config
@@ -344,9 +357,11 @@ impl SweetConductor {
         SweetAppBatch(apps)
     }
 
-    /// Get a stream of all Signals emitted since the time of this function call.
-    pub async fn signal_stream(&self) -> impl tokio::stream::Stream<Item = Signal> {
-        self.handle().signal_stream().await
+    /// Get a stream of all Signals emitted on the "sweet-interface" AppInterface.
+    pub async fn signals(&mut self) -> impl tokio::stream::Stream<Item = Signal> {
+        self.signal_stream
+            .take()
+            .expect("Can't take the SweetConductor signal stream twice")
     }
 
     /// Shutdown this conductor.
@@ -445,10 +460,10 @@ impl SweetConductorHandle {
             .expect("Couldn't deserialize zome call output")
     }
 
-    /// Get a stream of all Signals emitted since the time of this function call.
-    pub async fn signal_stream(&self) -> impl tokio::stream::Stream<Item = Signal> {
-        self.0.signal_broadcaster().await.subscribe_merged()
-    }
+    // /// Get a stream of all Signals emitted since the time of this function call.
+    // pub async fn signal_stream(&self) -> impl tokio::stream::Stream<Item = Signal> {
+    //     self.0.signal_broadcaster().await.subscribe_merged()
+    // }
 
     /// Manually await shutting down the conductor.
     /// Conductors are already cleaned up on drop but this
