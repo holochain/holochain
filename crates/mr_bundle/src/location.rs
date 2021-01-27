@@ -10,9 +10,8 @@ use crate::error::MrBundleResult;
 /// either "path", "url", or "bundled" can be specified due to this field
 /// being flattened.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-// #[serde(from = "LocationSerialized")]
+// #[serde(from = "LocationSerialized", into = "LocationSerialized")]
 #[serde(rename_all = "lowercase")]
-// #[serde(into = "LocationSerialized")]
 #[allow(missing_docs)]
 pub enum Location {
     /// Expect file to be part of this bundle
@@ -42,3 +41,38 @@ async fn resolve_local(path: &Path) -> MrBundleResult<Bytes> {
 async fn resolve_remote(url: &str) -> MrBundleResult<Bytes> {
     Ok(reqwest::get(url).await?.bytes().await?)
 }
+
+// #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+// #[serde(rename_all = "snake_case")]
+// #[serde(untagged)]
+// #[allow(missing_docs)]
+// pub enum LocationSerialized {
+//     /// Expect file to be part of this bundle
+//     Bundled { bundled: PathBuf },
+
+//     /// Get file from local filesystem (not bundled)
+//     Local { path: PathBuf },
+
+//     /// Get file from URL
+//     Remote { url: String },
+// }
+
+// impl From<Location> for LocationSerialized {
+//     fn from(loc: Location) -> Self {
+//         match loc {
+//             Location::Bundled(bundled) => Self::Bundled { bundled },
+//             Location::Path(path) => Self::Local { path },
+//             Location::Url(url) => Self::Remote { url },
+//         }
+//     }
+// }
+
+// impl From<LocationSerialized> for Location {
+//     fn from(loc: LocationSerialized) -> Self {
+//         match loc {
+//             LocationSerialized::Bundled { bundled } => Self::Bundled(bundled),
+//             LocationSerialized::Local { path } => Self::Path(path),
+//             LocationSerialized::Remote { url } => Self::Url(url),
+//         }
+//     }
+// }

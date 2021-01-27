@@ -882,9 +882,9 @@ dependencies = [
 
 [[package]]
 name = "rmp-serde"
-version = "0.14.4"
+version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ce7d70c926fe472aed493b902010bccc17fa9f7284145cb8772fd22fdb052d8"
+checksum = "046c5bb3a3728ed6a97d7337e436ec5966fa5e71899c5312c3aa0fda7f949c7f"
 dependencies = [
  "byteorder",
  "rmp",

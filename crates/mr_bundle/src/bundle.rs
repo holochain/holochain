@@ -1,26 +1,72 @@
 use bytes::Bytes;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::{error::MrBundleResult, location::Location, manifest::BundleManifest};
-use std::collections::HashMap;
+use crate::{
+    encode,
+    error::{MrBundleError, MrBundleResult},
+    location::Location,
+    manifest::BundleManifest,
+};
+use std::{collections::HashMap, convert::TryFrom};
 
 #[derive(Serialize, Deserialize, derive_more::From, derive_more::AsRef)]
 pub struct Blob(#[serde(with = "serde_bytes")] Vec<u8>);
 
-#[derive(Serialize, Deserialize)]
+/// A Manifest bundled together, optionally, with the Resources that it describes.
+/// This is meant to be serialized for standalone distribution, and deserialized
+/// by the receiver.
+///
+/// The manifest may describe locations of resources not included in the Bundle.
+/// TODO: make clear the difference between the partial set of resources and
+/// the full set of resolved resources.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Bundle<M, R>
 where
     M: BundleManifest,
-    R: Serialize + DeserializeOwned,
+    R: Clone + Serialize + DeserializeOwned,
 {
     manifest: M,
     resources: HashMap<Location, R>,
 }
 
+#[derive(Serialize, Deserialize)]
+struct BundleSerialized {
+    manifest: Vec<u8>,
+    resources: Vec<u8>,
+}
+
+impl<M, R> TryFrom<&Bundle<M, R>> for BundleSerialized
+where
+    M: BundleManifest,
+    R: Clone + Serialize + DeserializeOwned,
+{
+    type Error = MrBundleError;
+    fn try_from(bundle: &Bundle<M, R>) -> MrBundleResult<BundleSerialized> {
+        Ok(Self {
+            manifest: crate::encode(&bundle.manifest)?,
+            resources: crate::encode(&bundle.resources)?,
+        })
+    }
+}
+
+impl<M, R> TryFrom<&BundleSerialized> for Bundle<M, R>
+where
+    M: BundleManifest,
+    R: Clone + Serialize + DeserializeOwned,
+{
+    type Error = MrBundleError;
+    fn try_from(bundle: &BundleSerialized) -> MrBundleResult<Bundle<M, R>> {
+        Ok(Self {
+            manifest: crate::decode(&bundle.manifest)?,
+            resources: crate::decode(&bundle.resources)?,
+        })
+    }
+}
+
 impl<M, R> Bundle<M, R>
 where
     M: BundleManifest,
-    R: Serialize + DeserializeOwned,
+    R: Clone + Serialize + DeserializeOwned,
 {
     pub async fn from_manifest(manifest: M) -> MrBundleResult<Self> {
         let resources: HashMap<Location, R> =
@@ -42,6 +88,24 @@ where
 
     pub fn resource(&self, location: &Location) -> Option<&R> {
         self.resources.get(location)
+    }
+
+    pub fn to_bytes(&self) -> MrBundleResult<Vec<u8>> {
+        crate::encode(&(
+            crate::encode(&self.manifest)?,
+            crate::encode(&self.resources)?,
+        ))
+        // crate::encode(&BundleSerialized::try_from(self)?)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> MrBundleResult<Self> {
+        let (m, r): (Vec<u8>, Vec<u8>) = crate::decode(bytes)?;
+        Ok(Self {
+            manifest: crate::decode(&m)?,
+            resources: crate::decode(&r)?,
+        })
+        // let serialized: BundleSerialized = crate::decode(bytes)?;
+        // Ok(Self::try_from(&serialized)?)
     }
 }
 
@@ -80,7 +144,7 @@ mod tests {
             location: Location,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Clone, Serialize, Deserialize)]
         struct Thing(u32);
 
         let location1 = Location::Bundled("./1.thing".into());
@@ -105,7 +169,5 @@ mod tests {
                 location2 => Thing(2),
             },
         };
-
-        println!("{}", serde_yaml::to_string(&bundle).unwrap());
     }
 }

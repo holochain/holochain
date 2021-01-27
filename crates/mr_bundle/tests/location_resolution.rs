@@ -30,7 +30,7 @@ struct ThingManifest {
     location: Location,
 }
 
-#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 struct Thing(u32);
 
 #[tokio::test]
@@ -68,9 +68,11 @@ async fn path_roundtrip() -> anyhow::Result<()> {
 
     // Ensure that the bundle is serializable and writable
     let bundle_path = dir.path().join("test.bundle");
-    std::fs::write(bundle_path, &mr_bundle::encode(&bundle)?)?;
+    let bundle_bytes = bundle.to_bytes().unwrap();
+    std::fs::write(&bundle_path, bundle_bytes)?;
 
-    let decoded_bundle: Bundle<_, _> = mr_bundle::decode(&std::fs::read(bundle_path)?)?;
+    // Ensure that it is also readable and deserializable
+    let decoded_bundle: Bundle<_, _> = Bundle::from_bytes(&std::fs::read(bundle_path)?)?;
     assert_eq!(bundle, decoded_bundle);
 
     Ok(())

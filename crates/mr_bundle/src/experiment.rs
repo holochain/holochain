@@ -1,6 +1,10 @@
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-trait Trait<'d>: Sized + Serialize + Deserialize<'d> {}
+trait Manifest: Sized + Serialize + DeserializeOwned {}
 
 #[derive(Serialize, Deserialize)]
-struct Struct<T>(T);
+#[serde(from = "BundleSerialized", into = "BundleSerialized")]
+struct Bundle<M: Manifest>(M);
+
+#[derive(Serialize, Deserialize)]
+struct BundleSerialized(Vec<u8>);
