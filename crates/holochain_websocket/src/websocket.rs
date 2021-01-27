@@ -16,6 +16,7 @@ use ghost_actor::*;
 use tungstenite::protocol::frame::coding::CloseCode;
 use tungstenite::protocol::CloseFrame;
 
+use crate::util::addr_to_url;
 use crate::util::ToFromSocket;
 use crate::util::CLOSE_TIMEOUT;
 use crate::IncomingMessage;
@@ -25,6 +26,7 @@ use crate::Respond;
 use crate::WebsocketConfig;
 use crate::WebsocketError;
 use crate::WebsocketReceiver;
+use crate::WebsocketResult;
 use crate::WebsocketSender;
 
 type GhostResult<T> = std::result::Result<T, GhostError>;
@@ -103,7 +105,13 @@ impl Websocket {
         config: Arc<WebsocketConfig>,
         socket: ToFromSocket,
         listener_shutdown: Valve,
-    ) -> (WebsocketSender, WebsocketReceiver) {
+    ) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
+        let remote_addr = url2::url2!(
+            "{}#{}",
+            addr_to_url(socket.get_ref().peer_addr()?, config.scheme),
+            nanoid::nanoid!(),
+        );
+
         let (tx_to_websocket, rx_to_websocket) = tokio::sync::mpsc::channel(config.max_send_queue);
         let (tx_from_websocket, rx_from_websocket) =
             tokio::sync::mpsc::channel(config.max_send_queue);
@@ -121,7 +129,7 @@ impl Websocket {
         // ---- LISTENER SHUTDOWN ---- //
 
         // Shutdown the receiver stream if the listener is dropped
-        // TODO: Should this shutdown immediately or gracefully 
+        // TODO: Should this shutdown immediately or gracefully
         let rx_from_websocket = listener_shutdown.wrap(rx_from_websocket);
 
         Websocket::run(
@@ -131,14 +139,14 @@ impl Websocket {
             tx_from_websocket,
             pair_shutdown,
         );
-        
+
         let sender = WebsocketSender::new(
             tx_to_websocket,
             listener_shutdown,
             pair_shutdown_handle.clone(),
         );
-        let receiver = WebsocketReceiver::new(rx_from_websocket, pair_shutdown_handle);
-        (sender, receiver)
+        let receiver = WebsocketReceiver::new(rx_from_websocket, remote_addr, pair_shutdown_handle);
+        Ok((sender, receiver))
     }
 
     #[instrument(skip(
@@ -178,7 +186,7 @@ impl Websocket {
         pair_shutdown: Valve,
     ) {
         let (to_socket, from_socket) = socket.split();
-        
+
         // ---- TASK SHUTDOWN ---- //
         // These cause immediate shutdown
         let (shutdown_from_socket, from_socket) = Valved::new(from_socket);

@@ -1317,33 +1317,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ghost_websocket"
-version = "0.0.1"
-dependencies = [
- "async-stream",
- "futures",
- "ghost_actor 0.4.0-alpha.5",
- "holochain_serialized_bytes",
- "holochain_types",
- "linefeed",
- "must_future",
- "nanoid",
- "net2",
- "observability",
- "serde",
- "serde_bytes",
- "stream-cancel",
- "thiserror",
- "tokio 0.2.24",
- "tokio-tungstenite",
- "tracing",
- "tracing-futures",
- "tungstenite",
- "unwrap_to",
- "url2",
-]
-
-[[package]]
 name = "gimli"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1820,20 +1793,26 @@ dependencies = [
 name = "holochain_websocket"
 version = "0.0.1"
 dependencies = [
+ "async-stream",
  "futures",
+ "ghost_actor 0.4.0-alpha.5",
  "holochain_serialized_bytes",
  "holochain_types",
  "linefeed",
+ "must_future",
  "nanoid",
  "net2",
  "observability",
  "serde",
  "serde_bytes",
+ "stream-cancel",
+ "thiserror",
  "tokio 0.2.24",
  "tokio-tungstenite",
  "tracing",
  "tracing-futures",
  "tungstenite",
+ "unwrap_to",
  "url2",
 ]
 

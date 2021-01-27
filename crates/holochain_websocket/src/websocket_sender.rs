@@ -1,150 +1,106 @@
-//! defines the write/send half of a websocket pair
+use futures::FutureExt;
+use futures::StreamExt;
+use holochain_serialized_bytes::SerializedBytes;
+use stream_cancel::Valve;
+use websocket::PairShutdown;
+use websocket::TxToWebsocket;
 
-use super::task_socket_sink::ToSocketSinkSender;
-use crate::*;
-use task_dispatch_incoming::ToDispatchIncoming;
-use task_dispatch_incoming::ToDispatchIncomingSender;
-use tracing_futures::Instrument;
+use crate::websocket;
+use crate::WebsocketError;
+use crate::WebsocketResult;
+use std::convert::TryFrom;
+use std::convert::TryInto;
+use std::sync::Arc;
 
-/// The Sender/Write half of a split websocket. Use this to make
-/// outgoing requests to the remote end of this websocket connection.
-/// This struct is cheaply clone-able.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct WebsocketSender {
-    send_sink: ToSocketSinkSender,
-    send_dispatch: ToDispatchIncomingSender,
+    tx_to_websocket: TxToWebsocket,
+    listener_shutdown: Valve,
+    __pair_shutdown: Arc<PairShutdown>,
+}
+
+#[derive(Debug)]
+pub(crate) struct RegisterResponse {
+    respond: tokio::sync::oneshot::Sender<SerializedBytes>,
+}
+
+impl RegisterResponse {
+    pub(crate) fn respond(self, msg: SerializedBytes) -> WebsocketResult<()> {
+        self.respond
+            .send(msg)
+            .map_err(|_| WebsocketError::FailedToSendResp)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum OutgoingMessage {
+    Close,
+    Signal(SerializedBytes),
+    Request(SerializedBytes, RegisterResponse),
+    Response(SerializedBytes, u32),
+    Pong(Vec<u8>),
 }
 
 impl WebsocketSender {
-    /// internal constructor
-    pub(crate) fn priv_new(
-        send_sink: ToSocketSinkSender,
-        send_dispatch: ToDispatchIncomingSender,
+    pub(crate) fn new(
+        tx_to_websocket: TxToWebsocket,
+        listener_shutdown: Valve,
+        pair_shutdown: Arc<PairShutdown>,
     ) -> Self {
         Self {
-            send_sink,
-            send_dispatch,
+            tx_to_websocket,
+            listener_shutdown,
+            __pair_shutdown: pair_shutdown,
         }
     }
 
-    // FIXME use the code enum not the u16
-    /// Close the websocket
-    #[must_use]
-    pub fn close(&mut self, code: u16, reason: String) -> BoxFuture<'static, Result<()>> {
-        let mut send_sink = self.send_sink.clone();
-        async move {
-            let (send, recv) = tokio::sync::oneshot::channel();
-
-            send_sink
-                .send((
-                    tungstenite::Message::Close(Some(tungstenite::protocol::CloseFrame {
-                        code: code.into(),
-                        reason: reason.into(),
-                    })),
-                    send,
-                ))
-                .await
-                .map_err(|e| Error::new(ErrorKind::Other, e))?;
-
-            recv.await.map_err(|e| Error::new(ErrorKind::Other, e))?;
-
-            Ok(())
-        }
-        .boxed()
-    }
-
-    /// Emit a signal (message without response) to the remote end of this websocket
-    #[must_use]
-    pub fn signal<SB1>(&mut self, msg: SB1) -> BoxFuture<'static, Result<()>>
+    #[tracing::instrument(skip(self))]
+    pub async fn request<I, O, E, E2>(&mut self, msg: I) -> WebsocketResult<O>
     where
-        SB1: 'static + std::convert::TryInto<SerializedBytes> + Send,
-        <SB1 as std::convert::TryInto<SerializedBytes>>::Error:
-            'static + std::error::Error + Send + Sync,
+        I: std::fmt::Debug,
+        O: std::fmt::Debug,
+        WebsocketError: From<E>,
+        WebsocketError: From<E2>,
+        SerializedBytes: TryFrom<I, Error = E>,
+        O: TryFrom<SerializedBytes, Error = E2>,
     {
-        //let span = tracing::debug_span!("sender_signal");
-        let mut send_sink = self.send_sink.clone();
-        async move {
-            let bytes: SerializedBytes = msg
-                .try_into()
-                .map_err(|e| Error::new(ErrorKind::Other, e))?;
-            let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
+        tracing::trace!("Sending");
+        let (tx_resp, rx_resp) = tokio::sync::oneshot::channel();
+        let mut rx_resp = self.listener_shutdown.wrap(rx_resp.into_stream());
+        let resp = RegisterResponse { respond: tx_resp };
+        let msg = OutgoingMessage::Request(msg.try_into()?, resp);
 
-            let msg = WireMessage::Signal { data: bytes };
-            let bytes: SerializedBytes = msg.try_into()?;
-            let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
+        self.tx_to_websocket
+            .send(msg)
+            .await
+            .map_err(|_| WebsocketError::Shutdown)?;
 
-            let msg = tungstenite::Message::Binary(bytes);
+        tracing::trace!("Sent");
 
-            let (send, recv) = tokio::sync::oneshot::channel();
-
-            send_sink
-                .send((msg, send))
-                .await
-                .map_err(|e| Error::new(ErrorKind::Other, e))?;
-
-            recv.await.map_err(|e| Error::new(ErrorKind::Other, e))?;
-
-            Ok(())
-        }
-        .boxed()
+        Ok(rx_resp
+            .next()
+            .await
+            .ok_or(WebsocketError::Shutdown)?
+            .map_err(|_| WebsocketError::FailedToRecvResp)?
+            .try_into()?)
     }
 
-    /// Make a rpc request of the remote end of this websocket
-    #[must_use]
-    pub fn request<SB1, SB2>(&mut self, msg: SB1) -> BoxFuture<'static, Result<SB2>>
+    #[tracing::instrument(skip(self))]
+    pub async fn signal<I, E>(&mut self, msg: I) -> WebsocketResult<()>
     where
-        SB1: 'static + std::convert::TryInto<SerializedBytes> + Send + std::fmt::Debug,
-        <SB1 as std::convert::TryInto<SerializedBytes>>::Error:
-            'static + std::error::Error + Send + Sync,
-        SB2: 'static + std::convert::TryFrom<SerializedBytes> + Send,
-        <SB2 as std::convert::TryFrom<SerializedBytes>>::Error:
-            'static + std::error::Error + Send + Sync,
+        I: std::fmt::Debug,
+        WebsocketError: From<E>,
+        SerializedBytes: TryFrom<I, Error = E>,
     {
-        let mut send_sink = self.send_sink.clone();
-        let mut send_dispatch = self.send_dispatch.clone();
-        async move {
-            tracing::trace!(request_msg = ?msg);
-            let bytes: SerializedBytes = msg
-                .try_into()
-                .map_err(|e| Error::new(ErrorKind::Other, e))?;
-            let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
+        tracing::trace!("Sending");
+        let msg = OutgoingMessage::Signal(msg.try_into()?);
 
-            let id = nanoid::nanoid!();
+        self.tx_to_websocket
+            .send(msg)
+            .await
+            .map_err(|_| WebsocketError::Shutdown)?;
 
-            let (send_response, recv_response) = tokio::sync::oneshot::channel();
-
-            send_dispatch
-                .send(ToDispatchIncoming::RegisterResponse {
-                    id: id.clone(),
-                    respond: send_response,
-                })
-                .await
-                .map_err(|e| Error::new(ErrorKind::Other, e))?;
-
-            let msg = WireMessage::Request { id, data: bytes };
-            let bytes: SerializedBytes = msg.try_into()?;
-            let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
-
-            let msg = tungstenite::Message::Binary(bytes);
-
-            let (send_complete, recv_complete) = tokio::sync::oneshot::channel();
-
-            send_sink
-                .send((msg, send_complete))
-                .await
-                .map_err(|e| Error::new(ErrorKind::Other, e))?;
-
-            recv_complete
-                .await
-                .map_err(|e| Error::new(ErrorKind::Other, e))?;
-
-            let bytes = recv_response
-                .await
-                .map_err(|e| Error::new(ErrorKind::Other, e))??;
-            let bytes: SerializedBytes = UnsafeBytes::from(bytes).into();
-            Ok(SB2::try_from(bytes).map_err(|e| Error::new(ErrorKind::Other, e))?)
-        }
-        .instrument(tracing::debug_span!("sender_request"))
-        .boxed()
+        tracing::trace!("Sent");
+        Ok(())
     }
 }
