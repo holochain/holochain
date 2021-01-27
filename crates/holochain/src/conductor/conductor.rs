@@ -773,7 +773,7 @@ where
         id: I,
     ) -> ConductorResult<()> {
         let id = id.into();
-        let (signal_tx, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
+        let (signal_tx, _r) = tokio::sync::broadcast::channel(1000);
         if self.app_interfaces.contains_key(&id) {
             return Err(ConductorError::AppInterfaceIdCollision(id));
         }

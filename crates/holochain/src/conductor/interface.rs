@@ -94,7 +94,7 @@ impl SignalBroadcaster {
         for (i, rx) in self.subscribe_separately().into_iter().enumerate() {
             streams.insert(i, rx);
         }
-        streams.map(|(_, signal)| signal.expect("Signal channel closed"))
+        streams.map(|(_, signal)| signal.expect("Couldn't receive a signal"))
     }
 }
 
