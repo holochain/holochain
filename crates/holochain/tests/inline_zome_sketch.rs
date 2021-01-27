@@ -3,8 +3,9 @@ use holochain::test_utils::display_agent_infos;
 use holochain::test_utils::sweetest::{MaybeElement, SweetAgents, SweetConductor, SweetDnaFile};
 use holochain::test_utils::wait_for_integration_10s;
 use holochain::test_utils::WaitOps;
-use holochain_types::dna::zome::inline_zome::InlineZome;
+use holochain_types::{dna::zome::inline_zome::InlineZome, signal::Signal};
 use holochain_zome_types::element::ElementEntry;
+use tokio::stream::StreamExt;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
 #[serde(transparent)]
@@ -38,6 +39,11 @@ fn simple_crud_zome() -> InlineZome {
         })
         .callback("read_entry", |api, hash: EntryHash| {
             api.get((hash.into(), GetOptions::default()))
+                .map_err(Into::into)
+        })
+        // TODO: let this accept a usize, once the hdk refactor is merged
+        .callback("emit_signal", |api, ()| {
+            api.emit_signal(AppSignal::new(().try_into().unwrap()))
                 .map_err(Into::into)
         })
 }
@@ -249,6 +255,31 @@ async fn get_deleted() -> anyhow::Result<()> {
         .call(&alice.zome("zome1"), "read_entry", entry_hash)
         .await;
     assert!(element.0.is_none());
+
+    Ok(())
+}
+
+#[tokio::test(threaded_scheduler)]
+#[cfg(feature = "test_utils")]
+async fn signal_subscription() -> anyhow::Result<()> {
+    observability::test_run().ok();
+    const N: usize = 10;
+
+    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
+    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let app = conductor.setup_app("app", &[dna_file]).await;
+    let zome = &app.cells()[0].zome("zome1");
+
+    let signals = conductor.signals().await.take(N);
+
+    // Emit N signals
+    for _ in 0..N {
+        let _: () = conductor.call(zome, "emit_signal", ()).await;
+    }
+
+    // Ensure that we can receive all signals
+    let signals: Vec<Signal> = signals.collect().await;
+    assert_eq!(signals.len(), N);
 
     Ok(())
 }
