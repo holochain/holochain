@@ -1,115 +1,411 @@
-use holochain_websocket::*;
+use std::sync::Arc;
 
-use std::convert::TryInto;
-use tokio::stream::StreamExt;
-use url2::prelude::*;
+use futures::StreamExt;
+use holochain_serialized_bytes::prelude::*;
+use holochain_websocket::connect;
+use holochain_websocket::ListenerHandle;
+use holochain_websocket::ListenerItem;
+use holochain_websocket::WebsocketConfig;
+use holochain_websocket::WebsocketListener;
+use stream_cancel::Tripwire;
+use tracing::Instrument;
+use url2::url2;
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-struct TestMessage(pub String);
-try_from_serialized_bytes!(TestMessage);
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+struct TestString(pub String);
 
-#[tokio::test]
-async fn integration_test() {
-    let orig_handler = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |panic_info| {
-        eprintln!("THREAD PANIC {:#?}", panic_info);
-        // invoke the default handler and exit the process
-        orig_handler(panic_info);
-        std::process::exit(1);
-    }));
-
-    observability::test_run().unwrap();
-
-    let server = websocket_bind(
+async fn server() -> (
+    ListenerHandle,
+    impl futures::stream::Stream<Item = ListenerItem>,
+) {
+    WebsocketListener::bind_with_handle(
         url2!("ws://127.0.0.1:0"),
-        std::sync::Arc::new(WebsocketConfig::default()),
+        Arc::new(WebsocketConfig::default()),
     )
     .await
-    .unwrap();
-    let binding = server.local_addr().clone();
+    .unwrap()
+}
 
-    tracing::info!(
-        test = "got bound addr",
-        %binding,
-    );
+fn server_wait(
+    mut listener: impl futures::stream::Stream<Item = ListenerItem> + Unpin + Send + 'static,
+) -> tokio::task::JoinHandle<()> {
+    tokio::task::spawn(async move {
+        let (mut sender, mut receiver) = listener
+            .next()
+            .instrument(tracing::debug_span!("next_server_connection"))
+            .await
+            .unwrap()
+            .unwrap();
 
-    spawn_listener_loop(server);
+        let jh = tokio::task::spawn(async move {
+            sender
+                .signal(TestString("Hey from server".into()))
+                .instrument(tracing::debug_span!("server_sending_message"))
+                .await
+                .unwrap();
+            let _: Option<TestString> = sender
+                .request(TestString("Hey from server".into()))
+                .instrument(tracing::debug_span!("server_sending_request"))
+                .await
+                .ok();
+        });
+        while let Some(_) = receiver
+            .next()
+            .instrument(tracing::debug_span!("server_recv_msg"))
+            .await
+        {}
+        jh.await.unwrap();
+    })
+}
 
-    let (mut send, mut recv) =
-        websocket_connect(binding, std::sync::Arc::new(WebsocketConfig::default()))
+fn server_recv(
+    mut listener: impl futures::stream::Stream<Item = ListenerItem> + Unpin + Send + 'static,
+) -> tokio::task::JoinHandle<()> {
+    tokio::task::spawn(async move {
+        let (_, mut receiver) = listener
+            .next()
+            .instrument(tracing::debug_span!("next_server_connection"))
+            .await
+            .unwrap()
+            .unwrap();
+
+        while let Some((msg, _)) = receiver
+            .next()
+            .instrument(tracing::debug_span!("server_recv_msg"))
+            .await
+        {
+            let msg: TestString = msg.try_into().unwrap();
+            tracing::debug!(server_recv_msg = ?msg);
+        }
+    })
+}
+
+fn server_signal(
+    mut listener: impl futures::stream::Stream<Item = ListenerItem> + Unpin + Send + 'static,
+    n: usize,
+) -> tokio::task::JoinHandle<()> {
+    tokio::task::spawn(async move {
+        let (mut sender, _) = listener
+            .next()
+            .instrument(tracing::debug_span!("next_server_connection"))
+            .await
+            .unwrap()
+            .unwrap();
+
+        for _ in 0..n {
+            sender
+                .signal(TestString("Hey from server".into()))
+                .instrument(tracing::debug_span!("server_sending_message"))
+                .await
+                .unwrap();
+        }
+    })
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn can_connect() {
+    observability::test_run().ok();
+    let (handle, mut listener) = server().await;
+    tokio::task::spawn(async move {
+        let _ = listener
+            .next()
+            .instrument(tracing::debug_span!("next_server_connection"))
+            .await
+            .unwrap()
+            .expect("Failed to connect to client");
+    });
+    let binding = handle.local_addr().clone();
+    let _ = connect(binding, Arc::new(WebsocketConfig::default()))
+        .await
+        .expect("Failed to connect to server");
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn can_send_signal() {
+    observability::test_run().ok();
+    let (handle, mut listener) = server().await;
+    let jh = tokio::task::spawn(async move {
+        let (mut sender, mut receiver) = listener
+            .next()
+            .instrument(tracing::debug_span!("next_server_connection"))
+            .await
+            .unwrap()
+            .unwrap();
+
+        // - Signal client
+        sender
+            .signal(TestString("Hey from server".into()))
+            .instrument(tracing::debug_span!("server_sending_message"))
             .await
             .unwrap();
 
-    tracing::info!(
-        test = "connection success",
-        remote_addr = %recv.remote_addr(),
-    );
+        // - Receive signal from client
+        let (msg, _) = receiver
+            .next()
+            .instrument(tracing::debug_span!("next_sever_recv"))
+            .await
+            .unwrap();
+        let msg: TestString = msg.try_into().unwrap();
 
-    let msg = TestMessage("test-signal".to_string());
-    send.signal(msg).await.unwrap();
+        assert_eq!(msg.0, "Hey from client");
+    });
 
-    let msg = TestMessage("test-request".to_string());
-    let rsp: TestMessage = send.request(msg).await.unwrap();
+    // - Connect client
+    let binding = handle.local_addr().clone();
+    let (mut sender, mut receiver) = connect(binding, Arc::new(WebsocketConfig::default()))
+        .instrument(tracing::debug_span!("client"))
+        .await
+        .unwrap();
 
-    tracing::info!(
-        test = "got response",
-        data = %rsp.0,
-    );
+    // - Receive signal from server
+    let (msg, _) = receiver
+        .next()
+        .instrument(tracing::debug_span!("next_client_recv"))
+        .await
+        .unwrap();
 
-    assert_eq!("echo: test-request", &rsp.0,);
+    let msg: TestString = msg.try_into().unwrap();
 
-    send.close(1000, "test".to_string()).await.unwrap();
+    assert_eq!(msg.0, "Hey from server");
 
-    assert_eq!(
-        "WebsocketMessage::Close { close: WebsocketClosed { code: 0, reason: \"Internal Error: Protocol(\\\"Connection reset without closing handshake\\\")\" } }",
-        &format!("{:?}", recv.next().await.unwrap()),
-    );
+    // - Send signal to server
+    sender
+        .signal(TestString("Hey from client".into()))
+        .instrument(tracing::debug_span!("client_sending_message"))
+        .await
+        .unwrap();
 
-    assert_eq!("None", &format!("{:?}", recv.next().await),);
+    jh.await.unwrap();
 }
 
-#[tokio::test]
-#[ignore = "stub"]
-async fn channels_properly_close() {
-    // TODO
+#[tokio::test(threaded_scheduler)]
+async fn can_send_request() {
+    observability::test_run().ok();
+    let (handle, mut listener) = server().await;
+    let jh = tokio::task::spawn(async move {
+        let (mut sender, mut receiver) = listener
+            .next()
+            .instrument(tracing::debug_span!("next_server_connection"))
+            .await
+            .unwrap()
+            .unwrap();
+
+        // - Request client
+        let resp: TestString = sender
+            .request(TestString("Hey from server".into()))
+            .instrument(tracing::debug_span!("server_sending_message"))
+            .await
+            .unwrap();
+        assert_eq!(resp.0, "Bye from client");
+
+        // - Receive request from client
+        let (msg, resp) = receiver
+            .next()
+            .instrument(tracing::debug_span!("next_server_recv"))
+            .await
+            .unwrap();
+
+        let msg: TestString = msg.try_into().unwrap();
+
+        assert_eq!(msg.0, "Hey from client");
+
+        resp.respond(TestString("Bye from server".into()).try_into().unwrap())
+            .instrument(tracing::debug_span!("server_respond"))
+            .await
+            .unwrap();
+    });
+
+    // - Connect client
+    let binding = handle.local_addr().clone();
+    let (mut sender, mut receiver) = connect(binding, Arc::new(WebsocketConfig::default()))
+        .instrument(tracing::debug_span!("client"))
+        .await
+        .unwrap();
+
+    // - Receive Request from server
+    let (msg, resp) = receiver
+        .next()
+        .instrument(tracing::debug_span!("next_client_recv"))
+        .await
+        .unwrap();
+
+    let msg: TestString = msg.try_into().unwrap();
+
+    assert_eq!(msg.0, "Hey from server");
+    resp.respond(TestString("Bye from client".into()).try_into().unwrap())
+        .await
+        .unwrap();
+
+    // - Send signal to server
+    let msg: TestString = sender
+        .request(TestString("Hey from client".into()))
+        .instrument(tracing::debug_span!("client_sending_message"))
+        .await
+        .unwrap();
+    assert_eq!(msg.0, "Bye from server");
+
+    jh.await.unwrap();
 }
 
-fn spawn_listener_loop(mut server: WebsocketListener) -> tokio::task::JoinHandle<()> {
-    tokio::task::spawn(async move {
-        while let Some(maybe_con) = server.next().await {
-            let (_send, mut recv) = maybe_con.unwrap();
-            tracing::info!(
-                test = "incoming connection",
-                remote_addr = %recv.remote_addr(),
-            );
-            while let Some(msg) = recv.next().await {
-                match msg {
-                    WebsocketMessage::Close(close) => {
-                        tracing::error!(error = ?close);
-                        break;
-                    }
-                    WebsocketMessage::Signal(data) => {
-                        let msg: TestMessage = data.try_into().unwrap();
-                        tracing::info!(
-                            test = "incoming signal",
-                            data = %msg.0,
-                        );
+#[tokio::test(threaded_scheduler)]
+async fn shutdown_listener() {
+    observability::test_run().ok();
+    let (handle, mut listener) = server().await;
+    std::mem::drop(handle);
+    assert!(listener.next().await.is_none());
 
-                        assert_eq!("test-signal", msg.0,);
-                    }
-                    WebsocketMessage::Request(data, respond) => {
-                        let msg: TestMessage = data.try_into().unwrap();
-                        tracing::info!(
-                            test = "incoming message",
-                            data = %msg.0,
-                        );
-                        let msg = TestMessage(format!("echo: {}", msg.0));
-                        respond(msg.try_into().unwrap()).await.unwrap();
-                    }
-                }
-            }
-            tracing::info!(test = "exit srv con loop");
+    let (handle, mut listener) = server().await;
+    handle.close();
+    assert!(listener.next().await.is_none());
+
+    let (handle, mut listener) = server().await;
+    let jh = tokio::task::spawn(async move {
+        assert!(listener.next().await.is_none());
+    });
+    handle.close();
+    jh.await.unwrap();
+
+    // Close on with oneshot
+    let (handle, mut listener) = server().await;
+    let jh = tokio::task::spawn(async move {
+        assert!(listener.next().await.is_none());
+    });
+
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let cjh = tokio::task::spawn(handle.close_on(async move { rx.await.unwrap_or(true) }));
+    tx.send(true).unwrap();
+    cjh.await.unwrap();
+    jh.await.unwrap();
+
+    // Close on with TripWire
+    let (handle, mut listener) = server().await;
+    let jh = tokio::task::spawn(async move {
+        assert!(listener.next().await.is_none());
+    });
+
+    let (kill, trip) = Tripwire::new();
+    let cjh = tokio::task::spawn(handle.close_on(trip));
+    kill.cancel();
+    cjh.await.unwrap();
+    jh.await.unwrap();
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn shutdown_receiver() {
+    observability::test_run().ok();
+    let (handle, listener) = server().await;
+    let s_jh = server_wait(listener);
+    let binding = handle.local_addr().clone();
+    let (_sender, mut receiver) = connect(binding, Arc::new(WebsocketConfig::default()))
+        .instrument(tracing::debug_span!("client"))
+        .await
+        .unwrap();
+    let rh = receiver.take_handle().unwrap();
+    let c_jh = tokio::task::spawn(async move {
+        receiver
+            .next()
+            .instrument(tracing::debug_span!("client_recv_message"))
+            .await;
+    });
+
+    rh.close();
+    c_jh.await.unwrap();
+    handle.close();
+    s_jh.await.unwrap();
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn listener_shuts_down_server() {
+    observability::test_run().ok();
+    let (handle, listener) = server().await;
+    let s_jh = server_wait(listener);
+    let binding = handle.local_addr().clone();
+    let (_sender, mut receiver) = connect(binding, Arc::new(WebsocketConfig::default()))
+        .instrument(tracing::debug_span!("client"))
+        .await
+        .unwrap();
+
+    let c_jh = tokio::task::spawn(async move {
+        while let Some(_) = receiver
+            .next()
+            .instrument(tracing::debug_span!("client_recv_message"))
+            .await
+        {}
+    });
+
+    handle.close();
+    s_jh.await.unwrap();
+    c_jh.await.unwrap();
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn client_shutdown() {
+    observability::test_run().ok();
+    let (handle, listener) = server().await;
+    let s_jh = server_wait(listener);
+    let binding = handle.local_addr().clone();
+    let (_sender, mut receiver) = connect(binding, Arc::new(WebsocketConfig::default()))
+        .instrument(tracing::debug_span!("client"))
+        .await
+        .unwrap();
+    let rh = receiver.take_handle().unwrap();
+    let c_jh = tokio::task::spawn(async move {
+        while let Some(_) = receiver
+            .next()
+            .instrument(tracing::debug_span!("client_recv_message"))
+            .await
+        {}
+    });
+
+    rh.close();
+    c_jh.await.unwrap();
+    s_jh.await.unwrap();
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn drop_sender() {
+    observability::test_run().ok();
+    let (handle, listener) = server().await;
+    let s_jh = server_signal(listener, 10);
+    let binding = handle.local_addr().clone();
+    let (_, mut receiver) = connect(binding, Arc::new(WebsocketConfig::default()))
+        .instrument(tracing::debug_span!("client"))
+        .await
+        .unwrap();
+    let c_jh = tokio::task::spawn(async move {
+        for _ in 0..10 {
+            receiver
+                .next()
+                .instrument(tracing::debug_span!("server_recv_message"))
+                .await
+                .unwrap();
         }
-        tracing::info!(test = "exit srv listen loop");
-    })
+    });
+
+    c_jh.await.unwrap();
+    s_jh.await.unwrap();
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn drop_receiver() {
+    observability::test_run().ok();
+    let (handle, listener) = server().await;
+    let s_jh = server_recv(listener);
+    let binding = handle.local_addr().clone();
+    let (mut sender, _) = connect(binding, Arc::new(WebsocketConfig::default()))
+        .instrument(tracing::debug_span!("client"))
+        .await
+        .unwrap();
+    let c_jh = tokio::task::spawn(async move {
+        for _ in 0..10 {
+            sender
+                .signal(TestString("Hey from client".into()))
+                .instrument(tracing::debug_span!("client_sending_message"))
+                .await
+                .unwrap();
+        }
+    });
+
+    c_jh.await.unwrap();
+    s_jh.await.unwrap();
 }

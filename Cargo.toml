@@ -7,8 +7,6 @@ members = [
   "crates/hdk3_derive",
   "crates/holo_hash",
 
-  "crates/ghost_websocket",
-  
   "crates/holochain",
   "crates/holochain_cascade",
   "crates/holochain_conductor_api",
