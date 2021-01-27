@@ -1,16 +1,16 @@
-use mr_bundle::{bundle::Bundle, location::Location, manifest::BundleManifest};
+use mr_bundle::{bundle::Bundle, location::Location, manifest::Manifest};
 use std::{env::temp_dir, path::Path};
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "manifest_version")]
 #[allow(missing_docs)]
-enum Manifest {
+enum TestManifest {
     #[serde(rename = "1")]
     #[serde(alias = "\"1\"")]
     V1(ManifestV1),
 }
 
-impl BundleManifest for Manifest {
+impl Manifest for TestManifest {
     fn locations(&self) -> Vec<Location> {
         match self {
             Self::V1(mani) => mani.things.iter().map(|b| b.location.clone()).collect(),
@@ -48,7 +48,7 @@ async fn path_roundtrip() -> anyhow::Result<()> {
     // Create a Manifest that references these local resources
     let location1 = Location::Path(path1);
     let location2 = Location::Path(path2);
-    let manifest = Manifest::V1(ManifestV1 {
+    let manifest = TestManifest::V1(ManifestV1 {
         name: "name".to_string(),
         things: vec![
             ThingManifest {
@@ -68,11 +68,11 @@ async fn path_roundtrip() -> anyhow::Result<()> {
 
     // Ensure that the bundle is serializable and writable
     let bundle_path = dir.path().join("test.bundle");
-    let bundle_bytes = bundle.to_bytes().unwrap();
+    let bundle_bytes = bundle.encode().unwrap();
     std::fs::write(&bundle_path, bundle_bytes)?;
 
     // Ensure that it is also readable and deserializable
-    let decoded_bundle: Bundle<_, _> = Bundle::from_bytes(&std::fs::read(bundle_path)?)?;
+    let decoded_bundle: Bundle<_, _> = Bundle::decode(&std::fs::read(bundle_path)?)?;
     assert_eq!(bundle, decoded_bundle);
 
     Ok(())

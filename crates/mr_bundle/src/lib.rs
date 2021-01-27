@@ -4,6 +4,7 @@ pub mod bundle;
 pub mod error;
 pub mod location;
 pub mod manifest;
+pub mod resource;
 
 // mod experiment;
 
