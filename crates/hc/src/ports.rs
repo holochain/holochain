@@ -21,16 +21,8 @@ pub fn force_admin_port(path: PathBuf, port: u16) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Add a secondary admin port to the conductor config.
-pub fn add_secondary_admin_port(path: PathBuf, port: Option<u16>) -> anyhow::Result<()> {
-    let mut config = read_config(path.clone())?.expect("Failed to find config to force admin port");
-    set_secondary_admin_port(&mut config, port);
-    write_config(path, &config);
-    Ok(())
-}
-
-/// List the secondary ports for each setup.
-pub async fn get_secondary_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
+/// List the admin ports for each setup.
+pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
     let mut ports = Vec::new();
     for p in paths {
         if let Some(config) = read_config(p)? {
@@ -98,29 +90,4 @@ pub(crate) fn set_admin_port(config: &mut ConductorConfig, port: u16) {
         None => config.admin_interfaces = Some(vec![port]),
     }
     msg!("Admin port set to: {}", p);
-}
-
-pub(crate) fn set_secondary_admin_port(config: &mut ConductorConfig, port: Option<u16>) {
-    let port = port.unwrap_or_else(|| pick_unused_port().expect("No ports free"));
-    let p = port;
-    let port = AdminInterfaceConfig {
-        driver: InterfaceDriver::Websocket { port },
-    };
-    match config
-        .admin_interfaces
-        .as_mut()
-        // .and_then(|ai| ai)
-    {
-        Some(admin_interface) if admin_interface.len() == 1 => {
-            admin_interface.push(port);
-        }
-        Some(admin_interface) if admin_interface.len() >= 2 => {
-            admin_interface[1] = port;
-        }
-        Some(_) | None => {
-            random_admin_port_if_busy(config);
-            config.admin_interfaces = Some(vec![port])
-        }
-    }
-    msg!("Secondary admin port Admin port set to: {}", p);
 }

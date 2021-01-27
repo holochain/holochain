@@ -6,13 +6,15 @@ use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 /// Holochain CLI - Helper for generating, running interacting with Holochain setups.
+///
+/// A setup is a directory containing the conductor config, databases and keystore.
+/// Everything you need to quickly run your app in holochain or create complex setups.
 struct Ops {
     #[structopt(subcommand)]
     op: Op,
-    /// Force the admin port to a specific value.
-    /// Useful if you are setting this config
-    /// up for use elsewhere (see also secondary_admin_port).
-    /// For example `hc -f=9000,9001`
+    /// Force the admin port that hc uses to talk to holochain to a specific value.
+    /// For example `hc -f=9000,9001 run`
+    /// This must be set on each run or the port will change if it's in use.
     #[structopt(short, long, value_delimiter = ",")]
     force_admin_ports: Vec<u16>,
     /// Set the path to the holochain binary.
@@ -23,51 +25,45 @@ struct Ops {
 #[derive(Debug, StructOpt)]
 #[structopt(setting = structopt::clap::AppSettings::InferSubcommands)]
 enum Op {
-    /// Generate a fresh holochain setup.
+    /// Generate a new holochain setup for later use.
     Generate {
+        #[structopt(short, long, default_value = "1")]
+        /// Number of conductors to create.
+        num_conductors: usize,
         #[structopt(flatten)]
         gen: Create,
         #[structopt(flatten)]
         source: Source,
     },
-    /// Run a conductor from existing or new setup.
+    /// Run a conductor from existing or generate new setup and run.
     Run(Run),
-    /// Call conductor admin interfaces.
+    /// Call the conductor admin interface.
     Call(hc::calls::Call),
     /// [WIP unimplemented]: Run custom tasks using cargo task
     Task,
     /// List setups found in `$(pwd)/.hc`.
-    /// Note that indices will change if setups are removed.
     List {
         /// Show more verbose information.
         #[structopt(short, long, parse(from_occurrences))]
         verbose: usize,
     },
-    /// Clean setups that are listed in the current directory
-    /// inside the `.hc` file.
-    Clean {
-        /// Setups to clean.
-        /// If blank all will be cleaned.
-        setups: Vec<usize>,
-    },
+    /// Clean (completely remove) setups that are listed in the `$(pwd)/.hc` file.
+    Clean,
 }
 
 #[derive(Debug, StructOpt)]
 struct Run {
+    #[structopt(short, long, default_value = "1")]
+    /// Number of conductors to run.
+    ///
+    /// If you specify more then the number
+    /// of existing setups then additional setups will be generated.
+    num_conductors: usize,
     #[structopt(short, long, value_delimiter = ",")]
     /// Optionally create an app interface.
     /// This allows you UI to talk to the conductor.
     /// For example `hc run -p=0,9000,0`
     ports: Vec<u16>,
-    #[structopt(short, long, value_delimiter = ",")]
-    /// Specify a secondary admin port so you can make admin requests while holochain is running.
-    /// For example: `hc run -s=0,9000,1`
-    /// Set to 0 to let OS choose a free port.
-    /// Defaults to all 0.
-    /// Set `disable-secondary` to disable this.
-    secondary_admin_ports: Vec<u16>,
-    #[structopt(short, long)]
-    disable_secondary: bool,
     /// Generate a new setup and then run.
     #[structopt(subcommand)]
     gen: Option<Gen>,
@@ -84,13 +80,9 @@ enum Gen {
 
 #[derive(Debug, StructOpt)]
 struct Source {
-    #[structopt(short, long, default_value = "1")]
-    /// Number of conductors to create or run.
-    /// Must be <= to number of existing setups.
-    /// Defaults to 1.
-    num_conductors: usize,
     /// List of dnas to run.
-    /// Defaults to the current directory
+    /// Defaults to searching the current directory for
+    /// a single `*.dna.gz` file.
     dnas: Vec<PathBuf>,
 }
 
@@ -104,15 +96,13 @@ impl Gen {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    observability::test_run().ok();
+    observability::init_fmt(observability::Output::Log).ok();
     let ops = Ops::from_args();
     match ops.op {
         Op::Generate {
             gen,
-            source: Source {
-                dnas,
-                num_conductors,
-            },
+            num_conductors,
+            source: Source { dnas },
         } => {
             let paths = generate(&ops.holochain_path, dnas, num_conductors, gen).await?;
             for (port, path) in ops.force_admin_ports.into_iter().zip(paths.into_iter()) {
@@ -120,32 +110,16 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Op::Run(Run {
-            ports,
-            secondary_admin_ports,
-            disable_secondary,
-            existing,
-            ..
+            ports, existing, ..
         }) if !existing.is_empty() => {
             let paths = existing.load()?;
-            run_n(
-                &ops.holochain_path,
-                paths,
-                ports,
-                ops.force_admin_ports,
-                secondary_admin_ports,
-                disable_secondary,
-            )
-            .await?;
+            run_n(&ops.holochain_path, paths, ports, ops.force_admin_ports).await?;
         }
         Op::Run(Run {
             gen,
             ports,
-            secondary_admin_ports,
-            disable_secondary,
-            source: Source {
-                dnas,
-                num_conductors,
-            },
+            num_conductors,
+            source: Source { dnas },
             ..
         }) => {
             // Check if current directory has saved existing
@@ -158,20 +132,12 @@ async fn main() -> anyhow::Result<()> {
                 let create = gen.map(|g| g.into_inner()).unwrap_or_default();
                 generate(&ops.holochain_path, dnas, num_conductors, create).await?
             };
-            run_n(
-                &ops.holochain_path,
-                paths,
-                ports,
-                ops.force_admin_ports,
-                secondary_admin_ports,
-                disable_secondary,
-            )
-            .await?;
+            run_n(&ops.holochain_path, paths, ports, ops.force_admin_ports).await?;
         }
         Op::Call(call) => hc::calls::call(&ops.holochain_path, call).await?,
         Op::Task => todo!("Running custom tasks is coming soon"),
         Op::List { verbose } => hc::save::list(std::env::current_dir()?, verbose)?,
-        Op::Clean { setups } => hc::save::clean(std::env::current_dir()?, setups)?,
+        Op::Clean => hc::save::clean(std::env::current_dir()?, Vec::new())?,
     }
 
     Ok(())
@@ -180,42 +146,24 @@ async fn main() -> anyhow::Result<()> {
 async fn run_n(
     holochain_path: &Path,
     paths: Vec<PathBuf>,
-    ports: Vec<u16>,
+    app_ports: Vec<u16>,
     force_admin_ports: Vec<u16>,
-    mut secondary_admin_ports: Vec<u16>,
-    disable_secondary: bool,
 ) -> anyhow::Result<()> {
-    let run_holochain = |holochain_path: PathBuf,
-                         path: PathBuf,
-                         ports,
-                         secondary_admin_port,
-                         force_admin_port| async move {
-        if let Some(secondary_admin_port) = secondary_admin_port {
-            let secondary_admin_port = if secondary_admin_port == 0 {
-                None
-            } else {
-                Some(secondary_admin_port)
-            };
-            hc::add_secondary_admin_port(path.clone(), secondary_admin_port)?;
-        }
+    let run_holochain = |holochain_path: PathBuf, path: PathBuf, ports, force_admin_port| async move {
         hc::run::run(&holochain_path, path, ports, force_admin_port).await?;
         Result::<_, anyhow::Error>::Ok(())
     };
-    if !disable_secondary && secondary_admin_ports.is_empty() {
-        secondary_admin_ports = vec![0; paths.len()];
-    }
     let mut force_admin_ports = force_admin_ports.into_iter();
-    let mut secondary_admin_ports = secondary_admin_ports.into_iter();
+    let mut app_ports = app_ports.into_iter();
     let jhs = paths
         .into_iter()
         .zip(std::iter::repeat_with(|| force_admin_ports.next()))
-        .zip(std::iter::repeat_with(|| secondary_admin_ports.next()))
-        .map(|((path, force_admin_port), secondary_admin_port)| {
+        .zip(std::iter::repeat_with(|| app_ports.next()))
+        .map(|((path, force_admin_port), app_port)| {
             let f = run_holochain(
                 holochain_path.to_path_buf(),
                 path,
-                ports.clone(),
-                secondary_admin_port,
+                app_port.map(|p| vec![p]).unwrap_or_default(),
                 force_admin_port,
             );
             tokio::task::spawn(f)

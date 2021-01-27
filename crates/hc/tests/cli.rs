@@ -29,7 +29,9 @@ async fn websocket_client_by_port(
 
 async fn call_app_interface(port: u16) {
     tracing::debug!(calling_app_interface = ?port);
-    let (mut app_tx, _) = websocket_client_by_port(port).await.unwrap();
+    let (mut app_tx, _) = websocket_client_by_port(port)
+        .await
+        .expect(&format!("Failed to get port {}", port));
     let request = AppRequest::AppInfo {
         installed_app_id: "Stub".to_string(),
     };
@@ -56,8 +58,8 @@ async fn run_holochain() {
     let cmd = std::process::Command::cargo_bin("hc").unwrap();
     let mut cmd = Command::from(cmd);
     cmd.arg("run")
-        .arg("-p")
-        .arg(port.to_string())
+        .arg(format!("-p={}", port))
+        .arg("../../../elemental-chat/elemental-chat.dna.gz")
         .kill_on_drop(true);
     let _hc_admin = cmd.spawn().expect("Failed to spawn holochain");
     tokio::time::delay_for(std::time::Duration::from_secs(4)).await;
@@ -65,8 +67,30 @@ async fn run_holochain() {
     call_app_interface(port).await;
 }
 
-/// Create holochain directory
 #[tokio::test(threaded_scheduler)]
-async fn create_directory() {
+#[ignore = "Figure out how to get holochain bin in CI"]
+async fn run_multiple_on_same_port() {
     observability::test_run().ok();
+    let port: u16 = pick_unused_port().expect("No ports free");
+    let app_port: u16 = pick_unused_port().expect("No ports free");
+    let cmd = std::process::Command::cargo_bin("hc").unwrap();
+    let mut cmd = Command::from(cmd);
+    cmd.arg(format!("-f={}", port))
+        .arg("run")
+        .arg(format!("-p={}", app_port))
+        .arg("../../../elemental-chat/elemental-chat.dna.gz")
+        .kill_on_drop(true);
+    let _hc_admin = cmd.spawn().expect("Failed to spawn holochain");
+    tokio::time::delay_for(std::time::Duration::from_secs(4)).await;
+    // - Make a call to list app info to the port
+    call_app_interface(app_port).await;
+
+    let cmd = std::process::Command::cargo_bin("hc").unwrap();
+    let mut cmd = Command::from(cmd);
+    cmd.arg(format!("-f={}", port))
+        .arg("call")
+        .arg("list-dnas")
+        .kill_on_drop(true);
+    let _hc_admin2 = cmd.spawn().expect("Failed to spawn holochain");
+    tokio::time::delay_for(std::time::Duration::from_secs(4)).await;
 }

@@ -115,7 +115,6 @@ use holochain_conductor_api::{AdminRequest, AdminResponse};
 use holochain_websocket::WebsocketSender;
 use ports::get_admin_api;
 
-pub use ports::add_secondary_admin_port;
 pub use ports::force_admin_port;
 
 /// Print a msg with `hc-admin: ` pre-pended

@@ -8,6 +8,11 @@ use url2::Url2;
 
 const DEFAULT_APP_ID: &str = "test-app";
 #[derive(Debug, StructOpt, Clone)]
+// This creates a new holochain setup
+// which is a
+// - conductor config
+// - databases
+// - keystore
 pub struct Create {
     #[structopt(subcommand)]
     /// Add an optional network.
@@ -87,7 +92,7 @@ pub struct Quic {
 pub struct Existing {
     #[structopt(short, long, conflicts_with_all = &["dnas", "gen"], value_delimiter = ",")]
     /// Paths to existing setup directories.
-    /// For example `hc run -e /tmp/kAOXQlilEtJKlTM_W403b`.
+    /// For example `hc run -e=/tmp/kAOXQlilEtJKlTM_W403b,/tmp/kddsajkaasiIII_sJ`.
     pub existing_paths: Vec<PathBuf>,
     /// Conductors that have been setup and are
     /// available in `hc list`.

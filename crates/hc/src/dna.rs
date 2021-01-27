@@ -2,7 +2,7 @@
 use std::path::Path;
 use std::path::PathBuf;
 
-use anyhow::anyhow;
+use anyhow::bail;
 use anyhow::ensure;
 use walkdir::WalkDir;
 
@@ -31,17 +31,19 @@ pub fn parse_dnas(mut dnas: Vec<PathBuf>) -> anyhow::Result<Vec<PathBuf>> {
 }
 
 fn search_for_dna(dna: &Path) -> anyhow::Result<PathBuf> {
-    let dir = WalkDir::new(dna)
+    let dir: Vec<_> = WalkDir::new(dna)
         .max_depth(1)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|d| d.file_type().is_file())
-        .find(|f| f.file_name().to_string_lossy().ends_with(".dna.gz"))
-        .map(|f| f.into_path());
-    dir.ok_or_else(|| {
-        anyhow!(
+        .filter(|f| f.file_name().to_string_lossy().ends_with(".dna.gz"))
+        .map(|f| f.into_path())
+        .collect();
+    if dir.len() != 1 {
+        bail!(
             "Could not find a dna (e.g. my-dna.dna.gz) in directory {}",
             dna.display()
         )
-    })
+    }
+    Ok(dir.into_iter().next().expect("Safe due to check above"))
 }

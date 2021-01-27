@@ -9,7 +9,7 @@ use crate::config::create_config;
 use crate::config::write_config;
 
 /// Generate a new setup.
-/// This creates are directory and a [`ConductorConfig`]
+/// This creates a directory and a [`ConductorConfig`]
 /// from an optional network.
 /// The root directory and inner directory
 /// (where this setup will be created) can be overridden.

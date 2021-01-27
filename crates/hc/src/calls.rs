@@ -29,7 +29,7 @@ use std::convert::TryFrom;
 
 use crate::cmds::Existing;
 use crate::expect_match;
-use crate::ports::get_secondary_admin_ports;
+use crate::ports::get_admin_ports;
 use crate::run::run_async;
 use crate::CmdRunner;
 use structopt::StructOpt;
@@ -167,7 +167,7 @@ pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
         } else {
             existing.load()?
         };
-        let ports = get_secondary_admin_ports(paths.clone()).await?;
+        let ports = get_admin_ports(paths.clone()).await?;
         let mut cmds = Vec::with_capacity(ports.len());
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
             match CmdRunner::try_new(port).await {
@@ -322,7 +322,7 @@ pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyho
 }
 
 /// Calls [`AdminRequest::InstallApp`] and installs a new app.
-/// Creates an app per dna with the app id of `app-id-{dna-index}`
+/// Creates an app per dna with the app id of `{app-id}-{dna-index}`
 /// e.g. `my-cool-app-3`.
 pub async fn install_app(
     cmd: &mut CmdRunner,
