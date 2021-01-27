@@ -108,6 +108,7 @@ impl Websocket {
         let (tx_from_websocket, rx_from_websocket) =
             tokio::sync::mpsc::channel(config.max_send_queue);
 
+        // ---- PAIR SHUTDOWN ---- //
         // If both handles are dropped then we want to shutdown the to/from socket tasks
         let (close_from_socket, pair_shutdown) = Valve::new();
         let pair_shutdown_handle = PairShutdown {
@@ -117,6 +118,12 @@ impl Websocket {
         // Only shutdown if both trigger arcs are dropped
         let pair_shutdown_handle = Arc::new(pair_shutdown_handle);
 
+        // ---- LISTENER SHUTDOWN ---- //
+
+        // Shutdown the receiver stream if the listener is dropped
+        // TODO: Should this shutdown immediately or gracefully 
+        let rx_from_websocket = listener_shutdown.wrap(rx_from_websocket);
+
         Websocket::run(
             socket,
             tx_to_websocket.clone(),
@@ -124,10 +131,7 @@ impl Websocket {
             tx_from_websocket,
             pair_shutdown,
         );
-
-        // Shutdown the receiver stream if the listener is dropped
-        let rx_from_websocket = listener_shutdown.wrap(rx_from_websocket);
-
+        
         let sender = WebsocketSender::new(
             tx_to_websocket,
             listener_shutdown,
@@ -174,9 +178,13 @@ impl Websocket {
         pair_shutdown: Valve,
     ) {
         let (to_socket, from_socket) = socket.split();
+        
+        // ---- TASK SHUTDOWN ---- //
+        // These cause immediate shutdown
         let (shutdown_from_socket, from_socket) = Valved::new(from_socket);
         let from_socket = pair_shutdown.wrap(from_socket);
         let (shutdown_to_socket, to_websocket) = Valved::new(to_websocket);
+
         tokio::task::spawn(
             self.clone()
                 .run_to_socket(to_socket, to_websocket, shutdown_from_socket)
