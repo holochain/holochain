@@ -11,7 +11,7 @@ use hdk3::prelude::*;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
 use holochain_lmdb::test_utils::{test_environments, TestEnvironments};
-use holochain_types::{app::InstalledCell};
+use holochain_types::{app::InstalledCell, signal::Signal};
 
 use holochain_types::dna::DnaFile;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -344,6 +344,11 @@ impl SweetConductor {
         SweetAppBatch(apps)
     }
 
+    /// Get a stream of all Signals emitted since the time of this function call.
+    pub async fn signal_stream(&self) -> impl tokio::stream::Stream<Item = Signal> {
+        self.handle().signal_stream().await
+    }
+
     /// Shutdown this conductor.
     /// This will wait for the conductor to shutdown but
     /// keep the inner state to restart it.
@@ -438,6 +443,11 @@ impl SweetConductorHandle {
             .into_inner()
             .try_into()
             .expect("Couldn't deserialize zome call output")
+    }
+
+    /// Get a stream of all Signals emitted since the time of this function call.
+    pub async fn signal_stream(&self) -> impl tokio::stream::Stream<Item = Signal> {
+        self.0.signal_broadcaster().await.subscribe_merged()
     }
 
     /// Manually await shutting down the conductor.
