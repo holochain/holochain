@@ -28,7 +28,18 @@ pub struct ConductorState {
 }
 
 /// A unique identifier used to refer to an App Interface internally.
-#[derive(Clone, Deserialize, Serialize, Default, Debug, Hash, PartialEq, Eq, derive_more::From, derive_more::Display)]
+#[derive(
+    Clone,
+    Deserialize,
+    Serialize,
+    Default,
+    Debug,
+    Hash,
+    PartialEq,
+    Eq,
+    derive_more::From,
+    derive_more::Display,
+)]
 pub struct AppInterfaceId(String);
 
 impl From<&str> for AppInterfaceId {

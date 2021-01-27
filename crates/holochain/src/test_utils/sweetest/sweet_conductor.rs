@@ -358,6 +358,10 @@ impl SweetConductor {
     }
 
     /// Get a stream of all Signals emitted on the "sweet-interface" AppInterface.
+    ///
+    /// This is designed to crash if called more than once, because as currently
+    /// implemented, creating multiple signal streams would simply cause multiple
+    /// consumers of the same underlying streams, not a fresh subscription
     pub async fn signals(&mut self) -> impl tokio::stream::Stream<Item = Signal> {
         self.signal_stream
             .take()
