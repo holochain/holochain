@@ -8,9 +8,9 @@ use holochain_zome_types::zome::ZomeName;
 
 /// Helpful constructors for DnaFiles used in tests
 #[derive(Clone, Debug, derive_more::From, derive_more::Into, shrinkwraprs::Shrinkwrap)]
-pub struct CoolDnaFile(DnaFile);
+pub struct SweetDnaFile(DnaFile);
 
-impl CoolDnaFile {
+impl SweetDnaFile {
     /// Create a DnaFile from a collection of Zomes
     pub async fn from_zomes(
         uuid: String,

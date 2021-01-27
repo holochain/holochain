@@ -1,9 +1,9 @@
 use kitsune_p2p::KitsuneP2pConfig;
 
 /// Helper for constructing common kitsune networks
-pub struct CoolNetwork;
+pub struct SweetNetwork;
 
-impl CoolNetwork {
+impl SweetNetwork {
     /// Get a remote kitsune proxy address from the
     /// env var `KIT_PROXY` if it's set.
     pub fn env_var_proxy() -> Option<KitsuneP2pConfig> {
