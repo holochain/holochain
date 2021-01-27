@@ -1,14 +1,14 @@
 use hdk3::prelude::*;
 
-/// A reference to a Zome in a Cell created by a CoolConductor installation function.
-/// Think of it as a partially applied CoolCell, with the ZomeName baked in.
+/// A reference to a Zome in a Cell created by a SweetConductor installation function.
+/// Think of it as a partially applied SweetCell, with the ZomeName baked in.
 #[derive(Clone, derive_more::Constructor)]
-pub struct CoolZome {
+pub struct SweetZome {
     cell_id: CellId,
     name: ZomeName,
 }
 
-impl CoolZome {
+impl SweetZome {
     /// Accessor
     pub fn cell_id(&self) -> &CellId {
         &self.cell_id

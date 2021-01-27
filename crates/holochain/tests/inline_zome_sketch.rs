@@ -1,6 +1,6 @@
 use hdk3::prelude::*;
-use holochain::test_utils::cool::{CoolAgents, CoolConductor, CoolDnaFile, MaybeElement};
 use holochain::test_utils::display_agent_infos;
+use holochain::test_utils::sweetest::{MaybeElement, SweetAgents, SweetConductor, SweetDnaFile};
 use holochain::test_utils::wait_for_integration_10s;
 use holochain::test_utils::WaitOps;
 use holochain_types::dna::zome::inline_zome::InlineZome;
@@ -46,13 +46,13 @@ fn simple_crud_zome() -> InlineZome {
 #[cfg(feature = "test_utils")]
 async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     // Bundle the single zome into a DnaFile
-    let (dna_file, _) = CoolDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
+    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
 
     // Create a Conductor
-    let mut conductor = CoolConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     // Get two agents
-    let (alice, bobbo) = CoolAgents::two(conductor.keystore()).await;
+    let (alice, bobbo) = SweetAgents::two(conductor.keystore()).await;
 
     // Install DNA and install and activate apps in conductor
     let apps = conductor
@@ -93,12 +93,12 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 #[cfg(feature = "test_utils")]
 async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     observability::test_run().ok();
-    let mut conductor = CoolConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
-    let (dna_foo, _) = CoolDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
-    let (dna_bar, _) = CoolDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
+    let (dna_foo, _) = SweetDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
+    let (dna_bar, _) = SweetDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
 
-    let agents = CoolAgents::get(conductor.keystore(), 3).await;
+    let agents = SweetAgents::get(conductor.keystore(), 3).await;
 
     let apps = conductor
         .setup_app_for_agents("app", &agents, &[dna_foo, dna_bar])
@@ -149,7 +149,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     // Verify that carol can run "read" on her cell and get alice's Header
     // on the "bar" DNA
-    // Let's do it with the CoolZome instead of the CoolCell too, for fun
+    // Let's do it with the SweetZome instead of the SweetCell too, for fun
     let element: MaybeElement = conductor
         .call(&carol_bar.zome("barzome"), "read", hash_bar)
         .await;
@@ -170,12 +170,12 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 #[ignore = "Needs to be completed when HolochainP2pEvents is accessible"]
 async fn invalid_cell() -> anyhow::Result<()> {
     observability::test_run().ok();
-    let mut conductor = CoolConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
-    let (dna_foo, _) = CoolDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
-    let (dna_bar, _) = CoolDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
+    let (dna_foo, _) = SweetDnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
+    let (dna_bar, _) = SweetDnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
 
-    // let agents = CoolAgents::get(conductor.keystore(), 2).await;
+    // let agents = SweetAgents::get(conductor.keystore(), 2).await;
 
     let _app_foo = conductor.setup_app("foo", &[dna_foo]).await;
 
@@ -201,10 +201,10 @@ async fn invalid_cell() -> anyhow::Result<()> {
 async fn get_deleted() -> anyhow::Result<()> {
     observability::test_run().ok();
     // Bundle the single zome into a DnaFile
-    let (dna_file, _) = CoolDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
+    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
 
     // Create a Conductor
-    let mut conductor = CoolConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_config(Default::default()).await;
 
     // Install DNA and install and activate apps in conductor
     let alice = conductor

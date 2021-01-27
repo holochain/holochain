@@ -57,8 +57,8 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use super::*;
-    use crate::test_utils::cool::CoolDnaFile;
-    use crate::test_utils::cool::{CoolAgents, CoolConductorBatch};
+    use crate::test_utils::sweetest::SweetDnaFile;
+    use crate::test_utils::sweetest::{SweetAgents, SweetConductorBatch};
     use futures::future;
     use hdk3::prelude::*;
     use holochain_types::dna::zome::inline_zome::InlineZome;
@@ -116,11 +116,11 @@ mod tests {
 
         let num_signals = Arc::new(AtomicUsize::new(0));
 
-        let mut conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
+        let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
         let agents =
-            future::join_all(conductors.iter().map(|c| CoolAgents::one(c.keystore()))).await;
+            future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
 
-        let (dna_file, _) = CoolDnaFile::unique_from_inline_zome(
+        let (dna_file, _) = SweetDnaFile::unique_from_inline_zome(
             "zome1",
             zome(agents.clone(), num_signals.clone()),
         )
