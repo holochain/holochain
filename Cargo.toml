@@ -8,7 +8,7 @@ members = [
   "crates/holo_hash",
 
   "crates/hc",
-  
+
   "crates/holochain",
   "crates/holochain_cascade",
   "crates/holochain_conductor_api",
@@ -19,18 +19,18 @@ members = [
   "crates/holochain_types",
   "crates/holochain_websocket",
   "crates/holochain_zome_types",
-  
+
   "crates/kitsune_p2p/kitsune_p2p",
   "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",
   "crates/kitsune_p2p/proxy",
-  
+
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
 ]
 
 exclude = [
-  
+
 ]
 
 # These are the default params for RELEASE target
@@ -49,7 +49,7 @@ rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
 lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }
 #lmdb-rkv = { path = "../../rust/lmdb-rs" }
 # observability = { path = "../../rust/observability" }
-observability = { git = "https://github.com/freesig/observability.git", branch = "metrics" }
+observability = { git = "https://github.com/freesig/observability.git", branch = "main" }
 # holochain_wasmer_guest = { path = "../holochain-wasmer/crates/guest" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "remote_signal" }
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "remote_signal" }
