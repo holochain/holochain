@@ -47,14 +47,11 @@ codegen-units = 16
 
 rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
 lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }
-#lmdb-rkv = { path = "../../rust/lmdb-rs" }
-# observability = { path = "../../rust/observability" }
 observability = { git = "https://github.com/freesig/observability.git", branch = "main" }
-holochain_wasmer_guest = { path = "../holochain-wasmer/crates/guest" }
-holochain_wasmer_common = { path = "../holochain-wasmer/crates/common" }
-holochain_serialized_bytes = { path = "../holochain-serialization/crates/holochain_serialized_bytes" }
-# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "remote_signal" }
-# holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "remote_signal" }
+holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
+holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
+holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
+holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
 # ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 # ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "add_observability" }
 # lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "bump_ga" }
@@ -62,5 +59,4 @@ holochain_serialized_bytes = { path = "../holochain-serialization/crates/holocha
 # lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
 # lair_keystore_client = { path = "../lair/crates/lair_keystore_client" }
 # observability = { path = "../../rust/observability" }
-# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "try_from_ref" }
 tokio_safe_block_on = { git = "https://github.com/neonphog/tokio_safe_block_on.git", branch = "fix_holochain_bug" }
