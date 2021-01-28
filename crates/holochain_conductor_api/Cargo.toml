@@ -17,7 +17,7 @@ holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
 holochain_serialized_bytes = "=0.0.47"
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
 holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
-serde = { version = "1.0.104", features = [ "derive" ] }
+serde = { version = "1.0", features = [ "derive" ] }
 serde_derive = "1.0.104"
 serde_yaml = "0.8"
 tracing = "=0.1.21"

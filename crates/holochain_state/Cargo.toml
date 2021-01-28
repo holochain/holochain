@@ -15,7 +15,7 @@ derive_more = "0.99.3"
 holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }
 holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
 fallible-iterator = "0.2.0"
-serde = { version = "1.0.104", features = [ "derive" ] }
+serde = { version = "1.0", features = [ "derive" ] }
 tracing = "=0.1.21"
 tracing-futures = "0.2.4"
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }

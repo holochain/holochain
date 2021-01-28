@@ -9,5 +9,5 @@ name = "test_wasm_migrate_agent_pass"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-serde = "=1.0.104"
+serde = "1.0"
 hdk3 = { path = "../../../../hdk3" }
