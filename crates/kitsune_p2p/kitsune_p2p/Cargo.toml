@@ -11,7 +11,7 @@ categories = [ "network-programming" ]
 edition = "2018"
 
 [dependencies]
-derive_more = "0.99.11"
+derive_more = "0.99"
 futures = "0.3"
 ghost_actor = "0.3.0-alpha.1"
 kitsune_p2p_types = { version = "0.0.1", path = "../types" }

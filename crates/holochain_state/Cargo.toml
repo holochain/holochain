@@ -11,7 +11,7 @@ edition = "2018"
 [dependencies]
 byteorder = "1.3.4"
 chrono = "0.4.6"
-derive_more = "0.99.3"
+derive_more = "0.99"
 holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }
 holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
 fallible-iterator = "0.2.0"

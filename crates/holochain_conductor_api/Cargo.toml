@@ -10,7 +10,7 @@ edition = "2018"
 
 [dependencies]
 directories = "2.0.2"
-derive_more = "0.99.3"
+derive_more = "0.99"
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
 holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
