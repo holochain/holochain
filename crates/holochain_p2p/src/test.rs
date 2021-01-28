@@ -191,7 +191,7 @@ mod tests {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
                     CallRemote { respond, .. } => {
-                        respond.r(Ok(async move { Ok(ExternIO::from(b"yada".to_vec())) }
+                        respond.r(Ok(async move { Ok(UnsafeBytes::from(b"yada".to_vec()).into()) }
                             .boxed()
                             .into()));
                     }
@@ -217,7 +217,7 @@ mod tests {
                 "".into(),
                 "".into(),
                 None,
-                UnsafeBytes::from(b"yippo".to_vec()).into(),
+                ExternIO::encode(b"yippo").unwrap()
             )
             .await
             .unwrap();

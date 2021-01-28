@@ -438,7 +438,6 @@ async fn remote_signals() {
     for mut rx in rxs {
         let r = rx.try_recv();
         // Each handle should recv a signal
-
         assert_matches!(r, Ok(Signal::App(_, a)) if a == signal);
     }
 }
