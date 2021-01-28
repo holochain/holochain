@@ -32,7 +32,9 @@ where
 
 #[derive(Serialize, Deserialize)]
 struct BundleSerialized {
+    #[serde(with = "serde_bytes")]
     manifest: Vec<u8>,
+    #[serde(with = "serde_bytes")]
     resources: Vec<u8>,
 }
 
