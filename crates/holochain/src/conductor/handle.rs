@@ -208,6 +208,9 @@ pub trait ConductorHandleT: Send + Sync {
         cell_id: Option<CellId>,
     ) -> ConductorApiResult<Vec<AgentInfoSigned>>;
 
+    /// Print the current setup in a machine readable way.
+    async fn print_setup(&self);
+
     /// Retrieve the LMDB environment for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
@@ -223,6 +226,11 @@ pub trait ConductorHandleT: Send + Sync {
     /// Retrieve the ConductorState. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState>;
+
+    /// Add a "test" app interface for sending and receiving signals. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn add_test_app_interface(&self, id: super::state::AppInterfaceId)
+        -> ConductorResult<()>;
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -533,6 +541,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.get_agent_infos(cell_id)
     }
 
+    async fn print_setup(&self) {
+        self.conductor.read().await.print_setup()
+    }
+
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
         let cell = self.cell_by_id(cell_id).await?;
@@ -555,6 +567,15 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
         let lock = self.conductor.read().await;
         Ok(lock.get_state_from_handle().await?)
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn add_test_app_interface(
+        &self,
+        id: super::state::AppInterfaceId,
+    ) -> ConductorResult<()> {
+        let mut lock = self.conductor.write().await;
+        lock.add_test_app_interface(id).await
     }
 }
 

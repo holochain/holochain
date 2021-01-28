@@ -190,7 +190,7 @@ impl HostFnCaller {
         entry_def_id: E,
     ) -> HeaderHash {
         let (env, ribosome, call_context, workspace_lock) = self.explode();
-        let input = CreateInput::new((entry_def_id.into(), entry));
+        let input = EntryWithDefId::new(entry_def_id.into(), entry);
         let output = host_fn::create::create(ribosome, call_context, input).unwrap();
 
         // Write
@@ -199,14 +199,13 @@ impl HostFnCaller {
         env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
-        output.into_inner()
+        output
     }
 
     pub async fn delete_entry<'env>(&self, hash: HeaderHash) -> HeaderHash {
         let (env, ribosome, call_context, workspace_lock) = self.explode();
-        let input = DeleteInput::new(hash);
         let output = {
-            let r = host_fn::delete::delete(ribosome, call_context, input);
+            let r = host_fn::delete::delete(ribosome, call_context, hash);
             let r = r.map_err(|e| {
                 debug!(%e);
                 e
@@ -220,7 +219,7 @@ impl HostFnCaller {
         env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
-        output.into_inner()
+        output
     }
 
     pub async fn update_entry<'env, E: Into<entry_def::EntryDefId>>(
@@ -230,7 +229,10 @@ impl HostFnCaller {
         original_header_hash: HeaderHash,
     ) -> HeaderHash {
         let (env, ribosome, call_context, workspace_lock) = self.explode();
-        let input = UpdateInput::new((entry_def_id.into(), entry, original_header_hash));
+        let input = UpdateInput::new(
+            original_header_hash,
+            EntryWithDefId::new(entry_def_id.into(), entry),
+        );
         let output = { host_fn::update::update(ribosome, call_context, input).unwrap() };
 
         // Write
@@ -239,14 +241,13 @@ impl HostFnCaller {
         env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
-        output.into_inner()
+        output
     }
 
     pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Option<Element> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetInput::new((entry_hash, options));
-        let output = { host_fn::get::get(ribosome, call_context, input).unwrap() };
-        output.into_inner()
+        let input = GetInput::new(entry_hash, options);
+        host_fn::get::get(ribosome, call_context, input).unwrap()
     }
 
     pub async fn get_details<'env>(
@@ -255,9 +256,8 @@ impl HostFnCaller {
         options: GetOptions,
     ) -> Option<Details> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetDetailsInput::new((entry_hash, options));
-        let output = { host_fn::get_details::get_details(ribosome, call_context, input).unwrap() };
-        output.into_inner()
+        let input = GetInput::new(entry_hash, options);
+        host_fn::get_details::get_details(ribosome, call_context, input).unwrap()
     }
 
     pub async fn create_link<'env>(
@@ -267,7 +267,7 @@ impl HostFnCaller {
         link_tag: LinkTag,
     ) -> HeaderHash {
         let (env, ribosome, call_context, workspace_lock) = self.explode();
-        let input = CreateLinkInput::new((base.clone(), target.clone(), link_tag));
+        let input = CreateLinkInput::new(base.clone(), target.clone(), link_tag);
         let output = { host_fn::create_link::create_link(ribosome, call_context, input).unwrap() };
 
         // Write
@@ -276,13 +276,13 @@ impl HostFnCaller {
         env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
-        output.into_inner()
+        output
     }
 
     pub async fn delete_link<'env>(&self, link_add_hash: HeaderHash) -> HeaderHash {
         let (env, ribosome, call_context, workspace_lock) = self.explode();
-        let input = DeleteLinkInput::new(link_add_hash);
-        let output = { host_fn::delete_link::delete_link(ribosome, call_context, input).unwrap() };
+        let output =
+            { host_fn::delete_link::delete_link(ribosome, call_context, link_add_hash).unwrap() };
 
         // Write
         let mut guard = workspace_lock.write().await;
@@ -290,7 +290,7 @@ impl HostFnCaller {
         env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
-        output.into_inner()
+        output
     }
 
     pub async fn get_links<'env>(
@@ -300,7 +300,7 @@ impl HostFnCaller {
         _options: GetLinksOptions,
     ) -> Vec<Link> {
         let (env, ribosome, call_context, workspace_lock) = self.explode();
-        let input = GetLinksInput::new((base.clone(), link_tag));
+        let input = GetLinksInput::new(base.clone(), link_tag);
         let output = { host_fn::get_links::get_links(ribosome, call_context, input).unwrap() };
 
         // Write
@@ -309,7 +309,7 @@ impl HostFnCaller {
         env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
-        output.into_inner().into()
+        output.into()
     }
 
     pub async fn get_link_details<'env>(
@@ -331,14 +331,11 @@ impl HostFnCaller {
         request: ActivityRequest,
     ) -> AgentActivity {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetAgentActivityInput::new((agent.clone(), query.clone(), request));
-        let output = {
-            host_fn::get_agent_activity::get_agent_activity(ribosome, call_context, input).unwrap()
-        };
-        output.into_inner()
+        let input = GetAgentActivityInput::new(agent.clone(), query.clone(), request);
+        host_fn::get_agent_activity::get_agent_activity(ribosome, call_context, input).unwrap()
     }
 
-    pub async fn call_zome_direct(&self, invocation: ZomeCallInvocation) -> SerializedBytes {
+    pub async fn call_zome_direct(&self, invocation: ZomeCallInvocation) -> ExternIO {
         let (env, ribosome, call_context, workspace_lock) = self.explode();
 
         let output = {
@@ -352,9 +349,7 @@ impl HostFnCaller {
         let workspace = &mut guard;
         env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
-        let output = unwrap_to!(output => ZomeCallResponse::Ok).clone();
-
-        output.into_inner()
+        unwrap_to!(output => ZomeCallResponse::Ok).to_owned()
     }
 }
 
