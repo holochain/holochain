@@ -9,21 +9,15 @@ use crate::{
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
-
-#[derive(Serialize, Deserialize, derive_more::From, derive_more::AsRef)]
-pub struct Blob(#[serde(with = "serde_bytes")] Vec<u8>);
 
 /// A Manifest bundled together, optionally, with the Resources that it describes.
 /// This is meant to be serialized for standalone distribution, and deserialized
 /// by the receiver.
 ///
 /// The manifest may describe locations of resources not included in the Bundle.
-//
-// TODO: make clear the difference between the partial set of resources and
-// the full set of resolved resources.
-//
+///
 // NB: It would be so nice if this were Deserializable, but there are problems
 // with using the derive macro here.
 #[derive(Debug, PartialEq, Eq)]
@@ -107,6 +101,24 @@ where
             manifest,
             resources,
         })
+    }
+
+    pub fn from_file_content(content: &[u8]) -> MrBundleResult<Self> {
+        let data: BundleSerialized = crate::decode(content)?;
+        Self::try_from(&data)
+    }
+
+    pub fn to_file_content(&self) -> MrBundleResult<Vec<u8>> {
+        let data = BundleSerialized::try_from(self)?;
+        crate::encode(&data)
+    }
+
+    pub fn read_from_file(&self, path: &Path) -> MrBundleResult<Self> {
+        Ok(Self::from_file_content(&std::fs::read(path)?)?)
+    }
+
+    pub fn write_to_file(&self, path: &Path) -> MrBundleResult<()> {
+        Ok(std::fs::write(path, self.to_file_content()?)?)
     }
 
     pub async fn resolve(&self, location: &Location) -> MrBundleResult<R> {

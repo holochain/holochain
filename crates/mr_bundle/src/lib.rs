@@ -6,8 +6,6 @@ pub mod location;
 pub mod manifest;
 pub mod resource;
 
-// mod experiment;
-
 pub fn encode<T: serde::ser::Serialize>(data: &T) -> MrBundleResult<Vec<u8>> {
     Ok(rmp_serde::to_vec_named(data)?)
 }
