@@ -634,6 +634,8 @@ impl Cell {
         cap: Option<CapSecret>,
         payload: SerializedBytes,
     ) -> CellResult<SerializedBytes> {
+        use crate::core::ribosome::host_fn::HostFnMetrics;
+        HostFnMetrics::count(HostFnMetrics::CallRemoteRecv, 1);
         let invocation = ZomeCall {
             cell_id: self.id.clone(),
             zome_name,

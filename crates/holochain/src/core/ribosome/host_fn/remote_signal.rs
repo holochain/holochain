@@ -1,3 +1,4 @@
+use super::HostFnMetrics;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
@@ -7,9 +8,10 @@ use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::RemoteSignalInput;
 use holochain_zome_types::RemoteSignalOutput;
+use holochain_zome_types::TryFrom;
+use holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
 use tracing::Instrument;
-use super::HostFnMetrics;
 
 #[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn remote_signal(
@@ -25,6 +27,7 @@ pub fn remote_signal(
     let RemoteSignal { agents, signal } = input.into_inner();
     let zome_name: ZomeName = call_context.zome().into();
     let fn_name: FunctionName = FN_NAME.into();
+    tracing::debug!("Agents {}\n{:?}", agents.len(), agents);
     for agent in agents {
         tokio::task::spawn(
             {
@@ -34,17 +37,54 @@ pub fn remote_signal(
                 let request = signal.clone();
                 async move {
                     tracing::debug!("sending to {:?}", agent);
+                    HostFnMetrics::count(HostFnMetrics::RemoteSignalStart, 1);
                     let result = network
                         .call_remote(agent.clone(), zome_name, fn_name, None, request)
                         .await;
-                    tracing::debug!("sent to {:?}", agent);
-                    if let Err(e) = result {
-                        tracing::info!(
-                            "Failed to send remote signal to {:?} because of {:?}",
-                            agent,
-                            e
-                        );
+                    match result {
+                        Ok(r) => match ZomeCallResponse::try_from(r) {
+                            Ok(ZomeCallResponse::NetworkError(e)) => {
+                                tracing::info!(
+                                    "Failed to send remote signal to {:?} because of {:?}",
+                                    agent,
+                                    e
+                                );
+                            }
+                            Ok(ZomeCallResponse::Unauthorized(
+                                cell_id,
+                                zome_name,
+                                func,
+                                from_agent,
+                            )) => {
+                                tracing::info!(
+                                    msg = "Failed to send remote signal because unauthorized",
+                                    ?agent,
+                                    ?cell_id,
+                                    ?zome_name,
+                                    ?func,
+                                    ?from_agent,
+                                );
+                            }
+                            Ok(_) => {
+                                tracing::debug!("sent to {:?}", agent);
+                            }
+                            Err(e) => {
+                                tracing::info!(
+                                    "Failed to send remote signal to {:?} because of {:?}",
+                                    agent,
+                                    e
+                                );
+                            }
+                        },
+                        Err(e) => {
+                            tracing::info!(
+                                "Failed to send remote signal to {:?} because of {:?}",
+                                agent,
+                                e
+                            );
+                        }
                     }
+                    HostFnMetrics::count(HostFnMetrics::RemoteSignalEnd, 1);
                 }
             }
             .in_current_span(),

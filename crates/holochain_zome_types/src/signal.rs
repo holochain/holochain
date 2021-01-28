@@ -14,6 +14,14 @@ impl AppSignal {
     pub fn new(sb: SerializedBytes) -> Self {
         Self(sb)
     }
+    /// Access the inner type
+    pub fn into_inner<O, E>(self) -> Result<O, SerializedBytesError>
+    where
+        SerializedBytesError: From<E>,
+        O: TryFrom<SerializedBytes, Error=E>,
+    {
+        Ok(self.0.try_into()?)
+    }
 }
 
 /// Remote signal many agents without waiting for responses.

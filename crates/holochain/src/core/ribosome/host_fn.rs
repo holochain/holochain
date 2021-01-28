@@ -179,12 +179,15 @@ observability::metrics!(
     GetLinks,
     GetLinkDetails,
     RemoteSignal,
+    RemoteSignalStart,
+    RemoteSignalEnd,
     EmitSignal,
     Delete,
     DeleteLink,
     AgentInfo,
     Call,
-    CallRemote
+    CallRemote,
+    CallRemoteRecv
 );
 
 #[tracing::instrument]

@@ -46,6 +46,11 @@ impl SweetConductorBatch {
     pub fn iter(&self) -> impl Iterator<Item = &SweetConductor> {
         self.0.iter()
     }
+    
+    /// Get the underlying data
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut SweetConductor> {
+        self.0.iter_mut()
+    }
 
     /// Get the underlying data
     pub fn into_inner(self) -> Vec<SweetConductor> {
