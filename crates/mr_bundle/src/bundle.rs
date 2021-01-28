@@ -113,7 +113,7 @@ where
         crate::encode(&data)
     }
 
-    pub fn read_from_file(&self, path: &Path) -> MrBundleResult<Self> {
+    pub fn read_from_file(path: &Path) -> MrBundleResult<Self> {
         Ok(Self::from_file_content(&std::fs::read(path)?)?)
     }
 

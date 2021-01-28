@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 use mr_bundle::{bundle::Bundle, location::Location, manifest::Manifest};
 
@@ -31,11 +31,11 @@ struct ThingManifest {
     location: Location,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 struct Thing(String);
 
 #[tokio::test]
-async fn path_roundtrip() -> anyhow::Result<()> {
+async fn resource_resolution() -> anyhow::Result<()> {
     let dir = tempdir::TempDir::new("mr_bundle")?;
 
     // Write a Resource to disk
@@ -67,8 +67,8 @@ async fn path_roundtrip() -> anyhow::Result<()> {
         bundle
             .bundled_resources()
             .iter()
-            .collect::<Vec<(&Location, &Thing)>>(),
-        vec![(&bundled_location, &bundled_thing)]
+            .collect::<HashSet<(&Location, &Thing)>>(),
+        maplit::hashset![(&bundled_location, &bundled_thing)]
     );
 
     assert_eq!(
@@ -77,12 +77,19 @@ async fn path_roundtrip() -> anyhow::Result<()> {
             .await
             .unwrap()
             .iter()
-            .collect::<Vec<(&Location, &Thing)>>(),
-        vec![
+            .collect::<HashSet<(&Location, &Thing)>>(),
+        maplit::hashset![
             (&bundled_location, &bundled_thing),
             (&local_location, &local_thing)
         ]
     );
+
+    // Ensure that bundle writing and reading are inverses
+    bundle
+        .write_to_file(&dir.path().join("bundle.bundle"))
+        .unwrap();
+    let bundle_file = Bundle::read_from_file(&dir.path().join("bundle.bundle")).unwrap();
+    assert_eq!(bundle, bundle_file);
 
     // Ensure that the bundle is serializable and writable
     let bundled_path = dir.path().join("test.bundle");
