@@ -10,6 +10,7 @@ use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use super::HostFnMetrics;
 
 /// create element
 #[allow(clippy::extra_unused_lifetimes)]
@@ -18,6 +19,7 @@ pub fn create<'a>(
     call_context: Arc<CallContext>,
     input: CreateInput,
 ) -> RibosomeResult<CreateOutput> {
+    HostFnMetrics::count(HostFnMetrics::Create, 1);
     // destructure the args out into an app type def id and entry
     let (entry_def_id, entry) = input.into_inner();
 

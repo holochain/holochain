@@ -7,6 +7,7 @@ use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use holochain_cascade::error::CascadeResult;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use super::HostFnMetrics;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn delete_link<'a>(
@@ -14,6 +15,7 @@ pub fn delete_link<'a>(
     call_context: Arc<CallContext>,
     input: DeleteLinkInput,
 ) -> RibosomeResult<DeleteLinkOutput> {
+    HostFnMetrics::count(HostFnMetrics::DeleteLink, 1);
     let link_add_address = input.into_inner();
 
     // get the base address from the add link header

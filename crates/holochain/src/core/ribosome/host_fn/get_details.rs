@@ -3,6 +3,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use super::HostFnMetrics;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_details<'a>(
@@ -10,6 +11,7 @@ pub fn get_details<'a>(
     call_context: Arc<CallContext>,
     input: GetDetailsInput,
 ) -> RibosomeResult<GetDetailsOutput> {
+    HostFnMetrics::count(HostFnMetrics::GetDetails, 1);
     let (hash, options) = input.into_inner();
 
     // Get the network from the context

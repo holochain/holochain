@@ -5,6 +5,7 @@ use holochain_state::metadata::LinkMetaKey;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use super::HostFnMetrics;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_link_details<'a>(
@@ -12,6 +13,7 @@ pub fn get_link_details<'a>(
     call_context: Arc<CallContext>,
     input: GetLinkDetailsInput,
 ) -> RibosomeResult<GetLinkDetailsOutput> {
+    HostFnMetrics::count(HostFnMetrics::GetLinkDetails, 1);
     let (base_address, tag) = input.into_inner();
 
     // Get zome id

@@ -3,6 +3,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use super::HostFnMetrics;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn agent_info<'a>(
@@ -10,6 +11,7 @@ pub fn agent_info<'a>(
     call_context: Arc<CallContext>,
     _input: AgentInfoInput,
 ) -> RibosomeResult<AgentInfoOutput> {
+    HostFnMetrics::count(HostFnMetrics::AgentInfo, 1);
     let agent_pubkey = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let lock = call_context.host_access.workspace().read().await;
         lock.source_chain.agent_pubkey()

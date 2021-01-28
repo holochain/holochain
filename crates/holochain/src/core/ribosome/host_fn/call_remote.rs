@@ -5,12 +5,14 @@ use holochain_p2p::HolochainP2pCellT;
 use holochain_types::prelude::*;
 use std::convert::TryInto;
 use std::sync::Arc;
+use super::HostFnMetrics;
 
 pub fn call_remote(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CallRemoteInput,
 ) -> RibosomeResult<CallRemoteOutput> {
+    HostFnMetrics::count(HostFnMetrics::CallRemote, 1);
     // it is the network's responsibility to handle timeouts and return an Err result in that case
     let result = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let mut network = call_context.host_access().network().clone();

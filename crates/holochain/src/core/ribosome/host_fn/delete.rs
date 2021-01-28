@@ -10,6 +10,7 @@ use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use super::HostFnMetrics;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn delete<'a>(
@@ -17,6 +18,7 @@ pub fn delete<'a>(
     call_context: Arc<CallContext>,
     input: DeleteInput,
 ) -> RibosomeResult<DeleteOutput> {
+    HostFnMetrics::count(HostFnMetrics::Delete, 1);
     let deletes_address = input.into_inner();
 
     let deletes_entry_address =

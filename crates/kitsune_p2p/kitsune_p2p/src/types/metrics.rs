@@ -85,10 +85,12 @@ pub fn print_all_metrics() {
 }
 
 /// Turn on metrics if `KITSUNE_METRICS=ON`
-pub fn init() {
+pub fn init() -> bool {
     if let Some(km) = std::env::var_os("KITSUNE_METRICS") {
         if km == "ON" {
             observability::metrics::init();
+            return true;
         }
     }
+    false
 }

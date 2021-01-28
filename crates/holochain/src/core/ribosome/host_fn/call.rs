@@ -3,12 +3,14 @@ use crate::core::ribosome::ZomeCall;
 use crate::core::ribosome::{error::RibosomeResult, CallContext};
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use super::HostFnMetrics;
 
 pub fn call(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CallInput,
 ) -> RibosomeResult<CallOutput> {
+    HostFnMetrics::count(HostFnMetrics::Call, 1);
     // Get the input
     let call = input.into_inner();
 

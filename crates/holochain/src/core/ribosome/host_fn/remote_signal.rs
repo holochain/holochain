@@ -9,6 +9,7 @@ use holochain_zome_types::RemoteSignalInput;
 use holochain_zome_types::RemoteSignalOutput;
 use std::sync::Arc;
 use tracing::Instrument;
+use super::HostFnMetrics;
 
 #[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn remote_signal(
@@ -16,6 +17,7 @@ pub fn remote_signal(
     call_context: Arc<CallContext>,
     input: RemoteSignalInput,
 ) -> RibosomeResult<RemoteSignalOutput> {
+    HostFnMetrics::count(HostFnMetrics::RemoteSignal, 1);
     const FN_NAME: &str = "recv_remote_signal";
     // Timeouts and errors are ignored,
     // this is a send and forget operation.

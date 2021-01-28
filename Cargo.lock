@@ -1537,6 +1537,7 @@ dependencies = [
  "holochain_p2p",
  "holochain_types",
  "holochain_websocket",
+ "lazy_static",
  "matches",
  "nanoid",
  "observability",

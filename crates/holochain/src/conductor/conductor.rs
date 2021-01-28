@@ -48,6 +48,7 @@ use crate::conductor::dna_store::MockDnaStore;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::InitialQueueTriggers;
+use crate::core::ribosome::host_fn;
 pub use builder::*;
 use fallible_iterator::FallibleIterator;
 use futures::future;
@@ -1046,6 +1047,8 @@ mod builder {
 
             handle.print_setup().await;
 
+            spawn_metrics();
+
             Ok(handle)
         }
 
@@ -1105,6 +1108,25 @@ mod builder {
 
             Self::finish(conductor, self.config, p2p_evt).await
         }
+    }
+}
+
+fn spawn_metrics() {
+    let kit = kitsune_p2p::metrics::init();
+    let host = host_fn::init_metrics();
+    if kit || host {
+        tokio::task::spawn(async move {
+            let start = std::time::Instant::now();
+            loop {
+                tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+                if kit {
+                    kitsune_p2p::metrics::print_all_metrics();
+                }
+                if host {
+                    host_fn::print_host_fn_metrics(&start);
+                }
+            }
+        });
     }
 }
 

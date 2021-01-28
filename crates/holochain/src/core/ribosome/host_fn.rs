@@ -169,3 +169,58 @@ host_fn_api_impls! {
     fn zome_info (()) -> zt::zome_info::ZomeInfo;
 
 }
+
+observability::metrics!(
+    HostFnMetrics,
+    Create,
+    CreateLink,
+    Get,
+    GetDetails,
+    GetLinks,
+    GetLinkDetails,
+    RemoteSignal,
+    EmitSignal,
+    Delete,
+    DeleteLink,
+    AgentInfo,
+    Call,
+    CallRemote
+);
+
+#[tracing::instrument]
+pub fn print_host_fn_metrics(start: &std::time::Instant) {
+    use std::fmt::Write;
+    if observability::metrics::is_enabled() {
+        let mut out = String::new();
+        writeln!(
+                    out,
+                    "\n**************************\n* Host Fn Metrics Report *\n**************************\n",
+                )
+                .expect("Failed to print metrics");
+        for (metric, count) in HostFnMetrics::iter() {
+            let dur = start.elapsed().as_secs();
+            let per_sec = if count > 0 && dur > 0 {
+                dur as f64 / count as f64
+            } else {
+                0.0
+            };
+            writeln!(
+                out,
+                "metric: {:?} count: {}, A count every {:.4}secs elapsed: {}",
+                metric, count, per_sec, dur
+            )
+            .expect("Failed to print metrics");
+        }
+        tracing::trace!(metric = %out);
+    }
+}
+
+pub fn init_metrics() -> bool {
+    if let Some(km) = std::env::var_os("HOST_FN_METRICS") {
+        if km == "ON" {
+            observability::metrics::init();
+            return true;
+        }
+    }
+    false
+}

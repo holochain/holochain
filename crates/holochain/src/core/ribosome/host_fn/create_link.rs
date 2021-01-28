@@ -6,6 +6,7 @@ use crate::core::workflow::CallZomeWorkspace;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use super::HostFnMetrics;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn create_link<'a>(
@@ -13,6 +14,7 @@ pub fn create_link<'a>(
     call_context: Arc<CallContext>,
     input: CreateLinkInput,
 ) -> RibosomeResult<CreateLinkOutput> {
+    HostFnMetrics::count(HostFnMetrics::CreateLink, 1);
     let (base_address, target_address, tag) = input.into_inner();
 
     // extract the zome position
