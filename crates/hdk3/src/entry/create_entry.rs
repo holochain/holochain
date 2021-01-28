@@ -5,7 +5,7 @@ use crate::prelude::*;
 /// An app entry is anything that the app can define a type for that matches the entry defs and
 /// that can be serialized to `SerializedBytes`.
 ///
-/// Accepts any input that implements TryInto<HdkEntry>.
+/// Accepts any input that implements TryInto<EntryWithDefId>.
 /// The default impls from the `#[hdk_entry( .. )]` and `entry_def!()` macros include this.
 ///
 /// e.g.
@@ -16,11 +16,10 @@ use crate::prelude::*;
 /// ```
 ///
 /// @see get and get_details for more information on CRUD
-pub fn create_entry<I, E>(input: I) -> HdkResult<HeaderHash>
+pub fn create_entry<I, E>(input: I) -> ExternResult<HeaderHash>
 where
-    HdkEntry: TryFrom<I, Error = E>,
-    HdkError: From<E>,
+    EntryWithDefId: TryFrom<I, Error = E>,
+    WasmError: From<E>,
 {
-    let HdkEntry(entry_def_id, entry) = HdkEntry::try_from(input)?;
-    create(entry_def_id, entry)
+    create(EntryWithDefId::try_from(input)?)
 }

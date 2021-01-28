@@ -45,7 +45,7 @@ fn validation_package(
 
 #[hdk_extern]
 fn commit_artist(_: ()) -> ExternResult<HeaderHash> {
-    Ok(create_entry(&Artist)?)
+    create_entry(&Artist)
 }
 
 #[hdk_extern]

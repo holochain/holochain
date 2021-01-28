@@ -5,45 +5,10 @@ use crate::zome::ZomeName;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 
-macro_rules! wasm_io_type {
-    ( $struct:ident($arg:ty) ) => {
-        #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
-        pub struct $struct($arg);
-
-        impl $struct {
-            pub fn new(i: $arg) -> Self {
-                Self(i)
-            }
-
-            pub fn into_inner(self) -> $arg {
-                self.0
-            }
-
-            pub fn inner_ref(&self) -> &$arg {
-                &self.0
-            }
-        }
-    };
-}
-
 /// All wasm shared I/O types need to share the same basic behaviours to cross the host/guest
 /// boundary in a predictable way.
 macro_rules! wasm_io_types {
     ( $( fn $f:ident ( $in_arg:ty ) -> $out_arg:ty; )* ) => {
-        $(
-            paste::paste! {
-                wasm_io_type!([<$f:camel Input>]($in_arg));
-                wasm_io_type!([<$f:camel Output>]($out_arg));
-
-                // Typically we only need this for input types
-                impl From<$in_arg> for [<$f:camel Input>] {
-                    fn from(arg: $in_arg) -> Self {
-                        Self::new(arg)
-                    }
-                }
-            }
-        )*
-
         pub trait HostFnApiT {
             $(
                 fn $f(&self, _: $in_arg) -> Result<$out_arg, HostFnApiError>;
@@ -52,7 +17,7 @@ macro_rules! wasm_io_types {
     }
 }
 
-// Every externed function that the zome developer exposes to holochain returns `ExternOutput`.
+// Every externed function that the zome developer exposes to holochain returns `ExternIO`.
 // The zome developer can expose callbacks in a "sparse" way based on names and the functions
 // can take different input (e.g. validation vs. hooks like init, etc.).
 // All we can say is that some SerializedBytes are being received and returned.
@@ -64,8 +29,51 @@ macro_rules! wasm_io_types {
 // - first the sparse callback is triggered with SB input/output
 // - then the guest inflates the expected input or the host the expected output based on the
 //   callback flavour
-wasm_io_type!(ExternInput(SerializedBytes));
-wasm_io_type!(ExternOutput(SerializedBytes));
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(transparent)]
+#[repr(transparent)]
+pub struct ExternIO(#[serde(with = "serde_bytes")] pub Vec<u8>);
+
+impl ExternIO {
+    pub fn encode<I>(input: I) -> Result<Self, SerializedBytesError>
+    where
+        I: serde::Serialize,
+    {
+        Ok(Self(holochain_serialized_bytes::encode(&input)?))
+    }
+    pub fn decode<O>(&self) -> Result<O, SerializedBytesError>
+    where
+        O: serde::de::DeserializeOwned,
+    {
+        Ok(holochain_serialized_bytes::decode(&self.0)?)
+    }
+
+    pub fn into_vec(self) -> Vec<u8> {
+        self.into()
+    }
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.as_ref()
+    }
+}
+
+impl AsRef<[u8]> for ExternIO {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl From<Vec<u8>> for ExternIO {
+    fn from(v: Vec<u8>) -> Self {
+        Self(v)
+    }
+}
+
+impl From<ExternIO> for Vec<u8> {
+    fn from(extern_io: ExternIO) -> Self {
+        extern_io.0
+    }
+}
 
 wasm_io_types! {
 
@@ -75,10 +83,11 @@ wasm_io_types! {
 
     fn agent_info (()) -> zt::agent_info::AgentInfo;
 
-    fn call (zt::call::Call) -> zt::ZomeCallResponse;
-
     // Header hash of the DeleteLink element.
     fn call_remote (zt::call_remote::CallRemote) -> zt::ZomeCallResponse;
+
+    fn call (zt::call::Call) -> zt::ZomeCallResponse;
+
 
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();
@@ -89,62 +98,42 @@ wasm_io_types! {
     // @todo Get the capability for the current zome call.
     fn capability_info (()) -> ();
 
+    // Create a link between two entries.
+    fn create_link (zt::link::CreateLinkInput) -> holo_hash::HeaderHash;
+
     fn create_x25519_keypair(()) -> zt::x_salsa20_poly1305::x25519::X25519PubKey;
 
-    fn x_salsa20_poly1305_encrypt(
-        zt::x_salsa20_poly1305::XSalsa20Poly1305Encrypt
-    ) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
-
-    fn x_salsa20_poly1305_decrypt(
-        zt::x_salsa20_poly1305::XSalsa20Poly1305Decrypt
-    ) -> Option<zt::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
-
-    // Sender, Recipient, Data.
-    fn x_25519_x_salsa20_poly1305_encrypt(zt::x_salsa20_poly1305::X25519XSalsa20Poly1305Encrypt) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
-
-    // Recipient, Sender, Encrypted data.
-    fn x_25519_x_salsa20_poly1305_decrypt(zt::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<zt::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
-
     // Returns HeaderHash of the newly created element.
-    fn create ((zt::entry_def::EntryDefId, zt::entry::Entry)) -> holo_hash::HeaderHash;
-
-    // Create a link between two entries.
-    fn create_link ((holo_hash::EntryHash, holo_hash::EntryHash, zt::link::LinkTag)) -> holo_hash::HeaderHash;
-
-    // @todo
-    fn delete (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
-
-    // Header hash of the CreateLink element.
-    fn delete_link (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
-
-    // @todo
-    fn entry_type_properties (()) -> ();
-
-    // Header hash of the newly committed element.
-    // Emit a Signal::App to subscribers on the interface
-    fn emit_signal (zt::signal::AppSignal) -> ();
+    fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
 
     // The debug host import takes a DebugMsg to output wherever the host wants to display it.
     // DebugMsg includes line numbers. so the wasm tells the host about it's own code structure.
     fn debug (zt::debug::DebugMsg) -> ();
 
-    // Attempt to get a live entry from the cascade.
-    fn get ((holo_hash::AnyDhtHash, zt::entry::GetOptions)) -> Option<zt::element::Element>;
+    // Header hash of the CreateLink element.
+    fn delete_link (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
 
-    fn get_agent_activity (
-        (
-            holo_hash::AgentPubKey,
-            zt::query::ChainQueryFilter,
-            zt::query::ActivityRequest,
-        )
-    ) -> zt::query::AgentActivity;
+    // Delete an element.
+    fn delete (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
 
-    fn get_details ((holo_hash::AnyDhtHash, zt::entry::GetOptions)) -> Option<zt::metadata::Details>;
+    // Header hash of the newly committed element.
+    // Emit a Signal::App to subscribers on the interface
+    fn emit_signal (zt::signal::AppSignal) -> ();
+
+    // @todo
+    fn entry_type_properties (()) -> ();
+
+    fn get_agent_activity (zt::agent_info::GetAgentActivityInput) -> zt::query::AgentActivity;
+
+    fn get_details (zt::entry::GetInput) -> Option<zt::metadata::Details>;
+
+    fn get_link_details (zt::link::GetLinksInput) -> zt::link::LinkDetails;
 
     // Get links by entry hash from the cascade.
-    fn get_links ((holo_hash::EntryHash, Option<zt::link::LinkTag>)) -> zt::link::Links;
+    fn get_links (zt::link::GetLinksInput) -> zt::link::Links;
 
-    fn get_link_details ((holo_hash::EntryHash, Option<zt::link::LinkTag>)) -> zt::link::LinkDetails;
+    // Attempt to get a live entry from the cascade.
+    fn get (zt::entry::GetInput) -> Option<zt::element::Element>;
 
     // Hash an entry on the host.
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
@@ -177,14 +166,28 @@ wasm_io_types! {
     // Current system time, in the opinion of the host, as a `Duration`.
     fn sys_time (()) -> core::time::Duration;
 
-    // Same as  but also takes the HeaderHash of the updated element.
-    fn update ((zt::entry_def::EntryDefId, zt::entry::Entry, holo_hash::HeaderHash)) -> holo_hash::HeaderHash;
-
-    fn verify_signature (zt::signature::VerifySignature) -> bool;
-
     // There's nothing to go in or out of a noop.
     // Used to "defuse" host functions when side effects are not allowed.
     fn unreachable (()) -> ();
+
+    // Same as  but also takes the HeaderHash of the updated element.
+    fn update (zt::entry::UpdateInput) -> holo_hash::HeaderHash;
+
+    fn verify_signature (zt::signature::VerifySignature) -> bool;
+
+    fn x_salsa20_poly1305_encrypt(
+        zt::x_salsa20_poly1305::XSalsa20Poly1305Encrypt
+    ) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    fn x_salsa20_poly1305_decrypt(
+        zt::x_salsa20_poly1305::XSalsa20Poly1305Decrypt
+    ) -> Option<zt::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
+
+    // Sender, Recipient, Data.
+    fn x_25519_x_salsa20_poly1305_encrypt(zt::x_salsa20_poly1305::X25519XSalsa20Poly1305Encrypt) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    // Recipient, Sender, Encrypted data.
+    fn x_25519_x_salsa20_poly1305_decrypt(zt::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<zt::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
 
     // The zome and agent info are constants specific to the current zome and chain.
     // All the information is provided by core so there is no input value.
@@ -204,7 +207,7 @@ pub enum HostFnApiError {
 pub enum ZomeCallResponse {
     /// Arbitrary response from zome fns to the outside world.
     /// Something like a 200 http response.
-    Ok(ExternOutput),
+    Ok(crate::ExternIO),
     /// Cap grant failure.
     /// Something like a 401 http response.
     Unauthorized(CellId, ZomeName, FunctionName, AgentPubKey),

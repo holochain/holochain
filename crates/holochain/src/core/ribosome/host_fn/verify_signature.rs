@@ -8,17 +8,16 @@ use std::sync::Arc;
 pub fn verify_signature(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    input: VerifySignatureInput,
-) -> RibosomeResult<VerifySignatureOutput> {
-    let input = input.into_inner();
-    Ok(VerifySignatureOutput::new(
+    input: VerifySignature,
+) -> RibosomeResult<bool> {
+    Ok(
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             input
                 .key
                 .verify_signature_raw(input.as_ref(), input.as_data_ref().bytes())
                 .await
         })?,
-    ))
+    )
 }
 
 #[cfg(test)]
@@ -144,17 +143,15 @@ pub mod wasm_test {
                 vec![1_u8, 2_u8, 3_u8],
             ),
         ] {
-            for _ in 0..2 {
-                let output: VerifySignatureOutput = crate::call_test_ribosome!(
+            for _ in 0..2_usize {
+                let output: bool = crate::call_test_ribosome!(
                     host_access,
                     TestWasm::Sign,
                     "verify_signature",
-                    holochain_zome_types::zome_io::VerifySignatureInput::new(
-                        VerifySignature::new_raw(k.clone(), sig.clone().into(), data.clone())
-                    )
+                    VerifySignature::new_raw(k.clone(), sig.clone().into(), data.clone())
                 );
 
-                assert_eq!(expect, output.into_inner());
+                assert_eq!(expect, output);
             }
         }
     }

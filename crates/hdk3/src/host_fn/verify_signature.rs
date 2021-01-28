@@ -5,14 +5,13 @@ pub fn verify_signature<K: Into<AgentPubKey>, S: Into<Signature>, D: Into<Serial
     key: K,
     signature: S,
     data: D,
-) -> HdkResult<bool> {
-    Ok(host_call::<VerifySignatureInput, VerifySignatureOutput>(
+) -> ExternResult<bool> {
+    host_call::<VerifySignature, bool>(
         __verify_signature,
-        &VerifySignatureInput::new(VerifySignature {
+        VerifySignature {
             key: key.into(),
             signature: signature.into(),
             data: data.into(),
-        }),
-    )?
-    .into_inner())
+        },
+    )
 }

@@ -3,6 +3,7 @@ members = [
   "crates/dna_util",
   "crates/fixt",
   "crates/fixt/test",
+  "crates/hc",
   "crates/hdk3",
   "crates/hdk3_derive",
   "crates/holo_hash",
@@ -48,7 +49,7 @@ rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
 lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }
 #lmdb-rkv = { path = "../../rust/lmdb-rs" }
 # observability = { path = "../../rust/observability" }
-observability = { git = "https://github.com/freesig/observability.git", branch = "metrics" }
+observability = { git = "https://github.com/freesig/observability.git", branch = "main" }
 holochain_wasmer_guest = { path = "../holochain-wasmer/crates/guest" }
 holochain_wasmer_common = { path = "../holochain-wasmer/crates/common" }
 holochain_serialized_bytes = { path = "../holochain-serialization/crates/holochain_serialized_bytes" }

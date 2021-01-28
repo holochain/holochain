@@ -8,9 +8,9 @@ use std::sync::Arc;
 pub fn zome_info(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    _input: ZomeInfoInput,
-) -> RibosomeResult<ZomeInfoOutput> {
-    Ok(ZomeInfoOutput::new(ZomeInfo {
+    _input: (),
+) -> RibosomeResult<ZomeInfo> {
+    Ok(ZomeInfo {
         dna_name: ribosome.dna_def().name.clone(),
         zome_name: call_context.zome.zome_name().clone(),
         dna_hash: ribosome.dna_def().as_hash().clone(),
@@ -18,7 +18,7 @@ pub fn zome_info(
         properties: ribosome.dna_def().properties.clone(),
         // @TODO
         // public_token: "".into(),
-    }))
+    })
 }
 
 #[cfg(test)]
@@ -27,7 +27,7 @@ pub mod test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::ZomeInfoOutput;
+    use holochain_zome_types::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_zome_info_test() {
@@ -43,8 +43,8 @@ pub mod test {
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        let zome_info: ZomeInfoOutput =
+        let zome_info: ZomeInfo =
             crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "zome_info", ());
-        assert_eq!(zome_info.inner_ref().dna_name, "test",);
+        assert_eq!(zome_info.dna_name, "test",);
     }
 }

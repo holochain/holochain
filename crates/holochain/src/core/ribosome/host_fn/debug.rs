@@ -9,17 +9,16 @@ use tracing::*;
 pub fn debug(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    input: DebugInput,
-) -> RibosomeResult<DebugOutput> {
-    let msg: DebugMsg = input.into_inner();
+    input: DebugMsg,
+) -> RibosomeResult<()> {
     debug!(
         "{}:{}:{} {}",
-        msg.module_path(),
-        msg.file(),
-        msg.line(),
-        msg.msg()
+        input.module_path(),
+        input.file(),
+        input.line(),
+        input.msg()
     );
-    Ok(DebugOutput::new(()))
+    Ok(())
 }
 
 #[cfg(test)]
@@ -33,8 +32,6 @@ pub mod wasm_test {
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::debug_msg;
-    use holochain_zome_types::DebugInput;
-    use holochain_zome_types::DebugOutput;
     use std::sync::Arc;
 
     /// we can get an entry hash out of the fn directly
@@ -46,11 +43,11 @@ pub mod wasm_test {
         let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        let input = DebugInput::new(debug_msg!(format!("ribosome debug {}", "works!")));
+        let input = debug_msg!(format!("ribosome debug {}", "works!"));
 
-        let output: DebugOutput = debug(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
+        let output: () = debug(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
-        assert_eq!(DebugOutput::new(()), output);
+        assert_eq!((), output);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -69,8 +66,8 @@ pub mod wasm_test {
         host_access.workspace = workspace_lock;
 
         // this shows that we can get line numbers out of wasm
-        let output: DebugOutput =
+        let output: () =
             crate::call_test_ribosome!(host_access, TestWasm::Debug, "debug", ());
-        assert_eq!(output, DebugOutput::new(()));
+        assert_eq!(output, ());
     }
 }
