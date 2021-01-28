@@ -9,8 +9,8 @@ use sysinfo::{NetworkExt, NetworksExt, ProcessExt, SystemExt};
 static SYS_INFO: Once = Once::new();
 
 static TASK_COUNT: AtomicUsize = AtomicUsize::new(0);
-static USED_MEM: AtomicU64 = AtomicU64::new(0);
-static PROC_CPU_USAGE: AtomicUsize = AtomicUsize::new(0);
+static USED_MEM_KB: AtomicU64 = AtomicU64::new(0);
+static PROC_CPU_USAGE_PCT_1000: AtomicUsize = AtomicUsize::new(0);
 static TX_BYTES_PER_SEC: AtomicU64 = AtomicU64::new(0);
 static RX_BYTES_PER_SEC: AtomicU64 = AtomicU64::new(0);
 
@@ -32,9 +32,9 @@ macro_rules! metric_task {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct MetricSysInfo {
     /// Used system memory KB.
-    pub used_mem: u64,
+    pub used_mem_kb: u64,
     /// Process CPU Usage % x1000.
-    pub proc_cpu_usage: usize,
+    pub proc_cpu_usage_pct_1000: usize,
     /// network bytes transmitted.
     pub tx_bytes_per_sec: u64,
     /// network bytes received.
@@ -92,10 +92,10 @@ pub fn init_sys_info_poll() {
                 let proc = system.get_process(pid).unwrap();
 
                 let mem = proc.memory();
-                USED_MEM.store(mem, Ordering::Relaxed);
+                USED_MEM_KB.store(mem, Ordering::Relaxed);
 
                 let cpu = (proc.cpu_usage() * 1000.0) as usize;
-                PROC_CPU_USAGE.store(cpu, Ordering::Relaxed);
+                PROC_CPU_USAGE_PCT_1000.store(cpu, Ordering::Relaxed);
 
                 let mut tx = 0;
                 let mut rx = 0;
@@ -117,8 +117,8 @@ pub fn init_sys_info_poll() {
 /// Capture current sys_info metrics. Be sure you invoked `init_sys_info_poll`.
 pub fn get_sys_info() -> MetricSysInfo {
     MetricSysInfo {
-        used_mem: USED_MEM.load(Ordering::Relaxed),
-        proc_cpu_usage: PROC_CPU_USAGE.load(Ordering::Relaxed),
+        used_mem_kb: USED_MEM_KB.load(Ordering::Relaxed),
+        proc_cpu_usage_pct_1000: PROC_CPU_USAGE_PCT_1000.load(Ordering::Relaxed),
         tx_bytes_per_sec: TX_BYTES_PER_SEC.load(Ordering::Relaxed),
         rx_bytes_per_sec: RX_BYTES_PER_SEC.load(Ordering::Relaxed),
     }
