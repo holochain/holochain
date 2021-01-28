@@ -24,7 +24,6 @@ use holochain_types::prelude::InstallAppDnaPayload;
 use holochain_types::prelude::InstallAppPayload;
 use holochain_types::prelude::InstalledCell;
 use portpicker::is_free;
-use portpicker::pick_unused_port;
 use std::convert::TryFrom;
 
 use crate::cmds::Existing;
@@ -37,13 +36,13 @@ use structopt::StructOpt;
 #[doc(hidden)]
 #[derive(Debug, StructOpt)]
 pub struct Call {
-    #[structopt(flatten)]
-    pub existing: Existing,
     #[structopt(short, long, conflicts_with_all = &["existing_paths", "existing_indices"], value_delimiter = ",")]
     /// Ports to running conductor admin interfaces.
     /// If this is empty existing setups will be used.
     /// Cannot be combined with existing setups.
     pub running: Vec<u16>,
+    #[structopt(flatten)]
+    pub existing: Existing,
     #[structopt(subcommand)]
     /// The admin request you want to make.
     pub call: AdminRequestCli,
@@ -304,7 +303,7 @@ pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyho
             ensure!(is_free(port), "port {} is not free", port);
             port
         }
-        None => pick_unused_port().expect("No available ports free"),
+        None => 0,
     };
     let resp = cmd
         .command(AdminRequest::AddAdminInterfaces(vec![
@@ -318,6 +317,7 @@ pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyho
         "Failed to add admin interface, got: {:?}",
         resp
     );
+    // TODO: return chosen port when 0 is used
     Ok(port)
 }
 

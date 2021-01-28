@@ -32,10 +32,20 @@ enum Op {
         num_conductors: usize,
         #[structopt(flatten)]
         gen: Create,
-        #[structopt(flatten)]
-        source: Source,
+        #[structopt(short, long, value_delimiter = ",")]
+        /// Generate a new setups and then run them.
+        ///
+        /// Optionally create an app interface.
+        /// This allows you UI to talk to the conductor.
+        /// For example `hc generate -r=0,9000,0`
+        /// Or `hc generate -r` to run without attaching any app ports.
+        run: Option<Vec<u16>>,
+        /// List of dnas to run.
+        /// Defaults to searching the current directory for
+        /// a single `*.dna.gz` file.
+        dnas: Vec<PathBuf>,
     },
-    /// Run a conductor from existing or generate new setup and run.
+    /// Run a conductor from existing setup.
     Run(Run),
     /// Call the conductor admin interface.
     Call(hc::calls::Call),
@@ -53,87 +63,61 @@ enum Op {
 
 #[derive(Debug, StructOpt)]
 struct Run {
-    #[structopt(short, long, default_value = "1")]
-    /// Number of conductors to run.
-    ///
-    /// If you specify more then the number
-    /// of existing setups then additional setups will be generated.
-    num_conductors: usize,
     #[structopt(short, long, value_delimiter = ",")]
     /// Optionally create an app interface.
     /// This allows you UI to talk to the conductor.
     /// For example `hc run -p=0,9000,0`
     ports: Vec<u16>,
-    /// Generate a new setup and then run.
-    #[structopt(subcommand)]
-    gen: Option<Gen>,
     #[structopt(flatten)]
     existing: Existing,
-    #[structopt(flatten)]
-    source: Source,
-}
-
-#[derive(Debug, StructOpt)]
-enum Gen {
-    Gen(Create),
-}
-
-#[derive(Debug, StructOpt)]
-struct Source {
-    /// List of dnas to run.
-    /// Defaults to searching the current directory for
-    /// a single `*.dna.gz` file.
-    dnas: Vec<PathBuf>,
-}
-
-impl Gen {
-    pub fn into_inner(self) -> Create {
-        match self {
-            Gen::Gen(n) => n,
-        }
-    }
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    observability::init_fmt(observability::Output::Log).ok();
+    if std::env::var_os("RUST_LOG").is_some() {
+        observability::init_fmt(observability::Output::Log).ok();
+    }
     let ops = Ops::from_args();
     match ops.op {
         Op::Generate {
             gen,
+            run,
             num_conductors,
-            source: Source { dnas },
+            dnas,
         } => {
             let paths = generate(&ops.holochain_path, dnas, num_conductors, gen).await?;
-            for (port, path) in ops.force_admin_ports.into_iter().zip(paths.into_iter()) {
+            for (port, path) in ops
+                .force_admin_ports
+                .clone()
+                .into_iter()
+                .zip(paths.clone().into_iter())
+            {
                 hc::force_admin_port(path, port)?;
             }
+            if let Some(ports) = run {
+                run_n(&ops.holochain_path, paths, ports, ops.force_admin_ports).await?;
+            }
         }
-        Op::Run(Run {
-            ports, existing, ..
-        }) if !existing.is_empty() => {
+        Op::Run(Run { ports, existing }) => {
             let paths = existing.load()?;
+            if paths.is_empty() {
+                return Ok(());
+            }
             run_n(&ops.holochain_path, paths, ports, ops.force_admin_ports).await?;
         }
-        Op::Run(Run {
-            gen,
-            ports,
-            num_conductors,
-            source: Source { dnas },
-            ..
-        }) => {
-            // Check if current directory has saved existing
-            let existing = hc::save::load(std::env::current_dir()?)?;
-            // If we have existing setups and we are not trying to generate and
-            // we are not trying to load specific dnas then use existing.
-            let paths = if !existing.is_empty() && gen.is_none() && dnas.is_empty() {
-                existing
-            } else {
-                let create = gen.map(|g| g.into_inner()).unwrap_or_default();
-                generate(&ops.holochain_path, dnas, num_conductors, create).await?
-            };
-            run_n(&ops.holochain_path, paths, ports, ops.force_admin_ports).await?;
-        }
+        // Op::Run(Run { ports, .. }) => {
+        //     // Check if current directory has saved existing
+        //     let existing = hc::save::load(std::env::current_dir()?)?;
+        //     // If we have existing setups and we are not trying to generate and
+        //     // we are not trying to load specific dnas then use existing.
+        //     let paths = if !existing.is_empty() && gen.is_none() && dnas.is_empty() {
+        //         existing
+        //     } else {
+        //         let create = gen.map(|g| g.into_inner()).unwrap_or_default();
+        //         generate(&ops.holochain_path, dnas, num_conductors, create).await?
+        //     };
+        //     run_n(&ops.holochain_path, paths, ports, ops.force_admin_ports).await?;
+        // }
         Op::Call(call) => hc::calls::call(&ops.holochain_path, call).await?,
         Op::Task => todo!("Running custom tasks is coming soon"),
         Op::List { verbose } => hc::save::list(std::env::current_dir()?, verbose)?,

@@ -758,6 +758,15 @@ where
         self.p2p_env.clone()
     }
 
+    pub(super) fn print_setup(&self) {
+        use std::fmt::Write;
+        let mut out = String::new();
+        for port in &self.admin_websocket_ports {
+            writeln!(&mut out, "###ADMIN_PORT:{}###", port).expect("Can't write setup to std out");
+        }
+        println!("\n###HOLOCHAIN_SETUP###\n{}###HOLOCHAIN_SETUP_END###", out);
+    }
+
     #[cfg(any(test, feature = "test_utils"))]
     pub(super) async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
         self.get_state().await
@@ -1014,6 +1023,8 @@ mod builder {
 
             // Create app interfaces
             handle.clone().startup_app_interfaces().await?;
+
+            handle.print_setup().await;
 
             Ok(handle)
         }

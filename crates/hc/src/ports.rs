@@ -6,8 +6,6 @@ use holochain_conductor_api::{
     config::conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver,
 };
 use holochain_websocket::{websocket_connect, WebsocketConfig, WebsocketReceiver, WebsocketSender};
-use portpicker::is_free;
-use portpicker::pick_unused_port;
 use url2::prelude::*;
 
 use crate::config::read_config;
@@ -54,22 +52,26 @@ async fn websocket_client_by_port(
     .await?)
 }
 
-pub(crate) fn random_admin_port_if_busy(config: &mut ConductorConfig) -> u16 {
+pub(crate) fn random_admin_port_if_busy(config: &mut ConductorConfig) {
     match config.admin_interfaces.as_mut().and_then(|i| i.first_mut()) {
         Some(AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket { port },
         }) => {
-            if !is_free(*port) {
-                *port = pick_unused_port().expect("No ports free");
+            if *port != 0 {
+                *port = 0;
             }
-            *port
+            // if !is_free(dbg!(*port)) {
+            //     dbg!("not free");
+            //     *port = pick_unused_port().expect("No ports free");
+            // }
+            // dbg!(*port)
         }
         None => {
-            let port = pick_unused_port().expect("No ports free");
+            // let port = pick_unused_port().expect("No ports free");
+            let port = 0;
             config.admin_interfaces = Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket { port },
             }]);
-            port
         }
     }
 }

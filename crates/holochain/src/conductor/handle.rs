@@ -208,6 +208,9 @@ pub trait ConductorHandleT: Send + Sync {
         cell_id: Option<CellId>,
     ) -> ConductorApiResult<Vec<AgentInfoSigned>>;
 
+    /// Print the current setup in a machine readable way.
+    async fn print_setup(&self);
+
     /// Retrieve the LMDB environment for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
@@ -531,6 +534,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         cell_id: Option<CellId>,
     ) -> ConductorApiResult<Vec<AgentInfoSigned>> {
         self.conductor.read().await.get_agent_infos(cell_id)
+    }
+
+    async fn print_setup(&self) {
+        self.conductor.read().await.print_setup()
     }
 
     #[cfg(any(test, feature = "test_utils"))]

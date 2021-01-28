@@ -24,7 +24,7 @@ pub struct Create {
     /// Set a root directory for conductor setups to be placed into.
     /// Defaults to your systems temp directory.
     /// This must already exist.
-    #[structopt(short, long)]
+    #[structopt(long)]
     pub root: Option<PathBuf>,
     #[structopt(short, long)]
     /// Set a list of subdirectories for each setup that is created.
@@ -90,31 +90,76 @@ pub struct Quic {
 
 #[derive(Debug, StructOpt, Clone)]
 pub struct Existing {
-    #[structopt(short, long, conflicts_with_all = &["dnas", "gen"], value_delimiter = ",")]
+    #[structopt(short, long, value_delimiter = ",")]
     /// Paths to existing setup directories.
     /// For example `hc run -e=/tmp/kAOXQlilEtJKlTM_W403b,/tmp/kddsajkaasiIII_sJ`.
     pub existing_paths: Vec<PathBuf>,
+    #[structopt(short, long, conflicts_with_all = &["last"])]
+    /// Run all the existing conductor setups.
+    pub all: bool,
+    #[structopt(short, long)]
+    /// Run the last created conductor setup.
+    pub last: bool,
+    /// Run a selection of existing conductor setups.
     /// Conductors that have been setup and are
     /// available in `hc list`.
     /// Use the index to choose which setups to use.
-    /// For example `hc run -i=1,3,5`
-    #[structopt(short = "i", long, conflicts_with_all = &["dnas", "gen"], value_delimiter = ",")]
-    pub existing_indices: Vec<usize>,
+    /// For example `hc run 1 3 5` or `hc run 1`
+    #[structopt(conflicts_with_all = &["all", "last"])]
+    pub indices: Vec<usize>,
 }
 
 impl Existing {
     pub fn load(mut self) -> anyhow::Result<Vec<PathBuf>> {
         let setups = crate::save::load(std::env::current_dir()?)?;
-        let e = self
-            .existing_indices
-            .into_iter()
-            .filter_map(|i| setups.get(i).cloned());
-        self.existing_paths.extend(e);
+        if self.all {
+            // Get all the setups
+            self.existing_paths.extend(setups.into_iter())
+        } else if self.last && setups.last().is_some() {
+            // Get just the last setup
+            self.existing_paths
+                .push(setups.last().cloned().expect("Safe due to check above"));
+        } else if !self.indices.is_empty() {
+            // Get the indices
+            let e = self
+                .indices
+                .into_iter()
+                .filter_map(|i| setups.get(i).cloned());
+            self.existing_paths.extend(e);
+        } else if !self.existing_paths.is_empty() {
+            // If there is existing paths then use those
+        } else if setups.len() == 1 {
+            // If there is only one setup then use that
+            self.existing_paths
+                .push(setups.last().cloned().expect("Safe due to check above"));
+        } else if setups.len() > 1 {
+            // There is multiple setups, the use must disambiguate
+            msg!(
+                "
+There are multiple setups and hc doesn't know which to run.
+You can run:
+    - `--all` `-a` run all setups.
+    - `--last` `-l` run the last created setup.
+    - `--existing-paths` `-e` run a list of existing paths to setups.
+    - `1` run a index from the list below.
+    - `0 2` run multiple indices from the list below.
+Run `hc list` to see the setups or `hc r --help` for more information."
+            );
+            crate::save::list(std::env::current_dir()?, 0)?;
+        } else {
+            // There is no setups
+            msg!(
+                "
+Before running or calling you need to generate a setup.
+You can use `hc generate` or `hc g` to do this.
+Run `hc g --help` for more options."
+            );
+        }
         Ok(self.existing_paths)
     }
 
     pub fn is_empty(&self) -> bool {
-        self.existing_paths.is_empty() && self.existing_indices.is_empty()
+        self.existing_paths.is_empty() && self.indices.is_empty() && !self.all && !self.last
     }
 }
 
