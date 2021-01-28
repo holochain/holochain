@@ -218,7 +218,7 @@ impl TransportListenerHandler for TransportListenerQuic {
         Ok(async move {
             Ok(serde_json::json! {{
                 "url": url,
-                "connections": connections,
+                "connection_count": connections.len(),
             }})
         }
         .boxed()

@@ -18,6 +18,7 @@ async fn main() {
             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
             .finish(),
     );
+    kitsune_p2p_types::metrics::init_sys_info_poll();
 
     if let Err(e) = inner().await {
         eprintln!("{:?}", e);
@@ -94,6 +95,17 @@ async fn inner() -> TransportResult<()> {
 
     let (listener, mut events) =
         spawn_kitsune_proxy_listener(proxy_config, listener, events).await?;
+
+    let listener_clone = listener.clone();
+    metric_task!(async move {
+        loop {
+            tokio::time::delay_for(std::time::Duration::from_secs(60)).await;
+
+            let debug_dump = listener_clone.debug().await.unwrap();
+
+            tracing::info!("{}", serde_json::to_string_pretty(&debug_dump).unwrap());
+        }
+    });
 
     println!("{}", listener.bound_url().await?);
 

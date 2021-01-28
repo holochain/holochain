@@ -515,22 +515,15 @@ impl TransportListenerHandler for InnerListen {
     fn handle_debug(&mut self) -> TransportListenerHandlerResult<serde_json::Value> {
         let url = self.this_url.to_string();
         let sub = self.sub_sender.debug();
-        let proxy = self
-            .proxy_list
-            .iter()
-            .map(|(k, v)| {
-                serde_json::json! {{
-                    "proxy_url": k.to_string(),
-                    "base_url": v.base_connection_url.to_string(),
-                }}
-            })
-            .collect::<Vec<_>>();
+        let proxy_count = self.proxy_list.iter().count();
         Ok(async move {
             let sub = sub.await?;
             Ok(serde_json::json! {{
                 "sub_transport": sub,
                 "url": url,
-                "proxy": proxy,
+                "proxy_count": proxy_count,
+                "tokio_task_count": kitsune_p2p_types::metrics::metric_task_count(),
+                "sys_info": kitsune_p2p_types::metrics::get_sys_info(),
             }})
         }
         .boxed()

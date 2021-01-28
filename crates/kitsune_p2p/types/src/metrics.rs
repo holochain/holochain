@@ -4,13 +4,15 @@ use std::sync::{
     atomic::{AtomicU64, AtomicUsize, Ordering},
     Once,
 };
-use sysinfo::{ProcessExt, SystemExt};
+use sysinfo::{NetworkExt, NetworksExt, ProcessExt, SystemExt};
 
 static SYS_INFO: Once = Once::new();
 
 static TASK_COUNT: AtomicUsize = AtomicUsize::new(0);
 static USED_MEM: AtomicU64 = AtomicU64::new(0);
 static PROC_CPU_USAGE: AtomicUsize = AtomicUsize::new(0);
+static TX_BYTES_PER_SEC: AtomicU64 = AtomicU64::new(0);
+static RX_BYTES_PER_SEC: AtomicU64 = AtomicU64::new(0);
 
 /// Spawns a tokio task with given future/async block.
 /// Captures a new TaskCounter instance to track task count.
@@ -27,23 +29,65 @@ macro_rules! metric_task {
 }
 
 /// System Info.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct MetricSysInfo {
-    /// Used system memory.
+    /// Used system memory KB.
     pub used_mem: u64,
     /// Process CPU Usage % x1000.
     pub proc_cpu_usage: usize,
+    /// network bytes transmitted.
+    pub tx_bytes_per_sec: u64,
+    /// network bytes received.
+    pub rx_bytes_per_sec: u64,
 }
 
 /// Initialize polling of system usage info
 pub fn init_sys_info_poll() {
+    struct FiveAvg {
+        idx: usize,
+        data: [u64; 5],
+    }
+
+    impl FiveAvg {
+        pub fn new() -> Self {
+            Self {
+                idx: 0,
+                data: [0; 5],
+            }
+        }
+
+        pub fn push(&mut self, val: u64) {
+            self.data[self.idx] = val;
+            self.idx += 1;
+            if self.idx >= self.data.len() {
+                self.idx = 0;
+            }
+        }
+
+        pub fn avg(&self) -> u64 {
+            let mut tot = 0;
+            for f in self.data.iter() {
+                tot += f;
+            }
+            tot / self.data.len() as u64
+        }
+    }
+
     SYS_INFO.call_once(|| {
         metric_task!(async move {
-            let mut system = sysinfo::System::new();
+            let mut system = sysinfo::System::new_with_specifics(
+                sysinfo::RefreshKind::new()
+                    .with_networks()
+                    .with_networks_list(),
+            );
+
             let pid = sysinfo::get_current_pid().unwrap();
+            let mut tx_avg = FiveAvg::new();
+            let mut rx_avg = FiveAvg::new();
 
             loop {
                 system.refresh_process(pid);
+                system.get_networks_mut().refresh();
 
                 let proc = system.get_process(pid).unwrap();
 
@@ -52,6 +96,17 @@ pub fn init_sys_info_poll() {
 
                 let cpu = (proc.cpu_usage() * 1000.0) as usize;
                 PROC_CPU_USAGE.store(cpu, Ordering::Relaxed);
+
+                let mut tx = 0;
+                let mut rx = 0;
+                for (_n, network) in system.get_networks().iter() {
+                    tx += network.get_transmitted();
+                    rx += network.get_received();
+                }
+                tx_avg.push(tx);
+                rx_avg.push(rx);
+                TX_BYTES_PER_SEC.store(tx_avg.avg(), Ordering::Relaxed);
+                RX_BYTES_PER_SEC.store(rx_avg.avg(), Ordering::Relaxed);
 
                 tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
             }
@@ -64,6 +119,8 @@ pub fn get_sys_info() -> MetricSysInfo {
     MetricSysInfo {
         used_mem: USED_MEM.load(Ordering::Relaxed),
         proc_cpu_usage: PROC_CPU_USAGE.load(Ordering::Relaxed),
+        tx_bytes_per_sec: TX_BYTES_PER_SEC.load(Ordering::Relaxed),
+        rx_bytes_per_sec: RX_BYTES_PER_SEC.load(Ordering::Relaxed),
     }
 }
 
@@ -110,7 +167,9 @@ async fn test_metric_task() {
 
 #[tokio::test(threaded_scheduler)]
 async fn test_sys_info() {
+    observability::test_run().ok();
     init_sys_info_poll();
-    tokio::time::delay_for(std::time::Duration::from_millis(5)).await;
-    let _ = get_sys_info();
+    tokio::time::delay_for(std::time::Duration::from_millis(200)).await;
+    let sys_info = get_sys_info();
+    ghost_actor::dependencies::tracing::info!(?sys_info);
 }

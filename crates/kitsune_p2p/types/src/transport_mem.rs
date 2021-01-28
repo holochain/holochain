@@ -96,7 +96,7 @@ impl TransportListenerHandler for InnerListen {
             let listeners = listeners.await?;
             Ok(serde_json::json! {{
                 "url": url,
-                "listeners": listeners,
+                "listener_count": listeners.len(),
             }})
         }
         .boxed()
