@@ -34,17 +34,17 @@ fn add_valid_link_inner() -> ExternResult<HeaderHash> {
     let always_linkable_entry_hash = hash_entry(&MaybeLinkable::AlwaysLinkable)?;
     create_entry(&MaybeLinkable::AlwaysLinkable)?;
 
-    Ok(create_link(
+    create_link(
         always_linkable_entry_hash.clone(),
         always_linkable_entry_hash,
         (),
-    )?)
+    )
 }
 
 #[hdk_extern]
 fn remove_valid_link(_: ()) -> ExternResult<HeaderHash> {
     let valid_link = add_valid_link_inner()?;
-    Ok(delete_link(valid_link)?)
+    delete_link(valid_link)
 }
 
 #[hdk_extern]
@@ -59,17 +59,17 @@ fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
     create_entry(&MaybeLinkable::AlwaysLinkable)?;
     create_entry(&MaybeLinkable::NeverLinkable)?;
 
-    Ok(create_link(
+    create_link(
         never_linkable_entry_hash,
         always_linkable_entry_hash,
         (),
-    )?)
+    )
 }
 
 #[hdk_extern]
 fn remove_invalid_link(_: ()) -> ExternResult<HeaderHash> {
     let valid_link = add_invalid_link_inner()?;
-    Ok(delete_link(valid_link)?)
+    delete_link(valid_link)
 }
 
 #[hdk_extern]

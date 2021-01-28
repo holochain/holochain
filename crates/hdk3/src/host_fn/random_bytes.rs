@@ -24,17 +24,12 @@ use crate::prelude::*;
 /// PRNG from there.
 ///
 /// @see the rand rust crate
-pub fn random_bytes(number_of_bytes: u32) -> HdkResult<Vec<u8>> {
-    Ok(host_call::<RandomBytesInput, RandomBytesOutput>(
-        __random_bytes,
-        &RandomBytesInput::new(number_of_bytes),
-    )?
-    .into_inner()
-    .into_vec())
+pub fn random_bytes(number_of_bytes: u32) -> ExternResult<Bytes> {
+    host_call::<u32, Bytes>(__random_bytes, number_of_bytes)
 }
 
 pub trait TryFromRandom {
-    fn try_from_random() -> HdkResult<Self>
+    fn try_from_random() -> ExternResult<Self>
     where
         Self: Sized;
 }
@@ -46,7 +41,7 @@ pub trait TryFromRandom {
 macro_rules! impl_try_from_random {
     ( $t:ty, $bytes:expr ) => {
         impl TryFromRandom for $t {
-            fn try_from_random() -> $crate::prelude::HdkResult<Self> {
+            fn try_from_random() -> $crate::prelude::ExternResult<Self> {
                 $crate::prelude::random_bytes($bytes as u32).map(|bytes| {
                     // Always a fatal error if our own bytes generation has the wrong length.
                     assert_eq!($bytes, bytes.len());

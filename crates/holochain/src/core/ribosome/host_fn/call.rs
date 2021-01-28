@@ -7,10 +7,8 @@ use std::sync::Arc;
 pub fn call(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: CallInput,
-) -> RibosomeResult<CallOutput> {
-    // Get the input
-    let call = input.into_inner();
+    call: Call,
+) -> RibosomeResult<ZomeCallResponse> {
 
     // Get the conductor handle
     let host_access = call_context.host_access();
@@ -30,25 +28,22 @@ pub fn call(
         zome_name,
         cap: call.cap,
         fn_name: call.fn_name,
-        payload: ExternInput::new(call.request),
+        payload: call.payload,
         provenance: call.provenance,
     };
 
     // Make the call using this workspace
-    let result: ZomeCallResponse = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    Ok(tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         conductor_handle
             .call_zome(invocation, workspace)
             .await
             .map_err(Box::new)
-    })??;
-
-    Ok(CallOutput::new(result))
+    })??)
 }
 
 #[cfg(test)]
 pub mod wasm_test {
     use std::convert::TryFrom;
-    use std::convert::TryInto;
 
     use hdk3::prelude::AgentInfo;
     use hdk3::prelude::CellId;
@@ -59,7 +54,7 @@ pub mod wasm_test {
     use holochain_types::dna::DnaFile;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
-    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::ExternIO;
     use holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
 
@@ -90,7 +85,7 @@ pub mod wasm_test {
                 zome_name: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "set_access".into(),
-                payload: ExternInput::new(().try_into().unwrap()),
+                payload: ExternIO::encode(()).unwrap(),
                 provenance: bob_agent_id.clone(),
             })
             .await
@@ -104,7 +99,9 @@ pub mod wasm_test {
                 zome_name: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "who_are_they_local".into(),
-                payload: ExternInput::new(bob_cell_id.clone().try_into().unwrap()),
+                payload: ExternIO::encode(
+                    &bob_cell_id
+                ).unwrap(),
                 provenance: alice_agent_id.clone(),
             })
             .await
@@ -113,8 +110,7 @@ pub mod wasm_test {
 
         match output {
             ZomeCallResponse::Ok(guest_output) => {
-                let response: SerializedBytes = guest_output.into_inner();
-                let agent_info: AgentInfo = response.try_into().unwrap();
+                let agent_info: AgentInfo = guest_output.decode().unwrap();
                 assert_eq!(
                     agent_info,
                     AgentInfo {
@@ -149,9 +145,7 @@ pub mod wasm_test {
         // Get the header hash of that entry
         let header_hash: HeaderHash =
             unwrap_to::unwrap_to!(result.unwrap().unwrap() => ZomeCallResponse::Ok)
-                .clone()
-                .into_inner()
-                .try_into()
+                .decode()
                 .unwrap();
 
         // Check alice's source chain contains the new value
@@ -193,9 +187,7 @@ pub mod wasm_test {
         // Get the header hash of that entry
         let header_hash: HeaderHash =
             unwrap_to::unwrap_to!(result.unwrap().unwrap() => ZomeCallResponse::Ok)
-                .clone()
-                .into_inner()
-                .try_into()
+                .decode()
                 .unwrap();
 
         // Check alice's source chain contains the new value

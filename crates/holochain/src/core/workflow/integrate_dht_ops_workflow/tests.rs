@@ -911,7 +911,7 @@ async fn commit_entry<'env>(
         .next()
         .unwrap();
 
-    let input = CreateInput::new((entry_def_id.clone(), entry.clone()));
+    let input = EntryWithDefId::new(entry_def_id.clone(), entry.clone());
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -932,7 +932,7 @@ async fn commit_entry<'env>(
 
     let entry_hash = holochain_types::entry::EntryHashed::from_content_sync(entry).into_hash();
 
-    (entry_hash, output.into_inner().try_into().unwrap())
+    (entry_hash, output)
 }
 
 async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry> {
@@ -945,7 +945,7 @@ async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
 
-    let input = GetInput::new((entry_hash.clone().into(), GetOptions::latest()));
+    let input = GetInput::new(entry_hash.clone().into(), GetOptions::latest());
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -955,7 +955,7 @@ async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry
         let call_context = Arc::new(call_context);
         host_fn::get::get(ribosome.clone(), call_context.clone(), input).unwrap()
     };
-    output.into_inner().and_then(|el| el.into())
+    output.and_then(|el| el.into())
 }
 
 async fn create_link(
@@ -988,7 +988,7 @@ async fn create_link(
     call_context.zome = zome.clone();
 
     // Call create_link
-    let input = CreateLinkInput::new((base_address.into(), target_address.into(), link_tag));
+    let input = CreateLinkInput::new(base_address.into(), target_address.into(), link_tag);
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -1009,7 +1009,7 @@ async fn create_link(
     }
 
     // Get the CreateLink HeaderHash back
-    output.into_inner()
+    output
 }
 
 async fn get_links(
@@ -1043,21 +1043,15 @@ async fn get_links(
     call_context.zome = zome.clone();
 
     // Call get links
-    let input = GetLinksInput::new((base_address.into(), Some(link_tag)));
+    let input = GetLinksInput::new(base_address.into(), Some(link_tag));
 
-    let output = {
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
-        host_access.network = test_network.cell_network();
-        call_context.host_access = host_access.into();
-        let ribosome = Arc::new(ribosome);
-        let call_context = Arc::new(call_context);
-        host_fn::get_links::get_links(ribosome.clone(), call_context.clone(), input)
-            .unwrap()
-            .into_inner()
-    };
-
-    output
+    let mut host_access = fixt!(ZomeCallHostAccess);
+    host_access.workspace = workspace_lock;
+    host_access.network = test_network.cell_network();
+    call_context.host_access = host_access.into();
+    let ribosome = Arc::new(ribosome);
+    let call_context = Arc::new(call_context);
+    host_fn::get_links::get_links(ribosome.clone(), call_context.clone(), input).unwrap()
 }
 
 // This test is designed to run like the

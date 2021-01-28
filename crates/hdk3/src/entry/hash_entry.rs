@@ -39,14 +39,10 @@ use crate::prelude::*;
 ///
 /// let foo_hash = hash_entry(Foo)?;
 /// ```
-pub fn hash_entry<I, E>(input: I) -> HdkResult<EntryHash>
+pub fn hash_entry<I, E>(input: I) -> ExternResult<EntryHash>
 where
     Entry: TryFrom<I, Error = E>,
-    HdkError: From<E>,
+    WasmError: From<E>,
 {
-    Ok(host_call::<HashEntryInput, HashEntryOutput>(
-        __hash_entry,
-        &HashEntryInput::new(input.try_into()?),
-    )?
-    .into_inner())
+    host_call::<Entry, EntryHash>(__hash_entry, Entry::try_from(input)?)
 }

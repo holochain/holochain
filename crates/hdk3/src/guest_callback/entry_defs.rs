@@ -62,7 +62,7 @@ macro_rules! entry_def {
         }
 
         impl TryFrom<&$crate::prelude::Entry> for $t {
-            type Error = $crate::prelude::HdkError;
+            type Error = $crate::prelude::WasmError;
             fn try_from(entry: &$crate::prelude::Entry) -> Result<Self, Self::Error> {
                 match entry {
                     $crate::prelude::Entry::App(eb) => Ok(Self::try_from(
@@ -78,21 +78,31 @@ macro_rules! entry_def {
         }
 
         impl TryFrom<$crate::prelude::Entry> for $t {
-            type Error = $crate::prelude::HdkError;
+            type Error = $crate::prelude::WasmError;
             fn try_from(entry: $crate::prelude::Entry) -> Result<Self, Self::Error> {
                 Self::try_from(&entry)
             }
         }
 
         impl TryFrom<&$t> for $crate::prelude::Entry {
-            type Error = $crate::prelude::HdkError;
+            type Error = $crate::prelude::WasmError;
             fn try_from(t: &$t) -> Result<Self, Self::Error> {
-                Ok(Self::App(SerializedBytes::try_from(t)?.try_into()?))
+                match AppEntryBytes::try_from(SerializedBytes::try_from(t)?) {
+                    Ok(app_entry_bytes) => Ok(Self::App(app_entry_bytes)),
+                    Err(entry_error) => match entry_error {
+                        EntryError::SerializedBytes(serialized_bytes_error) => {
+                            Err(WasmError::Serialize(serialized_bytes_error))
+                        }
+                        EntryError::EntryTooLarge(_) => {
+                            Err(WasmError::Zome(entry_error.to_string()))
+                        }
+                    },
+                }
             }
         }
 
         impl TryFrom<$t> for $crate::prelude::Entry {
-            type Error = $crate::prelude::HdkError;
+            type Error = $crate::prelude::WasmError;
             fn try_from(t: $t) -> Result<Self, Self::Error> {
                 Self::try_from(&t)
             }
@@ -122,15 +132,15 @@ macro_rules! entry_def {
             }
         }
 
-        impl TryFrom<&$t> for $crate::prelude::HdkEntry {
-            type Error = $crate::prelude::HdkError;
+        impl TryFrom<&$t> for $crate::prelude::EntryWithDefId {
+            type Error = $crate::prelude::WasmError;
             fn try_from(t: &$t) -> Result<Self, Self::Error> {
-                Ok(Self($t::entry_def_id(), t.try_into()?))
+                Ok(Self::new($t::entry_def_id(), t.try_into()?))
             }
         }
 
-        impl TryFrom<$t> for $crate::prelude::HdkEntry {
-            type Error = $crate::prelude::HdkError;
+        impl TryFrom<$t> for $crate::prelude::EntryWithDefId {
+            type Error = $crate::prelude::WasmError;
             fn try_from(t: $t) -> Result<Self, Self::Error> {
                 (&t).try_into()
             }

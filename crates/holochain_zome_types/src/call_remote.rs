@@ -1,52 +1,52 @@
 use crate::capability::CapSecret;
+use crate::prelude::*;
 use crate::zome::FunctionName;
 use crate::zome::ZomeName;
 use holo_hash::AgentPubKey;
-use holochain_serialized_bytes::prelude::SerializedBytes;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CallRemote {
-    to_agent: AgentPubKey,
+    target_agent: AgentPubKey,
     zome_name: ZomeName,
     fn_name: FunctionName,
     cap: Option<CapSecret>,
-    request: SerializedBytes,
+    payload: ExternIO,
 }
 
 impl CallRemote {
     pub fn new(
-        to_agent: AgentPubKey,
+        target_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
-        request: SerializedBytes,
+        payload: ExternIO,
     ) -> Self {
         Self {
-            to_agent,
+            target_agent,
             zome_name,
             fn_name,
             cap,
-            request,
+            payload,
         }
     }
 
-    pub fn to_agent(&self) -> AgentPubKey {
-        self.to_agent.clone()
+    pub fn target_agent_as_ref(&self) -> &AgentPubKey {
+        &self.target_agent
     }
 
-    pub fn zome_name(&self) -> ZomeName {
-        self.zome_name.clone()
+    pub fn zome_name_as_ref(&self) -> &ZomeName {
+        &self.zome_name
     }
 
-    pub fn fn_name(&self) -> FunctionName {
-        self.fn_name.clone()
+    pub fn fn_name_as_ref(&self) -> &FunctionName {
+        &self.fn_name
     }
 
-    pub fn cap(&self) -> Option<CapSecret> {
-        self.cap
+    pub fn cap_as_ref(&self) -> &Option<CapSecret> {
+        &self.cap
     }
 
-    pub fn request(&self) -> SerializedBytes {
-        self.request.clone()
+    pub fn payload_as_ref(&self) -> &ExternIO {
+        &self.payload
     }
 }

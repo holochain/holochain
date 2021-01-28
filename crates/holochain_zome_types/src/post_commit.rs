@@ -1,17 +1,17 @@
 use crate::header::HeaderHashes;
-use crate::zome_io::ExternOutput;
+use crate::zome_io::ExternIO;
 use crate::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
 
-#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
 pub enum PostCommitCallbackResult {
     Success,
     Fail(HeaderHashes, String),
 }
 
-impl From<ExternOutput> for PostCommitCallbackResult {
-    fn from(guest_output: ExternOutput) -> Self {
-        match guest_output.into_inner().try_into() {
+impl From<ExternIO> for PostCommitCallbackResult {
+    fn from(guest_output: ExternIO) -> Self {
+        match guest_output.decode() {
             Ok(v) => v,
             Err(e) => Self::Fail(vec![].into(), format!("{:?}", e)),
         }

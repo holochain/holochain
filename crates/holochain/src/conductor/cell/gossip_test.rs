@@ -8,7 +8,6 @@ use hdk3::prelude::*;
 use holochain_lmdb::buffer::KvStoreT;
 use holochain_lmdb::fresh_reader_test;
 use holochain_test_wasm_common::AnchorInput;
-use holochain_test_wasm_common::TestString;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneBinType;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -63,15 +62,14 @@ async fn gossip_test() {
     let invocation = new_zome_call(
         bob_cell_id,
         "list_anchor_addresses",
-        TestString("alice".into()),
+        "alice".to_string(),
         TestWasm::Anchor,
     )
     .unwrap();
     let response = handle.call_zome(invocation).await.unwrap().unwrap();
     match response {
         ZomeCallResponse::Ok(r) => {
-            let response: SerializedBytes = r.into_inner();
-            let hashes: EntryHashes = response.try_into().unwrap();
+            let hashes: EntryHashes = r.decode().unwrap();
             assert_eq!(hashes.0.len(), NUM);
         }
         _ => unreachable!(),

@@ -5,8 +5,6 @@ use holochain_p2p::HolochainP2pCellT;
 use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::RemoteSignalInput;
-use holochain_zome_types::RemoteSignalOutput;
 use std::sync::Arc;
 use tracing::Instrument;
 
@@ -14,13 +12,13 @@ use tracing::Instrument;
 pub fn remote_signal(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: RemoteSignalInput,
-) -> RibosomeResult<RemoteSignalOutput> {
+    input: RemoteSignal,
+) -> RibosomeResult<()> {
     const FN_NAME: &str = "recv_remote_signal";
     // Timeouts and errors are ignored,
     // this is a send and forget operation.
     let network = call_context.host_access().network().clone();
-    let RemoteSignal { agents, signal } = input.into_inner();
+    let RemoteSignal { agents, signal } = input;
     let zome_name: ZomeName = call_context.zome().into();
     let fn_name: FunctionName = FN_NAME.into();
     for agent in agents {
@@ -29,11 +27,11 @@ pub fn remote_signal(
                 let mut network = network.clone();
                 let zome_name = zome_name.clone();
                 let fn_name = fn_name.clone();
-                let request = signal.clone();
+                let payload = signal.clone();
                 async move {
                     tracing::debug!("sending to {:?}", agent);
                     let result = network
-                        .call_remote(agent.clone(), zome_name, fn_name, None, request)
+                        .call_remote(agent.clone(), zome_name, fn_name, None, payload)
                         .await;
                     tracing::debug!("sent to {:?}", agent);
                     if let Err(e) = result {
@@ -48,7 +46,7 @@ pub fn remote_signal(
             .in_current_span(),
         );
     }
-    Ok(RemoteSignalOutput::new(()))
+    Ok(())
 }
 
 #[cfg(test)]
@@ -65,17 +63,12 @@ mod tests {
     use holochain_zome_types::signal::AppSignal;
     use matches::assert_matches;
 
-    #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
-    #[serde(transparent)]
-    #[repr(transparent)]
-    struct AppString(String);
-
     fn zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineZome {
         let entry_def = EntryDef::default_with_id("entrydef");
 
         InlineZome::new_unique(vec![entry_def.clone()])
             .callback("signal_others", move |api, ()| {
-                let signal = AppString("Hey".to_string()).try_into().unwrap();
+                let signal = ExternIO::encode("Hey").unwrap();
                 let signal = RemoteSignal {
                     agents: agents.clone(),
                     signal,
@@ -84,7 +77,7 @@ mod tests {
                 api.remote_signal(signal)?;
                 Ok(())
             })
-            .callback("recv_remote_signal", move |api, signal: SerializedBytes| {
+            .callback("recv_remote_signal", move |api, signal: ExternIO| {
                 tracing::debug!("remote signal");
                 num_signals.fetch_add(1, Ordering::SeqCst);
                 api.emit_signal(AppSignal::new(signal)).map_err(Into::into)
@@ -101,7 +94,7 @@ mod tests {
                     access: ().into(),
                     functions,
                 };
-                api.create((EntryDefId::CapGrant, Entry::CapGrant(cap_grant_entry)))
+                api.create(EntryWithDefId::new(EntryDefId::CapGrant, Entry::CapGrant(cap_grant_entry)))
                     .unwrap();
 
                 Ok(InitCallbackResult::Pass)
