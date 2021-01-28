@@ -21,7 +21,7 @@ paste = "1.0.3"
 rmp-serde = "0.14"
 serde = { version = "1", features = [ "derive", "rc" ] }
 serde_json = { version = "1", features = [ "preserve_order" ] }
-thiserror = "1.0.22"
+thiserror = "1.0"
 tokio = { version = "0.2", features = [ "full" ] }
 url2 = "0.0.6"
 

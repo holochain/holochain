@@ -15,7 +15,7 @@ edition = "2018"
 anyhow = "1.0.26"
 async-trait = "0.1"
 backtrace = "0.3.27"
-base64 = "0.10.1"
+base64 = "0.10"
 chrono = "0.4.6"
 derive_more = "0.99"
 fixt = { path = "../fixt" }
@@ -35,10 +35,10 @@ serde = { version = "1.0.104", features = [ "derive", "rc" ] }
 serde_bytes = "0.11"
 serde_derive = "1.0.104"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
-shrinkwraprs = "0.3.0"
+shrinkwraprs = "0.3"
 strum = "0.18.0"
 tempdir = "0.3.7"
-thiserror = "1.0.22"
+thiserror = "1.0"
 tokio = { version = "0.2", features = [ "blocking" ] }
 tokio_safe_block_on = "0.1.2"
 tracing = "=0.1.21"
