@@ -15,11 +15,11 @@ pub fn call_remote(
         let mut network = call_context.host_access().network().clone();
         network
             .call_remote(
-                input.as_to_agent().to_owned(),
-                input.as_zome_name().to_owned(),
-                input.as_fn_name().to_owned(),
-                input.as_cap().to_owned(),
-                input.as_payload().to_owned(),
+                input.target_agent_as_ref().to_owned(),
+                input.zome_name_as_ref().to_owned(),
+                input.fn_name_as_ref().to_owned(),
+                input.cap_as_ref().to_owned(),
+                input.payload_as_ref().to_owned(),
             )
             .await
     });

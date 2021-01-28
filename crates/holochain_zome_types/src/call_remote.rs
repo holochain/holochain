@@ -6,7 +6,7 @@ use holo_hash::AgentPubKey;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CallRemote {
-    to_agent: AgentPubKey,
+    target_agent: AgentPubKey,
     zome_name: ZomeName,
     fn_name: FunctionName,
     cap: Option<CapSecret>,
@@ -15,14 +15,14 @@ pub struct CallRemote {
 
 impl CallRemote {
     pub fn new(
-        to_agent: AgentPubKey,
+        target_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: ExternIO,
     ) -> Self {
         Self {
-            to_agent,
+            target_agent,
             zome_name,
             fn_name,
             cap,
@@ -30,23 +30,23 @@ impl CallRemote {
         }
     }
 
-    pub fn as_to_agent(&self) -> &AgentPubKey {
-        &self.to_agent
+    pub fn target_agent_as_ref(&self) -> &AgentPubKey {
+        &self.target_agent
     }
 
-    pub fn as_zome_name(&self) -> &ZomeName {
+    pub fn zome_name_as_ref(&self) -> &ZomeName {
         &self.zome_name
     }
 
-    pub fn as_fn_name(&self) -> &FunctionName {
+    pub fn fn_name_as_ref(&self) -> &FunctionName {
         &self.fn_name
     }
 
-    pub fn as_cap(&self) -> &Option<CapSecret> {
+    pub fn cap_as_ref(&self) -> &Option<CapSecret> {
         &self.cap
     }
 
-    pub fn as_payload(&self) -> &ExternIO {
+    pub fn payload_as_ref(&self) -> &ExternIO {
         &self.payload
     }
 }
