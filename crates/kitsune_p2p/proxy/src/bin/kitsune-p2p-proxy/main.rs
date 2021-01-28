@@ -4,6 +4,7 @@ use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
 use kitsune_p2p_types::dependencies::ghost_actor;
 use kitsune_p2p_types::dependencies::serde_json;
+use kitsune_p2p_types::metric_task;
 use kitsune_p2p_types::transport::*;
 use structopt::StructOpt;
 
@@ -96,7 +97,7 @@ async fn inner() -> TransportResult<()> {
 
     println!("{}", listener.bound_url().await?);
 
-    tokio::task::spawn(async move {
+    metric_task!(async move {
         while let Some(evt) = events.next().await {
             match evt {
                 TransportEvent::IncomingChannel(url, mut write, _read) => {

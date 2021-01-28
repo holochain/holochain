@@ -4,6 +4,7 @@ use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
 use kitsune_p2p_types::{
     dependencies::{ghost_actor, url2},
+    metric_task,
     transport::*,
     transport_mem::*,
 };
@@ -120,7 +121,7 @@ async fn inner() -> TransportResult<()> {
     let proxy_url = listener.bound_url().await?;
     println!("Proxy Url: {}", proxy_url);
 
-    tokio::task::spawn(async move {
+    metric_task!(async move {
         while let Some(evt) = events.next().await {
             match evt {
                 TransportEvent::IncomingChannel(url, mut write, _read) => {
@@ -134,7 +135,7 @@ async fn inner() -> TransportResult<()> {
     let (metric_send, mut metric_recv) =
         futures::channel::mpsc::channel((opt.node_count + 10) as usize);
 
-    tokio::task::spawn({
+    metric_task!({
         let mut metric_send = metric_send.clone();
         async move {
             loop {
@@ -148,7 +149,7 @@ async fn inner() -> TransportResult<()> {
         }
     });
 
-    tokio::task::spawn(async move {
+    metric_task!(async move {
         let mut last_disp = std::time::Instant::now();
         let mut rtime = Vec::new();
         while let Some(metric) = metric_recv.next().await {
@@ -170,7 +171,7 @@ async fn inner() -> TransportResult<()> {
     println!("Responder Url: {}", con_url);
 
     for _ in 0..opt.node_count {
-        tokio::task::spawn(client_loop(
+        metric_task!(client_loop(
             opt.clone(),
             proxy_url.clone(),
             con_url.clone(),
@@ -190,7 +191,7 @@ async fn gen_client(
 
     let con_url = con.bound_url().await?;
 
-    tokio::task::spawn({
+    metric_task!({
         let process_delay_ms = opt.process_delay_ms as u64;
         events.for_each_concurrent(
             /* limit */ (opt.node_count + 10) as usize,

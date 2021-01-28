@@ -39,7 +39,7 @@ async fn put_core(url: url2::Url2, send: TransportEventSender) -> TransportResul
 }
 
 fn drop_core(url: url2::Url2) {
-    tokio::task::spawn(async move {
+    crate::metric_task!(async move {
         let mut lock = CORE.lock().await;
         lock.remove(&url);
     });
@@ -63,7 +63,7 @@ pub async fn spawn_bind_transport_mem() -> TransportResult<(
 
     put_core(url.clone(), evt_send).await?;
 
-    tokio::task::spawn(builder.spawn(InnerListen::new(url)));
+    crate::metric_task!(builder.spawn(InnerListen::new(url)));
 
     Ok((sender, evt_recv))
 }
@@ -122,7 +122,7 @@ impl TransportListenerHandler for InnerListen {
             // if we don't spawn here there can be a deadlock on
             // incoming_channel trying to process all channel data
             // before we've returned our halves here.
-            tokio::task::spawn(async move {
+            crate::metric_task!(async move {
                 // it's ok if this errors... the channels will close.
                 let _ = evt_send
                     .send(TransportEvent::IncomingChannel(this_url, send1, recv1))
@@ -141,7 +141,7 @@ mod tests {
     use futures::stream::StreamExt;
 
     fn test_receiver(mut recv: TransportEventReceiver) {
-        tokio::task::spawn(async move {
+        crate::metric_task!(async move {
             while let Some(evt) = recv.next().await {
                 match evt {
                     TransportEvent::IncomingChannel(url, mut write, read) => {

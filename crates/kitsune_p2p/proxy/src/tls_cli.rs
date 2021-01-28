@@ -16,7 +16,7 @@ pub(crate) fn spawn_tls_client(
     read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) -> tokio::sync::oneshot::Receiver<TransportResult<()>> {
     let (setup_send, setup_recv) = tokio::sync::oneshot::channel();
-    tokio::task::spawn(tls_client(
+    metric_task!(tls_client(
         short,
         setup_send,
         expected_proxy_url,
