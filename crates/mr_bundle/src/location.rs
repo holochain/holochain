@@ -29,3 +29,43 @@ pub(crate) async fn resolve_local(path: &Path) -> MrBundleResult<Bytes> {
 pub(crate) async fn resolve_remote(url: &str) -> MrBundleResult<Bytes> {
     Ok(reqwest::get(url).await?.bytes().await?)
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize)]
+    struct TunaSalad {
+        celery: Vec<Location>,
+
+        #[serde(flatten)]
+        mayo: Location,
+    }
+
+    /// Test that Location serializes in a convenient way suitable for
+    /// human-readable manifests, e.g. YAML
+    ///
+    /// The YAML produced by this test looks like:
+    /// ---
+    /// celery:
+    ///   - bundled: b
+    ///   - path: p
+    /// url: "http://r.co"
+    #[test]
+    fn location_flattening() {
+        use serde_yaml::Value;
+
+        let r = TunaSalad {
+            celery: vec![Location::Bundled("b".into()), Location::Path("p".into())],
+            mayo: Location::Url("http://r.co".into()),
+        };
+        let val = serde_yaml::to_value(&r).unwrap();
+        println!("yaml produced:\n{}", serde_yaml::to_string(&r).unwrap());
+
+        assert_eq!(val["celery"][0]["bundled"], Value::from("b"));
+        assert_eq!(val["celery"][1]["path"], Value::from("p"));
+        assert_eq!(val["url"], Value::from("http://r.co"));
+    }
+}
