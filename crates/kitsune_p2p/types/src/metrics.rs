@@ -21,7 +21,7 @@ macro_rules! metric_task {
     ($task:expr) => {{
         let counter = $crate::metrics::MetricTaskCounter::new();
         let fut = { $task };
-        ::tokio::task::spawn(async move {
+        $crate::dependencies::tokio::task::spawn(async move {
             let _counter = counter;
             fut.await
         })
