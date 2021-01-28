@@ -5,10 +5,12 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-/// Holochain CLI - Helper for generating, running interacting with Holochain setups.
+/// Holochain CLI - Helper for generating, running, and interacting with Holochain Conductor "setups".
 ///
-/// A setup is a directory containing the conductor config, databases and keystore.
-/// Everything you need to quickly run your app in holochain or create complex setups.
+/// A setup is a directory containing a conductor config, databases, and keystore,
+/// with a single Holochain app installed in the conductor:
+/// Everything you need to quickly run your app in holochain,
+/// or create complex multi-conductor setups for testing.
 struct Ops {
     #[structopt(subcommand)]
     op: Op,
@@ -25,32 +27,38 @@ struct Ops {
 #[derive(Debug, StructOpt)]
 #[structopt(setting = structopt::clap::AppSettings::InferSubcommands)]
 enum Op {
-    /// Generate a new holochain setup for later use.
+    /// Generate one or more new Holochain Conductor setup(s) for later use.
+    ///
+    /// A single app will be installed as part of this setup.
+    /// See the help for the `<dnas>` argument below to learn how to define the app to be installed.
     Generate {
         #[structopt(short, long, default_value = "1")]
-        /// Number of conductors to create.
+        /// Number of conductor setups to create.
         num_conductors: usize,
         #[structopt(flatten)]
         gen: Create,
         #[structopt(short, long, value_delimiter = ",")]
-        /// Generate a new setups and then run them.
+        /// Automatically run the setup(s) that were created.
+        /// This is effectively a combination of `hc generate` and `hc run`
         ///
-        /// Optionally create an app interface.
-        /// This allows you UI to talk to the conductor.
-        /// For example `hc generate -r=0,9000,0`
-        /// Or `hc generate -r` to run without attaching any app ports.
+        /// You may optionally specify app interface ports to bind when running.
+        /// This allows your UI to talk to the conductor.
+        ///
+        /// For example, `hc generate -r=0,9000,0` will create three app interfaces.
+        /// Or, use `hc generate -r` to run without attaching any app interfaces.
+        ///
+        /// This follows the same structure as `hc run --ports`
         run: Option<Vec<u16>>,
-        /// List of dnas to run.
-        /// Defaults to searching the current directory for
-        /// a single `*.dna.gz` file.
+        /// List of DNAs to use when installing the App for this setup.
+        /// Defaults to searching the current directory for a single `*.dna.gz` file.
         dnas: Vec<PathBuf>,
     },
-    /// Run a conductor from existing setup.
+    /// Run conductor(s) from existing setup(s).
     Run(Run),
-    /// Call the conductor admin interface.
+    /// Make a call to a conductor's admin interface.
     Call(hc::calls::Call),
-    /// [WIP unimplemented]: Run custom tasks using cargo task
-    Task,
+    // /// [WIP unimplemented]: Run custom tasks using cargo task
+    // Task,
     /// List setups found in `$(pwd)/.hc`.
     List {
         /// Show more verbose information.
@@ -64,9 +72,9 @@ enum Op {
 #[derive(Debug, StructOpt)]
 struct Run {
     #[structopt(short, long, value_delimiter = ",")]
-    /// Optionally create an app interface.
-    /// This allows you UI to talk to the conductor.
-    /// For example `hc run -p=0,9000,0`
+    /// Optionally specifies app interface ports to bind when running.
+    /// This allows your UI to talk to the conductor.
+    /// For example, `hc -p=0,9000,0` will create three app interfaces.
     ports: Vec<u16>,
     #[structopt(flatten)]
     existing: Existing,
@@ -122,7 +130,7 @@ async fn main() -> anyhow::Result<()> {
             hc::save::release_ports(std::env::current_dir()?).await?;
         }
         Op::Call(call) => hc::calls::call(&ops.holochain_path, call).await?,
-        Op::Task => todo!("Running custom tasks is coming soon"),
+        // Op::Task => todo!("Running custom tasks is coming soon"),
         Op::List { verbose } => hc::save::list(std::env::current_dir()?, verbose)?,
         Op::Clean => hc::save::clean(std::env::current_dir()?, Vec::new())?,
     }
