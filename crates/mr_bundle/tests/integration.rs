@@ -1,6 +1,6 @@
 use std::{collections::HashSet, path::PathBuf};
 
-use mr_bundle::{bundle::Bundle, location::Location, manifest::Manifest};
+use mr_bundle::{Bundle, Location, Manifest};
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "manifest_version")]

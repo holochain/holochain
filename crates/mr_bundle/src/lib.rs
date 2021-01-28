@@ -1,10 +1,15 @@
 use error::MrBundleResult;
 
-pub mod bundle;
+mod bundle;
 pub mod error;
-pub mod location;
-pub mod manifest;
-pub mod resource;
+mod location;
+mod manifest;
+mod resource;
+
+pub use bundle::Bundle;
+pub use location::Location;
+pub use manifest::Manifest;
+pub use resource::Resource;
 
 pub fn encode<T: serde::ser::Serialize>(data: &T) -> MrBundleResult<Vec<u8>> {
     Ok(rmp_serde::to_vec_named(data)?)

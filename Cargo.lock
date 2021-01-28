@@ -1746,6 +1746,7 @@ dependencies = [
  "holochain_zome_types",
  "lazy_static",
  "maplit",
+ "mr_bundle",
  "must_future",
  "nanoid",
  "observability",
