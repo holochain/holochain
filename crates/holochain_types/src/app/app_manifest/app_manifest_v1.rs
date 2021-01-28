@@ -4,7 +4,7 @@ use super::{
 };
 use crate::prelude::{CellNick, YamlProperties};
 use holo_hash::{DnaHash, DnaHashB64};
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
 pub type Uuid = String;
 
@@ -12,13 +12,13 @@ pub type Uuid = String;
 #[serde(rename_all = "snake_case")]
 pub struct AppManifestV1 {
     /// Name of the App. This may be used as the installed_app_id.
-    name: String,
+    pub(super) name: String,
 
     /// Description of the app, just for context.
-    description: String,
+    pub(super) description: String,
 
     /// The Cell manifests that make up this app.
-    cells: Vec<CellManifest>,
+    pub(super) cells: Vec<CellManifest>,
 }
 
 /// Description of a new or existing Cell referenced by this Bundle
@@ -26,14 +26,14 @@ pub struct AppManifestV1 {
 #[serde(rename_all = "snake_case")]
 pub struct CellManifest {
     /// The CellNick which will be given to the installed Cell for this Dna.
-    nick: CellNick,
+    pub(super) nick: CellNick,
 
     /// Determines if, how, and when a Cell will be provisioned.
-    provisioning: Option<CellProvisioning>,
+    pub(super) provisioning: Option<CellProvisioning>,
 
     /// Declares where to find the DNA, and options to modify it before
     /// inclusion in a Cell
-    dna: DnaManifest,
+    pub(super) dna: DnaManifest,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -45,42 +45,27 @@ pub struct DnaManifest {
     /// Note that since this is flattened,
     /// there is no actual "location" key in the manifest.
     #[serde(flatten)]
-    location: Option<DnaLocation>,
+    pub(super) location: Option<mr_bundle::Location>,
 
     /// Optional default properties. May be overridden during installation.
-    properties: Option<YamlProperties>,
+    pub(super) properties: Option<YamlProperties>,
 
     /// Optional fixed UUID. May be overridden during installation.
-    uuid: Option<Uuid>,
+    pub(super) uuid: Option<Uuid>,
 
     /// The versioning constraints for the DNA. Ensures that only a DNA that
     /// matches the version spec will be used.
-    version: Option<DnaVersionSpec>,
+    pub(super) version: Option<DnaVersionSpec>,
 
     /// Allow up to this many "clones" to be created at runtime.
     /// Each runtime clone is created by the `CreateClone` strategy,
     /// regardless of the provisioning strategy set in the manifest.
     /// Default: 0
     #[serde(default)]
-    clone_limit: u32,
+    pub(super) clone_limit: u32,
 }
 
-/// Where to find this Dna.
-/// If Local, the path may refer to a Dna which is bundled with the manifest,
-/// or it may be to some other absolute or relative file path.
-///
-/// This representation, with named fields, is chosen so that in the yaml config,
-/// either "path" or "url" can be specified due to this field being flattened.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[serde(untagged)]
-pub enum DnaLocation {
-    /// Get Dna from local filesystem
-    Local { path: PathBuf },
-
-    /// Get Dna from URL
-    Remote { url: String },
-}
+pub type DnaLocation = mr_bundle::Location;
 
 /// Defines a criterion for a DNA version to match against.
 ///
@@ -223,9 +208,7 @@ mod tests {
         let cells = vec![CellManifest {
             nick: "nick".into(),
             dna: DnaManifest {
-                location: Some(DnaLocation::Local {
-                    path: PathBuf::from("/tmp/test.dna.gz"),
-                }),
+                location: Some(mr_bundle::Location::Path(PathBuf::from("/tmp/test.dna.gz"))),
                 properties: Some(YamlProperties::new(serde_yaml::to_value(props).unwrap())),
                 uuid: Some("uuid".into()),
                 version: Some(version),
