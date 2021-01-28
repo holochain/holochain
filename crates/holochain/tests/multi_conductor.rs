@@ -1,10 +1,10 @@
 use hdk3::prelude::*;
 use holochain::conductor::config::ConductorConfig;
-use holochain::test_utils::cool::CoolNetwork;
-use holochain::test_utils::cool::MaybeElement;
-use holochain::test_utils::cool::{CoolConductorBatch, CoolDnaFile};
 use holochain::test_utils::host_fn_caller::Post;
 use holochain::test_utils::show_authored;
+use holochain::test_utils::sweetest::MaybeElement;
+use holochain::test_utils::sweetest::SweetNetwork;
+use holochain::test_utils::sweetest::{SweetConductorBatch, SweetDnaFile};
 
 use holochain::test_utils::wait_for_integration_10s;
 use holochain::test_utils::wait_for_integration_with_others_10s;
@@ -57,9 +57,9 @@ async fn multi_conductor() -> anyhow::Result<()> {
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
-    let mut conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
+    let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
-    let (dna_file, _) = CoolDnaFile::unique_from_inline_zome("zome1", simple_crud_zome())
+    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_crud_zome())
         .await
         .unwrap();
 
@@ -100,16 +100,16 @@ async fn invalid_cell() -> anyhow::Result<()> {
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
-    let network = CoolNetwork::env_var_proxy().unwrap_or_else(|| {
+    let network = SweetNetwork::env_var_proxy().unwrap_or_else(|| {
         info!("KIT_PROXY not set using local quic network");
-        CoolNetwork::local_quic()
+        SweetNetwork::local_quic()
     });
     let mut config = ConductorConfig::default();
     config.network = Some(network);
 
-    let mut conductors = CoolConductorBatch::from_config(NUM_CONDUCTORS, config).await;
+    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
-    let (dna_file, _) = CoolDnaFile::unique_from_inline_zome("zome1", invalid_cell_zome())
+    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", invalid_cell_zome())
         .await
         .unwrap();
 

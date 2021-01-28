@@ -18,10 +18,10 @@ pub fn capability_grants(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::{conductor::dna_store::MockDnaStore, test_utils::cool::MaybeElement};
-    use crate::{conductor::ConductorBuilder, test_utils::cool::CoolConductor};
+    use crate::{conductor::dna_store::MockDnaStore, test_utils::sweetest::MaybeElement};
+    use crate::{conductor::ConductorBuilder, test_utils::sweetest::SweetConductor};
     use crate::{
-        core::workflow::call_zome_workflow::CallZomeWorkspace, test_utils::cool::CoolDnaFile,
+        core::workflow::call_zome_workflow::CallZomeWorkspace, test_utils::sweetest::SweetDnaFile,
     };
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
@@ -94,7 +94,7 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_authorized_call() {
         observability::test_run().ok();
-        let (dna_file, _) = CoolDnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
             .await
             .unwrap();
 
@@ -110,7 +110,7 @@ pub mod wasm_test {
         dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
 
         let mut conductor =
-            CoolConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
 
         let apps = conductor
             .setup_app_for_agents(

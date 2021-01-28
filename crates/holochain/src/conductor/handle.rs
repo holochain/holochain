@@ -226,6 +226,11 @@ pub trait ConductorHandleT: Send + Sync {
     /// Retrieve the ConductorState. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState>;
+
+    /// Add a "test" app interface for sending and receiving signals. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn add_test_app_interface(&self, id: super::state::AppInterfaceId)
+        -> ConductorResult<()>;
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -562,6 +567,15 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
         let lock = self.conductor.read().await;
         Ok(lock.get_state_from_handle().await?)
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn add_test_app_interface(
+        &self,
+        id: super::state::AppInterfaceId,
+    ) -> ConductorResult<()> {
+        let mut lock = self.conductor.write().await;
+        lock.add_test_app_interface(id).await
     }
 }
 

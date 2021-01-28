@@ -1,17 +1,17 @@
-use super::CoolZome;
+use super::SweetZome;
 use hdk3::prelude::*;
 use holo_hash::DnaHash;
 use holochain_lmdb::env::EnvironmentWrite;
 
-/// A reference to a Cell created by a CoolConductor installation function.
+/// A reference to a Cell created by a SweetConductor installation function.
 /// It has very concise methods for calling a zome on this cell
 #[derive(Clone, derive_more::Constructor)]
-pub struct CoolCell {
+pub struct SweetCell {
     pub(super) cell_id: CellId,
     pub(super) cell_env: EnvironmentWrite,
 }
 
-impl CoolCell {
+impl SweetCell {
     /// Accessor for CellId
     pub fn cell_id(&self) -> &CellId {
         &self.cell_id
@@ -32,8 +32,8 @@ impl CoolCell {
         &self.cell_id.dna_hash()
     }
 
-    /// Get a CoolZome with the given name
-    pub fn zome<Z: Into<ZomeName>>(&self, zome_name: Z) -> CoolZome {
-        CoolZome::new(self.cell_id.clone(), zome_name.into())
+    /// Get a SweetZome with the given name
+    pub fn zome<Z: Into<ZomeName>>(&self, zome_name: Z) -> SweetZome {
+        SweetZome::new(self.cell_id.clone(), zome_name.into())
     }
 }

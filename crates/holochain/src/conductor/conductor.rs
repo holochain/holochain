@@ -8,7 +8,6 @@
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
-use super::api::CellConductorApiT;
 use super::api::RealAdminInterfaceApi;
 use super::api::RealAppInterfaceApi;
 use super::config::AdminInterfaceConfig;
@@ -41,6 +40,7 @@ use super::state::AppInterfaceId;
 use super::state::ConductorState;
 use super::CellError;
 use super::{api::CellConductorApi, state::AppInterfaceConfig};
+use super::{api::CellConductorApiT, interface::AppInterfaceRuntime};
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::cell::Cell;
 use crate::conductor::config::ConductorConfig;
@@ -132,9 +132,8 @@ where
     /// the dynamically allocated port later.
     admin_websocket_ports: Vec<u16>,
 
-    /// Collection of signal broadcasters per app interface, keyed by id
-    app_interface_signal_broadcasters:
-        HashMap<AppInterfaceId, tokio::sync::broadcast::Sender<Signal>>,
+    /// Collection app interface data, keyed by id
+    app_interfaces: HashMap<AppInterfaceId, AppInterfaceRuntime>,
 
     /// Channel on which to send info about tasks we want to manage
     managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,
@@ -318,16 +317,20 @@ where
         let app_api = RealAppInterfaceApi::new(handle, interface_id.clone());
         // This receiver is thrown away because we can produce infinite new
         // receivers from the Sender
-        let (signal_broadcaster, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
+        let (signal_tx, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
         let stop_rx = self.managed_task_stop_broadcaster.subscribe();
-        let (port, task) =
-            spawn_app_interface_task(port, app_api, signal_broadcaster.clone(), stop_rx)
-                .await
-                .map_err(Box::new)?;
+        let (port, task) = spawn_app_interface_task(port, app_api, signal_tx.clone(), stop_rx)
+            .await
+            .map_err(Box::new)?;
         // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
         self.manage_task(ManagedTaskAdd::dont_handle(task)).await?;
-        self.app_interface_signal_broadcasters
-            .insert(interface_id.clone(), signal_broadcaster);
+        let interface = AppInterfaceRuntime::Websocket { signal_tx };
+
+        if self.app_interfaces.contains_key(&interface_id) {
+            return Err(ConductorError::AppInterfaceIdCollision(interface_id));
+        }
+
+        self.app_interfaces.insert(interface_id.clone(), interface);
         let config = AppInterfaceConfig::websocket(port);
         self.update_state(|mut state| {
             state.app_interfaces.insert(interface_id, config);
@@ -360,8 +363,9 @@ where
 
     pub(super) fn signal_broadcaster(&self) -> SignalBroadcaster {
         SignalBroadcaster::new(
-            self.app_interface_signal_broadcasters
+            self.app_interfaces
                 .values()
+                .map(|i| i.signal_tx())
                 .cloned()
                 .collect(),
         )
@@ -771,6 +775,22 @@ where
     pub(super) async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
         self.get_state().await
     }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    pub(super) async fn add_test_app_interface<I: Into<AppInterfaceId>>(
+        &mut self,
+        id: I,
+    ) -> ConductorResult<()> {
+        let id = id.into();
+        let (signal_tx, _r) = tokio::sync::broadcast::channel(1000);
+        if self.app_interfaces.contains_key(&id) {
+            return Err(ConductorError::AppInterfaceIdCollision(id));
+        }
+        let _ = self
+            .app_interfaces
+            .insert(id, AppInterfaceRuntime::Test { signal_tx });
+        Ok(())
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -801,7 +821,7 @@ where
             state_db: KvStore::new(db),
             cells: HashMap::new(),
             shutting_down: false,
-            app_interface_signal_broadcasters: HashMap::new(),
+            app_interfaces: HashMap::new(),
             managed_task_add_sender: task_tx,
             managed_task_stop_broadcaster: stop_tx,
             task_manager_run_handle,
