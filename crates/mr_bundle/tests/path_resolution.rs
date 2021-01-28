@@ -1,5 +1,4 @@
 use mr_bundle::{bundle::Bundle, location::Location, manifest::Manifest};
-use std::{env::temp_dir, path::Path};
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "manifest_version")]
@@ -63,8 +62,8 @@ async fn path_roundtrip() -> anyhow::Result<()> {
     // Pull all the pieces together into a Bundle, and assert that the same
     // resources are available
     let bundle = Bundle::<_, Thing>::from_manifest(manifest).await.unwrap();
-    assert_eq!(bundle.resource(&location1), Some(&thing1));
-    assert_eq!(bundle.resource(&location2), Some(&thing2));
+    assert_eq!(bundle.resources().get(&location1), Some(&thing1));
+    assert_eq!(bundle.resources().get(&location2), Some(&thing2));
 
     // Ensure that the bundle is serializable and writable
     let bundle_path = dir.path().join("test.bundle");

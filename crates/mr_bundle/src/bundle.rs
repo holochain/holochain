@@ -1,14 +1,16 @@
-use bytes::Bytes;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
-    encode,
-    error::{MrBundleError, MrBundleResult},
+    error::{BundleError, BundleResult, MrBundleError, MrBundleResult},
     location::Location,
     manifest::Manifest,
     resource::Resource,
 };
-use std::{collections::HashMap, convert::TryFrom};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryFrom,
+    path::PathBuf,
+};
 
 #[derive(Serialize, Deserialize, derive_more::From, derive_more::AsRef)]
 pub struct Blob(#[serde(with = "serde_bytes")] Vec<u8>);
@@ -73,6 +75,47 @@ where
     M: Manifest,
     R: Resource,
 {
+    /// Creates a bundle containing a manifest and a collection of resources to
+    /// be bundled together with the manifest.
+    ///
+    /// The paths paired with each resource must correspond to the set of
+    /// `Location::Bundle`s specified in the `Manifest::location()`, or else
+    /// this is not a valid bundle.
+    pub fn new(manifest: M, resources: Vec<(PathBuf, R)>) -> BundleResult<Self> {
+        let manifest_paths: HashSet<_> = manifest
+            .locations()
+            .into_iter()
+            .filter_map(|loc| match loc {
+                Location::Bundled(path) => Some(path),
+                _ => None,
+            })
+            .collect();
+
+        // Validate that each resource path is contained in the manifest
+        for (resource_path, _) in resources.iter() {
+            if !manifest_paths.contains(resource_path) {
+                return Err(BundleError::BundledPathNotInManifest(resource_path.clone()));
+            }
+        }
+
+        let resources = resources
+            .into_iter()
+            .map(|(path, res)| (Location::Bundled(path), res))
+            .collect();
+
+        Ok(Self {
+            manifest,
+            resources,
+        })
+    }
+
+    /// Return the full set of resources specified by this bundle's manifest.
+    /// Bundled resources can be returned directly, while all others will be
+    /// fetched from the filesystem or the internet.
+    pub async fn resolve_all(&self) -> HashMap<Location, R> {
+        todo!()
+    }
+
     // TODO: break this up into `resolve_all` and `new` which takes a partial set of
     // bundled resources
     pub async fn from_manifest(manifest: M) -> MrBundleResult<Self> {
@@ -93,8 +136,8 @@ where
         })
     }
 
-    pub fn resource(&self, location: &Location) -> Option<&R> {
-        self.resources.get(location)
+    pub fn resources(&self) -> &HashMap<Location, R> {
+        &self.resources
     }
 
     /// An arbitrary and opaque encoding of the bundle data into a byte array
@@ -121,61 +164,29 @@ where
 mod tests {
     use super::*;
 
-    #[test]
-    fn bundle_test() {
-        #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-        #[serde(tag = "manifest_version")]
-        #[allow(missing_docs)]
-        enum Manifest {
-            #[serde(rename = "1")]
-            #[serde(alias = "\"1\"")]
-            V1(ManifestV1),
+    #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+    struct TestManifest(Vec<Location>);
+
+    impl Manifest for TestManifest {
+        fn locations(&self) -> Vec<Location> {
+            self.0.clone()
         }
+    }
 
-        impl Manifest for Manifest {
-            fn locations(&self) -> Vec<Location> {
-                match self {
-                    Self::V1(mani) => mani.things.iter().map(|b| b.location.clone()).collect(),
-                }
-            }
-        }
+    #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+    struct Thing(u32);
 
-        #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-        struct ManifestV1 {
-            name: String,
-            things: Vec<ThingManifest>,
-        }
+    #[tokio::test]
+    async fn bundle_validation() {
+        let manifest = TestManifest(vec![
+            Location::Bundled("1.thing".into()),
+            Location::Bundled("2.thing".into()),
+        ]);
+        assert!(Bundle::new(manifest.clone(), vec![("1.thing".into(), Thing(1))]).is_ok());
 
-        #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-        struct ThingManifest {
-            #[serde(flatten)]
-            location: Location,
-        }
-
-        #[derive(Clone, Serialize, Deserialize)]
-        struct Thing(u32);
-
-        let location1 = Location::Bundled("./1.thing".into());
-        let location2 = Location::Bundled("./2.thing".into());
-
-        let manifest = Manifest::V1(ManifestV1 {
-            name: "name".to_string(),
-            things: vec![
-                ThingManifest {
-                    location: location1.clone(),
-                },
-                ThingManifest {
-                    location: location2.clone(),
-                },
-            ],
-        });
-
-        let bundle = Bundle {
-            manifest,
-            resources: maplit::hashmap! {
-                location1 => Thing(1),
-                location2 => Thing(2),
-            },
-        };
+        assert_eq!(
+            Bundle::new(manifest, vec![("3.thing".into(), Thing(3))]),
+            Err(BundleError::BundledPathNotInManifest("3.thing".into()))
+        );
     }
 }
