@@ -43,7 +43,7 @@ fn simple_crud_zome() -> InlineZome {
         })
         // TODO: let this accept a usize, once the hdk refactor is merged
         .callback("emit_signal", |api, ()| {
-            api.emit_signal(AppSignal::new(().try_into().unwrap()))
+            api.emit_signal(AppSignal::new(ExternIO::encode(()).unwrap()))
                 .map_err(Into::into)
         })
 }
