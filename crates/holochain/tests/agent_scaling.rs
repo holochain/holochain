@@ -2,9 +2,9 @@
 
 use hdk3::prelude::Links;
 use holochain::test_utils::consistency_10s;
-use holochain::test_utils::cool::CoolAgents;
-use holochain::test_utils::cool::CoolConductor;
-use holochain::test_utils::cool::CoolDnaFile;
+use holochain::test_utils::sweetest::SweetAgents;
+use holochain::test_utils::sweetest::SweetConductor;
+use holochain::test_utils::sweetest::SweetDnaFile;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -35,14 +35,14 @@ async fn many_agents_can_reach_consistency_agent_links() {
     observability::test_run().ok();
     const NUM_AGENTS: usize = 20;
 
-    let (dna_file, _) = CoolDnaFile::unique_from_inline_zome("links", links_zome())
+    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("links", links_zome())
         .await
         .unwrap();
 
     // Create a Conductor
-    let mut conductor = CoolConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_config(Default::default()).await;
 
-    let agents = CoolAgents::get(conductor.keystore(), NUM_AGENTS).await;
+    let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor
         .setup_app_for_agents("app", &agents, &[dna_file])
         .await;
@@ -86,14 +86,14 @@ async fn many_agents_can_reach_consistency_normal_links() {
     observability::test_run().ok();
     const NUM_AGENTS: usize = 30;
 
-    let (dna_file, _) = CoolDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
+    let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
         .await
         .unwrap();
 
     // Create a Conductor
-    let mut conductor = CoolConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_config(Default::default()).await;
 
-    let agents = CoolAgents::get(conductor.keystore(), NUM_AGENTS).await;
+    let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor
         .setup_app_for_agents("app", &agents, &[dna_file])
         .await;
@@ -122,10 +122,10 @@ async fn many_agents_can_reach_consistency_normal_links() {
 async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
     observability::test_run().ok();
     // Bundle the single zome into a DnaFile
-    let (dna_file, _) = CoolDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await?;
+    let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await?;
 
     // Create a Conductor
-    let mut conductor = CoolConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     // Install DNA and install and activate apps in conductor
     let alice = conductor
@@ -147,7 +147,7 @@ async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
     tracing::debug!("starting slow fn");
 
     // NB: there's currently no reason to independently create a bunch of tasks here,
-    // since they are all running in series. Hence, there is no reason to put the CoolConductor
+    // since they are all running in series. Hence, there is no reason to put the SweetConductor
     // in an Arc. However, maybe this test was written to make it easy to try running some
     // or all of the closures concurrently, in which case the Arc is indeed necessary.
     let conductor_arc = std::sync::Arc::new(conductor);

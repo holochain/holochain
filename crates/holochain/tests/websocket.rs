@@ -4,9 +4,9 @@ use assert_cmd::prelude::*;
 use futures::future;
 use futures::Future;
 use hdk3::prelude::RemoteSignal;
-use holochain::test_utils::cool::CoolAgents;
-use holochain::test_utils::cool::CoolConductorBatch;
-use holochain::test_utils::cool::CoolDnaFile;
+use holochain::test_utils::sweetest::SweetAgents;
+use holochain::test_utils::sweetest::SweetConductorBatch;
+use holochain::test_utils::sweetest::SweetDnaFile;
 use holochain::{
     conductor::api::ZomeCall,
     conductor::{
@@ -394,13 +394,13 @@ async fn remote_signals() {
     observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 5;
 
-    let mut conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
+    let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
     // TODO: write helper for agents across conductors
     let all_agents: Vec<HoloHash<hash_type::Agent>> =
-        future::join_all(conductors.iter().map(|c| CoolAgents::one(c.keystore()))).await;
+        future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
 
-    let dna_file = CoolDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
         .unwrap()
         .0;
@@ -415,7 +415,7 @@ async fn remote_signals() {
 
     let mut rxs = Vec::new();
     for h in conductors.iter().map(|c| c) {
-        rxs.push(h.signal_broadcaster().await.subscribe())
+        rxs.push(h.signal_broadcaster().await.subscribe_separately())
     }
     let rxs = rxs.into_iter().flatten().collect::<Vec<_>>();
 
