@@ -23,32 +23,36 @@ use crate::prelude::*;
 /// ```
 #[macro_export]
 macro_rules! map_extern {
-    ( $name:tt, $f:ident ) => {
+    ( $name:tt, $f:ident, $input:ty, $output:ty ) => {
         $crate::paste::paste! {
             mod [< __ $name _extern >] {
-                use $crate::prelude::*;
-                use std::convert::TryFrom;
+                use super::*;
 
                 #[no_mangle]
-                pub extern "C" fn $name(ptr: GuestPtr) -> GuestPtr {
-                    let input: ExternInput = host_args!(ptr);
-                    let result = super::$f(try_result!(
-                        input.into_inner().try_into(),
-                        "failed to deserialize args"
-                    ));
-                    let result_value = try_result!(
-                        result,
-                        concat!("inner function '", stringify!($f), "' failed")
-                    );
-                    let result_sb = try_result!(
-                        SerializedBytes::try_from(result_value),
-                        "inner function result serialization error"
-                    );
-                    ret!(ExternOutput::new(result_sb));
+                pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr) -> $crate::prelude::GuestPtr {
+                    let extern_io: $crate::prelude::ExternIO = match $crate::prelude::host_args(guest_ptr) {
+                        Ok(v) => v,
+                        Err(err_ptr) => return err_ptr,
+                    };
+
+                    let inner: $input = match extern_io.decode() {
+                        Ok(v) => v,
+                        Err(_) => return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Deserialize(vec![0])),
+                    };
+
+                    let output: $output = match super::$f(inner) {
+                        Ok(v) => Ok(v),
+                        Err(wasm_error) => return $crate::prelude::return_err_ptr(wasm_error),
+                    };
+
+                    match $crate::prelude::ExternIO::encode(output.unwrap()) {
+                        Ok(v) => $crate::prelude::return_ptr::<$crate::prelude::ExternIO>(v),
+                        Err(serialized_bytes_error) => $crate::prelude::return_err_ptr($crate::prelude::WasmError::Serialize(serialized_bytes_error)),
+                    }
                 }
             }
         }
     };
 }
 
-pub type ExternResult<T> = Result<T, HdkError>;
+pub type ExternResult<T> = Result<T, WasmError>;

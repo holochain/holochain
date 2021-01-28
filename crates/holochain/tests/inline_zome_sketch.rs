@@ -20,13 +20,13 @@ fn simple_crud_zome() -> InlineZome {
         .callback("create_string", move |api, s: String| {
             let entry_def_id: EntryDefId = string_entry_def.id.clone();
             let entry = Entry::app(AppString::from(s).try_into().unwrap()).unwrap();
-            let hash = api.create((entry_def_id, entry))?;
+            let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
             Ok(hash)
         })
         .callback("create_unit", move |api, ()| {
             let entry_def_id: EntryDefId = unit_entry_def.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create((entry_def_id, entry))?;
+            let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
             Ok(hash)
         })
         .callback("delete", move |api, header_hash: HeaderHash| {
@@ -34,16 +34,16 @@ fn simple_crud_zome() -> InlineZome {
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {
-            api.get((hash.into(), GetOptions::default()))
+            api.get(GetInput::new(hash.into(), GetOptions::default()))
                 .map_err(Into::into)
         })
         .callback("read_entry", |api, hash: EntryHash| {
-            api.get((hash.into(), GetOptions::default()))
+            api.get(GetInput::new(hash.into(), GetOptions::default()))
                 .map_err(Into::into)
         })
         // TODO: let this accept a usize, once the hdk refactor is merged
         .callback("emit_signal", |api, ()| {
-            api.emit_signal(AppSignal::new(().try_into().unwrap()))
+            api.emit_signal(AppSignal::new(ExternIO::encode(()).unwrap()))
                 .map_err(Into::into)
         })
 }

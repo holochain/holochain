@@ -35,6 +35,7 @@ pub use crate::validate_link::*;
 pub use crate::warrant::*;
 pub use crate::zome::*;
 pub use crate::zome_info::*;
+pub use crate::zome_io::ExternIO;
 pub use crate::zome_io::*;
 pub use crate::*;
 pub use x_salsa20_poly1305::data::*;

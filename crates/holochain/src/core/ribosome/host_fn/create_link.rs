@@ -12,8 +12,8 @@ pub fn create_link<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CreateLinkInput,
-) -> RibosomeResult<CreateLinkOutput> {
-    let (base_address, target_address, tag) = input.into_inner();
+) -> RibosomeResult<HeaderHash> {
+    let CreateLinkInput { base_address, target_address, tag } = input;
 
     // extract the zome position
     let zome_id = ribosome.zome_to_id(&call_context.zome)?;
@@ -44,7 +44,7 @@ pub fn create_link<'a>(
     // note that validation is handled by the workflow
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
-    Ok(CreateLinkOutput::new(header_hash))
+    Ok(header_hash)
 }
 
 // we rely on the tests for get_links and get_link_details

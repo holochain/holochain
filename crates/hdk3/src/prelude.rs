@@ -8,11 +8,8 @@ pub use crate::entry::create_entry::create_entry;
 pub use crate::entry::delete_entry::delete_entry;
 pub use crate::entry::hash_entry::hash_entry;
 pub use crate::entry::update_entry::update_entry;
-pub use crate::entry::HdkEntry;
 pub use crate::entry_def;
 pub use crate::entry_defs;
-pub use crate::error::HdkError;
-pub use crate::error::HdkResult;
 pub use crate::hash_path::anchor::anchor;
 pub use crate::hash_path::anchor::get_anchor;
 pub use crate::hash_path::anchor::list_anchor_addresses;
@@ -65,4 +62,50 @@ pub use std::collections::HashSet;
 pub use std::convert::TryFrom;
 
 // This needs to be called at least once _somewhere_ and is idempotent.
+#[macro_export]
+macro_rules! holochain_externs {
+    () => {
+        holochain_wasmer_guest::memory_externs!();
+        holochain_wasmer_guest::host_externs!(
+            __debug,
+            __hash_entry,
+            __unreachable,
+            __verify_signature,
+            __sign,
+            __decrypt,
+            __encrypt,
+            __zome_info,
+            __property,
+            __random_bytes,
+            __show_env,
+            __sys_time,
+            __agent_info,
+            __capability_claims,
+            __capability_grants,
+            __capability_info,
+            __get,
+            __get_details,
+            __get_links,
+            __get_link_details,
+            __get_agent_activity,
+            __query,
+            __call_remote,
+            __call,
+            __create,
+            __emit_signal,
+            __remote_signal,
+            __create_link,
+            __delete_link,
+            __update,
+            __delete,
+            __schedule,
+            __x_salsa20_poly1305_encrypt,
+            __x_salsa20_poly1305_decrypt,
+            __x_25519_x_salsa20_poly1305_encrypt,
+            __x_25519_x_salsa20_poly1305_decrypt,
+            __create_x25519_keypair
+        );
+    };
+}
+
 holochain_externs!();
