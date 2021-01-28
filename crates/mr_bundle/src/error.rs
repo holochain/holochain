@@ -5,6 +5,9 @@ pub enum BundleError {
         Make sure that Manifest::location returns this path as a Location::Bundled."
     )]
     BundledPathNotInManifest(std::path::PathBuf),
+
+    #[error("Attempted to resolve a bundled resource not present in this bundle: {0}")]
+    BundledResourceMissing(std::path::PathBuf),
 }
 
 pub type BundleResult<T> = Result<T, BundleError>;

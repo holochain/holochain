@@ -109,34 +109,39 @@ where
         })
     }
 
-    /// Return the full set of resources specified by this bundle's manifest.
-    /// Bundled resources can be returned directly, while all others will be
-    /// fetched from the filesystem or the internet.
-    pub async fn resolve_all(&self) -> HashMap<Location, R> {
-        todo!()
-    }
-
-    // TODO: break this up into `resolve_all` and `new` which takes a partial set of
-    // bundled resources
-    pub async fn from_manifest(manifest: M) -> MrBundleResult<Self> {
-        let resources: HashMap<Location, R> =
-            futures::future::join_all(manifest.locations().into_iter().map(|loc| async move {
-                Ok((
-                    loc.clone(),
-                    crate::decode(&loc.resolve().await?.into_iter().collect::<Vec<u8>>())?,
-                ))
-            }))
-            .await
-            .into_iter()
-            .collect::<MrBundleResult<HashMap<_, _>>>()?;
-
-        Ok(Self {
-            manifest,
-            resources,
+    pub async fn resolve(&self, location: &Location) -> MrBundleResult<R> {
+        Ok(match location {
+            Location::Bundled(path) => self
+                .resources
+                .get(location)
+                .cloned()
+                .ok_or_else(|| BundleError::BundledResourceMissing(path.clone()))?,
+            Location::Path(path) => crate::decode(&crate::location::resolve_local(path).await?)?,
+            Location::Url(url) => crate::decode(&crate::location::resolve_remote(url).await?)?,
         })
     }
 
-    pub fn resources(&self) -> &HashMap<Location, R> {
+    /// Return the full set of resources specified by this bundle's manifest.
+    /// Bundled resources can be returned directly, while all others will be
+    /// fetched from the filesystem or the internet.
+    pub async fn resolve_all(&self) -> MrBundleResult<HashMap<Location, R>> {
+        let resources: HashMap<Location, R> = futures::future::join_all(
+            self.manifest
+                .locations()
+                .into_iter()
+                .map(|loc| async move { Ok((loc.clone(), self.resolve(&loc).await?)) }),
+        )
+        .await
+        .into_iter()
+        .collect::<MrBundleResult<HashMap<_, _>>>()?;
+
+        Ok(resources)
+    }
+
+    /// Access the map of resources included in this bundle
+    /// Bundled resources are also accessible via `resolve` or `resolve_all`,
+    /// but using this method prevents a Clone
+    pub fn bundled_resources(&self) -> &HashMap<Location, R> {
         &self.resources
     }
 

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use mr_bundle::{bundle::Bundle, location::Location, manifest::Manifest};
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -30,48 +32,65 @@ struct ThingManifest {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-struct Thing(u32);
+struct Thing(String);
 
 #[tokio::test]
 async fn path_roundtrip() -> anyhow::Result<()> {
     let dir = tempdir::TempDir::new("mr_bundle")?;
 
-    // Write some Resources to disk
-    let path1 = dir.path().join("1.thing");
-    let path2 = dir.path().join("2.thing");
-    let thing1 = Thing(1);
-    let thing2 = Thing(2);
-    std::fs::write(&path1, mr_bundle::encode(&thing1)?)?;
-    std::fs::write(&path2, mr_bundle::encode(&thing2)?)?;
+    // Write a Resource to disk
+    let local_thing = Thing("local".into());
+    let local_path = dir.path().join("local.thing");
+    std::fs::write(&local_path, mr_bundle::encode(&local_thing)?)?;
 
-    // Create a Manifest that references these local resources
-    let location1 = Location::Path(path1);
-    let location2 = Location::Path(path2);
+    let bundled_path = PathBuf::from("bundled.thing");
+    let bundled_thing = Thing("bundled".into());
+
+    // Create a Manifest that references these resources
+    let bundled_location = Location::Bundled(bundled_path.clone());
+    let local_location = Location::Path(local_path.clone());
     let manifest = TestManifest::V1(ManifestV1 {
         name: "name".to_string(),
         things: vec![
             ThingManifest {
-                location: location1.clone(),
+                location: bundled_location.clone(),
             },
             ThingManifest {
-                location: location2.clone(),
+                location: local_location.clone(),
             },
         ],
     });
 
-    // Pull all the pieces together into a Bundle, and assert that the same
-    // resources are available
-    let bundle = Bundle::<_, Thing>::from_manifest(manifest).await.unwrap();
-    assert_eq!(bundle.resources().get(&location1), Some(&thing1));
-    assert_eq!(bundle.resources().get(&location2), Some(&thing2));
+    // Put the bundled resource into a Bundle (excluding the local resource)
+    let bundle = Bundle::new(manifest, vec![(bundled_path, bundled_thing.clone())]).unwrap();
+    assert_eq!(
+        bundle
+            .bundled_resources()
+            .iter()
+            .collect::<Vec<(&Location, &Thing)>>(),
+        vec![(&bundled_location, &bundled_thing)]
+    );
+
+    assert_eq!(
+        bundle
+            .resolve_all()
+            .await
+            .unwrap()
+            .iter()
+            .collect::<Vec<(&Location, &Thing)>>(),
+        vec![
+            (&bundled_location, &bundled_thing),
+            (&local_location, &local_thing)
+        ]
+    );
 
     // Ensure that the bundle is serializable and writable
-    let bundle_path = dir.path().join("test.bundle");
+    let bundled_path = dir.path().join("test.bundle");
     let bundle_bytes = bundle.encode().unwrap();
-    std::fs::write(&bundle_path, bundle_bytes)?;
+    std::fs::write(&bundled_path, bundle_bytes)?;
 
     // Ensure that it is also readable and deserializable
-    let decoded_bundle: Bundle<_, _> = Bundle::decode(&std::fs::read(bundle_path)?)?;
+    let decoded_bundle: Bundle<_, _> = Bundle::decode(&std::fs::read(bundled_path)?)?;
     assert_eq!(bundle, decoded_bundle);
 
     Ok(())
