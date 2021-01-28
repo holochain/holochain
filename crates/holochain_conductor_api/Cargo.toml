@@ -9,8 +9,8 @@ authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 
 [dependencies]
-directories = "2.0.2"
-derive_more = "0.99.3"
+directories = "2.0"
+derive_more = "0.99"
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
 holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
@@ -22,7 +22,7 @@ serde_derive = "1.0.104"
 serde_yaml = "0.8"
 structopt = "0.3"
 tracing = "=0.1.21"
-thiserror = "1.0.22"
+thiserror = "1.0"
 url2 = "0.0.6"
 
 [dev-dependencies]

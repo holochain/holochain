@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use holochain_types::dna::{
     error::DnaResult,
     wasm,
@@ -11,6 +13,11 @@ use holochain_zome_types::zome::ZomeName;
 pub struct SweetDnaFile(DnaFile);
 
 impl SweetDnaFile {
+    /// Create a DnaFile from a path to a *.dna.gz file
+    pub async fn from_file(path: &Path) -> DnaResult<DnaFile> {
+        DnaFile::from_file_content(&std::fs::read(path)?).await
+    }
+
     /// Create a DnaFile from a collection of Zomes
     pub async fn from_zomes(
         uuid: String,

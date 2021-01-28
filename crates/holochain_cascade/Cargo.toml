@@ -9,7 +9,7 @@ authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 
 [dependencies]
-derive_more = "0.99.3"
+derive_more = "0.99"
 either = "1.5"
 fallible-iterator = "0.2"
 fixt = { version = "0.0.1", path = "../fixt" }

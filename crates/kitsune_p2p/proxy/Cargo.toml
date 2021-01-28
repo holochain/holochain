@@ -13,7 +13,7 @@ edition = "2018"
 [dependencies]
 base64 = "0.12"
 blake2b_simd = "0.5.10"
-derive_more = "0.99.7"
+derive_more = "0.99"
 futures = "0.3"
 kitsune_p2p_types = { version = "0.0.1", path = "../types" }
 kitsune_p2p_transport_quic = { version = "0.0.1", path = "../transport_quic" }

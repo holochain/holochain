@@ -22,7 +22,7 @@ holochain_zome_types = { path = "../holochain_zome_types" }
 paste = "=1.0.3"
 serde = "1.0.104"
 serde_bytes = "0.11"
-thiserror = "1.0.22"
+thiserror = "1.0"
 
 [dev-dependencies]
 fixt = { path = "../fixt" }
