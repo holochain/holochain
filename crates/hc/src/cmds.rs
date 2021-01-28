@@ -15,22 +15,25 @@ const DEFAULT_APP_ID: &str = "test-app";
 // - keystore
 pub struct Create {
     #[structopt(subcommand)]
-    /// Add an optional network.
+    /// Add an optional network config
     pub network: Option<NetworkCmd>,
     #[structopt(short, long, default_value = DEFAULT_APP_ID)]
-    /// Id for the installed app.
+    /// ID for the installed app.
     /// This is just a String to identify the app by.
     pub app_id: InstalledAppId,
     /// Set a root directory for conductor setups to be placed into.
-    /// Defaults to your systems temp directory.
-    /// This must already exist.
+    /// Defaults to the system's temp directory.
+    /// This directory must already exist.
     #[structopt(long)]
     pub root: Option<PathBuf>,
     #[structopt(short, long)]
-    /// Set a list of subdirectories for each setup that is created.
-    /// Defaults to using a random nanoid like: `kAOXQlilEtJKlTM_W403b`.
-    /// Theses will be created in the root directory if they don't exist.
-    /// For example: `hc gen -r path/to/my/chains -d=first,second,third`
+    /// Specify the directory name for each setup that is created.
+    /// By default, new setup directories get a random name
+    /// like "kAOXQlilEtJKlTM_W403b".
+    /// Use this option to override those names with something explicit.
+    ///
+    /// For example `hc gen -r path/to/my/chains -n 3 -d=first,second,third`
+    /// will create three setups with directories named "first", "second", and "third".
     pub directories: Vec<PathBuf>,
 }
 
@@ -53,8 +56,9 @@ pub struct Network {
     /// Set the type of network.
     pub transport: NetworkType,
     #[structopt(short, long, parse(from_str = Url2::parse))]
-    /// Optionally set a bootstrap url.
-    /// The service used for peers to discover each before they are peers.
+    /// Optionally set a bootstrap service URL.
+    /// A bootstrap service can used for peers to discover each other without
+    /// prior knowledge of each other.
     pub bootstrap: Option<Url2>,
 }
 
@@ -94,10 +98,10 @@ pub struct Existing {
     /// Paths to existing setup directories.
     /// For example `hc run -e=/tmp/kAOXQlilEtJKlTM_W403b,/tmp/kddsajkaasiIII_sJ`.
     pub existing_paths: Vec<PathBuf>,
-    #[structopt(short, long, conflicts_with_all = &["last"])]
+    #[structopt(short, long, conflicts_with_all = &["last", "indices"])]
     /// Run all the existing conductor setups.
     pub all: bool,
-    #[structopt(short, long)]
+    #[structopt(short, long, conflicts_with_all = &["all", "indices"])]
     /// Run the last created conductor setup.
     pub last: bool,
     /// Run a selection of existing conductor setups.
