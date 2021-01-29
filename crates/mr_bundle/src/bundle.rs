@@ -79,14 +79,12 @@ where
         self.encode()
     }
 
-    #[cfg(feature = "io-tokio")]
     pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
-        Ok(Self::from_file_content(&tokio::fs::read(path).await?)?)
+        Ok(Self::from_file_content(&crate::fs::read_file(path).await?)?)
     }
 
-    #[cfg(feature = "io-tokio")]
     pub async fn write_to_file(&self, path: &Path) -> MrBundleResult<()> {
-        Ok(tokio::fs::write(path, self.to_file_content()?).await?)
+        Ok(crate::fs::write_file(path, &self.to_file_content()?).await?)
     }
 
     pub async fn resolve(&self, location: &Location) -> MrBundleResult<ResourceBytes> {

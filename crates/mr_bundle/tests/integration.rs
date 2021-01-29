@@ -99,17 +99,14 @@ async fn resource_resolution() -> anyhow::Result<()> {
     assert_eq!(bundle, decoded_bundle);
 
     // Ensure that bundle writing and reading are inverses
-    #[cfg(feature = "io-tokio")]
-    {
-        bundle
-            .write_to_file(&dir.path().join("bundle.bundle"))
-            .await
-            .unwrap();
-        let bundle_file = Bundle::read_from_file(&dir.path().join("bundle.bundle"))
-            .await
-            .unwrap();
-        assert_eq!(bundle, bundle_file);
-    }
+    bundle
+        .write_to_file(&dir.path().join("bundle.bundle"))
+        .await
+        .unwrap();
+    let bundle_file = Bundle::read_from_file(&dir.path().join("bundle.bundle"))
+        .await
+        .unwrap();
+    assert_eq!(bundle, bundle_file);
 
     Ok(())
 }

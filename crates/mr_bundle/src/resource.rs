@@ -1,6 +1,4 @@
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
-use crate::error::MrBundleResult;
+use serde::{de::DeserializeOwned, Serialize};
 
 pub type ResourceBytes = Vec<u8>;
 

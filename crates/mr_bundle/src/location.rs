@@ -1,5 +1,4 @@
 use crate::{error::MrBundleResult, ResourceBytes};
-use bytes::Bytes;
 use std::path::{Path, PathBuf};
 
 /// Where to find a file.
