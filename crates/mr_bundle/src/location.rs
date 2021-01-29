@@ -21,7 +21,7 @@ pub enum Location {
 }
 
 pub(crate) async fn resolve_local(path: &Path) -> MrBundleResult<ResourceBytes> {
-    Ok(std::fs::read(path)?.into())
+    Ok(std::fs::read(path)?)
 }
 
 pub(crate) async fn resolve_remote(url: &str) -> MrBundleResult<ResourceBytes> {
