@@ -9,6 +9,9 @@ use crate::prelude::*;
 ///
 /// @see create_cap_grant
 /// @see delete_cap_grant
-pub fn update_cap_grant(hash: HeaderHash, input: CapGrantEntry) -> HdkResult<HeaderHash> {
-    update(hash, EntryDefId::CapGrant, Entry::CapGrant(input))
+pub fn update_cap_grant(hash: HeaderHash, input: CapGrantEntry) -> ExternResult<HeaderHash> {
+    update(
+        hash,
+        EntryWithDefId::new(EntryDefId::CapGrant, Entry::CapGrant(input)),
+    )
 }

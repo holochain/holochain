@@ -425,12 +425,11 @@ pub struct SweetConductorHandle(pub(crate) ConductorHandle);
 impl SweetConductorHandle {
     /// Make a zome call to a Cell, as if that Cell were the caller. Most common case.
     /// No capability is necessary, since the authorship capability is automatically granted.
-    pub async fn call<I, O, F, E>(&self, zome: &SweetZome, fn_name: F, payload: I) -> O
+    pub async fn call<I, O, F>(&self, zome: &SweetZome, fn_name: F, payload: I) -> O
     where
-        E: std::fmt::Debug,
         FunctionName: From<F>,
-        SerializedBytes: TryFrom<I, Error = E>,
-        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
+        I: serde::Serialize,
+        O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
         self.call_from(zome.cell_id().agent_pubkey(), None, zome, fn_name, payload)
             .await
@@ -438,7 +437,7 @@ impl SweetConductorHandle {
 
     /// Make a zome call to a Cell, as if some other Cell were the caller. More general case.
     /// Can optionally provide a capability.
-    pub async fn call_from<I, O, F, E>(
+    pub async fn call_from<I, O, F>(
         &self,
         provenance: &AgentPubKey,
         cap: Option<CapSecret>,
@@ -447,12 +446,11 @@ impl SweetConductorHandle {
         payload: I,
     ) -> O
     where
-        E: std::fmt::Debug,
         FunctionName: From<F>,
-        SerializedBytes: TryFrom<I, Error = E>,
-        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
+        I: Serialize,
+        O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        let payload = ExternInput::new(payload.try_into().expect("Couldn't serialize payload"));
+        let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
         let call = ZomeCall {
             cell_id: zome.cell_id().clone(),
             zome_name: zome.name().clone(),
@@ -463,9 +461,7 @@ impl SweetConductorHandle {
         };
         let response = self.0.call_zome(call).await.unwrap().unwrap();
         unwrap_to!(response => ZomeCallResponse::Ok)
-            .clone()
-            .into_inner()
-            .try_into()
+            .decode()
             .expect("Couldn't deserialize zome call output")
     }
 

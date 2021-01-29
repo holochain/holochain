@@ -4,15 +4,15 @@ use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 
 /// A signal emitted by an app via `emit_signal`
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[repr(transparent)]
 #[serde(transparent)]
-pub struct AppSignal(SerializedBytes);
+pub struct AppSignal(crate::ExternIO);
 
 impl AppSignal {
     /// Constructor
-    pub fn new(sb: SerializedBytes) -> Self {
-        Self(sb)
+    pub fn new(extern_io: crate::ExternIO) -> Self {
+        Self(extern_io)
     }
     /// Access the inner type
     pub fn into_inner<O, E>(self) -> Result<O, SerializedBytesError>
@@ -30,5 +30,5 @@ pub struct RemoteSignal {
     /// Agents to send the signal to.
     pub agents: Vec<AgentPubKey>,
     /// The signal to send.
-    pub signal: SerializedBytes,
+    pub signal: crate::ExternIO,
 }

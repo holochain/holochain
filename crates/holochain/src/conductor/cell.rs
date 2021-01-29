@@ -47,7 +47,6 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use observability::OpenSpanExt;
-use std::convert::TryInto;
 use std::hash::Hash;
 use std::hash::Hasher;
 use tokio::sync;
@@ -226,12 +225,12 @@ impl Cell {
                 fn_name,
                 cap,
                 respond,
-                request,
+                payload,
                 ..
             } => {
                 async {
                     let res = self
-                        .handle_call_remote(from_agent, zome_name, fn_name, cap, request)
+                        .handle_call_remote(from_agent, zome_name, fn_name, cap, payload)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -632,7 +631,7 @@ impl Cell {
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
-        payload: SerializedBytes,
+        payload: ExternIO,
     ) -> CellResult<SerializedBytes> {
         use crate::core::ribosome::host_fn::HostFnMetrics;
         HostFnMetrics::count(HostFnMetrics::CallRemoteRecv, 1);
@@ -640,7 +639,7 @@ impl Cell {
             cell_id: self.id.clone(),
             zome_name,
             cap,
-            payload: ExternInput::new(payload),
+            payload,
             provenance: from_agent,
             fn_name,
         };

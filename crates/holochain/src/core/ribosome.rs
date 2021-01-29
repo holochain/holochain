@@ -244,9 +244,9 @@ pub trait Invocation: Clone {
     /// results).
     fn fn_components(&self) -> FnComponents;
     /// the serialized input from the host for the wasm call
-    /// this is intentionally NOT a reference to self because ExternInput may be huge we want to be
+    /// this is intentionally NOT a reference to self because ExternIO may be huge we want to be
     /// careful about cloning invocations
-    fn host_input(self) -> Result<ExternInput, SerializedBytesError>;
+    fn host_input(self) -> Result<ExternIO, SerializedBytesError>;
 }
 
 impl ZomeCallInvocation {
@@ -278,7 +278,7 @@ mockall::mock! {
     trait Invocation {
         fn zomes(&self) -> ZomesToInvoke;
         fn fn_components(&self) -> FnComponents;
-        fn host_input(self) -> Result<ExternInput, SerializedBytesError>;
+        fn host_input(self) -> Result<ExternIO, SerializedBytesError>;
     }
     trait Clone {
         fn clone(&self) -> Self;
@@ -301,7 +301,7 @@ pub struct ZomeCallInvocation {
     /// The name of the Zome function to call
     pub fn_name: FunctionName,
     /// The serialized data to pass as an argument to the Zome call
-    pub payload: ExternInput,
+    pub payload: ExternIO,
     /// The provenance of the call. Provenance means the 'source'
     /// so this expects the `AgentPubKey` of the agent calling the Zome function
     pub provenance: AgentPubKey,
@@ -314,7 +314,7 @@ impl Invocation for ZomeCallInvocation {
     fn fn_components(&self) -> FnComponents {
         vec![self.fn_name.to_owned().into()].into()
     }
-    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
+    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         Ok(self.payload)
     }
 }
@@ -435,7 +435,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         invocation: &I,
         zome: &Zome,
         to_call: &FunctionName,
-    ) -> Result<Option<ExternOutput>, RibosomeError>;
+    ) -> Result<Option<ExternIO>, RibosomeError>;
 
     /// @todo list out all the available callbacks and maybe cache them somewhere
     fn list_callbacks(&self) {
@@ -531,7 +531,6 @@ pub mod wasm_test {
             tokio::task::spawn(async move {
                 use holo_hash::*;
                 use holochain_p2p::HolochainP2pCellT;
-                use std::convert::TryInto;
                 use $crate::core::ribosome::RibosomeT;
 
                 let ribosome =
@@ -563,7 +562,7 @@ pub mod wasm_test {
                         cell_id,
                         $test_wasm.into(),
                         $fn_name.into(),
-                        holochain_zome_types::ExternInput::new(input.try_into().unwrap()),
+                        holochain_zome_types::ExternIO::encode(input).unwrap(),
                     ))
                     .next()
                     .unwrap();
@@ -578,7 +577,7 @@ pub mod wasm_test {
 
                 let output = match zome_invocation_response {
                     crate::core::ribosome::ZomeCallResponse::Ok(guest_output) => {
-                        guest_output.into_inner().try_into().unwrap()
+                        guest_output.decode().unwrap()
                     }
                     crate::core::ribosome::ZomeCallResponse::Unauthorized(_, _, _, _) => {
                         unreachable!()

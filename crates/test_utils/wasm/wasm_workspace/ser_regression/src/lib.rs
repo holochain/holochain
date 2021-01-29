@@ -6,8 +6,6 @@ struct CreateMessageInput {
     channel_hash: EntryHash,
     content: String,
 }
-#[derive(Debug, From, Into, Serialize, Deserialize, SerializedBytes)]
-pub struct ChannelName(String);
 
 #[hdk_entry(id = "channel")]
 #[derive(Constructor)]
@@ -34,10 +32,10 @@ fn channels_path() -> Path {
 }
 
 #[hdk_extern]
-fn create_channel(name: ChannelName) -> ExternResult<EntryHash> {
+fn create_channel(name: String) -> ExternResult<EntryHash> {
     debug!(format!("channel name {:?}", name));
     let path = channels_path();
-    let channel = Channel::new(name.into());
+    let channel = Channel::new(name);
     let channel_hash = hash_entry(&channel)?;
     let sb: SerializedBytes = channel_hash.clone().try_into().unwrap();
     create_entry(&channel)?;
@@ -47,7 +45,7 @@ fn create_channel(name: ChannelName) -> ExternResult<EntryHash> {
 }
 
 #[hdk_extern]
-fn create_message(input: CreateMessageInput) -> ExternResult<EntryHash> {
+fn create_message(input: crate::CreateMessageInput) -> ExternResult<EntryHash> {
     debug!(format!("{:?}", input));
     let CreateMessageInput {
         channel_hash,

@@ -36,7 +36,7 @@ impl HolochainP2pHandler for StubNetwork {
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
-        request: SerializedBytes,
+        payload: ExternIO,
     ) -> HolochainP2pHandlerResult<SerializedBytes> {
         Err("stub".into())
     }
@@ -219,7 +219,7 @@ mod tests {
                 "".into(),
                 "".into(),
                 None,
-                UnsafeBytes::from(b"yippo".to_vec()).into(),
+                ExternIO::encode(b"yippo").unwrap(),
             )
             .await
             .unwrap();

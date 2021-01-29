@@ -283,7 +283,7 @@ async fn run_test(
     let invalid_link_hash: HeaderHash =
         call_zome_directly(&bob_cell_id, &handle, dna_file, invocation)
             .await
-            .try_into()
+            .decode()
             .unwrap();
 
     // Integration should have 9 ops in it
@@ -351,7 +351,7 @@ async fn run_test(
     let invalid_remove_hash: HeaderHash =
         call_zome_directly(&bob_cell_id, &handle, dna_file, invocation)
             .await
-            .try_into()
+            .decode()
             .unwrap();
 
     // Integration should have 12 ops in it
@@ -484,7 +484,7 @@ async fn call_zome_directly(
     handle: &ConductorHandle,
     dna_file: &DnaFile,
     invocation: ZomeCallInvocation,
-) -> SerializedBytes {
+) -> ExternIO {
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
     // 4
     let output = call_data.call_zome_direct(invocation).await;

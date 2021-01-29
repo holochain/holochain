@@ -9,17 +9,17 @@ use super::HostFnMetrics;
 pub fn agent_info<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    _input: AgentInfoInput,
-) -> RibosomeResult<AgentInfoOutput> {
+    _input: (),
+) -> RibosomeResult<AgentInfo> {
     HostFnMetrics::count(HostFnMetrics::AgentInfo, 1);
     let agent_pubkey = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let lock = call_context.host_access.workspace().read().await;
         lock.source_chain.agent_pubkey()
     })?;
-    Ok(AgentInfoOutput::new(AgentInfo {
+    Ok(AgentInfo {
         agent_initial_pubkey: agent_pubkey.clone(),
         agent_latest_pubkey: agent_pubkey,
-    }))
+    })
 }
 
 #[cfg(test)]
@@ -28,10 +28,9 @@ pub mod test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
 
+    use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::AgentInfoInput;
-    use holochain_zome_types::AgentInfoOutput;
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_agent_info_test() {
@@ -49,18 +48,18 @@ pub mod test {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
 
-        let agent_info: AgentInfoOutput = crate::call_test_ribosome!(
+        let agent_info: AgentInfo = crate::call_test_ribosome!(
             host_access,
             TestWasm::AgentInfo,
             "agent_info",
-            AgentInfoInput::new(())
+            ()
         );
         assert_eq!(
-            agent_info.inner_ref().agent_initial_pubkey,
+            agent_info.agent_initial_pubkey,
             fake_agent_pubkey_1(),
         );
         assert_eq!(
-            agent_info.inner_ref().agent_latest_pubkey,
+            agent_info.agent_latest_pubkey,
             fake_agent_pubkey_1(),
         );
     }

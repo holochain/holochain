@@ -9,10 +9,10 @@ use super::HostFnMetrics;
 pub fn get_details<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: GetDetailsInput,
-) -> RibosomeResult<GetDetailsOutput> {
+    input: GetInput,
+) -> RibosomeResult<Option<Details>> {
     HostFnMetrics::count(HostFnMetrics::GetDetails, 1);
-    let (hash, options) = input.into_inner();
+    let GetInput{ any_dht_hash, get_options } = input;
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
@@ -25,9 +25,9 @@ pub fn get_details<'a>(
             .write()
             .await
             .cascade(network)
-            .get_details(hash, options)
+            .get_details(any_dht_hash, get_options)
             .await?;
-        Ok(GetDetailsOutput::new(maybe_details))
+        Ok(maybe_details)
     })
 }
 
@@ -62,8 +62,8 @@ pub mod wasm_test {
         #[derive(Clone, Copy, Serialize, Deserialize, SerializedBytes, Debug, PartialEq)]
         struct CounTree(u32);
 
-        let check = |details: GetDetailsOutput, count, delete| match details.clone().into_inner() {
-            Some(Details::Element(element_details)) => {
+        let check = |details: Option<Details>, count, delete| match details {
+            Some(Details::Element(ref element_details)) => {
                 match element_details.element.entry().to_app_option::<CounTree>() {
                     Ok(Some(CounTree(u))) => assert_eq!(u, count),
                     _ => panic!("failed to deserialize {:?}, {}, {}", details, count, delete),
@@ -73,14 +73,12 @@ pub mod wasm_test {
             _ => panic!("no element"),
         };
 
-        let check_entry = |details: GetDetailsOutput, count, update, delete, line| match details
-            .clone()
-            .into_inner()
+        let check_entry = |details: Option<Details>, count, update, delete, line| match details
         {
-            Some(Details::Entry(entry_details)) => {
+            Some(Details::Entry(ref entry_details)) => {
                 match entry_details.entry {
-                    Entry::App(eb) => {
-                        let countree = CounTree::try_from(eb.into_sb()).unwrap();
+                    Entry::App(ref eb) => {
+                        let countree = CounTree::try_from(eb.clone().into_sb()).unwrap();
                         assert_eq!(countree, CounTree(count));
                     }
                     _ => panic!(
@@ -236,9 +234,9 @@ pub mod wasm_test {
             line!(),
         );
 
-        let zero_b_details: GetDetailsOutput =
+        let zero_b_details: Option<Details> =
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", zero_b);
-        match zero_b_details.into_inner() {
+        match zero_b_details {
             Some(Details::Element(element_details)) => {
                 match element_details.element.entry().as_option() {
                     None => {

@@ -30,7 +30,7 @@ macro_rules! host_fn_api_impls {
                         self.ribosome.clone(),
                         self.call_context.clone(),
                         input.into()
-                    ).map(|r| r.into_inner()).map_err(|e| HostFnApiError::RibosomeError(Box::new(e)))
+                    ).map_err(|e| HostFnApiError::RibosomeError(Box::new(e)))
                 }
             )*
         }
@@ -67,7 +67,7 @@ host_fn_api_impls! {
     // CapGrant and CapClaim are handled natively.
     // App entries are referenced by entry defs then SerializedBytes stuffed into an Entry::App.
     // Returns HeaderHash of the newly created element.
-    fn create ((zt::entry_def::EntryDefId, zt::entry::Entry)) -> holo_hash::HeaderHash;
+    fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
 
     fn create_x25519_keypair(()) -> holochain_zome_types::x_salsa20_poly1305::x25519::X25519PubKey;
 
@@ -86,9 +86,9 @@ host_fn_api_impls! {
     fn x_25519_x_salsa20_poly1305_decrypt (holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
 
     // Create a link between two entries.
-    fn create_link ((holo_hash::EntryHash, holo_hash::EntryHash, zt::link::LinkTag)) -> holo_hash::HeaderHash;
+    fn create_link (zt::link::CreateLinkInput) -> holo_hash::HeaderHash;
 
-    // @todo
+    // Delete an entry.
     fn delete (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
 
     // Header hash of the CreateLink element.
@@ -106,22 +106,16 @@ host_fn_api_impls! {
     fn debug (zt::debug::DebugMsg) -> ();
 
     // Attempt to get a live entry from the cascade.
-    fn get ((holo_hash::AnyDhtHash, zt::entry::GetOptions)) -> Option<zt::element::Element>;
+    fn get (zt::entry::GetInput) -> Option<zt::element::Element>;
 
-    fn get_agent_activity (
-        (
-            holo_hash::AgentPubKey,
-            zt::query::ChainQueryFilter,
-            zt::query::ActivityRequest,
-        )
-    ) -> zt::query::AgentActivity;
+    fn get_agent_activity (zt::agent_info::GetAgentActivityInput) -> zt::query::AgentActivity;
 
-    fn get_details ((holo_hash::AnyDhtHash, zt::entry::GetOptions)) -> Option<zt::metadata::Details>;
+    fn get_details (zt::entry::GetInput) -> Option<zt::metadata::Details>;
 
     // Get links by entry hash from the cascade.
-    fn get_links ((holo_hash::EntryHash, Option<zt::link::LinkTag>)) -> zt::link::Links;
+    fn get_links (zt::link::GetLinksInput) -> zt::link::Links;
 
-    fn get_link_details ((holo_hash::EntryHash, Option<zt::link::LinkTag>)) -> zt::link::LinkDetails;
+    fn get_link_details (zt::link::GetLinksInput) -> zt::link::LinkDetails;
 
     // Hash an entry on the host.
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
@@ -155,7 +149,7 @@ host_fn_api_impls! {
     fn sys_time (()) -> core::time::Duration;
 
     // Same as  but also takes the HeaderHash of the updated element.
-    fn update ((zt::entry_def::EntryDefId, zt::entry::Entry, holo_hash::HeaderHash)) -> holo_hash::HeaderHash;
+    fn update (zt::entry::UpdateInput) -> holo_hash::HeaderHash;
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;
 

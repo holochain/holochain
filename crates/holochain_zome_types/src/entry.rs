@@ -169,3 +169,73 @@ impl HashableContent for Entry {
         }
     }
 }
+
+/// Data to create an entry.
+#[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct EntryWithDefId {
+    entry_def_id: crate::entry_def::EntryDefId,
+    entry: crate::entry::Entry,
+}
+
+impl EntryWithDefId {
+    /// Constructor.
+    pub fn new(entry_def_id: crate::entry_def::EntryDefId, entry: crate::entry::Entry) -> Self {
+        Self {
+            entry_def_id,
+            entry,
+        }
+    }
+}
+
+impl AsRef<crate::Entry> for EntryWithDefId {
+    fn as_ref(&self) -> &crate::Entry {
+        &self.entry
+    }
+}
+
+impl AsRef<crate::EntryDefId> for EntryWithDefId {
+    fn as_ref(&self) -> &crate::EntryDefId {
+        &self.entry_def_id
+    }
+}
+
+/// Zome IO inner for get and get_details calls.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct GetInput {
+    /// Any DHT hash to pass to get or get_details.
+    pub any_dht_hash: holo_hash::AnyDhtHash,
+    /// Options for the call.
+    pub get_options: crate::entry::GetOptions,
+}
+
+impl GetInput {
+    /// Constructor.
+    pub fn new(any_dht_hash: holo_hash::AnyDhtHash, get_options: crate::entry::GetOptions) -> Self {
+        Self {
+            any_dht_hash,
+            get_options,
+        }
+    }
+}
+
+/// Zome IO inner for update.
+#[derive(PartialEq, Debug, Deserialize, Serialize, Clone)]
+pub struct UpdateInput {
+    /// Header of the element being updated.
+    pub original_header_address: holo_hash::HeaderHash,
+    /// Value of the update.
+    pub entry_with_def_id: EntryWithDefId,
+}
+
+impl UpdateInput {
+    /// Constructor.
+    pub fn new(
+        original_header_address: holo_hash::HeaderHash,
+        entry_with_def_id: EntryWithDefId,
+    ) -> Self {
+        Self {
+            original_header_address,
+            entry_with_def_id,
+        }
+    }
+}
