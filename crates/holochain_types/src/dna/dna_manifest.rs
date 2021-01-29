@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::prelude::*;
 use holo_hash::*;
 use holochain_zome_types::ZomeName;
@@ -39,5 +41,9 @@ impl mr_bundle::Manifest for DnaManifest {
             .iter()
             .map(|zome| zome.location.clone())
             .collect()
+    }
+
+    fn path(&self) -> PathBuf {
+        "dna.yaml".into()
     }
 }

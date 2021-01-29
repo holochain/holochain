@@ -3,6 +3,7 @@
 
 use mr_bundle::{Location, Manifest};
 use serde;
+use std::path::PathBuf;
 
 mod app_manifest_v1;
 mod app_manifest_validated;
@@ -27,5 +28,9 @@ impl Manifest for AppManifest {
                 .filter_map(|cell| cell.dna.location.clone())
                 .collect(),
         }
+    }
+
+    fn path(&self) -> PathBuf {
+        "app.yaml".into()
     }
 }
