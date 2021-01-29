@@ -15,12 +15,8 @@ impl AppSignal {
         Self(extern_io)
     }
     /// Access the inner type
-    pub fn into_inner<O, E>(self) -> Result<O, SerializedBytesError>
-    where
-        SerializedBytesError: From<E>,
-        O: TryFrom<SerializedBytes, Error=E>,
-    {
-        Ok(self.0.try_into()?)
+    pub fn into_inner(self) -> crate::ExternIO {
+        self.0
     }
 }
 
