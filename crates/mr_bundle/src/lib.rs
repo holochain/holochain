@@ -1,10 +1,12 @@
 mod bundle;
-// mod compress;
 pub mod error;
 pub mod fs;
 mod location;
 mod manifest;
 mod resource;
+
+#[cfg(feature = "exploding")]
+mod explode;
 
 pub use bundle::Bundle;
 pub use location::Location;

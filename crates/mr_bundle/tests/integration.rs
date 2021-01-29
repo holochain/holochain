@@ -16,6 +16,10 @@ impl Manifest for TestManifest {
             Self::V1(mani) => mani.things.iter().map(|b| b.location.clone()).collect(),
         }
     }
+
+    fn path(&self) -> PathBuf {
+        "test-manifest.yaml".into()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -33,19 +37,54 @@ struct ThingManifest {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 struct Thing(String);
 
+// fn test_bundle(base_dir: &Path) -> Bundle<TestManifest> {
+//     // Write a ResourceBytes to disk
+//     let local_thing = Thing("local".into());
+//     let local_thing_encoded = mr_bundle::encode(&local_thing).unwrap();
+//     let local_path = base_dir.join("local.thing");
+//     std::fs::write(&local_path, mr_bundle::encode(&local_thing).unwrap()).unwrap();
+
+//     let bundled_thing = Thing("bundled".into());
+//     let bundled_thing_encoded = mr_bundle::encode(&bundled_thing).unwrap();
+//     let bundled_path = PathBuf::from("bundled.thing");
+
+//     // Create a Manifest that references these resources
+//     let bundled_location = Location::Bundled(bundled_path.clone());
+//     let local_location = Location::Path(local_path.clone());
+//     let manifest = TestManifest::V1(ManifestV1 {
+//         name: "name".to_string(),
+//         things: vec![
+//             ThingManifest {
+//                 location: bundled_location.clone(),
+//             },
+//             ThingManifest {
+//                 location: local_location.clone(),
+//             },
+//         ],
+//     });
+
+//     // Put the bundled resource into a Bundle (excluding the local resource)
+//     Bundle::new(
+//         manifest,
+//         vec![(bundled_path.clone(), bundled_thing_encoded.clone())],
+//     )
+//     .unwrap()
+// }
+
 #[tokio::test]
-async fn resource_resolution() -> anyhow::Result<()> {
-    let dir = tempdir::TempDir::new("mr_bundle")?;
+async fn resource_resolution() {
+    let dir = tempdir::TempDir::new("mr_bundle").unwrap();
 
     // Write a ResourceBytes to disk
     let local_thing = Thing("local".into());
-    let local_thing_encoded = mr_bundle::encode(&local_thing)?;
-    let local_path = dir.path().join("local.thing");
-    std::fs::write(&local_path, mr_bundle::encode(&local_thing)?)?;
+    let local_thing_encoded = mr_bundle::encode(&local_thing).unwrap();
+    let local_path = dir.path().join("deeply/nested/local.thing");
+    std::fs::create_dir_all(local_path.parent().unwrap()).unwrap();
+    std::fs::write(&local_path, mr_bundle::encode(&local_thing).unwrap()).unwrap();
 
     let bundled_thing = Thing("bundled".into());
-    let bundled_thing_encoded = mr_bundle::encode(&bundled_thing)?;
-    let bundled_path = PathBuf::from("bundled.thing");
+    let bundled_thing_encoded = mr_bundle::encode(&bundled_thing).unwrap();
+    let bundled_path = PathBuf::from("another/nested/bundled.thing");
 
     // Create a Manifest that references these resources
     let bundled_location = Location::Bundled(bundled_path.clone());
@@ -92,10 +131,10 @@ async fn resource_resolution() -> anyhow::Result<()> {
     // Ensure that the bundle is serializable and writable
     let bundled_path = dir.path().join("test.bundle");
     let bundle_bytes = bundle.encode().unwrap();
-    std::fs::write(&bundled_path, bundle_bytes)?;
+    std::fs::write(&bundled_path, bundle_bytes).unwrap();
 
     // Ensure that it is also readable and deserializable
-    let decoded_bundle: Bundle<_> = Bundle::decode(&std::fs::read(bundled_path)?)?;
+    let decoded_bundle: Bundle<_> = Bundle::decode(&std::fs::read(bundled_path).unwrap()).unwrap();
     assert_eq!(bundle, decoded_bundle);
 
     // Ensure that bundle writing and reading are inverses
@@ -107,6 +146,64 @@ async fn resource_resolution() -> anyhow::Result<()> {
         .await
         .unwrap();
     assert_eq!(bundle, bundle_file);
+}
 
-    Ok(())
+#[tokio::test]
+async fn explode_roundtrip() {
+    let dir = tempdir::TempDir::new("mr_bundle").unwrap();
+
+    // Write a ResourceBytes to disk
+    let local_thing = Thing("local".into());
+    let local_path = dir.path().join("deeply/nested/local.thing");
+    std::fs::create_dir_all(local_path.parent().unwrap()).unwrap();
+    std::fs::write(&local_path, mr_bundle::encode(&local_thing).unwrap()).unwrap();
+
+    let bundled_thing = Thing("bundled".into());
+    let bundled_thing_encoded = mr_bundle::encode(&bundled_thing).unwrap();
+    let bundled_path = PathBuf::from("another/nested/bundled.thing");
+
+    // Create a Manifest that references these resources
+    let bundled_location = Location::Bundled(bundled_path.clone());
+    let local_location = Location::Path(local_path.clone());
+    let manifest = TestManifest::V1(ManifestV1 {
+        name: "name".to_string(),
+        things: vec![
+            ThingManifest {
+                location: bundled_location.clone(),
+            },
+            ThingManifest {
+                location: local_location.clone(),
+            },
+        ],
+    });
+
+    // Put the bundled resource into a Bundle (excluding the local resource)
+    let bundle = Bundle::new(
+        manifest,
+        vec![(bundled_path.clone(), bundled_thing_encoded.clone())],
+    )
+    .unwrap();
+    assert_eq!(
+        bundle
+            .bundled_resources()
+            .iter()
+            .collect::<HashSet<(&PathBuf, &Vec<u8>)>>(),
+        maplit::hashset![(&bundled_path, &bundled_thing_encoded)]
+    );
+
+    // Explode the bundle to a directory on the filesystem
+    let exploded_dir = dir.path().join("exploded");
+    bundle.explode_yaml(&exploded_dir).await.unwrap();
+
+    dbg!(exploded_dir.read_dir().unwrap().collect::<Vec<_>>());
+    assert!(exploded_dir.join("test-manifest.yaml").is_file());
+    assert!(exploded_dir.join("another/nested/bundled.thing").is_file());
+    assert!(!exploded_dir.join("deeply/nested/local.thing").exists());
+
+    let reconstructed =
+        Bundle::<TestManifest>::implode_yaml(&exploded_dir.join("test-manifest.yaml"))
+            .await
+            .unwrap();
+
+    assert_eq!(bundle, reconstructed);
 }

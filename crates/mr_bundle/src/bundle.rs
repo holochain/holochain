@@ -1,14 +1,13 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    error::{BundleError, BundleResult, MrBundleError, MrBundleResult},
+    error::{BundleError, BundleResult, MrBundleResult},
     location::Location,
     manifest::Manifest,
-    resource::{ResourceBytes, ResourceData},
+    resource::ResourceBytes,
 };
 use std::{
     collections::{HashMap, HashSet},
-    convert::TryFrom,
     path::{Path, PathBuf},
 };
 
@@ -71,20 +70,16 @@ where
         })
     }
 
-    pub fn from_file_content(content: &[u8]) -> MrBundleResult<Self> {
-        Self::decode(&content)
-    }
-
-    pub fn to_file_content(&self) -> MrBundleResult<Vec<u8>> {
-        self.encode()
+    pub fn manifest(&self) -> &M {
+        &self.manifest
     }
 
     pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
-        Ok(Self::from_file_content(&crate::fs::read_file(path).await?)?)
+        Ok(Self::decode(&crate::fs::read(path).await?)?)
     }
 
     pub async fn write_to_file(&self, path: &Path) -> MrBundleResult<()> {
-        Ok(crate::fs::write_file(path, &self.to_file_content()?).await?)
+        Ok(crate::fs::write(path, &self.encode()?).await?)
     }
 
     pub async fn resolve(&self, location: &Location) -> MrBundleResult<ResourceBytes> {
@@ -154,6 +149,10 @@ mod tests {
     impl Manifest for TestManifest {
         fn locations(&self) -> Vec<Location> {
             self.0.clone()
+        }
+
+        fn path(&self) -> PathBuf {
+            unimplemented!()
         }
     }
 
