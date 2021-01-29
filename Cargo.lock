@@ -911,25 +911,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dna_util"
-version = "0.0.1"
-dependencies = [
- "holo_hash",
- "holochain",
- "holochain_serialized_bytes",
- "holochain_types",
- "holochain_zome_types",
- "mr_bundle",
- "serde",
- "serde_bytes",
- "serde_yaml",
- "structopt",
- "tempdir",
- "thiserror",
- "tokio 0.2.25",
-]
-
-[[package]]
 name = "doc-comment"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1367,6 +1348,25 @@ name = "hashbrown"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
+
+[[package]]
+name = "hc_bundle"
+version = "0.0.1"
+dependencies = [
+ "holo_hash",
+ "holochain",
+ "holochain_serialized_bytes",
+ "holochain_types",
+ "holochain_zome_types",
+ "mr_bundle",
+ "serde",
+ "serde_bytes",
+ "serde_yaml",
+ "structopt",
+ "tempdir",
+ "thiserror",
+ "tokio 0.2.25",
+]
 
 [[package]]
 name = "hdk3"

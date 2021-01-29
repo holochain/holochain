@@ -1,13 +1,14 @@
 [workspace]
 members = [
-  "crates/dna_util",
   "crates/fixt",
   "crates/fixt/test",
-  "crates/hc",
   "crates/hdk3",
   "crates/hdk3_derive",
   "crates/holo_hash",
   "crates/mr_bundle",
+
+  "crates/hc",
+  "crates/hc_bundle",
 
   "crates/holochain",
   "crates/holochain_cascade",
