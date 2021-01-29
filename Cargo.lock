@@ -2138,6 +2138,7 @@ dependencies = [
  "rmp-serde",
  "serde",
  "serde_json",
+ "sysinfo",
  "thiserror",
  "tokio",
  "tracing-subscriber",
@@ -2545,6 +2546,15 @@ name = "normalize-line-endings"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
+
+[[package]]
+name = "ntapi"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f6bb902e437b6d86e03cce10a7e2af662292c5dfef23b65899ea3ac9354ad44"
+dependencies = [
+ "winapi 0.3.9",
+]
 
 [[package]]
 name = "num-format"
@@ -3943,6 +3953,23 @@ dependencies = [
  "quote",
  "syn",
  "unicode-xid",
+]
+
+[[package]]
+name = "sysinfo"
+version = "0.15.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de94457a09609f33fec5e7fceaf907488967c6c7c75d64da6a7ce6ffdb8b5abd"
+dependencies = [
+ "cc",
+ "cfg-if 1.0.0",
+ "core-foundation-sys 0.8.2",
+ "doc-comment",
+ "libc",
+ "ntapi",
+ "once_cell",
+ "rayon",
+ "winapi 0.3.9",
 ]
 
 [[package]]
