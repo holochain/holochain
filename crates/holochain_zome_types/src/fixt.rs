@@ -6,10 +6,10 @@ use crate::element::Element;
 use crate::element::SignedHeaderHashed;
 use crate::entry::AppEntryBytes;
 use crate::entry_def::EntryVisibility;
-use crate::entry_def::*;
 use crate::header::*;
 use crate::link::LinkTag;
 use crate::migrate_agent::MigrateAgent;
+use crate::prelude::*;
 use crate::signature::Signature;
 use crate::timestamp::Timestamp;
 use crate::validate::RequiredValidationType;
@@ -24,6 +24,11 @@ use std::collections::BTreeMap;
 use std::collections::HashSet;
 
 pub use holo_hash::fixt::*;
+
+fixturator!(
+    ExternIO;
+    from Bytes;
+);
 
 fixturator!(
     Timestamp;

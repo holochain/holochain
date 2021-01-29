@@ -10,9 +10,9 @@ pub fn get<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: GetInput,
-) -> RibosomeResult<GetOutput> {
+) -> RibosomeResult<Option<Element>> {
     HostFnMetrics::count(HostFnMetrics::Get, 1);
-    let (hash, options) = input.into_inner();
+    let GetInput{ any_dht_hash, get_options } = input;
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
@@ -25,10 +25,10 @@ pub fn get<'a>(
             .write()
             .await
             .cascade(network)
-            .dht_get(hash, options)
+            .dht_get(any_dht_hash, get_options)
             .await?;
 
-        Ok(GetOutput::new(maybe_element))
+        Ok(maybe_element)
     })
 }
 

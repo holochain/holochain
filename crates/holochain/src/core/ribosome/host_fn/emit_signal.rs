@@ -8,12 +8,11 @@ use super::HostFnMetrics;
 pub fn emit_signal(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: EmitSignalInput,
-) -> RibosomeResult<EmitSignalOutput> {
+    input: AppSignal,
+) -> RibosomeResult<()> {
     HostFnMetrics::count(HostFnMetrics::EmitSignal, 1);
     let cell_id = call_context.host_access().cell_id().clone();
-    let bytes = input.into_inner();
-    let signal = Signal::App(cell_id, bytes);
+    let signal = Signal::App(cell_id, input);
     call_context.host_access().signal_tx().send(signal)?;
-    Ok(EmitSignalOutput::new(()))
+    Ok(())
 }

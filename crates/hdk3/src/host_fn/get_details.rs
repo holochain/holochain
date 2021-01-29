@@ -47,10 +47,6 @@ use crate::prelude::*;
 pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,
-) -> HdkResult<Option<Details>> {
-    Ok(host_call::<GetDetailsInput, GetDetailsOutput>(
-        __get_details,
-        &GetDetailsInput::new((hash.into(), options)),
-    )?
-    .into_inner())
+) -> ExternResult<Option<Details>> {
+    host_call::<GetInput, Option<Details>>(__get_details, GetInput::new(hash.into(), options))
 }

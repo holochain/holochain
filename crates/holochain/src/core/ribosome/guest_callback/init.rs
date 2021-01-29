@@ -47,15 +47,15 @@ impl Invocation for InitInvocation {
     fn fn_components(&self) -> FnComponents {
         vec!["init".into()].into()
     }
-    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
-        Ok(ExternInput::new(().try_into()?))
+    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
+        ExternIO::encode(())
     }
 }
 
-impl TryFrom<InitInvocation> for ExternInput {
+impl TryFrom<InitInvocation> for ExternIO {
     type Error = SerializedBytesError;
     fn try_from(_: InitInvocation) -> Result<Self, Self::Error> {
-        Ok(Self::new(().try_into()?))
+        Self::encode(())
     }
 }
 
@@ -101,10 +101,9 @@ mod test {
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
-    use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::init::InitCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::ExternIO;
 
     #[test]
     fn init_callback_result_fold() {
@@ -206,10 +205,7 @@ mod test {
 
         let host_input = init_invocation.clone().host_input().unwrap();
 
-        assert_eq!(
-            host_input,
-            ExternInput::new(SerializedBytes::try_from(()).unwrap()),
-        );
+        assert_eq!(host_input, ExternIO::encode(()).unwrap(),);
     }
 }
 

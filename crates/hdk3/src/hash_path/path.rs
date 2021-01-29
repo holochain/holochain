@@ -256,17 +256,17 @@ impl TryFrom<&LinkTag> for Path {
 
 impl Path {
     /// What is the hash for the current Path?
-    pub fn hash(&self) -> Result<holo_hash::EntryHash, HdkError> {
-        Ok(hash_entry(self)?)
+    pub fn hash(&self) -> ExternResult<holo_hash::EntryHash> {
+        hash_entry(Entry::try_from(self)?)
     }
 
     /// Does an entry exist at the hash we expect?
-    pub fn exists(&self) -> Result<bool, HdkError> {
+    pub fn exists(&self) -> ExternResult<bool> {
         Ok(get(self.hash()?, GetOptions::content())?.is_some())
     }
 
     /// Recursively touch this and every parent that doesn't exist yet.
-    pub fn ensure(&self) -> Result<(), HdkError> {
+    pub fn ensure(&self) -> ExternResult<()> {
         if !self.exists()? {
             create_entry(self)?;
             if let Some(parent) = self.parent() {
@@ -288,7 +288,7 @@ impl Path {
 
     /// Touch and list all the links from this anchor to anchors below it.
     /// Only returns links between anchors, not to other entries that might have their own links.
-    pub fn children(&self) -> Result<holochain_zome_types::link::Links, HdkError> {
+    pub fn children(&self) -> ExternResult<holochain_zome_types::link::Links> {
         Self::ensure(&self)?;
         let links = get_links(
             self.hash()?,
@@ -301,12 +301,12 @@ impl Path {
         Ok(holochain_zome_types::link::Links::from(unwrapped))
     }
 
-    pub fn children_details(&self) -> Result<holochain_zome_types::link::LinkDetails, HdkError> {
+    pub fn children_details(&self) -> ExternResult<holochain_zome_types::link::LinkDetails> {
         Self::ensure(&self)?;
-        Ok(get_link_details(
+        get_link_details(
             self.hash()?,
             Some(holochain_zome_types::link::LinkTag::new(NAME)),
-        )?)
+        )
     }
 }
 
