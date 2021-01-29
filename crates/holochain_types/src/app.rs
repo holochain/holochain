@@ -3,7 +3,6 @@
 pub mod app_manifest;
 
 use crate::dna::{DnaFile, YamlProperties};
-use app_manifest::AppManifest;
 use derive_more::Into;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::SerializedBytes;
@@ -41,38 +40,7 @@ pub struct RegisterDnaPayload {
 
 /// A collection of [DnaHash]es paired with an [AgentPubKey] and an app id
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(untagged)]
-pub enum InstallAppPayload {
-    /// Used to specify DNAs on-the-fly
-    Explicit(InstallAppPayloadNormalized),
-    /// Used to specify DNAs per a bundle file
-    Bundle {
-        /// The agent to use when creating Cells for this App
-        _agent_key: AgentPubKey,
-
-        /// The DNA bundle manifest for this app
-        // TODO: this will probably actually be a file path or raw file data
-        //       that gets deserialized
-        _dna_bundle: AppManifest,
-    },
-}
-
-impl InstallAppPayload {
-    /// Collapse the two variants down to a common normalized structure
-    pub fn normalize(self) -> InstallAppPayloadNormalized {
-        match self {
-            InstallAppPayload::Explicit(payload) => payload,
-            InstallAppPayload::Bundle {
-                _agent_key,
-                _dna_bundle,
-            } => todo!(),
-        }
-    }
-}
-
-/// A normalized structure common to both variants of InstallAppPayload
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct InstallAppPayloadNormalized {
+pub struct InstallAppPayload {
     /// The unique identifier for an installed app in this conductor
     pub installed_app_id: InstalledAppId,
 
@@ -81,12 +49,6 @@ pub struct InstallAppPayloadNormalized {
 
     /// The Dna paths in this app
     pub dnas: Vec<InstallAppDnaPayload>,
-}
-
-impl From<InstallAppPayloadNormalized> for InstallAppPayload {
-    fn from(p: InstallAppPayloadNormalized) -> Self {
-        InstallAppPayload::Explicit(p)
-    }
 }
 
 /// Information needed to specify a Dna as part of an App

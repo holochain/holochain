@@ -214,9 +214,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
                 }
                 break;
             }
-            Err(e) => {
-                error!(error = &e as &dyn std::error::Error)
-            }
+            Err(e) => error!(error = &e as &dyn std::error::Error),
             Ok(()) => {}
         }
     }
@@ -365,7 +363,7 @@ pub mod test {
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_types::test_utils::fake_dna_zomes;
-    use holochain_types::{app::InstallAppDnaPayload, prelude::InstallAppPayloadNormalized};
+    use holochain_types::{app::InstallAppDnaPayload, prelude::InstallAppPayload};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
     use holochain_zome_types::cell::CellId;
@@ -459,12 +457,11 @@ pub mod test {
         let dna_payload =
             InstallAppDnaPayload::path_only("some$\\//weird00=-+[] \\Path".into(), "".to_string());
         let agent_key = fake_agent_pubkey_1();
-        let payload = InstallAppPayloadNormalized {
+        let payload = InstallAppPayload {
             dnas: vec![dna_payload],
             installed_app_id: "test app".to_string(),
             agent_key,
-        }
-        .into();
+        };
         let msg = AdminRequest::InstallApp(Box::new(payload));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {

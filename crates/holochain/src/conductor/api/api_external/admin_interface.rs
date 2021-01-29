@@ -111,13 +111,12 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::DnaRegistered(hash))
             }
             InstallApp(payload) => {
-                let payload = payload.normalize();
                 trace!(?payload.dnas);
-                let InstallAppPayloadNormalized {
+                let InstallAppPayload {
                     installed_app_id,
                     agent_key,
                     dnas,
-                } = payload;
+                } = *payload;
 
                 // Install Dnas
                 let tasks = dnas.into_iter().map(|dna_payload| async {
@@ -434,12 +433,11 @@ mod test {
         // attempt install with a hash before the DNA has been registered
         let dna_hash = dna.dna_hash();
         let hash_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
-        let hash_install_payload: InstallAppPayload = InstallAppPayloadNormalized {
+        let hash_install_payload = InstallAppPayload {
             dnas: vec![hash_payload],
             installed_app_id: "test-by-hash".to_string(),
             agent_key: agent_key1,
-        }
-        .into();
+        };
         let install_response = admin_api
             .handle_admin_request(AdminRequest::InstallApp(Box::new(
                 hash_install_payload.clone(),
@@ -458,7 +456,7 @@ mod test {
             installed_app_id: "test-by-path".to_string(),
             cell_data: vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
         };
-        let path_install_payload: InstallAppPayload = InstallAppPayloadNormalized {
+        let path_install_payload: InstallAppPayload = InstallAppPayload {
             dnas: vec![path_payload],
             installed_app_id: "test".to_string(),
             agent_key: agent_key2,
