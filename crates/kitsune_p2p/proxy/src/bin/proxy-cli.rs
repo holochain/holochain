@@ -2,7 +2,7 @@ use futures::stream::StreamExt;
 use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
 use kitsune_p2p_types::dependencies::ghost_actor;
-use kitsune_p2p_types::metric_task;
+use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::transport::*;
 use structopt::StructOpt;
 
@@ -44,7 +44,7 @@ async fn inner() -> TransportResult<()> {
     let (listener, mut events) =
         spawn_kitsune_proxy_listener(proxy_config, listener, events).await?;
 
-    metric_task!(async move {
+    metric_task(async move {
         while let Some(evt) = events.next().await {
             match evt {
                 TransportEvent::IncomingChannel(url, mut write, read) => {
@@ -54,6 +54,7 @@ async fn inner() -> TransportResult<()> {
                 }
             }
         }
+        <Result<(), ()>>::Ok(())
     });
 
     let proxy_url = ProxyUrl::from(&opt.proxy_url);

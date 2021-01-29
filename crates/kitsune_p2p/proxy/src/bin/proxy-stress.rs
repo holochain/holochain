@@ -4,7 +4,7 @@ use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
 use kitsune_p2p_types::{
     dependencies::{ghost_actor, url2},
-    metric_task,
+    metrics::metric_task,
     transport::*,
     transport_mem::*,
 };
@@ -121,7 +121,7 @@ async fn inner() -> TransportResult<()> {
     let proxy_url = listener.bound_url().await?;
     println!("Proxy Url: {}", proxy_url);
 
-    metric_task!(async move {
+    metric_task(async move {
         while let Some(evt) = events.next().await {
             match evt {
                 TransportEvent::IncomingChannel(url, mut write, _read) => {
@@ -130,12 +130,13 @@ async fn inner() -> TransportResult<()> {
                 }
             }
         }
+        <Result<(), ()>>::Ok(())
     });
 
     let (metric_send, mut metric_recv) =
         futures::channel::mpsc::channel((opt.node_count + 10) as usize);
 
-    metric_task!({
+    metric_task({
         let mut metric_send = metric_send.clone();
         async move {
             loop {
@@ -149,7 +150,7 @@ async fn inner() -> TransportResult<()> {
         }
     });
 
-    metric_task!(async move {
+    metric_task(async move {
         let mut last_disp = std::time::Instant::now();
         let mut rtime = Vec::new();
         while let Some(metric) = metric_recv.next().await {
@@ -165,13 +166,14 @@ async fn inner() -> TransportResult<()> {
                 println!("Avg Request Overhead ({} requests): {} ms", cnt, avg);
             }
         }
+        <Result<(), ()>>::Ok(())
     });
 
     let (_con, con_url) = gen_client(opt.clone(), proxy_url.clone()).await?;
     println!("Responder Url: {}", con_url);
 
     for _ in 0..opt.node_count {
-        metric_task!(client_loop(
+        metric_task(client_loop(
             opt.clone(),
             proxy_url.clone(),
             con_url.clone(),
@@ -191,20 +193,25 @@ async fn gen_client(
 
     let con_url = con.bound_url().await?;
 
-    metric_task!({
+    metric_task(async move {
         let process_delay_ms = opt.process_delay_ms as u64;
-        events.for_each_concurrent(
-            /* limit */ (opt.node_count + 10) as usize,
-            move |evt| async move {
-                match evt {
-                    TransportEvent::IncomingChannel(_url, mut write, _read) => {
-                        tokio::time::delay_for(std::time::Duration::from_millis(process_delay_ms))
+        events
+            .for_each_concurrent(
+                /* limit */ (opt.node_count + 10) as usize,
+                move |evt| async move {
+                    match evt {
+                        TransportEvent::IncomingChannel(_url, mut write, _read) => {
+                            tokio::time::delay_for(std::time::Duration::from_millis(
+                                process_delay_ms,
+                            ))
                             .await;
-                        let _ = write.write_and_close(b"".to_vec()).await;
+                            let _ = write.write_and_close(b"".to_vec()).await;
+                        }
                     }
-                }
-            },
-        )
+                },
+            )
+            .await;
+        <Result<(), ()>>::Ok(())
     });
 
     Ok((con, con_url))

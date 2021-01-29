@@ -16,16 +16,21 @@ static RX_BYTES_PER_SEC: AtomicU64 = AtomicU64::new(0);
 
 /// Spawns a tokio task with given future/async block.
 /// Captures a new TaskCounter instance to track task count.
-#[macro_export]
-macro_rules! metric_task {
-    ($task:expr) => {{
-        let counter = $crate::metrics::MetricTaskCounter::new();
-        let fut = { $task };
-        $crate::dependencies::tokio::task::spawn(async move {
-            let _counter = counter;
-            fut.await
-        })
-    }};
+pub fn metric_task<T, E, F>(f: F) -> tokio::task::JoinHandle<Result<T, E>>
+where
+    T: 'static + Send,
+    E: 'static + Send + std::fmt::Debug,
+    F: 'static + Send + std::future::Future<Output = Result<T, E>>,
+{
+    let counter = MetricTaskCounter::new();
+    tokio::task::spawn(async move {
+        let _counter = counter;
+        let res = f.await;
+        if let Err(e) = &res {
+            ghost_actor::dependencies::tracing::error!(?e, "METRIC TASK ERROR");
+        }
+        res
+    })
 }
 
 /// System Info.
@@ -74,7 +79,7 @@ pub fn init_sys_info_poll() {
     }
 
     SYS_INFO.call_once(|| {
-        metric_task!(async move {
+        metric_task(async move {
             let mut system = sysinfo::System::new_with_specifics(
                 sysinfo::RefreshKind::new()
                     .with_networks()
@@ -110,6 +115,10 @@ pub fn init_sys_info_poll() {
 
                 tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
             }
+
+            // this is needed for type-ing the block, but will never return
+            #[allow(unreachable_code)]
+            <Result<(), ()>>::Ok(())
         });
     });
 }
@@ -155,8 +164,9 @@ pub fn metric_task_count() -> usize {
 #[tokio::test(threaded_scheduler)]
 async fn test_metric_task() {
     for _ in 0..20 {
-        metric_task!(async move {
+        metric_task(async move {
             tokio::time::delay_for(std::time::Duration::from_millis(3)).await;
+            <Result<(), ()>>::Ok(())
         });
     }
     let gt_task_count = metric_task_count();

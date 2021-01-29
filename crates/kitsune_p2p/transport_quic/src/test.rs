@@ -20,7 +20,7 @@ mod tests {
             .await
             .unwrap();
 
-        metric_task!(async move {
+        metric_task(async move {
             while let Some(evt) = events2.next().await {
                 match evt {
                     TransportEvent::IncomingChannel(url, mut write, read) => {
@@ -61,7 +61,7 @@ mod tests {
             .await
             .unwrap();
 
-        metric_task!(async move {
+        metric_task(async move {
             while let Some(evt) = events2.next().await {
                 match evt {
                     TransportEvent::IncomingChannel(_url, mut write, read) => {

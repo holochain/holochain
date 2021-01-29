@@ -20,7 +20,7 @@ fn tx_bi_chan(
 ) -> (TransportChannelWrite, TransportChannelRead) {
     let (write_send, mut write_recv) = futures::channel::mpsc::channel::<Vec<u8>>(10);
     let write_send = write_send.sink_map_err(TransportError::other);
-    metric_task!(async move {
+    metric_task(async move {
         while let Some(data) = write_recv.next().await {
             bi_send
                 .write_all(&data)
@@ -31,7 +31,7 @@ fn tx_bi_chan(
         TransportResult::Ok(())
     });
     let (mut read_send, read_recv) = futures::channel::mpsc::channel::<Vec<u8>>(10);
-    metric_task!(async move {
+    metric_task(async move {
         let mut buf = [0_u8; 4096];
         while let Some(read) = bi_recv
             .read(&mut buf)
@@ -171,7 +171,7 @@ impl ListenerInnerHandler for TransportListenerQuic {
 
             // pass any incoming channels off to our actor
             let url_clone = url.clone();
-            metric_task!(async move {
+            metric_task(async move {
                 while let Some(Ok((bi_send, bi_recv))) = bi_streams.next().await {
                     let (write, read) = tx_bi_chan(bi_send, bi_recv);
                     if incoming_channel_sender
@@ -186,6 +186,7 @@ impl ListenerInnerHandler for TransportListenerQuic {
                         break;
                     }
                 }
+                <Result<(), ()>>::Ok(())
             });
 
             Ok(out.map(move |(write, read)| (url, write, read)))
@@ -298,7 +299,7 @@ pub async fn spawn_transport_listener_quic(
     let sender = builder.channel_factory().create_channel().await?;
 
     let i_s = internal_sender.clone();
-    metric_task!(async move {
+    metric_task(async move {
         incoming
             .for_each_concurrent(10, |maybe_con| async {
                 let res: TransportResult<()> = async {
@@ -352,7 +353,7 @@ pub async fn spawn_transport_listener_quic(
         connections: HashMap::new(),
     };
 
-    metric_task!(builder.spawn(actor));
+    metric_task(builder.spawn(actor));
 
     Ok((sender, receiver))
 }

@@ -8,7 +8,7 @@ pub mod dependencies {
 }
 
 use kitsune_p2p_types::dependencies::url2::*;
-use kitsune_p2p_types::metric_task;
+use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::transport::TransportResult;
 use std::net::SocketAddr;
 

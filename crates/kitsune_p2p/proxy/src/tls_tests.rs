@@ -29,7 +29,7 @@ async fn tls_server_and_client_inner() -> TransportResult<()> {
 
     let (in_con_send, mut in_con_recv) = futures::channel::mpsc::channel::<TransportEvent>(10);
 
-    metric_task!(async move {
+    metric_task(async move {
         while let Some(evt) = in_con_recv.next().await {
             match evt {
                 TransportEvent::IncomingChannel(_url, mut send, recv) => {

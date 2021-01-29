@@ -53,17 +53,19 @@ pub async fn spawn_kitsune_proxy_listener(
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
 
     // spawn the actor
-    metric_task!(builder.spawn(
-        InnerListen::new(
-            i_s.clone(),
-            this_url,
-            tls,
-            accept_proxy_cb,
-            sub_sender,
-            evt_send,
-        )
-        .await?,
-    ));
+    metric_task(
+        builder.spawn(
+            InnerListen::new(
+                i_s.clone(),
+                this_url,
+                tls,
+                accept_proxy_cb,
+                sub_sender,
+                evt_send,
+            )
+            .await?,
+        ),
+    );
 
     // if we want to be proxied, we need to connect to our proxy
     // and manage that connection contract
@@ -78,7 +80,7 @@ pub async fn spawn_kitsune_proxy_listener(
 
         // Set up a timer to refresh our proxy contract at keepalive interval
         let i_s_c = i_s.clone();
-        metric_task!(async move {
+        metric_task(async move {
             loop {
                 tokio::time::delay_for(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS)).await;
 
@@ -96,18 +98,20 @@ pub async fn spawn_kitsune_proxy_listener(
                 }
             }
             tracing::error!("Keep alive closed");
+            <Result<(), ()>>::Ok(())
         });
     }
 
     // handle incoming channels from our sub transport
-    metric_task!(async move {
+    metric_task(async move {
         while let Some(evt) = sub_receiver.next().await {
             match evt {
                 TransportEvent::IncomingChannel(url, write, read) => {
                     // spawn so we can process incoming requests in parallel
                     let i_s = i_s.clone();
-                    metric_task!(async move {
+                    metric_task(async move {
                         let _ = i_s.incoming_channel(url, write, read).await;
+                        <Result<(), ()>>::Ok(())
                     });
                 }
             }
@@ -235,7 +239,7 @@ fn cross_join_channel_forward(
     mut write: futures::channel::mpsc::Sender<ProxyWire>,
     mut read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) {
-    metric_task!(async move {
+    metric_task(async move {
         while let Some(msg) = read.next().await {
             // do we need to inspect these??
             // for now just forwarding everything
