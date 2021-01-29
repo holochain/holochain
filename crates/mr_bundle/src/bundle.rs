@@ -4,7 +4,7 @@ use crate::{
     error::{BundleError, BundleResult, MrBundleError, MrBundleResult},
     location::Location,
     manifest::Manifest,
-    resource::Resource,
+    resource::{ResourceBytes, ResourceData},
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -21,13 +21,12 @@ use std::{
 // NB: It would be so nice if this were Deserializable, but there are problems
 // with using the derive macro here.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Bundle<M, R>
+pub struct Bundle<M>
 where
     M: Manifest,
-    R: Resource,
 {
     manifest: M,
-    resources: HashMap<Location, R>,
+    resources: HashMap<PathBuf, ResourceBytes>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -38,38 +37,9 @@ struct BundleSerialized {
     resources: Vec<u8>,
 }
 
-impl<M, R> TryFrom<&Bundle<M, R>> for BundleSerialized
+impl<M> Bundle<M>
 where
     M: Manifest,
-    R: Resource,
-{
-    type Error = MrBundleError;
-    fn try_from(bundle: &Bundle<M, R>) -> MrBundleResult<BundleSerialized> {
-        Ok(Self {
-            manifest: crate::encode(&bundle.manifest)?,
-            resources: crate::encode(&bundle.resources)?,
-        })
-    }
-}
-
-impl<M, R> TryFrom<&BundleSerialized> for Bundle<M, R>
-where
-    M: Manifest,
-    R: Resource,
-{
-    type Error = MrBundleError;
-    fn try_from(bundle: &BundleSerialized) -> MrBundleResult<Bundle<M, R>> {
-        Ok(Self {
-            manifest: crate::decode(&bundle.manifest)?,
-            resources: crate::decode(&bundle.resources)?,
-        })
-    }
-}
-
-impl<M, R> Bundle<M, R>
-where
-    M: Manifest,
-    R: Resource,
 {
     /// Creates a bundle containing a manifest and a collection of resources to
     /// be bundled together with the manifest.
@@ -77,7 +47,7 @@ where
     /// The paths paired with each resource must correspond to the set of
     /// `Location::Bundle`s specified in the `Manifest::location()`, or else
     /// this is not a valid bundle.
-    pub fn new(manifest: M, resources: Vec<(PathBuf, R)>) -> BundleResult<Self> {
+    pub fn new(manifest: M, resources: Vec<(PathBuf, ResourceBytes)>) -> BundleResult<Self> {
         let manifest_paths: HashSet<_> = manifest
             .locations()
             .into_iter()
@@ -94,11 +64,7 @@ where
             }
         }
 
-        let resources = resources
-            .into_iter()
-            .map(|(path, res)| (Location::Bundled(path), res))
-            .collect();
-
+        let resources = resources.into_iter().collect();
         Ok(Self {
             manifest,
             resources,
@@ -106,40 +72,41 @@ where
     }
 
     pub fn from_file_content(content: &[u8]) -> MrBundleResult<Self> {
-        let data: BundleSerialized = crate::decode(content)?;
-        Self::try_from(&data)
+        Self::decode(&content)
     }
 
     pub fn to_file_content(&self) -> MrBundleResult<Vec<u8>> {
-        let data = BundleSerialized::try_from(self)?;
-        crate::encode(&data)
+        self.encode()
     }
 
-    pub fn read_from_file(path: &Path) -> MrBundleResult<Self> {
-        Ok(Self::from_file_content(&std::fs::read(path)?)?)
+    #[cfg(feature = "io-tokio")]
+    pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
+        Ok(Self::from_file_content(&tokio::fs::read(path).await?)?)
     }
 
-    pub fn write_to_file(&self, path: &Path) -> MrBundleResult<()> {
-        Ok(std::fs::write(path, self.to_file_content()?)?)
+    #[cfg(feature = "io-tokio")]
+    pub async fn write_to_file(&self, path: &Path) -> MrBundleResult<()> {
+        Ok(tokio::fs::write(path, self.to_file_content()?).await?)
     }
 
-    pub async fn resolve(&self, location: &Location) -> MrBundleResult<R> {
-        Ok(match location {
+    pub async fn resolve(&self, location: &Location) -> MrBundleResult<ResourceBytes> {
+        let bytes = match location {
             Location::Bundled(path) => self
                 .resources
-                .get(location)
+                .get(path)
                 .cloned()
                 .ok_or_else(|| BundleError::BundledResourceMissing(path.clone()))?,
-            Location::Path(path) => crate::decode(&crate::location::resolve_local(path).await?)?,
-            Location::Url(url) => crate::decode(&crate::location::resolve_remote(url).await?)?,
-        })
+            Location::Path(path) => crate::location::resolve_local(path).await?,
+            Location::Url(url) => crate::location::resolve_remote(url).await?,
+        };
+        Ok(bytes)
     }
 
     /// Return the full set of resources specified by this bundle's manifest.
     /// Bundled resources can be returned directly, while all others will be
     /// fetched from the filesystem or the internet.
-    pub async fn resolve_all(&self) -> MrBundleResult<HashMap<Location, R>> {
-        let resources: HashMap<Location, R> = futures::future::join_all(
+    pub async fn resolve_all(&self) -> MrBundleResult<HashMap<Location, ResourceBytes>> {
+        let resources: HashMap<Location, ResourceBytes> = futures::future::join_all(
             self.manifest
                 .locations()
                 .into_iter()
@@ -155,7 +122,7 @@ where
     /// Access the map of resources included in this bundle
     /// Bundled resources are also accessible via `resolve` or `resolve_all`,
     /// but using this method prevents a Clone
-    pub fn bundled_resources(&self) -> &HashMap<Location, R> {
+    pub fn bundled_resources(&self) -> &HashMap<PathBuf, ResourceBytes> {
         &self.resources
     }
 
@@ -201,10 +168,10 @@ mod tests {
             Location::Bundled("1.thing".into()),
             Location::Bundled("2.thing".into()),
         ]);
-        assert!(Bundle::new(manifest.clone(), vec![("1.thing".into(), Thing(1))]).is_ok());
+        assert!(Bundle::new(manifest.clone(), vec![("1.thing".into(), vec![1])]).is_ok());
 
         assert_eq!(
-            Bundle::new(manifest, vec![("3.thing".into(), Thing(3))]),
+            Bundle::new(manifest, vec![("3.thing".into(), vec![3])]),
             Err(BundleError::BundledPathNotInManifest("3.thing".into()))
         );
     }

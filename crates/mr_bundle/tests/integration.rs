@@ -1,6 +1,5 @@
-use std::{collections::HashSet, path::PathBuf};
-
 use mr_bundle::{Bundle, Location, Manifest};
+use std::{collections::HashSet, path::PathBuf};
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "manifest_version")]
@@ -38,13 +37,15 @@ struct Thing(String);
 async fn resource_resolution() -> anyhow::Result<()> {
     let dir = tempdir::TempDir::new("mr_bundle")?;
 
-    // Write a Resource to disk
+    // Write a ResourceBytes to disk
     let local_thing = Thing("local".into());
+    let local_thing_encoded = mr_bundle::encode(&local_thing)?;
     let local_path = dir.path().join("local.thing");
     std::fs::write(&local_path, mr_bundle::encode(&local_thing)?)?;
 
-    let bundled_path = PathBuf::from("bundled.thing");
     let bundled_thing = Thing("bundled".into());
+    let bundled_thing_encoded = mr_bundle::encode(&bundled_thing)?;
+    let bundled_path = PathBuf::from("bundled.thing");
 
     // Create a Manifest that references these resources
     let bundled_location = Location::Bundled(bundled_path.clone());
@@ -62,13 +63,17 @@ async fn resource_resolution() -> anyhow::Result<()> {
     });
 
     // Put the bundled resource into a Bundle (excluding the local resource)
-    let bundle = Bundle::new(manifest, vec![(bundled_path, bundled_thing.clone())]).unwrap();
+    let bundle = Bundle::new(
+        manifest,
+        vec![(bundled_path.clone(), bundled_thing_encoded.clone())],
+    )
+    .unwrap();
     assert_eq!(
         bundle
             .bundled_resources()
             .iter()
-            .collect::<HashSet<(&Location, &Thing)>>(),
-        maplit::hashset![(&bundled_location, &bundled_thing)]
+            .collect::<HashSet<(&PathBuf, &Vec<u8>)>>(),
+        maplit::hashset![(&bundled_path, &bundled_thing_encoded)]
     );
 
     assert_eq!(
@@ -77,19 +82,12 @@ async fn resource_resolution() -> anyhow::Result<()> {
             .await
             .unwrap()
             .iter()
-            .collect::<HashSet<(&Location, &Thing)>>(),
+            .collect::<HashSet<(&Location, &Vec<u8>)>>(),
         maplit::hashset![
-            (&bundled_location, &bundled_thing),
-            (&local_location, &local_thing)
+            (&bundled_location, &bundled_thing_encoded),
+            (&local_location, &local_thing_encoded)
         ]
     );
-
-    // Ensure that bundle writing and reading are inverses
-    bundle
-        .write_to_file(&dir.path().join("bundle.bundle"))
-        .unwrap();
-    let bundle_file = Bundle::read_from_file(&dir.path().join("bundle.bundle")).unwrap();
-    assert_eq!(bundle, bundle_file);
 
     // Ensure that the bundle is serializable and writable
     let bundled_path = dir.path().join("test.bundle");
@@ -97,8 +95,21 @@ async fn resource_resolution() -> anyhow::Result<()> {
     std::fs::write(&bundled_path, bundle_bytes)?;
 
     // Ensure that it is also readable and deserializable
-    let decoded_bundle: Bundle<_, _> = Bundle::decode(&std::fs::read(bundled_path)?)?;
+    let decoded_bundle: Bundle<_> = Bundle::decode(&std::fs::read(bundled_path)?)?;
     assert_eq!(bundle, decoded_bundle);
+
+    // Ensure that bundle writing and reading are inverses
+    #[cfg(feature = "io-tokio")]
+    {
+        bundle
+            .write_to_file(&dir.path().join("bundle.bundle"))
+            .await
+            .unwrap();
+        let bundle_file = Bundle::read_from_file(&dir.path().join("bundle.bundle"))
+            .await
+            .unwrap();
+        assert_eq!(bundle, bundle_file);
+    }
 
     Ok(())
 }

@@ -80,7 +80,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                         zome: zome.clone(),
                         cap: Some(CAP.lock().unwrap().clone()),
                         fn_name: "echo_bytes".into(),
-                        payload: ExternIO::encode(bytes).unwrap(),
+                        payload: ExternIO::encode(bytes.clone()).unwrap(),
                         provenance: AGENT_KEY.lock().unwrap().clone(),
                     };
                     REAL_RIBOSOME
