@@ -1,6 +1,7 @@
 use super::Bundle;
 use crate::{
     error::{ExplodeError, ExplodeResult, ImplodeError, MrBundleResult},
+    util::prune_path,
     Manifest,
 };
 use std::path::{Path, PathBuf};
@@ -11,7 +12,11 @@ impl<M: Manifest> Bundle<M> {
     /// The paths of the resources are specified by the paths of the bundle,
     /// and the path of the manifest file is specified by the `Manifest::path`
     /// trait method implementation of the `M` type.
-    pub async fn explode_yaml(&self, base_path: &Path) -> ExplodeResult<()> {
+    pub async fn explode_yaml(&self, base_path: &Path) -> MrBundleResult<()> {
+        self.explode_yaml_inner(base_path).await.map_err(Into::into)
+    }
+
+    async fn explode_yaml_inner(&self, base_path: &Path) -> ExplodeResult<()> {
         crate::fs::create_dir_all(base_path).await?;
         let base_path = base_path.canonicalize()?;
         crate::fs::create_dir_all(&base_path).await?;
@@ -41,13 +46,7 @@ impl<M: Manifest> Bundle<M> {
             .map_err(|err| ImplodeError::BadManifestPath(manifest_path.clone(), err))?;
         let manifest: M = serde_yaml::from_str(&manifest_yaml).map_err(ExplodeError::from)?;
         let manifest_relative_path = manifest.path();
-        let base_path =
-            prune_path(manifest_path.clone(), &manifest_relative_path).ok_or_else(|| {
-                ExplodeError::ManifestPathSuffixMismatch(
-                    manifest_path,
-                    manifest_relative_path.clone(),
-                )
-            })?;
+        let base_path = prune_path(manifest_path.clone(), &manifest_relative_path)?;
         let resources = futures::future::join_all(manifest.bundled_paths().into_iter().map(
             |relative_path| async {
                 let resource_path = base_path.join(&relative_path);
@@ -63,18 +62,6 @@ impl<M: Manifest> Bundle<M> {
     }
 }
 
-/// Removes a subpath suffix from a path
-fn prune_path<P: AsRef<Path>>(mut path: PathBuf, subpath: P) -> Option<PathBuf> {
-    if path.ends_with(&subpath) {
-        for _ in subpath.as_ref().components() {
-            let _ = path.pop();
-        }
-        Some(path)
-    } else {
-        None
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -82,8 +69,18 @@ mod tests {
     #[test]
     fn test_pruning() {
         let path = PathBuf::from("/a/b/c/d");
-        assert_eq!(prune_path(path.clone(), "d"), Some(PathBuf::from("/a/b/c")));
-        assert_eq!(prune_path(path.clone(), "b/c/d"), Some(PathBuf::from("/a")));
-        assert_eq!(prune_path(path.clone(), "a/c"), None);
+        assert_eq!(
+            prune_path(path.clone(), "d").unwrap(),
+            PathBuf::from("/a/b/c")
+        );
+        assert_eq!(
+            prune_path(path.clone(), "b/c/d").unwrap(),
+            PathBuf::from("/a")
+        );
+        assert_matches::assert_matches!(
+            prune_path(path.clone(), "a/c"),
+            Err(ExplodeError::ManifestPathSuffixMismatch(abs, rel))
+            if abs == path && rel == PathBuf::from("a/c")
+        );
     }
 }

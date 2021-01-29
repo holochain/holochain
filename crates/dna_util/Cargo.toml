@@ -16,6 +16,7 @@ holochain = { path = "../holochain" }
 holochain_serialized_bytes = "0.0.47"
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
 holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
+mr_bundle = {version = "0.0.1", path = "../mr_bundle"}
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 serde_yaml = "0.8"

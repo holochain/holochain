@@ -5,7 +5,7 @@ use holochain_zome_types::zome::ZomeName;
 use thiserror::Error;
 
 /// Holochain DnaError type.
-#[derive(Clone, Debug, Error)]
+#[derive(Debug, Error)]
 pub enum DnaError {
     /// ZomeNotFound
     #[error("Zome not found: {0}")]
@@ -28,7 +28,7 @@ pub enum DnaError {
     ZomeFunctionNotFound(String),
 
     /// SerializedBytesError
-    #[error("SerializedBytesError: {0}")]
+    #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
 
     /// std::io::Error

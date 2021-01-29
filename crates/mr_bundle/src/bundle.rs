@@ -131,6 +131,23 @@ where
     pub fn decode(bytes: &[u8]) -> MrBundleResult<Self> {
         crate::decode(bytes)
     }
+
+    /// Given that the Manifest is located at the given absolute `path`, find
+    /// the absolute root directory for the "exploded" Bundle directory.
+    /// Useful when "imploding" a directory into a bundle to determine the
+    /// default location of the generated Bundle file.
+    ///
+    /// This will only be different than the Manifest path itself if the
+    /// Manifest::path impl specifies a nested path.
+    ///
+    /// Will return None if the `path` does not actually end with the
+    /// manifest relative path, meaning that either the manifest file is
+    /// misplaced within the exploded directory, or an incorrect path was
+    /// supplied.
+    #[cfg(feature = "exploding")]
+    pub fn find_root_dir(&self, path: &Path) -> MrBundleResult<PathBuf> {
+        crate::util::prune_path(path.into(), self.manifest.path()).map_err(Into::into)
+    }
 }
 
 #[cfg(test)]

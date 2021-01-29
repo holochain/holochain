@@ -40,8 +40,12 @@
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::zome::ZomeName;
-use std::collections::BTreeMap;
+use mr_bundle::error::MrBundleError;
 use std::path::PathBuf;
+use std::{collections::BTreeMap, path::Path};
+use tokio::fs;
+
+pub const BUNDLE_EXT: &str = ".dna";
 
 /// DnaUtilError type.
 #[derive(Debug, thiserror::Error)]
@@ -58,6 +62,10 @@ pub enum DnaUtilError {
     #[error("DNA error: {0}")]
     DnaError(#[from] holochain_types::dna::DnaError),
 
+    /// MrBundleError
+    #[error(transparent)]
+    MrBundleError(#[from] mr_bundle::error::MrBundleError),
+
     /// SerializedBytesError
     #[error("Internal serialization error: {0}")]
     SerializedBytesError(#[from] SerializedBytesError),
@@ -73,105 +81,62 @@ pub enum DnaUtilError {
     /// anything else
     #[error("Unknown error: {0}")]
     MiscError(#[from] Box<dyn std::error::Error + Send + Sync>),
+
+    #[error("This file should have a '{}' extension: {0}", BUNDLE_EXT)]
+    FileExtensionMissing(PathBuf),
 }
 
 /// DnaUtil Result type.
 pub type DnaUtilResult<T> = Result<T, DnaUtilError>;
 
-/// internal convert between dna_file_path and dna_work_dir
-fn dna_file_path_convert(
-    dna_file_path: &impl AsRef<std::path::Path>,
-    to_work_dir: bool,
-) -> DnaUtilResult<std::path::PathBuf> {
-    let dna_file_path = dna_file_path.as_ref();
+/// Expand a DnaFile into a working directory
+pub async fn expand(
+    bundle_path: &impl AsRef<std::path::Path>,
+    target_dir: Option<&Path>,
+) -> DnaUtilResult<()> {
+    let bundle_path = bundle_path.as_ref().canonicalize()?;
+    let bundle: DnaBundle = mr_bundle::Bundle::read_from_file(&bundle_path)
+        .await?
+        .into();
 
-    let tmp_lossy = dna_file_path.to_string_lossy();
-    if to_work_dir {
-        if !tmp_lossy.ends_with(".dna.gz") {
-            return Err(DnaUtilError::InvalidInput(format!(
-                "bad extract path, dna files must end with '.dna.gz': {}",
-                dna_file_path.display()
-            )));
-        }
-    } else if !tmp_lossy.ends_with(".dna.workdir") {
-        return Err(DnaUtilError::InvalidInput(format!(
-            "bad compile path, work dirs must end with '.dna.workdir': {}",
-            dna_file_path.display()
-        )));
-    }
-
-    let filename = dna_file_path
-        .file_name()
-        .ok_or_else(|| {
-            DnaUtilError::InvalidInput(format!(
-                "could not extract filename from: {}",
-                dna_file_path.display()
-            ))
-        })?
-        .to_string_lossy();
-
-    let new_name = if to_work_dir {
-        let filename_base = &filename[..filename.len() - 7];
-        format!("{}.dna.workdir", filename_base)
+    let target_dir = if let Some(d) = target_dir {
+        d.to_owned()
     } else {
-        let filename_base = &filename[..filename.len() - 12];
-        format!("{}.dna.gz", filename_base)
+        bundle_path_to_dir(&bundle_path)?
     };
 
-    let mut dir = std::path::PathBuf::new();
-    dir.push(dna_file_path);
-    dir.set_file_name(new_name);
-
-    Ok(dir)
-}
-
-/// Expand a DnaFile into a Dna Working Directory
-pub async fn expand(dna_file_path: &impl AsRef<std::path::Path>) -> DnaUtilResult<()> {
-    let dna_file_path = dna_file_path.as_ref().canonicalize()?;
-    let dir = dna_file_path_convert(&dna_file_path, true)?;
-    tokio::fs::create_dir_all(&dir).await?;
-
-    let dna_file = DnaFile::from_file_content(&tokio::fs::read(dna_file_path).await?).await?;
-
-    for (zome_name, zome) in &dna_file.dna().zomes {
-        let wasm_hash = &zome.wasm_hash(zome_name)?;
-        let wasm = dna_file.code().get(wasm_hash).expect("dna_file corrupted");
-        let mut wasm_filename = dir.clone();
-        wasm_filename.push(format!("{}.wasm", zome_name));
-        tokio::fs::write(wasm_filename, &*wasm.code()).await?;
-    }
-
-    // Might be more efficient to extract the DnaDef / Wasm from the DnaFile
-    // then pass by value here.
-    let dna_yaml = DnaDefYaml::from_dna_def(dna_file.dna().clone().into_content())?;
-    let dna_yaml = serde_yaml::to_string(&dna_yaml)?;
-
-    let mut yaml_filename = dir.clone();
-    yaml_filename.push("dna.yaml");
-    tokio::fs::write(yaml_filename, dna_yaml.as_bytes()).await?;
+    bundle.explode_yaml(&target_dir).await?;
 
     Ok(())
 }
 
+fn bundle_path_to_dir(path: &Path) -> DnaUtilResult<PathBuf> {
+    let bad_ext_err = || DnaUtilError::FileExtensionMissing(path.to_owned());
+    let ext = path.extension().ok_or_else(bad_ext_err)?;
+    if ext != BUNDLE_EXT {
+        return Err(bad_ext_err());
+    }
+    let stem = path
+        .file_stem()
+        .expect("A file with an extension also has a stem");
+
+    Ok(path
+        .parent()
+        .expect("file path should have parent")
+        .join(stem))
+}
+
 /// Compress a Dna Working Directory into a DnaFile
-pub async fn compress(dna_work_dir: &impl AsRef<std::path::Path>) -> DnaUtilResult<()> {
-    let dna_work_dir = dna_work_dir.as_ref().canonicalize()?;
-    let dna_file_path = dna_file_path_convert(&dna_work_dir, false)?;
-
-    let mut yaml_filename = dna_work_dir.clone();
-    yaml_filename.push("dna.yaml");
-
-    let yaml_data = tokio::fs::read(yaml_filename.clone())
-        .await
-        .map_err(move |e| DnaUtilError::PathNotFound(e, yaml_filename))?;
-
-    let yaml_file: DnaDefYaml = serde_yaml::from_slice(&yaml_data)?;
-
-    let dna_file_content = yaml_file.compile_dna_file(&dna_work_dir).await?;
-    let dna_file_content = dna_file_content.to_file_content().await?;
-
-    tokio::fs::write(dna_file_path, &dna_file_content).await?;
-
+pub async fn compress(
+    manifest_path: &impl AsRef<std::path::Path>,
+    target_path: Option<&Path>,
+) -> DnaUtilResult<()> {
+    let manifest_path = manifest_path.as_ref().canonicalize()?;
+    let bundle: DnaBundle = mr_bundle::Bundle::implode_yaml(&manifest_path)
+        .await?
+        .into();
+    let target_path = target_path.ok_or_else(|| bundle.find_root_dir(&manifest_path))?;
+    bundle.write_to_file(target_path).await?;
     Ok(())
 }
 
@@ -233,7 +198,7 @@ impl DnaDefYaml {
             let mut zome_file_path = work_dir.clone();
             zome_file_path.push(&zome.wasm_path);
 
-            let zome_content = tokio::fs::read(zome_file_path).await?;
+            let zome_content = fs::read(zome_file_path).await?;
 
             let wasm: DnaWasm = zome_content.into();
             let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
@@ -287,28 +252,26 @@ test_prop_2:
         let dna_filename = tmp_dir.path().join("test-dna.dna.gz");
         let content1 = dna_file.to_file_content().await.unwrap();
 
-        tokio::fs::write(&dna_filename, content1.clone())
-            .await
-            .unwrap();
+        fs::write(&dna_filename, content1.clone()).await.unwrap();
 
         {
             let dna_file_path = dna_filename.as_path().canonicalize().unwrap();
             let dir = dna_file_path_convert(&dna_file_path, true).unwrap();
-            tokio::fs::create_dir_all(&dir).await.unwrap();
-            let content2 = tokio::fs::read(dna_file_path).await.unwrap();
+            fs::create_dir_all(&dir).await.unwrap();
+            let content2 = fs::read(dna_file_path).await.unwrap();
 
             assert_eq!(content1, content2);
         };
 
         expand(&dna_filename).await.unwrap();
 
-        tokio::fs::remove_file(&dna_filename).await.unwrap();
+        fs::remove_file(&dna_filename).await.unwrap();
 
         compress(&tmp_dir.path().join("test-dna.dna.workdir"))
             .await
             .unwrap();
 
-        let content = tokio::fs::read(&dna_filename).await.unwrap();
+        let content = fs::read(&dna_filename).await.unwrap();
         let dna_file2 = DnaFile::from_file_content(&content).await.unwrap();
 
         assert_eq!(dna_file, dna_file2);
