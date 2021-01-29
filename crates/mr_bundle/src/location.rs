@@ -1,5 +1,4 @@
-use crate::error::MrBundleResult;
-use bytes::Bytes;
+use crate::{error::MrBundleResult, ResourceBytes};
 use std::path::{Path, PathBuf};
 
 /// Where to find a file.
@@ -8,7 +7,6 @@ use std::path::{Path, PathBuf};
 /// either "path", "url", or "bundled" can be specified due to this field
 /// being flattened.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-// #[serde(from = "LocationSerialized", into = "LocationSerialized")]
 #[serde(rename_all = "lowercase")]
 #[allow(missing_docs)]
 pub enum Location {
@@ -22,12 +20,17 @@ pub enum Location {
     Url(String),
 }
 
-pub(crate) async fn resolve_local(path: &Path) -> MrBundleResult<Bytes> {
-    Ok(std::fs::read(path)?.into())
+pub(crate) async fn resolve_local(path: &Path) -> MrBundleResult<ResourceBytes> {
+    Ok(std::fs::read(path)?)
 }
 
-pub(crate) async fn resolve_remote(url: &str) -> MrBundleResult<Bytes> {
-    Ok(reqwest::get(url).await?.bytes().await?)
+pub(crate) async fn resolve_remote(url: &str) -> MrBundleResult<ResourceBytes> {
+    Ok(reqwest::get(url)
+        .await?
+        .bytes()
+        .await?
+        .into_iter()
+        .collect())
 }
 
 #[cfg(test)]
