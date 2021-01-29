@@ -5,10 +5,12 @@ use crate::conductor::api::ZomeCall;
 use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
+use crate::conductor::p2p_store;
 use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
+use crate::core::workflow::integrate_dht_ops_workflow;
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use hdk3::prelude::ZomeName;
@@ -16,6 +18,8 @@ use holo_hash::fixt::*;
 use holo_hash::*;
 use holochain_cascade::Cascade;
 use holochain_cascade::DbPair;
+use holochain_conductor_api::IntegrationStateDump;
+use holochain_conductor_api::IntegrationStateDumps;
 use holochain_lmdb::env::EnvironmentWrite;
 use holochain_lmdb::fresh_reader_test;
 use holochain_lmdb::test_utils::test_environments;
@@ -34,7 +38,6 @@ use holochain_types::prelude::*;
 
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
-use std::convert::TryInto;
 use std::sync::Arc;
 use std::time::Duration;
 use tempdir::TempDir;
@@ -444,18 +447,18 @@ pub async fn wait_for_integration_with_others(
     for i in 0..num_attempts {
         let count = count_integration(env).await;
         let counts = get_counts(others).await;
-        let total: usize = counts.clone().into_iter().map(|(_, _, i)| i).sum();
+        let total: usize = counts.0.clone().into_iter().map(|i| i.integrated).sum();
         let change = total.checked_sub(last_total).expect("LOST A VALUE");
         last_total = total;
-        if count.2 == expected_count {
+        if count.integrated == expected_count {
             return;
         } else {
             let total_time_waited = delay * i as u32;
             tracing::debug!(
-                "Count: {}, val: {}, int: {}\nTime waited: {:?},\nCounts: {:?}\nTotal: {} change:{}\n",
-                count.2,
-                count.1,
-                count.0,
+                "Count: {}, val: {}, int: {}\nTime waited: {:?},\nCounts: {}\nTotal: {} change:{}\n",
+                count.integrated,
+                count.validation_limbo,
+                count.integration_limbo,
                 total_time_waited,
                 counts,
                 total,
@@ -485,51 +488,17 @@ pub fn show_authored(envs: &[&EnvironmentWrite]) {
     }
 }
 
-async fn get_counts(envs: &[&EnvironmentWrite]) -> Vec<(usize, usize, usize)> {
+async fn get_counts(envs: &[&EnvironmentWrite]) -> IntegrationStateDumps {
     let mut output = Vec::new();
     for env in envs {
         let env = *env;
         output.push(count_integration(env).await);
     }
-    output
+    IntegrationStateDumps(output)
 }
 
-async fn count_integration(env: &EnvironmentWrite) -> (usize, usize, usize) {
-    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
-    let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
-        workspace
-            .validation_limbo
-            .iter(&r)
-            .unwrap()
-            .map(|(_, v)| Ok(v))
-            .collect()
-            .unwrap()
-    });
-
-    let val_len = val_limbo.len();
-
-    let int_limbo: Vec<_> = fresh_reader_test!(env, |r| {
-        workspace
-            .integration_limbo
-            .iter(&r)
-            .unwrap()
-            .map(|(_, v)| Ok(v))
-            .collect()
-            .unwrap()
-    });
-    let int_limbo_len = int_limbo.len();
-
-    let int: Vec<_> = fresh_reader_test!(env, |r| {
-        workspace
-            .integrated_dht_ops
-            .iter(&r)
-            .unwrap()
-            .map(|(_, v)| Ok(v))
-            .collect()
-            .unwrap()
-    });
-    let int_len = int.len();
-    (val_len, int_limbo_len, int_len)
+async fn count_integration(env: &EnvironmentWrite) -> IntegrationStateDump {
+    integrate_dht_ops_workflow::dump_state(env.clone().into()).unwrap()
 }
 
 async fn display_integration(env: &EnvironmentWrite) -> usize {
@@ -605,40 +574,10 @@ async fn display_integration(env: &EnvironmentWrite) -> usize {
 
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
-    let agent_info = conductor.get_agent_infos(None).await.unwrap();
-    for info in agent_info {
-        let cell_info = conductor.list_cell_ids().await.unwrap();
-        let agents = cell_info
-            .iter()
-            .map(|c| c.agent_pubkey().clone())
-            .map(|a| (a.clone(), holochain_p2p::agent_holo_to_kit(a)))
-            .collect::<Vec<_>>();
-
-        let dnas = cell_info
-            .iter()
-            .map(|c| c.dna_hash().clone())
-            .map(|d| (d.clone(), holochain_p2p::space_holo_to_kit(d)))
-            .collect::<Vec<_>>();
-
-        let info: kitsune_p2p::agent_store::AgentInfo = (&info).try_into().unwrap();
-        let this_agent = agents.iter().find(|a| *info.as_agent_ref() == a.1).unwrap();
-        let this_dna = dnas.iter().find(|d| *info.as_space_ref() == d.1).unwrap();
-        tracing::debug!("This Agent {:?} is {:?}", this_agent.0, this_agent.1);
-        tracing::debug!("This DNA {:?} is {:?}", this_dna.0, this_dna.1);
-
-        use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-        let duration = Duration::milliseconds(info.signed_at_ms() as i64);
-        let s = duration.num_seconds() as i64;
-        let n = duration.clone().to_std().unwrap().subsec_nanos();
-        let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
-        let exp = dt + Duration::milliseconds(info.expires_after_ms() as i64);
-        let now = Utc::now();
-
-        tracing::debug!("signed at {}", dt);
-        tracing::debug!("expires at {} in {}mins", exp, (exp - now).num_minutes());
-        tracing::debug!("space: {:?}", info.as_space_ref());
-        tracing::debug!("agent: {:?}", info.as_agent_ref());
-        tracing::debug!("urls: {:?}", info.as_urls_ref());
+    let env = conductor.get_p2p_env().await;
+    for cell_id in conductor.list_cell_ids().await.unwrap() {
+        let info = p2p_store::dump_state(env.clone().into(), Some(cell_id)).unwrap();
+        tracing::debug!(%info);
     }
 }
 

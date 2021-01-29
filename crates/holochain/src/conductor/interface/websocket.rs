@@ -720,7 +720,8 @@ pub mod test {
         // Get state
         let expected = {
             let source_chain = SourceChainBuf::new(cell_env.clone().into()).unwrap();
-            source_chain.dump_as_json().await.unwrap()
+            let r = source_chain.dump_as_json().await.unwrap();
+            serde_json::to_string_pretty(&r).unwrap()
         };
 
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());

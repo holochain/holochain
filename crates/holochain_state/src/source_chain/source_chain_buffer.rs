@@ -20,6 +20,22 @@ pub struct SourceChainBuf {
     env: EnvironmentRead,
 }
 
+// TODO fix this.  We shouldn't really have nil values but this would
+// show if the database is corrupted and doesn't have an element
+#[derive(Serialize, Deserialize)]
+pub struct SourceChainJsonDump {
+    pub elements: Vec<Option<SourceChainJsonElement>>,
+    pub published_ops_count: usize,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SourceChainJsonElement {
+    pub signature: Signature,
+    pub header_address: HeaderHash,
+    pub header: Header,
+    pub entry: Option<Entry>,
+}
+
 impl SourceChainBuf {
     pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
         Ok(Self {
@@ -176,46 +192,52 @@ impl SourceChainBuf {
     }
 
     /// dump the entire source chain as a pretty-printed json string
-    pub async fn dump_as_json(&self) -> Result<String, SourceChainError> {
-        #[derive(Serialize, Deserialize)]
-        struct JsonElement {
-            pub signature: Signature,
-            pub header_address: HeaderHash,
-            pub header: Header,
-            pub entry: Option<Entry>,
-        }
-
-        // TODO fix this.  We shouldn't really have nil values but this would
-        // show if the database is corrupted and doesn't have an element
-        #[derive(Serialize, Deserialize)]
-        struct JsonChainDump {
-            element: Option<JsonElement>,
-        }
-
+    pub async fn dump_as_json(&self) -> Result<SourceChainJsonDump, SourceChainError> {
         let mut iter = self.iter_back();
-        let mut out = Vec::new();
+        let mut elements = Vec::new();
+        let mut published_ops_count = 0;
 
         while let Some(h) = iter.next()? {
             let maybe_element = self.get_element(h.header_address())?;
             match maybe_element {
-                None => out.push(JsonChainDump { element: None }),
+                None => elements.push(None),
                 Some(element) => {
+                    let ops = produce_op_lights_from_elements(vec![&element]).unwrap();
+                    published_ops_count += if element
+                        .header()
+                        .entry_type()
+                        .map(|e| *e.visibility() == EntryVisibility::Public)
+                        .unwrap_or(true)
+                    {
+                        ops.len()
+                    } else {
+                        ops.into_iter()
+                            .filter(|op| {
+                                if let DhtOpLight::StoreEntry(_, _, _) = &op {
+                                    false
+                                } else {
+                                    true
+                                }
+                            })
+                            .count()
+                    };
                     let (signed, entry) = element.into_inner();
                     let (header, signature) = signed.into_header_and_signature();
                     let (header, header_address) = header.into_inner();
-                    out.push(JsonChainDump {
-                        element: Some(JsonElement {
-                            signature,
-                            header_address,
-                            header,
-                            entry: entry.into_option(),
-                        }),
-                    });
+                    elements.push(Some(SourceChainJsonElement {
+                        signature,
+                        header_address,
+                        header,
+                        entry: entry.into_option(),
+                    }));
                 }
             }
         }
 
-        Ok(serde_json::to_string_pretty(&out)?)
+        Ok(SourceChainJsonDump {
+            elements,
+            published_ops_count,
+        })
     }
 
     /// Commit the genesis entries to this source chain, making the chain ready
@@ -457,6 +479,7 @@ pub mod tests {
         {
             let store = SourceChainBuf::new(arc.clone().into()).unwrap();
             let json = store.dump_as_json().await?;
+            let json = serde_json::to_string_pretty(&json)?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
             assert_eq!(parsed[0]["element"]["header"]["type"], "Create");
