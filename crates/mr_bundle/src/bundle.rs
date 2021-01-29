@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     error::{BundleError, BundleResult, MrBundleResult},
@@ -19,11 +19,12 @@ use std::{
 ///
 // NB: It would be so nice if this were Deserializable, but there are problems
 // with using the derive macro here.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Bundle<M>
 where
     M: Manifest,
 {
+    #[serde(bound(deserialize = "M: DeserializeOwned"))]
     manifest: M,
     resources: HashMap<PathBuf, ResourceBytes>,
 }
@@ -123,19 +124,12 @@ where
     // NB: Ideally, Bundle could just implement serde Serialize/Deserialize,
     // but the generic types cause problems
     pub fn encode(&self) -> MrBundleResult<Vec<u8>> {
-        crate::encode(&(
-            crate::encode(&self.manifest)?,
-            crate::encode(&self.resources)?,
-        ))
+        crate::encode(self)
     }
 
     /// Decode bytes produced by `to_bytes`
     pub fn decode(bytes: &[u8]) -> MrBundleResult<Self> {
-        let (m, r): (Vec<u8>, Vec<u8>) = crate::decode(bytes)?;
-        Ok(Self {
-            manifest: crate::decode(&m)?,
-            resources: crate::decode(&r)?,
-        })
+        crate::decode(bytes)
     }
 }
 
@@ -151,6 +145,7 @@ mod tests {
             self.0.clone()
         }
 
+        #[cfg(feature = "exploding")]
         fn path(&self) -> PathBuf {
             unimplemented!()
         }

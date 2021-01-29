@@ -17,6 +17,7 @@ impl Manifest for TestManifest {
         }
     }
 
+    #[cfg(feature = "exploding")]
     fn path(&self) -> PathBuf {
         "test-manifest.yaml".into()
     }
@@ -36,40 +37,6 @@ struct ThingManifest {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 struct Thing(String);
-
-// fn test_bundle(base_dir: &Path) -> Bundle<TestManifest> {
-//     // Write a ResourceBytes to disk
-//     let local_thing = Thing("local".into());
-//     let local_thing_encoded = mr_bundle::encode(&local_thing).unwrap();
-//     let local_path = base_dir.join("local.thing");
-//     std::fs::write(&local_path, mr_bundle::encode(&local_thing).unwrap()).unwrap();
-
-//     let bundled_thing = Thing("bundled".into());
-//     let bundled_thing_encoded = mr_bundle::encode(&bundled_thing).unwrap();
-//     let bundled_path = PathBuf::from("bundled.thing");
-
-//     // Create a Manifest that references these resources
-//     let bundled_location = Location::Bundled(bundled_path.clone());
-//     let local_location = Location::Path(local_path.clone());
-//     let manifest = TestManifest::V1(ManifestV1 {
-//         name: "name".to_string(),
-//         things: vec![
-//             ThingManifest {
-//                 location: bundled_location.clone(),
-//             },
-//             ThingManifest {
-//                 location: local_location.clone(),
-//             },
-//         ],
-//     });
-
-//     // Put the bundled resource into a Bundle (excluding the local resource)
-//     Bundle::new(
-//         manifest,
-//         vec![(bundled_path.clone(), bundled_thing_encoded.clone())],
-//     )
-//     .unwrap()
-// }
 
 #[tokio::test]
 async fn resource_resolution() {
@@ -148,6 +115,7 @@ async fn resource_resolution() {
     assert_eq!(bundle, bundle_file);
 }
 
+#[cfg(feature = "exploding")]
 #[tokio::test]
 async fn explode_roundtrip() {
     let dir = tempdir::TempDir::new("mr_bundle").unwrap();
