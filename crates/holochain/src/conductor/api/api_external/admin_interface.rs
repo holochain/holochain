@@ -174,6 +174,20 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 };
                 Ok(AdminResponse::AppInstalled(app))
             }
+            InstallAppBundle(payload) => {
+                unimplemented!()
+                // let InstallAppBundlePayload {
+                //     bundle,
+                //     agent_key,
+                //     installed_app_id,
+                // } = *payload;
+
+                // let bundled_dnas = bundle.resolve_all().await?;
+                // let manifest = bundle.manifest;
+
+                // // for dna_bytes = bundled_dnas.values()
+                // Ok(AdminResponse::AppBundleInstalled(todo!()));
+            }
             ListDnas => {
                 let dna_list = self.conductor_handle.list_dnas().await?;
                 Ok(AdminResponse::DnasListed(dna_list))

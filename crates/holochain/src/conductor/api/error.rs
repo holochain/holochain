@@ -11,6 +11,7 @@ use holochain_lmdb::error::DatabaseError;
 
 use holochain_state::source_chain::SourceChainError;
 use holochain_state::workspace::WorkspaceError;
+use holochain_types::prelude::AppBundleError;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
 
@@ -84,6 +85,8 @@ pub enum ConductorApiError {
 
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
+    // #[error(transparent)]
+    // AppBundleError(#[from] AppBundleError),
 }
 
 /// All the serialization errors that can occur

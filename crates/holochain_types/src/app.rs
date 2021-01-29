@@ -1,6 +1,9 @@
 //! Collection of cells to form a holochain application
 
-pub mod app_manifest;
+mod app_bundle;
+mod app_manifest;
+pub use app_bundle::*;
+pub use app_manifest::*;
 
 use crate::dna::{DnaFile, YamlProperties};
 use derive_more::Into;
@@ -49,6 +52,20 @@ pub struct InstallAppPayload {
 
     /// The Dna paths in this app
     pub dnas: Vec<InstallAppDnaPayload>,
+}
+
+/// An [AppBundle] along with an [AgentPubKey] and optional [InstalledAppId]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct InstallAppBundlePayload {
+    /// The unique identifier for an installed app in this conductor
+    pub bundle: AppBundle,
+
+    /// The agent to use when creating Cells for this App
+    pub agent_key: AgentPubKey,
+
+    /// The unique identifier for an installed app in this conductor.
+    /// If not specified, it will be derived from the app name in the bundle manifest.
+    pub installed_app_id: Option<InstalledAppId>,
 }
 
 /// Information needed to specify a Dna as part of an App
