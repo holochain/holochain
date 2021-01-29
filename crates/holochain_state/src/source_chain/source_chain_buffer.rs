@@ -212,13 +212,7 @@ impl SourceChainBuf {
                         ops.len()
                     } else {
                         ops.into_iter()
-                            .filter(|op| {
-                                if let DhtOpLight::StoreEntry(_, _, _) = &op {
-                                    false
-                                } else {
-                                    true
-                                }
-                            })
+                            .filter(|op| !matches!(&op, DhtOpLight::StoreEntry(_, _, _)))
                             .count()
                     };
                     let (signed, entry) = element.into_inner();
