@@ -45,7 +45,7 @@ pub struct DnaDef {
     #[builder(default = "().try_into().unwrap()")]
     pub properties: SerializedBytes,
 
-    /// An array of zomes associated with your holochain application.
+    /// An array of zomes associated with your DNA.
     pub zomes: Zomes,
 }
 
