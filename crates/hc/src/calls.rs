@@ -17,12 +17,12 @@ use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_p2p::kitsune_p2p;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
+use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::CellId;
 use holochain_types::prelude::DnaHash;
 use holochain_types::prelude::InstallAppDnaPayload;
 use holochain_types::prelude::InstallAppPayload;
 use holochain_types::prelude::InstalledCell;
-use holochain_types::prelude::{AgentPubKey, InstallAppPayloadNormalized};
 use portpicker::is_free;
 use std::convert::TryFrom;
 
@@ -345,12 +345,11 @@ pub async fn install_app(
         .map(|(i, path)| InstallAppDnaPayload::path_only(path, format!("{}-{}", app_id, i)))
         .collect::<Vec<_>>();
 
-    let app: InstallAppPayload = InstallAppPayloadNormalized {
+    let app = InstallAppPayload {
         installed_app_id: app_id,
         agent_key,
         dnas,
-    }
-    .into();
+    };
 
     let r = AdminRequest::InstallApp(app.into());
     let installed_app = cmd.command(r).await?;

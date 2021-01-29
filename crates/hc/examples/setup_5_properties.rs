@@ -7,9 +7,9 @@ use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
 use holochain_hc as hc;
 use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
+use holochain_types::prelude::InstallAppDnaPayload;
 use holochain_types::prelude::InstallAppPayload;
 use holochain_types::prelude::YamlProperties;
-use holochain_types::prelude::{InstallAppDnaPayload, InstallAppPayloadNormalized};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -70,12 +70,11 @@ async fn main() -> anyhow::Result<()> {
         // Create the admin request.
         // This is the same type that is used for
         // anyone calling the admin api.
-        let app: InstallAppPayload = InstallAppPayloadNormalized {
+        let app = InstallAppPayload {
             installed_app_id: app_id,
             agent_key,
             dnas,
-        }
-        .into();
+        };
         let r = AdminRequest::InstallApp(app.into());
 
         // Run the command and wait for the response.
