@@ -3,13 +3,13 @@ pub enum MrBundleError {
     #[error(transparent)]
     BundleError(#[from] BundleError),
 
-    #[cfg(feature = "exploding")]
+    #[cfg(feature = "packing")]
     #[error(transparent)]
-    ExplodeError(#[from] ExplodeError),
+    UnpackingError(#[from] UnpackingError),
 
-    #[cfg(feature = "exploding")]
+    #[cfg(feature = "packing")]
     #[error(transparent)]
-    ImplodeError(#[from] ImplodeError),
+    PackingError(#[from] PackingError),
 
     #[error(transparent)]
     IoError(#[from] std::io::Error),
@@ -38,9 +38,9 @@ pub enum BundleError {
 }
 pub type BundleResult<T> = Result<T, BundleError>;
 
-#[cfg(feature = "exploding")]
+#[cfg(feature = "packing")]
 #[derive(Debug, thiserror::Error)]
-pub enum ExplodeError {
+pub enum UnpackingError {
     #[error(transparent)]
     IoError(#[from] std::io::Error),
 
@@ -54,14 +54,14 @@ pub enum ExplodeError {
     Absolute path: '{0}'. Relative path: '{1}'.")]
     ManifestPathSuffixMismatch(std::path::PathBuf, std::path::PathBuf),
 }
-#[cfg(feature = "exploding")]
-pub type ExplodeResult<T> = Result<T, ExplodeError>;
+#[cfg(feature = "packing")]
+pub type UnpackingResult<T> = Result<T, UnpackingError>;
 
-#[cfg(feature = "exploding")]
+#[cfg(feature = "packing")]
 #[derive(Debug, thiserror::Error)]
-pub enum ImplodeError {
-    #[error("Must supply the path to the manifest file inside a bundle directory to implode. You supplied: {0}. Original error: {1}")]
+pub enum PackingError {
+    #[error("Must supply the path to the manifest file inside a bundle directory to pack. You supplied: {0}. Original error: {1}")]
     BadManifestPath(std::path::PathBuf, std::io::Error),
 }
-#[cfg(feature = "exploding")]
-pub type ImplodeResult<T> = Result<T, ImplodeError>;
+#[cfg(feature = "packing")]
+pub type PackingResult<T> = Result<T, PackingError>;

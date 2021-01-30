@@ -9,9 +9,9 @@ pub trait Manifest:
     /// correctly implemented to enable resource resolution.
     fn locations(&self) -> Vec<Location>;
 
-    /// When exploding the bundle into a directory structure, this becomes
+    /// When unpacking the bundle into a directory structure, this becomes
     /// the relative path of the manifest file.
-    #[cfg(feature = "exploding")]
+    #[cfg(feature = "packing")]
     fn path(&self) -> PathBuf;
 
     /// Get only the Bundled locations

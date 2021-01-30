@@ -6,8 +6,8 @@ mod manifest;
 mod resource;
 pub(crate) mod util;
 
-#[cfg(feature = "exploding")]
-mod explode;
+#[cfg(feature = "packing")]
+mod packing;
 
 pub use bundle::Bundle;
 pub use location::Location;

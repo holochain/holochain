@@ -48,8 +48,8 @@ use tokio::fs;
 /// The file extension to use for DNA bundles
 pub const DNA_BUNDLE_EXT: &str = ".dna";
 
-/// Explode a DnaFile into a working directory
-pub async fn explode(
+/// Unpack a DnaFile into a working directory
+pub async fn unpack(
     bundle_path: &impl AsRef<std::path::Path>,
     target_dir: Option<&Path>,
 ) -> HcBundleResult<()> {
@@ -64,7 +64,7 @@ pub async fn explode(
         bundle_path_to_dir(&bundle_path)?
     };
 
-    bundle.explode_yaml(&target_dir).await?;
+    bundle.unpack_yaml(&target_dir).await?;
 
     Ok(())
 }
@@ -91,9 +91,7 @@ pub async fn compress(
     target_path: Option<&Path>,
 ) -> HcBundleResult<()> {
     let manifest_path = manifest_path.as_ref().canonicalize()?;
-    let bundle: DnaBundle = mr_bundle::Bundle::implode_yaml(&manifest_path)
-        .await?
-        .into();
+    let bundle: DnaBundle = mr_bundle::Bundle::pack_yaml(&manifest_path).await?.into();
     let target_path = target_path
         .map(|p| Ok(p.to_owned()))
         .unwrap_or_else(|| bundle.find_root_dir(&manifest_path))?;

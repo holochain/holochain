@@ -17,7 +17,7 @@ impl Manifest for TestManifest {
         }
     }
 
-    #[cfg(feature = "exploding")]
+    #[cfg(feature = "packing")]
     fn path(&self) -> PathBuf {
         "test-manifest.yaml".into()
     }
@@ -115,9 +115,9 @@ async fn resource_resolution() {
     assert_eq!(bundle, bundle_file);
 }
 
-#[cfg(feature = "exploding")]
+#[cfg(feature = "packing")]
 #[tokio::test]
-async fn explode_roundtrip() {
+async fn unpack_roundtrip() {
     let dir = tempdir::TempDir::new("mr_bundle").unwrap();
 
     // Write a ResourceBytes to disk
@@ -159,19 +159,18 @@ async fn explode_roundtrip() {
         maplit::hashset![(&bundled_path, &bundled_thing_encoded)]
     );
 
-    // Explode the bundle to a directory on the filesystem
-    let exploded_dir = dir.path().join("exploded");
-    bundle.explode_yaml(&exploded_dir).await.unwrap();
+    // Unpack the bundle to a directory on the filesystem
+    let unpacked_dir = dir.path().join("unpacked");
+    bundle.unpack_yaml(&unpacked_dir).await.unwrap();
 
-    dbg!(exploded_dir.read_dir().unwrap().collect::<Vec<_>>());
-    assert!(exploded_dir.join("test-manifest.yaml").is_file());
-    assert!(exploded_dir.join("another/nested/bundled.thing").is_file());
-    assert!(!exploded_dir.join("deeply/nested/local.thing").exists());
+    dbg!(unpacked_dir.read_dir().unwrap().collect::<Vec<_>>());
+    assert!(unpacked_dir.join("test-manifest.yaml").is_file());
+    assert!(unpacked_dir.join("another/nested/bundled.thing").is_file());
+    assert!(!unpacked_dir.join("deeply/nested/local.thing").exists());
 
-    let reconstructed =
-        Bundle::<TestManifest>::implode_yaml(&exploded_dir.join("test-manifest.yaml"))
-            .await
-            .unwrap();
+    let reconstructed = Bundle::<TestManifest>::pack_yaml(&unpacked_dir.join("test-manifest.yaml"))
+        .await
+        .unwrap();
 
     assert_eq!(bundle, reconstructed);
 }

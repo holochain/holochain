@@ -9,19 +9,19 @@ pub fn decode<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> MrBundleResult<T>
     Ok(rmp_serde::from_read_ref(bytes)?)
 }
 
-#[cfg(feature = "exploding")]
-use crate::error::{ExplodeError, ExplodeResult};
+#[cfg(feature = "packing")]
+use crate::error::{UnpackingError, UnpackingResult};
 
 /// Removes a subpath suffix from a path
-#[cfg(feature = "exploding")]
-pub fn prune_path<P: AsRef<Path>>(mut path: PathBuf, subpath: P) -> ExplodeResult<PathBuf> {
+#[cfg(feature = "packing")]
+pub fn prune_path<P: AsRef<Path>>(mut path: PathBuf, subpath: P) -> UnpackingResult<PathBuf> {
     if path.ends_with(&subpath) {
         for _ in subpath.as_ref().components() {
             let _ = path.pop();
         }
         Ok(path)
     } else {
-        Err(ExplodeError::ManifestPathSuffixMismatch(
+        Err(UnpackingError::ManifestPathSuffixMismatch(
             path,
             subpath.as_ref().to_owned(),
         ))

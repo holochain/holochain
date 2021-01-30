@@ -1,6 +1,6 @@
 use super::Bundle;
 use crate::{
-    error::{ExplodeError, ExplodeResult, ImplodeError, MrBundleResult},
+    error::{UnpackingError, UnpackingResult, PackingError, MrBundleResult},
     util::prune_path,
     Manifest,
 };
@@ -12,11 +12,11 @@ impl<M: Manifest> Bundle<M> {
     /// The paths of the resources are specified by the paths of the bundle,
     /// and the path of the manifest file is specified by the `Manifest::path`
     /// trait method implementation of the `M` type.
-    pub async fn explode_yaml(&self, base_path: &Path) -> MrBundleResult<()> {
-        self.explode_yaml_inner(base_path).await.map_err(Into::into)
+    pub async fn unpack_yaml(&self, base_path: &Path) -> MrBundleResult<()> {
+        self.unpack_yaml_inner(base_path).await.map_err(Into::into)
     }
 
-    async fn explode_yaml_inner(&self, base_path: &Path) -> ExplodeResult<()> {
+    async fn unpack_yaml_inner(&self, base_path: &Path) -> UnpackingResult<()> {
         crate::fs::create_dir_all(base_path).await?;
         let base_path = base_path.canonicalize()?;
         crate::fs::create_dir_all(&base_path).await?;
@@ -26,7 +26,7 @@ impl<M: Manifest> Bundle<M> {
             let parent = path_clone
                 .parent()
                 .clone()
-                .ok_or_else(|| ExplodeError::ParentlessPath(path.clone()))?;
+                .ok_or_else(|| UnpackingError::ParentlessPath(path.clone()))?;
             crate::fs::create_dir_all(&parent).await?;
             crate::fs::write(&path, resource).await?;
         }
@@ -36,15 +36,15 @@ impl<M: Manifest> Bundle<M> {
         Ok(())
     }
 
-    /// Reconstruct a `Bundle<M>` from a previously exploded directory.
+    /// Reconstruct a `Bundle<M>` from a previously unpacked directory.
     /// The manifest file itself must be specified, since it may have an arbitrary
-    /// path relative to the exploded directory root.
-    pub async fn implode_yaml(manifest_path: &Path) -> MrBundleResult<Self> {
+    /// path relative to the unpacked directory root.
+    pub async fn pack_yaml(manifest_path: &Path) -> MrBundleResult<Self> {
         let manifest_path = manifest_path.canonicalize()?;
         let manifest_yaml = crate::fs::read_to_string(&manifest_path)
             .await
-            .map_err(|err| ImplodeError::BadManifestPath(manifest_path.clone(), err))?;
-        let manifest: M = serde_yaml::from_str(&manifest_yaml).map_err(ExplodeError::from)?;
+            .map_err(|err| PackingError::BadManifestPath(manifest_path.clone(), err))?;
+        let manifest: M = serde_yaml::from_str(&manifest_yaml).map_err(UnpackingError::from)?;
         let manifest_relative_path = manifest.path();
         let base_path = prune_path(manifest_path.clone(), &manifest_relative_path)?;
         let resources = futures::future::join_all(manifest.bundled_paths().into_iter().map(
@@ -80,7 +80,7 @@ mod tests {
         );
         assert_matches::assert_matches!(
             prune_path(path.clone(), "a/c"),
-            Err(ExplodeError::ManifestPathSuffixMismatch(abs, rel))
+            Err(UnpackingError::ManifestPathSuffixMismatch(abs, rel))
             if abs == path && rel == PathBuf::from("a/c")
         );
     }

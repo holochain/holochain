@@ -30,7 +30,7 @@ tempdir = "0.3"
 tokio-io = [
   "tokio"
 ]
-exploding = [
+packing = [
   "serde_yaml",
   "tokio-io",
 ]

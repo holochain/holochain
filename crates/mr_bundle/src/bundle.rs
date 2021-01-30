@@ -133,7 +133,7 @@ where
     }
 
     /// Given that the Manifest is located at the given absolute `path`, find
-    /// the absolute root directory for the "exploded" Bundle directory.
+    /// the absolute root directory for the "unpacked" Bundle directory.
     /// Useful when "imploding" a directory into a bundle to determine the
     /// default location of the generated Bundle file.
     ///
@@ -142,9 +142,9 @@ where
     ///
     /// Will return None if the `path` does not actually end with the
     /// manifest relative path, meaning that either the manifest file is
-    /// misplaced within the exploded directory, or an incorrect path was
+    /// misplaced within the unpacked directory, or an incorrect path was
     /// supplied.
-    #[cfg(feature = "exploding")]
+    #[cfg(feature = "packing")]
     pub fn find_root_dir(&self, path: &Path) -> MrBundleResult<PathBuf> {
         crate::util::prune_path(path.into(), self.manifest.path()).map_err(Into::into)
     }
@@ -162,7 +162,7 @@ mod tests {
             self.0.clone()
         }
 
-        #[cfg(feature = "exploding")]
+        #[cfg(feature = "packing")]
         fn path(&self) -> PathBuf {
             unimplemented!()
         }
