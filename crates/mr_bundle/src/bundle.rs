@@ -1,7 +1,8 @@
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    error::{BundleError, BundleResult, MrBundleResult},
+    error::{BundleError, BundleResult, MrBundleError, MrBundleResult},
+    io_error::IoError,
     location::Location,
     manifest::Manifest,
     resource::ResourceBytes,
@@ -27,14 +28,8 @@ where
     #[serde(bound(deserialize = "M: DeserializeOwned"))]
     manifest: M,
     resources: HashMap<PathBuf, ResourceBytes>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct BundleSerialized {
-    #[serde(with = "serde_bytes")]
-    manifest: Vec<u8>,
-    #[serde(with = "serde_bytes")]
-    resources: Vec<u8>,
+    #[serde(skip)]
+    normalized_locations: Vec<Location>,
 }
 
 impl<M> Bundle<M>
@@ -47,10 +42,33 @@ where
     /// The paths paired with each resource must correspond to the set of
     /// `Location::Bundle`s specified in the `Manifest::location()`, or else
     /// this is not a valid bundle.
-    pub fn new(manifest: M, resources: Vec<(PathBuf, ResourceBytes)>) -> BundleResult<Self> {
-        let manifest_paths: HashSet<_> = manifest
-            .locations()
-            .into_iter()
+    ///
+    /// A base directory must also be supplied so that relative paths can be
+    /// resolved into absolute ones
+    pub fn new(
+        manifest: M,
+        resources: Vec<(PathBuf, ResourceBytes)>,
+        base_dir: &Path,
+    ) -> MrBundleResult<Self> {
+        Self::from_parts(manifest, resources, Some(base_dir))
+    }
+
+    /// Create a bundle, but without
+    pub fn new_unchecked(
+        manifest: M,
+        resources: Vec<(PathBuf, ResourceBytes)>,
+    ) -> MrBundleResult<Self> {
+        Self::from_parts(manifest, resources, None)
+    }
+
+    pub fn from_parts(
+        manifest: M,
+        resources: Vec<(PathBuf, ResourceBytes)>,
+        base_dir: Option<&Path>,
+    ) -> MrBundleResult<Self> {
+        let normalized_locations = Self::normalize_locations(manifest.locations(), base_dir)?;
+        let manifest_paths: HashSet<_> = normalized_locations
+            .iter()
             .filter_map(|loc| match loc {
                 Location::Bundled(path) => Some(path),
                 _ => None,
@@ -60,7 +78,7 @@ where
         // Validate that each resource path is contained in the manifest
         for (resource_path, _) in resources.iter() {
             if !manifest_paths.contains(resource_path) {
-                return Err(BundleError::BundledPathNotInManifest(resource_path.clone()));
+                return Err(BundleError::BundledPathNotInManifest(resource_path.clone()).into());
             }
         }
 
@@ -68,6 +86,7 @@ where
         Ok(Self {
             manifest,
             resources,
+            normalized_locations,
         })
     }
 
@@ -76,11 +95,11 @@ where
     }
 
     pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
-        Ok(Self::decode(&crate::fs::read(path).await?)?)
+        Ok(Self::decode(&crate::fs(path).read().await?)?)
     }
 
     pub async fn write_to_file(&self, path: &Path) -> MrBundleResult<()> {
-        Ok(crate::fs::write(path, &self.encode()?).await?)
+        Ok(crate::fs(path).write(&self.encode()?).await?)
     }
 
     pub async fn resolve(&self, location: &Location) -> MrBundleResult<ResourceBytes> {
@@ -101,9 +120,8 @@ where
     /// fetched from the filesystem or the internet.
     pub async fn resolve_all(&self) -> MrBundleResult<HashMap<Location, ResourceBytes>> {
         let resources: HashMap<Location, ResourceBytes> = futures::future::join_all(
-            self.manifest
-                .locations()
-                .into_iter()
+            self.normalized_locations
+                .iter()
                 .map(|loc| async move { Ok((loc.clone(), self.resolve(&loc).await?)) }),
         )
         .await
@@ -130,6 +148,35 @@ where
     /// Decode bytes produced by `to_bytes`
     pub fn decode(bytes: &[u8]) -> MrBundleResult<Self> {
         crate::decode(bytes)
+    }
+
+    fn normalize_locations(
+        locations: Vec<Location>,
+        base_dir: Option<&Path>,
+    ) -> MrBundleResult<Vec<Location>> {
+        locations
+            .into_iter()
+            .map(|loc| {
+                if let Location::Path(path) = &loc {
+                    if path.is_relative() {
+                        if let Some(base_dir) = base_dir {
+                            Ok(Location::Path(
+                                base_dir
+                                    .join(&path)
+                                    .canonicalize()
+                                    .map_err(|e| IoError::new(e, Some(path.to_owned())))?,
+                            ))
+                        } else {
+                            Err(BundleError::RelativeLocalPath(path.to_owned()).into())
+                        }
+                    } else {
+                        Ok(loc)
+                    }
+                } else {
+                    Ok(loc)
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()
     }
 
     /// Given that the Manifest is located at the given absolute `path`, find
@@ -177,11 +224,11 @@ mod tests {
             Location::Bundled("1.thing".into()),
             Location::Bundled("2.thing".into()),
         ]);
-        assert!(Bundle::new(manifest.clone(), vec![("1.thing".into(), vec![1])]).is_ok());
+        assert!(Bundle::new_unchecked(manifest.clone(), vec![("1.thing".into(), vec![1])]).is_ok());
 
-        assert_eq!(
-            Bundle::new(manifest, vec![("3.thing".into(), vec![3])]),
-            Err(BundleError::BundledPathNotInManifest("3.thing".into()))
+        matches::assert_matches!(
+            Bundle::new_unchecked(manifest, vec![("3.thing".into(), vec![3])]),
+            Err(MrBundleError::BundleError(BundleError::BundledPathNotInManifest(path))) if path == PathBuf::from("3.thing")
         );
     }
 }

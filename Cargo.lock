@@ -112,12 +112,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "assert_matches"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "695579f0f2520f3774bb40461e5adb066459d4e0af4d59d20175484fb8e9edf1"
-
-[[package]]
 name = "async-stream"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1353,11 +1347,12 @@ checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 name = "hc_bundle"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
  "holo_hash",
- "holochain",
  "holochain_serialized_bytes",
  "holochain_types",
  "holochain_zome_types",
+ "matches",
  "mr_bundle",
  "serde",
  "serde_bytes",
@@ -2149,7 +2144,6 @@ dependencies = [
 name = "kitsune_p2p"
 version = "0.0.1"
 dependencies = [
- "assert_matches",
  "derive_more",
  "fixt",
  "futures",
@@ -2158,6 +2152,7 @@ dependencies = [
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
  "lair_keystore_api",
+ "matches",
  "observability",
  "once_cell",
  "rand 0.7.3",
@@ -2543,11 +2538,12 @@ name = "mr_bundle"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "assert_matches",
  "bytes 1.0.1",
  "derive_more",
+ "either",
  "futures",
  "maplit",
+ "matches",
  "reqwest 0.11.0",
  "rmp-serde 0.15.3",
  "serde",

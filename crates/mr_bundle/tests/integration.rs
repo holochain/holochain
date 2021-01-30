@@ -69,7 +69,7 @@ async fn resource_resolution() {
     });
 
     // Put the bundled resource into a Bundle (excluding the local resource)
-    let bundle = Bundle::new(
+    let bundle = Bundle::new_unchecked(
         manifest,
         vec![(bundled_path.clone(), bundled_thing_encoded.clone())],
     )
@@ -146,7 +146,7 @@ async fn unpack_roundtrip() {
     });
 
     // Put the bundled resource into a Bundle (excluding the local resource)
-    let bundle = Bundle::new(
+    let bundle = Bundle::new_unchecked(
         manifest,
         vec![(bundled_path.clone(), bundled_thing_encoded.clone())],
     )
@@ -161,7 +161,7 @@ async fn unpack_roundtrip() {
 
     // Unpack the bundle to a directory on the filesystem
     let unpacked_dir = dir.path().join("unpacked");
-    bundle.unpack_yaml(&unpacked_dir).await.unwrap();
+    bundle.unpack_yaml(&unpacked_dir, false).await.unwrap();
 
     assert!(unpacked_dir.join("test-manifest.yaml").is_file());
     assert!(unpacked_dir.join("another/nested/bundled.thing").is_file());

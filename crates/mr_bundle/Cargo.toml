@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 bytes = "1.0"
 derive_more = "0.99"
+either = "1.5"
 futures = "0.3"
 reqwest = "0.11"
 rmp-serde = "0.15"
@@ -20,7 +21,7 @@ tokio = { version = "0.2", features = ["fs"], optional = true}
 
 [dev-dependencies]
 anyhow = "1.0"
-assert_matches = "1.4"
+matches = "0.1"
 maplit = "1"
 serde_yaml = "0.8"
 tokio = { version = "0.2", features = ["full"]}

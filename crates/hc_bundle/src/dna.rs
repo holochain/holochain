@@ -46,13 +46,14 @@ use std::{collections::BTreeMap, path::Path};
 use tokio::fs;
 
 /// The file extension to use for DNA bundles
-pub const DNA_BUNDLE_EXT: &str = ".dna";
+pub const DNA_BUNDLE_EXT: &str = "dna";
 
-/// Unpack a DnaFile into a working directory
+/// Unpack a DNA bundle into a working directory, returning the directory path used.
 pub async fn unpack(
     bundle_path: &impl AsRef<std::path::Path>,
     target_dir: Option<PathBuf>,
-) -> HcBundleResult<()> {
+    force: bool,
+) -> HcBundleResult<PathBuf> {
     let bundle_path = bundle_path.as_ref().canonicalize()?;
     let bundle: DnaBundle = mr_bundle::Bundle::read_from_file(&bundle_path)
         .await?
@@ -64,9 +65,9 @@ pub async fn unpack(
         bundle_path_to_dir(&bundle_path)?
     };
 
-    bundle.unpack_yaml(&target_dir).await?;
+    bundle.unpack_yaml(&target_dir, force).await?;
 
-    Ok(())
+    Ok(target_dir)
 }
 
 fn bundle_path_to_dir(path: &Path) -> HcBundleResult<PathBuf> {
@@ -85,11 +86,12 @@ fn bundle_path_to_dir(path: &Path) -> HcBundleResult<PathBuf> {
         .join(stem))
 }
 
-/// Pack a directory containing a DNA manifest into a DnaBundle
+/// Pack a directory containing a DNA manifest into a DnaBundle, returning
+/// the path to which the bundle file was written
 pub async fn pack(
     dir_path: &impl AsRef<std::path::Path>,
     target_path: Option<PathBuf>,
-) -> HcBundleResult<()> {
+) -> HcBundleResult<(PathBuf, DnaBundle)> {
     let dir_path = dir_path.as_ref().canonicalize()?;
     let manifest_path = dir_path.join(&DnaManifest::relative_path());
     let bundle: DnaBundle = mr_bundle::Bundle::pack_yaml(&manifest_path).await?.into();
@@ -97,7 +99,7 @@ pub async fn pack(
         .map(Ok)
         .unwrap_or_else(|| dir_to_bundle_path(&dir_path))?;
     bundle.write_to_file(&target_path).await?;
-    Ok(())
+    Ok((target_path, bundle))
 }
 
 fn dir_to_bundle_path(dir_path: &Path) -> HcBundleResult<PathBuf> {
@@ -185,10 +187,77 @@ impl DnaDefYaml {
 
 #[cfg(test)]
 mod tests {
+    use mr_bundle::error::{MrBundleError, UnpackingError};
+
     use super::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_roundtrip() {
-        todo!()
+        let tmpdir = tempdir::TempDir::new("hc-bundle-test").unwrap();
+        let dir = tmpdir.path().join("test-dna");
+        std::fs::create_dir(&dir).unwrap();
+
+        let manifest_yaml = r#"
+---
+name: test dna
+uuid: blablabla
+properties:
+  some: 42
+  props: yay
+zomes:
+  - name: zome1
+    bundled: zome-1.wasm
+  - name: zome2
+    bundled: nested/zome-2.wasm
+  - name: zome3
+    path: ../zome-3.wasm
+        "#;
+
+        // Create files in working directory
+        std::fs::create_dir(dir.join("nested")).unwrap();
+        std::fs::write(dir.join("zome-1.wasm"), &[1, 2, 3]).unwrap();
+        std::fs::write(dir.join("nested/zome-2.wasm"), &[4, 5, 6]).unwrap();
+        std::fs::write(dir.join("dna.yaml"), manifest_yaml.as_bytes()).unwrap();
+
+        // Create a local file that's not actually part of the bundle,
+        // in the parent directory
+        std::fs::write(tmpdir.path().join("zome-3.wasm"), &[7, 8, 9]).unwrap();
+
+        let (bundle_path, bundle) = pack(&dir, None).await.unwrap();
+
+        // Ensure the bundle path was generated as expected
+        assert!(bundle_path.is_file());
+        assert_eq!(bundle_path.parent(), dir.parent());
+        assert_eq!(bundle_path, dir.parent().unwrap().join("test-dna.dna"));
+
+        // Ensure we can resolve all files, including the local one
+        assert_eq!(bundle.resolve_all().await.unwrap().values().len(), 3);
+
+        // Unpack without forcing, which will fail
+        matches::assert_matches!(
+            unpack(&bundle_path, None, false).await,
+            Err(
+                HcBundleError::MrBundleError(
+                    MrBundleError::UnpackingError(UnpackingError::DirectoryExists(_)),
+                ),
+            )
+        );
+        // Now unpack with forcing to overwrite original directory
+        unpack(&bundle_path, None, true).await.unwrap();
+
+        // Now remove the directory altogether, unpack again, and check that
+        // all of the same files are present
+        std::fs::remove_dir_all(&dir).unwrap();
+        unpack(&bundle_path, None, false).await.unwrap();
+        assert!(dir.join("zome-1.wasm").is_file());
+        assert!(dir.join("nested/zome-2.wasm").is_file());
+        assert!(dir.join("dna.yaml").is_file());
+
+        // Ensure that these are the only 3 files
+        assert_eq!(dir.read_dir().unwrap().collect::<Vec<_>>().len(), 3);
+
+        // Ensure that we get the same bundle after the roundtrip
+        let (_, bundle2) = pack(&dir, None).await.unwrap();
+        assert_eq!(bundle, bundle2);
     }
 }

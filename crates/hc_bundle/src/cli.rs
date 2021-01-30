@@ -43,6 +43,10 @@ pub enum HcDnaBundle {
         /// bundle file, with the same name as the bundle file name.
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
+
+        /// Overwrite an existing directory, if one exists.
+        #[structopt(short = "f", long)]
+        force: bool,
     },
 }
 
@@ -50,8 +54,19 @@ impl HcDnaBundle {
     /// Run this command
     pub async fn run(self) -> HcBundleResult<()> {
         match self {
-            Self::Pack { path, output } => crate::dna::pack(&path, output).await,
-            Self::Unpack { path, output } => crate::dna::unpack(&path, output).await,
+            Self::Pack { path, output } => {
+                let (bundle_path, _) = crate::dna::pack(&path, output).await?;
+                println!("Wrote bundle {}", bundle_path.to_string_lossy());
+            }
+            Self::Unpack {
+                path,
+                output,
+                force,
+            } => {
+                let dir_path = crate::dna::unpack(&path, output, force).await?;
+                println!("Unpacked to directory {}", dir_path.to_string_lossy());
+            }
         }
+        Ok(())
     }
 }

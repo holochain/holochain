@@ -1,5 +1,12 @@
+use std::path::PathBuf;
+
+use crate::io_error::IoError;
+
 #[derive(Debug, thiserror::Error)]
 pub enum MrBundleError {
+    #[error(transparent)]
+    StdIoError(#[from] std::io::Error),
+
     #[error(transparent)]
     BundleError(#[from] BundleError),
 
@@ -11,8 +18,8 @@ pub enum MrBundleError {
     #[error(transparent)]
     PackingError(#[from] PackingError),
 
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
+    #[error("IO error: {0}")]
+    IoError(#[from] IoError),
 
     #[error(transparent)]
     HttpError(#[from] reqwest::Error),
@@ -35,6 +42,11 @@ pub enum BundleError {
 
     #[error("Attempted to resolve a bundled resource not present in this bundle: {0}")]
     BundledResourceMissing(std::path::PathBuf),
+
+    #[error(
+        "Cannot use relative paths for local locations. The following local path is relative: {0}"
+    )]
+    RelativeLocalPath(std::path::PathBuf),
 }
 pub type BundleResult<T> = Result<T, BundleError>;
 
@@ -42,13 +54,19 @@ pub type BundleResult<T> = Result<T, BundleError>;
 #[derive(Debug, thiserror::Error)]
 pub enum UnpackingError {
     #[error(transparent)]
-    IoError(#[from] std::io::Error),
+    StdIoError(#[from] std::io::Error),
+
+    #[error("IO error: {0}")]
+    IoError(#[from] IoError),
 
     #[error(transparent)]
     YamlError(#[from] serde_yaml::Error),
 
     #[error("The supplied path '{0}' has no parent directory.")]
     ParentlessPath(std::path::PathBuf),
+
+    #[error("The target directory '{0}' already exists.")]
+    DirectoryExists(std::path::PathBuf),
 
     #[error("When imploding a bundle directory, the absolute manifest path specified did not match the relative path expected by the manifest.
     Absolute path: '{0}'. Relative path: '{1}'.")]
