@@ -26,7 +26,7 @@ holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.47"
 holochain_zome_types = { path = "../holochain_zome_types" }
 lazy_static = "1.4.0"
-mr_bundle = { path = "../mr_bundle" }
+mr_bundle = { path = "../mr_bundle", features = ["exploding"] }
 must_future = "0.1.1"
 nanoid = "0.3"
 observability = "0.1"

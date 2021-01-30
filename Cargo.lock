@@ -1027,7 +1027,7 @@ version = "0.0.1"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
- "parking_lot 0.10.2",
+ "parking_lot",
  "paste 1.0.3",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -1481,7 +1481,7 @@ dependencies = [
  "num_cpus",
  "observability",
  "once_cell",
- "parking_lot 0.10.2",
+ "parking_lot",
  "predicates",
  "pretty_assertions",
  "rand 0.7.3",
@@ -1622,7 +1622,7 @@ dependencies = [
  "must_future",
  "nanoid",
  "observability",
- "parking_lot 0.10.2",
+ "parking_lot",
  "rand 0.7.3",
  "rkv",
  "rmp-serde 0.15.3",
@@ -2079,15 +2079,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "instant"
-version = "0.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61124eeebbd69b8190558df225adf7e4caafce0d743919e5d6b19652314ec5ec"
-dependencies = [
- "cfg-if 1.0.0",
-]
-
-[[package]]
 name = "iovec"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2341,15 +2332,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lock_api"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd96ffd135b2fd7b973ac026d28085defbe8983df057ced3eb4f2130b0831312"
-dependencies = [
- "scopeguard",
-]
-
-[[package]]
 name = "log"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2574,7 +2556,7 @@ dependencies = [
  "serde_yaml",
  "tempdir",
  "thiserror",
- "tokio 1.1.0",
+ "tokio 0.2.25",
 ]
 
 [[package]]
@@ -2858,19 +2840,8 @@ version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3a704eb390aafdc107b0e392f56a82b668e3a71366993b5340f5833fd62505e"
 dependencies = [
- "lock_api 0.3.4",
- "parking_lot_core 0.7.2",
-]
-
-[[package]]
-name = "parking_lot"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d7744ac029df22dca6284efe4e898991d28e3085c706c972bcd7da4a27a15eb"
-dependencies = [
- "instant",
- "lock_api 0.4.2",
- "parking_lot_core 0.8.2",
+ "lock_api",
+ "parking_lot_core",
 ]
 
 [[package]]
@@ -2881,20 +2852,6 @@ checksum = "d58c7c768d4ba344e3e8d72518ac13e259d7c7ade24167003b8488e10b6740a3"
 dependencies = [
  "cfg-if 0.1.10",
  "cloudabi",
- "libc",
- "redox_syscall 0.1.57",
- "smallvec 1.6.1",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "parking_lot_core"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ccb628cad4f84851442432c60ad8e1f607e29752d0bf072cbd0baf28aa34272"
-dependencies = [
- "cfg-if 1.0.0",
- "instant",
  "libc",
  "redox_syscall 0.1.57",
  "smallvec 1.6.1",
@@ -4002,7 +3959,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fef5f7c7434b2f2c598adc6f9494648a1e41274a75c0ba4056f680ae0c117fd6"
 dependencies = [
  "lazy_static",
- "parking_lot 0.10.2",
+ "parking_lot",
  "serial_test_derive",
 ]
 
@@ -4381,7 +4338,7 @@ dependencies = [
  "pin-project-lite 0.1.11",
  "signal-hook-registry",
  "slab",
- "tokio-macros 0.2.6",
+ "tokio-macros",
  "winapi 0.3.9",
 ]
 
@@ -4396,13 +4353,7 @@ dependencies = [
  "libc",
  "memchr",
  "mio 0.7.7",
- "num_cpus",
- "once_cell",
- "parking_lot 0.11.1",
  "pin-project-lite 0.2.4",
- "signal-hook-registry",
- "tokio-macros 1.0.0",
- "winapi 0.3.9",
 ]
 
 [[package]]
@@ -4410,17 +4361,6 @@ name = "tokio-macros"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e44da00bfc73a25f814cd8d7e57a68a5c31b74b3152a0a1d1f590c97ed06265a"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "tokio-macros"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42517d2975ca3114b22a16192634e8241dc5cc1f130be194645970cc1c371494"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5018,7 +4958,7 @@ dependencies = [
  "libc",
  "nix 0.15.0",
  "page_size",
- "parking_lot 0.10.2",
+ "parking_lot",
  "rustc_version",
  "serde",
  "serde-bench",

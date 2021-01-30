@@ -4,7 +4,7 @@ use crate::{
     util::prune_path,
     Manifest,
 };
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 impl<M: Manifest> Bundle<M> {
     /// Create a directory which contains the manifest as a YAML file,
@@ -65,6 +65,7 @@ impl<M: Manifest> Bundle<M> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn test_pruning() {
