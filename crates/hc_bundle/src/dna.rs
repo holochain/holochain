@@ -51,7 +51,7 @@ pub const DNA_BUNDLE_EXT: &str = ".dna";
 /// Unpack a DnaFile into a working directory
 pub async fn unpack(
     bundle_path: &impl AsRef<std::path::Path>,
-    target_dir: Option<&Path>,
+    target_dir: Option<PathBuf>,
 ) -> HcBundleResult<()> {
     let bundle_path = bundle_path.as_ref().canonicalize()?;
     let bundle: DnaBundle = mr_bundle::Bundle::read_from_file(&bundle_path)
@@ -59,7 +59,7 @@ pub async fn unpack(
         .into();
 
     let target_dir = if let Some(d) = target_dir {
-        d.to_owned()
+        d
     } else {
         bundle_path_to_dir(&bundle_path)?
     };
@@ -85,18 +85,25 @@ fn bundle_path_to_dir(path: &Path) -> HcBundleResult<PathBuf> {
         .join(stem))
 }
 
-/// Compress a directory containing a DNA manifest into a DnaBundle
-pub async fn compress(
-    manifest_path: &impl AsRef<std::path::Path>,
-    target_path: Option<&Path>,
+/// Pack a directory containing a DNA manifest into a DnaBundle
+pub async fn pack(
+    dir_path: &impl AsRef<std::path::Path>,
+    target_path: Option<PathBuf>,
 ) -> HcBundleResult<()> {
-    let manifest_path = manifest_path.as_ref().canonicalize()?;
+    let dir_path = dir_path.as_ref().canonicalize()?;
+    let manifest_path = dir_path.join(&DnaManifest::relative_path());
     let bundle: DnaBundle = mr_bundle::Bundle::pack_yaml(&manifest_path).await?.into();
     let target_path = target_path
-        .map(|p| Ok(p.to_owned()))
-        .unwrap_or_else(|| bundle.find_root_dir(&manifest_path))?;
+        .map(Ok)
+        .unwrap_or_else(|| dir_to_bundle_path(&dir_path))?;
     bundle.write_to_file(&target_path).await?;
     Ok(())
+}
+
+fn dir_to_bundle_path(dir_path: &Path) -> HcBundleResult<PathBuf> {
+    let dir_name = dir_path.file_name().expect("Cannot pack `/`");
+    let parent_path = dir_path.parent().expect("Cannot pack `/`");
+    Ok(parent_path.join(format!("{}.dna", dir_name.to_string_lossy())))
 }
 
 /// See `holochain_types::dna::zome::Zome`.

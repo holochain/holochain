@@ -1,5 +1,4 @@
 use hc_bundle::cli::HcDnaBundle;
-use hc_bundle::error::HcBundleResult;
 use structopt::StructOpt;
 
 /// Main `hc-dna` executable entrypoint.

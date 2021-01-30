@@ -13,7 +13,7 @@ pub struct DnaManifest {
 
     /// A UUID for uniquifying this Dna.
     // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
-    pub uuid: String,
+    pub uuid: Option<String>,
 
     /// Any arbitrary application properties can be included in this object.
     pub properties: Option<YamlProperties>,
@@ -44,6 +44,14 @@ impl mr_bundle::Manifest for DnaManifest {
     }
 
     fn path(&self) -> PathBuf {
+        Self::relative_path()
+    }
+}
+
+impl DnaManifest {
+    /// The path of the manifest, relative to an unpacked working directory.
+    /// The manifest must live at the root and be named "dna.yaml".
+    pub fn relative_path() -> PathBuf {
         "dna.yaml".into()
     }
 }

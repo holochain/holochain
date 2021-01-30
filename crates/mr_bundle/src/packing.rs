@@ -1,6 +1,6 @@
 use super::Bundle;
 use crate::{
-    error::{UnpackingError, UnpackingResult, PackingError, MrBundleResult},
+    error::{MrBundleResult, PackingError, UnpackingError, UnpackingResult},
     util::prune_path,
     Manifest,
 };

@@ -163,7 +163,6 @@ async fn unpack_roundtrip() {
     let unpacked_dir = dir.path().join("unpacked");
     bundle.unpack_yaml(&unpacked_dir).await.unwrap();
 
-    dbg!(unpacked_dir.read_dir().unwrap().collect::<Vec<_>>());
     assert!(unpacked_dir.join("test-manifest.yaml").is_file());
     assert!(unpacked_dir.join("another/nested/bundled.thing").is_file());
     assert!(!unpacked_dir.join("deeply/nested/local.thing").exists());
