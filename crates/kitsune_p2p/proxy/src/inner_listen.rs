@@ -3,6 +3,7 @@ use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::dependencies::serde_json;
+use observability::tracing::Instrument;
 use std::collections::HashMap;
 
 /// How often should NAT nodes refresh their proxy contract?
@@ -74,25 +75,29 @@ pub async fn spawn_kitsune_proxy_listener(
 
         // Set up a timer to refresh our proxy contract at keepalive interval
         let i_s_c = i_s.clone();
-        tokio::task::spawn(async move {
-            loop {
-                tokio::time::delay_for(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS)).await;
+        tokio::task::spawn(
+            async move {
+                loop {
+                    tokio::time::delay_for(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS))
+                        .await;
 
-                if let Err(e) = i_s_c.req_proxy(proxy_url.clone()).await {
-                    tracing::error!(msg = "renewing proxy failed", ?proxy_url, ?e);
-                    // either we failed because the actor is already shutdown
-                    // or the remote end rejected us.
-                    // if it's the latter - shut down our ghost actor : )
-                    if !i_s_c.ghost_actor_is_active() {
-                        tracing::debug!("Ghost actor has closed so exiting keep alive");
-                        break;
+                    if let Err(e) = i_s_c.req_proxy(proxy_url.clone()).await {
+                        tracing::error!(msg = "renewing proxy failed", ?proxy_url, ?e);
+                        // either we failed because the actor is already shutdown
+                        // or the remote end rejected us.
+                        // if it's the latter - shut down our ghost actor : )
+                        if !i_s_c.ghost_actor_is_active() {
+                            tracing::debug!("Ghost actor has closed so exiting keep alive");
+                            break;
+                        }
+                    } else {
+                        tracing::info!("Proxy renewed for {:?}", proxy_url);
                     }
-                } else {
-                    tracing::info!("Proxy renewed for {:?}", proxy_url);
                 }
+                tracing::error!("Keep alive closed");
             }
-            tracing::error!("Keep alive closed");
-        });
+            .instrument(tracing::debug_span!("keep_alive")),
+        );
     }
 
     // handle incoming channels from our sub transport
