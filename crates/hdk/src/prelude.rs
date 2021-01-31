@@ -11,7 +11,7 @@ pub use crate::{
     },
     debug,
     entry::{create_entry::create_entry, delete_entry::delete_entry, update_entry::update_entry},
-    entry_def, entry_defs,
+    app_entry, entry_interface, entry_def, entry_defs,
     hash_path::{
         anchor::{
             anchor, get_anchor, list_anchor_addresses, list_anchor_tags,
