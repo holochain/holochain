@@ -23,7 +23,7 @@ serde_derive = "1.0.104"
 serde_yaml = "0.8"
 structopt = "0.3"
 tracing = "=0.1.21"
-thiserror = "1.0.22"
+thiserror = "1.0.23"
 url2 = "0.0.6"
 
 [dev-dependencies]

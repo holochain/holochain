@@ -26,6 +26,6 @@ mockall = "0.8.1"
 observability = "0.1.2" 
 serde = { version = "1.0.104", features = [ "derive" ] }
 serde_bytes = "0.11"
-thiserror = "1.0.22"
+thiserror = "1.0.23"
 tokio = { version = "0.2", features = [ "full" ] }
 tokio_safe_block_on = "0.1.2"

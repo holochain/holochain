@@ -54,7 +54,7 @@ shrinkwraprs = "0.3.0"
 structopt = "0.3.11"
 strum = "0.18.0"
 tempdir = "0.3.7"
-thiserror = "1.0.22"
+thiserror = "1.0.23"
 tokio = { version = "0.2.11", features = [ "full" ] }
 tokio_safe_block_on = "0.1.2"
 toml = "0.5.6"

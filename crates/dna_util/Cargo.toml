@@ -20,7 +20,7 @@ serde = { version = "1.0.104", features = [ "derive" ] }
 serde_bytes = "0.11"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 structopt = "0.3.11"
-thiserror = "1.0.22"
+thiserror = "1.0.23"
 tokio = { version = "0.2", features = [ "full" ] }
 
 [dev-dependencies]

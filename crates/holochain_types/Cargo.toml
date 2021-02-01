@@ -38,7 +38,7 @@ serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 shrinkwraprs = "0.3.0"
 strum = "0.18.0"
 tempdir = "0.3.7"
-thiserror = "1.0.22"
+thiserror = "1.0.23"
 tokio = { version = "0.2", features = [ "blocking" ] }
 tokio_safe_block_on = "0.1.2"
 tracing = "=0.1.21"
