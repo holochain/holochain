@@ -37,7 +37,7 @@ fixt = { version = "0.0.1", path = "../fixt" }
 hdk3 = { version = "0.0.1", path = "../hdk3" }
 holochain_wasm_test_utils = { path = "../test_utils/wasm" }
 matches = "0.1.8"
-observability = "0.1"
+observability = "0.1.2"
 pretty_assertions = "0.6.1"
 
 [features]

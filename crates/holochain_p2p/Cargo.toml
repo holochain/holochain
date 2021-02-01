@@ -23,7 +23,7 @@ holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 kitsune_p2p_types = { version = "0.0.1", path = "../kitsune_p2p/types" }
 mockall = "0.8.1"
-observability = "0.1"
+observability = "0.1.2" 
 serde = { version = "1.0.104", features = [ "derive" ] }
 serde_bytes = "0.11"
 thiserror = "1.0"

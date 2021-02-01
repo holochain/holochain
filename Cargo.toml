@@ -49,7 +49,7 @@ rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
 lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }
 #lmdb-rkv = { path = "../../rust/lmdb-rs" }
 # observability = { path = "../../rust/observability" }
-observability = { git = "https://github.com/freesig/observability.git", branch = "main" }
+# observability = { git = "https://github.com/freesig/observability.git", branch = "main" }
 # holochain_wasmer_guest = { path = "../holochain-wasmer/crates/guest" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "remote_signal" }
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "remote_signal" }
