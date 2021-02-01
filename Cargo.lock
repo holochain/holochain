@@ -921,7 +921,7 @@ dependencies = [
  "holochain_zome_types",
  "serde",
  "serde_bytes",
- "serde_json",
+ "serde_yaml",
  "structopt",
  "tempdir",
  "thiserror",
@@ -1423,6 +1423,7 @@ version = "0.0.1"
 dependencies = [
  "base64 0.12.3",
  "blake2b_simd",
+ "derive_more",
  "fixt",
  "holochain_serialized_bytes",
  "rand 0.7.3",
@@ -1485,7 +1486,6 @@ dependencies = [
  "rand 0.7.3",
  "ring",
  "serde",
- "serde_json",
  "serde_yaml",
  "serial_test",
  "shrinkwraprs",
@@ -1755,7 +1755,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_derive",
- "serde_json",
+ "serde_yaml",
  "shrinkwraprs",
  "strum",
  "tempdir",
@@ -2193,7 +2193,7 @@ dependencies = [
  "nanoid",
  "observability",
  "rmp-serde 0.15.3",
- "rustls 0.18.1",
+ "rustls 0.19.0",
  "serde",
  "serde_bytes",
  "structopt",
@@ -2234,6 +2234,7 @@ dependencies = [
  "rmp-serde 0.15.3",
  "serde",
  "serde_json",
+ "sysinfo",
  "thiserror",
  "tokio 0.2.25",
  "tracing-subscriber",
@@ -2728,7 +2729,8 @@ checksum = "a9a7ab5d64814df0fe4a4b5ead45ed6c5f181ee3ff04ba344313a6c80446c5d4"
 [[package]]
 name = "observability"
 version = "0.1.2"
-source = "git+https://github.com/freesig/observability.git?branch=main#7764105ecf331956b3a51f6ddc19bb3c1889f348"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "695f7586c38395841bd94ec7b94ddacd03723ce276fbfa2e95091fb022d1ce0e"
 dependencies = [
  "chrono",
  "derive_more",
@@ -3758,11 +3760,11 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.18.1"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d1126dcf58e93cee7d098dbda643b5f92ed724f1f6a63007c1116eed6700c81"
+checksum = "064fd21ff87c6e87ed4506e68beb42459caa4a0e2eb144932e6776768556980b"
 dependencies = [
- "base64 0.12.3",
+ "base64 0.13.0",
  "log",
  "ring",
  "sct",
@@ -4204,6 +4206,23 @@ dependencies = [
  "quote",
  "syn",
  "unicode-xid",
+]
+
+[[package]]
+name = "sysinfo"
+version = "0.15.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de94457a09609f33fec5e7fceaf907488967c6c7c75d64da6a7ce6ffdb8b5abd"
+dependencies = [
+ "cc",
+ "cfg-if 1.0.0",
+ "core-foundation-sys 0.8.2",
+ "doc-comment",
+ "libc",
+ "ntapi",
+ "once_cell",
+ "rayon",
+ "winapi 0.3.9",
 ]
 
 [[package]]

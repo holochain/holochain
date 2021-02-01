@@ -77,9 +77,9 @@ and they will be available in `target/wasm32-unknown-unknown/release/`
 *Note: Soon, this process will be easier in that it will not require a `.dna.workdir`*
 
 1. Create a `demo.dna.workdir` directory (replace "demo" with whatever you want)
-2. Create a `demo.dna.workdir/dna.json` file which references the `*.wasm` files you built in the previous step. See the [dna.json](dna.json) file in this repo for an example.
-  - Note: this is a bit hacky right now. Normally when using a dna.workdir, you would include the Wasms alongside the `dna.json` in the same directory. However, it is easier for the purposes of this tutorial to let the `dna.json` reference Wasms in a different directory. The workdir construct becomes more useful when you need to go back and forth between an already-built DNA and its constituent Wasms.
-3. Run the following command to assemble your Wasms into a DNA file per your dna.json:
+2. Create a `demo.dna.workdir/dna.yaml` file which references the `*.wasm` files you built in the previous step. See the [dna.yaml](dna.yaml) file in this repo for an example.
+  - Note: this is a bit hacky right now. Normally when using a dna.workdir, you would include the Wasms alongside the `dna.yaml` in the same directory. However, it is easier for the purposes of this tutorial to let the `dna.yaml` reference Wasms in a different directory. The workdir construct becomes more useful when you need to go back and forth between an already-built DNA and its constituent Wasms.
+3. Run the following command to assemble your Wasms into a DNA file per your dna.yaml:
 
 ```bash
 dna-util -c demo.dna.workdir

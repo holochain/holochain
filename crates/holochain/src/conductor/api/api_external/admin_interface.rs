@@ -254,7 +254,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
 /// Reads the [Dna] from disk and parses to [SerializedBytes]
 async fn read_parse_dna(
     dna_path: PathBuf,
-    properties: Option<JsonProperties>,
+    properties: Option<YamlProperties>,
 ) -> ConductorApiResult<DnaFile> {
     let dna_content = tokio::fs::read(dna_path)
         .await
@@ -364,10 +364,8 @@ mod test {
         );
 
         // with a property should install and produce a different hash
-        let json = serde_json::json!({
-            "some prop": "foo",
-        });
-        hash_payload.properties = Some(JsonProperties::new(json.clone()));
+        let json: serde_yaml::Value = serde_yaml::from_str("some prop: \"foo\"").unwrap();
+        hash_payload.properties = Some(YamlProperties::new(json.clone()));
         let install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload.clone())))
             .await;
@@ -462,11 +460,12 @@ mod test {
             installed_app_id: "test-by-path".to_string(),
             cell_data: vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
         };
-        let path_install_payload = InstallAppPayload {
+        let path_install_payload: InstallAppPayload = InstallAppPayload {
             dnas: vec![path_payload],
             installed_app_id: "test-by-path".to_string(),
             agent_key: agent_key2,
-        };
+        }
+        .into();
 
         let install_response = admin_api
             .handle_admin_request(AdminRequest::InstallApp(Box::new(path_install_payload)))
@@ -521,13 +520,16 @@ mod test {
         let uuid = Uuid::new_v4();
         let dna = fake_dna_file(&uuid.to_string());
         let (dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await?;
-        let json = serde_json::json!({
-            "test": "example",
-            "how_many": 42,
-        });
-        let properties = Some(JsonProperties::new(json.clone()));
+        let json: serde_yaml::Value = serde_yaml::from_str(
+            r#"
+test: "example"
+how_many": 42
+        "#,
+        )
+        .unwrap();
+        let properties = Some(YamlProperties::new(json.clone()));
         let result = read_parse_dna(dna_path, properties).await?;
-        let properties = JsonProperties::new(json);
+        let properties = YamlProperties::new(json);
         let mut dna = dna.dna_def().clone();
         dna.properties = properties.try_into().unwrap();
         assert_eq!(&dna, result.dna_def());

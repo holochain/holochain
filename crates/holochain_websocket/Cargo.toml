@@ -25,4 +25,4 @@ url2 = "0.0.6"
 [dev-dependencies]
 holochain_types = { version = "=0.0.1", path = "../holochain_types" }
 linefeed = "0.6"
-observability = "0.1"
+observability = "0.1.2"

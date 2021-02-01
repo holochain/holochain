@@ -38,7 +38,7 @@ pub async fn spawn_transport_pool() -> TransportResult<(
 
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
 
-    tokio::task::spawn(builder.spawn(Inner {
+    crate::metrics::metric_task(builder.spawn(Inner {
         i_s,
         sub_listeners: HashMap::new(),
         evt_send,
@@ -113,12 +113,14 @@ impl TransportPoolHandler for Inner {
 
             i_s.inject_listener(scheme, sub_listener).await?;
 
-            tokio::task::spawn(async move {
+            crate::metrics::metric_task(async move {
                 while let Some(evt) = sub_event.next().await {
                     if evt_send.send(evt).await.is_err() {
                         break;
                     }
                 }
+
+                <Result<(), ()>>::Ok(())
             });
 
             Ok(())
@@ -200,7 +202,7 @@ mod tests {
     use futures::stream::StreamExt;
 
     fn test_receiver(mut recv: TransportEventReceiver) {
-        tokio::task::spawn(async move {
+        crate::metrics::metric_task(async move {
             while let Some(evt) = recv.next().await {
                 match evt {
                     TransportEvent::IncomingChannel(url, mut write, read) => {

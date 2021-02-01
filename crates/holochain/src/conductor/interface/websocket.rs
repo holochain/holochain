@@ -214,9 +214,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
                 }
                 break;
             }
-            Err(e) => {
-                error!(error = &e as &dyn std::error::Error)
-            }
+            Err(e) => error!(error = &e as &dyn std::error::Error),
             Ok(()) => {}
         }
     }
@@ -359,14 +357,13 @@ pub mod test {
     use holochain_lmdb::test_utils::test_environments;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::source_chain::SourceChainBuf;
-    use holochain_types::app::InstallAppDnaPayload;
-    use holochain_types::app::InstallAppPayload;
     use holochain_types::app::InstalledCell;
     use holochain_types::dna::DnaDef;
     use holochain_types::dna::DnaFile;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_types::test_utils::fake_dna_zomes;
+    use holochain_types::{app::InstallAppDnaPayload, prelude::InstallAppPayload};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
     use holochain_zome_types::cell::CellId;
