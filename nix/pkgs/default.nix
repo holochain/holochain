@@ -16,6 +16,7 @@ let
     cargo run --target-dir=''${CARGO_TARGET_DIR:?} --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml -- $@
   '';
 
+  ci = callPackage ./ci.nix { };
   core = callPackage ./core.nix { };
   happ = let
     mkHolochainBinaryScript = crate: writeShellScriptBin (builtins.replaceStrings ["_"] ["-"] crate) ''
@@ -29,6 +30,7 @@ let
   all = {
     inherit
       core
+      ci
       happ
       ;
   };

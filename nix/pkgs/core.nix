@@ -4,6 +4,7 @@
 , writeShellScriptBin
 
 , holonix
+, holonixPath
 }:
 
 rec {

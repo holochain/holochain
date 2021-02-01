@@ -42,8 +42,12 @@ rec {
     nativeBuildInputs = builtins.attrValues (pkgs.core);
   };
 
-  # we may need more packages on CI
-  ci = coreDev;
+  ci = hcMkShell {
+    inputsFrom = [
+      (builtins.removeAttrs coreDev [ "shellHook" ])
+    ];
+    nativeBuildInputs = builtins.attrValues pkgs.ci;
+  };
 
   happDev = hcMkShell {
     inputsFrom = [
