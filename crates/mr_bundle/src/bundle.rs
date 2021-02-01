@@ -13,6 +13,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub type ResourceMap = HashMap<PathBuf, ResourceBytes>;
+
 /// A Manifest bundled together, optionally, with the Resources that it describes.
 /// This is meant to be serialized for standalone distribution, and deserialized
 /// by the receiver.
@@ -33,7 +35,7 @@ where
     /// The full or partial resource data. Each entry must correspond to one
     /// of the Bundled Locations specified by the Manifest. Bundled Locations
     /// are always relative paths (relative to the root_dir).
-    resources: HashMap<PathBuf, ResourceBytes>,
+    resources: ResourceMap,
 
     /// Since the Manifest may contain local paths referencing unbundled files,
     /// on the local filesystem, we must have an absolute path at runtime for
@@ -62,27 +64,28 @@ where
     ///
     /// A base directory must also be supplied so that relative paths can be
     /// resolved into absolute ones
-    pub fn new(
+    pub fn new<R: IntoIterator<Item = (PathBuf, ResourceBytes)>>(
         manifest: M,
-        resources: Vec<(PathBuf, ResourceBytes)>,
+        resources: R,
         root_dir: PathBuf,
     ) -> MrBundleResult<Self> {
         Self::from_parts(manifest, resources, Some(root_dir))
     }
 
     /// Create a bundle, but without
-    pub fn new_unchecked(
+    pub fn new_unchecked<R: IntoIterator<Item = (PathBuf, ResourceBytes)>>(
         manifest: M,
-        resources: Vec<(PathBuf, ResourceBytes)>,
+        resources: R,
     ) -> MrBundleResult<Self> {
         Self::from_parts(manifest, resources, None)
     }
 
-    pub fn from_parts(
+    pub fn from_parts<R: IntoIterator<Item = (PathBuf, ResourceBytes)>>(
         manifest: M,
-        resources: Vec<(PathBuf, ResourceBytes)>,
+        resources: R,
         root_dir: Option<PathBuf>,
     ) -> MrBundleResult<Self> {
+        let resources: ResourceMap = resources.into_iter().collect();
         let manifest_paths: HashSet<_> = manifest
             .locations()
             .into_iter()
@@ -164,7 +167,7 @@ where
     /// Access the map of resources included in this bundle
     /// Bundled resources are also accessible via `resolve` or `resolve_all`,
     /// but using this method prevents a Clone
-    pub fn bundled_resources(&self) -> &HashMap<PathBuf, ResourceBytes> {
+    pub fn bundled_resources(&self) -> &ResourceMap {
         &self.resources
     }
 
@@ -178,10 +181,6 @@ where
     /// Decode bytes produced by `to_bytes`
     pub fn decode(bytes: &[u8]) -> MrBundleResult<Self> {
         crate::decode(bytes)
-    }
-
-    fn normalized_locations(&self) -> MrBundleResult<Vec<Location>> {
-        normalized_locations(self.root_dir.as_ref(), self.manifest.locations())
     }
 
     /// Given that the Manifest is located at the given absolute `path`, find
@@ -200,16 +199,6 @@ where
     pub fn find_root_dir(&self, path: &Path) -> MrBundleResult<PathBuf> {
         crate::util::prune_path(path.into(), self.manifest.path()).map_err(Into::into)
     }
-}
-
-fn normalized_locations(
-    root_dir: Option<&PathBuf>,
-    locations: Vec<Location>,
-) -> MrBundleResult<Vec<Location>> {
-    locations
-        .into_iter()
-        .map(|loc| loc.normalize(root_dir))
-        .collect::<Result<Vec<_>, _>>()
 }
 
 #[cfg(test)]
