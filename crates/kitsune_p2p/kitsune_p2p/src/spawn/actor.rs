@@ -43,6 +43,7 @@ pub(crate) struct KitsuneP2pActor {
 
 fn build_transport(
     t_conf: TransportConfig,
+    tuning_params: Arc<kitsune_p2p_types::config::KitsuneP2pTuningParams>,
     tls_config: Arc<kitsune_p2p_proxy::TlsConfig>,
 ) -> must_future::MustBoxFuture<
     'static,
@@ -72,7 +73,8 @@ fn build_transport(
                 proxy_config,
             } => {
                 let (sub_lstn, sub_evt) =
-                    build_transport(*sub_transport, tls_config.clone()).await?;
+                    build_transport(*sub_transport, tuning_params.clone(), tls_config.clone())
+                        .await?;
                 let sub_conf = match proxy_config {
                     ProxyConfig::RemoteProxyClient { proxy_url } => {
                         kitsune_p2p_proxy::ProxyConfig::remote_proxy_client(
@@ -94,10 +96,13 @@ fn build_transport(
                         },
                     ),
                 };
-                Ok(
-                    kitsune_p2p_proxy::spawn_kitsune_proxy_listener(sub_conf, sub_lstn, sub_evt)
-                        .await?,
+                Ok(kitsune_p2p_proxy::spawn_kitsune_proxy_listener(
+                    sub_conf,
+                    tuning_params,
+                    sub_lstn,
+                    sub_evt,
                 )
+                .await?)
             }
         }
     })
@@ -115,7 +120,8 @@ impl KitsuneP2pActor {
         let tls_config = Arc::new(tls_config);
         let (t_pool, transport, t_event) = spawn_transport_pool().await?;
         for t_conf in config.transport_pool.clone() {
-            let (l, e) = build_transport(t_conf, tls_config.clone()).await?;
+            let (l, e) =
+                build_transport(t_conf, config.tuning_params.clone(), tls_config.clone()).await?;
             t_pool.push_sub_transport(l, e).await?;
         }
 
