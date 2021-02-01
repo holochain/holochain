@@ -46,15 +46,8 @@ impl Invocation for EntryDefsInvocation {
     fn fn_components(&self) -> FnComponents {
         vec!["entry_defs".into()].into()
     }
-    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
-        Ok(ExternInput::new(().try_into()?))
-    }
-}
-
-impl TryFrom<EntryDefsInvocation> for ExternInput {
-    type Error = SerializedBytesError;
-    fn try_from(_: EntryDefsInvocation) -> Result<Self, Self::Error> {
-        Ok(Self::new(().try_into()?))
+    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
+        ExternIO::encode(())
     }
 }
 
@@ -98,10 +91,9 @@ mod test {
     use crate::fixt::EntryDefsInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
-    use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::entry_def::EntryDefsCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::ExternIO;
     use std::collections::BTreeMap;
 
     #[test]
@@ -213,10 +205,7 @@ mod test {
 
         let host_input = entry_defs_invocation.clone().host_input().unwrap();
 
-        assert_eq!(
-            host_input,
-            ExternInput::new(SerializedBytes::try_from(()).unwrap()),
-        );
+        assert_eq!(host_input, ExternIO::encode(()).unwrap());
     }
 }
 

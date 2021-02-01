@@ -143,20 +143,15 @@ impl RealRibosome {
                         ctx,
                         guest_allocation_ptr,
                     )?;
-                    // this will be run in a tokio background thread
-                    // designed for doing blocking work.
-                    let output_sb: holochain_wasmer_host::prelude::SerializedBytes =
-                        $host_function(
-                            std::sync::Arc::clone(&closure_self_arc),
-                            std::sync::Arc::clone(&closure_call_context_arc),
-                            input,
-                        )
-                        .map_err(|e| WasmError::Zome(format!("{:?}", e)))?
-                        .try_into()?;
 
-                    Ok($crate::holochain_wasmer_host::import::set_context_data(
-                        ctx, output_sb,
-                    ))
+                    let output = $host_function(
+                        std::sync::Arc::clone(&closure_self_arc),
+                        std::sync::Arc::clone(&closure_call_context_arc),
+                        input,
+                    )
+                    .map_err(|e| WasmError::Zome(format!("{:?}", e)))?;
+
+                    $crate::holochain_wasmer_host::import::set_context_data(ctx, output)
                 }
             }};
         }
@@ -404,7 +399,7 @@ impl RibosomeT for RealRibosome {
         invocation: &I,
         zome: &Zome,
         to_call: &FunctionName,
-    ) -> Result<Option<ExternOutput>, RibosomeError> {
+    ) -> Result<Option<ExternIO>, RibosomeError> {
         let call_context = CallContext {
             zome: zome.clone(),
             host_access,
@@ -420,16 +415,16 @@ impl RibosomeT for RealRibosome {
                     // because it builds guards against memory leaks and handles imports correctly
                     let mut instance = self.instance(call_context)?;
 
-                    let result: ExternOutput = holochain_wasmer_host::guest::call(
+                    let result: Result<ExternIO, WasmError> = holochain_wasmer_host::guest::call(
                         &mut instance,
                         to_call.as_ref(),
                         // be aware of this clone!
                         // the whole invocation is cloned!
                         // @todo - is this a problem for large payloads like entries?
                         invocation.to_owned().host_input()?,
-                    )?;
+                    );
 
-                    Ok(Some(result))
+                    Ok(Some(result?))
                 } else {
                     // the func doesn't exist
                     // the callback is not implemented
@@ -465,7 +460,7 @@ impl RibosomeT for RealRibosome {
             let zome_name = invocation.zome.zome_name().clone();
             let fn_name = invocation.fn_name.clone();
 
-            let guest_output: ExternOutput =
+            let guest_output: ExternIO =
                 match self.call_iterator(host_access.into(), invocation).next()? {
                     Some(result) => result.1,
                     None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
@@ -545,7 +540,6 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use holochain_test_wasm_common::TestString;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
@@ -564,14 +558,14 @@ pub mod wasm_test {
         let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
         host_access.workspace = workspace_lock;
 
-        let foo_result: TestString =
+        let foo_result: String =
             crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "foo", ());
 
-        assert_eq!("foo", foo_result.0.as_str());
+        assert_eq!("foo", foo_result.as_str());
 
-        let bar_result: TestString =
+        let bar_result: String =
             crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "bar", ());
 
-        assert_eq!("foobar", bar_result.0.as_str());
+        assert_eq!("foobar", bar_result.as_str());
     }
 }

@@ -18,26 +18,26 @@ fn msg() -> Msg {
 
 #[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<HeaderHash> {
-    Ok(hdk3::prelude::create_entry(&post())?)
+    hdk3::prelude::create_entry(&post())
 }
 
 #[hdk_extern]
-fn get_entry(_: ()) -> ExternResult<GetOutput> {
-    Ok(GetOutput::new(get(
+fn get_entry(_: ()) -> ExternResult<Option<Element>> {
+    get(
         hash_entry(&post())?,
         GetOptions::latest(),
-    )?))
+    )
 }
 
 #[hdk_extern]
 fn update_entry(_: ()) -> ExternResult<HeaderHash> {
     let header_hash = hdk3::prelude::create_entry(&post())?;
-    Ok(hdk3::prelude::update_entry(header_hash, &post())?)
+    hdk3::prelude::update_entry(header_hash, &post())
 }
 
 #[hdk_extern]
 /// Updates to a different entry, this will fail
 fn invalid_update_entry(_: ()) -> ExternResult<HeaderHash> {
     let header_hash = hdk3::prelude::create_entry(&post())?;
-    Ok(hdk3::prelude::update_entry(header_hash, &msg())?)
+    hdk3::prelude::update_entry(header_hash, &msg())
 }

@@ -42,11 +42,11 @@ use tokio::sync::mpsc;
 
 pub use itertools;
 
-use self::cool::CoolCell;
+use self::sweetest::SweetCell;
 
 pub mod conductor_setup;
-pub mod cool;
 pub mod host_fn_caller;
+pub mod sweetest;
 
 /// Produce file and line number info at compile-time
 #[macro_export]
@@ -357,7 +357,7 @@ impl WaitOps {
 }
 
 /// Wait for all cells to reach consistency for 10 seconds
-pub async fn consistency_10s(all_cells: &[&CoolCell]) {
+pub async fn consistency_10s(all_cells: &[&SweetCell]) {
     const NUM_ATTEMPTS: usize = 100;
     const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
     consistency(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
@@ -365,7 +365,7 @@ pub async fn consistency_10s(all_cells: &[&CoolCell]) {
 
 /// Wait for all cells to reach consistency
 #[tracing::instrument(skip(all_cells))]
-pub async fn consistency(all_cells: &[&CoolCell], num_attempts: usize, delay: Duration) {
+pub async fn consistency(all_cells: &[&SweetCell], num_attempts: usize, delay: Duration) {
     let all_cell_envs: Vec<_> = all_cells.iter().map(|c| c.env()).collect();
     consistency_envs(&all_cell_envs[..], num_attempts, delay).await
 }
@@ -650,14 +650,14 @@ pub fn new_zome_call<P, Z: Into<ZomeName>>(
     zome: Z,
 ) -> Result<ZomeCall, SerializedBytesError>
 where
-    P: TryInto<SerializedBytes, Error = SerializedBytesError>,
+    P: serde::Serialize,
 {
     Ok(ZomeCall {
         cell_id: cell_id.clone(),
         zome_name: zome.into(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
-        payload: ExternInput::new(payload.try_into()?),
+        payload: ExternIO::encode(payload)?,
         provenance: cell_id.agent_pubkey().clone(),
     })
 }
@@ -670,14 +670,14 @@ pub fn new_invocation<P, Z: Into<Zome>>(
     zome: Z,
 ) -> Result<ZomeCallInvocation, SerializedBytesError>
 where
-    P: TryInto<SerializedBytes, Error = SerializedBytesError>,
+    P: serde::Serialize,
 {
     Ok(ZomeCallInvocation {
         cell_id: cell_id.clone(),
         zome: zome.into(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
-        payload: ExternInput::new(payload.try_into()?),
+        payload: ExternIO::encode(payload)?,
         provenance: cell_id.agent_pubkey().clone(),
     })
 }

@@ -33,7 +33,7 @@ holochain_serialized_bytes = "=0.0.47"
 holochain_state = { version = "0.0.1", path = "../holochain_state" }
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
 holochain_wasm_test_utils = { version = "0.0.1", path = "../test_utils/wasm" }
-holochain_wasmer_host = "=0.0.53"
+holochain_wasmer_host = "0.0.64"
 holochain_websocket = { version = "0.0.1", path = "../holochain_websocket" }
 holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
 human-panic = "1.0.3"
@@ -42,7 +42,7 @@ mockall = "0.8"
 must_future = "0.1.1"
 nanoid = "0.3"
 num_cpus = "1.8"
-observability = "0.1"
+observability = "0.1.2"
 parking_lot = "0.10"
 predicates = "1.0.4"
 rand = "0.7"

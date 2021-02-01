@@ -368,7 +368,7 @@ pub mod test {
     use holochain_websocket::WebsocketMessage;
     use holochain_zome_types::cell::CellId;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
-    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::ExternIO;
     use kitsune_p2p::agent_store::AgentInfoSigned;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use matches::assert_matches;
@@ -525,7 +525,7 @@ pub mod test {
                 cell_id.clone(),
                 TestWasm::Foo.into(),
                 "foo".into(),
-                ExternInput::new(().try_into().unwrap()),
+                ExternIO::encode(()).unwrap(),
             ))
             .next()
             .unwrap()

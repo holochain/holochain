@@ -28,7 +28,7 @@ holochain_zome_types = { path = "../holochain_zome_types" }
 lazy_static = "1.4.0"
 must_future = "0.1.1"
 nanoid = "0.3"
-observability = "0.1"
+observability = "0.1.2"
 rand = "0.7"
 regex = "1.1.2"
 serde = { version = "1.0.104", features = [ "derive", "rc" ] }

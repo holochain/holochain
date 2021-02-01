@@ -137,7 +137,7 @@ impl TestConductorHandle {
     }
 
     /// `call_zome_ok`, but with arguments provided individually
-    pub async fn call_zome_ok_flat<I, O, Z, F, E>(
+    pub async fn call_zome_ok_flat<I, O, Z, F>(
         &self,
         cell_id: &CellId,
         zome_name: Z,
@@ -147,13 +147,12 @@ impl TestConductorHandle {
         payload: I,
     ) -> O
     where
-        E: std::fmt::Debug,
         ZomeName: From<Z>,
         FunctionName: From<F>,
-        SerializedBytes: TryFrom<I, Error = E>,
-        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
+        I: Serialize,
+        O: DeserializeOwned + std::fmt::Debug,
     {
-        let payload = ExternInput::new(payload.try_into().expect("Couldn't serialize payload"));
+        let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
         let provenance = provenance.unwrap_or_else(|| cell_id.agent_pubkey().clone());
         let call = ZomeCall {
             cell_id: cell_id.clone(),
@@ -165,9 +164,7 @@ impl TestConductorHandle {
         };
         let response = self.0.call_zome(call).await.unwrap().unwrap();
         unwrap_to!(response => ZomeCallResponse::Ok)
-            .clone()
-            .into_inner()
-            .try_into()
+            .decode()
             .expect("Couldn't deserialize zome call output")
     }
 }
@@ -198,13 +195,12 @@ where
     pub provenance: Option<AgentPubKey>,
 }
 
-impl<'a, P, F, E> From<TestZomeCall<'a, P, F, E>> for ZomeCallInvocation
+impl<'a, P, F> From<TestZomeCall<'a, P, F>> for ZomeCallInvocation
 where
-    SerializedBytes: TryFrom<P, Error = E>,
-    E: std::fmt::Debug,
+    P: Serialize,
     FunctionName: From<F>,
 {
-    fn from(tzci: TestZomeCall<'a, P, F, E>) -> Self {
+    fn from(tzci: TestZomeCall<'a, P, F>) -> Self {
         let TestZomeCall {
             cell_id,
             zome,
@@ -213,7 +209,7 @@ where
             provenance,
             payload,
         } = tzci;
-        let payload = ExternInput::new(payload.try_into().expect("Couldn't serialize payload"));
+        let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
         let provenance = provenance.unwrap_or_else(|| cell_id.agent_pubkey().clone());
         ZomeCallInvocation {
             cell_id: cell_id.clone(),
