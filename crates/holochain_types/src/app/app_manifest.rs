@@ -1,5 +1,6 @@
-//! Defines the DNA Bundle manifest format.
 #![warn(missing_docs)]
+
+//! Defines the hApp Manifest YAML format, including validation.
 
 use mr_bundle::{Location, Manifest};
 use serde;
@@ -10,7 +11,8 @@ mod app_manifest_validated;
 mod current;
 mod error;
 
-/// Alias for the current AppManifest format
+/// Container struct which uses the `manifest_version` field to determine
+/// which manifest version to deserialize to.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "manifest_version")]
 #[allow(missing_docs)]

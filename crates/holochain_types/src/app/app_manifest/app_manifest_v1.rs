@@ -200,9 +200,11 @@ mod tests {
         };
 
         let dna_hash_0 =
-            DnaHashB64::from_str("uhC0kAAD_AJfVAQBxgQHGAPQoAAHTATIAlQFk_7n_AQAB_-PDre2C").unwrap();
+            DnaHashB64::from_b64_str("uhC0kAAD_AJfVAQBxgQHGAPQoAAHTATIAlQFk_7n_AQAB_-PDre2C")
+                .unwrap();
         let dna_hash_1 =
-            DnaHashB64::from_str("uhC0kyiEBnw7_EsuRAAABcgH_w-zfAQ7_9gBs_wEAPJwBjf_cn8ta").unwrap();
+            DnaHashB64::from_b64_str("uhC0kyiEBnw7_EsuRAAABcgH_w-zfAQ7_9gBs_wEAPJwBjf_cn8ta")
+                .unwrap();
         let version = DnaVersionSpec::from(vec![dna_hash_0.clone(), dna_hash_1.clone()]);
 
         let cells = vec![CellManifest {
@@ -228,6 +230,7 @@ mod tests {
 
         let expected_yaml = format!(
             r#"---
+
 manifest_version: "1"
 name: "Test app"
 description: "Serialization roundtrip test"
@@ -245,6 +248,7 @@ cells:
       uuid: uuid
       properties:
         salad: "bar"
+
         "#,
             dna_hash_0, dna_hash_1
         );

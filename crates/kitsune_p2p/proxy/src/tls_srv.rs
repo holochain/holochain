@@ -14,7 +14,7 @@ pub(crate) fn spawn_tls_server(
     write: futures::channel::mpsc::Sender<ProxyWire>,
     read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) {
-    tokio::task::spawn(tls_server(
+    metric_task(tls_server(
         short,
         incoming_base_url,
         tls_server_config,
@@ -31,7 +31,7 @@ async fn tls_server(
     mut evt_send: TransportEventSender,
     mut write: futures::channel::mpsc::Sender<ProxyWire>,
     read: futures::channel::mpsc::Receiver<ProxyWire>,
-) {
+) -> TransportResult<()> {
     let res: TransportResult<()> = async {
         let mut srv = rustls::ServerSession::new(&tls_server_config);
         let mut buf = [0_u8; 4096];
@@ -141,4 +141,6 @@ async fn tls_server(
             .await
             .map_err(TransportError::other);
     }
+
+    Ok(())
 }
