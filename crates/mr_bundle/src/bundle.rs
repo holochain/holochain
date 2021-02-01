@@ -8,6 +8,7 @@ use crate::{
     resource::ResourceBytes,
 };
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
@@ -25,11 +26,27 @@ pub struct Bundle<M>
 where
     M: Manifest,
 {
+    /// The manifest describing the resources that compose this bundle.
     #[serde(bound(deserialize = "M: DeserializeOwned"))]
     manifest: M,
+
+    /// The full or partial resource data. Each entry must correspond to one
+    /// of the Bundled Locations specified by the Manifest. Bundled Locations
+    /// are always relative paths (relative to the root_dir).
     resources: HashMap<PathBuf, ResourceBytes>,
+
+    /// Since the Manifest may contain local paths referencing unbundled files,
+    /// on the local filesystem, we must have an absolute path at runtime for
+    /// normalizing those locations.
+    ///
+    /// Passing None is a runtime assertion that the manifest contains only
+    /// absolute local paths. If this assertion fails,
+    /// **resource resolution will panic!**
+    //
+    // TODO: Represent this with types more solidly, perhaps breaking this
+    //       struct into two versions for each case.
     #[serde(skip)]
-    normalized_locations: Vec<Location>,
+    root_dir: Option<PathBuf>,
 }
 
 impl<M> Bundle<M>
@@ -48,9 +65,9 @@ where
     pub fn new(
         manifest: M,
         resources: Vec<(PathBuf, ResourceBytes)>,
-        base_dir: &Path,
+        root_dir: PathBuf,
     ) -> MrBundleResult<Self> {
-        Self::from_parts(manifest, resources, Some(base_dir))
+        Self::from_parts(manifest, resources, Some(root_dir))
     }
 
     /// Create a bundle, but without
@@ -64,11 +81,11 @@ where
     pub fn from_parts(
         manifest: M,
         resources: Vec<(PathBuf, ResourceBytes)>,
-        base_dir: Option<&Path>,
+        root_dir: Option<PathBuf>,
     ) -> MrBundleResult<Self> {
-        let normalized_locations = Self::normalize_locations(manifest.locations(), base_dir)?;
-        let manifest_paths: HashSet<_> = normalized_locations
-            .iter()
+        let manifest_paths: HashSet<_> = manifest
+            .locations()
+            .into_iter()
             .filter_map(|loc| match loc {
                 Location::Bundled(path) => Some(path),
                 _ => None,
@@ -86,7 +103,7 @@ where
         Ok(Self {
             manifest,
             resources,
-            normalized_locations,
+            root_dir,
         })
     }
 
@@ -102,33 +119,46 @@ where
         Ok(crate::fs(path).write(&self.encode()?).await?)
     }
 
-    pub async fn resolve(&self, location: &Location) -> MrBundleResult<ResourceBytes> {
-        let bytes = match location {
-            Location::Bundled(path) => self
-                .resources
-                .get(path)
-                .cloned()
-                .ok_or_else(|| BundleError::BundledResourceMissing(path.clone()))?,
-            Location::Path(path) => crate::location::resolve_local(path).await?,
-            Location::Url(url) => crate::location::resolve_remote(url).await?,
+    pub async fn resolve<'a>(
+        &'a self,
+        location: &Location,
+    ) -> MrBundleResult<Cow<'a, ResourceBytes>> {
+        let bytes = match &location.normalize(self.root_dir.as_ref())? {
+            Location::Bundled(path) => Cow::Borrowed(
+                self.resources
+                    .get(path)
+                    .ok_or_else(|| BundleError::BundledResourceMissing(path.clone()))?,
+            ),
+            Location::Path(path) => Cow::Owned(crate::location::resolve_local(path).await?),
+            Location::Url(url) => Cow::Owned(crate::location::resolve_remote(url).await?),
         };
         Ok(bytes)
     }
 
     /// Return the full set of resources specified by this bundle's manifest.
-    /// Bundled resources can be returned directly, while all others will be
-    /// fetched from the filesystem or the internet.
-    pub async fn resolve_all(&self) -> MrBundleResult<HashMap<Location, ResourceBytes>> {
-        let resources: HashMap<Location, ResourceBytes> = futures::future::join_all(
-            self.normalized_locations
-                .iter()
-                .map(|loc| async move { Ok((loc.clone(), self.resolve(&loc).await?)) }),
+    /// References to bundled resources can be returned directly, while all
+    /// others will be fetched from the filesystem or the network.
+    pub async fn resolve_all<'a>(
+        &'a self,
+    ) -> MrBundleResult<HashMap<Location, Cow<'a, ResourceBytes>>> {
+        futures::future::join_all(
+            self.manifest.locations().into_iter().map(|loc| async move {
+                MrBundleResult::Ok((loc.clone(), self.resolve(&loc).await?))
+            }),
         )
         .await
         .into_iter()
-        .collect::<MrBundleResult<HashMap<_, _>>>()?;
+        .collect::<MrBundleResult<HashMap<Location, Cow<'a, ResourceBytes>>>>()
+    }
 
-        Ok(resources)
+    /// Resolve all resources, but with fully owned references
+    pub async fn resolve_all_cloned(&self) -> MrBundleResult<HashMap<Location, ResourceBytes>> {
+        Ok(self
+            .resolve_all()
+            .await?
+            .into_iter()
+            .map(|(k, v)| (k, v.into_owned().into()))
+            .collect())
     }
 
     /// Access the map of resources included in this bundle
@@ -150,33 +180,8 @@ where
         crate::decode(bytes)
     }
 
-    fn normalize_locations(
-        locations: Vec<Location>,
-        base_dir: Option<&Path>,
-    ) -> MrBundleResult<Vec<Location>> {
-        locations
-            .into_iter()
-            .map(|loc| {
-                if let Location::Path(path) = &loc {
-                    if path.is_relative() {
-                        if let Some(base_dir) = base_dir {
-                            Ok(Location::Path(
-                                base_dir
-                                    .join(&path)
-                                    .canonicalize()
-                                    .map_err(|e| IoError::new(e, Some(path.to_owned())))?,
-                            ))
-                        } else {
-                            Err(BundleError::RelativeLocalPath(path.to_owned()).into())
-                        }
-                    } else {
-                        Ok(loc)
-                    }
-                } else {
-                    Ok(loc)
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()
+    fn normalized_locations(&self) -> MrBundleResult<Vec<Location>> {
+        normalized_locations(self.root_dir.as_ref(), self.manifest.locations())
     }
 
     /// Given that the Manifest is located at the given absolute `path`, find
@@ -195,6 +200,16 @@ where
     pub fn find_root_dir(&self, path: &Path) -> MrBundleResult<PathBuf> {
         crate::util::prune_path(path.into(), self.manifest.path()).map_err(Into::into)
     }
+}
+
+fn normalized_locations(
+    root_dir: Option<&PathBuf>,
+    locations: Vec<Location>,
+) -> MrBundleResult<Vec<Location>> {
+    locations
+        .into_iter()
+        .map(|loc| loc.normalize(root_dir))
+        .collect::<Result<Vec<_>, _>>()
 }
 
 #[cfg(test)]

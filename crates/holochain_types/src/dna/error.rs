@@ -27,6 +27,10 @@ pub enum DnaError {
     #[error("Zome function not found: {0}")]
     ZomeFunctionNotFound(String),
 
+    /// MrBundleError
+    #[error(transparent)]
+    MrBundleError(#[from] mr_bundle::error::MrBundleError),
+
     /// SerializedBytesError
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),

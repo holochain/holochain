@@ -84,14 +84,14 @@ async fn resource_resolution() {
 
     assert_eq!(
         bundle
-            .resolve_all()
+            .resolve_all_cloned()
             .await
             .unwrap()
-            .iter()
-            .collect::<HashSet<(&Location, &Vec<u8>)>>(),
+            .into_iter()
+            .collect::<HashSet<(Location, Vec<u8>)>>(),
         maplit::hashset![
-            (&bundled_location, &bundled_thing_encoded),
-            (&local_location, &local_thing_encoded)
+            (bundled_location, bundled_thing_encoded),
+            (local_location, local_thing_encoded)
         ]
     );
 

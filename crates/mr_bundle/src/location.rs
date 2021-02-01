@@ -1,4 +1,8 @@
-use crate::{error::MrBundleResult, ResourceBytes};
+use crate::{
+    error::{BundleError, MrBundleResult},
+    io_error::IoError,
+    ResourceBytes,
+};
 use std::path::{Path, PathBuf};
 
 /// Where to find a file.
@@ -18,6 +22,28 @@ pub enum Location {
 
     /// Get file from URL
     Url(String),
+}
+
+impl Location {
+    pub fn normalize(&self, root_dir: Option<&PathBuf>) -> MrBundleResult<Location> {
+        if let Location::Path(path) = self {
+            if path.is_relative() {
+                if let Some(dir) = root_dir {
+                    Ok(Location::Path(
+                        dir.join(&path)
+                            .canonicalize()
+                            .map_err(|e| IoError::new(e, Some(path.to_owned())))?,
+                    ))
+                } else {
+                    Err(BundleError::RelativeLocalPath(path.to_owned()).into())
+                }
+            } else {
+                Ok(self.clone())
+            }
+        } else {
+            Ok(self.clone())
+        }
+    }
 }
 
 pub(crate) async fn resolve_local(path: &Path) -> MrBundleResult<ResourceBytes> {
