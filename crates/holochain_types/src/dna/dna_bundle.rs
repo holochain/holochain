@@ -26,9 +26,9 @@ impl DnaBundle {
         Ok(DnaFile::from_parts(dna_def, wasms))
     }
 
-    async fn inner_maps(&self) -> MrBundleResult<(Zomes, WasmMap)> {
+    async fn inner_maps(&self) -> DnaResult<(Zomes, WasmMap)> {
         let mut resources = self.resolve_all_cloned().await?;
-        let names_and_wasms: Vec<_> = self
+        let intermediate: Vec<_> = self
             .manifest()
             .zomes
             .iter()
@@ -36,16 +36,28 @@ impl DnaBundle {
                 let bytes = resources
                     .remove(&z.location)
                     .expect("resource referenced in manifest must exist");
-                (z.name.clone(), DnaWasm::from(bytes))
+                (
+                    z.name.clone(),
+                    z.hash.clone().map(WasmHash::from),
+                    DnaWasm::from(bytes),
+                )
             })
             .collect();
 
-        let data: Vec<_> =
-            futures::future::join_all(names_and_wasms.into_iter().map(|(zome_name, wasm)| async {
+        let data = futures::future::join_all(intermediate.into_iter().map(
+            |(zome_name, expected_hash, wasm)| async {
                 let hash = WasmHash::with_data(&wasm).await;
-                (zome_name, hash, wasm)
-            }))
-            .await;
+                if let Some(expected) = expected_hash {
+                    if hash != expected {
+                        return Err(DnaError::WasmHashMismatch(expected, hash));
+                    }
+                }
+                DnaResult::Ok((zome_name, hash, wasm))
+            },
+        ))
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?;
 
         let zomes: Zomes = data
             .iter()
@@ -92,7 +104,6 @@ mod tests {
 
     use super::*;
     use crate::prelude::ZomeManifest;
-    // use ::fixt::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn dna_bundle_to_dna_file() {
@@ -102,7 +113,7 @@ mod tests {
         let wasm2 = vec![4, 5, 6];
         let hash1 = WasmHash::with_data(&DnaWasm::from(wasm1.clone())).await;
         let hash2 = WasmHash::with_data(&DnaWasm::from(wasm2.clone())).await;
-        let manifest = DnaManifest {
+        let mut manifest = DnaManifest {
             name: "name".into(),
             uuid: None,
             properties: None,
@@ -114,12 +125,27 @@ mod tests {
                 },
                 ZomeManifest {
                     name: "zome2".into(),
-                    hash: Some(hash2.into()),
+                    // Intentional wrong hash
+                    hash: Some(hash1.clone().into()),
                     location: mr_bundle::Location::Bundled(path2.clone()),
                 },
             ],
         };
         let resources = vec![(path1, wasm1), (path2, wasm2)];
+
+        // Show that conversion fails due to hash mismatch
+        let bad_bundle: DnaBundle =
+            mr_bundle::Bundle::new_unchecked(manifest.clone(), resources.clone())
+                .unwrap()
+                .into();
+        matches::assert_matches!(
+            bad_bundle.into_dna_file().await,
+            Err(DnaError::WasmHashMismatch(h1, h2))
+            if h1 == hash1 && h2 == hash2
+        );
+
+        // Correct the hash and try again
+        manifest.zomes[1].hash = Some(hash2.into());
         let bundle: DnaBundle = mr_bundle::Bundle::new_unchecked(manifest, resources)
             .unwrap()
             .into();

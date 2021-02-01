@@ -1742,6 +1742,7 @@ dependencies = [
  "holochain_zome_types",
  "lazy_static",
  "maplit",
+ "matches",
  "mr_bundle",
  "must_future",
  "nanoid",
