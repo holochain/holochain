@@ -1,9 +1,5 @@
 use crate::*;
 
-/// How many TLS sessions should we store in memory
-/// for session resumption on both client and server?
-const MEM_SESSION_STORAGE: usize = 512;
-
 /// Callback function signature for proxy accept/deny.
 pub type AcceptProxyCallbackFn =
     Arc<dyn Fn(CertDigest) -> MustBoxFuture<'static, bool> + 'static + Send + Sync>;
@@ -105,6 +101,7 @@ static CIPHER_SUITES: &[&rustls::SupportedCipherSuite] = &[
 #[allow(dead_code)]
 pub(crate) fn gen_tls_configs(
     tls: &TlsConfig,
+    tuning_params: Arc<kitsune_p2p_types::config::KitsuneP2pTuningParams>,
 ) -> TransportResult<(Arc<rustls::ServerConfig>, Arc<rustls::ClientConfig>)> {
     let cert = rustls::Certificate(tls.cert.0.to_vec());
     let cert_priv_key = rustls::PrivateKey(tls.cert_priv_key.0.to_vec());
@@ -122,7 +119,9 @@ pub(crate) fn gen_tls_configs(
         .set_single_cert(vec![cert.clone()], cert_priv_key.clone())
         .map_err(TransportError::other)?;
     // put this in a database at some point
-    tls_server_config.set_persistence(rustls::ServerSessionMemoryCache::new(MEM_SESSION_STORAGE));
+    tls_server_config.set_persistence(rustls::ServerSessionMemoryCache::new(
+        tuning_params.tls_in_mem_session_storage as usize,
+    ));
     tls_server_config.ticketer = rustls::Ticketer::new();
     tls_server_config.set_protocols(&[ALPN_KITSUNE_PROXY_0.to_vec()]);
     let tls_server_config = Arc::new(tls_server_config);
@@ -135,7 +134,9 @@ pub(crate) fn gen_tls_configs(
         .dangerous()
         .set_certificate_verifier(TlsServerVerifier::new());
     // put this in a database at some point
-    tls_client_config.set_persistence(rustls::ClientSessionMemoryCache::new(MEM_SESSION_STORAGE));
+    tls_client_config.set_persistence(rustls::ClientSessionMemoryCache::new(
+        tuning_params.tls_in_mem_session_storage as usize,
+    ));
     tls_client_config.set_protocols(&[ALPN_KITSUNE_PROXY_0.to_vec()]);
     let tls_client_config = Arc::new(tls_client_config);
 
