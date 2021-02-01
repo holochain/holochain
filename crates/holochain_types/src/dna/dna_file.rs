@@ -39,10 +39,10 @@ impl From<WasmMapSerialized> for WasmMap {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, SerializedBytes)]
 pub struct DnaFile {
     /// The hashable portion that can be shared with hApp code.
-    pub dna: DnaDefHashed,
+    dna: DnaDefHashed,
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
-    pub code: WasmMap,
+    code: WasmMap,
 }
 
 impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
@@ -70,6 +70,12 @@ impl DnaFile {
             dna,
             code: code.into(),
         })
+    }
+
+    /// Construct a DnaFile from its constituent parts
+    #[cfg(feature = "fixturators")]
+    pub fn from_parts(dna: DnaDefHashed, code: WasmMap) -> Self {
+        Self { dna, code }
     }
 
     /// The DnaDef along with its hash

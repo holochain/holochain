@@ -135,12 +135,12 @@ fixturator!(
 fixturator!(
     DnaFile,
     {
-        DnaFile {
-            dna: tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        DnaFile::from_parts(
+            tokio_safe_block_on::tokio_safe_block_forever_on(async move {
                 DnaDefHashed::from_content(DnaDefFixturator::new(Empty).next().unwrap()).await
             }),
-            code: WasmMapFixturator::new(Empty).next().unwrap(),
-        }
+            WasmMapFixturator::new(Empty).next().unwrap(),
+        )
     },
     {
         // align the wasm hashes across the file and def
@@ -161,10 +161,7 @@ fixturator!(
         let dna = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             DnaDefHashed::from_content(dna_def).await
         });
-        DnaFile {
-            dna,
-            code: WasmMapFixturator::new(Unpredictable).next().unwrap(),
-        }
+        DnaFile::from_parts(dna, WasmMapFixturator::new(Unpredictable).next().unwrap())
     },
     {
         // align the wasm hashes across the file and def
@@ -190,12 +187,12 @@ fixturator!(
         let dna = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             DnaDefHashed::from_content(dna_def).await
         });
-        DnaFile {
+        DnaFile::from_parts(
             dna,
-            code: WasmMapFixturator::new_indexed(Predictable, get_fixt_index!())
+            WasmMapFixturator::new_indexed(Predictable, get_fixt_index!())
                 .next()
                 .unwrap(),
-        }
+        )
     }
 );
 

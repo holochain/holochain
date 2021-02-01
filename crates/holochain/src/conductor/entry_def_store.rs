@@ -172,7 +172,7 @@ pub(crate) fn get_entry_defs(
 
     // Get the zomes hashes
     let zomes = dna
-        .dna
+        .dna()
         .zomes
         .iter()
         .cloned()
