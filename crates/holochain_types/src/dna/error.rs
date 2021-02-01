@@ -1,6 +1,6 @@
 //! Holochain DnaError type.
 
-use holo_hash::DnaHash;
+use holo_hash::{DnaHash, WasmHash};
 use holochain_zome_types::zome::ZomeName;
 use thiserror::Error;
 
@@ -49,8 +49,12 @@ pub enum DnaError {
     NonWasmZome(ZomeName),
 
     /// DnaHashMismatch
-    #[error("DNA hash of file does not match contents.\nHash in file: {0}\nActual hash: {1}")]
+    #[error("DNA file hash mismatch.\nExpected: {0}\nActual: {1}")]
     DnaHashMismatch(DnaHash, DnaHash),
+
+    /// WasmHashMismatch
+    #[error("Wasm hash mismatch.\nExpected: {0}\nActual: {1}")]
+    WasmHashMismatch(WasmHash, WasmHash),
 }
 
 impl From<std::io::Error> for DnaError {
