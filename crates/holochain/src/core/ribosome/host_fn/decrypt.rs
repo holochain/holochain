@@ -4,10 +4,10 @@ use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
-pub fn schedule(
+pub fn decrypt(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    _input: ScheduleInput,
-) -> RibosomeResult<ScheduleOutput> {
-    unimplemented!()
+    _input: DecryptInput,
+) -> RibosomeResult<DecryptOutput> {
+    unimplemented!();
 }

@@ -9,13 +9,13 @@ use std::sync::Arc;
 pub fn random_bytes(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    input: u32,
-) -> RibosomeResult<Bytes> {
+    input: RandomBytesInput,
+) -> RibosomeResult<RandomBytesOutput> {
     let system_random = ring::rand::SystemRandom::new();
-    let mut bytes = vec![0; input as _];
+    let mut bytes = vec![0; input.into_inner() as _];
     system_random.fill(&mut bytes)?;
 
-    Ok(Bytes::from(bytes))
+    Ok(RandomBytesOutput::new(Bytes::from(bytes)))
 }
 
 #[cfg(test)]
@@ -28,6 +28,9 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::RandomBytesInput;
+    use holochain_zome_types::RandomBytesOutput;
+    use std::convert::TryInto;
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
@@ -39,14 +42,15 @@ pub mod wasm_test {
         let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        const LEN: u32 = 10;
+        const LEN: usize = 10;
+        let input = RandomBytesInput::new(LEN.try_into().unwrap());
 
-        let output: holochain_zome_types::prelude::Bytes =
-            random_bytes(Arc::new(ribosome), Arc::new(call_context), LEN).unwrap();
+        let output: RandomBytesOutput =
+            random_bytes(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
         println!("{:?}", output);
 
-        assert_ne!(&[0; LEN as usize], output.as_ref(),);
+        assert_ne!(&[0; LEN], output.into_inner().as_ref(),);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -61,16 +65,16 @@ pub mod wasm_test {
             .unwrap();
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
-        const LEN: u32 = 5;
+        const LEN: usize = 5;
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        let output: hdk3::prelude::Bytes = crate::call_test_ribosome!(
+        let output: RandomBytesOutput = crate::call_test_ribosome!(
             host_access,
             TestWasm::RandomBytes,
             "random_bytes",
-            LEN
+            RandomBytesInput::new(5 as _)
         );
 
-        assert_ne!(&vec![0; LEN as usize], &output.to_vec());
+        assert_ne!(&[0; LEN], output.into_inner().as_ref(),);
     }
 }

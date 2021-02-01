@@ -15,11 +15,12 @@ use std::sync::Arc;
 pub fn delete<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: HeaderHash,
-) -> RibosomeResult<HeaderHash> {
+    input: DeleteInput,
+) -> RibosomeResult<DeleteOutput> {
+    let deletes_address = input.into_inner();
 
     let deletes_entry_address =
-        get_original_address(call_context.clone(), input.clone())?;
+        get_original_address(call_context.clone(), deletes_address.clone())?;
 
     let host_access = call_context.host_access();
 
@@ -29,7 +30,7 @@ pub fn delete<'a>(
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
         let header_builder = builder::Delete {
-            deletes_address: input,
+            deletes_address,
             deletes_entry_address,
         };
         let header_hash = source_chain.put(header_builder, None).await?;
@@ -43,7 +44,7 @@ pub fn delete<'a>(
             &mut workspace.meta_authored,
         )
         .map_err(Box::new)?;
-        Ok(header_hash)
+        Ok(DeleteOutput::new(header_hash))
     })
 }
 
@@ -116,9 +117,9 @@ pub mod wasm_test {
 
         let thing_a: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "create", ());
-        let get_thing: Option<Element> =
+        let get_thing: GetOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "read", thing_a);
-        match get_thing {
+        match get_thing.into_inner() {
             Some(element) => assert!(element.entry().as_option().is_some()),
 
             None => unreachable!(),
@@ -127,9 +128,9 @@ pub mod wasm_test {
         let _: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete", thing_a);
 
-        let get_thing: Option<Element> =
+        let get_thing: GetOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "read", thing_a);
-        match get_thing {
+        match get_thing.into_inner() {
             None => {
                 // this is what we want, deletion => None for a get
             }

@@ -17,7 +17,7 @@ fn set_access(_: ()) -> ExternResult<()> {
 // returns the current agent info
 #[hdk_extern]
 fn whoami(_: ()) -> ExternResult<AgentInfo> {
-    agent_info()
+    Ok(agent_info()?)
 }
 
 // returns the agent info reported by the given pub key
@@ -25,19 +25,13 @@ fn whoami(_: ()) -> ExternResult<AgentInfo> {
 // it's just that the output comes _from the opinion of the remote agent_
 #[hdk_extern]
 fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
-    let zome_call_response: ZomeCallResponse = call_remote(
+    Ok(call_remote(
         agent_pubkey,
         zome_info()?.zome_name,
         "whoami".to_string().into(),
         None,
         &(),
-    )?;
-    match zome_call_response {
-        // The decode() type needs to match the return type of "whoami"
-        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
-        // This should be handled in real code.
-        _ => unreachable!(),
-    }
+    )?)
 }
 
 // returns the agent info reported by the given pub key
@@ -45,18 +39,13 @@ fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
 // it's just that the output comes _from the opinion of the remote agent_
 #[hdk_extern]
 fn who_are_they_local(cell_id: CellId) -> ExternResult<AgentInfo> {
-    let zome_call_response: ZomeCallResponse = call(
+    call(
         Some(cell_id),
         zome_info()?.zome_name,
         "whoami".to_string().into(),
         None,
         &(),
-    )?;
-    match zome_call_response {
-        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
-        // This should be handled in real code.
-        _ => unreachable!(),
-    }
+    )
 }
 
 /// Call the create entry zome from this zome.
@@ -64,16 +53,11 @@ fn who_are_they_local(cell_id: CellId) -> ExternResult<AgentInfo> {
 /// the "create_entry" zome.
 #[hdk_extern]
 fn call_create_entry(cell_id: CellId) -> ExternResult<HeaderHash> {
-    let zome_call_response: ZomeCallResponse = call(
+    Ok(call(
         Some(cell_id),
         "create_entry".to_string().into(),
         "create_entry".to_string().into(),
         None,
         &(),
-    )?;
-    match zome_call_response {
-        ZomeCallResponse::Ok(v) => Ok(v.decode()?),
-        // This should be handled in real code.
-        _ => unreachable!(),
-    }
+    )?)
 }

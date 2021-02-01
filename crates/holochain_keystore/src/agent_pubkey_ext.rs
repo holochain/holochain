@@ -13,9 +13,9 @@ pub trait AgentPubKeyExt {
         Self: Sized;
 
     /// sign some arbitrary data
-    fn sign<S>(&self, keystore: &KeystoreSender, data: S) -> KeystoreApiFuture<Signature>
+    fn sign<D>(&self, keystore: &KeystoreSender, data: D) -> KeystoreApiFuture<Signature>
     where
-        S: Serialize;
+        D: TryInto<SerializedBytes, Error = SerializedBytesError>;
 
     /// sign some arbitrary raw bytes
     fn sign_raw(&self, keystore: &KeystoreSender, data: &[u8]) -> KeystoreApiFuture<Signature>;
@@ -38,14 +38,13 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         ghost_actor::dependencies::must_future::MustBoxFuture::new(async move { f.await })
     }
 
-    fn sign<S>(&self, keystore: &KeystoreSender, input: S) -> KeystoreApiFuture<Signature>
+    fn sign<D>(&self, keystore: &KeystoreSender, data: D) -> KeystoreApiFuture<Signature>
     where
-        S: Serialize,
+        D: TryInto<SerializedBytes, Error = SerializedBytesError>,
     {
         use ghost_actor::dependencies::futures::future::FutureExt;
         let keystore = keystore.clone();
-        let maybe_data: Result<Vec<u8>, SerializedBytesError> =
-            holochain_serialized_bytes::encode(&input);
+        let maybe_data: Result<SerializedBytes, SerializedBytesError> = data.try_into();
         let key = self.clone();
         async move {
             let data = maybe_data?;

@@ -62,28 +62,16 @@ impl TryFrom<&Entry> for ThisWasmEntry {
 }
 
 impl TryFrom<&ThisWasmEntry> for Entry {
-    type Error = WasmError;
+    type Error = HdkError;
     fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
-        Ok(
-            Entry::App(
-                match AppEntryBytes::try_from(
-                    SerializedBytes::try_from(this_wasm_entry)?
-                ) {
-                    Ok(app_entry_bytes) => app_entry_bytes,
-                    Err(entry_error) => match entry_error {
-                        EntryError::SerializedBytes(serialized_bytes_error) => return Err(WasmError::Serialize(serialized_bytes_error)),
-                        EntryError::EntryTooLarge(_) => return Err(WasmError::Zome(entry_error.to_string())),
-                    },
-                }
-            )
-        )
+        Ok(Entry::App(AppEntryBytes::try_from(SerializedBytes::try_from(this_wasm_entry)?)?))
     }
 }
 
-impl TryFrom<&ThisWasmEntry> for EntryWithDefId {
-    type Error = WasmError;
+impl TryFrom<&ThisWasmEntry> for HdkEntry {
+    type Error = HdkError;
     fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
-        Ok(Self::new(EntryDefId::from(this_wasm_entry), Entry::try_from(this_wasm_entry)?))
+        Ok(Self(EntryDefId::from(this_wasm_entry), Entry::try_from(this_wasm_entry)?))
     }
 }
 
@@ -113,7 +101,7 @@ fn validate(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn _commit_validate(to_commit: ThisWasmEntry) -> ExternResult<HeaderHash> {
-    create_entry(&to_commit)
+    Ok(create_entry(&to_commit)?)
 }
 
 #[hdk_extern]

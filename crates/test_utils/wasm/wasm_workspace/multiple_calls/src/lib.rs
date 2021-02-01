@@ -1,4 +1,6 @@
 use hdk3::prelude::*;
+use holochain_test_wasm_common::TestBytes;
+use holochain_test_wasm_common::TestInt;
 
 #[hdk_entry(id = "post")]
 struct Val(u32);
@@ -6,8 +8,8 @@ struct Val(u32);
 entry_defs![Val::entry_def()];
 
 #[hdk_extern]
-fn create_entry_multiple(n: u32) -> ExternResult<()> {
-    for i in 0..n {
+fn create_entry_multiple(n: TestInt) -> ExternResult<()> {
+    for i in 0..n.0 {
         debug!(format!("{}", i));
         create_entry(&Val(i))?;
     }
@@ -16,9 +18,9 @@ fn create_entry_multiple(n: u32) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-fn get_entry_multiple(n: u32) -> ExternResult<hdk3::prelude::Bytes> {
+fn get_entry_multiple(n: TestInt) -> ExternResult<TestBytes> {
     let mut bytes = vec![];
-    'test_loop: for i in 0..n {
+    'test_loop: for i in 0..n.0 {
         match get(hash_entry(&Val(i))?, GetOptions::content())? {
             Some(element) => {
                 match element.entry().to_app_option::<Val>()? {
@@ -33,7 +35,7 @@ fn get_entry_multiple(n: u32) -> ExternResult<hdk3::prelude::Bytes> {
         }
     }
 
-    Ok(Bytes::from(bytes))
+    Ok(TestBytes(bytes))
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]

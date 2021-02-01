@@ -104,7 +104,7 @@ where
     fn fn_components(&self) -> FnComponents {
         self.invocation.fn_components()
     }
-    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
         self.invocation.host_input()
     }
 }
@@ -119,8 +119,10 @@ impl Invocation for ValidateCreateLinkInvocation {
     fn fn_components(&self) -> FnComponents {
         vec!["validate_create_link".into()].into()
     }
-    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(ValidateCreateLinkData::from(self))
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
+        Ok(ExternInput::new(
+            ValidateCreateLinkData::from(self).try_into()?,
+        ))
     }
 }
 
@@ -134,8 +136,10 @@ impl Invocation for ValidateDeleteLinkInvocation {
     fn fn_components(&self) -> FnComponents {
         vec!["validate_delete_link".into()].into()
     }
-    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(ValidateDeleteLinkData::from(self))
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
+        Ok(ExternInput::new(
+            ValidateDeleteLinkData::from(self).try_into()?,
+        ))
     }
 }
 
@@ -177,11 +181,12 @@ mod test {
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::*;
     use ::fixt::prelude::*;
+    use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_types::dna::zome::Permission;
     use holochain_zome_types::validate_link::ValidateCreateLinkData;
     use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
-    use holochain_zome_types::ExternIO;
+    use holochain_zome_types::ExternInput;
     use rand::seq::SliceRandom;
 
     #[tokio::test(threaded_scheduler)]
@@ -269,10 +274,12 @@ mod test {
 
         assert_eq!(
             host_input,
-            ExternIO::encode(&ValidateCreateLinkData::from(
-                validate_create_link_invocation
-            ))
-            .unwrap(),
+            ExternInput::new(
+                SerializedBytes::try_from(&ValidateCreateLinkData::from(
+                    validate_create_link_invocation
+                ))
+                .unwrap()
+            ),
         );
     }
 }

@@ -211,21 +211,10 @@ pub fn hdk_extern(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     // extract the ident of the fn
     // this will be exposed as the external facing extern
     let external_fn_ident = item_fn.sig.ident.clone();
-    let input_type = if let Some(syn::FnArg::Typed(pat_type)) = item_fn.sig.inputs.first() {
-        pat_type.ty.clone()
-    } else {
-        unreachable!();
-    };
-    let output_type = if let syn::ReturnType::Type(_, ref ty) = item_fn.sig.output {
-        ty.clone()
-    } else {
-        unreachable!();
-    };
-
     let internal_fn_ident = external_fn_ident.clone();
 
     (quote::quote! {
-        map_extern!(#external_fn_ident, #internal_fn_ident, #input_type, #output_type);
+        map_extern!(#external_fn_ident, #internal_fn_ident);
         #item_fn
     })
     .into()

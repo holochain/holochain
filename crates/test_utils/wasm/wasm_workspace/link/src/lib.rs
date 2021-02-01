@@ -5,7 +5,7 @@ entry_defs![Path::entry_def()];
 fn path(s: &str) -> ExternResult<EntryHash> {
     let path = Path::from(s);
     path.ensure()?;
-    path.hash()
+    Ok(path.hash()?)
 }
 
 fn base() -> ExternResult<EntryHash> {
@@ -18,17 +18,17 @@ fn target() -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 fn create_link(_: ()) -> ExternResult<HeaderHash> {
-    hdk3::prelude::create_link(base()?, target()?, ())
+    Ok(hdk3::prelude::create_link(base()?, target()?, ())?)
 }
 
 #[hdk_extern]
-fn delete_link(input: HeaderHash) -> ExternResult<HeaderHash> {
-    hdk3::prelude::delete_link(input)
+fn delete_link(input: DeleteLinkInput) -> ExternResult<HeaderHash> {
+    Ok(hdk3::prelude::delete_link(input.into_inner())?)
 }
 
 #[hdk_extern]
 fn get_links(_: ()) -> ExternResult<Links> {
-    hdk3::prelude::get_links(base()?, None)
+    Ok(hdk3::prelude::get_links(base()?, None)?)
 }
 
 #[hdk_extern]
@@ -55,5 +55,5 @@ fn commit_existing_path(_: ()) -> ExternResult<()> {
 
 #[hdk_extern]
 fn get_long_path(_: ()) -> ExternResult<Links> {
-    Path::from("a").children()
+    Ok(Path::from("a").children()?)
 }

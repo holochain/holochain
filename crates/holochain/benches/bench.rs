@@ -10,6 +10,7 @@ use holochain::core::ribosome::RibosomeT;
 use holochain::core::ribosome::ZomeCallInvocation;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::ExternInput;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
@@ -68,7 +69,8 @@ pub fn wasm_call_n(c: &mut Criterion) {
 
         group.bench_function(BenchmarkId::from_parameter(n), |b| {
             // bytes
-            let bytes = vec![0; n];
+            let bytes = holochain_test_wasm_common::TestBytes::from(vec![0; n]);
+            let sb: SerializedBytes = bytes.try_into().unwrap();
 
             TOKIO_RUNTIME.lock().unwrap().enter(move || {
                 let ha = HOST_ACCESS_FIXTURATOR.lock().unwrap().next().unwrap();

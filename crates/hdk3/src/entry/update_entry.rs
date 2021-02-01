@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// Thin wrapper around update for app entries.
-/// The hash is the HeaderHash of the deleted element, the input is a TryInto<EntryWithDefId>.
+/// The hash is the HeaderHash of the deleted element, the input is a TryInto<HdkEntry>.
 ///
 /// Updates can reference create and update elements (header+entry) but not deletes.
 ///
@@ -27,10 +27,11 @@ use crate::prelude::*;
 /// @see create_entry
 /// @see update
 /// @see delete_entry
-pub fn update_entry<I, E>(hash: HeaderHash, input: I) -> ExternResult<HeaderHash>
+pub fn update_entry<I, E>(hash: HeaderHash, input: I) -> HdkResult<HeaderHash>
 where
-    EntryWithDefId: TryFrom<I, Error = E>,
-    WasmError: From<E>,
+    HdkEntry: TryFrom<I, Error = E>,
+    HdkError: From<E>,
 {
-    update(hash, EntryWithDefId::try_from(input)?)
+    let HdkEntry(entry_def_id, entry) = HdkEntry::try_from(input)?;
+    update(hash, entry_def_id, entry)
 }

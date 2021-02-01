@@ -1,18 +1,19 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 pub fn sys_time(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    _input: (),
-) -> RibosomeResult<core::time::Duration> {
+    _input: SysTimeInput,
+) -> RibosomeResult<SysTimeOutput> {
     let start = std::time::SystemTime::now();
     let since_the_epoch = start
         .duration_since(std::time::UNIX_EPOCH)
         .expect("Time went backwards");
-    Ok(since_the_epoch)
+    Ok(SysTimeOutput::new(since_the_epoch))
 }
 
 #[cfg(test)]
@@ -21,6 +22,7 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::SysTimeOutput;
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_sys_time_test() {
@@ -36,7 +38,7 @@ pub mod wasm_test {
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        let _: core::time::Duration =
+        let _: SysTimeOutput =
             crate::call_test_ribosome!(host_access, TestWasm::SysTime, "sys_time", ());
     }
 }

@@ -66,20 +66,20 @@ impl TryFrom<&Path> for Anchor {
 
 /// Simple string interface to simple string based paths.
 /// a.k.a "the anchor pattern" that predates paths by a few years.
-pub fn anchor(anchor_type: String, anchor_text: String) -> ExternResult<holo_hash::EntryHash> {
+pub fn anchor(anchor_type: String, anchor_text: String) -> Result<holo_hash::EntryHash, HdkError> {
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: Some(anchor_text),
     })
         .into();
     path.ensure()?;
-    path.hash()
+    Ok(path.hash()?)
 }
 
 /// Attempt to get an anchor by its hash.
 /// Returns None if the hash doesn't point to an anchor.
 /// We can't do anything fancy like ensure the anchor if not exists because we only have a hash.
-pub fn get_anchor(anchor_address: EntryHash) -> ExternResult<Option<Anchor>> {
+pub fn get_anchor(anchor_address: EntryHash) -> Result<Option<Anchor>, HdkError> {
     Ok(
         match crate::prelude::get(anchor_address, GetOptions::content())?.and_then(|el| el.into()) {
             Some(Entry::App(eb)) => {
@@ -93,7 +93,7 @@ pub fn get_anchor(anchor_address: EntryHash) -> ExternResult<Option<Anchor>> {
 
 /// Returns every entry hash in a vector from the root of an anchor.
 /// Hashes are sorted in the same way that paths sort children.
-pub fn list_anchor_type_addresses() -> ExternResult<Vec<EntryHash>> {
+pub fn list_anchor_type_addresses() -> Result<Vec<EntryHash>, HdkError> {
     let links = Path::from(ROOT)
         .children()?
         .into_inner()
@@ -106,7 +106,7 @@ pub fn list_anchor_type_addresses() -> ExternResult<Vec<EntryHash>> {
 /// Returns every entry hash in a vector from the second level of an anchor.
 /// Uses the string argument to build the path from the root.
 /// Hashes are sorted in the same way that paths sort children.
-pub fn list_anchor_addresses(anchor_type: String) -> ExternResult<Vec<EntryHash>> {
+pub fn list_anchor_addresses(anchor_type: String) -> Result<Vec<EntryHash>, HdkError> {
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: None,
@@ -126,7 +126,7 @@ pub fn list_anchor_addresses(anchor_type: String) -> ExternResult<Vec<EntryHash>
 /// tags are a single array of bytes, so to get an external interface that is somewhat backwards
 /// compatible we need to rebuild the anchors from the paths serialized into the links and then
 /// return them.
-pub fn list_anchor_tags(anchor_type: String) -> ExternResult<Vec<String>> {
+pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<String>, HdkError> {
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: None,

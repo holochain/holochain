@@ -47,15 +47,15 @@ impl Invocation for PostCommitInvocation {
     fn fn_components(&self) -> FnComponents {
         vec!["post_commit".into()].into()
     }
-    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(self.headers)
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
+        Ok(ExternInput::new((&self.headers).try_into()?))
     }
 }
 
-impl TryFrom<PostCommitInvocation> for ExternIO {
+impl TryFrom<PostCommitInvocation> for ExternInput {
     type Error = SerializedBytesError;
     fn try_from(post_commit_invocation: PostCommitInvocation) -> Result<Self, Self::Error> {
-        ExternIO::encode(&post_commit_invocation.headers)
+        Ok(Self::new((&post_commit_invocation.headers).try_into()?))
     }
 }
 
@@ -96,9 +96,10 @@ mod test {
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
     use ::fixt::prelude::*;
+    use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::post_commit::PostCommitCallbackResult;
-    use holochain_zome_types::ExternIO;
+    use holochain_zome_types::ExternInput;
 
     #[test]
     fn post_commit_callback_result_fold() {
@@ -185,7 +186,12 @@ mod test {
 
         assert_eq!(
             host_input,
-            ExternIO::encode(HeaderHashesFixturator::new(::fixt::Empty).next().unwrap()).unwrap(),
+            ExternInput::new(
+                SerializedBytes::try_from(
+                    HeaderHashesFixturator::new(::fixt::Empty).next().unwrap()
+                )
+                .unwrap()
+            ),
         );
     }
 }

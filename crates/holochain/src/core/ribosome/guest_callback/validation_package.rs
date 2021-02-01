@@ -58,17 +58,19 @@ impl Invocation for ValidationPackageInvocation {
         ]
         .into()
     }
-    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(self.app_entry_type)
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
+        Ok(ExternInput::new((&self.app_entry_type).try_into()?))
     }
 }
 
-impl TryFrom<ValidationPackageInvocation> for ExternIO {
+impl TryFrom<ValidationPackageInvocation> for ExternInput {
     type Error = SerializedBytesError;
     fn try_from(
         validation_package_invocation: ValidationPackageInvocation,
     ) -> Result<Self, Self::Error> {
-        Self::encode(&validation_package_invocation.app_entry_type)
+        Ok(Self::new(
+            (&validation_package_invocation.app_entry_type).try_into()?,
+        ))
     }
 }
 
@@ -122,10 +124,11 @@ mod test {
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::ValidationPackageHostAccessFixturator;
     use crate::fixt::ValidationPackageInvocationFixturator;
+    use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::validate::ValidationPackage;
     use holochain_zome_types::validate::ValidationPackageCallbackResult;
-    use holochain_zome_types::ExternIO;
+    use holochain_zome_types::ExternInput;
     use rand::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -232,7 +235,9 @@ mod test {
 
         assert_eq!(
             host_input,
-            ExternIO::encode(&validation_package_invocation.app_entry_type).unwrap(),
+            ExternInput::new(
+                SerializedBytes::try_from(&validation_package_invocation.app_entry_type).unwrap()
+            ),
         );
     }
 }

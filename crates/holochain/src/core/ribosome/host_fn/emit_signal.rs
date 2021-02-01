@@ -7,10 +7,11 @@ use std::sync::Arc;
 pub fn emit_signal(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: AppSignal,
-) -> RibosomeResult<()> {
+    input: EmitSignalInput,
+) -> RibosomeResult<EmitSignalOutput> {
     let cell_id = call_context.host_access().cell_id().clone();
-    let signal = Signal::App(cell_id, input);
+    let bytes = input.into_inner();
+    let signal = Signal::App(cell_id, bytes);
     call_context.host_access().signal_tx().send(signal)?;
-    Ok(())
+    Ok(EmitSignalOutput::new(()))
 }

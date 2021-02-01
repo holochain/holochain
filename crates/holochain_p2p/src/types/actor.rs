@@ -205,7 +205,7 @@ ghost_actor::ghost_chan! {
             zome_name: ZomeName,
             fn_name: FunctionName,
             cap: Option<CapSecret>,
-            payload: ExternIO,
+            request: SerializedBytes,
         ) -> SerializedBytes;
 
         /// Publish data to the correct neighborhood.

@@ -13,6 +13,7 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::ZomeCallResponse;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
+use std::convert::TryInto;
 use tempdir::TempDir;
 use tracing::debug_span;
 
@@ -340,7 +341,9 @@ async fn init_all(handles: &[TestHandle]) -> Vec<HeaderHash> {
     for f in futures {
         let result = f.await.unwrap();
         let result: HeaderHash = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
-            .decode()
+            .clone()
+            .into_inner()
+            .try_into()
             .unwrap();
         headers.push(result);
     }
@@ -423,14 +426,17 @@ async fn check_gossip(
         let invocation =
             new_zome_call(&handle.cell_id, "get_post", hash, TestWasm::Create).unwrap();
         let result = handle.call_zome(invocation).await.unwrap().unwrap();
-        let result: Option<Element> = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
-            .decode()
-            .unwrap();
+        let result: hdk3::prelude::GetOutput =
+            unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+                .clone()
+                .into_inner()
+                .try_into()
+                .unwrap();
         let s = debug_span!("check_gossip", ?line, ?i, ?hash);
         let _g = s.enter();
         tracing::debug!("Checking hash {:?} for {}", hash, i);
         tracing::debug!(?result);
-        assert_matches!(result, Some(_));
+        assert_matches!(result.into_inner(), Some(_));
     }
 }
 

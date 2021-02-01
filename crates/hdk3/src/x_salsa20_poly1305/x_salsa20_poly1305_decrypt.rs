@@ -13,12 +13,18 @@ use crate::prelude::*;
 pub fn x_salsa20_poly1305_decrypt(
     key_ref: XSalsa20Poly1305KeyRef,
     encrypted_data: XSalsa20Poly1305EncryptedData,
-) -> ExternResult<Option<XSalsa20Poly1305Data>> {
-    host_call::<XSalsa20Poly1305Decrypt, Option<XSalsa20Poly1305Data>>(
-        __x_salsa20_poly1305_decrypt,
-        holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Decrypt::new(
-            key_ref,
-            encrypted_data,
-        ),
+) -> HdkResult<Option<XSalsa20Poly1305Data>> {
+    host_externs!(__x_salsa20_poly1305_decrypt);
+    Ok(
+        host_call::<XSalsa20Poly1305DecryptInput, XSalsa20Poly1305DecryptOutput>(
+            __x_salsa20_poly1305_decrypt,
+            &XSalsa20Poly1305DecryptInput::new(
+                holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305Decrypt::new(
+                    key_ref,
+                    encrypted_data,
+                ),
+            ),
+        )?
+        .into_inner(),
     )
 }

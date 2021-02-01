@@ -8,7 +8,7 @@ use crate::prelude::*;
 /// Re-using secrets is forbidden across claims and grants per-source chain.
 ///
 /// Predictable and/or short secrets represent a serious security vulnerability.
-pub fn generate_cap_secret() -> ExternResult<CapSecret> {
+pub fn generate_cap_secret() -> HdkResult<CapSecret> {
     random_bytes(CAP_SECRET_BYTES as u32).map(|bytes| {
         // Always a fatal error if our own bytes generation has the wrong number of bytes.
         assert_eq!(CAP_SECRET_BYTES, bytes.len());

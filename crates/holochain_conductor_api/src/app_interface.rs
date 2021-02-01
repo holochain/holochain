@@ -73,16 +73,16 @@ pub enum AppResponse {
 
     /// The successful response to an [`AppRequest::ZomeCall`].
     ///
-    /// Note that [`ExternIO`] is simply a structure of [`SerializedBytes`] so the client will have
+    /// Note that [`ExternOutput`] is simply a structure of [`SerializedBytes`] so the client will have
     /// to decode this response back into the data provided by the Zome using a [msgpack](https://msgpack.org/) library to utilize it.
     ///
     /// [`AppRequest::ZomeCall`]: enum.AppRequest.html#variant.ZomeCall
-    /// [`ExternIO`]: ../../../holochain_zome_types/zome_io/struct.ExternIO.html
+    /// [`ExternOutput`]: ../../../holochain_zome_types/zome_io/struct.ExternOutput.html
     /// [`SerializedBytes`]: ../../../holochain_zome_types/query/struct.SerializedBytes.html
-    ZomeCall(Box<ExternIO>),
+    ZomeCall(Box<ExternOutput>),
 
     /// DEPRECATED. See `ZomeCall`.
-    ZomeCallInvocation(Box<ExternIO>),
+    ZomeCallInvocation(Box<ExternOutput>),
 }
 
 /// The data provided across an App interface in order to make a zome call
@@ -95,7 +95,7 @@ pub struct ZomeCall {
     /// The name of the Zome function to call
     pub fn_name: FunctionName,
     /// The serialized data to pass as an argument to the Zome call
-    pub payload: ExternIO,
+    pub payload: ExternInput,
     /// The capability request authorization.
     /// This can be `None` and still succeed in the case where the function
     /// in the zome being called has been given an Unrestricted status

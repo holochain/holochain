@@ -33,6 +33,7 @@ use holochain::conductor::ConductorHandle;
 use holochain_lmdb::test_utils::test_environments;
 use holochain_lmdb::test_utils::TestEnvironments;
 use holochain_test_wasm_common::AnchorInput;
+use holochain_test_wasm_common::TestString;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
@@ -213,14 +214,14 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
         payload: P,
     ) -> Result<ZomeCall, SerializedBytesError>
     where
-        P: serde::Serialize,
+        P: TryInto<SerializedBytes, Error = SerializedBytesError>,
     {
         Ok(ZomeCall {
             cell_id: cell_id.clone(),
             zome_name: TestWasm::Anchor.into(),
             cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
             fn_name: func.into(),
-            payload: ExternIO::encode(payload)?,
+            payload: ExternInput::new(payload.try_into()?),
             provenance: cell_id.agent_pubkey().clone(),
         })
     }
@@ -251,23 +252,26 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
 
     let mut alice_done = false;
     let mut bobbo_done = false;
-    let mut alice_attempts = 0_usize;
-    let mut bobbo_attempts = 0_usize;
+    let mut alice_attempts = 0;
+    let mut bobbo_attempts = 0;
     loop {
         if !bobbo_done {
             bobbo_attempts += 1;
             let invocation = new_zome_call(
                 alice_cell_id.clone(),
                 "list_anchor_addresses",
-                "bobbo".to_string(),
+                TestString("bobbo".into()),
             )
             .unwrap();
             let response = call(&mut app_interface, invocation).await.unwrap();
-            let hashes: EntryHashes = match response {
-                AppResponse::ZomeCall(r) => r.decode().unwrap(),
+            match response {
+                AppResponse::ZomeCall(r) => {
+                    let response: SerializedBytes = r.into_inner();
+                    let hashes: EntryHashes = response.try_into().unwrap();
+                    bobbo_done = hashes.0.len() == num;
+                }
                 _ => unreachable!(),
-            };
-            bobbo_done = hashes.0.len() == num;
+            }
         }
 
         if !alice_done {
@@ -275,15 +279,18 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
             let invocation = new_zome_call(
                 bob_cell_id.clone(),
                 "list_anchor_addresses",
-                "alice".to_string(),
+                TestString("alice".into()),
             )
             .unwrap();
             let response = call(&mut app_interface, invocation).await.unwrap();
-            let hashes: EntryHashes = match response {
-                AppResponse::ZomeCall(r) => r.decode().unwrap(),
+            match response {
+                AppResponse::ZomeCall(r) => {
+                    let response: SerializedBytes = r.into_inner();
+                    let hashes: EntryHashes = response.try_into().unwrap();
+                    alice_done = hashes.0.len() == num;
+                }
                 _ => unreachable!(),
-            };
-            alice_done = hashes.0.len() == num;
+            }
         }
         if alice_done && bobbo_done {
             let el = timer.elapsed();

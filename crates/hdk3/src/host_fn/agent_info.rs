@@ -9,6 +9,9 @@ use crate::prelude::*;
 ///
 /// the AgentInfo is the current agent's original pubkey/address that they joined the network with
 /// and their most recent pubkey/address.
-pub fn agent_info() -> ExternResult<AgentInfo> {
-    host_call::<(), AgentInfo>(__agent_info, ())
+pub fn agent_info() -> HdkResult<AgentInfo> {
+    Ok(
+        host_call::<AgentInfoInput, AgentInfoOutput>(__agent_info, &AgentInfoInput::new(()))?
+            .into_inner(),
+    )
 }

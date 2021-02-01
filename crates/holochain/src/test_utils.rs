@@ -589,14 +589,14 @@ pub fn new_zome_call<P, Z: Into<ZomeName>>(
     zome: Z,
 ) -> Result<ZomeCall, SerializedBytesError>
 where
-    P: serde::Serialize,
+    P: TryInto<SerializedBytes, Error = SerializedBytesError>,
 {
     Ok(ZomeCall {
         cell_id: cell_id.clone(),
         zome_name: zome.into(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
-        payload: ExternIO::encode(payload)?,
+        payload: ExternInput::new(payload.try_into()?),
         provenance: cell_id.agent_pubkey().clone(),
     })
 }
@@ -609,14 +609,14 @@ pub fn new_invocation<P, Z: Into<Zome>>(
     zome: Z,
 ) -> Result<ZomeCallInvocation, SerializedBytesError>
 where
-    P: serde::Serialize,
+    P: TryInto<SerializedBytes, Error = SerializedBytesError>,
 {
     Ok(ZomeCallInvocation {
         cell_id: cell_id.clone(),
         zome: zome.into(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
-        payload: ExternIO::encode(payload)?,
+        payload: ExternInput::new(payload.try_into()?),
         provenance: cell_id.agent_pubkey().clone(),
     })
 }

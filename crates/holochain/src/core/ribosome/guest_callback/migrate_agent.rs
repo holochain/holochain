@@ -59,15 +59,17 @@ impl Invocation for MigrateAgentInvocation {
         ]
         .into()
     }
-    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(self.migrate_agent)
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
+        Ok(ExternInput::new((&self.migrate_agent).try_into()?))
     }
 }
 
-impl TryFrom<MigrateAgentInvocation> for ExternIO {
+impl TryFrom<MigrateAgentInvocation> for ExternInput {
     type Error = SerializedBytesError;
     fn try_from(migrate_agent_invocation: MigrateAgentInvocation) -> Result<Self, Self::Error> {
-        ExternIO::encode(&migrate_agent_invocation.migrate_agent)
+        Ok(Self::new(
+            (&migrate_agent_invocation.migrate_agent).try_into()?,
+        ))
     }
 }
 
@@ -108,6 +110,7 @@ mod test {
     use crate::fixt::MigrateAgentHostAccessFixturator;
     use crate::fixt::MigrateAgentInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
+    use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_types::prelude::*;
     use rand::prelude::*;
@@ -214,7 +217,12 @@ mod test {
 
         assert_eq!(
             host_input,
-            ExternIO::encode(MigrateAgentFixturator::new(::fixt::Empty).next().unwrap()).unwrap(),
+            ExternInput::new(
+                SerializedBytes::try_from(
+                    MigrateAgentFixturator::new(::fixt::Empty).next().unwrap()
+                )
+                .unwrap()
+            ),
         );
     }
 }

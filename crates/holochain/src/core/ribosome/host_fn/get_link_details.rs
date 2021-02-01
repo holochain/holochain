@@ -10,9 +10,9 @@ use std::sync::Arc;
 pub fn get_link_details<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: GetLinksInput,
-) -> RibosomeResult<LinkDetails> {
-    let GetLinksInput { base_address, tag_prefix } = input;
+    input: GetLinkDetailsInput,
+) -> RibosomeResult<GetLinkDetailsOutput> {
+    let (base_address, tag) = input.into_inner();
 
     // Get zome id
     let zome_id = ribosome.zome_to_id(&call_context.zome)?;
@@ -22,8 +22,8 @@ pub fn get_link_details<'a>(
 
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         // Create the key
-        let key = match tag_prefix.as_ref() {
-            Some(tag_prefix) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag_prefix),
+        let key = match tag.as_ref() {
+            Some(tag) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag),
             None => LinkMetaKey::BaseZome(&base_address, zome_id),
         };
 
@@ -39,7 +39,7 @@ pub fn get_link_details<'a>(
                 .await?,
         );
 
-        Ok(link_details)
+        Ok(GetLinkDetailsOutput::new(link_details))
     })
 }
 
@@ -51,6 +51,7 @@ pub mod slow_tests {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::Header;
+    use holochain_test_wasm_common::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_entry_hash_path_children_details() {
@@ -74,13 +75,13 @@ pub mod slow_tests {
             host_access,
             TestWasm::HashPath,
             "ensure",
-            "foo.bar".to_string()
+            TestString::from("foo.bar".to_string())
         );
         let _: () = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "ensure",
-            "foo.bar".to_string()
+            TestString::from("foo.bar".to_string())
         );
 
         // ensure foo.baz
@@ -88,37 +89,37 @@ pub mod slow_tests {
             host_access,
             TestWasm::HashPath,
             "ensure",
-            "foo.baz".to_string()
+            TestString::from("foo.baz".to_string())
         );
 
-        let exists_output: bool = crate::call_test_ribosome!(
+        let exists_output: TestBool = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "exists",
-            "foo".to_string()
+            TestString::from("foo".to_string())
         );
 
-        assert_eq!(true, exists_output,);
+        assert_eq!(TestBool(true), exists_output,);
 
         let _foo_bar: holo_hash::EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "hash",
-            "foo.bar".to_string()
+            TestString::from("foo.bar".to_string())
         );
 
         let _foo_baz: holo_hash::EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "hash",
-            "foo.baz".to_string()
+            TestString::from("foo.baz".to_string())
         );
 
         let children_details_output: holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children_details",
-            "foo".to_string()
+            TestString::from("foo".to_string())
         );
 
         let link_details = children_details_output.into_inner();
@@ -138,7 +139,7 @@ pub mod slow_tests {
             host_access,
             TestWasm::HashPath,
             "children_details",
-            "foo".to_string()
+            TestString::from("foo".to_string())
         );
 
         let children_details_output_2_vec = children_details_output_2.into_inner();

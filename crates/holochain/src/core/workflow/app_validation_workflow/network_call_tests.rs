@@ -11,6 +11,7 @@ use holochain_test_wasm_common::AgentActivitySearch;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use matches::assert_matches;
+use std::convert::TryInto;
 
 use crate::conductor::ConductorHandle;
 use crate::test_utils::conductor_setup::CellHostFnCaller;
@@ -648,10 +649,10 @@ async fn get_agent_activity_host_fn_test() {
     )
     .unwrap();
     let result = handle.call_zome(invocation).await.unwrap().unwrap();
-    let agent_activity: holochain_zome_types::query::AgentActivity =
-        unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
-            .decode()
-            .unwrap();
+    let result = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+        .clone()
+        .into_inner();
+    let agent_activity: holochain_zome_types::query::AgentActivity = result.try_into().unwrap();
     assert_eq!(agent_activity, expected_activity);
     conductor_test.shutdown_conductor().await;
 }
@@ -667,10 +668,10 @@ async fn commit_some_data(
         let invocation =
             new_zome_call(&alice_call_data.cell_id, call, (), TestWasm::Create).unwrap();
         let result = handle.call_zome(invocation).await.unwrap().unwrap();
-        let result: HeaderHash = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
-            .decode()
-            .unwrap();
-        header_hash = Some(result);
+        let result = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+            .clone()
+            .into_inner();
+        header_hash = Some(result.try_into().unwrap());
     }
     header_hash.unwrap()
 }

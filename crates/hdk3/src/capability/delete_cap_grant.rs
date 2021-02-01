@@ -15,6 +15,6 @@ use crate::prelude::*;
 /// To 'undo' a delete a new grant with a new secret will need to be issued.
 ///
 /// @see create_cap_grant
-pub fn delete_cap_grant(hash: HeaderHash) -> ExternResult<HeaderHash> {
+pub fn delete_cap_grant(hash: HeaderHash) -> HdkResult<HeaderHash> {
     delete(hash)
 }

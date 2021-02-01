@@ -7,6 +7,6 @@ use crate::prelude::*;
 /// ```ignore
 /// delete_entry(entry_hash(foo_entry)?)?;
 /// ```
-pub fn delete_entry(hash: HeaderHash) -> ExternResult<HeaderHash> {
+pub fn delete_entry(hash: HeaderHash) -> HdkResult<HeaderHash> {
     delete(hash)
 }

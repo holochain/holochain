@@ -15,12 +15,12 @@ pub fn update<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: UpdateInput,
-) -> RibosomeResult<HeaderHash> {
+) -> RibosomeResult<UpdateOutput> {
     // destructure the args out into an app type def id and entry
-    let UpdateInput { original_header_address, entry_with_def_id } = input;
+    let (entry_def_id, entry, original_header_address) = input.into_inner();
 
     // build the entry hash
-    let async_entry = AsRef::<Entry>::as_ref(&entry_with_def_id).to_owned();
+    let async_entry = entry.clone();
     let entry_hash =
         holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
 
@@ -28,10 +28,10 @@ pub fn update<'a>(
     let header_zome_id = ribosome.zome_to_id(&call_context.zome)?;
 
     // extract the entry defs for a zome
-    let entry_type = match AsRef::<EntryDefId>::as_ref(&entry_with_def_id) {
+    let entry_type = match entry_def_id {
         EntryDefId::App(entry_def_id) => {
             let (header_entry_def_id, entry_visibility) =
-                extract_entry_def(ribosome, call_context.clone(), entry_def_id.to_owned().into())?;
+                extract_entry_def(ribosome, call_context.clone(), entry_def_id.into())?;
             let app_entry_type =
                 AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
             EntryType::App(app_entry_type)
@@ -57,7 +57,6 @@ pub fn update<'a>(
     // note that validation is handled by the workflow
     // if the validation fails this update will be rolled back by virtue of the lmdb transaction
     // being atomic
-    let entry = AsRef::<Entry>::as_ref(&entry_with_def_id).to_owned();
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let mut guard = workspace_lock.write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
@@ -74,7 +73,7 @@ pub fn update<'a>(
             &mut workspace.meta_authored,
         )
         .map_err(Box::new)?;
-        Ok(header_hash)
+        Ok(UpdateOutput::new(header_hash))
     })
 }
 

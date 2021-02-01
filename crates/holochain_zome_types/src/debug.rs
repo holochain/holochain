@@ -3,7 +3,7 @@
 use holochain_serialized_bytes::prelude::*;
 
 /// Representation of message to be logged via the `debug` host function
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 pub struct DebugMsg {
     // TODO: Consider either replacing with `Cow<'static, str>` or with
     // `&'a str` and using `#[serde(borrow)]`

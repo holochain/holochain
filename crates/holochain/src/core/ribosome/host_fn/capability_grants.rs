@@ -1,6 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 /// list all the grants stored locally in the chain filtered by tag
@@ -8,8 +9,8 @@ use std::sync::Arc;
 pub fn capability_grants(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    _input: (),
-) -> RibosomeResult<()> {
+    _input: CapabilityGrantsInput,
+) -> RibosomeResult<CapabilityGrantsOutput> {
     unimplemented!();
 }
 
@@ -73,10 +74,10 @@ pub mod wasm_test {
             "transferable_cap_grant",
             secret
         );
-        let maybe_element: Option<Element> =
+        let entry: GetOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Capability, "get_entry", header);
 
-        let entry_secret: CapSecret = match maybe_element {
+        let entry_secret: CapSecret = match entry.into_inner() {
             Some(element) => {
                 let cap_grant_entry: CapGrantEntry = element.entry().to_grant_option().unwrap();
                 match cap_grant_entry.access {
@@ -126,7 +127,7 @@ pub mod wasm_test {
 
         // ALICE FAILING AN UNAUTHED CALL
 
-        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
+        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
         pub struct CapFor(CapSecret, AgentPubKey);
 
         let original_secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
@@ -159,7 +160,7 @@ pub mod wasm_test {
 
         assert_eq!(
             response,
-            ZomeCallResponse::Ok(ExternIO::encode(()).unwrap()),
+            ZomeCallResponse::Ok(ExternOutput::new(().try_into().unwrap())),
         );
 
         // BOB ROLLS THE GRANT SO ONLY THE NEW ONE WILL WORK FOR ALICE
@@ -202,7 +203,7 @@ pub mod wasm_test {
             .await;
         assert_eq!(
             output,
-            ZomeCallResponse::Ok(ExternIO::encode(()).unwrap()),
+            ZomeCallResponse::Ok(ExternOutput::new(().try_into().unwrap())),
         );
 
         // BOB DELETES THE GRANT SO NO SECRETS WORK

@@ -230,21 +230,19 @@ pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &
     app_tx.close(1000, "Shutting down".into()).await.unwrap();
 }
 
-pub async fn call_zome_fn<S>(
+pub async fn call_zome_fn<SB: TryInto<SerializedBytes, Error = SerializedBytesError>>(
     holochain: &mut Child,
     app_tx: &mut WebsocketSender,
     cell_id: CellId,
     wasm: TestWasm,
     fn_name: String,
-    input: S,
-) where
-    S: Serialize,
-{
+    input: SB,
+) {
     let call: ZomeCall = ZomeCallInvocationFixturator::new(NamedInvocation(
         cell_id,
         wasm,
         fn_name,
-        ExternIO::encode(input).unwrap(),
+        ExternInput::new(input.try_into().unwrap()),
     ))
     .next()
     .unwrap()
@@ -419,7 +417,7 @@ async fn remote_signals() {
     }
     let rxs = rxs.into_iter().flatten().collect::<Vec<_>>();
 
-    let signal = fixt!(ExternIo);
+    let signal = fixt!(SerializedBytes);
 
     let _: () = conductors[0]
         .call(
@@ -438,6 +436,7 @@ async fn remote_signals() {
     for mut rx in rxs {
         let r = rx.try_recv();
         // Each handle should recv a signal
+
         assert_matches!(r, Ok(Signal::App(_, a)) if a == signal);
     }
 }
@@ -528,7 +527,7 @@ async fn emit_signals() {
     let sig2: SerializedBytes = unwrap_to::unwrap_to!(msg2 => WebsocketMessage::Signal).clone();
 
     assert_eq!(
-        Signal::App(cell_id, AppSignal::new(ExternIO::encode(()).unwrap())),
+        Signal::App(cell_id, AppSignal::new(().try_into().unwrap())),
         Signal::try_from(sig1.clone()).unwrap(),
     );
     assert_eq!(sig1, sig2);

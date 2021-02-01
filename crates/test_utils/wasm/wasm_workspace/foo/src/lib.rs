@@ -1,4 +1,5 @@
 use hdk3::prelude::*;
+use holochain_test_wasm_common::TestString;
 
 #[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
@@ -17,6 +18,6 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 }
 
 #[hdk_extern]
-fn foo(_: ()) -> ExternResult<String> {
-    Ok(String::from("foo"))
+fn foo(_: ()) -> ExternResult<TestString> {
+    Ok(TestString::from(String::from("foo")))
 }

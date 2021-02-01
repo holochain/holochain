@@ -1,6 +1,6 @@
 use crate::crdt::CrdtType;
 use crate::validate::RequiredValidationType;
-use crate::zome_io::ExternIO;
+use crate::zome_io::ExternOutput;
 use crate::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
 
@@ -152,9 +152,9 @@ impl From<Vec<EntryDef>> for EntryDefsCallbackResult {
     }
 }
 
-impl From<ExternIO> for EntryDefsCallbackResult {
-    fn from(callback_guest_output: ExternIO) -> Self {
-        match callback_guest_output.decode() {
+impl From<ExternOutput> for EntryDefsCallbackResult {
+    fn from(callback_guest_output: ExternOutput) -> Self {
+        match callback_guest_output.into_inner().try_into() {
             Ok(v) => v,
             Err(e) => Self::Err(format!("{:?}", e)),
         }
@@ -177,7 +177,8 @@ mod tests {
     use super::EntryVisibility;
     use crate::crdt::CrdtType;
     use crate::validate::RequiredValidationType;
-    use crate::zome_io::ExternIO;
+    use crate::zome_io::ExternOutput;
+    use std::convert::TryInto;
 
     #[test]
     fn from_guest_output_test() {
@@ -191,7 +192,7 @@ mod tests {
             }]
             .into(),
         );
-        let guest_output = ExternIO::encode(&defs_callback_result).unwrap();
+        let guest_output = ExternOutput::new(defs_callback_result.clone().try_into().unwrap());
         assert_eq!(defs_callback_result, guest_output.into(),);
     }
 }

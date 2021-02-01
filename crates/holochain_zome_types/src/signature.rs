@@ -10,20 +10,17 @@ pub struct Sign {
     pub key: holo_hash::AgentPubKey,
 
     /// The data that should be signed.
-    #[serde(with = "serde_bytes")]
-    pub data: Vec<u8>,
+    pub data: SerializedBytes,
 }
 
 impl Sign {
     /// construct a new Sign struct.
-    pub fn new<S>(key: holo_hash::AgentPubKey, input: S) -> Result<Self, SerializedBytesError>
+    pub fn new<D>(key: holo_hash::AgentPubKey, data: D) -> Result<Self, SerializedBytesError>
     where
-        S: Serialize,
+        D: TryInto<SerializedBytes, Error = SerializedBytesError>,
     {
-        Ok(Self {
-            key,
-            data: holochain_serialized_bytes::encode(&input)?,
-        })
+        let data: SerializedBytes = data.try_into()?;
+        Ok(Self { key, data })
     }
 
     /// construct a new Sign struct from raw bytes.
@@ -40,7 +37,7 @@ impl Sign {
     }
 
     /// data getter
-    pub fn data(&self) -> &[u8] {
+    pub fn data(&self) -> &SerializedBytes {
         &self.data
     }
 }

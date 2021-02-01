@@ -5,6 +5,7 @@
 //! having to go through the heavy machinery of wasm compilation
 
 use self::error::InlineZomeResult;
+use holochain_serialized_bytes as sb;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
 use serde::de::DeserializeOwned;
@@ -52,10 +53,13 @@ impl InlineZome {
     where
         F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
         I: DeserializeOwned,
-        O: Serialize + std::fmt::Debug,
+        O: Serialize,
     {
-        let z = move |api: BoxApi, input: ExternIO| -> InlineZomeResult<ExternIO> {
-            Ok(ExternIO::encode(f(api, input.decode()?)?)?)
+        let z = move |api: BoxApi, input: SerializedBytes| -> InlineZomeResult<SerializedBytes> {
+            let output = f(api, sb::decode(input.bytes())?)?;
+            Ok(SerializedBytes::from(UnsafeBytes::from(sb::encode(
+                &output,
+            )?)))
         };
         if self.callbacks.insert(name.into(), Box::new(z)).is_some() {
             tracing::warn!("Replacing existing InlineZome callback '{}'", name);
@@ -69,10 +73,10 @@ impl InlineZome {
         &self,
         api: BoxApi,
         name: &FunctionName,
-        input: ExternIO,
-    ) -> InlineZomeResult<Option<ExternIO>> {
+        input: ExternInput,
+    ) -> InlineZomeResult<Option<ExternOutput>> {
         if let Some(f) = self.callbacks.get(name) {
-            Ok(Some(f(api, input)?))
+            Ok(Some(ExternOutput::new(f(api, input.into_inner())?)))
         } else {
             Ok(None)
         }
@@ -80,8 +84,9 @@ impl InlineZome {
 }
 
 /// An inline zome function takes a Host API and an input, and produces an output.
-pub type InlineZomeFn =
-    Box<dyn Fn(BoxApi, ExternIO) -> InlineZomeResult<ExternIO> + 'static + Send + Sync>;
+pub type InlineZomeFn = Box<
+    dyn Fn(BoxApi, SerializedBytes) -> InlineZomeResult<SerializedBytes> + 'static + Send + Sync,
+>;
 
 impl std::fmt::Debug for InlineZome {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -127,7 +132,7 @@ mod tests {
         let zome = InlineZome::new("", vec![]).callback("zome_fn_1", |api, a: ()| {
             let hash: AnyDhtHash = todo!();
             Ok(api
-                .get(GetInput::new(hash, GetOptions::default()))
+                .get((hash, GetOptions::default()))
                 .expect("TODO after crate re-org"))
         });
         // let dna = InlineDna::new(hashmap! {

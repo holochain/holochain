@@ -25,11 +25,11 @@ fn simple_crud_zome() -> InlineZome {
         .callback("create", move |api, ()| {
             let entry_def_id: EntryDefId = entry_def.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
+            let hash = api.create((entry_def_id, entry))?;
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {
-            api.get(GetInput::new(hash.into(), GetOptions::default()))
+            api.get((hash.into(), GetOptions::default()))
                 .map_err(Into::into)
         })
 }
@@ -41,11 +41,11 @@ fn invalid_cell_zome() -> InlineZome {
         .callback("create", move |api, entry: Post| {
             let entry_def_id: EntryDefId = entry_def.id.clone();
             let entry = Entry::app(entry.try_into().unwrap()).unwrap();
-            let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
+            let hash = api.create((entry_def_id, entry))?;
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {
-            api.get(GetInput::new(hash.into(), GetOptions::default()))
+            api.get((hash.into(), GetOptions::default()))
                 .map_err(Into::into)
         })
 }

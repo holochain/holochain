@@ -10,10 +10,29 @@ use holochain_zome_types::signal::AppSignal;
 // statically typed languages can more easily get a hint of what type to
 // deserialize to. This of course requires a corresponding change to the
 // Signal type.
-pub fn emit_signal<I>(input: I) -> ExternResult<()>
+// pub fn emit_signal<'a, D: 'a>(data: &'a D) -> HdkResult<()>
+// where
+//     SerializedBytes: TryFrom<&'a D, Error = SerializedBytesError>,
+// {
+//     let sb = SerializedBytes::try_from(data)?;
+//     #[allow(clippy::unit_arg)]
+//     Ok(host_call::<EmitSignalInput, EmitSignalOutput>(
+//         __emit_signal,
+//         &EmitSignalInput::new(AppSignal::new(sb)),
+//     )?
+//     .into_inner())
+// }
+
+pub fn emit_signal<D, E>(data: D) -> HdkResult<()>
 where
-    I: serde::Serialize,
+    HdkError: From<E>,
+    SerializedBytes: TryFrom<D, Error = E>,
 {
+    let sb = SerializedBytes::try_from(data)?;
     #[allow(clippy::unit_arg)]
-    host_call::<AppSignal, ()>(__emit_signal, AppSignal::new(ExternIO::encode(input)?))
+    Ok(host_call::<EmitSignalInput, EmitSignalOutput>(
+        __emit_signal,
+        &EmitSignalInput::new(AppSignal::new(sb)),
+    )?
+    .into_inner())
 }

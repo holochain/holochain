@@ -1,5 +1,5 @@
 use crate::element::Element;
-use crate::zome_io::ExternIO;
+use crate::zome_io::ExternOutput;
 use crate::CallbackResult;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
@@ -21,7 +21,7 @@ pub enum ValidationStatus {
     Abandoned,
 }
 
-#[derive(Serialize, Deserialize, SerializedBytes, Debug)]
+#[derive(Serialize, Deserialize, SerializedBytes)]
 pub struct ValidateData {
     pub element: Element,
     pub validation_package: Option<ValidationPackage>,
@@ -42,9 +42,9 @@ impl CallbackResult for ValidateCallbackResult {
     }
 }
 
-impl From<ExternIO> for ValidateCallbackResult {
-    fn from(guest_output: ExternIO) -> Self {
-        match guest_output.decode() {
+impl From<ExternOutput> for ValidateCallbackResult {
+    fn from(guest_output: ExternOutput) -> Self {
+        match guest_output.into_inner().try_into() {
             Ok(v) => v,
             Err(e) => Self::Invalid(format!("{:?}", e)),
         }
@@ -68,16 +68,16 @@ pub enum RequiredValidationType {
     Custom,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidationPackageCallbackResult {
     Success(ValidationPackage),
     Fail(String),
     UnresolvedDependencies(Vec<AnyDhtHash>),
 }
 
-impl From<ExternIO> for ValidationPackageCallbackResult {
-    fn from(guest_output: ExternIO) -> Self {
-        match guest_output.decode() {
+impl From<ExternOutput> for ValidationPackageCallbackResult {
+    fn from(guest_output: ExternOutput) -> Self {
+        match guest_output.into_inner().try_into() {
             Ok(v) => v,
             Err(e) => ValidationPackageCallbackResult::Fail(format!("{:?}", e)),
         }

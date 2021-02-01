@@ -353,7 +353,8 @@ pub mod tests {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::cell::CellId;
     use holochain_zome_types::entry::Entry;
-    use holochain_zome_types::ExternIO;
+    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::ExternOutput;
     use matches::assert_matches;
     use observability;
 
@@ -403,7 +404,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                ExternIO::encode(Payload { a: 1 }).unwrap(),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ))
             .next()
             .unwrap();
@@ -463,9 +464,8 @@ pub mod tests {
         ribosome
             .expect_call_zome_function()
             .returning(move |_workspace, _invocation| {
-                Ok(ZomeCallResponse::Ok(
-                    ExternIO::encode(Payload { a: 3 }).unwrap(),
-                ))
+                let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
+                Ok(ZomeCallResponse::Ok(ExternOutput::new(x)))
             });
 
         let invocation =
@@ -475,7 +475,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                ExternIO::encode(Payload { a: 1 }).unwrap(),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ))
             .next()
             .unwrap();
@@ -510,7 +510,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                ExternIO::encode(Payload { a: 1 }).unwrap(),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ))
             .next()
             .unwrap();
@@ -533,9 +533,11 @@ pub mod tests {
         let mut ribosome = MockRibosomeT::new();
         let dna_def = fixt!(DnaFile).dna().clone();
         ribosome.expect_dna_def().return_const(dna_def);
-        ribosome
-            .expect_call_zome_function()
-            .returning(|_, _| Ok(ZomeCallResponse::Ok(ExternIO::encode(()).unwrap())));
+        ribosome.expect_call_zome_function().returning(|_, _| {
+            Ok(ZomeCallResponse::Ok(ExternOutput::new(
+                ().try_into().unwrap(),
+            )))
+        });
         // TODO: Make this mock return an output
         let invocation =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
@@ -544,7 +546,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                ExternIO::encode(Payload { a: 1 }).unwrap(),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ))
             .next()
             .unwrap();

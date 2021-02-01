@@ -31,12 +31,12 @@ pub struct ChannelName(String);
 async fn ser_entry_hash_test() {
     observability::test_run().ok();
     let eh = fixt!(EntryHash);
-    let extern_io: ExternIO = ExternIO::encode(eh).unwrap();
-    tracing::debug!(?extern_io);
-    let o: EntryHash = extern_io.decode().unwrap();
-    let extern_io: ExternIO = ExternIO::encode(o).unwrap();
-    tracing::debug!(?extern_io);
-    let _eh: EntryHash = extern_io.decode().unwrap();
+    let sb: SerializedBytes = eh.clone().try_into().unwrap();
+    tracing::debug!(?sb);
+    let o: HashEntryOutput = sb.try_into().unwrap();
+    let sb: SerializedBytes = o.try_into().unwrap();
+    tracing::debug!(?sb);
+    let _eh: EntryHash = sb.try_into().unwrap();
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -123,7 +123,7 @@ async fn ser_regression_test() {
         zome_name: TestWasm::SerRegression.into(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: "create_channel".into(),
-        payload: ExternIO::encode(channel).unwrap(),
+        payload: ExternInput::new(channel.try_into().unwrap()),
         provenance: alice_agent_id.clone(),
     };
 
@@ -131,15 +131,23 @@ async fn ser_regression_test() {
     let request = AppRequest::ZomeCall(request).try_into().unwrap();
     let response = app_api.handle_app_request(request).await;
 
-    let _channel_hash: EntryHash = match response {
-        AppResponse::ZomeCall(r) => r.decode().unwrap(),
+    let _channel_hash = match response {
+        AppResponse::ZomeCall(r) => {
+            let response: SerializedBytes = r.into_inner();
+            let channel_hash: EntryHash = response.try_into().unwrap();
+            channel_hash
+        }
         _ => unreachable!(),
     };
 
     let output = handle.call_zome(invocation).await.unwrap().unwrap();
 
-    let channel_hash: EntryHash = match output {
-        ZomeCallResponse::Ok(guest_output) => guest_output.decode().unwrap(),
+    let channel_hash = match output {
+        ZomeCallResponse::Ok(guest_output) => {
+            let response: SerializedBytes = guest_output.into_inner();
+            let channel_hash: EntryHash = response.try_into().unwrap();
+            channel_hash
+        }
         _ => unreachable!(),
     };
 
@@ -152,7 +160,7 @@ async fn ser_regression_test() {
         zome_name: TestWasm::SerRegression.into(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: "create_message".into(),
-        payload: ExternIO::encode(message).unwrap(),
+        payload: ExternInput::new(message.try_into().unwrap()),
         provenance: alice_agent_id.clone(),
     };
 
@@ -160,15 +168,22 @@ async fn ser_regression_test() {
     let request = AppRequest::ZomeCall(request).try_into().unwrap();
     let response = app_api.handle_app_request(request).await;
 
-    let _msg_hash: EntryHash = match response {
-        AppResponse::ZomeCall(r) => r.decode().unwrap(),
+    let _msg_hash = match response {
+        AppResponse::ZomeCall(r) => {
+            let response: SerializedBytes = r.into_inner();
+            let msg_hash: EntryHash = response.try_into().unwrap();
+            msg_hash
+        }
         _ => unreachable!(),
     };
 
     let output = handle.call_zome(invocation).await.unwrap().unwrap();
 
-    let _msg_hash: EntryHash = match output {
-        ZomeCallResponse::Ok(guest_output) => guest_output.decode().unwrap(),
+    match output {
+        ZomeCallResponse::Ok(guest_output) => {
+            let response: SerializedBytes = guest_output.into_inner();
+            let _msg_hash: EntryHash = response.try_into().unwrap();
+        }
         _ => unreachable!(),
     };
 

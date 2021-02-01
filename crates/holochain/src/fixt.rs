@@ -50,6 +50,8 @@ use strum::IntoEnumIterator;
 
 pub use holochain_types::fixt::*;
 
+wasm_io_fixturator!(ExternInput<SerializedBytes>);
+
 newtype_fixturator!(FnComponents<Vec<String>>);
 
 fixturator!(
@@ -448,7 +450,7 @@ fixturator!(
         zome: ZomeFixturator::new(Empty).next().unwrap(),
         cap: Some(CapSecretFixturator::new(Empty).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
-        payload: ExternIoFixturator::new(Empty).next().unwrap(),
+        payload: ExternInputFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
     };
     curve Unpredictable ZomeCallInvocation {
@@ -456,7 +458,7 @@ fixturator!(
         zome: ZomeFixturator::new(Unpredictable).next().unwrap(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
-        payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
+        payload: ExternInputFixturator::new(Unpredictable).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
     };
     curve Predictable ZomeCallInvocation {
@@ -472,7 +474,7 @@ fixturator!(
         fn_name: FunctionNameFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        payload: ExternIoFixturator::new_indexed(Predictable, get_fixt_index!())
+        payload: ExternInputFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
         provenance: AgentPubKeyFixturator::new_indexed(Predictable, get_fixt_index!())
@@ -483,7 +485,7 @@ fixturator!(
 
 /// Fixturator curve for a named zome invocation
 /// cell id, test wasm for zome to call, function name, host input payload
-pub struct NamedInvocation(pub CellId, pub TestWasm, pub String, pub ExternIO);
+pub struct NamedInvocation(pub CellId, pub TestWasm, pub String, pub ExternInput);
 
 impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
     type Item = ZomeCallInvocation;
