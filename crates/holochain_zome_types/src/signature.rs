@@ -18,7 +18,7 @@ impl Sign {
     /// construct a new Sign struct.
     pub fn new<S>(key: holo_hash::AgentPubKey, input: S) -> Result<Self, SerializedBytesError>
     where
-        S: Serialize,
+        S: Serialize + std::fmt::Debug,
     {
         Ok(Self {
             key,

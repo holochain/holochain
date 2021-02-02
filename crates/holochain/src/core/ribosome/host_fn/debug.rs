@@ -5,12 +5,10 @@ use holochain_types::prelude::*;
 use std::sync::Arc;
 use tracing::*;
 
-#[instrument(skip(_ribosome, _call_context, input))]
-pub fn debug(
-    _ribosome: Arc<impl RibosomeT>,
-    _call_context: Arc<CallContext>,
+#[instrument(skip(input))]
+pub fn wasm_debug(
     input: DebugMsg,
-) -> RibosomeResult<()> {
+) {
     debug!(
         "{}:{}:{} {}",
         input.module_path(),
@@ -18,6 +16,19 @@ pub fn debug(
         input.line(),
         input.msg()
     );
+}
+
+pub fn debug(
+    _ribosome: Arc<impl RibosomeT>,
+    _call_context: Arc<CallContext>,
+    input: DebugMsg,
+) -> RibosomeResult<()> {
+    let collector = tracing_subscriber::fmt()
+    .with_max_level(tracing::Level::TRACE)
+    .finish();
+    tracing::subscriber::with_default(collector, || {
+        wasm_debug(input)
+    });
     Ok(())
 }
 

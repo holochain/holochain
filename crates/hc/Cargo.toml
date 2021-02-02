@@ -34,7 +34,7 @@ url2 = "0.0.6"
 portpicker = "0.1.0"
 nanoid = "0.3"
 # unwrap_to = { version = "0.1.0", optional = false }
-observability = "0.1.2"
+observability = "0.1.3"
 chrono = "0.4.6"
 walkdir = "2"
 
