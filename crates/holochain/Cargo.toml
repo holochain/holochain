@@ -9,6 +9,7 @@ authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 
 [dependencies]
+syn = "=1.0.55"
 anyhow = "1.0.26"
 async-trait = "0.1"
 base64 = "0.10.1"
