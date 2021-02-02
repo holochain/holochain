@@ -54,6 +54,14 @@ pub struct Opt {
     /// How long nodes should delay before responding
     #[structopt(short = "d", long, default_value = "200")]
     process_delay_ms: u32,
+
+    /// Message size bytes
+    #[structopt(short = "m", long, default_value = "512")]
+    message_size_bytes: usize,
+
+    /// Number of incoming requests to process in parallel
+    #[structopt(short = "p", long, default_value = "32")]
+    parallel_request_handle_count: usize,
 }
 
 #[tokio::main]
@@ -135,6 +143,7 @@ async fn inner() -> TransportResult<()> {
     let proxy_url = listener.bound_url().await?;
     println!("Proxy Url: {}", proxy_url);
 
+    // proxy handler - this won't actually do anything
     metric_task(async move {
         while let Some(evt) = events.next().await {
             match evt {
@@ -150,6 +159,7 @@ async fn inner() -> TransportResult<()> {
     let (metric_send, mut metric_recv) =
         futures::channel::mpsc::channel((opt.node_count + 10) as usize);
 
+    // metrics ticker to wake task if infrequent data
     metric_task({
         let mut metric_send = metric_send.clone();
         async move {
@@ -164,6 +174,7 @@ async fn inner() -> TransportResult<()> {
         }
     });
 
+    // metrics display task
     metric_task(async move {
         let mut last_disp = std::time::Instant::now();
         let mut rtime = Vec::new();
@@ -183,9 +194,12 @@ async fn inner() -> TransportResult<()> {
         <Result<(), ()>>::Ok(())
     });
 
+    // everybody will talk to this one client
+    // this proves that the client can process many responses in parallel
     let (_con, con_url) = gen_client(opt.clone(), proxy_url.clone()).await?;
     println!("Responder Url: {}", con_url);
 
+    // spin up all the nodes that will be making requests of the responder.
     for _ in 0..opt.node_count {
         metric_task(client_loop(
             opt.clone(),
@@ -207,19 +221,29 @@ async fn gen_client(
 
     let con_url = con.bound_url().await?;
 
+    let msg_size = opt.message_size_bytes;
     metric_task(async move {
+        let in_data = vec![0xdb; msg_size];
+        let in_data = &in_data;
+        let out_data = vec![0xbd; msg_size];
+        let out_data = &out_data;
         let process_delay_ms = opt.process_delay_ms as u64;
         events
             .for_each_concurrent(
-                /* limit */ (opt.node_count + 10) as usize,
+                /* limit */ opt.parallel_request_handle_count,
                 move |evt| async move {
                     match evt {
-                        TransportEvent::IncomingChannel(_url, mut write, _read) => {
+                        TransportEvent::IncomingChannel(_url, mut write, read) => {
                             tokio::time::delay_for(std::time::Duration::from_millis(
                                 process_delay_ms,
                             ))
                             .await;
-                            let _ = write.write_and_close(b"".to_vec()).await;
+                            let data = read.read_to_end().await;
+                            assert_eq!(
+                                &data,
+                                in_data,
+                            );
+                            let _ = write.write_and_close(out_data.clone()).await;
                         }
                     }
                 },
@@ -245,10 +269,14 @@ async fn client_loop(
         ))
         .await;
 
+        let out_data = vec![0xdb; opt.message_size_bytes];
+        let in_data = vec![0xbd; opt.message_size_bytes];
+
         let start = std::time::Instant::now();
         let (_, mut write, read) = con.create_channel(con_url.clone()).await?;
-        write.write_and_close(b"".to_vec()).await?;
-        read.read_to_end().await;
+        write.write_and_close(out_data.clone()).await?;
+        let res = read.read_to_end().await;
+        assert_eq!(in_data, res);
         metric_send
             .send(Metric::RequestOverhead(
                 start.elapsed().as_millis() as u64 - opt.process_delay_ms as u64,
