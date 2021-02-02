@@ -25,7 +25,10 @@ rec {
 
     # alas, we cannot specify --features in the virtual workspace
     cargo test warm_wasm_tests --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms
+    # run the specific slow tests in the holochain crate
     cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests -- --nocapture
+    # run all the remaining cargo tests
+    cargo test -- --nocapture
   '';
 
   hcMergeTest = let
