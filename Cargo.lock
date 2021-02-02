@@ -1346,6 +1346,8 @@ dependencies = [
  "serde",
  "serde_bytes",
  "thiserror",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1821,6 +1823,7 @@ dependencies = [
  "strum",
  "subtle 2.4.0",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]

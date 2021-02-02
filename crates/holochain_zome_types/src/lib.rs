@@ -20,7 +20,7 @@ pub mod capability;
 pub mod cell;
 #[allow(missing_docs)]
 pub mod crdt;
-pub mod debug;
+pub mod trace;
 pub mod element;
 pub mod entry;
 #[allow(missing_docs)]

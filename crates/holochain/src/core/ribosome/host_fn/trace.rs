@@ -6,28 +6,29 @@ use std::sync::Arc;
 use tracing::*;
 
 #[instrument(skip(input))]
-pub fn wasm_debug(
-    input: DebugMsg,
+pub fn wasm_trace(
+    input: TraceMsg,
 ) {
-    debug!(
-        "{}:{}:{} {}",
-        input.module_path(),
-        input.file(),
-        input.line(),
-        input.msg()
-    );
+    match input.level {
+        holochain_types::prelude::Level::TRACE => tracing::trace!("{}", input.msg),
+        holochain_types::prelude::Level::DEBUG => tracing::debug!("{}", input.msg),
+        holochain_types::prelude::Level::INFO => tracing::info!("{}", input.msg),
+        holochain_types::prelude::Level::WARN => tracing::warn!("{}", input.msg),
+        holochain_types::prelude::Level::ERROR => tracing::error!("{}", input.msg),
+    }
 }
 
-pub fn debug(
+pub fn trace(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    input: DebugMsg,
+    input: TraceMsg,
 ) -> RibosomeResult<()> {
     let collector = tracing_subscriber::fmt()
     .with_max_level(tracing::Level::TRACE)
+    .with_target(false)
     .finish();
     tracing::subscriber::with_default(collector, || {
-        wasm_debug(input)
+        wasm_trace(input)
     });
     Ok(())
 }
@@ -35,34 +36,34 @@ pub fn debug(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use super::debug;
+    use super::trace;
 
     use crate::fixt::CallContextFixturator;
     use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::debug_msg;
+    use holochain_zome_types::prelude::*;
     use std::sync::Arc;
 
     /// we can get an entry hash out of the fn directly
     #[tokio::test(threaded_scheduler)]
-    async fn debug_test() {
+    async fn trace_test() {
         let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
         let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        let input = debug_msg!(format!("ribosome debug {}", "works!"));
+        let input = trace_msg!(Level::DEBUG, "ribosome trace {}", "works!");
 
-        let output: () = debug(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
+        let output: () = trace(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
         assert_eq!((), output);
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn wasm_line_numbers_test() {
+    async fn wasm_trace_test() {
         let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =

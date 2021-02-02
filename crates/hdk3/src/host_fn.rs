@@ -3,7 +3,7 @@ pub mod call;
 pub mod call_remote;
 pub mod create;
 pub mod create_link;
-pub mod debug;
+pub mod trace;
 pub mod delete;
 pub mod delete_link;
 pub mod emit_signal;

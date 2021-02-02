@@ -60,6 +60,8 @@ pub use holochain_zome_types;
 pub use holochain_zome_types::prelude::*;
 pub use std::collections::HashSet;
 pub use std::convert::TryFrom;
+pub use tracing;
+pub use tracing_subscriber;
 
 // This needs to be called at least once _somewhere_ and is idempotent.
 #[macro_export]
@@ -67,7 +69,7 @@ macro_rules! holochain_externs {
     () => {
         holochain_wasmer_guest::memory_externs!();
         holochain_wasmer_guest::host_externs!(
-            __debug,
+            __trace,
             __hash_entry,
             __unreachable,
             __verify_signature,

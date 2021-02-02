@@ -35,7 +35,7 @@ use crate::core::ribosome::host_fn::capability_info::capability_info;
 use crate::core::ribosome::host_fn::create::create;
 use crate::core::ribosome::host_fn::create_link::create_link;
 use crate::core::ribosome::host_fn::create_x25519_keypair::create_x25519_keypair;
-use crate::core::ribosome::host_fn::debug::debug;
+use crate::core::ribosome::host_fn::trace::trace;
 use crate::core::ribosome::host_fn::delete::delete;
 use crate::core::ribosome::host_fn::delete_link::delete_link;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
@@ -165,7 +165,7 @@ impl RealRibosome {
         );
 
         // imported host functions for core
-        ns.insert("__debug", func!(invoke_host_function!(debug)));
+        ns.insert("__trace", func!(invoke_host_function!(trace)));
         ns.insert("__hash_entry", func!(invoke_host_function!(hash_entry)));
         ns.insert("__unreachable", func!(invoke_host_function!(unreachable)));
 
