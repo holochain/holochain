@@ -55,7 +55,10 @@ pub mod wasm_test {
         let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        let input = trace_msg!(Level::DEBUG, "ribosome trace {}", "works!");
+        let input = TraceMsg{
+            level: Level::DEBUG,
+            msg: "ribosome trace works".to_string(),
+        };
 
         let output: () = trace(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 

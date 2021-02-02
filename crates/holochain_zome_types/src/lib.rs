@@ -20,7 +20,6 @@ pub mod capability;
 pub mod cell;
 #[allow(missing_docs)]
 pub mod crdt;
-pub mod trace;
 pub mod element;
 pub mod entry;
 #[allow(missing_docs)]
@@ -42,6 +41,7 @@ pub mod request;
 pub mod signal;
 pub mod signature;
 pub mod timestamp;
+pub mod trace;
 #[allow(missing_docs)]
 pub mod validate;
 #[allow(missing_docs)]

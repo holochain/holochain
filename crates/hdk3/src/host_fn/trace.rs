@@ -1,77 +1,74 @@
-/// Debug anything that can be formatted.
-///
-/// Internally calls trace_msg! which should preserve the line numbers etc. from _inside the wasm_
-/// which is normally difficult information to access due to limited debugging options for wasm
-/// code.
-///
-/// Note: Debugging happens _on the host side_ with the debug! macro from the tracing crate.
-///
-/// Note: Debug does not return a result.
-///
-/// ```ignore
-/// debug!("{:?}", foo);
-/// ```
-#[macro_export]
-macro_rules! debug {
-    ( $msg:expr ) => {
-        $crate::debug!("{}", $msg );
-    };
-    ( $msg:expr, $($tail:expr),* ) => {{
-        host_call::<crate::prelude::TraceMsg, ()>(
-            __trace,
-            holochain_zome_types::trace_msg!(holochain_zome_types::trace::Level::DEBUG, $msg, $($tail),*),
-        ).ok();
-    }};
+use crate::prelude::*;
+use std::fmt::Write;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+
+#[derive(Default)]
+pub struct WasmSubscriber {
+    ids: AtomicUsize,
 }
 
-#[macro_export]
-macro_rules! trace {
-    ( $msg:expr ) => {
-        $crate::trace!("{}", $msg );
-    };
-    ( $msg:expr, $($tail:expr),* ) => {{
-        host_call::<crate::prelude::TraceMsg, ()>(
-            __trace,
-            holochain_zome_types::trace_msg!(holochain_zome_types::trace::Level::TRACE, $msg, $($tail),*),
-        ).ok();
-    }};
+struct StringVisitor<'a> {
+    fields: &'a mut String,
+    message: &'a mut String,
 }
 
-#[macro_export]
-macro_rules! info {
-    ( $msg:expr ) => {
-        $crate::info!("{}", $msg );
-    };
-    ( $msg:expr, $($tail:expr),* ) => {{
-        host_call::<crate::prelude::TraceMsg, ()>(
-            __trace,
-            holochain_zome_types::trace_msg!(holochain_zome_types::trace::Level::INFO, $msg, $($tail),*),
-        ).ok();
-    }};
+impl<'a> tracing_core::field::Visit for StringVisitor<'a> {
+    fn record_debug(&mut self, field: &tracing_core::Field, value: &dyn std::fmt::Debug) {
+        if field.name() == "message" {
+            let did_write = write!(self.message, "{:?}", value);
+            if did_write.is_err() {
+                let _ = write!(self.message, "**failed to write message**");
+            }
+        } else {
+            let did_write = write!(self.fields, "{} = {:?}; ", field.name(), value);
+            if did_write.is_err() {
+                let _ = write!(self.fields, "**failed to write {}**", field.name());
+            }
+        }
+    }
 }
 
-#[macro_export]
-macro_rules! warn {
-    ( $msg:expr ) => {
-        $crate::warn!("{}", $msg );
-    };
-    ( $msg:expr, $($tail:expr),* ) => {{
-        host_call::<crate::prelude::TraceMsg, ()>(
+impl tracing_core::Subscriber for WasmSubscriber {
+    fn enabled(&self, _metadata: &tracing::Metadata<'_>) -> bool {
+        true
+    }
+    fn new_span(&self, _attributes: &tracing_core::span::Attributes<'_>) -> tracing::Id {
+        let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
+        tracing::Id::from_u64(next)
+    }
+    fn record(&self, _span: &tracing::Id, _values: &tracing::span::Record<'_>) {
+        // unimplemented
+    }
+    fn record_follows_from(&self, _span: &tracing::Id, _follows: &tracing::Id) {
+        // unimplemented
+    }
+    fn event(&self, event: &tracing::Event<'_>) {
+        let mut visitor = StringVisitor {
+            message: &mut String::new(),
+            fields: &mut String::new(),
+        };
+        event.record(&mut visitor);
+        host_call::<TraceMsg, ()>(
             __trace,
-            holochain_zome_types::trace_msg!(holochain_zome_types::trace::Level::WARN, $msg, $($tail),*),
-        ).ok();
-    }};
-}
-
-#[macro_export]
-macro_rules! error {
-    ( $msg:expr ) => {
-        $crate::error!("{}", $msg );
-    };
-    ( $msg:expr, $($tail:expr),* ) => {{
-        host_call::<crate::prelude::TraceMsg, ()>(
-            __trace,
-            holochain_zome_types::trace_msg!(holochain_zome_types::trace::Level::ERROR, $msg, $($tail),*),
-        ).ok();
-    }};
+            TraceMsg {
+                level: event.metadata().level().into(),
+                msg: format!(
+                    "{}:{}:{} {}{}",
+                    event.metadata().module_path().unwrap_or(""),
+                    event.metadata().file().unwrap_or(""),
+                    event.metadata().line().unwrap_or(0),
+                    visitor.fields,
+                    visitor.message
+                ),
+            },
+        )
+        .ok();
+    }
+    fn enter(&self, _span: &tracing::Id) {
+        // unimplemented
+    }
+    fn exit(&self, _span: &tracing::Id) {
+        // unimplemented
+    }
 }

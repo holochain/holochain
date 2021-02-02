@@ -152,6 +152,7 @@ dependencies = [
  "serde_bytes",
  "thiserror",
  "tracing",
+ "tracing-core",
  "tracing-subscriber",
 ]
 

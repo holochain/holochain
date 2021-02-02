@@ -19,7 +19,7 @@ pub enum Level {
 }
 
 impl From<&tracing::Level> for Level {
-    fn from (level: &tracing::Level) -> Self {
+    fn from(level: &tracing::Level) -> Self {
         match level {
             &tracing::Level::ERROR => Self::ERROR,
             &tracing::Level::WARN => Self::WARN,
@@ -45,58 +45,4 @@ pub struct TraceMsg {
     pub msg: String,
     /// Severity level for the message.
     pub level: Level,
-}
-
-/// Returns a [`TraceMsg`][] combining the message passed `trace_msg!` with
-/// the source code location in which it's called.
-///
-/// # Examples
-///
-/// Basic usage
-///
-/// ```rust
-/// // Due to doc-test weirdness, this comment is technically on line 4.
-/// let message: TraceMsg = trace_msg!("info: operation complete");
-///
-/// assert_eq!(message.msg(), "info: operation complete");
-/// assert_eq!(message.file(), "src/debug.rs");
-/// assert_eq!(message.line(), 5);
-/// # use holochain_zome_types::{trace::TraceMsg, trace_msg};
-/// ```
-///
-/// Advanced formatting
-///
-/// ```rust
-/// let operation = "frobnicate";
-///
-/// // Due to doc-test weirdness, this comment is technically on line 6.
-/// let message: TraceMsg = trace_msg!(
-///     "info: operation complete: {}",
-///     operation
-/// );
-///
-/// assert_eq!(message.msg(), "info: operation complete: frobnicate");
-/// assert_eq!(message.file(), "src/debug.rs");
-/// assert_eq!(message.line(), 7);
-/// # use holochain_zome_types::{trace::TraceMsg, trace_msg};
-/// ```
-///
-/// [`TraceMsg`]: struct.TraceMsg.html
-#[macro_export]
-macro_rules! trace_msg {
-    ( $level:expr, $msg:expr ) => {
-        holochain_zome_types::trace_msg!($level, "{}", $msg);
-    };
-    ( $level:expr, $msg:expr, $($tail:expr),* ) => {{
-        $crate::trace::TraceMsg{
-            msg: format!(
-                "{}:{}:{} {}", 
-                module_path!(), 
-                file!(), 
-                line!(), 
-                format!($msg, $($tail),*),
-            ),
-            level: $level,
-        }
-    }};
 }
