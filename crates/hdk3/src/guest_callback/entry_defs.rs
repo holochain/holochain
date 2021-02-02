@@ -54,7 +54,7 @@ macro_rules! app_entry {
                 Self::try_from(&t)
             }
         }
-    }
+    };
 }
 
 /// Implements a whole lot of sane defaults for a struct or enum that should behave as an entry,
@@ -162,7 +162,7 @@ macro_rules! entry_interface {
                 $t::required_validations()
             }
         }
-    }
+    };
 }
 
 /// Implements a whole lot of sane defaults for a struct or enum that should behave as an entry.
