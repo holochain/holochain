@@ -5,8 +5,11 @@
 //! may contain various invalid combinations of data. In contrast, these types
 //! are structured to ensure validity, and are used internally by Holochain.
 
-use crate::app::app_manifest::current::{DnaLocation, DnaVersionSpec};
 use crate::prelude::{CellNick, YamlProperties};
+use crate::{
+    app::app_manifest::current::{DnaLocation, DnaVersionSpec},
+    prelude::dna_gamut::DnaGamut,
+};
 use std::collections::HashMap;
 
 use super::error::{AppManifestError, AppManifestResult};
@@ -21,11 +24,11 @@ pub struct AppManifestValidated {
 }
 
 impl AppManifestValidated {
-    /// Constructor with internal consistency check.
+    /// Constructor with internal consistency checks.
     ///
     /// NB: never make this struct's fields public. This constructor should be
     /// the only way to instantiate this type.
-    pub fn new(
+    pub(super) fn new(
         name: String,
         cells: HashMap<CellNick, CellManifestValidated>,
     ) -> AppManifestResult<Self> {
@@ -81,4 +84,10 @@ pub enum CellManifestValidated {
     /// Disallow provisioning altogether. In this case, we expect
     /// `clone_limit > 0`: otherwise, no Cells will ever be created.
     Disabled { clone_limit: u32 },
+}
+
+impl CellManifestValidated {
+    pub fn dna_gamut(conductor: impl ConductorHandleT) -> DnaGamut {
+        todo!()
+    }
 }
