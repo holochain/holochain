@@ -1022,7 +1022,7 @@ mod builder {
                 holochain_p2p,
             });
 
-            handle.add_dnas().await?;
+            handle.load_dnas().await?;
 
             tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
 

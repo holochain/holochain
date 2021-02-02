@@ -62,7 +62,7 @@ use futures::future::FutureExt;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::*;
 
@@ -104,7 +104,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16>;
 
     /// Install a [Dna] in this Conductor
-    async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()>;
+    async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
     /// Get the list of hashes of installed Dnas in this Conductor
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
@@ -116,7 +116,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
     /// Add the [DnaFile]s from the wasm and dna_def databases into memory
-    async fn add_dnas(&self) -> ConductorResult<()>;
+    async fn load_dnas(&self) -> ConductorResult<()>;
 
     /// Dispatch a network event to the correct cell.
     async fn dispatch_holochain_p2p_event(
@@ -164,6 +164,12 @@ pub trait ConductorHandleT: Send + Sync {
         self: Arc<Self>,
         installed_app_id: InstalledAppId,
         cell_data_with_proofs: Vec<(InstalledCell, Option<MembraneProof>)>,
+    ) -> ConductorResult<()>;
+
+    /// Install DNAs and set up Cells as specified by an AppBundle
+    async fn install_app_bundle(
+        self: Arc<Self>,
+        payload: InstallAppBundlePayload,
     ) -> ConductorResult<()>;
 
     /// Setup the cells from the database
@@ -276,7 +282,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         lock.add_app_interface_via_handle(port, self.clone()).await
     }
 
-    async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
+    async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
         let is_full_wasm_dna = dna
             .dna_def()
             .zomes
@@ -296,7 +302,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(())
     }
 
-    async fn add_dnas(&self) -> ConductorResult<()> {
+    async fn load_dnas(&self) -> ConductorResult<()> {
         let (dnas, entry_defs) = self
             .conductor
             .read()
@@ -449,6 +455,27 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
             .add_inactive_app_to_db(app)
             .await
+    }
+
+    async fn install_app_bundle(
+        self: Arc<Self>,
+        payload: InstallAppBundlePayload,
+    ) -> ConductorResult<()> {
+        let InstallAppBundlePayload {
+            bundle,
+            agent_key,
+            installed_app_id,
+            membrane_proofs,
+        } = payload;
+        let manifest = bundle.manifest();
+        let bundled_dnas = bundle.resolve_all().await?;
+
+        self.clone().register_dna(todo!("get dnas")).await?;
+
+        self.clone().install_app(todo!(), todo!()).await?;
+
+        // for dna_bytes in bundled_dnas.values()
+        todo!()
     }
 
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>> {

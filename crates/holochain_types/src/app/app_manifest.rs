@@ -11,6 +11,8 @@ mod app_manifest_validated;
 mod current;
 mod error;
 
+pub use current::*;
+
 /// Container struct which uses the `manifest_version` field to determine
 /// which manifest version to deserialize to.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

@@ -2,6 +2,7 @@
 
 mod app_bundle;
 mod app_manifest;
+pub mod dna_gamut;
 pub use app_bundle::*;
 pub use app_manifest::*;
 
@@ -10,7 +11,7 @@ use derive_more::Into;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::cell::CellId;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 /// The unique identifier for an installed app in this conductor
 pub type InstalledAppId = String;
@@ -57,15 +58,19 @@ pub struct InstallAppPayload {
 /// An [AppBundle] along with an [AgentPubKey] and optional [InstalledAppId]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct InstallAppBundlePayload {
-    /// The unique identifier for an installed app in this conductor
+    /// The unique identifier for an installed app in this conductor.
     pub bundle: AppBundle,
 
-    /// The agent to use when creating Cells for this App
+    /// The agent to use when creating Cells for this App.
     pub agent_key: AgentPubKey,
 
     /// The unique identifier for an installed app in this conductor.
     /// If not specified, it will be derived from the app name in the bundle manifest.
     pub installed_app_id: Option<InstalledAppId>,
+
+    /// Include proof-of-membrane-membership data for cells that require it,
+    /// keyed by the CellNick specified in the app bundle manifest.
+    pub membrane_proofs: HashMap<CellNick, MembraneProof>,
 }
 
 /// Information needed to specify a Dna as part of an App

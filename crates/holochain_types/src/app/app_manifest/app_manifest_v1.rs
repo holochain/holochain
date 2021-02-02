@@ -1,3 +1,8 @@
+//! App Manifest format, version 1.
+//!
+//! NB: After stabilization, *do not modify this file*! Create a new version of
+//! the spec and leave this one alone to maintain backwards compatibility.
+
 use super::{
     app_manifest_validated::{AppManifestValidated, CellManifestValidated},
     error::{AppManifestError, AppManifestResult},
@@ -33,12 +38,12 @@ pub struct CellManifest {
 
     /// Declares where to find the DNA, and options to modify it before
     /// inclusion in a Cell
-    pub(super) dna: DnaManifest,
+    pub(super) dna: AppDnaManifest,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub struct DnaManifest {
+pub struct AppDnaManifest {
     /// Where to find this Dna. To specify a DNA included in a hApp Bundle,
     /// use a local relative path that corresponds with the bundle structure.
     ///
@@ -70,14 +75,24 @@ pub type DnaLocation = mr_bundle::Location;
 /// Defines a criterion for a DNA version to match against.
 ///
 /// Currently we're using the most simple possible version spec: A list of
-/// valid DnaHashes. The order of the list is from earliest to latest version.
+/// valid DnaHashes. The order of the list is from latest version to earliest.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
 pub struct DnaVersionSpec(Vec<DnaHashB64>);
 
+// NB: the following is likely to remain in the API for DnaVersionSpec
 impl DnaVersionSpec {
     /// Check if a DNA satisfies this version spec
     pub fn _matches(&self, hash: DnaHash) -> bool {
         self.0.contains(&hash.into())
+    }
+}
+
+// NB: the following is likely to be removed from the API for DnaVersionSpec
+// after our versioning becomes more sophisticated
+
+impl DnaVersionSpec {
+    pub fn dna_hashes(&self) -> Vec<&DnaHashB64> {
+        self.0.iter().collect()
     }
 }
 
@@ -123,7 +138,7 @@ impl AppManifestV1 {
                      provisioning,
                      dna,
                  }| {
-                    let DnaManifest {
+                    let AppDnaManifest {
                         location,
                         properties,
                         version,
@@ -209,7 +224,7 @@ mod tests {
 
         let cells = vec![CellManifest {
             nick: "nick".into(),
-            dna: DnaManifest {
+            dna: AppDnaManifest {
                 location: Some(mr_bundle::Location::Path(PathBuf::from("/tmp/test.dna.gz"))),
                 properties: Some(YamlProperties::new(serde_yaml::to_value(props).unwrap())),
                 uuid: Some("uuid".into()),

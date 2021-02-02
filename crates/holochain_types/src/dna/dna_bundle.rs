@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::{DnaDef, DnaFile, DnaManifest, WasmMap};
+use super::{DnaDef, DnaFile, WasmMap};
 use crate::prelude::*;
 use holo_hash::*;
 use mr_bundle::error::MrBundleResult;
@@ -12,6 +12,7 @@ use mr_bundle::error::MrBundleResult;
     Eq,
     serde::Serialize,
     serde::Deserialize,
+    SerializedBytes,
     shrinkwraprs::Shrinkwrap,
     derive_more::From,
 )]

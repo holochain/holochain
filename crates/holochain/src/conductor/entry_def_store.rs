@@ -270,7 +270,7 @@ mod tests {
             entry_def_position: 1.into(),
         };
 
-        handle.install_dna(dna).await.unwrap();
+        handle.register_dna(dna).await.unwrap();
         // Check entry defs are here
         assert_eq!(
             handle.get_entry_def(&post_def_key).await,

@@ -103,7 +103,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let hash = dna.dna_hash().clone();
                 let dna_list = self.conductor_handle.list_dnas().await?;
                 if !dna_list.contains(&hash) {
-                    self.conductor_handle.install_dna(dna).await?;
+                    self.conductor_handle.register_dna(dna).await?;
                 }
                 Ok(AdminResponse::DnaRegistered(hash))
             }
@@ -130,13 +130,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     if maybe_path.is_some() && maybe_hash.is_some() {
                         return Err(ConductorApiError::DnaReadError("Both path and hash specified in payload, pick just one".to_string()))
                     }
+                    // TODO: this if let will be removed after deprecation period
                     if let Some(path) = maybe_path {
-                        // TODO: this if let will be removed after deprecation period
                         tracing::warn!("specifying dna by path with register side-effect is deprecated, please use RegisterDna and install by hash");
                         let dna = read_parse_dna(path, properties).await?;
                         let hash = dna.dna_hash().clone();
                         let cell_id = CellId::from((hash.clone(), agent_key.clone()));
-                        self.conductor_handle.install_dna(dna).await?;
+                        self.conductor_handle.register_dna(dna).await?;
                         ConductorApiResult::Ok((InstalledCell::new(cell_id, nick), membrane_proof))
                     } else if let Some(hash) = maybe_hash {
                         // confirm that hash has been installed
@@ -175,18 +175,8 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::AppInstalled(app))
             }
             InstallAppBundle(payload) => {
-                unimplemented!()
-                // let InstallAppBundlePayload {
-                //     bundle,
-                //     agent_key,
-                //     installed_app_id,
-                // } = *payload;
-
-                // let bundled_dnas = bundle.resolve_all().await?;
-                // let manifest = bundle.manifest;
-
-                // // for dna_bytes = bundled_dnas.values()
-                // Ok(AdminResponse::AppBundleInstalled(todo!()));
+                let result = self.conductor_handle.install_app_bundle(*payload).await?;
+                Ok(AdminResponse::AppBundleInstalled(todo!()));
             }
             ListDnas => {
                 let dna_list = self.conductor_handle.list_dnas().await?;

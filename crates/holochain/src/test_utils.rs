@@ -236,7 +236,7 @@ pub async fn install_app(
     conductor_handle: ConductorHandle,
 ) {
     for dna in dnas {
-        conductor_handle.install_dna(dna).await.unwrap();
+        conductor_handle.register_dna(dna).await.unwrap();
     }
     conductor_handle
         .clone()

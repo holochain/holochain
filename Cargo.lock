@@ -1471,6 +1471,7 @@ dependencies = [
  "maplit",
  "matches",
  "mockall",
+ "mr_bundle",
  "must_future",
  "nanoid",
  "num_cpus",
