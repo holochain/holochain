@@ -29,6 +29,11 @@ impl<'a> tracing_core::field::Visit for StringVisitor<'a> {
     }
 }
 
+/// By implementing WasmSubscriber we integrate the rust tracing crate with the __trace host_fn without inventing some DIY DSL
+///
+/// Currently supports all the event macros for tracing such as `trace!`, `info!`, `debug!`, `warn!`, `error!`.
+///
+/// Does NOT support spans, so attempting to `#[instrument]` a function or similar will panic the wasm.
 impl tracing_core::Subscriber for WasmSubscriber {
     fn enabled(&self, _metadata: &tracing::Metadata<'_>) -> bool {
         true

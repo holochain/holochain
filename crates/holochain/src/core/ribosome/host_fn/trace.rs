@@ -4,6 +4,7 @@ use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 use tracing::*;
+use once_cell::unsync::Lazy;
 
 #[instrument(skip(input))]
 pub fn wasm_trace(
@@ -23,10 +24,12 @@ pub fn trace(
     _call_context: Arc<CallContext>,
     input: TraceMsg,
 ) -> RibosomeResult<()> {
-    let wasm_log = std::env::var("WASM_LOG").unwrap_or("[wasm_trace]=debug".to_string());
-    let wasm_log = tracing_subscriber::EnvFilter::new(wasm_log);
+    // Avoid dialing out to the environment on every trace.
+    let wasm_log = Lazy::new(||{
+        std::env::var("WASM_LOG").unwrap_or_else(|_| "[wasm_trace]=debug".to_string())
+    });
     let collector = tracing_subscriber::fmt()
-    .with_env_filter(wasm_log)
+    .with_env_filter(tracing_subscriber::EnvFilter::new((*wasm_log).clone()))
     .with_target(false)
     .finish();
     tracing::subscriber::with_default(collector, || {

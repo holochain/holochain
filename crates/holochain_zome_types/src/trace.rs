@@ -20,12 +20,12 @@ pub enum Level {
 
 impl From<&tracing::Level> for Level {
     fn from(level: &tracing::Level) -> Self {
-        match level {
-            &tracing::Level::ERROR => Self::ERROR,
-            &tracing::Level::WARN => Self::WARN,
-            &tracing::Level::INFO => Self::INFO,
-            &tracing::Level::DEBUG => Self::DEBUG,
-            &tracing::Level::TRACE => Self::TRACE,
+        match *level {
+            tracing::Level::ERROR => Self::ERROR,
+            tracing::Level::WARN => Self::WARN,
+            tracing::Level::INFO => Self::INFO,
+            tracing::Level::DEBUG => Self::DEBUG,
+            tracing::Level::TRACE => Self::TRACE,
         }
     }
 }

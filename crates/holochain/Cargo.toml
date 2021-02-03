@@ -67,6 +67,7 @@ url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 xsalsa20poly1305 = "0.6.0"
+once_cell = "1.4.1"
 
 # Dependencies for test_utils: keep in sync with below
 hdk3 = { path = "../hdk3", optional = true }
@@ -84,7 +85,6 @@ maplit = "1"
 pretty_assertions = "0.6.1"
 serial_test = "0.4.0"
 test-case = "1.0.0"
-once_cell = "1.4.1"
 
 # Dependencies for test_utils: keep in sync with above
 hdk3 = { path = "../hdk3", optional = false }
