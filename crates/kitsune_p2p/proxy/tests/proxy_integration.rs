@@ -20,13 +20,6 @@ async fn test_proxy_integration() {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
-async fn test_proxy_tasks() {
-    if let Err(e) = test_tasks().await {
-        panic!("{:?}", e);
-    }
-}
-
 async fn connect(
     proxy_config: Arc<ProxyConfig>,
 ) -> TransportResult<ghost_actor::GhostSender<TransportListener>> {
@@ -90,76 +83,6 @@ async fn test_inner() -> TransportResult<()> {
     let data = read.read_to_end().await;
     let data = String::from_utf8_lossy(&data);
     assert_eq!("echo: test", data);
-
-    tracing::warn!("TEST COMPLETE");
-
-    Ok(())
-}
-
-async fn test_tasks() -> TransportResult<()> {
-    init_tracing();
-
-    let proxy_config1 = ProxyConfig::local_proxy_server(
-        TlsConfig::new_ephemeral().await?,
-        AcceptProxyCallback::accept_all(),
-    );
-    let bind1 = connect(proxy_config1).await?;
-    let addr1 = bind1.bound_url().await?;
-
-    let proxy_config2 = ProxyConfig::local_proxy_server(
-        TlsConfig::new_ephemeral().await?,
-        AcceptProxyCallback::accept_all(),
-    );
-    let bind2 = connect(proxy_config2).await?;
-
-    let proxy_config3 =
-        ProxyConfig::remote_proxy_client(TlsConfig::new_ephemeral().await?, addr1.into());
-    let bind3 = connect(proxy_config3).await?;
-    let addr3 = bind3.bound_url().await?;
-
-    let mut cons = Vec::new();
-    for i in 0..10 {
-        dbg!(i);
-        let con = bind2.create_channel(addr3.clone()).await?;
-        cons.push(con);
-    }
-
-    dbg!();
-    let (_url, mut write, read) = bind2.create_channel(addr3.clone()).await?;
-    dbg!();
-    write.write_and_close(Vec::with_capacity(0)).await?;
-    dbg!();
-    let res = read.read_to_end().await;
-    dbg!();
-    println!(
-        "#DEBUG:START#\n{}\n#DEBUG:END#",
-        String::from_utf8_lossy(&res)
-    );
-    for _ in 0..10 {
-        let con = bind2.create_channel(addr3.clone()).await?;
-        cons.push(con);
-    }
-    let (_url, mut write, read) = bind2.create_channel(addr3.clone()).await?;
-    write.write_and_close(Vec::with_capacity(0)).await?;
-    let res = read.read_to_end().await;
-    println!(
-        "#DEBUG:START#\n{}\n#DEBUG:END#",
-        String::from_utf8_lossy(&res)
-    );
-    // Give time to use the cli do get a metric task dump
-    // tokio::time::delay_for(std::time::Duration::from_secs(60 * 10)).await;
-    // let (_url, mut write, read) = bind2.create_channel(addr3.clone()).await?;
-    // write.write_and_close(b"test".to_vec()).await?;
-    // let data = read.read_to_end().await;
-    // let data = String::from_utf8_lossy(&data);
-    // assert_eq!("echo: test", data);
-
-    // // run a second time to prove out session resumption
-    // let (_url, mut write, read) = bind2.create_channel(addr3).await?;
-    // write.write_and_close(b"test".to_vec()).await?;
-    // let data = read.read_to_end().await;
-    // let data = String::from_utf8_lossy(&data);
-    // assert_eq!("echo: test", data);
 
     tracing::warn!("TEST COMPLETE");
 
