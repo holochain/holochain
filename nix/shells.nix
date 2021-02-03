@@ -22,10 +22,10 @@ let
       { shellHook = ''
         echo Using "$NIX_ENV_PREFIX" as target prefix...
 
-        export HC_TEST_WASM_DIR="$NIX_ENV_PREFIX/.wasm_target"
+        export HC_TEST_WASM_DIR="$CARGO_TARGET_DIR/.wasm_target"
         mkdir -p $HC_TEST_WASM_DIR
 
-        export HC_WASM_CACHE_PATH="$NIX_ENV_PREFIX/.wasm_cache"
+        export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
         mkdir -p $HC_WASM_CACHE_PATH
       ''; }
 
