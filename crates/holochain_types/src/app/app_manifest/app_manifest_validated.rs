@@ -44,6 +44,7 @@ impl AppManifestValidated {
 }
 
 /// Rules to determine if and how a Cell will be created for this Dna
+#[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CellManifestValidated {
     /// Always create a new Cell when installing this App

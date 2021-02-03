@@ -60,7 +60,7 @@ pub struct AppDnaManifest {
 
     /// The versioning constraints for the DNA. Ensures that only a DNA that
     /// matches the version spec will be used.
-    pub(super) version: Option<DnaVersionSpec>,
+    pub(super) version: Option<DnaVersionFlexible>,
 
     /// Allow up to this many "clones" to be created at runtime.
     /// Each runtime clone is created by the `CreateClone` strategy,
@@ -70,12 +70,34 @@ pub struct AppDnaManifest {
     pub(super) clone_limit: u32,
 }
 
+/// Allow the DNA version to be specified as a single hash, rather than a
+/// singleton list. Just a convenience.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
+#[serde(rename_all = "snake_case")]
+#[serde(untagged)]
+pub enum DnaVersionFlexible {
+    /// A version spec with a single hash
+    Singleton(DnaHashB64),
+    /// An actual version spec
+    Multiple(DnaVersionSpec),
+}
+
+impl From<DnaVersionFlexible> for DnaVersionSpec {
+    fn from(v: DnaVersionFlexible) -> Self {
+        match v {
+            DnaVersionFlexible::Singleton(h) => DnaVersionSpec(vec![h]),
+            DnaVersionFlexible::Multiple(v) => v,
+        }
+    }
+}
+
 pub type DnaLocation = mr_bundle::Location;
 
 /// Defines a criterion for a DNA version to match against.
 ///
 /// Currently we're using the most simple possible version spec: A list of
 /// valid DnaHashes. The order of the list is from latest version to earliest.
+/// In subsequent manifest versions, this will become more expressive.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
 pub struct DnaVersionSpec(Vec<DnaHashB64>);
 
@@ -146,6 +168,8 @@ impl AppManifestV1 {
                         uuid,
                         clone_limit,
                     } = dna;
+                    // Go from "flexible" enum into proper DnaVersionSpec.
+                    let version = version.map(Into::into);
                     let validated = match provisioning.unwrap_or_default() {
                         CellProvisioning::Create { deferred } => CellManifestValidated::Create {
                             deferred,
@@ -226,7 +250,7 @@ pub mod tests {
         )
         .await;
 
-        let version = DnaVersionSpec::from(hashes.clone());
+        let version = DnaVersionSpec::from(hashes.clone()).into();
 
         let cells = vec![CellManifest {
             nick: "nick".into(),

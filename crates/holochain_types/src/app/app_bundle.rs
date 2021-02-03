@@ -44,7 +44,9 @@ impl AppBundle {
                 self.resolve_cell_create(&location, version.as_ref())
                     .await?,
             ),
-            CellManifestValidated::CreateClone { .. } => todo!(),
+            CellManifestValidated::CreateClone { .. } => {
+                todo!("Come back to this after implementing DNA cloning")
+            }
             CellManifestValidated::UseExisting { version, .. } => {
                 Some(self.resolve_cell_existing(&version))
             }
@@ -75,7 +77,7 @@ impl AppBundle {
     }
 
     fn resolve_cell_existing(&self, version: &DnaVersionSpec) -> CellProvisioningOp {
-        todo!()
+        unimplemented!("Reusing existing cells is not yet implemented")
     }
 }
 

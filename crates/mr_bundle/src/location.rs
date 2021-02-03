@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 /// either "path", "url", or "bundled" can be specified due to this field
 /// being flattened.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 #[allow(missing_docs)]
 pub enum Location {
     /// Expect file to be part of this bundle
