@@ -23,8 +23,10 @@ pub fn trace(
     _call_context: Arc<CallContext>,
     input: TraceMsg,
 ) -> RibosomeResult<()> {
+    let wasm_log = std::env::var("WASM_LOG").unwrap_or("[wasm_trace]=debug".to_string());
+    let wasm_log = tracing_subscriber::EnvFilter::new(wasm_log);
     let collector = tracing_subscriber::fmt()
-    .with_max_level(tracing::Level::TRACE)
+    .with_env_filter(wasm_log)
     .with_target(false)
     .finish();
     tracing::subscriber::with_default(collector, || {
