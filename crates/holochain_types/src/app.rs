@@ -1,9 +1,17 @@
-//! Collection of cells to form a holochain application
+//! Everything to do with App (hApp) installation and uninstallation
+//!
+//! An App is a essentially a collection of Cells which are intended to be
+//! available for a particular Holochain use-case, such as a microservice used
+//! by some UI in a broader application.
+//!
+//! Each Cell maintains its own identity separate from any App.
+//! Access to Cells can be shared between different Apps.
 
 mod app_bundle;
 mod app_manifest;
 pub mod dna_gamut;
 pub use app_bundle::*;
+pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
 
 use crate::dna::{DnaFile, YamlProperties};
@@ -153,7 +161,7 @@ impl InstalledCell {
 /// A collection of [InstalledCell]s paired with an app id
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct InstalledApp {
-    /// Placeholder to find the app
+    /// The unique identifier for an installed app in this conductor
     pub installed_app_id: InstalledAppId,
     /// Cell data for this app
     pub cell_data: Vec<InstalledCell>,

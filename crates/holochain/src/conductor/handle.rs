@@ -509,6 +509,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
             .activate_app_in_db(installed_app_id)
             .await
+        // MD: Should we be doing `Conductor::add_cells()` here? (see below comment)
     }
 
     async fn deactivate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()> {

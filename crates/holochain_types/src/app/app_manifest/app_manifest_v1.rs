@@ -124,6 +124,7 @@ impl Default for CellProvisioning {
 }
 
 impl AppManifestV1 {
+    /// Convert this human-focused manifest into a validated, concise representation
     pub fn validate(self) -> AppManifestResult<AppManifestValidated> {
         let AppManifestV1 {
             name,
@@ -197,35 +198,40 @@ impl AppManifestV1 {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
+    use futures::future::join_all;
+
     use super::*;
-    use crate::app::app_manifest::AppManifest;
-    use crate::prelude::YamlProperties;
+    use crate::prelude::*;
+    use crate::{app::app_manifest::AppManifest, prelude::DnaDef};
+    use ::fixt::prelude::*;
     use std::path::PathBuf;
 
-    #[test]
-    fn manifest_v1_roundtrip() {
-        #[derive(serde::Serialize, serde::Deserialize)]
-        struct Props {
-            salad: String,
-        }
+    #[derive(serde::Serialize, serde::Deserialize)]
+    struct Props {
+        salad: String,
+    }
 
+    pub async fn app_manifest_fixture<I: IntoIterator<Item = DnaDef>>(
+        location: Option<mr_bundle::Location>,
+        dnas: I,
+    ) -> (AppManifest, Vec<DnaHashB64>) {
         let props = Props {
             salad: "bar".to_string(),
         };
 
-        let dna_hash_0 =
-            DnaHashB64::from_b64_str("uhC0kAAD_AJfVAQBxgQHGAPQoAAHTATIAlQFk_7n_AQAB_-PDre2C")
-                .unwrap();
-        let dna_hash_1 =
-            DnaHashB64::from_b64_str("uhC0kyiEBnw7_EsuRAAABcgH_w-zfAQ7_9gBs_wEAPJwBjf_cn8ta")
-                .unwrap();
-        let version = DnaVersionSpec::from(vec![dna_hash_0.clone(), dna_hash_1.clone()]);
+        let hashes = join_all(
+            dnas.into_iter()
+                .map(|dna| async move { DnaHash::with_data(&dna).await.into() }),
+        )
+        .await;
+
+        let version = DnaVersionSpec::from(hashes.clone());
 
         let cells = vec![CellManifest {
             nick: "nick".into(),
             dna: AppDnaManifest {
-                location: Some(mr_bundle::Location::Path(PathBuf::from("/tmp/test.dna.gz"))),
+                location,
                 properties: Some(YamlProperties::new(serde_yaml::to_value(props).unwrap())),
                 uuid: Some("uuid".into()),
                 version: Some(version),
@@ -238,6 +244,14 @@ mod tests {
             description: "Serialization roundtrip test".to_string(),
             cells,
         });
+        (manifest, hashes)
+    }
+
+    #[tokio::test]
+    async fn manifest_v1_roundtrip() {
+        let location = Some(mr_bundle::Location::Path(PathBuf::from("/tmp/test.dna.gz")));
+        let (manifest, dna_hashes) =
+            app_manifest_fixture(location, vec![fixt!(DnaDef), fixt!(DnaDef)]).await;
         let manifest_yaml = serde_yaml::to_string(&manifest).unwrap();
         let manifest_roundtrip = serde_yaml::from_str(&manifest_yaml).unwrap();
 
@@ -265,7 +279,7 @@ cells:
         salad: "bar"
 
         "#,
-            dna_hash_0, dna_hash_1
+            dna_hashes[0], dna_hashes[1]
         );
         let actual = serde_yaml::to_value(&manifest).unwrap();
         let expected: serde_yaml::Value = serde_yaml::from_str(&expected_yaml).unwrap();

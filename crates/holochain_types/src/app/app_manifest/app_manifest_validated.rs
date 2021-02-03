@@ -5,6 +5,7 @@
 //! may contain various invalid combinations of data. In contrast, these types
 //! are structured to ensure validity, and are used internally by Holochain.
 
+use super::error::{AppManifestError, AppManifestResult};
 use crate::prelude::{CellNick, YamlProperties};
 use crate::{
     app::app_manifest::current::{DnaLocation, DnaVersionSpec},
@@ -12,15 +13,14 @@ use crate::{
 };
 use std::collections::HashMap;
 
-use super::error::{AppManifestError, AppManifestResult};
-
+/// Normalized, validated representation of the App Manifest.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AppManifestValidated {
     /// Name of the App. This may be used as the installed_app_id.
-    name: String,
+    pub(in crate::app) name: String,
 
     /// The Cell manifests that make up this app.
-    cells: HashMap<CellNick, CellManifestValidated>,
+    pub(in crate::app) cells: HashMap<CellNick, CellManifestValidated>,
 }
 
 impl AppManifestValidated {
@@ -28,7 +28,7 @@ impl AppManifestValidated {
     ///
     /// NB: never make this struct's fields public. This constructor should be
     /// the only way to instantiate this type.
-    pub(super) fn new(
+    pub(in crate::app) fn new(
         name: String,
         cells: HashMap<CellNick, CellManifestValidated>,
     ) -> AppManifestResult<Self> {
@@ -86,8 +86,10 @@ pub enum CellManifestValidated {
     Disabled { clone_limit: u32 },
 }
 
-impl CellManifestValidated {
-    pub fn dna_gamut(conductor: impl ConductorHandleT) -> DnaGamut {
-        todo!()
-    }
-}
+// impl CellManifestValidated {
+//     pub fn resolve(&self, gamut: DnaGamut) {
+//         match self {
+//             Self::Create
+//         }
+//     }
+// }

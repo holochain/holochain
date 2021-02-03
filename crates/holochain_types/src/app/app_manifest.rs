@@ -6,12 +6,15 @@ use mr_bundle::{Location, Manifest};
 use serde;
 use std::path::PathBuf;
 
-mod app_manifest_v1;
-mod app_manifest_validated;
+pub(crate) mod app_manifest_v1;
+pub mod app_manifest_validated;
 mod current;
 mod error;
 
 pub use current::*;
+pub use error::*;
+
+use self::{app_manifest_validated::AppManifestValidated, error::AppManifestResult};
 
 /// Container struct which uses the `manifest_version` field to determine
 /// which manifest version to deserialize to.
@@ -36,5 +39,14 @@ impl Manifest for AppManifest {
 
     fn path(&self) -> PathBuf {
         "app.yaml".into()
+    }
+}
+
+impl AppManifest {
+    /// Convert this human-focused manifest into a validated, concise representation
+    pub fn validate(self) -> AppManifestResult<AppManifestValidated> {
+        match self {
+            Self::V1(manifest) => manifest.validate(),
+        }
     }
 }
