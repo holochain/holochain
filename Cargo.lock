@@ -2138,6 +2138,7 @@ dependencies = [
  "rmp-serde",
  "serde",
  "serde_json",
+ "spawn_pressure",
  "sysinfo",
  "thiserror",
  "tokio",
@@ -3852,6 +3853,14 @@ dependencies = [
  "cfg-if 1.0.0",
  "libc",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "spawn_pressure"
+version = "0.1.0"
+source = "git+https://github.com/freesig/spawn_pressure.git?branch=main#11466c398a8fab266b543ab862f7f52ad8e372bd"
+dependencies = [
+ "tokio",
 ]
 
 [[package]]

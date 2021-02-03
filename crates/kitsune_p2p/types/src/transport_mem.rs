@@ -11,6 +11,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 const SCHEME: &str = "kitsune-mem";
+const MAX_TRANSPORTS: usize = 1000;
+const MAX_CHANNELS: usize = 500;
 
 static CORE: Lazy<Arc<Mutex<HashMap<url2::Url2, TransportEventSender>>>> =
     Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
@@ -39,7 +41,7 @@ async fn put_core(url: url2::Url2, send: TransportEventSender) -> TransportResul
 }
 
 fn drop_core(url: url2::Url2) {
-    crate::metrics::metric_task(async move {
+    crate::metrics::metric_task_warn_limit(spawn_pressure::spawn_limit!(500), async move {
         let mut lock = CORE.lock().await;
         lock.remove(&url);
 
@@ -65,7 +67,11 @@ pub async fn spawn_bind_transport_mem() -> TransportResult<(
 
     put_core(url.clone(), evt_send).await?;
 
-    crate::metrics::metric_task(builder.spawn(InnerListen::new(url)));
+    crate::metrics::metric_task(
+        spawn_pressure::spawn_limit!(MAX_TRANSPORTS),
+        builder.spawn(InnerListen::new(url)),
+    )
+    .await;
 
     Ok((sender, evt_recv))
 }
@@ -124,14 +130,15 @@ impl TransportListenerHandler for InnerListen {
             // if we don't spawn here there can be a deadlock on
             // incoming_channel trying to process all channel data
             // before we've returned our halves here.
-            crate::metrics::metric_task(async move {
+            crate::metrics::metric_task(spawn_pressure::spawn_limit!(MAX_CHANNELS), async move {
                 // it's ok if this errors... the channels will close.
                 let _ = evt_send
                     .send(TransportEvent::IncomingChannel(this_url, send1, recv1))
                     .await;
 
                 <Result<(), ()>>::Ok(())
-            });
+            })
+            .await;
             Ok((url, send2, recv2))
         }
         .boxed()
@@ -145,7 +152,7 @@ mod tests {
     use futures::stream::StreamExt;
 
     fn test_receiver(mut recv: TransportEventReceiver) {
-        crate::metrics::metric_task(async move {
+        crate::metrics::metric_task_warn_limit(spawn_pressure::spawn_limit!(500), async move {
             while let Some(evt) = recv.next().await {
                 match evt {
                     TransportEvent::IncomingChannel(url, mut write, read) => {

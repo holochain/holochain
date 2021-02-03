@@ -3,14 +3,17 @@ use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::codec::Codec;
+use kitsune_p2p_types::dependencies::spawn_pressure;
+
+const MAX_CHANNELS: usize = 500;
 
 /// Wrap a TransportChannelRead in code that decodes ProxyWire items.
-pub(crate) fn wrap_wire_read(
+pub(crate) async fn wrap_wire_read(
     mut read: TransportChannelRead,
 ) -> futures::channel::mpsc::Receiver<ProxyWire> {
     let (mut send, recv) = futures::channel::mpsc::channel(10);
 
-    metric_task(async move {
+    metric_task(spawn_pressure::spawn_limit!(MAX_CHANNELS), async move {
         let mut buf = Vec::new();
         while let Some(data) = read.next().await {
             buf.extend_from_slice(&data);
@@ -22,7 +25,8 @@ pub(crate) fn wrap_wire_read(
             }
         }
         TransportResult::Ok(())
-    });
+    })
+    .await;
 
     recv
 }

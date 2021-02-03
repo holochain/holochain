@@ -2,6 +2,8 @@
 mod tests {
     use crate::*;
     use futures::stream::StreamExt;
+    use kitsune_p2p_types::dependencies::spawn_pressure;
+    use kitsune_p2p_types::metrics::metric_task_warn_limit;
     use kitsune_p2p_types::transport::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -20,7 +22,7 @@ mod tests {
             .await
             .unwrap();
 
-        metric_task(async move {
+        metric_task_warn_limit(spawn_pressure::spawn_limit!(1000), async move {
             while let Some(evt) = events2.next().await {
                 match evt {
                     TransportEvent::IncomingChannel(url, mut write, read) => {
@@ -61,7 +63,7 @@ mod tests {
             .await
             .unwrap();
 
-        metric_task(async move {
+        metric_task_warn_limit(spawn_pressure::spawn_limit!(1000), async move {
             while let Some(evt) = events2.next().await {
                 match evt {
                     TransportEvent::IncomingChannel(_url, mut write, read) => {

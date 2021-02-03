@@ -9,6 +9,8 @@ use ghost_actor::dependencies::tracing;
 use ghost_actor::GhostControlSender;
 use std::collections::HashMap;
 
+const MAX_TRANSPORTS: usize = 1000;
+
 ghost_actor::ghost_chan! {
     /// Additional control functions for a transport pool
     pub chan TransportPool<TransportError> {
@@ -38,11 +40,15 @@ pub async fn spawn_transport_pool() -> TransportResult<(
 
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
 
-    crate::metrics::metric_task(builder.spawn(Inner {
-        i_s,
-        sub_listeners: HashMap::new(),
-        evt_send,
-    }));
+    crate::metrics::metric_task(
+        spawn_pressure::spawn_limit!(MAX_TRANSPORTS),
+        builder.spawn(Inner {
+            i_s,
+            sub_listeners: HashMap::new(),
+            evt_send,
+        }),
+    )
+    .await;
 
     Ok((pool, listener, evt_recv))
 }
@@ -113,7 +119,7 @@ impl TransportPoolHandler for Inner {
 
             i_s.inject_listener(scheme, sub_listener).await?;
 
-            crate::metrics::metric_task(async move {
+            crate::metrics::metric_task(spawn_pressure::spawn_limit!(500), async move {
                 while let Some(evt) = sub_event.next().await {
                     if evt_send.send(evt).await.is_err() {
                         break;
@@ -121,7 +127,8 @@ impl TransportPoolHandler for Inner {
                 }
 
                 <Result<(), ()>>::Ok(())
-            });
+            })
+            .await;
 
             Ok(())
         }
@@ -202,7 +209,7 @@ mod tests {
     use futures::stream::StreamExt;
 
     fn test_receiver(mut recv: TransportEventReceiver) {
-        crate::metrics::metric_task(async move {
+        crate::metrics::metric_task_warn_limit(spawn_pressure::spawn_limit!(500), async move {
             while let Some(evt) = recv.next().await {
                 match evt {
                     TransportEvent::IncomingChannel(url, mut write, read) => {

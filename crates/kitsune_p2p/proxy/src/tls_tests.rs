@@ -1,6 +1,8 @@
 use crate::*;
 use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
+use kitsune_p2p_types::dependencies::spawn_pressure;
+use kitsune_p2p_types::metrics::metric_task_warn_limit;
 
 fn init_tracing() {
     let _ = tracing::subscriber::set_global_default(
@@ -29,7 +31,7 @@ async fn tls_server_and_client_inner() -> TransportResult<()> {
 
     let (in_con_send, mut in_con_recv) = futures::channel::mpsc::channel::<TransportEvent>(10);
 
-    metric_task(async move {
+    metric_task_warn_limit(spawn_pressure::spawn_limit!(1000), async move {
         while let Some(evt) = in_con_recv.next().await {
             match evt {
                 TransportEvent::IncomingChannel(_url, mut send, recv) => {
@@ -56,7 +58,8 @@ async fn tls_server_and_client_inner() -> TransportResult<()> {
         in_con_send,
         srv_proxy_send,
         srv_proxy_recv,
-    );
+    )
+    .await;
 
     let ((cli_data_send1, cli_data_recv1), (mut cli_data_send2, cli_data_recv2)) =
         kitsune_p2p_types::transport::create_transport_channel_pair();
@@ -70,7 +73,8 @@ async fn tls_server_and_client_inner() -> TransportResult<()> {
         cli_data_recv1,
         cli_proxy_send,
         cli_proxy_recv,
-    );
+    )
+    .await;
 
     tracing::warn!("about to write");
     let large_msg = std::iter::repeat(b"a"[0]).take(70_400).collect::<Vec<_>>();

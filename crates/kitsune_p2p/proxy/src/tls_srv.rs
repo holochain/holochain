@@ -2,11 +2,14 @@ use crate::*;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
+use kitsune_p2p_types::dependencies::spawn_pressure;
 use rustls::Session;
 use std::io::Read;
 use std::io::Write;
 
-pub(crate) fn spawn_tls_server(
+const MAX_SERVERS: usize = 1000;
+
+pub(crate) async fn spawn_tls_server(
     short: String,
     incoming_base_url: url2::Url2,
     tls_server_config: Arc<rustls::ServerConfig>,
@@ -14,14 +17,18 @@ pub(crate) fn spawn_tls_server(
     write: futures::channel::mpsc::Sender<ProxyWire>,
     read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) {
-    metric_task(tls_server(
-        short,
-        incoming_base_url,
-        tls_server_config,
-        evt_send,
-        write,
-        read,
-    ));
+    metric_task(
+        spawn_pressure::spawn_limit!(MAX_SERVERS),
+        tls_server(
+            short,
+            incoming_base_url,
+            tls_server_config,
+            evt_send,
+            write,
+            read,
+        ),
+    )
+    .await;
 }
 
 async fn tls_server(

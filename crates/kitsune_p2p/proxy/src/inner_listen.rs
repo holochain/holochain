@@ -3,6 +3,7 @@ use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::dependencies::serde_json;
+use kitsune_p2p_types::dependencies::spawn_pressure;
 use std::collections::HashMap;
 
 /// How often should NAT nodes refresh their proxy contract?
@@ -11,6 +12,8 @@ const PROXY_KEEPALIVE_MS: u64 = 15000;
 /// How much longer the proxy should wait to remove the contract
 /// if no keep alive is received.
 const KEEPALIVE_MULTIPLIER: u64 = 3;
+const MAX_LISTENERS: usize = 1000;
+const MAX_CHANNELS: usize = 500;
 
 /// Wrap a transport listener sender/receiver in kitsune proxy logic.
 pub async fn spawn_kitsune_proxy_listener(
@@ -54,6 +57,7 @@ pub async fn spawn_kitsune_proxy_listener(
 
     // spawn the actor
     metric_task(
+        spawn_pressure::spawn_limit!(MAX_LISTENERS),
         builder.spawn(
             InnerListen::new(
                 i_s.clone(),
@@ -65,7 +69,8 @@ pub async fn spawn_kitsune_proxy_listener(
             )
             .await?,
         ),
-    );
+    )
+    .await;
 
     // if we want to be proxied, we need to connect to our proxy
     // and manage that connection contract
@@ -80,7 +85,7 @@ pub async fn spawn_kitsune_proxy_listener(
 
         // Set up a timer to refresh our proxy contract at keepalive interval
         let i_s_c = i_s.clone();
-        metric_task(async move {
+        metric_task(spawn_pressure::spawn_limit!(MAX_LISTENERS), async move {
             loop {
                 tokio::time::delay_for(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS)).await;
 
@@ -99,20 +104,22 @@ pub async fn spawn_kitsune_proxy_listener(
             }
             tracing::error!("Keep alive closed");
             <Result<(), ()>>::Ok(())
-        });
+        })
+        .await;
     }
 
     // handle incoming channels from our sub transport
-    metric_task(async move {
+    metric_task(spawn_pressure::spawn_limit!(MAX_LISTENERS), async move {
         while let Some(evt) = sub_receiver.next().await {
             match evt {
                 TransportEvent::IncomingChannel(url, write, read) => {
                     // spawn so we can process incoming requests in parallel
                     let i_s = i_s.clone();
-                    metric_task(async move {
+                    metric_task(spawn_pressure::spawn_limit!(MAX_CHANNELS), async move {
                         let _ = i_s.incoming_channel(url, write, read).await;
                         <Result<(), ()>>::Ok(())
-                    });
+                    })
+                    .await;
                 }
             }
         }
@@ -123,7 +130,8 @@ pub async fn spawn_kitsune_proxy_listener(
         i_s.ghost_actor_shutdown().await?;
 
         TransportResult::Ok(())
-    });
+    })
+    .await;
 
     Ok((sender, evt_recv))
 }
@@ -235,18 +243,19 @@ impl ghost_actor::GhostHandler<Internal> for InnerListen {}
 
 // If we're forwarding data to another channel,
 // we need to forward all data read from a reader to a writer.
-fn cross_join_channel_forward(
+async fn cross_join_channel_forward(
     mut write: futures::channel::mpsc::Sender<ProxyWire>,
     mut read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) {
-    metric_task(async move {
+    metric_task(spawn_pressure::spawn_limit!(MAX_CHANNELS), async move {
         while let Some(msg) = read.next().await {
             // do we need to inspect these??
             // for now just forwarding everything
             write.send(msg).await.map_err(TransportError::other)?;
         }
         TransportResult::Ok(())
-    });
+    })
+    .await;
 }
 
 impl InternalHandler for InnerListen {
@@ -258,10 +267,12 @@ impl InternalHandler for InnerListen {
     ) -> InternalHandlerResult<()> {
         let short = self.this_url.short().to_string();
         tracing::debug!("{}: proxy, incoming channel: {}", short, base_url);
-        let mut write = wire_write::wrap_wire_write(write);
-        let mut read = wire_read::wrap_wire_read(read);
+        let write = wire_write::wrap_wire_write(write);
+        let read = wire_read::wrap_wire_read(read);
         let i_s = self.i_s.clone();
         Ok(async move {
+            let mut read = read.await;
+            let mut write = write.await;
             match read.next().await {
                 Some(ProxyWire::ReqProxy(p)) => {
                     tracing::debug!("{}: req proxy: {:?}", short, p.cert_digest);
@@ -352,7 +363,7 @@ impl InternalHandler for InnerListen {
 
                 // Hey! They're trying to talk to us!
                 // Let's connect them to our owner.
-                tls_srv::spawn_tls_server(
+                let f = tls_srv::spawn_tls_server(
                     short,
                     base_url,
                     self.tls_server_config.clone(),
@@ -360,6 +371,12 @@ impl InternalHandler for InnerListen {
                     write,
                     read,
                 );
+                return Ok(async move {
+                    f.await;
+                    Ok(())
+                }
+                .boxed()
+                .into());
             } else {
                 tracing::warn!("Dropping message for {}", dest_proxy_url.as_full_str());
                 return Ok(async move {
@@ -375,8 +392,6 @@ impl InternalHandler for InnerListen {
                 .boxed()
                 .into());
             }
-
-            return Ok(async move { Ok(()) }.boxed().into());
         }
 
         // if we are proxying - forward to another channel
@@ -425,8 +440,8 @@ impl InternalHandler for InnerListen {
                 }
                 Ok(t) => t,
             };
-            cross_join_channel_forward(fwd_write, read);
-            cross_join_channel_forward(write, fwd_read);
+            cross_join_channel_forward(fwd_write, read).await;
+            cross_join_channel_forward(write, fwd_read).await;
             Ok(())
         }
         .boxed()
@@ -443,8 +458,8 @@ impl InternalHandler for InnerListen {
         let fut = self.sub_sender.create_channel(base_url);
         Ok(async move {
             let (_url, write, read) = fut.await?;
-            let write = wire_write::wrap_wire_write(write);
-            let read = wire_read::wrap_wire_read(read);
+            let write = wire_write::wrap_wire_write(write).await;
+            let read = wire_read::wrap_wire_read(read).await;
             Ok((write, read))
         }
         .boxed()
@@ -572,6 +587,7 @@ impl TransportListenerHandler for InnerListen {
                 write,
                 read,
             )
+            .await
             .await
             .map_err(TransportError::other)??;
             Ok((proxy_url.into(), send2, recv2))

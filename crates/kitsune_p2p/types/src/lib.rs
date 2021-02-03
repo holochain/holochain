@@ -8,6 +8,7 @@ pub mod dependencies {
     pub use ::paste;
     pub use ::serde;
     pub use ::serde_json;
+    pub use ::spawn_pressure;
     pub use ::thiserror;
     pub use ::tokio;
     pub use ::url2;

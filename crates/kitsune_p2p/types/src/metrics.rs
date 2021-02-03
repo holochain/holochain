@@ -1,5 +1,7 @@
 //! Utilities for helping with metric tracking.
 
+use spawn_pressure::spawn_with_limit;
+use spawn_pressure::SpawnLimit;
 use std::sync::{
     atomic::{AtomicU64, AtomicUsize, Ordering},
     Once,
@@ -16,21 +18,72 @@ static RX_BYTES_PER_SEC: AtomicU64 = AtomicU64::new(0);
 
 /// Spawns a tokio task with given future/async block.
 /// Captures a new TaskCounter instance to track task count.
-pub fn metric_task<T, E, F>(f: F) -> tokio::task::JoinHandle<Result<T, E>>
+pub async fn metric_task<T, E, F>(
+    limit: &'static SpawnLimit,
+    f: F,
+) -> tokio::task::JoinHandle<Result<T, E>>
+where
+    T: 'static + Send,
+    E: 'static + Send + std::fmt::Debug,
+    F: 'static + Send + std::future::Future<Output = Result<T, E>>,
+{
+    spawn_with_limit(limit, metric_inner(f)).await
+}
+
+/// Same as metric task but will never
+/// block, returns an error with your task if limit is reached.
+pub fn metric_task_try_limit<T, E, F>(
+    limit: &'static SpawnLimit,
+    f: F,
+) -> Result<tokio::task::JoinHandle<Result<T, E>>, F>
+where
+    T: 'static + Send,
+    E: 'static + Send + std::fmt::Debug,
+    F: 'static + Send + std::future::Future<Output = Result<T, E>>,
+{
+    match limit.take_limit() {
+        Some(guard) => {
+            let jh = guard.spawn(metric_inner(f));
+            Ok(jh)
+        }
+        None => Err(f),
+    }
+}
+
+/// Same as metric task but will never
+/// block, instead an error will be logged.
+pub fn metric_task_warn_limit<T, E, F>(
+    limit: &'static SpawnLimit,
+    f: F,
+) -> tokio::task::JoinHandle<Result<T, E>>
+where
+    T: 'static + Send,
+    E: 'static + Send + std::fmt::Debug,
+    F: 'static + Send + std::future::Future<Output = Result<T, E>>,
+{
+    match metric_task_try_limit(limit, f) {
+        Ok(jh) => jh,
+        Err(f) => {
+            observability::tracing::error!("Spawning task beyond limit {}", limit.show_limit());
+            tokio::task::spawn(metric_inner(f))
+        }
+    }
+}
+fn metric_inner<T, E, F>(f: F) -> impl std::future::Future<Output = Result<T, E>>
 where
     T: 'static + Send,
     E: 'static + Send + std::fmt::Debug,
     F: 'static + Send + std::future::Future<Output = Result<T, E>>,
 {
     let counter = MetricTaskCounter::new();
-    tokio::task::spawn(async move {
+    async move {
         let _counter = counter;
         let res = f.await;
         if let Err(e) = &res {
             ghost_actor::dependencies::tracing::error!(?e, "METRIC TASK ERROR");
         }
         res
-    })
+    }
 }
 
 /// System Info.
@@ -79,7 +132,7 @@ pub fn init_sys_info_poll() {
     }
 
     SYS_INFO.call_once(|| {
-        metric_task(async move {
+        metric_task_warn_limit(spawn_pressure::spawn_limit!(1000), async move {
             let mut system = sysinfo::System::new_with_specifics(
                 sysinfo::RefreshKind::new()
                     .with_networks()
@@ -164,7 +217,7 @@ pub fn metric_task_count() -> usize {
 #[tokio::test(threaded_scheduler)]
 async fn test_metric_task() {
     for _ in 0..20 {
-        metric_task(async move {
+        metric_task_warn_limit(spawn_pressure::spawn_limit!(20), async move {
             tokio::time::delay_for(std::time::Duration::from_millis(3)).await;
             <Result<(), ()>>::Ok(())
         });

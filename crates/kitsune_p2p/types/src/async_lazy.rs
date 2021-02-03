@@ -13,7 +13,7 @@ impl<O: 'static + Clone + Send + Sync> AsyncLazy<O> {
         F: 'static + std::future::Future<Output = O> + Send,
     {
         let (s, r) = tokio::sync::watch::channel(None);
-        crate::metrics::metric_task(async move {
+        crate::metrics::metric_task_warn_limit(spawn_pressure::spawn_limit!(1000), async move {
             let val: O = f.await;
             let _ = s.broadcast(Some(val));
             <Result<(), ()>>::Ok(())

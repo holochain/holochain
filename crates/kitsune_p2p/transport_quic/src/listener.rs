@@ -6,21 +6,25 @@ use ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::dependencies::ghost_actor;
 use kitsune_p2p_types::dependencies::ghost_actor::GhostControlSender;
 use kitsune_p2p_types::dependencies::serde_json;
+use kitsune_p2p_types::dependencies::spawn_pressure;
 use kitsune_p2p_types::dependencies::url2;
 use kitsune_p2p_types::transport::*;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
+const MAX_CHANNELS: usize = 500;
+const MAX_TRANSPORTS: usize = 1000;
+
 /// Convert quinn async read/write streams into Vec<u8> senders / receivers.
 /// Quic bi-streams are Async Read/Write - But the kitsune transport api
 /// uses Vec<u8> Streams / Sinks - This code translates into that.
-fn tx_bi_chan(
+async fn tx_bi_chan(
     mut bi_send: quinn::SendStream,
     mut bi_recv: quinn::RecvStream,
 ) -> (TransportChannelWrite, TransportChannelRead) {
     let (write_send, mut write_recv) = futures::channel::mpsc::channel::<Vec<u8>>(10);
     let write_send = write_send.sink_map_err(TransportError::other);
-    metric_task(async move {
+    metric_task(spawn_pressure::spawn_limit!(MAX_CHANNELS), async move {
         while let Some(data) = write_recv.next().await {
             bi_send
                 .write_all(&data)
@@ -29,9 +33,10 @@ fn tx_bi_chan(
         }
         bi_send.finish().await.map_err(TransportError::other)?;
         TransportResult::Ok(())
-    });
+    })
+    .await;
     let (mut read_send, read_recv) = futures::channel::mpsc::channel::<Vec<u8>>(10);
-    metric_task(async move {
+    metric_task(spawn_pressure::spawn_limit!(MAX_CHANNELS), async move {
         let mut buf = [0_u8; 4096];
         while let Some(read) = bi_recv
             .read(&mut buf)
@@ -48,7 +53,8 @@ fn tx_bi_chan(
                 .map_err(TransportError::other)?;
         }
         TransportResult::Ok(())
-    });
+    })
+    .await;
     let write_send: TransportChannelWrite = Box::new(write_send);
     let read_recv: TransportChannelRead = Box::new(read_recv);
     (write_send, read_recv)
@@ -157,7 +163,7 @@ impl ListenerInnerHandler for TransportListenerQuic {
             // we also need to make an initial channel
             let out = if with_channel {
                 let (bi_send, bi_recv) = con.open_bi().await.map_err(TransportError::other)?;
-                Some(tx_bi_chan(bi_send, bi_recv))
+                Some(tx_bi_chan(bi_send, bi_recv).await)
             } else {
                 None
             };
@@ -171,9 +177,9 @@ impl ListenerInnerHandler for TransportListenerQuic {
 
             // pass any incoming channels off to our actor
             let url_clone = url.clone();
-            metric_task(async move {
+            metric_task(spawn_pressure::spawn_limit!(MAX_CHANNELS), async move {
                 while let Some(Ok((bi_send, bi_recv))) = bi_streams.next().await {
-                    let (write, read) = tx_bi_chan(bi_send, bi_recv);
+                    let (write, read) = tx_bi_chan(bi_send, bi_recv).await;
                     if incoming_channel_sender
                         .send(TransportEvent::IncomingChannel(
                             url_clone.clone(),
@@ -187,7 +193,8 @@ impl ListenerInnerHandler for TransportListenerQuic {
                     }
                 }
                 <Result<(), ()>>::Ok(())
-            });
+            })
+            .await;
 
             Ok(out.map(move |(write, read)| (url, write, read)))
         }
@@ -246,7 +253,7 @@ impl TransportListenerHandler for TransportListenerQuic {
             if let Some(maybe_bi) = maybe_bi {
                 match maybe_bi.await {
                     Ok((bi_send, bi_recv)) => {
-                        let (write, read) = tx_bi_chan(bi_send, bi_recv);
+                        let (write, read) = tx_bi_chan(bi_send, bi_recv).await;
                         return Ok((url, write, read));
                     }
                     Err(_) => {
@@ -299,7 +306,7 @@ pub async fn spawn_transport_listener_quic(
     let sender = builder.channel_factory().create_channel().await?;
 
     let i_s = internal_sender.clone();
-    metric_task(async move {
+    metric_task(spawn_pressure::spawn_limit!(MAX_TRANSPORTS), async move {
         incoming
             .for_each_concurrent(10, |maybe_con| async {
                 let res: TransportResult<()> = async {
@@ -319,7 +326,8 @@ pub async fn spawn_transport_listener_quic(
         i_s.ghost_actor_shutdown().await?;
 
         TransportResult::Ok(())
-    });
+    })
+    .await;
 
     let mut bound_url = url2!(
         "{}://{}",
@@ -353,7 +361,11 @@ pub async fn spawn_transport_listener_quic(
         connections: HashMap::new(),
     };
 
-    metric_task(builder.spawn(actor));
+    metric_task(
+        spawn_pressure::spawn_limit!(MAX_TRANSPORTS),
+        builder.spawn(actor),
+    )
+    .await;
 
     Ok((sender, receiver))
 }

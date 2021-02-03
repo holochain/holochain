@@ -21,6 +21,7 @@ paste = "1.0.3"
 rmp-serde = "0.14"
 serde = { version = "1", features = [ "derive", "rc" ] }
 serde_json = { version = "1", features = [ "preserve_order" ] }
+spawn_pressure = { git = "https://github.com/freesig/spawn_pressure.git", branch = "main" }
 sysinfo = "0.15.9"
 thiserror = "1.0.22"
 tokio = { version = "0.2", features = [ "full" ] }
