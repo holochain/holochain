@@ -45,9 +45,12 @@ jobs:
          name: Unset CircleCI's forced conversion of HTTPS->SSH
          command: git config --global --unset "url.ssh://git@github.com.insteadof"
       - run:
+         name: Set up Hydra cache
+         command: $(nix-build . --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
+      - run:
          name: Run the merge tests
          no_output_timeout: 30m
-         command: nix-shell --pure --argstr flavor ci --run hc-merge-test
+         command: nix-shell --pure --argstr flavor "coreDev" --run hc-merge-test
 
   merge-test-mac:
    macos:
