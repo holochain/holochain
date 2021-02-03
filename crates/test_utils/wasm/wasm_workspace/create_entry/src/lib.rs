@@ -72,6 +72,9 @@ fn get_post(hash: HeaderHash) -> ExternResult<Option<Element>> {
 
 #[hdk_extern]
 fn create_msg(_: ()) -> ExternResult<HeaderHash> {
+    // Creating multiple entries in a Zome function should be fine, but presently fails...
+    // Run "cargo test validation" to trigger this to fail in get_validation_package_test
+    //hdk3::prelude::create_entry(&Setup(String::from("Hello, before Msg...")))?;
     hdk3::prelude::create_entry(&msg())
 }
 
@@ -117,10 +120,12 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
         functions,
     })?;
 
-    // Test that the init function can also successfully commit entries to the source-chain.
-    // Until https://github.com/holochain/holochain/pull/601 is fixed, this will cause failure
-    // in test cases ...::wasm_test::bridge_call and call_the_same_cell!
-    hdk3::prelude::create_entry(&Setup(String::from("Hello, world!")))?;
+    // Test that the init function can also successfully commit entries to the source-chain.  Until
+    // https://github.com/holochain/holochain/pull/601 is fixed, this will cause failure in test
+    // cases ...::wasm_test::bridge_call and call_the_same_cell!  It appears that *any* Zome API
+    // function that commits more than one Entry will fail (see below, in fn call_create_entry).
+    // Run "cargo test wasm" to trigger this failure.
+    //hdk3::prelude::create_entry(&Setup(String::from("Hello, world!")))?;
 
     Ok(InitCallbackResult::Pass)
 }
@@ -130,6 +135,9 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 /// call
 #[hdk_extern]
 fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
+    // Creating multiple entries in a Zome function should be fine, but presently fails...
+    // Run "cargo test wasm" to trigger this failure.
+    hdk3::prelude::create_entry(&Setup(String::from("Hello, before Post...")))?;
     // Create an entry directly via. the hdk.
     hdk3::prelude::create_entry(&post())?;
     // Create an entry via a `call`.

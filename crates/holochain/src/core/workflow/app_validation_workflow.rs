@@ -483,7 +483,7 @@ async fn get_link_zome(
                 _ => Err(Outcome::awaiting(&dl.link_add_address)),
             }
         }
-        _ => unreachable!(),
+        other => unreachable!("Unhandled {:?}", other),
     }
 }
 
