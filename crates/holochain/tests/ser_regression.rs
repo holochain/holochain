@@ -18,7 +18,7 @@ use observability;
 use std::sync::Arc;
 use tempdir::TempDir;
 
-#[derive(Serialize, Deserialize, SerializedBytes)]
+#[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 struct CreateMessageInput {
     channel_hash: EntryHash,
     content: String,

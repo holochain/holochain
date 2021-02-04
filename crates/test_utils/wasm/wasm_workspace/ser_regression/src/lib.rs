@@ -33,20 +33,20 @@ fn channels_path() -> Path {
 
 #[hdk_extern]
 fn create_channel(name: String) -> ExternResult<EntryHash> {
-    debug!(format!("channel name {:?}", name));
+    debug!("channel name {:?}", name);
     let path = channels_path();
     let channel = Channel::new(name);
     let channel_hash = hash_entry(&channel)?;
     let sb: SerializedBytes = channel_hash.clone().try_into().unwrap();
     create_entry(&channel)?;
-    debug!(format!("sb in channel {:?}", sb));
+    debug!("sb in channel {:?}", sb);
     create_link(hash_entry(&path)?, channel_hash.clone(), ())?;
     Ok(channel_hash)
 }
 
 #[hdk_extern]
 fn create_message(input: crate::CreateMessageInput) -> ExternResult<EntryHash> {
-    debug!(format!("{:?}", input));
+    debug!("{:?}", input);
     let CreateMessageInput {
         channel_hash,
         content,

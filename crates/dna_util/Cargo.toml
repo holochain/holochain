@@ -13,7 +13,7 @@ edition = "2018"
 [dependencies]
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
 holochain = { path = "../holochain" }
-holochain_serialized_bytes = "=0.0.47"
+holochain_serialized_bytes = "=0.0.48"
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
 holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
 serde = { version = "1.0.104", features = [ "derive" ] }
