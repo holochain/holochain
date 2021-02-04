@@ -13,7 +13,7 @@ use std::path::PathBuf;
 
 pub use holochain_zome_types::test_utils::*;
 
-#[derive(Serialize, Deserialize, SerializedBytes)]
+#[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 struct FakeProperties {
     test: String,
 }

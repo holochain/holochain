@@ -8,7 +8,7 @@ pub use crate::{
     capability::*,
     cell::*,
     crdt::CrdtType,
-    debug_msg,
+    trace_msg,
     element::{Element, ElementVec},
     entry::*,
     entry_def::*,
