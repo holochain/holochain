@@ -21,13 +21,13 @@ pub const THINGS_TO_SERIALIZE: [ThingsToSerialize; 4] = [
 ];
 
 /// Serialization wrapper for bools
-#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 struct BoolWrap(bool);
 /// Serialization wrapper for u32 (number)
-#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 struct U32Wrap(u32);
 /// Serialzation wrapper for Strings
-#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 struct StringWrap(String);
 
 fixturator!(
@@ -37,17 +37,21 @@ fixturator!(
         // randomly select a thing to serialize
         let thing_to_serialize = THINGS_TO_SERIALIZE
             .to_vec()
-            .choose(&mut rand::thread_rng())
+            .choose(&mut crate::rng())
             .unwrap()
             .to_owned();
 
         // serialize a thing based on a delegated fixturator
         match thing_to_serialize {
-            ThingsToSerialize::Unit => UnitFixturator::new(Unpredictable)
-                .next()
-                .unwrap()
-                .try_into()
-                .unwrap(),
+            ThingsToSerialize::Unit =>
+            {
+                #[allow(clippy::unit_arg)]
+                UnitFixturator::new(Unpredictable)
+                    .next()
+                    .unwrap()
+                    .try_into()
+                    .unwrap()
+            }
             ThingsToSerialize::Bool => BoolWrap(BoolFixturator::new(Unpredictable).next().unwrap())
                 .try_into()
                 .unwrap(),
@@ -62,37 +66,42 @@ fixturator!(
         }
     },
     {
+        let mut index = get_fixt_index!();
         // iteratively select a thing to serialize
         let thing_to_serialize = THINGS_TO_SERIALIZE
             .to_vec()
             .into_iter()
             .cycle()
-            .nth(self.0.index)
+            .nth(index)
             .unwrap();
 
         // serialize a thing based on a delegated fixturator
         let ret: SerializedBytes = match thing_to_serialize {
-            ThingsToSerialize::Unit => UnitFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap()
-                .try_into()
-                .unwrap(),
+            ThingsToSerialize::Unit =>
+            {
+                #[allow(clippy::unit_arg)]
+                UnitFixturator::new_indexed(Predictable, index)
+                    .next()
+                    .unwrap()
+                    .try_into()
+                    .unwrap()
+            }
             ThingsToSerialize::Bool => BoolWrap(
-                BoolFixturator::new_indexed(Predictable, self.0.index)
+                BoolFixturator::new_indexed(Predictable, index)
                     .next()
                     .unwrap(),
             )
             .try_into()
             .unwrap(),
             ThingsToSerialize::Number => U32Wrap(
-                U32Fixturator::new_indexed(Predictable, self.0.index)
+                U32Fixturator::new_indexed(Predictable, index)
                     .next()
                     .unwrap(),
             )
             .try_into()
             .unwrap(),
             ThingsToSerialize::String => StringWrap(
-                StringFixturator::new_indexed(Predictable, self.0.index)
+                StringFixturator::new_indexed(Predictable, index)
                     .next()
                     .unwrap(),
             )
@@ -100,7 +109,8 @@ fixturator!(
             .unwrap(),
         };
 
-        self.0.index += 1;
+        index += 1;
+        set_fixt_index!(index);
         ret
     }
 );

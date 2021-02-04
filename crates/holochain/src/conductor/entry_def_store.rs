@@ -1,24 +1,25 @@
 //! # Entry Defs Store
 //! Stores all the entry definitions across zomes
-use crate::core::ribosome::{
-    guest_callback::entry_defs::{EntryDefsHostAccess, EntryDefsInvocation, EntryDefsResult},
-    wasm_ribosome::WasmRibosome,
-    RibosomeT,
-};
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::core::ribosome::real_ribosome::RealRibosome;
+use crate::core::ribosome::RibosomeT;
 
-use error::{EntryDefStoreError, EntryDefStoreResult};
+use super::api::CellConductorApiT;
+use error::EntryDefStoreError;
+use error::EntryDefStoreResult;
 use fallible_iterator::FallibleIterator;
+use holo_hash::*;
+use holochain_lmdb::buffer::KvBufFresh;
+use holochain_lmdb::error::DatabaseError;
+use holochain_lmdb::error::DatabaseResult;
+use holochain_lmdb::prelude::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{
-    buffer::KvBufFresh,
-    error::{DatabaseError, DatabaseResult},
-    prelude::*,
-};
-use holochain_types::dna::{zome::Zome, DnaFile};
-use holochain_zome_types::entry_def::EntryDef;
-use holochain_zome_types::header::EntryDefIndex;
-use std::{collections::HashMap, convert::TryInto};
+use holochain_types::prelude::*;
+use std::collections::HashMap;
+use std::convert::TryInto;
 
 pub mod error;
 
@@ -27,7 +28,7 @@ pub mod error;
     Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize, SerializedBytes,
 )]
 pub struct EntryDefBufferKey {
-    zome: Zome,
+    zome: ZomeDef,
     entry_def_position: EntryDefIndex,
 }
 
@@ -73,7 +74,7 @@ impl From<EntryDefStoreKey> for EntryDefBufferKey {
 
 impl EntryDefBufferKey {
     /// Create a new key
-    pub fn new(zome: Zome, entry_def_position: EntryDefIndex) -> Self {
+    pub fn new(zome: ZomeDef, entry_def_position: EntryDefIndex) -> Self {
         Self {
             zome,
             entry_def_position,
@@ -122,10 +123,50 @@ impl BufferedStore for EntryDefBuf {
     }
 }
 
+/// Get an [EntryDef] from the entry def store
+/// or fallback to running the zome
+pub(crate) async fn get_entry_def(
+    entry_def_index: EntryDefIndex,
+    zome: ZomeDef,
+    dna_def: &DnaDefHashed,
+    conductor_api: &impl CellConductorApiT,
+) -> EntryDefStoreResult<Option<EntryDef>> {
+    // Try to get the entry def from the entry def store
+    let key = EntryDefBufferKey::new(zome, entry_def_index);
+    let entry_def = conductor_api.get_entry_def(&key).await;
+    let dna_hash = dna_def.as_hash();
+    let dna_file = conductor_api
+        .get_dna(dna_hash)
+        .await
+        .ok_or_else(|| EntryDefStoreError::DnaFileMissing(dna_hash.clone()))?;
+
+    // If it's not found run the ribosome and get the entry defs
+    match &entry_def {
+        Some(_) => Ok(entry_def),
+        None => Ok(get_entry_defs(dna_file)?
+            .get(entry_def_index.index())
+            .map(|(_, v)| v.clone())),
+    }
+}
+
+pub(crate) async fn get_entry_def_from_ids(
+    zome_id: ZomeId,
+    entry_def_index: EntryDefIndex,
+    dna_def: &DnaDefHashed,
+    conductor_api: &impl CellConductorApiT,
+) -> EntryDefStoreResult<Option<EntryDef>> {
+    match dna_def.zomes.get(zome_id.index()) {
+        Some((_, zome)) => {
+            get_entry_def(entry_def_index, zome.clone(), dna_def, conductor_api).await
+        }
+        None => Ok(None),
+    }
+}
+
 #[tracing::instrument(skip(dna))]
 /// Get all the [EntryDef] for this dna
 pub(crate) fn get_entry_defs(
-    dna: DnaFile,
+    dna: DnaFile, // TODO: make generic
 ) -> EntryDefStoreResult<Vec<(EntryDefBufferKey, EntryDef)>> {
     let invocation = EntryDefsInvocation;
 
@@ -138,7 +179,7 @@ pub(crate) fn get_entry_defs(
         .map(|(zome_name, zome)| (zome_name, zome))
         .collect::<HashMap<_, _>>();
 
-    let ribosome = WasmRibosome::new(dna);
+    let ribosome = RealRibosome::new(dna);
     match ribosome.run_entry_defs(EntryDefsHostAccess, invocation)? {
         EntryDefsResult::Defs(map) => {
             // Turn the defs map into a vec of keys and entry defs
@@ -181,36 +222,20 @@ mod tests {
     use super::EntryDefBufferKey;
     use crate::conductor::Conductor;
     use holo_hash::HasHash;
-    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
-    use holochain_types::{
-        dna::{wasm::DnaWasmHashed, zome::Zome},
-        test_utils::fake_dna_zomes,
-    };
+    use holochain_lmdb::test_utils::test_environments;
+    use holochain_types::dna::wasm::DnaWasmHashed;
+    use holochain_types::dna::zome::ZomeDef;
+    use holochain_types::prelude::*;
+    use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::{
-        crdt::CrdtType,
-        entry_def::{EntryDef, EntryVisibility},
-    };
 
     #[tokio::test(threaded_scheduler)]
     async fn test_store_entry_defs() {
-        holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
 
         // all the stuff needed to have a WasmBuf
-        let test_env = test_conductor_env();
-        let TestEnvironment {
-            env: wasm_env,
-            tmpdir: _tmpdir,
-        } = test_wasm_env();
-        let _tmpdir = test_env.tmpdir.clone();
-        let test_env_2 = TestEnvironment {
-            env: test_env.env().into(),
-            tmpdir: test_env.tmpdir.clone(),
-        };
-        let handle = Conductor::builder()
-            .test(test_env_2, wasm_env.clone())
-            .await
-            .unwrap();
+        let envs = test_environments();
+        let handle = Conductor::builder().test(&envs).await.unwrap();
 
         let dna = fake_dna_zomes(
             "",
@@ -223,23 +248,25 @@ mod tests {
             visibility: EntryVisibility::Public,
             crdt_type: CrdtType,
             required_validations: 5.into(),
+            required_validation_type: Default::default(),
         };
         let comment_def = EntryDef {
             id: "comment".into(),
             visibility: EntryVisibility::Private,
             crdt_type: CrdtType,
             required_validations: 5.into(),
+            required_validation_type: Default::default(),
         };
         let dna_wasm = DnaWasmHashed::from_content(TestWasm::EntryDefs.into())
             .await
             .into_hash();
 
         let post_def_key = EntryDefBufferKey {
-            zome: Zome::from_hash(dna_wasm.clone()),
+            zome: ZomeDef::from_hash(dna_wasm.clone()),
             entry_def_position: 0.into(),
         };
         let comment_def_key = EntryDefBufferKey {
-            zome: Zome::from_hash(dna_wasm),
+            zome: ZomeDef::from_hash(dna_wasm),
             entry_def_position: 1.into(),
         };
 
@@ -257,7 +284,7 @@ mod tests {
         std::mem::drop(handle);
 
         // Restart conductor and check defs are still here
-        let handle = Conductor::builder().test(test_env, wasm_env).await.unwrap();
+        let handle = Conductor::builder().test(&envs).await.unwrap();
 
         assert_eq!(handle.get_entry_def(&post_def_key).await, Some(post_def));
         assert_eq!(

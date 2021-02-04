@@ -1,27 +1,36 @@
 [workspace]
 members = [
-  "crates/crypto",
   "crates/dna_util",
   "crates/fixt",
   "crates/fixt/test",
-  "crates/hdk",
+  "crates/hdk3",
+  "crates/hdk3_derive",
   "crates/holo_hash",
+
+  "crates/hc",
+
   "crates/holochain",
+  "crates/holochain_cascade",
+  "crates/holochain_conductor_api",
+  "crates/holochain_lmdb",
   "crates/holochain_p2p",
-  "crates/keystore",
+  "crates/holochain_keystore",
+  "crates/holochain_state",
+  "crates/holochain_types",
+  "crates/holochain_websocket",
+  "crates/holochain_zome_types",
+
   "crates/kitsune_p2p/kitsune_p2p",
   "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",
-  "crates/legacy",
-  "crates/state",
+  "crates/kitsune_p2p/proxy",
+
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
-  "crates/types",
-  "crates/websocket",
 ]
 
 exclude = [
-  "pseudocode",
+
 ]
 
 # These are the default params for RELEASE target
@@ -37,6 +46,19 @@ codegen-units = 16
 [patch.crates-io]
 
 rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
-#rkv = { path = "../../rust/rkv" }
 lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }
 #lmdb-rkv = { path = "../../rust/lmdb-rs" }
+# observability = { path = "../../rust/observability" }
+# observability = { git = "https://github.com/freesig/observability.git", branch = "main" }
+# holochain_wasmer_guest = { path = "../holochain-wasmer/crates/guest" }
+# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "remote_signal" }
+# holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "remote_signal" }
+# ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
+# ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "add_observability" }
+# lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "bump_ga" }
+# lair_keystore_client = { git = "https://github.com/holochain/lair.git", branch = "bump_ga" }
+# lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
+# lair_keystore_client = { path = "../lair/crates/lair_keystore_client" }
+# observability = { path = "../../rust/observability" }
+# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "try_from_ref" }
+tokio_safe_block_on = { git = "https://github.com/neonphog/tokio_safe_block_on.git", branch = "fix_holochain_bug" }

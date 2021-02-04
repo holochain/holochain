@@ -1,15 +1,16 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::{CallContext, RibosomeT};
-use holochain_zome_types::{GetDetailsInput, GetDetailsOutput};
+use crate::core::ribosome::CallContext;
+use crate::core::ribosome::RibosomeT;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_details<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: GetDetailsInput,
-) -> RibosomeResult<GetDetailsOutput> {
-    let (hash, options) = input.into_inner();
+    input: GetInput,
+) -> RibosomeResult<Option<Details>> {
+    let GetInput{ any_dht_hash, get_options } = input;
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
@@ -22,25 +23,26 @@ pub fn get_details<'a>(
             .write()
             .await
             .cascade(network)
-            .get_details(hash, options.into())
+            .get_details(any_dht_hash, get_options)
             .await?;
-        Ok(GetDetailsOutput::new(maybe_details))
+        Ok(maybe_details)
     })
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::{core::workflow::CallZomeWorkspace, fixt::ZomeCallHostAccessFixturator};
-    use ::fixt::prelude::*;
     use hdk3::prelude::*;
+    use crate::core::workflow::CallZomeWorkspace;
+    use crate::fixt::ZomeCallHostAccessFixturator;
     use holochain_wasm_test_utils::TestWasm;
+    use ::fixt::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_get_details_test<'a>() {
-        holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
 
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
@@ -48,7 +50,8 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
@@ -57,8 +60,8 @@ pub mod wasm_test {
         #[derive(Clone, Copy, Serialize, Deserialize, SerializedBytes, Debug, PartialEq)]
         struct CounTree(u32);
 
-        let check = |details: GetDetailsOutput, count, delete| match details.clone().into_inner() {
-            Some(Details::Element(element_details)) => {
+        let check = |details: Option<Details>, count, delete| match details {
+            Some(Details::Element(ref element_details)) => {
                 match element_details.element.entry().to_app_option::<CounTree>() {
                     Ok(Some(CounTree(u))) => assert_eq!(u, count),
                     _ => panic!("failed to deserialize {:?}, {}, {}", details, count, delete),
@@ -68,24 +71,24 @@ pub mod wasm_test {
             _ => panic!("no element"),
         };
 
-        let check_entry =
-            |details: GetDetailsOutput, count, update, delete| match details.clone().into_inner() {
-                Some(Details::Entry(entry_details)) => {
-                    match entry_details.entry {
-                        Entry::App(eb) => {
-                            let countree = CounTree::try_from(eb.into_sb()).unwrap();
-                            assert_eq!(countree, CounTree(count));
-                        }
-                        _ => panic!(
-                            "failed to deserialize {:?}, {}, {}, {}",
-                            details, count, update, delete
-                        ),
+        let check_entry = |details: Option<Details>, count, update, delete, line| match details
+        {
+            Some(Details::Entry(ref entry_details)) => {
+                match entry_details.entry {
+                    Entry::App(ref eb) => {
+                        let countree = CounTree::try_from(eb.clone().into_sb()).unwrap();
+                        assert_eq!(countree, CounTree(count));
                     }
-                    assert_eq!(entry_details.updates.len(), update);
-                    assert_eq!(entry_details.deletes.len(), delete);
+                    _ => panic!(
+                        "failed to deserialize {:?}, {}, {}, {}",
+                        details, count, update, delete
+                    ),
                 }
-                _ => panic!("no entry"),
-            };
+                assert_eq!(entry_details.updates.len(), update, "{}", line);
+                assert_eq!(entry_details.deletes.len(), delete, "{}", line);
+            }
+            _ => panic!("no entry"),
+        };
 
         let zero_hash: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_hash", CounTree(0));
@@ -105,6 +108,7 @@ pub mod wasm_test {
             0,
             0,
             0,
+            line!(),
         );
 
         let one_a: HeaderHash =
@@ -124,12 +128,14 @@ pub mod wasm_test {
             0,
             1,
             0,
+            line!(),
         );
         check_entry(
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash),
             1,
             0,
             0,
+            line!(),
         );
 
         let one_b: HeaderHash =
@@ -149,12 +155,14 @@ pub mod wasm_test {
             0,
             2,
             0,
+            line!(),
         );
         check_entry(
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash),
             1,
             0,
             0,
+            line!(),
         );
 
         let two: HeaderHash = crate::call_test_ribosome!(host_access, TestWasm::Crud, "inc", one_b);
@@ -173,18 +181,21 @@ pub mod wasm_test {
             0,
             2,
             0,
+            line!(),
         );
         check_entry(
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash),
             1,
             1,
             0,
+            line!(),
         );
         check_entry(
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", two_hash),
             2,
             0,
             0,
+            line!(),
         );
 
         let zero_b: HeaderHash =
@@ -204,23 +215,26 @@ pub mod wasm_test {
             0,
             2,
             0,
+            line!(),
         );
         check_entry(
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash),
             1,
             1,
             1,
+            line!(),
         );
         check_entry(
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", two_hash),
             2,
             0,
             0,
+            line!(),
         );
 
-        let zero_b_details: GetDetailsOutput =
+        let zero_b_details: Option<Details> =
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", zero_b);
-        match zero_b_details.into_inner() {
+        match zero_b_details {
             Some(Details::Element(element_details)) => {
                 match element_details.element.entry().as_option() {
                     None => {

@@ -1,13 +1,10 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_cache;
-use crate::core::{
-    ribosome::{CallContext, RibosomeT},
-    workflow::CallZomeWorkspace,
-    SourceChainResult,
-};
-use holochain_zome_types::header::builder;
-use holochain_zome_types::CreateLinkInput;
-use holochain_zome_types::CreateLinkOutput;
+use crate::core::ribosome::CallContext;
+use crate::core::ribosome::RibosomeT;
+use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
+use crate::core::workflow::CallZomeWorkspace;
+
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -15,11 +12,11 @@ pub fn create_link<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CreateLinkInput,
-) -> RibosomeResult<CreateLinkOutput> {
-    let (base_address, target_address, tag) = input.into_inner();
+) -> RibosomeResult<HeaderHash> {
+    let CreateLinkInput { base_address, target_address, tag } = input;
 
     // extract the zome position
-    let zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
+    let zome_id = ribosome.zome_to_id(&call_context.zome)?;
 
     // Construct the link add
     let header_builder = builder::CreateLink::new(base_address, target_address, zome_id, tag);
@@ -34,21 +31,20 @@ pub fn create_link<'a>(
                 .source_chain
                 .get_element(&header_hash)?
                 .expect("Element we just put in SourceChain must be gettable");
-            integrate_to_cache(
+            integrate_to_authored(
                 &element,
                 workspace.source_chain.elements(),
-                &mut workspace.cache_meta,
+                &mut workspace.meta_authored,
             )
-            .await
             .map_err(Box::new)?;
-            SourceChainResult::Ok(header_hash)
+            RibosomeResult::Ok(header_hash)
         }))??;
 
     // return the hash of the committed link
     // note that validation is handled by the workflow
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
-    Ok(CreateLinkOutput::new(header_hash))
+    Ok(header_hash)
 }
 
 // we rely on the tests for get_links and get_link_details

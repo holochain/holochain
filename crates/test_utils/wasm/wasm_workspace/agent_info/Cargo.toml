@@ -9,5 +9,5 @@ name = "test_wasm_agent_info"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-hdk3 = { path = "../../../../hdk" }
+hdk3 = { path = "../../../../hdk3" }
 serde = "=1.0.104"

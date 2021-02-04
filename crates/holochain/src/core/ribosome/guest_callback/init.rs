@@ -8,11 +8,7 @@ use holo_hash::EntryHash;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::HostFnAccess;
-use holochain_types::dna::DnaDef;
-use holochain_zome_types::init::InitCallbackResult;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use holochain_types::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct InitInvocation {
@@ -51,15 +47,15 @@ impl Invocation for InitInvocation {
     fn fn_components(&self) -> FnComponents {
         vec!["init".into()].into()
     }
-    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
-        Ok(ExternInput::new(().try_into()?))
+    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
+        ExternIO::encode(())
     }
 }
 
-impl TryFrom<InitInvocation> for ExternInput {
+impl TryFrom<InitInvocation> for ExternIO {
     type Error = SerializedBytesError;
     fn try_from(_: InitInvocation) -> Result<Self, Self::Error> {
-        Ok(Self::new(().try_into()?))
+        Self::encode(())
     }
 }
 
@@ -98,7 +94,6 @@ impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
 
 #[cfg(test)]
 mod test {
-
     use super::InitResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
@@ -106,44 +101,43 @@ mod test {
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
-    use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::init::InitCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::ExternIO;
 
     #[test]
     fn init_callback_result_fold() {
-        let mut rng = thread_rng();
+        let mut rng = ::fixt::rng();
 
         let result_pass = || InitResult::Pass;
         let result_ud = || {
             InitResult::UnresolvedDependencies(
-                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                ZomeNameFixturator::new(::fixt::Predictable).next().unwrap(),
                 vec![],
             )
         };
         let result_fail = || {
             InitResult::Fail(
-                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                ZomeNameFixturator::new(::fixt::Predictable).next().unwrap(),
                 "".into(),
             )
         };
 
         let cb_pass = || {
             (
-                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                ZomeNameFixturator::new(::fixt::Predictable).next().unwrap(),
                 InitCallbackResult::Pass,
             )
         };
         let cb_ud = || {
             (
-                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                ZomeNameFixturator::new(::fixt::Predictable).next().unwrap(),
                 InitCallbackResult::UnresolvedDependencies(vec![]),
             )
         };
         let cb_fail = || {
             (
-                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                ZomeNameFixturator::new(::fixt::Predictable).next().unwrap(),
                 InitCallbackResult::Fail("".into()),
             )
         };
@@ -177,7 +171,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn init_access() {
-        let init_host_access = InitHostAccessFixturator::new(fixt::Unpredictable)
+        let init_host_access = InitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         assert_eq!(HostFnAccess::from(&init_host_access), HostFnAccess::all(),);
@@ -185,7 +179,7 @@ mod test {
 
     #[test]
     fn init_invocation_zomes() {
-        let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
+        let init_invocation = InitInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         assert_eq!(ZomesToInvoke::All, init_invocation.zomes(),);
@@ -193,7 +187,7 @@ mod test {
 
     #[test]
     fn init_invocation_fn_components() {
-        let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
+        let init_invocation = InitInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
 
@@ -205,39 +199,35 @@ mod test {
 
     #[test]
     fn init_invocation_host_input() {
-        let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
+        let init_invocation = InitInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
 
         let host_input = init_invocation.clone().host_input().unwrap();
 
-        assert_eq!(
-            host_input,
-            ExternInput::new(SerializedBytes::try_from(()).unwrap()),
-        );
+        assert_eq!(host_input, ExternIO::encode(()).unwrap(),);
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-
     use super::InitResult;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::InitHostAccessFixturator;
     use crate::fixt::InitInvocationFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::RealRibosomeFixturator;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_init_unimplemented() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Crud]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Crud]))
             .next()
             .unwrap();
-        let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
-        init_invocation.dna_def = ribosome.dna_file.dna.clone();
+        let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
+        init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let host_access = fixt!(InitHostAccess);
         let result = ribosome.run_init(host_access, init_invocation).unwrap();
@@ -246,11 +236,11 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_init_implemented_pass() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass]))
             .next()
             .unwrap();
-        let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
-        init_invocation.dna_def = ribosome.dna_file.dna.clone();
+        let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
+        init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let host_access = fixt!(InitHostAccess);
         let result = ribosome.run_init(host_access, init_invocation).unwrap();
@@ -259,11 +249,11 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_init_implemented_fail() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitFail]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::InitFail]))
             .next()
             .unwrap();
-        let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
-        init_invocation.dna_def = ribosome.dna_file.dna.clone();
+        let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
+        init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let host_access = fixt!(InitHostAccess);
         let result = ribosome.run_init(host_access, init_invocation).unwrap();
@@ -276,11 +266,11 @@ mod slow_tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_init_multi_implemented_fail() {
         let ribosome =
-            WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass, TestWasm::InitFail]))
+            RealRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass, TestWasm::InitFail]))
                 .next()
                 .unwrap();
-        let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
-        init_invocation.dna_def = ribosome.dna_file.dna.clone();
+        let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
+        init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let host_access = fixt!(InitHostAccess);
         let result = ribosome.run_init(host_access, init_invocation).unwrap();

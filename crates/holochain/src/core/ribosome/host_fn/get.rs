@@ -1,7 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::{CallContext, RibosomeT};
-use holochain_zome_types::GetInput;
-use holochain_zome_types::GetOutput;
+use crate::core::ribosome::CallContext;
+use crate::core::ribosome::RibosomeT;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -9,8 +9,8 @@ pub fn get<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: GetInput,
-) -> RibosomeResult<GetOutput> {
-    let (hash, options) = input.into_inner();
+) -> RibosomeResult<Option<Element>> {
+    let GetInput{ any_dht_hash, get_options } = input;
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
@@ -23,10 +23,10 @@ pub fn get<'a>(
             .write()
             .await
             .cascade(network)
-            .dht_get(hash, options.into())
+            .dht_get(any_dht_hash, get_options)
             .await?;
 
-        Ok(GetOutput::new(maybe_element))
+        Ok(maybe_element)
     })
 }
 

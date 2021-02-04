@@ -11,13 +11,25 @@ categories = [ "network-programming" ]
 edition = "2018"
 
 [dependencies]
-derive_more = "0.99.7"
+derive_more = "0.99.11"
 futures = "0.3"
-ghost_actor = "0.2.1"
+ghost_actor = "0.3.0-alpha.1"
 kitsune_p2p_types = { version = "0.0.1", path = "../types" }
+kitsune_p2p_proxy = { version = "0.0.1", path = "../proxy" }
+kitsune_p2p_transport_quic = { version = "0.0.1", path = "../transport_quic" }
+lair_keystore_api = "=0.0.1-alpha.10"
+rand = "0.7"
 shrinkwraprs = "0.3.0"
-thiserror = "1.0.18"
+thiserror = "1.0.22"
 tokio = { version = "0.2", features = [ "full" ] }
+url2 = "0.0.6"
+serde = { version = "1.0.104", features = [ "derive" ] }
+serde_bytes = "0.11"
+reqwest = "0.10.8"
+once_cell = "1.4.1"
+fixt = { path = "../../fixt" }
+observability = "0.1.3"
 
 [dev-dependencies]
 assert_matches = "1.3"
+tracing-subscriber = "0.2"

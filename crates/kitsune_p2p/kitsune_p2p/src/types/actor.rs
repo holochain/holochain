@@ -1,6 +1,7 @@
 //! Definitions related to the KitsuneP2p peer-to-peer / dht communications actor.
 
 use std::sync::Arc;
+use url2::Url2;
 
 /// Make a request to multiple destination agents - awaiting/aggregating the responses.
 /// The remote sides will see these messages as "RequestEvt" events.
@@ -65,6 +66,9 @@ pub struct NotifyMulti {
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pSender allows async remote-control of the KitsuneP2p actor.
     pub chan KitsuneP2p<super::KitsuneP2pError> {
+        /// Get the calculated transport bindings.
+        fn list_transport_bindings() -> Vec<Url2>;
+
         /// Announce a space/agent pair on this network.
         fn join(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>) -> ();
 
@@ -73,7 +77,7 @@ ghost_actor::ghost_chan! {
 
         /// Make a request of a single remote agent, expecting a response.
         /// The remote side will receive a "Call" event.
-        fn rpc_single(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;
+        fn rpc_single(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>, timeout_ms: Option<u64>) -> Vec<u8>;
 
         /// Make a request to multiple destination agents - awaiting/aggregating the responses.
         /// The remote sides will see these messages as "Call" events.

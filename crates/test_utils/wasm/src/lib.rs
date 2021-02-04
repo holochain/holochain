@@ -1,9 +1,5 @@
-use holochain_types::dna::wasm::DnaWasm;
-pub extern crate strum;
-#[macro_use]
-extern crate strum_macros;
-use holochain_types::dna::zome::Zome;
-use holochain_zome_types::zome::ZomeName;
+use holochain_types::prelude::*;
+use strum_macros::EnumIter;
 
 const WASM_WORKSPACE_TARGET: &str = "wasm_workspace/target";
 
@@ -18,21 +14,26 @@ pub enum TestWasm {
     Crud,
     Debug,
     EntryDefs,
+    EmitSignal,
     HashEntry,
     Foo,
     HashPath,
-    Imports,
+    HdkExtern,
     InitFail,
     InitPass,
     Link,
     MigrateAgentFail,
     MigrateAgentPass,
+    MultipleCalls,
     PostCommitFail,
     PostCommitSuccess,
     Query,
     RandomBytes,
+    XSalsa20Poly1305,
     SerRegression,
+    Sign,
     SysTime,
+    Update,
     Validate,
     ValidateLink,
     ValidateInvalid,
@@ -57,21 +58,26 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Crud => "crud",
             TestWasm::Debug => "debug",
             TestWasm::EntryDefs => "entry_defs",
+            TestWasm::EmitSignal => "emit_signal",
             TestWasm::HashEntry => "hash_entry",
             TestWasm::Foo => "foo",
             TestWasm::HashPath => "hash_path",
-            TestWasm::Imports => "imports",
+            TestWasm::HdkExtern => "hdk_extern",
             TestWasm::InitFail => "init_fail",
             TestWasm::InitPass => "init_pass",
             TestWasm::Link => "link",
             TestWasm::MigrateAgentFail => "migrate_agent_fail",
             TestWasm::MigrateAgentPass => "migrate_agent_pass",
+            TestWasm::MultipleCalls => "multiple_calls",
             TestWasm::PostCommitFail => "post_commit_fail",
             TestWasm::PostCommitSuccess => "post_commit_success",
             TestWasm::Query => "query",
             TestWasm::RandomBytes => "random_bytes",
+            TestWasm::XSalsa20Poly1305 => "x_salsa20_poly1305",
             TestWasm::SerRegression => "ser_regression",
+            TestWasm::Sign => "sign",
             TestWasm::SysTime => "sys_time",
+            TestWasm::Update => "update_entry",
             TestWasm::Validate => "validate",
             TestWasm::ValidateLink => "validate_link",
             TestWasm::ValidateInvalid => "validate_invalid",
@@ -106,6 +112,9 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::EntryDefs => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_entry_defs.wasm")
             }
+            TestWasm::EmitSignal => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_emit_signal.wasm")
+            }
             TestWasm::HashEntry => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_hash_entry.wasm")
             }
@@ -113,7 +122,9 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::HashPath => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_hash_path.wasm")
             }
-            TestWasm::Imports => get_code("wasm32-unknown-unknown/release/test_wasm_imports.wasm"),
+            TestWasm::HdkExtern => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_hdk_extern.wasm")
+            }
             TestWasm::InitFail => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_init_fail.wasm")
             }
@@ -127,6 +138,9 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::MigrateAgentPass => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_migrate_agent_pass.wasm")
             }
+            TestWasm::MultipleCalls => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_multiple_calls.wasm")
+            }
             TestWasm::PostCommitFail => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_fail.wasm")
             }
@@ -137,10 +151,17 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::RandomBytes => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_random_bytes.wasm")
             }
+            TestWasm::XSalsa20Poly1305 => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_x_salsa20_poly1305.wasm")
+            }
             TestWasm::SerRegression => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_ser_regression.wasm")
             }
+            TestWasm::Sign => get_code("wasm32-unknown-unknown/release/test_wasm_sign.wasm"),
             TestWasm::SysTime => get_code("wasm32-unknown-unknown/release/test_wasm_sys_time.wasm"),
+            TestWasm::Update => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_update_entry.wasm")
+            }
             TestWasm::Validate => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_validate.wasm")
             }
@@ -193,20 +214,26 @@ fn get_code(path: &'static str) -> Vec<u8> {
     std::fs::read(path).expect(&warning)
 }
 
-impl From<TestWasm> for Zome {
+impl From<TestWasm> for ZomeDef {
     fn from(test_wasm: TestWasm) -> Self {
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             let dna_wasm: DnaWasm = test_wasm.into();
             let (_, wasm_hash) = holochain_types::dna::wasm::DnaWasmHashed::from_content(dna_wasm)
                 .await
                 .into_inner();
-            Self { wasm_hash }
+            WasmZome { wasm_hash }.into()
         })
     }
 }
 
-impl From<TestWasm> for (ZomeName, Zome) {
+impl From<TestWasm> for (ZomeName, ZomeDef) {
     fn from(test_wasm: TestWasm) -> Self {
         (test_wasm.into(), test_wasm.into())
+    }
+}
+
+impl From<TestWasm> for Zome {
+    fn from(test_wasm: TestWasm) -> Self {
+        Zome::new(test_wasm.into(), test_wasm.into())
     }
 }

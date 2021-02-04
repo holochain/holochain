@@ -2,16 +2,19 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::*;
-use holochain_zome_types::request::MetadataRequest;
-use holochain_zome_types::zome::FunctionName;
+use holochain_types::activity::AgentActivityResponse;
 
 /// Request a validation package.
+#[derive(Clone, Debug)]
 pub struct GetValidationPackage {
     /// The dna_hash / space_hash context.
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
-    // TODO - parameters
+    /// Request the package from this agent.
+    pub request_from: AgentPubKey,
+    /// Request the package for this Header
+    pub header_hash: HeaderHash,
 }
 
 #[derive(Clone, Debug)]
@@ -78,6 +81,7 @@ impl From<holochain_zome_types::entry::GetOptions> for GetOptions {
 /// Fields tagged with `[Network]` are network-level controls.
 /// Fields tagged with `[Remote]` are controls that will be forwarded to the
 /// remote agent processing this `GetLinks` request.
+#[derive(Clone, Debug)]
 pub struct GetMetaOptions {
     /// [Network]
     /// How many remote nodes should we make requests of / aggregate.
@@ -140,6 +144,49 @@ impl Default for GetLinksOptions {
     }
 }
 
+#[derive(Debug, Clone)]
+/// Get agent activity from the DHT.
+/// Fields tagged with `[Network]` are network-level controls.
+/// Fields tagged with `[Remote]` are controls that will be forwarded to the
+/// remote agent processing this `GetLinks` request.
+pub struct GetActivityOptions {
+    /// [Network]
+    /// Timeout to await responses for aggregation.
+    /// Set to `None` for a default "best-effort".
+    /// Note - if all requests time-out you will receive an empty result,
+    /// not a timeout error.
+    pub timeout_ms: Option<u64>,
+    /// Number of times to retry getting elements in parallel.
+    /// For a small dht a large parallel get can overwhelm a single
+    /// agent and it can be worth retrying the elements that didn't
+    /// get found.
+    pub retry_gets: u8,
+    /// [Remote]
+    /// Include the all valid activity headers in the response.
+    /// If this is false the call becomes a lightweight response with
+    /// just the chain status and highest observed header.
+    /// This is useful when you want to ask an authority about the
+    /// status of a chain but do not need all the headers.
+    pub include_valid_activity: bool,
+    /// Include any rejected headers in the response.
+    pub include_rejected_activity: bool,
+    /// Include the full signed headers and hashes in the response
+    /// instead of just the hashes.
+    pub include_full_headers: bool,
+}
+
+impl Default for GetActivityOptions {
+    fn default() -> Self {
+        Self {
+            timeout_ms: None,
+            retry_gets: 0,
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_full_headers: false,
+        }
+    }
+}
+
 ghost_actor::ghost_chan! {
     /// The HolochainP2pSender struct allows controlling the HolochainP2p
     /// actor instance.
@@ -157,8 +204,8 @@ ghost_actor::ghost_chan! {
             to_agent: AgentPubKey,
             zome_name: ZomeName,
             fn_name: FunctionName,
-            cap: CapSecret,
-            request: SerializedBytes,
+            cap: Option<CapSecret>,
+            payload: ExternIO,
         ) -> SerializedBytes;
 
         /// Publish data to the correct neighborhood.
@@ -172,7 +219,7 @@ ghost_actor::ghost_chan! {
         ) -> ();
 
         /// Request a validation package.
-        fn get_validation_package(input: GetValidationPackage) -> (); // TODO - proper return type
+        fn get_validation_package(input: GetValidationPackage) -> ValidationPackageResponse;
 
         /// Get an entry from the DHT.
         fn get(
@@ -197,6 +244,15 @@ ghost_actor::ghost_chan! {
             link_key: WireLinkMetaKey,
             options: GetLinksOptions,
         ) -> Vec<GetLinksResponse>;
+
+        /// Get agent activity from the DHT.
+        fn get_agent_activity(
+            dna_hash: DnaHash,
+            from_agent: AgentPubKey,
+            agent: AgentPubKey,
+            query: ChainQueryFilter,
+            options: GetActivityOptions,
+        ) -> Vec<AgentActivityResponse>;
 
         /// Send a validation receipt to a remote node.
         fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, from_agent: AgentPubKey, receipt: SerializedBytes) -> ();

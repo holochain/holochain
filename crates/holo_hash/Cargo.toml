@@ -17,9 +17,7 @@ serde_bytes = "0.11"
 base64 = {version = "0.12.0", optional = true}
 blake2b_simd = {version = "0.5.10", optional = true}
 fixt = { version = "0.0.1", path = "../fixt", optional = true }
-futures = {version = "0.3", optional = true}
-holochain_serialized_bytes = {version = "=0.0.43", optional = true }
-must_future = {version = "0.1.1", optional = true}
+holochain_serialized_bytes = {version = "=0.0.48", optional = true }
 rand = {version = "0.7", optional = true}
 tracing = { version = "0.1", optional = true}
 
@@ -34,4 +32,7 @@ full = ["fixturators", "hashing", "string-encoding"]
 fixturators = ["fixt", "rand", "serialized-bytes", "string-encoding"]
 serialized-bytes = ["holochain_serialized_bytes"]
 string-encoding = ["base64", "blake2b_simd"]
-hashing = ["blake2b_simd", "futures", "serialized-bytes", "must_future", "tracing"]
+hashing = ["blake2b_simd", "serialized-bytes"]
+
+[package.metadata.cargo-udeps.ignore]
+normal = ["tracing"]

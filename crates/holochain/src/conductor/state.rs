@@ -1,13 +1,11 @@
 //! Structs which allow the Conductor's state to be persisted across
 //! startups and shutdowns
 
-use crate::conductor::interface::InterfaceDriver;
-
-use holochain_types::{
-    app::{AppId, InstalledApp, InstalledCell},
-    cell::CellId,
-};
-use serde::{Deserialize, Serialize};
+use holochain_conductor_api::config::InterfaceDriver;
+use holochain_conductor_api::signal_subscription::SignalSubscription;
+use holochain_types::prelude::*;
+use serde::Deserialize;
+use serde::Serialize;
 use std::collections::HashMap;
 
 /// Mutable conductor state, stored in a DB and writeable only via Admin interface.
@@ -20,34 +18,51 @@ use std::collections::HashMap;
 pub struct ConductorState {
     /// Apps that are ready to be activated
     #[serde(default)]
-    pub inactive_apps: HashMap<AppId, Vec<InstalledCell>>,
+    pub inactive_apps: HashMap<InstalledAppId, Vec<InstalledCell>>,
     /// Apps that are active and will be loaded
     #[serde(default)]
-    pub active_apps: HashMap<AppId, Vec<InstalledCell>>,
+    pub active_apps: HashMap<InstalledAppId, Vec<InstalledCell>>,
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
-    pub app_interfaces: HashMap<AppInterfaceNick, AppInterfaceConfig>,
+    pub app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
 }
 
-/// A friendly name used to refer to an App Interface.
-// TODO: is this needed?
-pub type AppInterfaceNick = String;
+/// A unique identifier used to refer to an App Interface internally.
+#[derive(
+    Clone,
+    Deserialize,
+    Serialize,
+    Default,
+    Debug,
+    Hash,
+    PartialEq,
+    Eq,
+    derive_more::From,
+    derive_more::Display,
+)]
+pub struct AppInterfaceId(String);
+
+impl From<&str> for AppInterfaceId {
+    fn from(s: &str) -> Self {
+        Self(s.into())
+    }
+}
 
 impl ConductorState {
-    /// Retrieve info about an installed App by its AppId
+    /// Retrieve info about an installed App by its InstalledAppId
     #[allow(clippy::ptr_arg)]
-    pub fn get_app_info(&self, app_id: &AppId) -> Option<InstalledApp> {
+    pub fn get_app_info(&self, installed_app_id: &InstalledAppId) -> Option<InstalledApp> {
         self.active_apps
-            .get(app_id)
-            .or_else(|| self.inactive_apps.get(app_id))
+            .get(installed_app_id)
+            .or_else(|| self.inactive_apps.get(installed_app_id))
             .map(|cell_data| InstalledApp {
-                app_id: app_id.clone(),
+                installed_app_id: installed_app_id.clone(),
                 cell_data: cell_data.clone(),
             })
     }
 
     /// Returns the interface configuration with the given ID if present
-    pub fn interface_by_id(&self, id: &str) -> Option<AppInterfaceConfig> {
+    pub fn interface_by_id(&self, id: &AppInterfaceId) -> Option<AppInterfaceConfig> {
         self.app_interfaces.get(id).cloned()
     }
 }
@@ -56,7 +71,6 @@ impl ConductorState {
 /// GUIs, browser based web UIs, local native UIs, other local applications and scripts.
 /// We currently have:
 /// * websockets
-/// * HTTP
 ///
 /// We will also soon develop
 /// * Unix domain sockets
@@ -65,12 +79,21 @@ impl ConductorState {
 #[derive(Clone, Deserialize, Serialize, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct AppInterfaceConfig {
-    /// The list of CellIds which this app interface applies to
-    // FIXME: [ B-01607 ] currently not hooked up, doesn't make sense until
-    // Signals are implemented
-    pub cells: Vec<CellId>,
+    /// The signal subscription settings for each App
+    pub signal_subscriptions: HashMap<InstalledAppId, SignalSubscription>,
+
     /// The driver for the interface, e.g. Websocket
     pub driver: InterfaceDriver,
+}
+
+impl AppInterfaceConfig {
+    /// Create config for a websocket interface
+    pub fn websocket(port: u16) -> Self {
+        Self {
+            signal_subscriptions: HashMap::new(),
+            driver: InterfaceDriver::Websocket { port },
+        }
+    }
 }
 
 // TODO: Tons of consistency check tests were ripped out in the great legacy code cleanup

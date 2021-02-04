@@ -1,28 +1,34 @@
 // Error types are self-explanatory
 #![allow(missing_docs)]
 
+use super::app_validation_workflow::AppValidationError;
 use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
-use crate::{
-    conductor::{api::error::ConductorApiError, CellError},
-    core::{
-        queue_consumer::QueueTriggerClosedError,
-        ribosome::error::RibosomeError,
-        state::{source_chain::SourceChainError, workspace::WorkspaceError},
-        SysValidationError,
-    },
-};
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::CellError;
+use crate::core::queue_consumer::QueueTriggerClosedError;
+use crate::core::ribosome::error::RibosomeError;
+use crate::core::SysValidationError;
+use holochain_cascade::error::CascadeError;
+use holochain_lmdb::error::DatabaseError;
 use holochain_p2p::HolochainP2pError;
-use holochain_state::error::DatabaseError;
-use holochain_types::{dht_op::error::DhtOpError, prelude::*};
+use holochain_state::source_chain::SourceChainError;
+use holochain_state::workspace::WorkspaceError;
+use holochain_types::prelude::*;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum WorkflowError {
+    #[error(transparent)]
+    AppValidationError(#[from] AppValidationError),
+
     #[error("Agent is invalid: {0:?}")]
     AgentInvalid(AgentPubKey),
 
     #[error("Conductor API error: {0}")]
     ConductorApi(#[from] Box<ConductorApiError>),
+
+    #[error(transparent)]
+    CascadeError(#[from] CascadeError),
 
     #[error("Workspace error: {0}")]
     WorkspaceError(#[from] WorkspaceError),
@@ -47,6 +53,9 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     CellError(#[from] CellError),
+
+    #[error(transparent)]
+    JoinError(#[from] tokio::task::JoinError),
 
     #[error(transparent)]
     QueueTriggerClosedError(#[from] QueueTriggerClosedError),

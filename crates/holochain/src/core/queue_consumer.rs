@@ -25,12 +25,15 @@
 //! Implicitly, every workflow also writes to its own source queue, i.e. to
 //! remove the item it has just processed.
 
-use derive_more::{Constructor, Display, From};
-use holochain_state::{
-    env::{EnvironmentWrite, WriteManager},
-    prelude::Writer,
-};
-use tokio::sync::{self, mpsc};
+use derive_more::Constructor;
+use derive_more::Display;
+use derive_more::From;
+use futures::future::Either;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::env::WriteManager;
+use holochain_lmdb::prelude::Writer;
+use tokio::sync;
+use tokio::sync::mpsc;
 
 // TODO: move these to workflow mod
 mod integrate_dht_ops_consumer;
@@ -42,9 +45,10 @@ use app_validation_consumer::*;
 mod produce_dht_ops_consumer;
 use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
-use super::state::workspace::WorkspaceError;
-use crate::conductor::{api::CellConductorApiT, manager::ManagedTaskAdd};
+use crate::conductor::api::CellConductorApiT;
+use crate::conductor::manager::ManagedTaskAdd;
 use holochain_p2p::HolochainP2pCell;
+use holochain_state::workspace::WorkspaceError;
 use publish_dht_ops_consumer::*;
 
 /// Spawns several long-running tasks which are responsible for processing work
@@ -58,9 +62,9 @@ pub async fn spawn_queue_consumer_tasks(
     conductor_api: impl CellConductorApiT + 'static,
     mut task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
     stop: sync::broadcast::Sender<()>,
-) -> InitialQueueTriggers {
+) -> (QueueTriggers, InitialQueueTriggers) {
     // Publish
-    let (tx_publish, rx1, handle) =
+    let (tx_publish, handle) =
         spawn_publish_dht_ops_consumer(env.clone(), stop.subscribe(), cell_network.clone());
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
@@ -70,7 +74,7 @@ pub async fn spawn_queue_consumer_tasks(
     let (create_tx_sys, get_tx_sys) = tokio::sync::oneshot::channel();
 
     // Integration
-    let (tx_integration, rx2, handle) =
+    let (tx_integration, handle) =
         spawn_integrate_dht_ops_consumer(env.clone(), stop.subscribe(), get_tx_sys);
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
@@ -78,18 +82,23 @@ pub async fn spawn_queue_consumer_tasks(
         .expect("Failed to manage workflow handle");
 
     // App validation
-    let (tx_app, rx3, handle) =
-        spawn_app_validation_consumer(env.clone(), stop.subscribe(), tx_integration.clone());
+    let (tx_app, handle) = spawn_app_validation_consumer(
+        env.clone(),
+        stop.subscribe(),
+        tx_integration.clone(),
+        conductor_api.clone(),
+        cell_network.clone(),
+    );
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
 
     // Sys validation
-    let (tx_sys, rx4, handle) = spawn_sys_validation_consumer(
+    let (tx_sys, handle) = spawn_sys_validation_consumer(
         env.clone(),
         stop.subscribe(),
-        tx_app,
+        tx_app.clone(),
         cell_network,
         conductor_api,
     );
@@ -102,35 +111,75 @@ pub async fn spawn_queue_consumer_tasks(
     }
 
     // Produce
-    let (tx_produce, rx5, handle) =
+    let (tx_produce, handle) =
         spawn_produce_dht_ops_consumer(env.clone(), stop.subscribe(), tx_publish.clone());
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
 
-    // Wait for initial loop to complete for each consumer
-    futures::future::join_all(vec![rx1, rx2, rx3, rx4, rx5].into_iter())
-        .await
-        .into_iter()
-        .collect::<Result<Vec<()>, _>>()
-        .expect("A queue consumer's oneshot channel was closed before initializing.");
-
-    InitialQueueTriggers {
-        sys_validation: tx_sys,
-        produce_dht_ops: tx_produce,
-    }
+    (
+        QueueTriggers::new(tx_sys.clone(), tx_produce.clone()),
+        InitialQueueTriggers::new(tx_sys, tx_produce, tx_publish, tx_app, tx_integration),
+    )
 }
 
 #[derive(Clone)]
 /// The entry points for kicking off a chain reaction of queue activity
-pub struct InitialQueueTriggers {
+pub struct QueueTriggers {
     /// Notify the SysValidation workflow to run, i.e. after handling gossip
     pub sys_validation: TriggerSender,
     /// Notify the ProduceDhtOps workflow to run, i.e. after InvokeCallZome
     pub produce_dht_ops: TriggerSender,
 }
 
+/// The triggers to run once at the start of a cell
+pub struct InitialQueueTriggers {
+    /// These triggers can only be run once
+    /// so they are private
+    sys_validation: TriggerSender,
+    produce_dht_ops: TriggerSender,
+    publish_dht_ops: TriggerSender,
+    app_validation: TriggerSender,
+    integrate_dht_ops: TriggerSender,
+}
+
+impl QueueTriggers {
+    /// Create a new queue trigger
+    pub fn new(sys_validation: TriggerSender, produce_dht_ops: TriggerSender) -> Self {
+        Self {
+            sys_validation,
+            produce_dht_ops,
+        }
+    }
+}
+
+impl InitialQueueTriggers {
+    fn new(
+        sys_validation: TriggerSender,
+        produce_dht_ops: TriggerSender,
+        publish_dht_ops: TriggerSender,
+        app_validation: TriggerSender,
+        integrate_dht_ops: TriggerSender,
+    ) -> Self {
+        Self {
+            sys_validation,
+            produce_dht_ops,
+            publish_dht_ops,
+            app_validation,
+            integrate_dht_ops,
+        }
+    }
+
+    /// Initialize all the workflows once.
+    pub fn initialize_workflows(mut self) {
+        self.sys_validation.trigger();
+        self.app_validation.trigger();
+        self.publish_dht_ops.trigger();
+        self.integrate_dht_ops.trigger();
+        self.produce_dht_ops.trigger();
+    }
+}
 /// The means of nudging a queue consumer to tell it to look for more work
 #[derive(Clone)]
 pub struct TriggerSender(mpsc::Sender<()>);
@@ -157,8 +206,8 @@ impl TriggerSender {
                     "Queue consumer trigger was sent while Cell is shutting down: ignoring."
                 );
             }
-            Err(mpsc::error::TrySendError::Full(_)) => (),
-            Ok(()) => (),
+            Err(mpsc::error::TrySendError::Full(_)) => {}
+            Ok(()) => {}
         };
     }
 }
@@ -176,7 +225,7 @@ impl TriggerReceiver {
                 match self.0.try_recv() {
                     Err(TryRecvError::Closed) => return Err(QueueTriggerClosedError),
                     Err(TryRecvError::Empty) => return Ok(()),
-                    Ok(()) => (),
+                    Ok(()) => {}
                 }
             }
         } else {
@@ -219,3 +268,32 @@ pub enum WorkComplete {
 /// The only error possible when attempting to trigger: the channel is closed
 #[derive(Debug, Display, thiserror::Error)]
 pub struct QueueTriggerClosedError;
+
+/// Inform a workflow to run a job or shutdown
+enum Job {
+    Run,
+    Shutdown,
+}
+
+/// Wait for the next job or exit command
+async fn next_job_or_exit(
+    rx: &mut TriggerReceiver,
+    stop: &mut sync::broadcast::Receiver<()>,
+) -> Job {
+    if stop.try_recv().is_ok() {
+        return Job::Shutdown;
+    }
+    // Check for shutdown or next job
+    let next_job = rx.listen();
+    let kill = stop.recv();
+    tokio::pin!(next_job);
+    tokio::pin!(kill);
+
+    if let Either::Left((Err(_), _)) | Either::Right((_, _)) =
+        futures::future::select(next_job, kill).await
+    {
+        Job::Shutdown
+    } else {
+        Job::Run
+    }
+}

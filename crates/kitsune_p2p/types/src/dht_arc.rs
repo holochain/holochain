@@ -1,14 +1,14 @@
 //! A type for indicating ranges on the dht arc
 
-use derive_more::{From, Into};
+use derive_more::From;
+use derive_more::Into;
+use std::num::Wrapping;
+use std::ops::Bound;
+use std::ops::RangeBounds;
 #[cfg(test)]
 use std::ops::RangeInclusive;
-use std::{
-    num::Wrapping,
-    ops::{Bound, RangeBounds},
-};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, From, Into)]
 /// Type for representing a location that can wrap around
 /// a u32 dht arc
 pub struct DhtLocation(pub Wrapping<u32>);
@@ -20,7 +20,7 @@ pub struct DhtLocation(pub Wrapping<u32>);
 /// 1 more is added to represent the middle point of an odd length array
 pub const MAX_HALF_LENGTH: u32 = (u32::MAX / 2) + 1 + 1;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 /// Represents how much of a dht arc is held
 /// center_loc is where the hash is.
 /// The center_loc is the center of the arc
@@ -137,20 +137,17 @@ impl ArcRange {
     /// Show if the bound is empty
     /// Useful before using as an index
     pub fn is_empty(&self) -> bool {
-        match (self.start_bound(), self.end_bound()) {
-            (Bound::Excluded(a), Bound::Excluded(b)) if a == b => true,
-            _ => false,
-        }
+        matches!((self.start_bound(), self.end_bound()), (Bound::Excluded(a), Bound::Excluded(b)) if a == b)
     }
 
     #[cfg(test)]
-    fn to_inc(self: ArcRange) -> RangeInclusive<usize> {
+    fn into_inc(self: ArcRange) -> RangeInclusive<usize> {
         match self {
             ArcRange {
                 start: Bound::Included(a),
                 end: Bound::Included(b),
             } if a <= b => RangeInclusive::new(a as usize, b as usize),
-            arc @ _ => panic!(
+            arc => panic!(
                 "This range goes all the way around the arc from {:?} to {:?}",
                 arc.start_bound(),
                 arc.end_bound()
@@ -265,28 +262,28 @@ mod tests {
         };
 
         assert!(DhtArc::new(0, 0).range().is_empty());
-        assert_eq!(DhtArc::new(0, 1).range().to_inc(), 0..=0);
-        assert_eq!(DhtArc::new(1, 2).range().to_inc(), 0..=2);
+        assert_eq!(DhtArc::new(0, 1).range().into_inc(), 0..=0);
+        assert_eq!(DhtArc::new(1, 2).range().into_inc(), 0..=2);
         assert_eq!(
-            DhtArc::new(quarter, quarter + 1).range().to_inc(),
+            DhtArc::new(quarter, quarter + 1).range().into_inc(),
             0..=(half as usize)
         );
         check_bounds(quarter, quarter + 1, 0, half);
 
         assert_eq!(
-            DhtArc::new(half, quarter + 1).range().to_inc(),
+            DhtArc::new(half, quarter + 1).range().into_inc(),
             (quarter as usize)..=((quarter * 3) as usize)
         );
         check_bounds(half, quarter + 1, quarter, quarter * 3);
 
         assert_eq!(
-            DhtArc::new(half, MAX_HALF_LENGTH).range().to_inc(),
+            DhtArc::new(half, MAX_HALF_LENGTH).range().into_inc(),
             0..=(u32::MAX as usize)
         );
         check_bounds_full(half, MAX_HALF_LENGTH, 0, u32::MAX);
 
         assert_eq!(
-            DhtArc::new(half, MAX_HALF_LENGTH - 2).range().to_inc(),
+            DhtArc::new(half, MAX_HALF_LENGTH - 2).range().into_inc(),
             2..=((u32::MAX - 1) as usize)
         );
         check_bounds(half, MAX_HALF_LENGTH - 2, 2, u32::MAX - 1);

@@ -1,31 +1,27 @@
 //! The workflow and queue consumer for DhtOp integration
 
-use super::{
-    error::WorkflowResult,
-    integrate_dht_ops_workflow::{integrate_single_data, integrate_single_metadata},
-    produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult,
-    sys_validation_workflow::types::PendingDependencies,
-};
-use crate::core::{
-    queue_consumer::TriggerSender,
-    state::{
-        dht_op_integration::{IntegratedDhtOpsStore, IntegrationLimboStore},
-        element_buf::ElementBuf,
-        metadata::MetadataBuf,
-        validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
-        workspace::{Workspace, WorkspaceResult},
-    },
-};
+use super::error::WorkflowResult;
+use super::integrate_dht_ops_workflow::integrate_single_data;
+use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
+use super::sys_validation_workflow::counterfeit_check;
+use crate::core::queue_consumer::TriggerSender;
+use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
-use holochain_state::{
-    buffer::BufferedStore,
-    buffer::KvBufFresh,
-    db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
-    env::EnvironmentWrite,
-    error::DatabaseResult,
-    prelude::{EnvironmentRead, GetDb, PendingPrefix, Writer},
-};
-use holochain_types::{dht_op::DhtOp, Timestamp};
+use holochain_cascade::integrate_single_metadata;
+use holochain_lmdb::buffer::BufferedStore;
+use holochain_lmdb::buffer::KvBufFresh;
+use holochain_lmdb::db::INTEGRATED_DHT_OPS;
+use holochain_lmdb::db::INTEGRATION_LIMBO;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::error::DatabaseResult;
+use holochain_lmdb::prelude::EnvironmentRead;
+use holochain_lmdb::prelude::GetDb;
+use holochain_lmdb::prelude::IntegratedPrefix;
+use holochain_lmdb::prelude::PendingPrefix;
+use holochain_lmdb::prelude::Writer;
+use holochain_state::prelude::*;
+use holochain_types::prelude::*;
+use holochain_zome_types::query::HighestObserved;
 use tracing::instrument;
 
 #[cfg(test)]
@@ -36,6 +32,7 @@ pub async fn incoming_dht_ops_workflow(
     state_env: &EnvironmentWrite,
     mut sys_validation_trigger: TriggerSender,
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+    from_agent: Option<AgentPubKey>,
 ) -> WorkflowResult<()> {
     // set up our workspace
     let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into())?;
@@ -43,8 +40,15 @@ pub async fn incoming_dht_ops_workflow(
     // add incoming ops to the validation limbo
     for (hash, op) in ops {
         if !workspace.op_exists(&hash)? {
-            tracing::debug!(?op);
-            workspace.add_to_pending(hash, op).await?;
+            tracing::debug!(?hash, ?op);
+            if should_keep(&op).await? {
+                workspace.add_to_pending(hash, op, from_agent.clone())?;
+            } else {
+                tracing::warn!(
+                    msg = "Dropping op because it failed counterfeit checks",
+                    ?op
+                );
+            }
         }
     }
 
@@ -59,6 +63,14 @@ pub async fn incoming_dht_ops_workflow(
     Ok(())
 }
 
+#[instrument(skip(op))]
+/// If this op fails the counterfeit check it should be dropped
+async fn should_keep(op: &DhtOp) -> WorkflowResult<bool> {
+    let header = op.header();
+    let signature = op.signature();
+    Ok(counterfeit_check(signature, &header).await?)
+}
+
 #[allow(missing_docs)]
 pub struct IncomingDhtOpsWorkspace {
     pub integration_limbo: IntegrationLimboStore,
@@ -66,6 +78,7 @@ pub struct IncomingDhtOpsWorkspace {
     pub validation_limbo: ValidationLimboStore,
     pub element_pending: ElementBuf<PendingPrefix>,
     pub meta_pending: MetadataBuf<PendingPrefix>,
+    pub meta_integrated: MetadataBuf<IntegratedPrefix>,
 }
 
 impl Workspace for IncomingDhtOpsWorkspace {
@@ -73,6 +86,7 @@ impl Workspace for IncomingDhtOpsWorkspace {
         self.validation_limbo.0.flush_to_txn_ref(writer)?;
         self.element_pending.flush_to_txn_ref(writer)?;
         self.meta_pending.flush_to_txn_ref(writer)?;
+        self.meta_integrated.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
@@ -88,7 +102,9 @@ impl IncomingDhtOpsWorkspace {
         let validation_limbo = ValidationLimboStore::new(env.clone())?;
 
         let element_pending = ElementBuf::pending(env.clone())?;
-        let meta_pending = MetadataBuf::pending(env)?;
+        let meta_pending = MetadataBuf::pending(env.clone())?;
+
+        let meta_integrated = MetadataBuf::vault(env)?;
 
         Ok(Self {
             integration_limbo,
@@ -96,12 +112,30 @@ impl IncomingDhtOpsWorkspace {
             validation_limbo,
             element_pending,
             meta_pending,
+            meta_integrated,
         })
     }
 
-    async fn add_to_pending(&mut self, hash: DhtOpHash, op: DhtOp) -> DhtOpConvertResult<()> {
-        let basis = op.dht_basis().await;
-        let op_light = op.to_light().await;
+    fn add_to_pending(
+        &mut self,
+        hash: DhtOpHash,
+        op: DhtOp,
+        from_agent: Option<AgentPubKey>,
+    ) -> DhtOpConvertResult<()> {
+        let basis = op.dht_basis();
+        let op_light = op.to_light();
+        tracing::debug!(?op_light);
+
+        // register the highest observed header in an agents chain
+        if let DhtOp::RegisterAgentActivity(_, header) = &op {
+            self.meta_integrated.register_activity_observed(
+                header.author(),
+                HighestObserved {
+                    header_seq: header.header_seq(),
+                    hash: vec![op_light.header_hash().clone()],
+                },
+            )?;
+        }
 
         integrate_single_data(op, &mut self.element_pending)?;
         integrate_single_metadata(
@@ -116,7 +150,7 @@ impl IncomingDhtOpsWorkspace {
             time_added: Timestamp::now(),
             last_try: None,
             num_tries: 0,
-            pending_dependencies: PendingDependencies::new(),
+            from_agent,
         };
         self.validation_limbo.put(hash, vlv)?;
         Ok(())

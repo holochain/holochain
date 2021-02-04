@@ -1,26 +1,25 @@
-use crate::core::ribosome::error::{RibosomeError, RibosomeResult};
+use crate::core::ribosome::error::RibosomeError;
+use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use crate::core::state::cascade::error::CascadeError;
+use holochain_cascade::error::CascadeError;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-use crate::core::{workflow::integrate_dht_ops_workflow::integrate_to_cache, SourceChainError};
-use holo_hash::{EntryHash, HeaderHash};
-use holochain_p2p::actor::GetOptions;
-use holochain_zome_types::header::builder;
-use holochain_zome_types::DeleteInput;
-use holochain_zome_types::{element::SignedHeaderHashed, DeleteOutput};
+use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
+
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn delete<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: DeleteInput,
-) -> RibosomeResult<DeleteOutput> {
-    let deletes_address = input.into_inner();
+    input: HeaderHash,
+) -> RibosomeResult<HeaderHash> {
 
     let deletes_entry_address =
-        get_original_address(call_context.clone(), deletes_address.clone())?;
+        get_original_address(call_context.clone(), input.clone())?;
 
     let host_access = call_context.host_access();
 
@@ -30,7 +29,7 @@ pub fn delete<'a>(
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
         let header_builder = builder::Delete {
-            deletes_address,
+            deletes_address: input,
             deletes_entry_address,
         };
         let header_hash = source_chain.put(header_builder, None).await?;
@@ -38,15 +37,13 @@ pub fn delete<'a>(
             .get_element(&header_hash)?
             .expect("Element we just put in SourceChain must be gettable");
         tracing::debug!(in_delete_entry = ?header_hash);
-        integrate_to_cache(
+        integrate_to_authored(
             &element,
             workspace.source_chain.elements(),
-            &mut workspace.cache_meta,
+            &mut workspace.meta_authored,
         )
-        .await
-        .map_err(Box::new)
-        .map_err(SourceChainError::from)?;
-        Ok(DeleteOutput::new(header_hash))
+        .map_err(Box::new)?;
+        Ok(header_hash)
     })
 }
 
@@ -63,7 +60,7 @@ pub(crate) fn get_original_address<'a>(
         let mut cascade = workspace.cascade(network);
         // TODO: Think about what options to use here
         let maybe_original_element: Option<SignedHeaderHashed> = cascade
-            .get_details(address.clone().into(), GetOptions::default())
+            .get_details(address.clone().into(), GetOptions::content())
             .await?
             .map(|el| {
                 match el {
@@ -93,16 +90,17 @@ pub(crate) fn get_original_address<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::{core::workflow::CallZomeWorkspace, fixt::ZomeCallHostAccessFixturator};
-    use ::fixt::prelude::*;
     use hdk3::prelude::*;
+    use crate::core::workflow::CallZomeWorkspace;
+    use crate::fixt::ZomeCallHostAccessFixturator;
     use holochain_wasm_test_utils::TestWasm;
+    use ::fixt::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_delete_entry_test<'a>() {
-        holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
 
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
@@ -110,16 +108,17 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
 
         let thing_a: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "create", ());
-        let get_thing: GetOutput =
+        let get_thing: Option<Element> =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "read", thing_a);
-        match get_thing.into_inner() {
+        match get_thing {
             Some(element) => assert!(element.entry().as_option().is_some()),
 
             None => unreachable!(),
@@ -128,9 +127,9 @@ pub mod wasm_test {
         let _: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete", thing_a);
 
-        let get_thing: GetOutput =
+        let get_thing: Option<Element> =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "read", thing_a);
-        match get_thing.into_inner() {
+        match get_thing {
             None => {
                 // this is what we want, deletion => None for a get
             }

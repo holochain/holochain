@@ -1,5 +1,6 @@
 //! Definitions for events emited from the KitsuneP2p actor.
 
+use crate::types::agent_store::AgentInfoSigned;
 use std::sync::Arc;
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
@@ -36,13 +37,52 @@ pub struct SignNetworkDataEvt {
     /// The "agent" context.
     pub agent: Arc<super::KitsuneAgent>,
     /// The data to sign.
+    #[allow(clippy::rc_buffer)]
     pub data: Arc<Vec<u8>>,
+}
+
+#[derive(Debug)]
+/// Store the AgentInfo as signed by the agent themselves.
+pub struct PutAgentInfoSignedEvt {
+    /// The "space" context.
+    pub space: Arc<super::KitsuneSpace>,
+    /// The "agent" context.
+    pub agent: Arc<super::KitsuneAgent>,
+    /// The signed agent info.
+    pub agent_info_signed: AgentInfoSigned,
+}
+
+#[derive(Debug)]
+/// Get agent info as previously signed and put.
+pub struct GetAgentInfoSignedEvt {
+    /// The "space" context.
+    pub space: Arc<super::KitsuneSpace>,
+    /// The "agent" context.
+    pub agent: Arc<super::KitsuneAgent>,
+}
+
+#[derive(Debug)]
+/// Get agent info as previously signed and put.
+pub struct QueryAgentInfoSignedEvt {
+    /// The "space" context.
+    pub space: Arc<super::KitsuneSpace>,
+    /// The "agent" context.
+    pub agent: Arc<super::KitsuneAgent>,
 }
 
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
     /// KitsuneP2p actor.
     pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
+        /// We need to store signed agent info.
+        fn put_agent_info_signed(input: PutAgentInfoSignedEvt) -> ();
+
+        /// We need to get previously stored agent info.
+        fn get_agent_info_signed(input: GetAgentInfoSignedEvt) -> Option<crate::types::agent_store::AgentInfoSigned>;
+
+        /// We need to get previously stored agent info.
+        fn query_agent_info_signed(input: QueryAgentInfoSignedEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
+
         /// We are receiving a request from a remote node.
         fn call(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;
 

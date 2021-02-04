@@ -4,29 +4,34 @@ use ::fixt::prelude::*;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 
-use crate::entry_def::EntryVisibility;
-use crate::header::*;
-use crate::link::LinkTag;
-use crate::timestamp::Timestamp;
+use crate::{
+    entry_def::EntryVisibility, header::*, link::LinkTag, signal::AppSignal, timestamp::Timestamp,
+    validate::RequiredValidationType,
+};
 
 pub use holo_hash::fixt::*;
 
 fixturator!(
     Timestamp;
-    curve Empty (
+    curve Empty {
         Timestamp(I64Fixturator::new(Empty).next().unwrap(), U32Fixturator::new(Empty).next().unwrap())
-    );
-    curve Unpredictable (
+    };
+    curve Unpredictable {
         Timestamp(I64Fixturator::new(Unpredictable).next().unwrap(), U32Fixturator::new(Unpredictable).next().unwrap())
-    );
-    curve Predictable (
+    };
+    curve Predictable {
         Timestamp(I64Fixturator::new(Predictable).next().unwrap(), U32Fixturator::new(Predictable).next().unwrap())
-    );
+    };
 );
 
 fixturator!(
     EntryVisibility;
     unit variants [ Public Private ] empty Public;
+);
+
+fixturator!(
+    RequiredValidationType;
+    unit variants [ Element SubChain Full ] empty Element;
 );
 
 fixturator!(
@@ -57,9 +62,9 @@ fixturator! {
         MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
         MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(fixt!(SerializedBytes)),
     };
-    curve Predictable match MaybeSerializedBytesVariant::nth(self.0.index) {
+    curve Predictable match MaybeSerializedBytesVariant::nth(get_fixt_index!()) {
         MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
-        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(SerializedBytesFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
+        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
     };
 }
 
@@ -73,9 +78,9 @@ fixturator! {
         EntryTypeVariant::CapClaim => EntryType::CapClaim,
         EntryTypeVariant::CapGrant => EntryType::CapGrant,
     };
-    curve Predictable match EntryTypeVariant::nth(self.0.index) {
+    curve Predictable match EntryTypeVariant::nth(get_fixt_index!()) {
         EntryTypeVariant::AgentPubKey => EntryType::AgentPubKey,
-        EntryTypeVariant::App => EntryType::App(AppEntryTypeFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
+        EntryTypeVariant::App => EntryType::App(AppEntryTypeFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
         EntryTypeVariant::CapClaim => EntryType::CapClaim,
         EntryTypeVariant::CapGrant => EntryType::CapGrant,
     };
@@ -133,6 +138,11 @@ fixturator!(
 
 fixturator!(
     LinkTag; from Bytes;
+);
+
+fixturator!(
+    AppSignal;
+    constructor fn new(SerializedBytes);
 );
 
 pub struct KnownCreateLink {

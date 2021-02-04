@@ -1,35 +1,33 @@
 use hdk3::prelude::*;
-use test_wasm_common::TestBool;
-use test_wasm_common::TestString;
 
 entry_defs![Path::entry_def()];
 
 #[hdk_extern]
-fn hash(path_string: TestString) -> ExternResult<EntryHash> {
-    Path::from(path_string.0).hash()
+fn hash(path_string: String) -> ExternResult<EntryHash> {
+    Path::from(path_string).hash()
 }
 
 #[hdk_extern]
-fn exists(path_string: TestString) -> ExternResult<TestBool> {
-    Ok(Path::from(path_string.0).exists()?.into())
+fn exists(path_string: String) -> ExternResult<bool> {
+    Ok(Path::from(path_string).exists()?)
 }
 
 #[hdk_extern]
-fn ensure(path_string: TestString) -> ExternResult<()> {
-    Path::from(path_string.0).ensure()
+fn ensure(path_string: String) -> ExternResult<()> {
+    Path::from(path_string).ensure()
 }
 
 #[hdk_extern]
-fn delete_link(delete_link: DeleteLinkInput) -> ExternResult<HeaderHash> {
-    Ok(delete_link!(delete_link.into_inner())?)
+fn delete_link(delete_link: HeaderHash) -> ExternResult<HeaderHash> {
+    hdk3::prelude::delete_link(delete_link)
 }
 
 #[hdk_extern]
-fn children(path_string: TestString) -> ExternResult<Links> {
-    Path::from(path_string.0).children()
+fn children(path_string: String) -> ExternResult<Links> {
+    Path::from(path_string).children()
 }
 
 #[hdk_extern]
-fn children_details(path_string: TestString) -> ExternResult<LinkDetails> {
-    Path::from(path_string.0).children_details()
+fn children_details(path_string: String) -> ExternResult<LinkDetails> {
+    Path::from(path_string).children_details()
 }

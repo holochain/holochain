@@ -10,29 +10,23 @@
 //!
 //!
 
-use super::{
-    error::WorkflowResult,
-    produce_dht_ops_workflow::dht_op_light::{error::DhtOpConvertError, light_to_op},
-};
-use crate::core::{
-    queue_consumer::{OneshotWriter, WorkComplete},
-    state::{
-        dht_op_integration::AuthoredDhtOpsStore,
-        element_buf::ElementBuf,
-        workspace::{Workspace, WorkspaceResult},
-    },
-};
+use super::error::WorkflowResult;
+use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
+use super::produce_dht_ops_workflow::dht_op_light::light_to_op;
+use crate::core::queue_consumer::OneshotWriter;
+use crate::core::queue_consumer::WorkComplete;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
+use holochain_lmdb::buffer::BufferedStore;
+use holochain_lmdb::buffer::KvBufFresh;
+use holochain_lmdb::db::AUTHORED_DHT_OPS;
+use holochain_lmdb::fresh_reader;
+use holochain_lmdb::prelude::*;
+use holochain_lmdb::transaction::Writer;
 use holochain_p2p::HolochainP2pCell;
-use holochain_state::{
-    buffer::{BufferedStore, KvBufFresh},
-    db::AUTHORED_DHT_OPS,
-    fresh_reader,
-    prelude::*,
-    transaction::Writer,
-};
-use holochain_types::{dht_op::DhtOp, Timestamp};
+use holochain_p2p::HolochainP2pCellT;
+use holochain_state::prelude::*;
+use holochain_types::prelude::*;
 use std::collections::HashMap;
 use std::time;
 use tracing::*;
@@ -53,7 +47,7 @@ pub struct PublishDhtOpsWorkspace {
     /// Database of authored DhtOps, with data about prior publishing
     authored_dht_ops: AuthoredDhtOpsStore,
     /// Element store for looking up data to construct ops
-    elements: ElementBuf,
+    elements: ElementBuf<AuthoredPrefix>,
 }
 
 #[instrument(skip(workspace, writer, network))]
@@ -106,7 +100,12 @@ pub async fn publish_dht_ops_workflow_inner(
                     .unwrap_or(true);
                 if needs_publish {
                     r.last_publish_time = Some(now_ts);
-                    Some((DhtOpHash::with_pre_hashed(k.to_vec()), r))
+                    // HACK: Incrementing the receipt count to prevent publishing
+                    // forever although without receipts this could lead to data loss
+                    // and relies on gossip for data integrity.
+                    // This should be removed when receipts are implemented.
+                    r.receipt_count += 1;
+                    Some((DhtOpHash::from_raw_39_panicky(k.to_vec()), r))
                 } else {
                     None
                 }
@@ -124,7 +123,7 @@ pub async fn publish_dht_ops_workflow_inner(
         let op = value.op.clone();
         workspace.authored().put(op_hash.clone(), value)?;
 
-        let op = match light_to_op(op, workspace.elements()).await {
+        let op = match light_to_op(op, workspace.elements()) {
             // Ignore StoreEntry ops on private
             Err(DhtOpConvertError::StoreEntryOnPrivate) => continue,
             r => r?,
@@ -132,7 +131,7 @@ pub async fn publish_dht_ops_workflow_inner(
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
-            .entry(op.dht_basis().await)
+            .entry(op.dht_basis())
             .or_insert_with(Vec::new)
             .push((op_hash, op));
     }
@@ -152,7 +151,7 @@ impl PublishDhtOpsWorkspace {
         let db = env.get_db(&*AUTHORED_DHT_OPS)?;
         let authored_dht_ops = KvBufFresh::new(env.clone(), db);
         // Note that this must always be false as we don't want private entries being published
-        let elements = ElementBuf::vault(env, false)?;
+        let elements = ElementBuf::authored(env, false)?;
         Ok(Self {
             authored_dht_ops,
             elements,
@@ -163,7 +162,7 @@ impl PublishDhtOpsWorkspace {
         &mut self.authored_dht_ops
     }
 
-    fn elements(&self) -> &ElementBuf {
+    fn elements(&self) -> &ElementBuf<AuthoredPrefix> {
         &self.elements
     }
 }
@@ -171,52 +170,27 @@ impl PublishDhtOpsWorkspace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        core::{
-            queue_consumer::TriggerSender,
-            state::{dht_op_integration::AuthoredDhtOpsValue, source_chain::SourceChain},
-            workflow::{
-                fake_genesis,
-                produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace},
-            },
-            SourceChainError,
-        },
-        fixt::{CreateLinkFixturator, EntryFixturator},
-    };
+    use crate::core::queue_consumer::TriggerSender;
+    use crate::core::workflow::fake_genesis;
+    use crate::core::workflow::produce_dht_ops_workflow::produce_dht_ops_workflow;
+    use crate::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
+    use crate::core::SourceChainError;
+    use crate::fixt::CreateLinkFixturator;
+    use crate::fixt::EntryFixturator;
+    use crate::test_utils::test_network_with_events;
+    use crate::test_utils::TestNetwork;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
-    use ghost_actor::GhostControlSender;
-    use holo_hash::fixt::*;
-    use holochain_p2p::{
-        actor::{HolochainP2p, HolochainP2pRefToCell, HolochainP2pSender},
-        spawn_holochain_p2p,
-    };
-    use holochain_state::{
-        buffer::BufferedStore,
-        env::{EnvironmentWrite, ReadManager, WriteManager},
-        error::DatabaseError,
-        test_utils::test_cell_env,
-    };
-    use holochain_types::{
-        dht_op::{DhtOp, DhtOpHashed, DhtOpLight},
-        fixt::{AppEntryTypeFixturator, SignatureFixturator},
-        observability, HeaderHashed,
-    };
-    use holochain_zome_types::entry_def::EntryVisibility;
-    use holochain_zome_types::{
-        element::SignedHeaderHashed,
-        header::{builder, EntryType, Update},
-    };
+    use holochain_p2p::actor::HolochainP2pSender;
+    use holochain_p2p::HolochainP2pRef;
     use matches::assert_matches;
-    use std::{
-        collections::HashMap,
-        convert::TryInto,
-        sync::{
-            atomic::{AtomicU32, Ordering},
-            Arc,
-        },
-        time::Duration,
-    };
+    use observability;
+    use std::collections::HashMap;
+    use std::convert::TryInto;
+    use std::sync::atomic::AtomicU32;
+    use std::sync::atomic::Ordering;
+    use std::sync::Arc;
+    use std::time::Duration;
     use test_case::test_case;
     use tokio::task::JoinHandle;
     use tracing_futures::Instrument;
@@ -230,7 +204,7 @@ mod tests {
         num_hash: u32,
         panic_on_publish: bool,
     ) -> (
-        ghost_actor::GhostSender<HolochainP2p>,
+        TestNetwork,
         HolochainP2pCell,
         JoinHandle<()>,
         tokio::sync::oneshot::Receiver<()>,
@@ -289,9 +263,21 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Create the network
-        let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
+        let filter_events = |evt: &_| match evt {
+            holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
+            _ => false,
+        };
+        let (tx, mut recv) = tokio::sync::mpsc::channel(10);
+        let test_network = test_network_with_events(
+            Some(dna.clone()),
+            Some(agents[0].clone()),
+            filter_events,
+            tx,
+        )
+        .await;
         let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
-        let cell_network = network.to_cell(dna.clone(), agents[0].clone());
+        let cell_network = test_network.cell_network();
+        let network = test_network.network();
         let mut recv_count: u32 = 0;
         let total_expected = num_agents * num_hash;
 
@@ -315,18 +301,21 @@ mod tests {
                                 break;
                             }
                         }
-                        _ => (),
+                        _ => {}
                     }
                 }
             }
         });
 
         // Join some agents onto the network
-        for agent in agents {
-            network.join(dna.clone(), agent).await.unwrap();
+        // Skip the first agent as it has already joined
+        for agent in agents.into_iter().skip(1) {
+            HolochainP2pRef::join(&network, dna.clone(), agent)
+                .await
+                .unwrap();
         }
 
-        (network, cell_network, recv_task, rx_complete)
+        (test_network, cell_network, recv_task, rx_complete)
     }
 
     /// Call the workflow
@@ -356,7 +345,7 @@ mod tests {
             let env = test_env.env();
 
             // Setup
-            let (network, cell_network, recv_task, rx_complete) =
+            let (_network, cell_network, recv_task, rx_complete) =
                 setup(env.clone(), num_agents, num_hash, false).await;
 
             call_workflow(env.clone().into(), cell_network).await;
@@ -381,9 +370,6 @@ mod tests {
             };
 
             // Shutdown
-            tokio::time::timeout(Duration::from_secs(10), network.ghost_actor_shutdown())
-                .await
-                .ok();
             tokio::time::timeout(Duration::from_secs(10), check)
                 .await
                 .ok();
@@ -411,7 +397,7 @@ mod tests {
             let env_ref = env.guard();
 
             // Setup
-            let (network, cell_network, recv_task, _) =
+            let (_network, cell_network, recv_task, _) =
                 setup(env.clone(), num_agents, num_hash, true).await;
 
             // Update the authored to have > R counts
@@ -426,7 +412,7 @@ mod tests {
                     .unwrap()
                     .map(|(k, mut v)| {
                         v.receipt_count = DEFAULT_RECEIPT_BUNDLE_SIZE;
-                        Ok((DhtOpHash::with_pre_hashed(k.to_vec()), v))
+                        Ok((DhtOpHash::from_raw_39_panicky(k.to_vec()), v))
                     })
                     .collect::<Vec<_>>()
                     .unwrap();
@@ -454,9 +440,6 @@ mod tests {
             .await;
 
             // Shutdown
-            tokio::time::timeout(Duration::from_secs(10), network.ghost_actor_shutdown())
-                .await
-                .ok();
             tokio::time::timeout(Duration::from_secs(10), recv_task)
                 .await
                 .ok();
@@ -472,12 +455,12 @@ mod tests {
     /// - Add / Remove links: Currently publish all.
     /// ## Explication
     /// This test is a little big so a quick run down:
-    /// 1. All ops that can contain entries are created with entries (StoreElement, StoreEntry and RegisterUpdatedBy)
+    /// 1. All ops that can contain entries are created with entries (StoreElement, StoreEntry and RegisterUpdatedContent)
     /// 2. Then we create identical versions of these ops without the entires (set to None) (expect StoreEntry)
     /// 3. The workflow is run and the ops are sent to the network receiver
     /// 4. We check that the correct number of ops are received (so we know there were no other ops sent)
     /// 5. StoreEntry is __not__ expected so would show up as an extra if it was produced
-    /// 6. Every op that is received (StoreElement and RegisterUpdatedBy) is checked to match the expected versions (entries removed)
+    /// 6. Every op that is received (StoreElement and RegisterUpdatedContent) is checked to match the expected versions (entries removed)
     /// 7. Each op also has a count to check for duplicates
     #[test_case(1)]
     #[test_case(10)]
@@ -586,6 +569,7 @@ mod tests {
                 // We are only expecting Store Element and Register Replaced By ops and nothing else
                 let store_element_count = Arc::new(AtomicU32::new(0));
                 let register_replaced_by_count = Arc::new(AtomicU32::new(0));
+                let register_updated_element_count = Arc::new(AtomicU32::new(0));
                 let register_agent_activity_count = Arc::new(AtomicU32::new(0));
 
                 let expected = {
@@ -612,7 +596,7 @@ mod tests {
 
                     map.insert(op_hash, (expected_op, store_element_count.clone()));
 
-                    // Create RegisterUpdatedBy
+                    // Create RegisterUpdatedContent
                     // Op is expected to not contain the Entry
                     let (entry_update_header, sig) =
                         entry_update_header.into_header_and_signature();
@@ -624,11 +608,25 @@ mod tests {
 
                     map.insert(op_hash, (expected_op, store_element_count.clone()));
 
-                    let expected_op =
-                        DhtOp::RegisterUpdatedBy(sig.clone(), entry_update_header.clone());
+                    let expected_op = DhtOp::RegisterUpdatedContent(
+                        sig.clone(),
+                        entry_update_header.clone(),
+                        None,
+                    );
                     let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
 
                     map.insert(op_hash, (expected_op, register_replaced_by_count.clone()));
+                    let expected_op = DhtOp::RegisterUpdatedElement(
+                        sig.clone(),
+                        entry_update_header.clone(),
+                        None,
+                    );
+                    let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
+
+                    map.insert(
+                        op_hash,
+                        (expected_op, register_updated_element_count.clone()),
+                    );
                     let expected_op = DhtOp::RegisterAgentActivity(sig, entry_update_header.into());
                     let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
                     map.insert(
@@ -656,11 +654,23 @@ mod tests {
                     .collect::<Vec<_>>();
 
                 // Create the network
-                let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
-                let cell_network = network.to_cell(dna.clone(), agents[0].clone());
+
+                let filter_events = |evt: &_| match evt {
+                    holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
+                    _ => false,
+                };
+                let (tx, mut recv) = tokio::sync::mpsc::channel(10);
+                let test_network = test_network_with_events(
+                    Some(dna.clone()),
+                    Some(agents[0].clone()),
+                    filter_events,
+                    tx,
+                )
+                .await;
+                let cell_network = test_network.cell_network();
                 let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
                 // We are expecting five ops per agent
-                let total_expected = num_agents * 5;
+                let total_expected = num_agents * 6;
                 let mut recv_count: u32 = 0;
 
                 // Receive events and increment count
@@ -685,7 +695,7 @@ mod tests {
                                         match expected.get(&op_hash) {
                                             Some((expected_op, count)) => {
                                                 assert_eq!(&op, expected_op);
-                                                assert_eq!(dht_hash, expected_op.dht_basis().await);
+                                                assert_eq!(dht_hash, expected_op.dht_basis());
                                                 count.fetch_add(1, Ordering::SeqCst);
                                             }
                                             None => panic!(
@@ -700,7 +710,7 @@ mod tests {
                                         tx_complete.take().unwrap().send(()).unwrap();
                                     }
                                 }
-                                _ => (),
+                                _ => {}
                             }
                         }
                     }
@@ -708,8 +718,13 @@ mod tests {
                 });
 
                 // Join some agents onto the network
-                for agent in agents {
-                    network.join(dna.clone(), agent).await.unwrap();
+                {
+                    let network = test_network.network();
+                    for agent in agents {
+                        HolochainP2pRef::join(&network, dna.clone(), agent)
+                            .await
+                            .unwrap()
+                    }
                 }
 
                 call_workflow(env.clone().into(), cell_network).await;
@@ -727,6 +742,10 @@ mod tests {
                     num_agents * 1,
                     register_replaced_by_count.load(Ordering::SeqCst)
                 );
+                assert_eq!(
+                    num_agents * 1,
+                    register_updated_element_count.load(Ordering::SeqCst)
+                );
                 assert_eq!(num_agents * 2, store_element_count.load(Ordering::SeqCst));
                 assert_eq!(
                     num_agents * 2,
@@ -734,9 +753,6 @@ mod tests {
                 );
 
                 // Shutdown
-                tokio::time::timeout(Duration::from_secs(10), network.ghost_actor_shutdown())
-                    .await
-                    .ok();
                 tokio::time::timeout(Duration::from_secs(10), recv_task)
                     .await
                     .ok();

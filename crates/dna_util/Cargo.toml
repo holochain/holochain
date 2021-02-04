@@ -12,14 +12,15 @@ edition = "2018"
 
 [dependencies]
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
-holochain_serialized_bytes = "=0.0.43"
-holochain_types = { version = "0.0.1", path = "../types" }
-holochain_zome_types = { path = "../zome_types" }
+holochain = { path = "../holochain" }
+holochain_serialized_bytes = "=0.0.48"
+holochain_types = { version = "0.0.1", path = "../holochain_types" }
+holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
 serde = { version = "1.0.104", features = [ "derive" ] }
 serde_bytes = "0.11"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 structopt = "0.3.11"
-thiserror = "1.0.10"
+thiserror = "1.0.22"
 tokio = { version = "0.2", features = [ "full" ] }
 
 [dev-dependencies]

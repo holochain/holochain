@@ -38,9 +38,10 @@
 //! ```
 
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::{wasm::DnaWasm, zome::Zome, DnaDef, DnaFile};
+use holochain_types::prelude::*;
 use holochain_zome_types::zome::ZomeName;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 /// DnaUtilError type.
 #[derive(Debug, thiserror::Error)]
@@ -133,7 +134,7 @@ pub async fn expand(dna_file_path: &impl AsRef<std::path::Path>) -> DnaUtilResul
     let dna_file = DnaFile::from_file_content(&tokio::fs::read(dna_file_path).await?).await?;
 
     for (zome_name, zome) in &dna_file.dna().zomes {
-        let wasm_hash = &zome.wasm_hash;
+        let wasm_hash = &zome.wasm_hash(zome_name)?;
         let wasm = dna_file.code().get(wasm_hash).expect("dna_file corrupted");
         let mut wasm_filename = dir.clone();
         wasm_filename.push(format!("{}.wasm", zome_name));
@@ -142,7 +143,7 @@ pub async fn expand(dna_file_path: &impl AsRef<std::path::Path>) -> DnaUtilResul
 
     // Might be more efficient to extract the DnaDef / Wasm from the DnaFile
     // then pass by value here.
-    let dna_json = DnaDefJson::from_dna_def(dna_file.dna().clone())?;
+    let dna_json = DnaDefJson::from_dna_def(dna_file.dna().clone().into_content())?;
     let dna_json = serde_json::to_string_pretty(&dna_json)?;
 
     let mut json_filename = dir.clone();
@@ -236,7 +237,7 @@ impl DnaDefJson {
 
             let wasm: DnaWasm = zome_content.into();
             let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
-            zomes.push((zome_name.clone(), Zome { wasm_hash }));
+            zomes.push((zome_name.clone(), WasmZome { wasm_hash }.into()));
             wasm_list.push(wasm);
         }
 
@@ -278,10 +279,20 @@ mod tests {
             .unwrap();
 
         let dna_filename = tmp_dir.path().join("test-dna.dna.gz");
+        let content1 = dna_file.to_file_content().await.unwrap();
 
-        tokio::fs::write(&dna_filename, dna_file.to_file_content().await.unwrap())
+        tokio::fs::write(&dna_filename, content1.clone())
             .await
             .unwrap();
+
+        {
+            let dna_file_path = dna_filename.as_path().canonicalize().unwrap();
+            let dir = dna_file_path_convert(&dna_file_path, true).unwrap();
+            tokio::fs::create_dir_all(&dir).await.unwrap();
+            let content2 = tokio::fs::read(dna_file_path).await.unwrap();
+
+            assert_eq!(content1, content2);
+        };
 
         expand(&dna_filename).await.unwrap();
 
@@ -291,8 +302,8 @@ mod tests {
             .await
             .unwrap();
 
-        let dna_file_content = tokio::fs::read(&dna_filename).await.unwrap();
-        let dna_file2 = DnaFile::from_file_content(&dna_file_content).await.unwrap();
+        let content = tokio::fs::read(&dna_filename).await.unwrap();
+        let dna_file2 = DnaFile::from_file_content(&content).await.unwrap();
 
         assert_eq!(dna_file, dna_file2);
     }

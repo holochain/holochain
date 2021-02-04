@@ -13,9 +13,10 @@ impl<O: 'static + Clone + Send + Sync> AsyncLazy<O> {
         F: 'static + std::future::Future<Output = O> + Send,
     {
         let (s, r) = tokio::sync::watch::channel(None);
-        tokio::task::spawn(async move {
+        crate::metrics::metric_task(async move {
             let val: O = f.await;
             let _ = s.broadcast(Some(val));
+            <Result<(), ()>>::Ok(())
         });
         Self(r)
     }
@@ -29,7 +30,7 @@ impl<O: 'static + Clone + Send + Sync> AsyncLazy<O> {
                 match r.recv().await {
                     Some(Some(v)) => return v,
                     None => panic!("sender task dropped"),
-                    _ => (),
+                    _ => {}
                 }
             }
         }

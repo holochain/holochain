@@ -25,7 +25,7 @@ pub(crate) enum WireMessage {
     CallRemote {
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: CapSecret,
+        cap: Option<CapSecret>,
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
     },
@@ -50,29 +50,36 @@ pub(crate) enum WireMessage {
         link_key: WireLinkMetaKey,
         options: event::GetLinksOptions,
     },
+    GetAgentActivity {
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: event::GetActivityOptions,
+    },
+    GetValidationPackage {
+        header_hash: HeaderHash,
+    },
 }
 
 impl WireMessage {
-    pub fn encode(self) -> Result<Vec<u8>, SerializedBytesError> {
-        Ok(UnsafeBytes::from(SerializedBytes::try_from(self)?).into())
+    pub fn encode(&self) -> Result<Vec<u8>, SerializedBytesError> {
+        holochain_serialized_bytes::encode(&self)
     }
 
-    pub fn decode(data: Vec<u8>) -> Result<Self, SerializedBytesError> {
-        let request: SerializedBytes = UnsafeBytes::from(data).into();
-        Ok(request.try_into()?)
+    pub fn decode(data: &[u8]) -> Result<Self, SerializedBytesError> {
+        holochain_serialized_bytes::decode(&data)
     }
 
     pub fn call_remote(
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: CapSecret,
-        request: SerializedBytes,
+        cap: Option<CapSecret>,
+        payload: ExternIO,
     ) -> WireMessage {
         Self::CallRemote {
             zome_name,
             fn_name,
             cap,
-            data: UnsafeBytes::from(request).into(),
+            data: payload.into_vec(),
         }
     }
 
@@ -107,5 +114,20 @@ impl WireMessage {
 
     pub fn get_links(link_key: WireLinkMetaKey, options: event::GetLinksOptions) -> WireMessage {
         Self::GetLinks { link_key, options }
+    }
+
+    pub fn get_agent_activity(
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: event::GetActivityOptions,
+    ) -> WireMessage {
+        Self::GetAgentActivity {
+            agent,
+            query,
+            options,
+        }
+    }
+    pub fn get_validation_package(header_hash: HeaderHash) -> WireMessage {
+        Self::GetValidationPackage { header_hash }
     }
 }

@@ -1,5 +1,6 @@
 use super::*;
 use holo_hash::EntryHash;
+use holochain_cascade::get_header;
 
 pub fn disintegrate_single_metadata<C, P>(
     op: DhtOpLight,
@@ -22,9 +23,10 @@ where
         DhtOpLight::RegisterAgentActivity(hash, _) => {
             let header = get_header(hash, element_store)?;
             // register agent activity on this agents pub key
-            meta_store.deregister_activity(header)?;
+            meta_store.deregister_activity(&header, ValidationStatus::Valid)?;
         }
-        DhtOpLight::RegisterUpdatedBy(hash, _, _) => {
+        DhtOpLight::RegisterUpdatedContent(hash, _, _)
+        | DhtOpLight::RegisterUpdatedElement(hash, _, _) => {
             let header = get_header(hash, element_store)?.try_into()?;
             meta_store.deregister_update(header)?;
         }
@@ -59,7 +61,10 @@ pub fn disintegrate_single_data<P: PrefixType>(op: DhtOpLight, element_store: &m
         DhtOpLight::RegisterAgentActivity(header, _) => {
             delete_data(header, None, element_store);
         }
-        DhtOpLight::RegisterUpdatedBy(entry_update, _, _) => {
+        DhtOpLight::RegisterUpdatedContent(entry_update, _, _) => {
+            delete_data(entry_update, None, element_store);
+        }
+        DhtOpLight::RegisterUpdatedElement(entry_update, _, _) => {
             delete_data(entry_update, None, element_store);
         }
         DhtOpLight::RegisterDeletedEntryHeader(element_delete, _) => {
@@ -91,7 +96,10 @@ pub fn reintegrate_single_data<P: PrefixType>(op: DhtOpLight, element_store: &mu
         DhtOpLight::RegisterAgentActivity(header, _) => {
             cancel_delete(header, None, element_store);
         }
-        DhtOpLight::RegisterUpdatedBy(entry_update, _, _) => {
+        DhtOpLight::RegisterUpdatedContent(entry_update, _, _) => {
+            cancel_delete(entry_update, None, element_store);
+        }
+        DhtOpLight::RegisterUpdatedElement(entry_update, _, _) => {
             cancel_delete(entry_update, None, element_store);
         }
         DhtOpLight::RegisterDeletedEntryHeader(element_delete, _) => {

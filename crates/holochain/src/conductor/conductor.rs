@@ -8,66 +8,78 @@
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
-use super::{
-    api::{CellConductorApi, CellConductorApiT, RealAdminInterfaceApi, RealAppInterfaceApi},
-    config::{AdminInterfaceConfig, InterfaceDriver},
-    dna_store::{DnaDefBuf, DnaStore, RealDnaStore},
-    entry_def_store::{get_entry_defs, EntryDefBuf, EntryDefBufferKey},
-    error::{ConductorError, CreateAppError},
-    handle::ConductorHandleImpl,
-    interface::{
-        error::InterfaceResult,
-        websocket::{
-            spawn_admin_interface_task, spawn_app_interface_task, spawn_websocket_listener,
-            SIGNAL_BUFFER_SIZE,
-        },
-    },
-    manager::{
-        keep_alive_task, spawn_task_manager, ManagedTaskAdd, ManagedTaskHandle,
-        TaskManagerRunHandle,
-    },
-    paths::EnvironmentRootPath,
-    state::ConductorState,
-    CellError,
-};
-use crate::{
-    conductor::{
-        api::error::ConductorApiResult, cell::Cell, config::ConductorConfig,
-        dna_store::MockDnaStore, error::ConductorResult, handle::ConductorHandle,
-    },
-    core::state::{source_chain::SourceChainBuf, wasm::WasmBuf},
-};
-use holochain_keystore::{
-    test_keystore::{spawn_test_keystore, MockKeypair},
-    KeystoreApiSender, KeystoreSender,
-};
-use holochain_state::{
-    buffer::BufferedStore,
-    buffer::{KvStore, KvStoreT},
-    db,
-    env::{EnvironmentKind, EnvironmentWrite, ReadManager},
-    exports::SingleStore,
-    fresh_reader,
-    prelude::*,
-};
-use holochain_types::{
-    app::{AppId, InstalledApp, InstalledCell, MembraneProof},
-    cell::CellId,
-    dna::{wasm::DnaWasmHashed, DnaFile},
-};
+use super::api::RealAdminInterfaceApi;
+use super::api::RealAppInterfaceApi;
+use super::config::AdminInterfaceConfig;
+use super::config::InterfaceDriver;
+use super::dna_store::DnaDefBuf;
+use super::dna_store::DnaStore;
+use super::dna_store::RealDnaStore;
+use super::entry_def_store::get_entry_defs;
+use super::entry_def_store::EntryDefBuf;
+use super::entry_def_store::EntryDefBufferKey;
+use super::error::ConductorError;
+use super::error::CreateAppError;
+use super::handle::ConductorHandleImpl;
+use super::interface::error::InterfaceResult;
+use super::interface::websocket::spawn_admin_interface_task;
+use super::interface::websocket::spawn_app_interface_task;
+use super::interface::websocket::spawn_websocket_listener;
+use super::interface::websocket::SIGNAL_BUFFER_SIZE;
+use super::interface::SignalBroadcaster;
+use super::manager::keep_alive_task;
+use super::manager::spawn_task_manager;
+use super::manager::ManagedTaskAdd;
+use super::manager::ManagedTaskHandle;
+use super::manager::TaskManagerRunHandle;
+use super::p2p_store::all_agent_infos;
+use super::p2p_store::get_single_agent_info;
+use super::p2p_store::inject_agent_infos;
+use super::paths::EnvironmentRootPath;
+use super::state::AppInterfaceId;
+use super::state::ConductorState;
+use super::CellError;
+use super::{api::CellConductorApi, state::AppInterfaceConfig};
+use super::{api::CellConductorApiT, interface::AppInterfaceRuntime};
+use crate::conductor::api::error::ConductorApiResult;
+use crate::conductor::cell::Cell;
+use crate::conductor::config::ConductorConfig;
+use crate::conductor::dna_store::MockDnaStore;
+use crate::conductor::error::ConductorResult;
+use crate::conductor::handle::ConductorHandle;
+use crate::core::queue_consumer::InitialQueueTriggers;
+pub use builder::*;
+use fallible_iterator::FallibleIterator;
+use futures::future;
+use futures::future::TryFutureExt;
+use futures::stream::StreamExt;
+use holo_hash::DnaHash;
+use holochain_keystore::lair_keystore::spawn_lair_keystore;
+use holochain_keystore::test_keystore::spawn_test_keystore;
+use holochain_keystore::KeystoreSender;
+use holochain_keystore::KeystoreSenderExt;
+use holochain_lmdb::buffer::BufferedStore;
+use holochain_lmdb::buffer::KvStore;
+use holochain_lmdb::buffer::KvStoreT;
+use holochain_lmdb::db;
+use holochain_lmdb::env::EnvironmentKind;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::env::ReadManager;
+use holochain_lmdb::exports::SingleStore;
+use holochain_lmdb::fresh_reader;
+use holochain_lmdb::prelude::*;
+use holochain_state::source_chain::SourceChainBuf;
+use holochain_state::wasm::WasmBuf;
+use holochain_types::prelude::*;
+use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::mpsc;
+use tokio::sync::RwLock;
 use tracing::*;
 
-pub use builder::*;
-use futures::future::{self, TryFutureExt};
-use holo_hash::DnaHash;
-
-#[cfg(test)]
-use super::handle::mock::MockConductorHandle;
-use fallible_iterator::FallibleIterator;
-use holochain_zome_types::entry_def::EntryDef;
+#[cfg(any(test, feature = "test_utils"))]
+use super::handle::MockConductorHandleT;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -83,7 +95,7 @@ struct CellItem<CA>
 where
     CA: CellConductorApiT,
 {
-    cell: Cell<CA>,
+    cell: Arc<Cell<CA>>,
     _state: CellState,
 }
 
@@ -105,6 +117,9 @@ where
     /// An LMDB environment for storing wasm
     wasm_env: EnvironmentWrite,
 
+    /// The LMDB environment for storing AgentInfoSigned
+    p2p_env: EnvironmentWrite,
+
     /// The database for persisting [ConductorState]
     state_db: ConductorStateDb,
 
@@ -116,6 +131,9 @@ where
     /// This exists so that we can run tests and bind to port 0, and find out
     /// the dynamically allocated port later.
     admin_websocket_ports: Vec<u16>,
+
+    /// Collection app interface data, keyed by id
+    app_interfaces: HashMap<AppInterfaceId, AppInterfaceRuntime>,
 
     /// Channel on which to send info about tasks we want to manage
     managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,
@@ -168,12 +186,12 @@ impl<DS> Conductor<DS>
 where
     DS: DnaStore + 'static,
 {
-    pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<&Cell> {
+    pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
         let item = self
             .cells
             .get(cell_id)
             .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
-        Ok(&item.cell)
+        Ok(item.cell.clone())
     }
 
     /// A gate to put at the top of public functions to ensure that work is not
@@ -194,8 +212,15 @@ where
         &mut self.dna_store
     }
 
+    /// Broadcasts the shutdown signal to all managed tasks.
+    /// To actually wait for these tasks to complete, be sure to
+    /// `take_shutdown_handle` to await for completion.
     pub(super) fn shutdown(&mut self) {
         self.shutting_down = true;
+        tracing::info!(
+            "Sending shutdown signal to {} managed tasks.",
+            self.managed_task_stop_broadcaster.receiver_count(),
+        );
         self.managed_task_stop_broadcaster
             .send(())
             .map(|_| ())
@@ -204,6 +229,7 @@ where
             })
     }
 
+    /// Return the handle which waits for the task manager task to complete
     pub(super) fn take_shutdown_handle(&mut self) -> Option<TaskManagerRunHandle> {
         self.task_manager_run_handle.take()
     }
@@ -287,15 +313,62 @@ where
         port: u16,
         handle: ConductorHandle,
     ) -> ConductorResult<u16> {
-        let app_api = RealAppInterfaceApi::new(handle);
-        let (signal_broadcaster, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
+        let interface_id: AppInterfaceId = format!("interface-{}", port).into();
+        let app_api = RealAppInterfaceApi::new(handle, interface_id.clone());
+        // This receiver is thrown away because we can produce infinite new
+        // receivers from the Sender
+        let (signal_tx, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
         let stop_rx = self.managed_task_stop_broadcaster.subscribe();
-        let (port, task) = spawn_app_interface_task(port, app_api, signal_broadcaster, stop_rx)
+        let (port, task) = spawn_app_interface_task(port, app_api, signal_tx.clone(), stop_rx)
             .await
             .map_err(Box::new)?;
-        // TODO: RELIABILITY: Handle this task by restating it if it fails and log the error
+        // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
         self.manage_task(ManagedTaskAdd::dont_handle(task)).await?;
+        let interface = AppInterfaceRuntime::Websocket { signal_tx };
+
+        if self.app_interfaces.contains_key(&interface_id) {
+            return Err(ConductorError::AppInterfaceIdCollision(interface_id));
+        }
+
+        self.app_interfaces.insert(interface_id.clone(), interface);
+        let config = AppInterfaceConfig::websocket(port);
+        self.update_state(|mut state| {
+            state.app_interfaces.insert(interface_id, config);
+            Ok(state)
+        })
+        .await?;
         Ok(port)
+    }
+
+    /// Start all app interfaces currently in state.
+    /// This should only be run at conductor initialization.
+    #[allow(irrefutable_let_patterns)]
+    pub(super) async fn startup_app_interfaces_via_handle(
+        &mut self,
+        handle: ConductorHandle,
+    ) -> ConductorResult<()> {
+        for i in self.get_state().await?.app_interfaces.values() {
+            tracing::debug!("Starting up app interface: {:?}", i);
+            let port = if let InterfaceDriver::Websocket { port } = i.driver {
+                port
+            } else {
+                unreachable!()
+            };
+            let _ = self
+                .add_app_interface_via_handle(port, handle.clone())
+                .await?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn signal_broadcaster(&self) -> SignalBroadcaster {
+        SignalBroadcaster::new(
+            self.app_interfaces
+                .values()
+                .map(|i| i.signal_tx())
+                .cloned()
+                .collect(),
+        )
     }
 
     /// Perform Genesis on the source chains for each of the specified CellIds.
@@ -334,7 +407,7 @@ where
         // unwrap safe because of the partition
         let success = success.into_iter().map(Result::unwrap);
 
-        // If there was errors, cleanup and return the errors
+        // If there were errors, cleanup and return the errors
         if !errors.is_empty() {
             for cell_id in success {
                 let env = EnvironmentWrite::new(
@@ -365,7 +438,7 @@ where
     pub(super) async fn create_active_app_cells(
         &self,
         conductor_handle: ConductorHandle,
-    ) -> ConductorResult<Vec<Result<Vec<Cell>, CreateAppError>>> {
+    ) -> ConductorResult<Vec<Result<Vec<(Cell, InitialQueueTriggers)>, CreateAppError>>> {
         // Only create the active apps
         let active_apps = self.get_state().await?.active_apps;
 
@@ -374,91 +447,94 @@ where
         let keystore = self.keystore.clone();
 
         // Closure for creating all cells in an app
-        let tasks =
-            active_apps
-                .into_iter()
-                .map(move |(app_id, cells): (AppId, Vec<InstalledCell>)| {
-                    let cell_ids = cells.into_iter().map(|c| c.into_id());
-                    // Clone data for async block
-                    let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
-                    let conductor_handle = conductor_handle.clone();
-                    let keystore = keystore.clone();
+        let tasks = active_apps.into_iter().map(
+            move |(installed_app_id, cells): (InstalledAppId, Vec<InstalledCell>)| {
+                let cell_ids = cells.into_iter().map(|c| c.into_id());
+                // Clone data for async block
+                let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
+                let conductor_handle = conductor_handle.clone();
+                let keystore = keystore.clone();
 
-                    // Task that creates the cells
-                    async move {
-                        // Only create cells not already created
-                        let cells_to_create = cell_ids
-                            .filter(|cell_id| !self.cells.contains_key(cell_id))
-                            .map(|cell_id| {
-                                (
-                                    cell_id,
-                                    root_env_dir.clone(),
-                                    keystore.clone(),
-                                    conductor_handle.clone(),
-                                )
-                            });
+                // Task that creates the cells
+                async move {
+                    // Only create cells not already created
+                    let cells_to_create = cell_ids
+                        .filter(|cell_id| !self.cells.contains_key(cell_id))
+                        .map(|cell_id| {
+                            (
+                                cell_id,
+                                root_env_dir.clone(),
+                                keystore.clone(),
+                                conductor_handle.clone(),
+                            )
+                        });
 
-                        use holochain_p2p::actor::HolochainP2pRefToCell;
+                    use holochain_p2p::actor::HolochainP2pRefToCell;
 
-                        // Create each cell
-                        let cells_tasks = cells_to_create.map(
-                            |(cell_id, dir, keystore, conductor_handle)| async move {
-                                let holochain_p2p_cell = self.holochain_p2p.to_cell(
-                                    cell_id.dna_hash().clone(),
-                                    cell_id.agent_pubkey().clone(),
-                                );
+                    // Create each cell
+                    let cells_tasks = cells_to_create.map(
+                        |(cell_id, dir, keystore, conductor_handle)| async move {
+                            tracing::info!(?cell_id, "CREATE CELL");
+                            let holochain_p2p_cell = self.holochain_p2p.to_cell(
+                                cell_id.dna_hash().clone(),
+                                cell_id.agent_pubkey().clone(),
+                            );
 
-                                let env = EnvironmentWrite::new_cell(
-                                    &dir,
-                                    cell_id.clone(),
-                                    keystore.clone(),
-                                )?;
-                                Cell::create(
-                                    cell_id.clone(),
-                                    conductor_handle.clone(),
-                                    env,
-                                    holochain_p2p_cell,
-                                    self.managed_task_add_sender.clone(),
-                                    self.managed_task_stop_broadcaster.clone(),
-                                )
-                                .await
-                            },
-                        );
+                            let env = EnvironmentWrite::new_cell(
+                                &dir,
+                                cell_id.clone(),
+                                keystore.clone(),
+                            )?;
+                            Cell::create(
+                                cell_id.clone(),
+                                conductor_handle.clone(),
+                                env,
+                                holochain_p2p_cell,
+                                self.managed_task_add_sender.clone(),
+                                self.managed_task_stop_broadcaster.clone(),
+                            )
+                            .await
+                        },
+                    );
 
-                        // Join all the cell create tasks for this app
-                        // and seperate any errors
-                        let (success, errors): (Vec<_>, Vec<_>) =
-                            futures::future::join_all(cells_tasks)
-                                .await
-                                .into_iter()
-                                .partition(Result::is_ok);
-                        // unwrap safe because of the partition
-                        let success = success.into_iter().map(Result::unwrap);
+                    // Join all the cell create tasks for this app
+                    // and seperate any errors
+                    let (success, errors): (Vec<_>, Vec<_>) =
+                        futures::future::join_all(cells_tasks)
+                            .await
+                            .into_iter()
+                            .partition(Result::is_ok);
+                    // unwrap safe because of the partition
+                    let success = success.into_iter().map(Result::unwrap);
 
-                        // If there was errors, cleanup and return the errors
-                        if !errors.is_empty() {
-                            for cell in success {
-                                // Error needs to capture which app failed
-                                cell.destroy().await.map_err(|e| CreateAppError::Failed {
-                                    app_id: app_id.clone(),
-                                    errors: vec![e],
-                                })?;
-                            }
-                            // match needed to avoid Debug requirement on unwrap_err
-                            let errors = errors
-                                .into_iter()
-                                .map(|e| match e {
-                                    Err(e) => e,
-                                    Ok(_) => unreachable!("Safe because of the partition"),
-                                })
-                                .collect();
-                            Err(CreateAppError::Failed { app_id, errors })
-                        } else {
-                            // No errors so return the cells
-                            Ok(success.collect())
+                    // If there was errors, cleanup and return the errors
+                    if !errors.is_empty() {
+                        for cell in success {
+                            // Error needs to capture which app failed
+                            cell.0.destroy().await.map_err(|e| CreateAppError::Failed {
+                                installed_app_id: installed_app_id.clone(),
+                                errors: vec![e],
+                            })?;
                         }
+                        // match needed to avoid Debug requirement on unwrap_err
+                        let errors = errors
+                            .into_iter()
+                            .map(|e| match e {
+                                Err(e) => e,
+                                Ok(_) => unreachable!("Safe because of the partition"),
+                            })
+                            .collect();
+                        Err(CreateAppError::Failed {
+                            installed_app_id,
+                            errors,
+                        })
+                    } else {
+                        // No errors so return the cells
+                        Ok(success.collect())
                     }
-                });
+                }
+            },
+        );
 
         // Join on all apps and return a list of
         // apps that had succelly created cells
@@ -473,21 +549,33 @@ where
     ) -> ConductorResult<()> {
         trace!(?app);
         self.update_state(move |mut state| {
-            state.inactive_apps.insert(app.app_id, app.cell_data);
-            Ok(state)
+            debug!(?app);
+            let is_active = state.active_apps.contains_key(&app.installed_app_id);
+            let is_inactive = state
+                .inactive_apps
+                .insert(app.installed_app_id.clone(), app.cell_data)
+                .is_some();
+            if is_active || is_inactive {
+                Err(ConductorError::AppAlreadyInstalled(app.installed_app_id))
+            } else {
+                Ok(state)
+            }
         })
         .await?;
         Ok(())
     }
 
     /// Activate an app in the database
-    pub(super) async fn activate_app_in_db(&mut self, app_id: AppId) -> ConductorResult<()> {
+    pub(super) async fn activate_app_in_db(
+        &mut self,
+        installed_app_id: InstalledAppId,
+    ) -> ConductorResult<()> {
         self.update_state(move |mut state| {
             let cell_data = state
                 .inactive_apps
-                .remove(&app_id)
-                .ok_or(ConductorError::AppNotInstalled)?;
-            state.active_apps.insert(app_id, cell_data);
+                .remove(&installed_app_id)
+                .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
+            state.active_apps.insert(installed_app_id, cell_data);
             Ok(state)
         })
         .await?;
@@ -497,24 +585,24 @@ where
     /// Deactivate an app in the database
     pub(super) async fn deactivate_app_in_db(
         &mut self,
-        app_id: AppId,
+        installed_app_id: InstalledAppId,
     ) -> ConductorResult<Vec<CellId>> {
         let state = self
             .update_state({
-                let app_id = app_id.clone();
+                let installed_app_id = installed_app_id.clone();
                 move |mut state| {
                     let cell_ids = state
                         .active_apps
-                        .remove(&app_id)
-                        .ok_or(ConductorError::AppNotActive)?;
-                    state.inactive_apps.insert(app_id, cell_ids);
+                        .remove(&installed_app_id)
+                        .ok_or_else(|| ConductorError::AppNotActive(installed_app_id.clone()))?;
+                    state.inactive_apps.insert(installed_app_id, cell_ids);
                     Ok(state)
                 }
             })
             .await?;
         Ok(state
             .inactive_apps
-            .get(&app_id)
+            .get(&installed_app_id)
             .expect("This app was just put here")
             .clone()
             .into_iter()
@@ -523,15 +611,19 @@ where
     }
 
     /// Add fully constructed cells to the cell map in the Conductor
-    pub(super) fn add_cells(&mut self, cells: Vec<Cell>) {
-        for cell in cells {
+    pub(super) fn add_cells(&mut self, cells: Vec<(Cell, InitialQueueTriggers)>) {
+        for (cell, trigger) in cells {
+            let cell_id = cell.id().clone();
+            tracing::info!(?cell_id, "ADD CELL");
             self.cells.insert(
-                cell.id().clone(),
+                cell_id,
                 CellItem {
-                    cell,
+                    cell: Arc::new(cell),
                     _state: CellState { _active: false },
                 },
             );
+
+            trigger.initialize_workflows();
         }
     }
 
@@ -542,9 +634,9 @@ where
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
         let environ = &self.wasm_env;
-        let wasm = environ.get_db(&*holochain_state::db::WASM)?;
-        let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
-        let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
+        let wasm = environ.get_db(&*holochain_lmdb::db::WASM)?;
+        let dna_def_db = environ.get_db(&*holochain_lmdb::db::DNA_DEF)?;
+        let entry_def_db = environ.get_db(&*holochain_lmdb::db::ENTRY_DEF)?;
 
         let wasm_buf = Arc::new(WasmBuf::new(environ.clone().into(), wasm)?);
         let dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
@@ -555,11 +647,11 @@ where
             .into_iter()
             .map(|dna_def| {
                 // Load all wasms for each dna_def from the wasm db into memory
-                let wasms = dna_def.zomes.clone().into_iter().map(|(_, zome)| {
+                let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
                     let wasm_buf = wasm_buf.clone();
                     async move {
                         wasm_buf
-                            .get(&zome.wasm_hash)
+                            .get(&zome.wasm_hash(&zome_name)?)
                             .await?
                             .map(|hashed| hashed.into_content())
                             .ok_or(ConductorError::WasmMissing)
@@ -586,14 +678,36 @@ where
         }
     }
 
+    pub(super) fn add_agent_infos(
+        &self,
+        agent_infos: Vec<AgentInfoSigned>,
+    ) -> ConductorApiResult<()> {
+        Ok(inject_agent_infos(self.p2p_env.clone(), agent_infos)?)
+    }
+
+    pub(super) fn get_agent_infos(
+        &self,
+        cell_id: Option<CellId>,
+    ) -> ConductorApiResult<Vec<AgentInfoSigned>> {
+        match cell_id {
+            Some(c) => {
+                let (d, a) = c.into_dna_and_agent();
+                Ok(get_single_agent_info(self.p2p_env.clone().into(), d, a)?
+                    .map(|a| vec![a])
+                    .unwrap_or_default())
+            }
+            None => Ok(all_agent_infos(self.p2p_env.clone().into())?),
+        }
+    }
+
     pub(super) async fn put_wasm(
         &self,
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
         let environ = self.wasm_env.clone();
-        let wasm = environ.get_db(&*holochain_state::db::WASM)?;
-        let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
-        let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
+        let wasm = environ.get_db(&*holochain_lmdb::db::WASM)?;
+        let dna_def_db = environ.get_db(&*holochain_lmdb::db::DNA_DEF)?;
+        let entry_def_db = environ.get_db(&*holochain_lmdb::db::ENTRY_DEF)?;
 
         let zome_defs = get_entry_defs(dna.clone())?;
 
@@ -612,7 +726,7 @@ where
             }
         }
         if dna_def_buf.get(dna.dna_hash()).await?.is_none() {
-            dna_def_buf.put(dna.dna().clone()).await?;
+            dna_def_buf.put(dna.dna_def().clone()).await?;
         }
         {
             let env = environ.guard();
@@ -628,6 +742,15 @@ where
         Ok(zome_defs)
     }
 
+    pub(super) async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>> {
+        Ok(self.cells.keys().cloned().collect())
+    }
+
+    pub(super) async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
+        let active_apps = self.get_state().await?.active_apps;
+        Ok(active_apps.keys().cloned().collect())
+    }
+
     pub(super) async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.env();
@@ -635,59 +758,40 @@ where
         Ok(source_chain.dump_as_json().await?)
     }
 
-    #[cfg(test)]
+    pub(super) fn p2p_env(&self) -> EnvironmentWrite {
+        self.p2p_env.clone()
+    }
+
+    pub(super) fn print_setup(&self) {
+        use std::fmt::Write;
+        let mut out = String::new();
+        for port in &self.admin_websocket_ports {
+            writeln!(&mut out, "###ADMIN_PORT:{}###", port).expect("Can't write setup to std out");
+        }
+        println!("\n###HOLOCHAIN_SETUP###\n{}###HOLOCHAIN_SETUP_END###", out);
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
     pub(super) async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
         self.get_state().await
     }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    pub(super) async fn add_test_app_interface<I: Into<AppInterfaceId>>(
+        &mut self,
+        id: I,
+    ) -> ConductorResult<()> {
+        let id = id.into();
+        let (signal_tx, _r) = tokio::sync::broadcast::channel(1000);
+        if self.app_interfaces.contains_key(&id) {
+            return Err(ConductorError::AppInterfaceIdCollision(id));
+        }
+        let _ = self
+            .app_interfaces
+            .insert(id, AppInterfaceRuntime::Test { signal_tx });
+        Ok(())
+    }
 }
-
-// -- TODO - delete this helper when we have a real keystore -- //
-
-pub(crate) async fn delete_me_create_test_keystore() -> KeystoreSender {
-    use std::convert::TryFrom;
-    let keystore = spawn_test_keystore(vec![
-        MockKeypair {
-            pub_key: holo_hash::AgentPubKey::try_from(
-                "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
-            )
-            .unwrap(),
-            sec_key: vec![
-                220, 218, 15, 212, 178, 51, 204, 96, 121, 97, 6, 205, 179, 84, 80, 159, 84, 163,
-                193, 46, 127, 15, 47, 91, 134, 106, 72, 72, 51, 76, 26, 16, 195, 236, 235, 182,
-                216, 152, 165, 215, 192, 97, 126, 31, 71, 165, 188, 12, 245, 29, 133, 230, 73, 251,
-                84, 44, 68, 14, 28, 76, 137, 166, 205, 54,
-            ],
-        },
-        MockKeypair {
-            pub_key: holo_hash::AgentPubKey::try_from(
-                "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK",
-            )
-            .unwrap(),
-            sec_key: vec![
-                170, 205, 134, 46, 233, 225, 100, 162, 101, 124, 207, 157, 12, 131, 239, 244, 216,
-                190, 244, 161, 209, 56, 159, 135, 240, 134, 88, 28, 48, 75, 227, 244, 162, 97, 243,
-                122, 69, 52, 251, 30, 233, 235, 101, 166, 174, 235, 29, 196, 61, 176, 247, 7, 35,
-                117, 168, 194, 243, 206, 188, 240, 145, 146, 76, 74,
-            ],
-        },
-    ])
-    .await
-    .unwrap();
-
-    // pre-populate with our two fixture agent keypairs
-    keystore
-        .generate_sign_keypair_from_pure_entropy()
-        .await
-        .unwrap();
-    keystore
-        .generate_sign_keypair_from_pure_entropy()
-        .await
-        .unwrap();
-
-    keystore
-}
-
-// -- TODO - end -- //
 
 //-----------------------------------------------------------------------------
 // Private methods
@@ -700,6 +804,7 @@ where
     async fn new(
         env: EnvironmentWrite,
         wasm_env: EnvironmentWrite,
+        p2p_env: EnvironmentWrite,
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
@@ -712,9 +817,11 @@ where
         Ok(Self {
             env,
             wasm_env,
+            p2p_env,
             state_db: KvStore::new(db),
             cells: HashMap::new(),
             shutting_down: false,
+            app_interfaces: HashMap::new(),
             managed_task_add_sender: task_tx,
             managed_task_stop_broadcaster: stop_tx,
             task_manager_run_handle,
@@ -764,21 +871,28 @@ where
 pub type ConductorStateDb = KvStore<UnitDbKey, ConductorState>;
 
 mod builder {
-
     use super::*;
-    use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
-    use holochain_state::{env::EnvironmentKind, test_utils::TestEnvironment};
+    use crate::conductor::dna_store::RealDnaStore;
+    use crate::conductor::ConductorHandle;
+    use holochain_lmdb::env::EnvironmentKind;
+    #[cfg(any(test, feature = "test_utils"))]
+    use holochain_lmdb::test_utils::TestEnvironments;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
     pub struct ConductorBuilder<DS = RealDnaStore> {
-        config: ConductorConfig,
-        dna_store: DS,
-        keystore: Option<KeystoreSender>,
-        #[cfg(test)]
-        state: Option<ConductorState>,
-        #[cfg(test)]
-        mock_handle: Option<MockConductorHandle>,
+        /// The configuration
+        pub config: ConductorConfig,
+        /// The DnaStore (mockable)
+        pub dna_store: DS,
+        /// Optional keystore override
+        pub keystore: Option<KeystoreSender>,
+        #[cfg(any(test, feature = "test_utils"))]
+        /// Optional state override (for testing)
+        pub state: Option<ConductorState>,
+        #[cfg(any(test, feature = "test_utils"))]
+        /// Optional handle mock (for testing)
+        pub mock_handle: Option<MockConductorHandleT>,
     }
 
     impl ConductorBuilder {
@@ -820,12 +934,24 @@ mod builder {
                 }
             }
 
-            let _ = holochain_crypto::crypto_init_sodium();
+            tracing::info!(?self.config);
 
             let keystore = if let Some(keystore) = self.keystore {
                 keystore
+            } else if self.config.use_dangerous_test_keystore {
+                let keystore = spawn_test_keystore().await?;
+                // pre-populate with our two fixture agent keypairs
+                keystore
+                    .generate_sign_keypair_from_pure_entropy()
+                    .await
+                    .unwrap();
+                keystore
+                    .generate_sign_keypair_from_pure_entropy()
+                    .await
+                    .unwrap();
+                keystore
             } else {
-                delete_me_create_test_keystore().await
+                spawn_lair_keystore(self.config.keystore_path.as_deref()).await?
             };
             let env_path = self.config.environment_path.clone();
 
@@ -838,18 +964,35 @@ mod builder {
             let wasm_environment =
                 EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::Wasm, keystore.clone())?;
 
-            #[cfg(test)]
+            let p2p_environment =
+                EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::P2p, keystore.clone())?;
+
+            #[cfg(any(test, feature = "test_utils"))]
             let state = self.state;
 
             let Self {
                 dna_store, config, ..
             } = self;
 
-            let (holochain_p2p, p2p_evt) = holochain_p2p::spawn_holochain_p2p().await?;
+            let network_config = match &config.network {
+                None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
+                Some(config) => config.clone(),
+            };
+            let (cert_digest, cert, cert_priv_key) =
+                keystore.get_or_create_first_tls_cert().await?;
+            let tls_config =
+                holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig {
+                    cert,
+                    cert_priv_key,
+                    cert_digest,
+                };
+            let (holochain_p2p, p2p_evt) =
+                holochain_p2p::spawn_holochain_p2p(network_config, tls_config).await?;
 
             let conductor = Conductor::new(
                 environment,
                 wasm_environment,
+                p2p_environment,
                 dna_store,
                 keystore,
                 env_path,
@@ -857,7 +1000,7 @@ mod builder {
             )
             .await?;
 
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test_utils"))]
             let conductor = Self::update_fake_state(state, conductor).await?;
 
             Self::finish(conductor, config, p2p_evt).await
@@ -881,6 +1024,8 @@ mod builder {
 
             handle.add_dnas().await?;
 
+            tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
+
             let cell_startup_errors = handle.clone().setup_cells().await?;
 
             // TODO: This should probably be emitted over the admin interface
@@ -896,7 +1041,10 @@ mod builder {
                 handle.clone().add_admin_interfaces(configs).await?;
             }
 
-            tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
+            // Create app interfaces
+            handle.clone().startup_app_interfaces().await?;
+
+            handle.print_setup().await;
 
             Ok(handle)
         }
@@ -908,7 +1056,7 @@ mod builder {
             self
         }
 
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test_utils"))]
         /// Sets some fake conductor state for tests
         pub fn fake_state(mut self, state: ConductorState) -> Self {
             self.state = Some(state);
@@ -917,13 +1065,13 @@ mod builder {
 
         /// Pass a mock handle in, which will be returned regardless of whatever
         /// else happens to this builder
-        #[cfg(test)]
-        pub fn with_mock_handle(mut self, handle: MockConductorHandle) -> Self {
+        #[cfg(any(test, feature = "test_utils"))]
+        pub fn with_mock_handle(mut self, handle: MockConductorHandleT) -> Self {
             self.mock_handle = Some(handle);
             self
         }
 
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test_utils"))]
         async fn update_fake_state(
             state: Option<ConductorState>,
             conductor: Conductor<DS>,
@@ -935,28 +1083,24 @@ mod builder {
         }
 
         /// Build a Conductor with a test environment
-        pub async fn test(
-            self,
-            test_env: TestEnvironment,
-            test_wasm_env: EnvironmentWrite,
-        ) -> ConductorResult<ConductorHandle> {
-            let TestEnvironment {
-                env: environment,
-                tmpdir,
-            } = test_env;
-            let keystore = environment.keystore();
-            let (holochain_p2p, p2p_evt) = holochain_p2p::spawn_holochain_p2p().await?;
+        #[cfg(any(test, feature = "test_utils"))]
+        pub async fn test(self, envs: &TestEnvironments) -> ConductorResult<ConductorHandle> {
+            let keystore = envs.conductor().keystore();
+            let (holochain_p2p, p2p_evt) =
+                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
+                    .await?;
             let conductor = Conductor::new(
-                environment,
-                test_wasm_env,
+                envs.conductor(),
+                envs.wasm(),
+                envs.p2p(),
                 self.dna_store,
                 keystore,
-                tmpdir.path().to_path_buf().into(),
+                envs.tempdir().path().to_path_buf().into(),
                 holochain_p2p,
             )
             .await?;
 
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test_utils"))]
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
             Self::finish(conductor, self.config, p2p_evt).await
@@ -964,94 +1108,33 @@ mod builder {
     }
 }
 
+#[instrument(skip(p2p_evt, handle))]
 async fn p2p_event_task(
-    mut p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
+    p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,
 ) {
-    use tokio::stream::StreamExt;
-    while let Some(evt) = p2p_evt.next().await {
-        let cell_id = CellId::new(evt.dna_hash().clone(), evt.as_to_agent().clone());
-        if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
-            tracing::error!(
-                message = "error dispatching network event",
-                error = ?e,
-            );
-        }
-    }
+    /// The number of events we allow to run in parallel before
+    /// starting to await on the join handles.
+    const NUM_PARALLEL_EVTS: usize = 100;
+    p2p_evt
+        .for_each_concurrent(NUM_PARALLEL_EVTS, |evt| {
+            let handle = handle.clone();
+            async move {
+                let cell_id =
+                    CellId::new(evt.dna_hash().clone(), evt.target_agent_as_ref().clone());
+                if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
+                    tracing::error!(
+                        message = "error dispatching network event",
+                        error = ?e,
+                    );
+                }
+            }
+            .in_current_span()
+        })
+        .await;
+
     tracing::warn!("p2p_event_task has ended");
 }
 
 #[cfg(test)]
-pub mod tests {
-    use super::*;
-    use super::{Conductor, ConductorState};
-    use crate::conductor::dna_store::MockDnaStore;
-    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
-    use holochain_types::test_utils::fake_cell_id;
-
-    #[tokio::test(threaded_scheduler)]
-    async fn can_update_state() {
-        let TestEnvironment {
-            env: environment,
-            tmpdir,
-        } = test_conductor_env();
-        let TestEnvironment {
-            env: wasm_env,
-            tmpdir: _tmpdir,
-        } = test_wasm_env();
-        let dna_store = MockDnaStore::new();
-        let keystore = environment.keystore().clone();
-        let (holochain_p2p, _p2p_evt) = holochain_p2p::spawn_holochain_p2p().await.unwrap();
-        let conductor = Conductor::new(
-            environment,
-            wasm_env,
-            dna_store,
-            keystore,
-            tmpdir.path().to_path_buf().into(),
-            holochain_p2p,
-        )
-        .await
-        .unwrap();
-        let state = conductor.get_state().await.unwrap();
-        assert_eq!(state, ConductorState::default());
-
-        let cell_id = fake_cell_id(1);
-        let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
-
-        conductor
-            .update_state(|mut state| {
-                state
-                    .inactive_apps
-                    .insert("fake app".to_string(), vec![installed_cell]);
-                Ok(state)
-            })
-            .await
-            .unwrap();
-        let state = conductor.get_state().await.unwrap();
-        assert_eq!(
-            state.inactive_apps.values().collect::<Vec<_>>()[0]
-                .into_iter()
-                .map(|c| c.as_id().clone())
-                .collect::<Vec<_>>()
-                .as_slice(),
-            &[cell_id]
-        );
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    async fn can_set_fake_state() {
-        let test_env = test_conductor_env();
-        let _tmpdir = test_env.tmpdir.clone();
-        let TestEnvironment {
-            env: wasm_env,
-            tmpdir: _tmpdir,
-        } = test_wasm_env();
-        let state = ConductorState::default();
-        let conductor = ConductorBuilder::new()
-            .fake_state(state.clone())
-            .test(test_env, wasm_env)
-            .await
-            .unwrap();
-        assert_eq!(state, conductor.get_state_from_handle().await.unwrap());
-    }
-}
+pub mod tests;

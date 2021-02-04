@@ -1,0 +1,55 @@
+[package]
+name = "holochain_types"
+version = "0.0.1"
+description = "Holochain common types"
+license = "CAL-1.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://github.com/holochain/holochain"
+readme = "README.md"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.26"
+async-trait = "0.1"
+backtrace = "0.3.27"
+base64 = "0.10.1"
+chrono = "0.4.6"
+derive_more = "0.99.3"
+fixt = { path = "../fixt" }
+flate2 = "1.0.14"
+futures = "0.3"
+holo_hash = { version = "0.0.1", path = "../holo_hash" }
+holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
+holochain_serialized_bytes = "=0.0.48"
+holochain_zome_types = { path = "../holochain_zome_types" }
+lazy_static = "1.4.0"
+must_future = "0.1.1"
+nanoid = "0.3"
+observability = "0.1.3"
+rand = "0.7"
+regex = "1.1.2"
+serde = { version = "1.0.104", features = [ "derive", "rc" ] }
+serde_bytes = "0.11"
+serde_derive = "1.0.104"
+serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
+shrinkwraprs = "0.3.0"
+strum = "0.18.0"
+tempdir = "0.3.7"
+thiserror = "1.0.22"
+tokio = { version = "0.2", features = [ "blocking" ] }
+tokio_safe_block_on = "0.1.2"
+tracing = "=0.1.21"
+derive_builder = "0.9.0"
+
+[dev-dependencies]
+# rmp-serde = "0.14.3"
+maplit = "1"
+tokio = { version = "0.2", features = [ "full" ] }
+
+[features]
+default = ["fixturators", "test_utils"]
+fixturators = ["holochain_zome_types/fixturators"]
+test_utils = ["holochain_zome_types/test_utils"]

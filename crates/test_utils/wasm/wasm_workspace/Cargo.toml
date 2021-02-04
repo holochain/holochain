@@ -8,22 +8,27 @@ members = [
     "crd",
     "crud",
     "debug",
+    "emit_signal",
     "entry_defs",
     "hash_entry",
     "foo",
     "hash_path",
-    "imports",
+    "hdk_extern",
     "init_fail",
     "init_pass",
     "link",
     "migrate_agent_fail",
     "migrate_agent_pass",
+    "multiple_calls",
     "post_commit_fail",
     "post_commit_success",
     "query",
     "random_bytes",
+    "x_salsa20_poly1305",
     "ser_regression",
+    "sign",
     "sys_time",
+    "update_entry",
     "validate",
     "validate_invalid",
     "validate_link",
@@ -41,3 +46,7 @@ opt-level = "z"
 
 
 [patch.crates-io]
+# holochain_wasmer_guest = { path = "../../../../../holochain-wasmer/crates/guest" }
+
+# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "remote_signal" }
+# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "try_from_ref" }

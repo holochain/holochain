@@ -10,6 +10,14 @@ impl CallZomeWorkspaceLock {
     pub fn new(workspace: CallZomeWorkspace) -> Self {
         Self(Arc::new(RwLock::new(workspace)))
     }
+
+    pub fn into_inner(self) -> Arc<RwLock<CallZomeWorkspace>> {
+        self.0
+    }
+
+    pub async fn env(&self) -> EnvironmentRead {
+        self.0.read().await.env().clone()
+    }
 }
 
 impl From<CallZomeWorkspace> for CallZomeWorkspaceLock {

@@ -3,6 +3,12 @@ use std::process::Stdio;
 
 fn main() {
     let should_build = std::env::var_os("CARGO_FEATURE_BUILD").is_some();
+    let only_check = std::env::var_os("CARGO_FEATURE_ONLY_CHECK").is_some();
+
+    if !(should_build || only_check) {
+        return;
+    }
+
     let wasms_path = format!("{}/{}/", env!("CARGO_MANIFEST_DIR"), "wasm_workspace");
     println!("cargo:rerun-if-changed=Cargo.toml");
     println!("cargo:rerun-if-changed=../../../Cargo.lock");

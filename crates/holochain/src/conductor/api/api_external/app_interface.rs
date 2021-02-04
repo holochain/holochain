@@ -1,14 +1,17 @@
 use super::InterfaceApi;
-use crate::conductor::api::error::{ConductorApiResult, ExternalApiWireError, SerializationError};
-use crate::conductor::{
-    interface::error::{InterfaceError, InterfaceResult},
-    ConductorHandle,
-};
-use crate::core::ribosome::ZomeCallInvocation;
+use crate::conductor::api::error::ConductorApiResult;
+use crate::conductor::api::error::ExternalApiWireError;
+use crate::conductor::api::error::SerializationError;
+use crate::conductor::interface::error::InterfaceError;
+use crate::conductor::interface::error::InterfaceResult;
+use crate::conductor::state::AppInterfaceId;
+use crate::conductor::ConductorHandle;
+
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::app::{AppId, InstalledApp};
-use holochain_zome_types::ExternOutput;
-use holochain_zome_types::ZomeCallResponse;
+
+use holochain_types::prelude::*;
+
+pub use holochain_conductor_api::*;
 
 /// The interface that a Conductor exposes to the outside world.
 #[async_trait::async_trait]
@@ -37,12 +40,16 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 #[derive(Clone)]
 pub struct RealAppInterfaceApi {
     conductor_handle: ConductorHandle,
+    interface_id: AppInterfaceId,
 }
 
 impl RealAppInterfaceApi {
     /// Create a new instance from a shared Conductor reference
-    pub fn new(conductor_handle: ConductorHandle) -> Self {
-        Self { conductor_handle }
+    pub fn new(conductor_handle: ConductorHandle, interface_id: AppInterfaceId) -> Self {
+        Self {
+            conductor_handle,
+            interface_id,
+        }
     }
 }
 
@@ -54,19 +61,44 @@ impl AppInterfaceApi for RealAppInterfaceApi {
         request: AppRequest,
     ) -> ConductorApiResult<AppResponse> {
         match request {
-            AppRequest::AppInfo { app_id } => Ok(AppResponse::AppInfo(
-                self.conductor_handle.get_app_info(&app_id).await?,
+            AppRequest::AppInfo { installed_app_id } => Ok(AppResponse::AppInfo(
+                self.conductor_handle
+                    .get_app_info(&installed_app_id)
+                    .await?,
             )),
-            AppRequest::ZomeCallInvocation(request) => {
-                match self.conductor_handle.call_zome(*request).await? {
-                    Ok(ZomeCallResponse::Ok(output)) => {
-                        Ok(AppResponse::ZomeCallInvocation(Box::new(output)))
-                    }
-                    Ok(ZomeCallResponse::Unauthorized) => Ok(AppResponse::ZomeCallUnauthorized),
+            AppRequest::ZomeCallInvocation(call) => {
+                tracing::warn!(
+                    "AppRequest::ZomeCallInvocation is deprecated, use AppRequest::ZomeCall (TODO: update conductor-api)"
+                );
+                self.handle_app_request_inner(AppRequest::ZomeCall(call))
+                    .await
+                    .map(|r| {
+                        match r {
+                            // if successful, re-wrap in the deprecated response type
+                            AppResponse::ZomeCall(zc) => AppResponse::ZomeCallInvocation(zc),
+                            // else (probably an error), return as-is
+                            other => other,
+                        }
+                    })
+            }
+            AppRequest::ZomeCall(call) => {
+                match self.conductor_handle.call_zome(*call.clone()).await? {
+                    Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCall(Box::new(output))),
+                    Ok(ZomeCallResponse::Unauthorized(_, _, _, _)) => Ok(AppResponse::Error(
+                        ExternalApiWireError::ZomeCallUnauthorized(format!(
+                            "No capabilities grant has been committed that allows the CapSecret {:?} to call the function {} in zome {}",
+                            call.cap, call.fn_name, call.zome_name
+                        )),
+                    )),
+                    Ok(ZomeCallResponse::NetworkError(e)) => unreachable!(
+                        "Interface zome calls should never be routed to the network. This is a bug. Got {}",
+                        e
+                    ),
                     Err(e) => Ok(AppResponse::Error(e.into())),
                 }
             }
-            AppRequest::Crypto(_) => unimplemented!("Crypto methods currently unimplemented"),
+            AppRequest::SignalSubscription(_) => Ok(AppResponse::Unimplemented(request)),
+            AppRequest::Crypto(_) => Ok(AppResponse::Unimplemented(request)),
         }
     }
 }
@@ -91,47 +123,4 @@ impl InterfaceApi for RealAppInterfaceApi {
             Err(e) => Ok(AppResponse::Error(SerializationError::from(e).into())),
         }
     }
-}
-
-/// The set of messages that a conductor understands how to handle over an App interface
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename = "snake-case", tag = "type", content = "data")]
-pub enum AppRequest {
-    /// Get info about the App
-    AppInfo {
-        /// The AppId for which to get information
-        app_id: AppId,
-    },
-
-    /// Asks the conductor to do some crypto
-    Crypto(Box<CryptoRequest>),
-
-    /// Call a zome function
-    ZomeCallInvocation(Box<ZomeCallInvocation>),
-}
-
-/// Responses to requests received on an App interface
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename = "snake-case", tag = "type", content = "data")]
-pub enum AppResponse {
-    /// There has been an error in the request
-    Error(ExternalApiWireError),
-
-    /// The response to an AppInfo request
-    AppInfo(Option<InstalledApp>),
-
-    /// The response to a zome call
-    ZomeCallInvocation(Box<ExternOutput>),
-
-    /// The zome call is unauthorized
-    ZomeCallUnauthorized,
-}
-
-#[allow(missing_docs)]
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename = "snake-case", tag = "type", content = "data")]
-pub enum CryptoRequest {
-    Sign(String),
-    Decrypt(String),
-    Encrypt(String),
 }

@@ -1,8 +1,11 @@
-use super::{entry_def_store::error::EntryDefStoreError, interface::error::InterfaceError};
-use crate::{conductor::cell::error::CellError, core::workflow::error::WorkflowError};
-use holochain_state::error::DatabaseError;
-use holochain_types::{app::AppId, cell::CellId};
-use std::path::PathBuf;
+use super::interface::error::InterfaceError;
+use super::{entry_def_store::error::EntryDefStoreError, state::AppInterfaceId};
+use crate::conductor::cell::error::CellError;
+use crate::core::workflow::error::WorkflowError;
+use holochain_conductor_api::conductor::ConductorConfigError;
+use holochain_lmdb::error::DatabaseError;
+use holochain_types::app::InstalledAppId;
+use holochain_zome_types::cell::CellId;
 use thiserror::Error;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
@@ -27,17 +30,14 @@ pub enum ConductorError {
     #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
     CellMissing(CellId),
 
-    #[error("No conductor config found at this path: {0}")]
-    ConfigMissing(PathBuf),
+    #[error(transparent)]
+    ConductorConfigError(#[from] ConductorConfigError),
 
     #[error("Configuration consistency error: {0}")]
     ConfigError(String),
 
-    #[error("Config serialization error: {0}")]
-    DeserializationError(#[from] toml::de::Error),
-
     #[error("Config deserialization error: {0}")]
-    SerializationError(#[from] toml::ser::Error),
+    SerializationError(#[from] serde_yaml::Error),
 
     #[error("Attempted to call into the conductor while it is shutting down")]
     ShuttingDown,
@@ -57,6 +57,9 @@ pub enum ConductorError {
     #[error("Workflow error: {0:?}")]
     WorkflowError(#[from] WorkflowError),
 
+    #[error("Attempted to add two app interfaces with the same id: {0}")]
+    AppInterfaceIdCollision(AppInterfaceId),
+
     // Box is to avoid cycle in error definition
     #[error(transparent)]
     InterfaceError(#[from] Box<InterfaceError>),
@@ -73,24 +76,33 @@ pub enum ConductorError {
     #[error("Wasm code was not found in the wasm store")]
     WasmMissing,
 
-    #[error("Tried to activate an app that was not installed")]
-    AppNotInstalled,
+    #[error("Tried to activate an app that was not installed: {0}")]
+    AppNotInstalled(InstalledAppId),
 
-    #[error("Tried to deactivate an app that was not active")]
-    AppNotActive,
+    #[error("Tried to install an app using an already-used InstalledAppId: {0}")]
+    AppAlreadyInstalled(InstalledAppId),
+
+    #[error("Tried to deactivate an app that was not active: {0}")]
+    AppNotActive(InstalledAppId),
 
     #[error(transparent)]
     HolochainP2pError(#[from] holochain_p2p::HolochainP2pError),
 
     #[error(transparent)]
     EntryDefStoreError(#[from] EntryDefStoreError),
+
+    #[error(transparent)]
+    KeystoreError(#[from] holochain_keystore::KeystoreError),
+
+    #[error(transparent)]
+    KitsuneP2pError(#[from] kitsune_p2p::KitsuneP2pError),
 }
 
 #[derive(Error, Debug)]
 pub enum CreateAppError {
-    #[error("Failed to create the following cells in the {app_id} app: {errors:?}")]
+    #[error("Failed to create the following cells in the {installed_app_id} app: {errors:?}")]
     Failed {
-        app_id: AppId,
+        installed_app_id: InstalledAppId,
         errors: Vec<CellError>,
     },
 }
@@ -99,17 +111,5 @@ pub enum CreateAppError {
 impl From<String> for ConductorError {
     fn from(s: String) -> Self {
         ConductorError::Todo(s)
-    }
-}
-
-impl PartialEq for ConductorError {
-    fn eq(&self, other: &Self) -> bool {
-        use ConductorError::*;
-        match (self, other) {
-            (InternalCellError(a), InternalCellError(b)) => a.to_string() == b.to_string(),
-            (InternalCellError(_), _) => false,
-            (_, InternalCellError(_)) => false,
-            (a, b) => a == b,
-        }
     }
 }

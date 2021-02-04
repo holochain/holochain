@@ -102,7 +102,7 @@ use holo_hash::*;
 // pretend our pub key is all 0xdb bytes
 let agent_pub_key = vec![0xdb; 32];
 
-let agent_id: HoloHash = AgentPubKey::with_pre_hashed(agent_pub_key).into();
+let agent_id: HoloHash = AgentPubKey::from_raw_32(agent_pub_key).into();
 
 assert_eq!(
     "AgentPubKey(uhCAk29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29uTp5Iv)",

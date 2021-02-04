@@ -1,45 +1,42 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_types::HeaderHashed;
-use holochain_zome_types::header::HeaderHashedVec;
-use holochain_zome_types::QueryInput;
-use holochain_zome_types::QueryOutput;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 pub fn query(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: QueryInput,
-) -> RibosomeResult<QueryOutput> {
+    input: ChainQueryFilter,
+) -> RibosomeResult<ElementVec> {
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let hashes: Vec<HeaderHashed> = call_context
+        let elements: Vec<Element> = call_context
             .host_access
             .workspace()
             .write()
             .await
             .source_chain
-            .query(input.inner_ref())?;
-        Ok(QueryOutput::new(HeaderHashedVec(hashes)))
+            .query(&input)?;
+        Ok(ElementVec(elements))
     })
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-
-    use crate::{core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator};
+    use crate::{
+        core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator,
+    };
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use holochain_state::test_utils::TestEnvironment;
+    use holochain_lmdb::test_utils::TestEnvironment;
     use query::ChainQueryFilter;
 
     use holochain_wasm_test_utils::TestWasm;
-    use test_wasm_common::*;
 
     // TODO: use this setup function to DRY up a lot of duplicated code
     async fn setup() -> (TestEnvironment, ZomeCallHostAccess) {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
 
         let mut workspace =
@@ -50,7 +47,8 @@ pub mod slow_tests {
             .await
             .unwrap();
 
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
         (test_env, host_access)
@@ -64,16 +62,16 @@ pub mod slow_tests {
             host_access,
             TestWasm::Query,
             "add_path",
-            TestString::from("a".to_string())
+            "a".to_string()
         );
         let _hash_b: EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::Query,
             "add_path",
-            TestString::from("b".to_string())
+            "b".to_string()
         );
 
-        let elements: HeaderHashedVec = crate::call_test_ribosome!(
+        let elements: ElementVec = crate::call_test_ribosome!(
             host_access,
             TestWasm::Query,
             "query",

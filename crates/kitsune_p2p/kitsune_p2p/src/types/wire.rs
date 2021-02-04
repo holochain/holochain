@@ -1,137 +1,107 @@
 //! KitsuneP2p Wire Protocol Encoding Decoding
 
-// The kitsune wire protocol is designed to be very light,
-// both in terms of cpu overhead, and in terms of dependencies.
+use crate::agent_store::AgentInfoSigned;
+use crate::types::gossip::{OpConsistency, OpCount};
+use crate::types::*;
+use derive_more::*;
+use kitsune_p2p_types::dht_arc::DhtArc;
+use std::sync::Arc;
 
-use crate::types::KitsuneP2pError;
+/// Type used for content data of wire messages.
+#[derive(
+    Debug, Clone, PartialEq, Deref, AsRef, From, Into, serde::Serialize, serde::Deserialize,
+)]
+pub struct WireData(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
-/// The main kitsune wire message enum
-#[derive(Debug)]
-pub enum Wire {
-    Call(Vec<u8>),
-    Notify(Vec<u8>),
-}
+kitsune_p2p_types::write_codec_enum! {
+    /// KitsuneP2p Wire Protocol Top-Level Enum.
+    codec Wire {
+        /// Failure
+        Failure(0x00) {
+            reason.0: String,
+        },
 
-impl Wire {
-    pub fn decode(data: Vec<u8>) -> Result<Self, KitsuneP2pError> {
-        Wire::priv_decode(data)
-    }
+        /// "Call" to the remote.
+        Call(0x010) {
+            space.0: Arc<KitsuneSpace>,
+            from_agent.1: Arc<KitsuneAgent>,
+            to_agent.2: Arc<KitsuneAgent>,
+            data.3: WireData,
+        },
 
-    pub fn encode(self) -> Vec<u8> {
-        self.priv_encode()
-    }
+        /// "Call" response from the remote.
+        CallResp(0x11) {
+            data.0: WireData,
+        },
 
-    pub fn call(payload: Vec<u8>) -> Self {
-        Self::Call(payload)
-    }
+        /// "Notify" the remote.
+        Notify(0x20) {
+            space.0: Arc<KitsuneSpace>,
+            from_agent.1: Arc<KitsuneAgent>,
+            to_agent.2: Arc<KitsuneAgent>,
+            data.3: WireData,
+        },
 
-    pub fn notify(payload: Vec<u8>) -> Self {
-        Self::Notify(payload)
-    }
-}
+        /// "Notify" response from the remote.
+        NotifyResp(0x21) {
+        },
 
-// -- private -- //
+        /// Fetch DhtOp and Agent Hashes with Constraints
+        FetchOpHashes(0x31) {
+            space.0: Arc<KitsuneSpace>,
+            from_agent.1: Arc<KitsuneAgent>,
+            to_agent.2: Arc<KitsuneAgent>,
+            dht_arc.3: DhtArc,
+            since_utc_epoch_s.4: i64,
+            until_utc_epoch_s.5: i64,
+            last_count.6: OpCount,
+        },
 
-/// protocol identification heuristic
-const KITSUNE_MAGIC_1: u8 = 0xdb;
+        /// List of hashes response to FetchOpHashes
+        FetchOpHashesResponse(0x32) {
+            hashes.0: OpConsistency,
+            peer_hashes.1: Vec<(Arc<KitsuneAgent>, u64)>,
+        },
 
-/// protocol identification heuristic
-const KITSUNE_MAGIC_2: u8 = 0x55;
+        /// Fetch DhtOp data and AgentInfo for hashes lists
+        FetchOpData(0x33) {
+            space.0: Arc<KitsuneSpace>,
+            from_agent.1: Arc<KitsuneAgent>,
+            to_agent.2: Arc<KitsuneAgent>,
+            op_hashes.3: Vec<Arc<KitsuneOpHash>>,
+            peer_hashes.4: Vec<Arc<KitsuneAgent>>,
+        },
 
-/// protocol version marker
-const KITSUNE_PROTO_VER: u8 = 0x00;
+        /// Lists of data in response to FetchOpData
+        FetchOpDataResponse(0x34) {
+            op_data.0: Vec<(Arc<KitsuneOpHash>, WireData)>,
+            agent_infos.1: Vec<AgentInfoSigned>,
+        },
 
-// list of message type bytes
+        /// Query Agent data from a remote node
+        AgentInfoQuery(0x40) {
+            space.0: Arc<KitsuneSpace>,
+            to_agent.1: Arc<KitsuneAgent>,
+            by_agent.2: Option<Arc<KitsuneAgent>>,
+            by_basis_arc.3: Option<(Arc<KitsuneBasis>, DhtArc)>,
+        },
 
-/// a kitsune call message
-const WIRE_CALL: u8 = 0x10;
+        /// Response type for agent info query
+        AgentInfoQueryResp(0x41) {
+            agent_infos.0: Vec<AgentInfoSigned>,
+        },
 
-/// a kitsune notify message
-const WIRE_NOTIFY: u8 = 0x20;
+        /// Fetch DhtOp data and AgentInfo for hashes lists
+        Gossip(0x50) {
+            space.0: Arc<KitsuneSpace>,
+            from_agent.1: Arc<KitsuneAgent>,
+            to_agent.2: Arc<KitsuneAgent>,
+            ops.3: Vec<(Arc<KitsuneOpHash>, WireData)>,
+            agents.4: Vec<AgentInfoSigned>,
+        },
 
-impl Wire {
-    fn priv_encode_inner(msg_type: u8, mut msg: Vec<u8>) -> Vec<u8> {
-        let mut out = Vec::with_capacity(msg.len() + 4);
-        out.push(KITSUNE_MAGIC_1);
-        out.push(KITSUNE_MAGIC_2);
-        out.push(KITSUNE_PROTO_VER);
-        out.push(msg_type);
-        out.append(&mut msg);
-        out
-    }
-
-    fn priv_encode(self) -> Vec<u8> {
-        match self {
-            Wire::Call(payload) => Wire::priv_encode_inner(WIRE_CALL, payload),
-            Wire::Notify(payload) => Wire::priv_encode_inner(WIRE_NOTIFY, payload),
-        }
-    }
-
-    fn priv_decode(mut data: Vec<u8>) -> Result<Self, KitsuneP2pError> {
-        match &data[..] {
-            [KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_CALL, ..] => {
-                data.drain(..4);
-                Ok(Wire::Call(data))
-            }
-            [KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_NOTIFY, ..] => {
-                data.drain(..4);
-                Ok(Wire::Notify(data))
-            }
-            _ => Err(KitsuneP2pError::decoding_error(
-                "invalid or corrupt kitsune p2p message".to_string(),
-            )),
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use assert_matches::*;
-
-    #[test]
-    fn ok_decode() {
-        let res = Wire::decode(vec![
-            KITSUNE_MAGIC_1,
-            KITSUNE_MAGIC_2,
-            KITSUNE_PROTO_VER,
-            WIRE_CALL,
-        ]);
-        assert_matches!(res, Ok(Wire::Call(vec)) if vec.is_empty());
-    }
-
-    #[test]
-    fn bad_decode_size() {
-        let res = Wire::decode(vec![KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER]);
-        assert_matches!(res, Err(KitsuneP2pError::DecodingError(_)));
-    }
-
-    #[test]
-    fn bad_decode_msg_type() {
-        let res = Wire::decode(vec![
-            KITSUNE_MAGIC_1,
-            KITSUNE_MAGIC_2,
-            KITSUNE_PROTO_VER,
-            0xff,
-        ]);
-        assert_matches!(res, Err(KitsuneP2pError::DecodingError(_)));
-    }
-
-    #[test]
-    fn bad_decode_magic_1() {
-        let res = Wire::decode(vec![0xff, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_CALL]);
-        assert_matches!(res, Err(KitsuneP2pError::DecodingError(_)));
-    }
-
-    #[test]
-    fn bad_decode_magic_2() {
-        let res = Wire::decode(vec![KITSUNE_MAGIC_1, 0xff, KITSUNE_PROTO_VER, WIRE_CALL]);
-        assert_matches!(res, Err(KitsuneP2pError::DecodingError(_)));
-    }
-
-    #[test]
-    fn bad_decode_proto_ver() {
-        let res = Wire::decode(vec![KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, 0xff, WIRE_CALL]);
-        assert_matches!(res, Err(KitsuneP2pError::DecodingError(_)));
+        /// Lists of data in response to FetchOpData
+        GossipResp(0x51) {
+        },
     }
 }

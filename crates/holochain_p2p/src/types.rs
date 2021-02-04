@@ -91,6 +91,16 @@ impl From<&str> for HolochainP2pError {
     }
 }
 
+/// Turn an [AgentKey] into a [KitsuneAgent]
+pub fn agent_holo_to_kit(a: holo_hash::AgentPubKey) -> kitsune_p2p::KitsuneAgent {
+    a.into_kitsune_raw()
+}
+
+/// Turn a [DnaHash] into a [KitsuneSpace]
+pub fn space_holo_to_kit(d: holo_hash::DnaHash) -> kitsune_p2p::KitsuneSpace {
+    d.into_kitsune_raw()
+}
+
 pub mod actor;
 pub mod event;
 
@@ -114,11 +124,11 @@ macro_rules! to_and_from_kitsune {
                 }
 
                 fn into_kitsune_raw(self) -> $k {
-                    self.into_inner().into()
+                    <$k as kitsune_p2p::KitsuneBinType>::new(self.get_raw_36().to_vec())
                 }
 
                 fn from_kitsune(k: &::std::sync::Arc<$k>) -> Self {
-                    <$h>::from_raw_bytes((**k).clone().into()).into()
+                    <$h>::from_raw_36((**k).clone().into()).into()
                 }
             }
         )*
@@ -150,7 +160,7 @@ macro_rules! to_kitsune {
                 }
 
                 fn into_kitsune_raw(self) -> $k {
-                    self.into_inner().into()
+                    <$k as kitsune_p2p::KitsuneBinType>::new(self.get_raw_36().to_vec())
                 }
             }
         )*

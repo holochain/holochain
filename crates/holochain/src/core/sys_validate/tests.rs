@@ -1,125 +1,24 @@
 use super::*;
-use crate::{conductor::api::MockCellConductorApi, meta_mock};
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::api::MockCellConductorApi;
+use crate::meta_mock;
 use ::fixt::prelude::*;
 use error::SysValidationError;
-use holo_hash::fixt::*;
+
 use holochain_keystore::AgentPubKeyExt;
+use holochain_lmdb::env::EnvironmentRead;
+use holochain_lmdb::test_utils::test_cell_env;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{env::EnvironmentRead, test_utils::test_cell_env};
-use holochain_types::{
-    dna::{DnaDef, DnaFile},
-    element::{SignedHeaderHashed, SignedHeaderHashedExt},
-    fixt::*,
-    observability,
-    test_utils::{fake_agent_pubkey_1, fake_header_hash},
-    Timestamp,
-};
+
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{header::InitZomesComplete, Header};
+use holochain_zome_types::Header;
 use matches::assert_matches;
-use std::convert::{TryFrom, TryInto};
-
-async fn test_gen(ts: Timestamp, seq: u32, prev: HeaderHash) -> Element {
-    let keystore = holochain_state::test_utils::test_keystore();
-
-    let header = InitZomesComplete {
-        author: fake_agent_pubkey_1(),
-        timestamp: ts.into(),
-        header_seq: seq,
-        prev_header: prev,
-    };
-
-    let hashed = HeaderHashed::from_content_sync(header.into());
-    let signed = SignedHeaderHashed::new(&keystore, hashed).await.unwrap();
-    Element::new(signed, None)
-}
-
-#[tokio::test(threaded_scheduler)]
-async fn valid_headers_validate() {
-    let first = test_gen(
-        "2020-05-05T19:16:04.266431045Z".try_into().unwrap(),
-        12,
-        fake_header_hash(1),
-    )
-    .await;
-    let second = test_gen(
-        "2020-05-05T19:16:04.366431045Z".try_into().unwrap(),
-        13,
-        first.header_address().clone(),
-    )
-    .await;
-
-    sys_validate_element(&fake_agent_pubkey_1(), &second, Some(&first))
-        .await
-        .unwrap();
-}
-
-#[tokio::test(threaded_scheduler)]
-async fn invalid_hash_headers_dont_validate() {
-    let first = test_gen(
-        "2020-05-05T19:16:04.266431045Z".try_into().unwrap(),
-        12,
-        fake_header_hash(1),
-    )
-    .await;
-    let second = test_gen(
-        "2020-05-05T19:16:04.366431045Z".try_into().unwrap(),
-        13,
-        fake_header_hash(2),
-    )
-    .await;
-
-    matches::assert_matches!(
-        sys_validate_element(&fake_agent_pubkey_1(), &second, Some(&first)).await,
-        Err(SourceChainError::InvalidPreviousHeader(_))
-    );
-}
-
-#[tokio::test(threaded_scheduler)]
-async fn invalid_timestamp_headers_dont_validate() {
-    let first = test_gen(
-        "2020-05-05T19:16:04.266431045Z".try_into().unwrap(),
-        12,
-        fake_header_hash(1),
-    )
-    .await;
-    let second = test_gen(
-        "2020-05-05T19:16:04.166431045Z".try_into().unwrap(),
-        13,
-        first.header_address().clone(),
-    )
-    .await;
-
-    matches::assert_matches!(
-        sys_validate_element(&fake_agent_pubkey_1(), &second, Some(&first)).await,
-        Err(SourceChainError::InvalidPreviousHeader(_))
-    );
-}
-
-#[tokio::test(threaded_scheduler)]
-async fn invalid_seq_headers_dont_validate() {
-    let first = test_gen(
-        "2020-05-05T19:16:04.266431045Z".try_into().unwrap(),
-        12,
-        fake_header_hash(1),
-    )
-    .await;
-    let second = test_gen(
-        "2020-05-05T19:16:04.366431045Z".try_into().unwrap(),
-        14,
-        first.header_address().clone(),
-    )
-    .await;
-
-    matches::assert_matches!(
-        sys_validate_element(&fake_agent_pubkey_1(), &second, Some(&first)).await,
-        Err(SourceChainError::InvalidPreviousHeader(_))
-    );
-}
+use observability;
+use std::convert::TryFrom;
 
 #[tokio::test(threaded_scheduler)]
 async fn verify_header_signature_test() {
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_lmdb::test_utils::test_keystore();
     let author = fake_agent_pubkey_1();
     let mut header = fixt!(CreateLink);
     header.author = author.clone();
@@ -129,12 +28,12 @@ async fn verify_header_signature_test() {
 
     assert_matches!(
         verify_header_signature(&wrong_signature, &header).await,
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::VerifySignature(_, _)))
+        Ok(false)
     );
 
     assert_matches!(
         verify_header_signature(&real_signature, &header).await,
-        Ok(())
+        Ok(true)
     );
 }
 
@@ -158,7 +57,7 @@ async fn check_previous_header() {
 
 #[tokio::test(threaded_scheduler)]
 async fn check_valid_if_dna_test() {
-    let env: EnvironmentRead = test_cell_env().env.into();
+    let env: EnvironmentRead = test_cell_env().env().into();
     // Test data
     let activity_return = vec![fixt!(HeaderHash)];
 
@@ -186,34 +85,6 @@ async fn check_valid_if_dna_test() {
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRoot)
         ))
-    );
-}
-
-#[tokio::test(threaded_scheduler)]
-async fn check_prev_header_in_metadata_test() {
-    let env: EnvironmentRead = test_cell_env().env.into();
-    // Test data
-    let mut header_fixt = HeaderHashFixturator::new(Predictable);
-    let prev_header_hash = header_fixt.next().unwrap();
-    let author = fixt!(AgentPubKey);
-    let activity_return = vec![prev_header_hash.clone()];
-    let mut metadata = meta_mock!(expect_get_activity, activity_return, {
-        let author = author.clone();
-        move |a| *a == author
-    });
-
-    metadata.expect_env().return_const(env);
-
-    // Previous header on this hash
-    assert_matches!(
-        check_prev_header_in_metadata(&author, &prev_header_hash, &metadata).await,
-        Ok(())
-    );
-
-    // No previous header on this hash
-    assert_matches!(
-        check_prev_header_in_metadata(&author, &header_fixt.next().unwrap(), &metadata).await,
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::NotHoldingDep(_)))
     );
 }
 
@@ -412,6 +283,7 @@ async fn check_app_entry_type_test() {
     )
     .await
     .unwrap();
+    let dna_hash = dna_file.dna_hash().to_owned().clone();
     let mut entry_def = fixt!(EntryDef);
     entry_def.visibility = EntryVisibility::Public;
 
@@ -420,13 +292,17 @@ async fn check_app_entry_type_test() {
     conductor_api.expect_cell_id().return_const(fixt!(CellId));
     // # No dna or entry def
     conductor_api.expect_sync_get_entry_def().return_const(None);
-    conductor_api.expect_sync_get_this_dna().return_const(None);
+    conductor_api.expect_sync_get_dna().return_const(None);
+    conductor_api
+        .expect_sync_get_this_dna()
+        .returning(move || Err(ConductorApiError::DnaMissing(dna_hash.clone())));
 
     // ## Dna is missing
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,
-        Err(SysValidationError::DnaMissing(_))
+        Err(SysValidationError::ConductorApiError(e))
+        if matches!(*e, ConductorApiError::DnaMissing(_))
     );
 
     // # Dna but no entry def in buffer
@@ -434,8 +310,11 @@ async fn check_app_entry_type_test() {
     conductor_api.checkpoint();
     conductor_api.expect_sync_get_entry_def().return_const(None);
     conductor_api
+        .expect_sync_get_dna()
+        .return_const(Some(dna_file.clone()));
+    conductor_api
         .expect_sync_get_this_dna()
-        .return_const(Some(dna_file));
+        .returning(move || Ok(dna_file.clone()));
     let aet = AppEntryType::new(0.into(), 1.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,

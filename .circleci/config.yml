@@ -18,9 +18,21 @@ commands:
       command: ./docker/push.sh << parameters.box >> $CIRCLE_BRANCH
 
 jobs:
+  build-binary-packages:
+    docker:
+     - image: nixos/nix
+    environment:
+     NIXPKGS_ALLOW_UNFREE: 1
+    steps:
+      - checkout
+      - run:
+         name: Build the Nix packages
+         no_output_timeout: 45m
+         command: nix build --verbose -f default.nix pkgs.applications
+
   merge-test:
     docker:
-     - image: holochain/holochain-2020:circle.build.develop
+     - image: holochain/holochain:circle.build.develop
        auth:
         username: $DOCKER_USER
         password: $DOCKER_PASS
@@ -30,7 +42,35 @@ jobs:
     steps:
       - checkout
       - run:
-          command: nix-shell --run hc-merge-test
+         name: Unset CircleCI's forced conversion of HTTPS->SSH
+         command: git config --global --unset "url.ssh://git@github.com.insteadof"
+      - run:
+         name: Set up Hydra cache
+         command: $(nix-build . --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
+      - run:
+         name: Run the merge tests
+         no_output_timeout: 30m
+         command: nix-shell --pure --argstr flavor "coreDev" --run hc-merge-test
+
+  merge-test-mac:
+   macos:
+    xcode: "12.0.0"
+   resource_class: xlarge
+   environment:
+    NIXPKGS_ALLOW_UNFREE: 1
+   steps:
+    - checkout
+    - run:
+       name: Test on mac
+       no_output_timeout: 30m
+       command: |
+        # fix for "too many open files" that breaks tokio and lmdb
+        ulimit -n 10240
+        # catalina nixos install
+        sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume
+        . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
+        # do tests
+        nix-shell --argstr flavor ci --run hc-merge-test
 
   docker-build-latest:
    resource_class: large
@@ -50,7 +90,14 @@ workflows:
  version: 2.1
  tests:
   jobs:
+   - build-binary-packages:
+      filters:
+       branches:
+        only:
+          - /.*release.*/
    - merge-test
+   # - merge-test-mac
+
  docker-builds:
   triggers:
    - schedule:

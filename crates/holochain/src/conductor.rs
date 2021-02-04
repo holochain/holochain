@@ -14,11 +14,10 @@
 
 pub mod api;
 mod cell;
-#[allow(missing_docs)]
-pub mod compat;
 #[allow(clippy::module_inception)]
 #[allow(missing_docs)]
 mod conductor;
+#[allow(missing_docs)]
 pub mod config;
 #[allow(missing_docs)]
 pub mod dna_store;
@@ -27,15 +26,17 @@ pub mod entry_def_store;
 pub mod error;
 pub mod handle;
 pub mod interactive;
-#[allow(missing_docs)]
 pub mod interface;
 pub mod manager;
+pub mod p2p_store;
 pub mod paths;
 pub mod state;
 
-pub use cell::{error::CellError, Cell};
-pub(crate) use conductor::delete_me_create_test_keystore;
-pub use conductor::{Conductor, ConductorBuilder, ConductorStateDb};
+pub use cell::error::CellError;
+pub use cell::Cell;
+pub use conductor::Conductor;
+pub use conductor::ConductorBuilder;
+pub use conductor::ConductorStateDb;
 pub use handle::ConductorHandle;
 
 /// setup a tokio runtime that meets the conductor's needs

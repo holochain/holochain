@@ -1,16 +1,18 @@
+use std::convert::TryFrom;
+
 use super::SourceChainError;
-use crate::{
-    conductor::entry_def_store::error::EntryDefStoreError,
-    core::state::cascade::error::CascadeError,
-};
-use holo_hash::{AnyDhtHash, HeaderHash};
-use holochain_keystore::{KeystoreError, Signature};
-use holochain_state::error::DatabaseError;
-use holochain_types::cell::CellId;
-use holochain_zome_types::{
-    header::{AppEntryType, EntryType},
-    Header,
-};
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::entry_def_store::error::EntryDefStoreError;
+use crate::core::validation::OutcomeOrError;
+use crate::core::workflow::error::WorkflowError;
+use crate::from_sub_error;
+use holo_hash::AnyDhtHash;
+use holo_hash::HeaderHash;
+use holochain_cascade::error::CascadeError;
+use holochain_keystore::KeystoreError;
+use holochain_lmdb::error::DatabaseError;
+use holochain_state::workspace::WorkspaceError;
+use holochain_types::prelude::*;
 use thiserror::Error;
 
 /// Validation can result in either
@@ -35,11 +37,47 @@ pub enum SysValidationError {
     SourceChainError(#[from] SourceChainError),
     #[error("Dna is missing for this cell {0:?}. Cannot validate without dna.")]
     DnaMissing(CellId),
+    // TODO: Remove this when SysValidationResult is replace with SysValidationOutcome
     #[error(transparent)]
     ValidationOutcome(#[from] ValidationOutcome),
+    #[error(transparent)]
+    WorkflowError(#[from] Box<WorkflowError>),
+    #[error(transparent)]
+    WorkspaceError(#[from] WorkspaceError),
+    #[error(transparent)]
+    ConductorApiError(#[from] Box<ConductorApiError>),
 }
 
+#[deprecated = "This will be replaced with SysValidationOutcome as we shouldn't treat outcomes as errors"]
 pub type SysValidationResult<T> = Result<T, SysValidationError>;
+
+/// Return either:
+/// - an Ok result
+/// - ValidationOutcome
+/// - SysValidationError
+pub type SysValidationOutcome<T> = Result<T, OutcomeOrError<ValidationOutcome, SysValidationError>>;
+
+from_sub_error!(SysValidationError, WorkspaceError);
+
+impl<T> From<SysValidationError> for OutcomeOrError<T, SysValidationError> {
+    fn from(e: SysValidationError) -> Self {
+        OutcomeOrError::Err(e)
+    }
+}
+
+/// Turn the OutcomeOrError into an Outcome or and Error
+/// This is the best way to convert into an outcome or
+/// exit early with a real error
+impl<E> TryFrom<OutcomeOrError<ValidationOutcome, E>> for ValidationOutcome {
+    type Error = E;
+
+    fn try_from(value: OutcomeOrError<ValidationOutcome, E>) -> Result<Self, Self::Error> {
+        match value {
+            OutcomeOrError::Outcome(o) => Ok(o),
+            OutcomeOrError::Err(e) => Err(e),
+        }
+    }
+}
 
 // TODO: use try guard crate to refactor this so it's not an "Error"
 // https://docs.rs/try-guard/0.2.0/try_guard/
@@ -48,6 +86,8 @@ pub type SysValidationResult<T> = Result<T, SysValidationError>;
 /// failed validation.
 #[derive(Error, Debug)]
 pub enum ValidationOutcome {
+    #[error("The element with signature {0:?} and header {1:?} was found to be counterfeit")]
+    Counterfeit(Signature, Header),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
     #[error("The app entry type {0:?} entry def id was out of range")]
@@ -78,6 +118,21 @@ pub enum ValidationOutcome {
     VerifySignature(Signature, Header),
     #[error("The app entry type {0:?} zome id was out of range")]
     ZomeId(AppEntryType),
+}
+
+impl ValidationOutcome {
+    pub fn not_holding<I: Into<AnyDhtHash> + Clone>(h: &I) -> Self {
+        Self::NotHoldingDep(h.clone().into())
+    }
+    pub fn not_found<I: Into<AnyDhtHash> + Clone>(h: &I) -> Self {
+        Self::DepMissingFromDht(h.clone().into())
+    }
+
+    /// Convert into a OutcomeOrError<ValidationOutcome, SysValidationError>
+    /// and exit early
+    pub fn into_outcome<T>(self) -> SysValidationOutcome<T> {
+        Err(OutcomeOrError::Outcome(self))
+    }
 }
 
 #[derive(Error, Debug)]

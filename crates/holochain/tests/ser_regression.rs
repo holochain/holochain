@@ -1,28 +1,24 @@
 use ::fixt::prelude::*;
 use hdk3::prelude::*;
-use holo_hash::fixt::*;
-use holochain::conductor::{
-    api::{AppInterfaceApi, AppRequest, AppResponse, RealAppInterfaceApi},
-    dna_store::MockDnaStore,
-    ConductorBuilder, ConductorHandle,
-};
-use holochain::core::ribosome::ZomeCallInvocation;
-use holochain::fixt::*;
-use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
-use holochain_types::app::InstalledCell;
-use holochain_types::cell::CellId;
-use holochain_types::dna::DnaDef;
-use holochain_types::dna::DnaFile;
-use holochain_types::test_utils::fake_agent_pubkey_1;
-use holochain_types::{observability, test_utils::fake_agent_pubkey_2};
+
+use holochain::conductor::api::AppInterfaceApi;
+use holochain::conductor::api::AppRequest;
+use holochain::conductor::api::AppResponse;
+use holochain::conductor::api::RealAppInterfaceApi;
+use holochain::conductor::api::ZomeCall;
+use holochain::conductor::dna_store::MockDnaStore;
+use holochain::conductor::ConductorBuilder;
+use holochain::conductor::ConductorHandle;
+
+use holochain_lmdb::test_utils::test_environments;
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 pub use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::ExternInput;
-use holochain_zome_types::ZomeCallResponse;
+use observability;
 use std::sync::Arc;
 use tempdir::TempDir;
 
-#[derive(Serialize, Deserialize, SerializedBytes)]
+#[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 struct CreateMessageInput {
     channel_hash: EntryHash,
     content: String,
@@ -35,12 +31,12 @@ pub struct ChannelName(String);
 async fn ser_entry_hash_test() {
     observability::test_run().ok();
     let eh = fixt!(EntryHash);
-    let sb: SerializedBytes = eh.clone().try_into().unwrap();
-    tracing::debug!(?sb);
-    let o: HashEntryOutput = sb.try_into().unwrap();
-    let sb: SerializedBytes = o.try_into().unwrap();
-    tracing::debug!(?sb);
-    let _eh: EntryHash = sb.try_into().unwrap();
+    let extern_io: ExternIO = ExternIO::encode(eh).unwrap();
+    tracing::debug!(?extern_io);
+    let o: EntryHash = extern_io.decode().unwrap();
+    let extern_io: ExternIO = ExternIO::encode(o).unwrap();
+    tracing::debug!(?extern_io);
+    let _eh: EntryHash = extern_io.decode().unwrap();
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -122,36 +118,28 @@ async fn ser_regression_test() {
 
     let channel = ChannelName("hello world".into());
 
-    let invocation = ZomeCallInvocation {
+    let invocation = ZomeCall {
         cell_id: alice_cell_id.clone(),
         zome_name: TestWasm::SerRegression.into(),
-        cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
+        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: "create_channel".into(),
-        payload: ExternInput::new(channel.try_into().unwrap()),
+        payload: ExternIO::encode(channel).unwrap(),
         provenance: alice_agent_id.clone(),
     };
 
     let request = Box::new(invocation.clone());
-    let request = AppRequest::ZomeCallInvocation(request).try_into().unwrap();
+    let request = AppRequest::ZomeCall(request).try_into().unwrap();
     let response = app_api.handle_app_request(request).await;
 
-    let _channel_hash = match response {
-        AppResponse::ZomeCallInvocation(r) => {
-            let response: SerializedBytes = r.into_inner();
-            let channel_hash: EntryHash = response.try_into().unwrap();
-            channel_hash
-        }
+    let _channel_hash: EntryHash = match response {
+        AppResponse::ZomeCall(r) => r.decode().unwrap(),
         _ => unreachable!(),
     };
 
     let output = handle.call_zome(invocation).await.unwrap().unwrap();
 
-    let channel_hash = match output {
-        ZomeCallResponse::Ok(guest_output) => {
-            let response: SerializedBytes = guest_output.into_inner();
-            let channel_hash: EntryHash = response.try_into().unwrap();
-            channel_hash
-        }
+    let channel_hash: EntryHash = match output {
+        ZomeCallResponse::Ok(guest_output) => guest_output.decode().unwrap(),
         _ => unreachable!(),
     };
 
@@ -159,35 +147,28 @@ async fn ser_regression_test() {
         channel_hash,
         content: "Hello from alice :)".into(),
     };
-    let invocation = ZomeCallInvocation {
+    let invocation = ZomeCall {
         cell_id: alice_cell_id.clone(),
         zome_name: TestWasm::SerRegression.into(),
-        cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
+        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: "create_message".into(),
-        payload: ExternInput::new(message.try_into().unwrap()),
+        payload: ExternIO::encode(message).unwrap(),
         provenance: alice_agent_id.clone(),
     };
 
     let request = Box::new(invocation.clone());
-    let request = AppRequest::ZomeCallInvocation(request).try_into().unwrap();
+    let request = AppRequest::ZomeCall(request).try_into().unwrap();
     let response = app_api.handle_app_request(request).await;
 
-    let _msg_hash = match response {
-        AppResponse::ZomeCallInvocation(r) => {
-            let response: SerializedBytes = r.into_inner();
-            let msg_hash: EntryHash = response.try_into().unwrap();
-            msg_hash
-        }
+    let _msg_hash: EntryHash = match response {
+        AppResponse::ZomeCall(r) => r.decode().unwrap(),
         _ => unreachable!(),
     };
 
     let output = handle.call_zome(invocation).await.unwrap().unwrap();
 
-    match output {
-        ZomeCallResponse::Ok(guest_output) => {
-            let response: SerializedBytes = guest_output.into_inner();
-            let _msg_hash: EntryHash = response.try_into().unwrap();
-        }
+    let _msg_hash: EntryHash = match output {
+        ZomeCallResponse::Ok(guest_output) => guest_output.decode().unwrap(),
         _ => unreachable!(),
     };
 
@@ -200,15 +181,9 @@ pub async fn setup_app(
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
     dna_store: MockDnaStore,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-    let test_env = test_conductor_env();
-    let TestEnvironment {
-        env: wasm_env,
-        tmpdir: _tmpdir,
-    } = test_wasm_env();
-    let tmpdir = test_env.tmpdir.clone();
-
+    let envs = test_environments();
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-        .test(test_env, wasm_env)
+        .test(&envs)
         .await
         .unwrap();
 
@@ -229,5 +204,9 @@ pub async fn setup_app(
 
     let handle = conductor_handle.clone();
 
-    (tmpdir, RealAppInterfaceApi::new(conductor_handle), handle)
+    (
+        envs.tempdir(),
+        RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+        handle,
+    )
 }

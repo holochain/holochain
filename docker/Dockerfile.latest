@@ -2,12 +2,13 @@ FROM holochain/holonix:latest
 
 WORKDIR /holochain/build
 ENV NIX_ENV_PREFIX /holochain/build
+ENV NIXPKGS_ALLOW_UNFREE 1
 
 ARG DOCKER_BRANCH=develop
-ARG GITHUB_ACCESS_TOKEN=xxxx
 
-ADD https://api.github.com/repos/holochain/holochain/tarball/$DOCKER_BRANCH?access_token=$GITHUB_ACCESS_TOKEN /holochain/build/$DOCKER_BRANCH.tar.gz
+ADD https://github.com/holochain/holochain/archive/$DOCKER_BRANCH.tar.gz /holochain/build/$DOCKER_BRANCH.tar.gz
 RUN tar --strip-components=1 -zxvf $DOCKER_BRANCH.tar.gz
 
 # warm things
+RUN `nix-build . --no-link -A pkgs.ci.ciSetupNixConf`/bin/hc-ci-setup-nix-conf.sh
 RUN nix-shell --run echo

@@ -1,17 +1,13 @@
 use super::entry_def_store::EntryDefBufferKey;
 use fallible_iterator::FallibleIterator;
-use holochain_state::{
-    buffer::CasBufFreshAsync,
-    env::EnvironmentRead,
-    error::{DatabaseError, DatabaseResult},
-    exports::SingleStore,
-    fresh_reader,
-    prelude::*,
-};
-use holochain_types::{
-    dna::{DnaDef, DnaDefHashed, DnaFile},
-    prelude::*,
-};
+use holochain_lmdb::buffer::CasBufFreshAsync;
+use holochain_lmdb::env::EnvironmentRead;
+use holochain_lmdb::error::DatabaseError;
+use holochain_lmdb::error::DatabaseResult;
+use holochain_lmdb::exports::SingleStore;
+use holochain_lmdb::fresh_reader;
+use holochain_lmdb::prelude::*;
+use holochain_types::prelude::*;
 use holochain_zome_types::entry_def::EntryDef;
 use mockall::automock;
 use std::collections::HashMap;
@@ -30,7 +26,7 @@ pub struct DnaDefBuf {
 
 #[automock]
 pub trait DnaStore: Default + Send + Sync {
-    fn add(&mut self, dna: DnaFile);
+    fn add_dna(&mut self, dna: DnaFile);
     fn add_dnas<T: IntoIterator<Item = (DnaHash, DnaFile)> + 'static>(&mut self, dnas: T);
     fn add_entry_def(&mut self, k: EntryDefBufferKey, entry_def: EntryDef);
     fn add_entry_defs<T: IntoIterator<Item = (EntryDefBufferKey, EntryDef)> + 'static>(
@@ -45,7 +41,7 @@ pub trait DnaStore: Default + Send + Sync {
 
 impl DnaStore for RealDnaStore {
     #[instrument]
-    fn add(&mut self, dna: DnaFile) {
+    fn add_dna(&mut self, dna: DnaFile) {
         self.dnas.insert(dna.dna_hash().clone(), dna);
     }
     fn add_dnas<T: IntoIterator<Item = (DnaHash, DnaFile)> + 'static>(&mut self, dnas: T) {
