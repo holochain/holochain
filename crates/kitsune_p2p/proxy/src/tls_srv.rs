@@ -60,7 +60,7 @@ async fn tls_server(
 
                 let remote_proxy_url =
                     ProxyUrl::new(incoming_base_url.as_str(), cert_digest.into())?;
-                tracing::info!("{}: SRV: INCOMING TLS: {}", short, remote_proxy_url);
+                tracing::trace!("{}: SRV: INCOMING TLS: {}", short, remote_proxy_url);
 
                 evt_send
                     .send(TransportEvent::IncomingChannel(

@@ -68,7 +68,7 @@ async fn tls_client(
                     ProxyUrl::new(expected_proxy_url.as_base().as_str(), cert_digest.into())?;
                 if let Some(setup_send) = setup_send.take() {
                     if expected_proxy_url == remote_proxy_url {
-                        tracing::info!("{}: CLI: CONNECTED TLS: {}", short, remote_proxy_url);
+                        tracing::trace!("{}: CLI: CONNECTED TLS: {}", short, remote_proxy_url);
                         let _ = setup_send.send(Ok(()));
                     } else {
                         let msg = format!(

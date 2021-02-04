@@ -82,7 +82,11 @@ async fn gen_base_con(
 )> {
     match t {
         ProxyTransport::Mem => spawn_bind_transport_mem().await,
-        ProxyTransport::Quic => spawn_transport_listener_quic(Default::default()).await,
+        ProxyTransport::Quic => {
+            let mut cfg = ConfigListenerQuic::default();
+            cfg.bind_to = Some(url2::url2!("kitsune-quic://127.0.0.1:0"));
+            spawn_transport_listener_quic(cfg).await
+        }
     }
 }
 
@@ -136,9 +140,29 @@ enum Metric {
 async fn inner() -> TransportResult<()> {
     let opt = Opt::from_args();
 
+    kitsune_p2p_types::metrics::init_sys_info_poll();
+
     println!("{:#?}", opt);
 
     let (listener, mut events) = gen_proxy_con(&opt.transport).await?;
+
+    let listener_clone = listener.clone();
+    metric_task(async move {
+        loop {
+            tokio::time::delay_for(std::time::Duration::from_secs(20)).await;
+
+            let debug_dump = listener_clone.debug().await.unwrap();
+
+            println!(
+                "{}",
+                kitsune_p2p_types::dependencies::serde_json::to_string_pretty(&debug_dump).unwrap()
+            );
+        }
+
+        // needed for types
+        #[allow(unreachable_code)]
+        <Result<(), ()>>::Ok(())
+    });
 
     let proxy_url = listener.bound_url().await?;
     println!("Proxy Url: {}", proxy_url);
@@ -239,10 +263,7 @@ async fn gen_client(
                             ))
                             .await;
                             let data = read.read_to_end().await;
-                            assert_eq!(
-                                &data,
-                                in_data,
-                            );
+                            assert_eq!(&data, in_data,);
                             let _ = write.write_and_close(out_data.clone()).await;
                         }
                     }
@@ -259,29 +280,37 @@ async fn client_loop(
     opt: Opt,
     proxy_url: url2::Url2,
     con_url: url2::Url2,
-    mut metric_send: futures::channel::mpsc::Sender<Metric>,
+    metric_send: futures::channel::mpsc::Sender<Metric>,
 ) -> TransportResult<()> {
     let (con, _my_url) = gen_client(opt.clone(), proxy_url).await?;
 
+    let msg_size = opt.message_size_bytes;
+    let req_int = opt.request_interval_ms;
+    let proc_delay = opt.process_delay_ms;
     loop {
-        tokio::time::delay_for(std::time::Duration::from_millis(
-            opt.request_interval_ms as u64,
-        ))
-        .await;
+        tokio::time::delay_for(std::time::Duration::from_millis(req_int as u64)).await;
 
-        let out_data = vec![0xdb; opt.message_size_bytes];
-        let in_data = vec![0xbd; opt.message_size_bytes];
+        let out_data = vec![0xdb; msg_size];
+        let in_data = vec![0xbd; msg_size];
 
         let start = std::time::Instant::now();
-        let (_, mut write, read) = con.create_channel(con_url.clone()).await?;
-        write.write_and_close(out_data.clone()).await?;
-        let res = read.read_to_end().await;
-        assert_eq!(in_data, res);
-        metric_send
-            .send(Metric::RequestOverhead(
-                start.elapsed().as_millis() as u64 - opt.process_delay_ms as u64,
-            ))
-            .await
-            .map_err(TransportError::other)?;
+
+        let con = con.clone();
+        let con_url = con_url.clone();
+        let mut metric_send = metric_send.clone();
+        metric_task(async move {
+            let (_, mut write, read) = con.create_channel(con_url.clone()).await?;
+            write.write_and_close(out_data.clone()).await?;
+            let res = read.read_to_end().await;
+            assert_eq!(in_data, res);
+            metric_send
+                .send(Metric::RequestOverhead(
+                    start.elapsed().as_millis() as u64 - proc_delay as u64,
+                ))
+                .await
+                .map_err(TransportError::other)?;
+
+            TransportResult::Ok(())
+        });
     }
 }
