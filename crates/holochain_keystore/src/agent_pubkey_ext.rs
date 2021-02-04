@@ -15,7 +15,7 @@ pub trait AgentPubKeyExt {
     /// sign some arbitrary data
     fn sign<S>(&self, keystore: &KeystoreSender, data: S) -> KeystoreApiFuture<Signature>
     where
-        S: Serialize;
+        S: Serialize + std::fmt::Debug;
 
     /// sign some arbitrary raw bytes
     fn sign_raw(&self, keystore: &KeystoreSender, data: &[u8]) -> KeystoreApiFuture<Signature>;
@@ -40,7 +40,7 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
 
     fn sign<S>(&self, keystore: &KeystoreSender, input: S) -> KeystoreApiFuture<Signature>
     where
-        S: Serialize,
+        S: Serialize + std::fmt::Debug,
     {
         use ghost_actor::dependencies::futures::future::FutureExt;
         let keystore = keystore.clone();

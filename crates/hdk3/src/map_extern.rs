@@ -30,21 +30,32 @@ macro_rules! map_extern {
 
                 #[no_mangle]
                 pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr) -> $crate::prelude::GuestPtr {
+                    // Setup tracing.
+                    // @TODO feature flag this?
+                    match $crate::prelude::tracing::subscriber::set_global_default(
+                        $crate::host_fn::trace::WasmSubscriber::default()
+                    ) {
+                        Ok(_) => {},
+                        Err(e) => return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Zome(e.to_string())),
+                    }
+
+                    // Deserialize the input from the host.
                     let extern_io: $crate::prelude::ExternIO = match $crate::prelude::host_args(guest_ptr) {
                         Ok(v) => v,
                         Err(err_ptr) => return err_ptr,
                     };
-
                     let inner: $input = match extern_io.decode() {
                         Ok(v) => v,
                         Err(_) => return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Deserialize(vec![0])),
                     };
 
+                    // Call the function.
                     let output: $output = match super::$f(inner) {
                         Ok(v) => Ok(v),
                         Err(wasm_error) => return $crate::prelude::return_err_ptr(wasm_error),
                     };
 
+                    // Serialize the output for the host.
                     match $crate::prelude::ExternIO::encode(output.unwrap()) {
                         Ok(v) => $crate::prelude::return_ptr::<$crate::prelude::ExternIO>(v),
                         Err(serialized_bytes_error) => $crate::prelude::return_err_ptr($crate::prelude::WasmError::Serialize(serialized_bytes_error)),

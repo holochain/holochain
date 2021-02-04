@@ -242,7 +242,7 @@ mod tests {
         }
     }
 
-    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(serde::Serialize, serde::Deserialize, Debug)]
     struct TestMessage(String);
     try_from_serialized_bytes!(TestMessage);
 

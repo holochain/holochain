@@ -21,13 +21,13 @@ pub const THINGS_TO_SERIALIZE: [ThingsToSerialize; 4] = [
 ];
 
 /// Serialization wrapper for bools
-#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 struct BoolWrap(bool);
 /// Serialization wrapper for u32 (number)
-#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 struct U32Wrap(u32);
 /// Serialzation wrapper for Strings
-#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 struct StringWrap(String);
 
 fixturator!(
