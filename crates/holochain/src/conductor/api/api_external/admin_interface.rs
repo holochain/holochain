@@ -108,11 +108,12 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::DnaRegistered(hash))
             }
             CreateCloneCell(payload) => {
+                let cell_id = payload.cell_id();
                 self.conductor_handle
                     .clone()
                     .create_clone_cell(*payload)
                     .await?;
-                todo!()
+                Ok(AdminResponse::CloneCellCreated(cell_id))
             }
             InstallApp(payload) => {
                 trace!(?payload.dnas);

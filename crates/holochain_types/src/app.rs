@@ -75,6 +75,13 @@ pub struct CreateCloneCellPayload {
     pub membrane_proof: Option<MembraneProof>,
 }
 
+impl CreateCloneCellPayload {
+    /// Get the CellId of the to-be-created clone cell
+    pub fn cell_id(&self) -> CellId {
+        CellId::new(self.dna_hash.clone(), self.agent_key.clone())
+    }
+}
+
 /// A collection of [DnaHash]es paired with an [AgentPubKey] and an app id
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct InstallAppPayload {
@@ -251,20 +258,21 @@ impl InstalledApp {
 
     /// Accessor
     pub fn provisioned_cells(&self) -> impl Iterator<Item = (&CellNick, &CellId)> {
-        todo!("implement or remove if not needed");
-        std::iter::empty()
+        self.slots
+            .iter()
+            .filter_map(|(nick, slot)| slot.provisioned_cell.as_ref().map(|c| (nick, c)))
     }
 
     /// Accessor
-    pub fn into_provisioned_cells(self) -> impl Iterator<Item = CellId> {
-        todo!("implement or remove if not needed");
-        std::iter::empty()
+    pub fn into_provisioned_cells(self) -> impl Iterator<Item = (CellNick, CellId)> {
+        self.slots
+            .into_iter()
+            .filter_map(|(nick, slot)| slot.provisioned_cell.map(|c| (nick, c)))
     }
 
     /// Accessor
     pub fn cloned_cells(&self) -> impl Iterator<Item = &CellId> {
-        todo!("implement or remove if not needed");
-        std::iter::empty()
+        self.slots.iter().map(|(_, slot)| &slot.clones).flatten()
     }
 
     /// Iterator of all cells, both provisioned and cloned
@@ -276,7 +284,7 @@ impl InstalledApp {
 
     /// Add a cloned cell
     pub fn add_clone(&mut self, cell_nick: &CellNick, cell_id: CellId) -> AppResult<()> {
-        let mut slot = self
+        let slot = self
             .slots
             .get_mut(cell_nick)
             .ok_or_else(|| AppError::CellNickMissing(cell_nick.clone()))?;
@@ -288,8 +296,13 @@ impl InstalledApp {
     }
 
     /// Remove a cloned cell
-    pub fn remove_clone(&mut self, cell_nick: &CellNick, cell_id: &CellId) -> () {
-        todo!("implement");
+    pub fn remove_clone(&mut self, cell_nick: &CellNick, cell_id: &CellId) -> AppResult<()> {
+        let slot = self
+            .slots
+            .get_mut(cell_nick)
+            .ok_or_else(|| AppError::CellNickMissing(cell_nick.clone()))?;
+        todo!("rethink this as hashmap")
+        // slot.clones.remove()
     }
 }
 

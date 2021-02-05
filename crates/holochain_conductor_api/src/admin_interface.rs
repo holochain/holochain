@@ -263,6 +263,14 @@ pub enum AdminResponse {
     /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
     AppBundleInstalled(InstalledApp),
 
+    /// The successful response to an [`AdminRequest::CreateCloneCell`].
+    ///
+    /// The response contains the [`CellId`] of the newly created clone.
+    ///
+    /// [`AdminRequest::CreateCloneCell`]: enum.AdminRequest.html#variant.CreateCloneCell
+    /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
+    CloneCellCreated(CellId),
+
     /// The succesful response to an [`AdminRequest::AddAdminInterfaces`].
     ///
     /// It means the `AdminInterface`s have successfully been added
