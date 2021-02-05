@@ -239,7 +239,7 @@ impl InstalledApp {
             .map(|InstalledCell { cell_nick, cell_id }| {
                 let slot = CellSlot {
                     provisioned_cell: Some(cell_id),
-                    clones: Vec::new(),
+                    clones: HashSet::new(),
                     clone_limit: 0,
                 };
                 (cell_nick, slot)
@@ -283,7 +283,7 @@ impl InstalledApp {
     }
 
     /// Add a cloned cell
-    pub fn add_clone(&mut self, cell_nick: &CellNick, cell_id: CellId) -> AppResult<()> {
+    pub fn add_clone(&mut self, cell_nick: &CellNick, cell_id: CellId) -> AppResult<bool> {
         let slot = self
             .slots
             .get_mut(cell_nick)
@@ -291,18 +291,16 @@ impl InstalledApp {
         if slot.clones.len() >= slot.clone_limit {
             return Err(AppError::CloneLimitExceeded(slot.clone_limit, slot.clone()));
         }
-        slot.clones.push(cell_id);
-        Ok(())
+        Ok(slot.clones.insert(cell_id))
     }
 
     /// Remove a cloned cell
-    pub fn remove_clone(&mut self, cell_nick: &CellNick, cell_id: &CellId) -> AppResult<()> {
+    pub fn remove_clone(&mut self, cell_nick: &CellNick, cell_id: &CellId) -> AppResult<bool> {
         let slot = self
             .slots
             .get_mut(cell_nick)
             .ok_or_else(|| AppError::CellNickMissing(cell_nick.clone()))?;
-        todo!("rethink this as hashmap")
-        // slot.clones.remove()
+        Ok(slot.clones.remove(cell_id))
     }
 }
 
@@ -317,7 +315,7 @@ pub struct CellSlot {
     clone_limit: usize,
     /// Cells which were cloned at runtime. The length cannot grow beyond
     /// `clone_limit`
-    clones: Vec<CellId>,
+    clones: HashSet<CellId>,
 }
 
 impl CellSlot {
@@ -326,7 +324,7 @@ impl CellSlot {
         Self {
             provisioned_cell,
             clone_limit,
-            clones: Vec::new(),
+            clones: HashSet::new(),
         }
     }
 }
@@ -343,6 +341,8 @@ mod tests {
         let slot1 = CellSlot::new(None, 3);
         let nick: CellNick = "nick".into();
         let mut app = InstalledApp::new("app", vec![(nick.clone(), slot1)]);
+
+        // Can add clones up to the limit
         let cell_ids = vec![fixt!(CellId), fixt!(CellId), fixt!(CellId)];
         app.add_clone(&nick, cell_ids[0].clone()).unwrap();
         app.add_clone(&nick, cell_ids[1].clone()).unwrap();
@@ -359,7 +359,8 @@ mod tests {
             maplit::hashset! { &cell_ids[0], &cell_ids[1], &cell_ids[2] }
         );
 
-        app.remove_clone(&nick, &cell_ids[1]).unwrap();
+        assert_eq!(app.remove_clone(&nick, &cell_ids[1]).unwrap(), true);
+        assert_eq!(app.remove_clone(&nick, &cell_ids[1]).unwrap(), false);
 
         assert_eq!(
             app.cloned_cells().collect::<HashSet<_>>(),
@@ -367,10 +368,9 @@ mod tests {
         );
 
         // Can't add the same clone twice
-        matches::assert_matches!(
-            app.add_clone(&nick, cell_ids[0].clone()),
-            Err(AppError::CloneAlreadyExists(n, _)) if n == nick
-        );
+        assert_eq!(app.add_clone(&nick, cell_ids[0].clone()).unwrap(), false);
+
+        assert_eq!(app.cloned_cells().count(), 2);
 
         assert_eq!(
             app.cloned_cells().collect::<HashSet<_>>(),
