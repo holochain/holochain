@@ -330,3 +330,51 @@ impl CellSlot {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{CellSlot, InstalledApp};
+    use crate::prelude::*;
+    use ::fixt::prelude::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn clone_management() {
+        let slot1 = CellSlot::new(None, 3);
+        let nick: CellNick = "nick".into();
+        let mut app = InstalledApp::new("app", vec![(nick.clone(), slot1)]);
+        let cell_ids = vec![fixt!(CellId), fixt!(CellId), fixt!(CellId)];
+        app.add_clone(&nick, cell_ids[0].clone()).unwrap();
+        app.add_clone(&nick, cell_ids[1].clone()).unwrap();
+        app.add_clone(&nick, cell_ids[2].clone()).unwrap();
+
+        // Adding a clone beyond the clone_limit is an error
+        matches::assert_matches!(
+            app.add_clone(&nick, fixt!(CellId)),
+            Err(AppError::CloneLimitExceeded(3, _))
+        );
+
+        assert_eq!(
+            app.cloned_cells().collect::<HashSet<_>>(),
+            maplit::hashset! { &cell_ids[0], &cell_ids[1], &cell_ids[2] }
+        );
+
+        app.remove_clone(&nick, &cell_ids[1]).unwrap();
+
+        assert_eq!(
+            app.cloned_cells().collect::<HashSet<_>>(),
+            maplit::hashset! { &cell_ids[0], &cell_ids[2] }
+        );
+
+        // Can't add the same clone twice
+        matches::assert_matches!(
+            app.add_clone(&nick, cell_ids[0].clone()),
+            Err(AppError::CloneAlreadyExists(n, _)) if n == nick
+        );
+
+        assert_eq!(
+            app.cloned_cells().collect::<HashSet<_>>(),
+            app.cells().collect::<HashSet<_>>()
+        );
+    }
+}
