@@ -18,7 +18,6 @@ pub fn create<'a>(
     call_context: Arc<CallContext>,
     input: EntryWithDefId,
 ) -> Result<HeaderHash, WasmError> {
-    println!("create");
 
     // build the entry hash
     let async_entry = AsRef::<Entry>::as_ref(&input).to_owned();
@@ -77,7 +76,6 @@ pub fn extract_entry_def(
     call_context: Arc<CallContext>,
     entry_def_id: EntryDefId,
 ) -> Result<(holochain_zome_types::header::EntryDefIndex, EntryVisibility), WasmError> {
-    println!("extract_entry_def");
     let app_entry_type = match ribosome
         .run_entry_defs((&call_context.host_access).into(), EntryDefsInvocation)
         .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?
@@ -160,12 +158,12 @@ pub mod wasm_test {
         let output = create(Arc::new(ribosome), Arc::new(call_context), input);
 
         assert_eq!(
-            format!("{:?}", output.unwrap_err()),
+            format!("{}", output.unwrap_err().to_string()),
             format!(
-                "{:?}",
-                RibosomeError::SourceChainError(SourceChainError::InvalidStructure(
+                "{}",
+                WasmError::Host(RibosomeError::SourceChainError(SourceChainError::InvalidStructure(
                     ChainInvalidReason::GenesisDataMissing
-                ))
+                )).to_string())
             ),
         );
     }

@@ -1643,7 +1643,6 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "thiserror",
- "tracing",
 ]
 
 [[package]]

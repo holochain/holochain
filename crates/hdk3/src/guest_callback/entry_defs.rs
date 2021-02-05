@@ -203,7 +203,6 @@ macro_rules! entry_defs {
     [ $( $def:expr ),* ] => {
         #[hdk_extern]
         fn entry_defs(_: ()) -> $crate::prelude::ExternResult<$crate::prelude::EntryDefsCallbackResult> {
-            debug!("entry_defs");
             Ok($crate::prelude::EntryDefsCallbackResult::from(vec![ $( $def ),* ]))
         }
     };
