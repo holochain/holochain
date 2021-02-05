@@ -40,7 +40,7 @@ impl std::str::FromStr for ProxyTransport {
 #[structopt(name = "proxy-stress")]
 pub struct Opt {
     /// Transport to test with. ('mem'/'m' or 'quic'/'q')
-    #[structopt(short = "t", long, default_value = "Mem")]
+    #[structopt(short = "t", long, default_value = "Quic")]
     transport: ProxyTransport,
 
     /// How many client nodes should be spawned
@@ -52,7 +52,7 @@ pub struct Opt {
     request_interval_ms: u32,
 
     /// How long nodes should delay before responding
-    #[structopt(short = "d", long, default_value = "200")]
+    #[structopt(short = "d", long, default_value = "100")]
     process_delay_ms: u32,
 
     /// Message size bytes
@@ -60,8 +60,12 @@ pub struct Opt {
     message_size_bytes: usize,
 
     /// Number of incoming requests to process in parallel
-    #[structopt(short = "p", long, default_value = "32")]
+    #[structopt(short = "p", long, default_value = "512")]
     parallel_request_handle_count: usize,
+
+    /// Limit open requests allowed per node
+    #[structopt(short = "l", long, default_value = "512")]
+    limit_open_requests_per_node: usize,
 }
 
 #[tokio::main]
@@ -76,6 +80,7 @@ async fn main() {
 
 async fn gen_base_con(
     t: &ProxyTransport,
+    tuning_params: Arc<KitsuneP2pTuningParams>,
 ) -> TransportResult<(
     ghost_actor::GhostSender<TransportListener>,
     futures::channel::mpsc::Receiver<TransportEvent>,
@@ -85,52 +90,38 @@ async fn gen_base_con(
         ProxyTransport::Quic => {
             let mut cfg = ConfigListenerQuic::default();
             cfg.bind_to = Some(url2::url2!("kitsune-quic://127.0.0.1:0"));
-            spawn_transport_listener_quic(
-                cfg,
-                Arc::new(kitsune_p2p_types::config::KitsuneP2pTuningParams::default()),
-            )
-            .await
+            spawn_transport_listener_quic(cfg, tuning_params).await
         }
     }
 }
 
 async fn gen_proxy_con(
     t: &ProxyTransport,
+    tuning_params: Arc<KitsuneP2pTuningParams>,
 ) -> TransportResult<(
     ghost_actor::GhostSender<TransportListener>,
     futures::channel::mpsc::Receiver<TransportEvent>,
 )> {
-    let (listener, events) = gen_base_con(t).await?;
+    let (listener, events) = gen_base_con(t, tuning_params.clone()).await?;
     let proxy_config = ProxyConfig::local_proxy_server(
         TlsConfig::new_ephemeral().await?,
         AcceptProxyCallback::accept_all(),
     );
-    spawn_kitsune_proxy_listener(
-        proxy_config,
-        Arc::new(KitsuneP2pTuningParams::default()),
-        listener,
-        events,
-    )
-    .await
+    spawn_kitsune_proxy_listener(proxy_config, tuning_params, listener, events).await
 }
 
 async fn gen_cli_con(
     t: &ProxyTransport,
     proxy_url: url2::Url2,
+    tuning_params: Arc<KitsuneP2pTuningParams>,
 ) -> TransportResult<(
     ghost_actor::GhostSender<TransportListener>,
     futures::channel::mpsc::Receiver<TransportEvent>,
 )> {
-    let (listener, events) = gen_base_con(t).await?;
+    let (listener, events) = gen_base_con(t, tuning_params.clone()).await?;
     let proxy_config =
         ProxyConfig::remote_proxy_client(TlsConfig::new_ephemeral().await?, proxy_url.into());
-    spawn_kitsune_proxy_listener(
-        proxy_config,
-        Arc::new(KitsuneP2pTuningParams::default()),
-        listener,
-        events,
-    )
-    .await
+    spawn_kitsune_proxy_listener(proxy_config, tuning_params, listener, events).await
 }
 
 #[derive(Debug)]
@@ -144,11 +135,16 @@ enum Metric {
 async fn inner() -> TransportResult<()> {
     let opt = Opt::from_args();
 
+    let mut tuning_params = KitsuneP2pTuningParams::default();
+    tuning_params.concurrent_recv_buffer = opt.limit_open_requests_per_node as u32;
+    tuning_params.quic_connection_channel_limit = opt.limit_open_requests_per_node as u32;
+    let tuning_params = Arc::new(tuning_params);
+
     kitsune_p2p_types::metrics::init_sys_info_poll();
 
     println!("{:#?}", opt);
 
-    let (listener, mut events) = gen_proxy_con(&opt.transport).await?;
+    let (listener, mut events) = gen_proxy_con(&opt.transport, tuning_params.clone()).await?;
 
     let listener_clone = listener.clone();
     metric_task(async move {
@@ -224,7 +220,7 @@ async fn inner() -> TransportResult<()> {
 
     // everybody will talk to this one client
     // this proves that the client can process many responses in parallel
-    let (_con, con_url) = gen_client(opt.clone(), proxy_url.clone()).await?;
+    let (_con, con_url) = gen_client(opt.clone(), proxy_url.clone(), tuning_params.clone()).await?;
     println!("Responder Url: {}", con_url);
 
     // spin up all the nodes that will be making requests of the responder.
@@ -234,6 +230,7 @@ async fn inner() -> TransportResult<()> {
             proxy_url.clone(),
             con_url.clone(),
             metric_send.clone(),
+            tuning_params.clone(),
         ));
     }
 
@@ -244,12 +241,15 @@ async fn inner() -> TransportResult<()> {
 async fn gen_client(
     opt: Opt,
     proxy_url: url2::Url2,
+    tuning_params: Arc<KitsuneP2pTuningParams>,
 ) -> TransportResult<(ghost_actor::GhostSender<TransportListener>, url2::Url2)> {
-    let (con, events) = gen_cli_con(&opt.transport, proxy_url).await?;
+    let (con, events) = gen_cli_con(&opt.transport, proxy_url, tuning_params).await?;
 
     let con_url = con.bound_url().await?;
 
     let msg_size = opt.message_size_bytes;
+    //static BOB: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    //let start = std::time::Instant::now();
     metric_task(async move {
         let in_data = vec![0xdb; msg_size];
         let in_data = &in_data;
@@ -260,6 +260,7 @@ async fn gen_client(
             .for_each_concurrent(
                 /* limit */ opt.parallel_request_handle_count,
                 move |evt| async move {
+                    //println!("incoming: {} req/s", BOB.fetch_add(1, std::sync::atomic::Ordering::Relaxed) * 1000 / (start.elapsed().as_millis() as u64 + 1));
                     match evt {
                         TransportEvent::IncomingChannel(_url, mut write, read) => {
                             tokio::time::delay_for(std::time::Duration::from_millis(
@@ -285,8 +286,13 @@ async fn client_loop(
     proxy_url: url2::Url2,
     con_url: url2::Url2,
     metric_send: futures::channel::mpsc::Sender<Metric>,
+    tuning_params: Arc<KitsuneP2pTuningParams>,
 ) -> TransportResult<()> {
-    let (con, _my_url) = gen_client(opt.clone(), proxy_url).await?;
+    let (con, _my_url) = gen_client(opt.clone(), proxy_url, tuning_params).await?;
+
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(
+        opt.limit_open_requests_per_node,
+    ));
 
     let msg_size = opt.message_size_bytes;
     let req_int = opt.request_interval_ms;
@@ -302,7 +308,9 @@ async fn client_loop(
         let con = con.clone();
         let con_url = con_url.clone();
         let mut metric_send = metric_send.clone();
+        let permit = semaphore.clone().acquire_owned().await;
         metric_task(async move {
+            let _permit = permit;
             let (_, mut write, read) = con.create_channel(con_url.clone()).await?;
             write.write_and_close(out_data.clone()).await?;
             let res = read.read_to_end().await;

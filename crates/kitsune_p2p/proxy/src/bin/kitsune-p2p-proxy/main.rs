@@ -59,6 +59,7 @@ impl From<TlsFileCert> for TlsConfig {
 
 async fn inner() -> TransportResult<()> {
     let opt = Opt::from_args();
+    let tuning_params = Arc::new(KitsuneP2pTuningParams::default());
 
     if let Some(gen_cert) = &opt.danger_gen_unenc_cert {
         let tls = TlsConfig::new_ephemeral().await?;
@@ -92,18 +93,12 @@ async fn inner() -> TransportResult<()> {
     };
 
     let (listener, events) =
-        spawn_transport_listener_quic(opt.into(), Arc::new(KitsuneP2pTuningParams::default()))
-            .await?;
+        spawn_transport_listener_quic(opt.into(), tuning_params.clone()).await?;
 
     let proxy_config = ProxyConfig::local_proxy_server(tls_conf, AcceptProxyCallback::accept_all());
 
-    let (listener, mut events) = spawn_kitsune_proxy_listener(
-        proxy_config,
-        Arc::new(KitsuneP2pTuningParams::default()),
-        listener,
-        events,
-    )
-    .await?;
+    let (listener, events) =
+        spawn_kitsune_proxy_listener(proxy_config, tuning_params.clone(), listener, events).await?;
 
     let listener_clone = listener.clone();
     metric_task(async move {
@@ -122,26 +117,30 @@ async fn inner() -> TransportResult<()> {
 
     println!("{}", listener.bound_url().await?);
 
+    let concurrent_recv = tuning_params.concurrent_recv_buffer as usize;
     metric_task(async move {
-        while let Some(evt) = events.next().await {
-            match evt {
-                TransportEvent::IncomingChannel(url, mut write, _read) => {
-                    tracing::debug!(
-                        "{} is trying to talk directly to us - dump proxy state",
-                        url
-                    );
-                    match listener.debug().await {
-                        Ok(dump) => {
-                            let dump = serde_json::to_string_pretty(&dump).unwrap();
-                            let _ = write.write_and_close(dump.into_bytes()).await;
-                        }
-                        Err(e) => {
-                            let _ = write.write_and_close(format!("{:?}", e).into_bytes()).await;
+        events
+            .for_each_concurrent(concurrent_recv, |evt| async {
+                match evt {
+                    TransportEvent::IncomingChannel(url, mut write, _read) => {
+                        tracing::debug!(
+                            "{} is trying to talk directly to us - dump proxy state",
+                            url
+                        );
+                        match listener.debug().await {
+                            Ok(dump) => {
+                                let dump = serde_json::to_string_pretty(&dump).unwrap();
+                                let _ = write.write_and_close(dump.into_bytes()).await;
+                            }
+                            Err(e) => {
+                                let _ =
+                                    write.write_and_close(format!("{:?}", e).into_bytes()).await;
+                            }
                         }
                     }
                 }
-            }
-        }
+            })
+            .await;
         <Result<(), ()>>::Ok(())
     });
 

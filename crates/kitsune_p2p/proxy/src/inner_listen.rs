@@ -11,7 +11,7 @@ pub async fn spawn_kitsune_proxy_listener(
     proxy_config: Arc<ProxyConfig>,
     tuning_params: Arc<KitsuneP2pTuningParams>,
     sub_sender: ghost_actor::GhostSender<TransportListener>,
-    mut sub_receiver: TransportEventReceiver,
+    sub_receiver: TransportEventReceiver,
 ) -> TransportResult<(
     ghost_actor::GhostSender<TransportListener>,
     TransportEventReceiver,
@@ -45,7 +45,8 @@ pub async fn spawn_kitsune_proxy_listener(
 
     let i_s = channel_factory.create_channel::<Internal>().await?;
 
-    let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
+    let concurrent_recv = tuning_params.concurrent_recv_buffer as usize;
+    let (evt_send, evt_recv) = futures::channel::mpsc::channel(concurrent_recv);
 
     // spawn the actor
     metric_task(
@@ -100,19 +101,22 @@ pub async fn spawn_kitsune_proxy_listener(
     }
 
     // handle incoming channels from our sub transport
+    let concurrent_recv = tuning_params.concurrent_recv_buffer as usize;
     metric_task(async move {
-        while let Some(evt) = sub_receiver.next().await {
-            match evt {
-                TransportEvent::IncomingChannel(url, write, read) => {
-                    // spawn so we can process incoming requests in parallel
-                    let i_s = i_s.clone();
-                    metric_task(async move {
-                        let _ = i_s.incoming_channel(url, write, read).await;
-                        <Result<(), ()>>::Ok(())
-                    });
+        sub_receiver
+            .for_each_concurrent(concurrent_recv, |evt| async {
+                match evt {
+                    TransportEvent::IncomingChannel(url, write, read) => {
+                        // spawn so we can process incoming requests in parallel
+                        let i_s = i_s.clone();
+                        metric_task(async move {
+                            let _ = i_s.incoming_channel(url, write, read).await;
+                            <Result<(), ()>>::Ok(())
+                        });
+                    }
                 }
-            }
-        }
+            })
+            .await;
 
         // Our incoming channels ended,
         // this also indicates we cannot establish outgoing connections.

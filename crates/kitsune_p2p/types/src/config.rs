@@ -44,8 +44,20 @@ pub struct KitsuneP2pTuningParams {
     /// [Default: 5 minutes]
     pub proxy_to_expire_ms: u32,
 
-    /// Quic channel limit per connection
+    /// Concurrent receive process buffer size. [Default: 512]
+    pub concurrent_recv_buffer: u32,
+
+    /// Quic max idle timeout (connection timeout). [Default: 30 Seconds]
+    pub quic_max_idle_timeout_ms: u32,
+
+    /// Quic channel limit per connection. [Default: 512]
     pub quic_connection_channel_limit: u32,
+
+    /// Quic window management multiplier. [Default: 1]
+    pub quic_window_multiplier: u32,
+
+    /// Quic crypto buffer multiplier. [Default: 1]
+    pub quic_crypto_buffer_multiplier: u32,
 }
 
 impl Default for KitsuneP2pTuningParams {
@@ -61,7 +73,11 @@ impl Default for KitsuneP2pTuningParams {
             tls_in_mem_session_storage: 512,
             proxy_keepalive_ms: 1000 * 60 * 2, // 2 minutes
             proxy_to_expire_ms: 1000 * 60 * 5, // 5 minutes
-            quic_connection_channel_limit: 32,
+            concurrent_recv_buffer: 512,
+            quic_max_idle_timeout_ms: 1000 * 30, // 30 seconds
+            quic_connection_channel_limit: 512,
+            quic_window_multiplier: 1,
+            quic_crypto_buffer_multiplier: 1,
         }
     }
 }
@@ -114,8 +130,24 @@ impl serde::Serialize for KitsuneP2pTuningParams {
             &format!("{}", self.proxy_to_expire_ms),
         )?;
         m.serialize_entry(
+            "concurrent_recv_buffer",
+            &format!("{}", self.concurrent_recv_buffer),
+        )?;
+        m.serialize_entry(
+            "quic_max_idle_timeout_ms",
+            &format!("{}", self.quic_max_idle_timeout_ms),
+        )?;
+        m.serialize_entry(
             "quic_connection_channel_limit",
             &format!("{}", self.quic_connection_channel_limit),
+        )?;
+        m.serialize_entry(
+            "quic_window_multiplier",
+            &format!("{}", self.quic_window_multiplier),
+        )?;
+        m.serialize_entry(
+            "quic_crypto_buffer_multiplier",
+            &format!("{}", self.quic_crypto_buffer_multiplier),
         )?;
         m.end()
     }
@@ -170,8 +202,24 @@ impl<'de> serde::Deserialize<'de> for KitsuneP2pTuningParams {
                     Ok(v) => out.proxy_to_expire_ms = v,
                     Err(e) => tracing::warn!("failed to parse {}: {}", k, e),
                 },
+                "concurrent_recv_buffer" => match v.parse::<u32>() {
+                    Ok(v) => out.concurrent_recv_buffer = v,
+                    Err(e) => tracing::warn!("failed to parse {}: {}", k, e),
+                },
+                "quic_max_idle_timeout_ms" => match v.parse::<u32>() {
+                    Ok(v) => out.quic_max_idle_timeout_ms = v,
+                    Err(e) => tracing::warn!("failed to parse {}: {}", k, e),
+                },
                 "quic_connection_channel_limit" => match v.parse::<u32>() {
                     Ok(v) => out.quic_connection_channel_limit = v,
+                    Err(e) => tracing::warn!("failed to parse {}: {}", k, e),
+                },
+                "quic_window_multiplier" => match v.parse::<u32>() {
+                    Ok(v) => out.quic_window_multiplier = v,
+                    Err(e) => tracing::warn!("failed to parse {}: {}", k, e),
+                },
+                "quic_crypto_buffer_multiplier" => match v.parse::<u32>() {
+                    Ok(v) => out.quic_crypto_buffer_multiplier = v,
                     Err(e) => tracing::warn!("failed to parse {}: {}", k, e),
                 },
                 _ => tracing::warn!("INVALID TUNING PARAM: '{}'", k),

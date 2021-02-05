@@ -3,6 +3,7 @@ use futures::future::FutureExt;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dependencies::ghost_actor;
 use kitsune_p2p_types::dependencies::ghost_actor::GhostControlSender;
 use kitsune_p2p_types::dependencies::serde_json;
@@ -11,11 +12,22 @@ use kitsune_p2p_types::transport::*;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
-struct DropMe(tokio::sync::OwnedSemaphorePermit);
+struct DropMe(tokio::sync::OwnedSemaphorePermit, std::time::Instant);
 
 impl DropMe {
     pub fn new(permit: tokio::sync::OwnedSemaphorePermit) -> Arc<Self> {
-        Arc::new(Self(permit))
+        Arc::new(Self(permit, std::time::Instant::now()))
+    }
+}
+
+static LONG_CHAN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+impl Drop for DropMe {
+    fn drop(&mut self) {
+        let time = self.1.elapsed().as_millis();
+        if time > 500 && LONG_CHAN.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 10_000 == 0
+        {
+            tracing::warn!("10_000 slow channel times, e.g.: {} ms", time);
+        }
     }
 }
 
@@ -149,7 +161,7 @@ struct TransportListenerQuic {
     /// pool of active connections
     connections: HashMap<Url2, ConItem>,
     /// tuning params
-    tuning_params: Arc<kitsune_p2p_types::config::KitsuneP2pTuningParams>,
+    tuning_params: Arc<KitsuneP2pTuningParams>,
 }
 
 impl ghost_actor::GhostControlHandler for TransportListenerQuic {
@@ -246,6 +258,9 @@ impl ListenerInnerHandler for TransportListenerQuic {
             // if we are making an outgoing connection
             // we also need to make an initial channel
             let out = if with_channel {
+                // acquire our first channel limit permit
+                // this should always resolve immediately, given our
+                // semaphore is new
                 let permit = con.channel_limit.clone().acquire_owned().await;
                 let (bi_send, bi_recv) = con.con.open_bi().await.map_err(TransportError::other)?;
                 Some(tx_bi_chan(bi_send, bi_recv, permit))
@@ -268,6 +283,8 @@ impl ListenerInnerHandler for TransportListenerQuic {
             let url_clone = url.clone();
             metric_task(async move {
                 loop {
+                    // acquire a new channel_limit permit before accepting
+                    // a new incoming channel
                     let permit = channel_limit.clone().acquire_owned().await;
                     match bi_streams.next().await {
                         Some(Err(e)) => {
@@ -275,15 +292,15 @@ impl ListenerInnerHandler for TransportListenerQuic {
                         }
                         Some(Ok((bi_send, bi_recv))) => {
                             let (write, read) = tx_bi_chan(bi_send, bi_recv, permit);
-                            if incoming_channel_sender
+                            let res = incoming_channel_sender
                                 .send(TransportEvent::IncomingChannel(
                                     url_clone.clone(),
                                     write,
                                     read,
                                 ))
-                                .await
-                                .is_err()
-                            {
+                                .await;
+
+                            if res.is_err() {
                                 break;
                             }
                         }
@@ -344,6 +361,7 @@ impl TransportListenerHandler for TransportListenerQuic {
             // if we already had a connection and the bi-stream
             // channel is successfully opened, return early using that
             if let Some(con) = maybe_con {
+                // await our channel limit semaphore before opening the channel
                 let permit = con.channel_limit.acquire_owned().await;
                 match con.con.open_bi().await {
                     Ok((bi_send, bi_recv)) => {
@@ -374,7 +392,7 @@ impl TransportListenerHandler for TransportListenerQuic {
 /// Spawn a new QUIC TransportListenerSender.
 pub async fn spawn_transport_listener_quic(
     config: ConfigListenerQuic,
-    tuning_params: Arc<kitsune_p2p_types::config::KitsuneP2pTuningParams>,
+    tuning_params: Arc<KitsuneP2pTuningParams>,
 ) -> TransportListenerResult<(
     ghost_actor::GhostSender<TransportListener>,
     TransportEventReceiver,
@@ -382,17 +400,18 @@ pub async fn spawn_transport_listener_quic(
     let bind_to = config
         .bind_to
         .unwrap_or_else(|| url2::url2!("kitsune-quic://0.0.0.0:0"));
-    let server_config = danger::configure_server(config.tls)
+    let server_config = danger::configure_server(config.tls, tuning_params.clone())
         .await
         .map_err(|e| TransportError::from(format!("cert error: {:?}", e)))?;
     let mut builder = quinn::Endpoint::builder();
     builder.listen(server_config);
-    builder.default_client_config(danger::configure_client());
+    builder.default_client_config(danger::configure_client(tuning_params.clone()));
     let (quinn_endpoint, incoming) = builder
         .bind(&crate::url_to_addr(&bind_to, crate::SCHEME).await?)
         .map_err(TransportError::other)?;
 
-    let (incoming_channel_sender, receiver) = futures::channel::mpsc::channel(10);
+    let concurrent_recv = tuning_params.concurrent_recv_buffer as usize;
+    let (incoming_channel_sender, receiver) = futures::channel::mpsc::channel(concurrent_recv);
 
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
 
@@ -403,7 +422,7 @@ pub async fn spawn_transport_listener_quic(
     let i_s = internal_sender.clone();
     metric_task(async move {
         incoming
-            .for_each_concurrent(10, |maybe_con| async {
+            .for_each_concurrent(concurrent_recv, |maybe_con| async {
                 let res: TransportResult<()> = async {
                     i_s.take_connecting(maybe_con, false).await?;
                     Ok(())
@@ -463,9 +482,9 @@ pub async fn spawn_transport_listener_quic(
 
 // TODO - modernize all this taking hints from TLS code in proxy crate.
 mod danger {
+    use kitsune_p2p_types::config::KitsuneP2pTuningParams;
     use kitsune_p2p_types::transport::TransportError;
     use kitsune_p2p_types::transport::TransportResult;
-    use once_cell::sync::Lazy;
     use quinn::Certificate;
     use quinn::CertificateChain;
     use quinn::ClientConfig;
@@ -473,11 +492,24 @@ mod danger {
     use quinn::PrivateKey;
     use quinn::ServerConfig;
     use quinn::ServerConfigBuilder;
-    use quinn::TransportConfig;
     use std::sync::Arc;
 
-    static TRANSPORT: Lazy<Arc<quinn::TransportConfig>> = Lazy::new(|| {
+    fn transport_config(tuning_params: Arc<KitsuneP2pTuningParams>) -> Arc<quinn::TransportConfig> {
         let mut transport = quinn::TransportConfig::default();
+
+        const EXPECTED_RTT: u64 = 100; // ms
+        const MAX_STREAM_BANDWIDTH: u64 = 12500 * 1000; // bytes/s
+        const STREAM_RWND: u64 = MAX_STREAM_BANDWIDTH / 1000 * EXPECTED_RTT;
+
+        let w_mult = tuning_params.quic_window_multiplier as u64;
+
+        transport.stream_window_bidi(32 * w_mult);
+        transport.stream_receive_window(STREAM_RWND * w_mult);
+        transport.receive_window(8 * STREAM_RWND * w_mult);
+        transport.send_window(8 * STREAM_RWND * w_mult);
+
+        let c_mult = tuning_params.quic_crypto_buffer_multiplier as usize;
+        transport.crypto_buffer_size(16 * 1024 * c_mult);
 
         // We don't use uni streams in kitsune - only bidi streams
         transport.stream_window_uni(0);
@@ -485,6 +517,7 @@ mod danger {
         // We don't use "Application" datagrams in kitsune -
         // only bidi streams.
         transport.datagram_receive_buffer_size(None);
+        transport.datagram_send_buffer_size(0);
 
         // Disable spin bit - we'd like the extra privacy
         // any metrics we implement will be opt-in self reporting
@@ -492,13 +525,14 @@ mod danger {
 
         // see also `keep_alive_interval`.
         // right now keep_alive_interval is None,
-        // so connections will idle timeout after 20 seconds.
+        // so connections will idle timeout after this interval.
+        let timeout = tuning_params.quic_max_idle_timeout_ms as u64;
         transport
-            .max_idle_timeout(Some(std::time::Duration::from_millis(30_000)))
+            .max_idle_timeout(Some(std::time::Duration::from_millis(timeout)))
             .unwrap();
 
         Arc::new(transport)
-    });
+    }
 
     #[allow(dead_code)]
     pub(crate) async fn configure_server(
@@ -506,6 +540,7 @@ mod danger {
             lair_keystore_api::actor::Cert,
             lair_keystore_api::actor::CertPrivKey,
         )>,
+        tuning_params: Arc<KitsuneP2pTuningParams>,
     ) -> TransportResult<ServerConfig> {
         let (cert, cert_priv) = match cert {
             Some(r) => r,
@@ -524,10 +559,7 @@ mod danger {
         let tcert = Certificate::from_der(&cert).map_err(TransportError::other)?;
         let tcert_priv = PrivateKey::from_der(&cert_priv).map_err(TransportError::other)?;
 
-        let mut transport_config = TransportConfig::default();
-        transport_config.stream_window_uni(0);
-        let mut server_config = ServerConfig::default();
-        server_config.transport = Arc::new(transport_config);
+        let server_config = ServerConfig::default();
         let mut cfg_builder = ServerConfigBuilder::new(server_config);
         cfg_builder
             .certificate(CertificateChain::from_certs(vec![tcert]), tcert_priv)
@@ -535,7 +567,7 @@ mod danger {
 
         let mut cfg = cfg_builder.build();
 
-        cfg.transport = TRANSPORT.clone();
+        cfg.transport = transport_config(tuning_params);
         Ok(cfg)
     }
 
@@ -561,7 +593,7 @@ mod danger {
         }
     }
 
-    pub(crate) fn configure_client() -> ClientConfig {
+    pub(crate) fn configure_client(tuning_params: Arc<KitsuneP2pTuningParams>) -> ClientConfig {
         let mut cfg = ClientConfigBuilder::default().build();
         let tls_cfg: &mut rustls::ClientConfig = Arc::get_mut(&mut cfg.crypto).unwrap();
         // this is only available when compiled with "dangerous_configuration" feature
@@ -569,7 +601,7 @@ mod danger {
             .dangerous()
             .set_certificate_verifier(SkipServerVerification::new());
 
-        cfg.transport = TRANSPORT.clone();
+        cfg.transport = transport_config(tuning_params);
         cfg
     }
 }
