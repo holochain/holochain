@@ -609,13 +609,12 @@ pub mod test {
         assert_eq!(r, None);
 
         // Check it is in active apps
-        let cell_ids: Vec<_> = state
+        let cell_ids: Vec<CellId> = state
             .active_apps
             .get("test app")
-            .cloned()
             .unwrap()
-            .into_iter()
-            .map(|c| c.into_id())
+            .cells()
+            .cloned()
             .collect();
 
         // Collect the expected result
@@ -651,13 +650,12 @@ pub mod test {
         assert_eq!(r, None);
 
         // Check it's added to inactive
-        let cell_ids: Vec<_> = state
+        let cell_ids: Vec<CellId> = state
             .inactive_apps
             .get("test app")
-            .cloned()
             .unwrap()
-            .into_iter()
-            .map(|c| c.into_id())
+            .cells()
+            .cloned()
             .collect();
 
         assert_eq!(expected, cell_ids);

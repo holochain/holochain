@@ -91,6 +91,7 @@ impl From<DnaVersionFlexible> for DnaVersionSpec {
     }
 }
 
+/// Specifies remote, local, or bundled location of DNA
 pub type DnaLocation = mr_bundle::Location;
 
 /// Defines a criterion for a DNA version to match against.

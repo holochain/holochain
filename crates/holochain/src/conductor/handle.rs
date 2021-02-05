@@ -157,6 +157,15 @@ pub trait ConductorHandleT: Send + Sync {
     /// Request access to this conductor's networking handle
     fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef;
 
+    /// Create a new Cell in an existing App based on an existing DNA
+    async fn create_clone_cell(
+        self: Arc<Self>,
+        payload: CreateCloneCellPayload,
+    ) -> ConductorResult<()>;
+
+    /// Destroy a cloned Cell
+    async fn destroy_clone_cell(self: Arc<Self>, cell_id: CellId) -> ConductorResult<()>;
+
     /// Install Cells into ConductorState based on installation info, and run
     /// genesis on all new source chains
     #[allow(clippy::ptr_arg)]
@@ -426,6 +435,32 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self.holochain_p2p
     }
 
+    async fn create_clone_cell(
+        self: Arc<Self>,
+        payload: CreateCloneCellPayload,
+    ) -> ConductorResult<()> {
+        let CreateCloneCellPayload {
+            properties,
+            dna_hash,
+            installed_app_id,
+            agent_key,
+            cell_nick,
+            membrane_proof,
+        } = payload;
+        let mut conductor = self.conductor.write().await;
+        let cell_id = CellId::new(dna_hash, agent_key);
+        let cells = vec![(cell_id.clone(), membrane_proof)];
+        conductor.genesis_cells(cells, self.clone()).await?;
+        conductor
+            .associate_clone_cell_with_app(&installed_app_id, &cell_nick, cell_id)
+            .await?;
+        Ok(())
+    }
+
+    async fn destroy_clone_cell(self: Arc<Self>, cell_id: CellId) -> ConductorResult<()> {
+        todo!()
+    }
+
     async fn install_app(
         self: Arc<Self>,
         installed_app_id: InstalledAppId,
@@ -443,11 +478,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             )
             .await?;
 
-        let cell_data = cell_data.into_iter().map(|(c, _)| c).collect();
-        let app = InstalledApp {
-            installed_app_id,
-            cell_data,
-        };
+        let cell_data = cell_data.into_iter().map(|(c, _)| c);
+        let app = InstalledApp::new_legacy(installed_app_id, cell_data);
 
         // Update the db
         self.conductor
@@ -461,18 +493,18 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self: Arc<Self>,
         payload: InstallAppBundlePayload,
     ) -> ConductorResult<()> {
-        let InstallAppBundlePayload {
-            bundle,
-            agent_key,
-            installed_app_id,
-            membrane_proofs,
-        } = payload;
-        let manifest = bundle.manifest();
-        let bundled_dnas = bundle.resolve_all().await?;
+        // let InstallAppBundlePayload {
+        //     bundle,
+        //     agent_key,
+        //     installed_app_id,
+        //     membrane_proofs,
+        // } = payload;
+        // let manifest = bundle.manifest();
+        // let bundled_dnas = bundle.resolve_all().await?;
 
-        self.clone().register_dna(todo!("get dnas")).await?;
+        // self.clone().register_dna(todo!("get dnas")).await?;
 
-        self.clone().install_app(todo!(), todo!()).await?;
+        // self.clone().install_app(todo!(), todo!()).await?;
 
         // for dna_bytes in bundled_dnas.values()
         todo!()
@@ -555,7 +587,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
             .get_state()
             .await?
-            .get_app_info(installed_app_id))
+            .get_app_info(installed_app_id)
+            .cloned())
     }
 
     async fn add_agent_infos(&self, agent_infos: Vec<AgentInfoSigned>) -> ConductorApiResult<()> {

@@ -18,10 +18,10 @@ use std::collections::HashMap;
 pub struct ConductorState {
     /// Apps that are ready to be activated
     #[serde(default)]
-    pub inactive_apps: HashMap<InstalledAppId, Vec<InstalledCell>>,
+    pub inactive_apps: InstalledAppMap,
     /// Apps that are active and will be loaded
     #[serde(default)]
-    pub active_apps: HashMap<InstalledAppId, Vec<InstalledCell>>,
+    pub active_apps: InstalledAppMap,
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
     pub app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
@@ -51,14 +51,10 @@ impl From<&str> for AppInterfaceId {
 impl ConductorState {
     /// Retrieve info about an installed App by its InstalledAppId
     #[allow(clippy::ptr_arg)]
-    pub fn get_app_info(&self, installed_app_id: &InstalledAppId) -> Option<InstalledApp> {
+    pub fn get_app_info(&self, installed_app_id: &InstalledAppId) -> Option<&InstalledApp> {
         self.active_apps
             .get(installed_app_id)
             .or_else(|| self.inactive_apps.get(installed_app_id))
-            .map(|cell_data| InstalledApp {
-                installed_app_id: installed_app_id.clone(),
-                cell_data: cell_data.clone(),
-            })
     }
 
     /// Returns the interface configuration with the given ID if present

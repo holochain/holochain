@@ -105,9 +105,14 @@ where
 }
 
 impl Cell {
-    /// Constructor for a Cell. The SourceChain will be created, and genesis
-    /// will be run if necessary. A Cell will not be created if the SourceChain
-    /// is not ready to be used.
+    /// Constructor for a Cell, which ensure the Cell is fully initialized
+    /// before returning.
+    ///
+    /// If it hasn't happened already, a SourceChain will be created, and
+    /// genesis will be run. If these have already happened, those steps are
+    /// skipped.
+    ///
+    /// No Cell will be created if the SourceChain is not ready to be used.
     pub async fn create(
         id: CellId,
         conductor_handle: ConductorHandle,

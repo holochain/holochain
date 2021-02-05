@@ -4,7 +4,7 @@ use crate::conductor::cell::error::CellError;
 use crate::core::workflow::error::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_lmdb::error::DatabaseError;
-use holochain_types::app::InstalledAppId;
+use holochain_types::{app::InstalledAppId, prelude::AppError};
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
 
@@ -14,6 +14,9 @@ pub type ConductorResult<T> = Result<T, ConductorError>;
 pub enum ConductorError {
     #[error("Internal Cell error: {0}")]
     InternalCellError(#[from] CellError),
+
+    #[error(transparent)]
+    AppError(#[from] AppError),
 
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
@@ -82,7 +85,7 @@ pub enum ConductorError {
     #[error("Tried to install an app using an already-used InstalledAppId: {0}")]
     AppAlreadyInstalled(InstalledAppId),
 
-    #[error("Tried to deactivate an app that was not active: {0}")]
+    #[error("Tried to perform an operation on an app that was not active: {0}")]
     AppNotActive(InstalledAppId),
 
     #[error(transparent)]

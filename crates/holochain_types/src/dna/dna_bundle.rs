@@ -3,7 +3,6 @@ use std::collections::BTreeMap;
 use super::{DnaDef, DnaFile, WasmMap};
 use crate::prelude::*;
 use holo_hash::*;
-use mr_bundle::error::MrBundleResult;
 
 /// A bundle of Wasm zomes, respresented as a file.
 #[derive(

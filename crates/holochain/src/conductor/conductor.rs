@@ -448,8 +448,7 @@ where
 
         // Closure for creating all cells in an app
         let tasks = active_apps.into_iter().map(
-            move |(installed_app_id, cells): (InstalledAppId, Vec<InstalledCell>)| {
-                let cell_ids = cells.into_iter().map(|c| c.into_id());
+            move |(installed_app_id, app): (InstalledAppId, InstalledApp)| {
                 // Clone data for async block
                 let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
                 let conductor_handle = conductor_handle.clone();
@@ -458,7 +457,8 @@ where
                 // Task that creates the cells
                 async move {
                     // Only create cells not already created
-                    let cells_to_create = cell_ids
+                    let cells_to_create = app
+                        .cells()
                         .filter(|cell_id| !self.cells.contains_key(cell_id))
                         .map(|cell_id| {
                             (
@@ -498,7 +498,7 @@ where
                     );
 
                     // Join all the cell create tasks for this app
-                    // and seperate any errors
+                    // and separate any errors
                     let (success, errors): (Vec<_>, Vec<_>) =
                         futures::future::join_all(cells_tasks)
                             .await
@@ -550,13 +550,12 @@ where
         trace!(?app);
         self.update_state(move |mut state| {
             debug!(?app);
-            let is_active = state.active_apps.contains_key(&app.installed_app_id);
-            let is_inactive = state
-                .inactive_apps
-                .insert(app.installed_app_id.clone(), app.cell_data)
-                .is_some();
+            let is_active = state.active_apps.contains_key(app.installed_app_id());
+            let is_inactive = state.inactive_apps.insert(app.clone()).is_some();
             if is_active || is_inactive {
-                Err(ConductorError::AppAlreadyInstalled(app.installed_app_id))
+                Err(ConductorError::AppAlreadyInstalled(
+                    app.installed_app_id().clone(),
+                ))
             } else {
                 Ok(state)
             }
@@ -571,11 +570,11 @@ where
         installed_app_id: InstalledAppId,
     ) -> ConductorResult<()> {
         self.update_state(move |mut state| {
-            let cell_data = state
+            let app = state
                 .inactive_apps
                 .remove(&installed_app_id)
                 .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
-            state.active_apps.insert(installed_app_id, cell_data);
+            state.active_apps.insert(app);
             Ok(state)
         })
         .await?;
@@ -591,11 +590,11 @@ where
             .update_state({
                 let installed_app_id = installed_app_id.clone();
                 move |mut state| {
-                    let cell_ids = state
+                    let app = state
                         .active_apps
                         .remove(&installed_app_id)
                         .ok_or_else(|| ConductorError::AppNotActive(installed_app_id.clone()))?;
-                    state.inactive_apps.insert(installed_app_id, cell_ids);
+                    state.inactive_apps.insert(app);
                     Ok(state)
                 }
             })
@@ -605,8 +604,8 @@ where
             .get(&installed_app_id)
             .expect("This app was just put here")
             .clone()
-            .into_iter()
-            .map(|c| c.into_id())
+            .cells()
+            .cloned()
             .collect())
     }
 
@@ -625,6 +624,25 @@ where
 
             trigger.initialize_workflows();
         }
+    }
+
+    /// Associate a Cell with an existing App
+    pub(super) async fn associate_clone_cell_with_app(
+        &mut self,
+        installed_app_id: &InstalledAppId,
+        cell_nick: &CellNick,
+        cell_id: CellId,
+    ) -> ConductorResult<()> {
+        self.update_state(|mut state| {
+            if let Some(app) = state.active_apps.get_mut(installed_app_id) {
+                app.add_clone(cell_nick, cell_id)?;
+                Ok(state)
+            } else {
+                Err(ConductorError::AppNotActive(installed_app_id.clone()))
+            }
+        })
+        .await?;
+        Ok(())
     }
 
     pub(super) async fn load_wasms_into_dna_files(

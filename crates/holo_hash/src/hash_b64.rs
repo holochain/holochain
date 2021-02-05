@@ -7,6 +7,9 @@ use crate::{error::HoloHashResult, HashType};
 
 /// A wrapper around HoloHash to denote that deserialization should use
 /// base-64 strings rather than raw byte arrays
+//
+// TODO: make HoloHash and HoloHashB64 both deserialize identically (can take either string or seq),
+//       so that the only difference is how they serialize
 #[derive(
     Debug,
     Clone,

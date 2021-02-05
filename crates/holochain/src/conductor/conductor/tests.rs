@@ -27,13 +27,12 @@ async fn can_update_state() {
     assert_eq!(state, ConductorState::default());
 
     let cell_id = fake_cell_id(1);
-    let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
+    let installed_cell = InstalledCell::new(cell_id.clone(), "nick".to_string());
+    let app = InstalledApp::new_legacy("fake app", vec![installed_cell]);
 
     conductor
         .update_state(|mut state| {
-            state
-                .inactive_apps
-                .insert("fake app".to_string(), vec![installed_cell]);
+            state.inactive_apps.insert(app);
             Ok(state)
         })
         .await
@@ -41,11 +40,76 @@ async fn can_update_state() {
     let state = conductor.get_state().await.unwrap();
     assert_eq!(
         state.inactive_apps.values().collect::<Vec<_>>()[0]
-            .into_iter()
-            .map(|c| c.as_id().clone())
+            .cells()
             .collect::<Vec<_>>()
             .as_slice(),
-        &[cell_id]
+        &[&cell_id]
+    );
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn can_associate_clone_cell_with_app() {
+    let envs = test_environments();
+    let dna_store = MockDnaStore::new();
+    let keystore = envs.conductor().keystore().clone();
+    let holochain_p2p = holochain_p2p::stub_network().await;
+    let mut conductor = Conductor::new(
+        envs.conductor(),
+        envs.wasm(),
+        envs.p2p(),
+        dna_store,
+        keystore,
+        envs.tempdir().path().to_path_buf().into(),
+        holochain_p2p,
+    )
+    .await
+    .unwrap();
+
+    let cell_id = fake_cell_id(1);
+    let installed_cell = InstalledCell::new(cell_id.clone(), "nick".to_string());
+    let slot = CellSlot::new(Some(cell_id.clone()), 1);
+    let app1 = InstalledApp::new_legacy("no clone", vec![installed_cell.clone()]);
+    let app2 = InstalledApp::new("yes clone", vec![("nick".into(), slot.clone())]);
+
+    conductor
+        .update_state(|mut state| {
+            state.active_apps.insert(app1.clone());
+            state.active_apps.insert(app2.clone());
+            Ok(state)
+        })
+        .await
+        .unwrap();
+
+    matches::assert_matches!(
+        conductor
+            .associate_clone_cell_with_app(
+                &"no clone".to_string(),
+                &"nick".to_string(),
+                cell_id.clone()
+            )
+            .await,
+        Err(ConductorError::AppError(AppError::CloneLimitExceeded(0, _)))
+    );
+
+    conductor
+        .associate_clone_cell_with_app(
+            &"yes clone".to_string(),
+            &"nick".to_string(),
+            cell_id.clone(),
+        )
+        .await
+        .unwrap();
+
+    let state = conductor.get_state().await.unwrap();
+    assert_eq!(
+        state
+            .active_apps
+            .get("yes clone")
+            .unwrap()
+            .cloned_cells()
+            .cloned()
+            .collect::<Vec<CellId>>(),
+        vec![cell_id]
     );
 }
 
@@ -70,10 +134,7 @@ async fn app_ids_are_unique() {
 
     let cell_id = fake_cell_id(1);
     let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
-    let app = InstalledApp {
-        installed_app_id: "id".to_string(),
-        cell_data: vec![installed_cell],
-    };
+    let app = InstalledApp::new_legacy("id".to_string(), vec![installed_cell]);
 
     conductor.add_inactive_app_to_db(app.clone()).await.unwrap();
 

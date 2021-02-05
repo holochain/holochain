@@ -10,16 +10,22 @@
 mod app_bundle;
 mod app_manifest;
 pub mod dna_gamut;
+pub mod error;
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
 
 use crate::dna::{DnaFile, YamlProperties};
 use derive_more::Into;
-use holo_hash::{AgentPubKey, DnaHash};
+use holo_hash::{AgentPubKey, DnaHash, DnaHashB64};
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::cell::CellId;
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
+
+use self::error::{AppError, AppResult};
 
 /// The unique identifier for an installed app in this conductor
 pub type InstalledAppId = String;
@@ -46,8 +52,27 @@ pub struct RegisterDnaPayload {
     pub uuid: Option<String>,
     /// Properties to override when installing this Dna
     pub properties: Option<YamlProperties>,
-    /// The dna source
+    /// Where to find the DNA
     pub source: DnaSource,
+}
+
+/// The instructions on how to get the DNA to be registered
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CreateCloneCellPayload {
+    /// Properties to override when installing this Dna
+    pub properties: Option<YamlProperties>,
+    /// The DNA to clone
+    pub dna_hash: DnaHash,
+    /// The Agent key with which to create this Cell
+    /// (TODO: should this be derived from the App?)
+    pub agent_key: AgentPubKey,
+    /// The App with which to associate the newly created Cell
+    pub installed_app_id: InstalledAppId,
+    /// The CellNick under which to create this clone
+    /// (needed to track cloning permissions and `clone_count`)
+    pub cell_nick: CellNick,
+    /// Proof-of-membership, if required by this DNA
+    pub membrane_proof: Option<MembraneProof>,
 }
 
 /// A collection of [DnaHash]es paired with an [AgentPubKey] and an app id
@@ -123,38 +148,43 @@ impl InstallAppDnaPayload {
 pub type MembraneProof = SerializedBytes;
 
 /// Data about an installed Cell
-#[derive(Clone, Debug, Into, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct InstalledCell(CellId, CellNick);
+// TODO: is this still what we want?
+#[deprecated = "this may not be the right thing"]
+#[derive(Clone, Debug, Into, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct InstalledCell {
+    cell_id: CellId,
+    cell_nick: CellNick,
+}
 
 impl InstalledCell {
     /// Constructor
-    pub fn new(cell_id: CellId, cell_handle: CellNick) -> Self {
-        Self(cell_id, cell_handle)
+    pub fn new(cell_id: CellId, cell_nick: CellNick) -> Self {
+        Self { cell_id, cell_nick }
     }
 
     /// Get the CellId
     pub fn into_id(self) -> CellId {
-        self.0
+        self.cell_id
     }
 
     /// Get the CellNick
     pub fn into_nick(self) -> CellNick {
-        self.1
+        self.cell_nick
     }
 
     /// Get the inner data as a tuple
     pub fn into_inner(self) -> (CellId, CellNick) {
-        (self.0, self.1)
+        (self.cell_id, self.cell_nick)
     }
 
     /// Get the CellId
     pub fn as_id(&self) -> &CellId {
-        &self.0
+        &self.cell_id
     }
 
     /// Get the CellNick
     pub fn as_nick(&self) -> &CellNick {
-        &self.1
+        &self.cell_nick
     }
 }
 
@@ -162,7 +192,128 @@ impl InstalledCell {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct InstalledApp {
     /// The unique identifier for an installed app in this conductor
-    pub installed_app_id: InstalledAppId,
-    /// Cell data for this app
-    pub cell_data: Vec<InstalledCell>,
+    installed_app_id: InstalledAppId,
+    /// The "slots" as specified in the AppManifest
+    slots: HashMap<CellNick, CellSlot>,
+}
+
+impl automap::AutoMapped for InstalledApp {
+    type Key = InstalledAppId;
+
+    fn key(&self) -> &Self::Key {
+        &self.installed_app_id
+    }
+}
+
+/// A map from InstalledAppId -> InstalledApp
+pub type InstalledAppMap = automap::AutoHashMap<InstalledApp>;
+
+impl InstalledApp {
+    /// Constructor
+    pub fn new<S: ToString, I: IntoIterator<Item = (CellNick, CellSlot)>>(
+        installed_app_id: S,
+        slots: I,
+    ) -> Self {
+        Self {
+            installed_app_id: installed_app_id.to_string(),
+            slots: slots.into_iter().collect(),
+        }
+    }
+
+    /// Constructor for apps not using a manifest.
+    /// Disables cloning, and implies immediate provisioning.
+    pub fn new_legacy<S: ToString, I: IntoIterator<Item = InstalledCell>>(
+        installed_app_id: S,
+        installed_cells: I,
+    ) -> Self {
+        let installed_app_id = installed_app_id.to_string();
+        let slots = installed_cells
+            .into_iter()
+            .map(|InstalledCell { cell_nick, cell_id }| {
+                let slot = CellSlot {
+                    provisioned_cell: Some(cell_id),
+                    clones: Vec::new(),
+                    clone_limit: 0,
+                };
+                (cell_nick, slot)
+            })
+            .collect();
+        Self {
+            installed_app_id,
+            slots,
+        }
+    }
+
+    /// Accessor
+    pub fn installed_app_id(&self) -> &InstalledAppId {
+        &self.installed_app_id
+    }
+
+    /// Accessor
+    pub fn provisioned_cells(&self) -> impl Iterator<Item = (&CellNick, &CellId)> {
+        todo!("implement or remove if not needed");
+        std::iter::empty()
+    }
+
+    /// Accessor
+    pub fn into_provisioned_cells(self) -> impl Iterator<Item = CellId> {
+        todo!("implement or remove if not needed");
+        std::iter::empty()
+    }
+
+    /// Accessor
+    pub fn cloned_cells(&self) -> impl Iterator<Item = &CellId> {
+        todo!("implement or remove if not needed");
+        std::iter::empty()
+    }
+
+    /// Iterator of all cells, both provisioned and cloned
+    pub fn cells(&self) -> impl Iterator<Item = &CellId> {
+        self.provisioned_cells()
+            .map(|(_, c)| c)
+            .chain(self.cloned_cells())
+    }
+
+    /// Add a cloned cell
+    pub fn add_clone(&mut self, cell_nick: &CellNick, cell_id: CellId) -> AppResult<()> {
+        let mut slot = self
+            .slots
+            .get_mut(cell_nick)
+            .ok_or_else(|| AppError::CellNickMissing(cell_nick.clone()))?;
+        if slot.clones.len() >= slot.clone_limit {
+            return Err(AppError::CloneLimitExceeded(slot.clone_limit, slot.clone()));
+        }
+        slot.clones.push(cell_id);
+        Ok(())
+    }
+
+    /// Remove a cloned cell
+    pub fn remove_clone(&mut self, cell_nick: &CellNick, cell_id: &CellId) -> () {
+        todo!("implement");
+    }
+}
+
+/// Cell "slots" correspond to cell entries in the AppManifest.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CellSlot {
+    /// A cells which was provisioned at install-time.
+    /// If provisioning was deferred, this will be None, and will become Some
+    /// once the cell is created.
+    provisioned_cell: Option<CellId>,
+    /// The number of cloned cells allowed
+    clone_limit: usize,
+    /// Cells which were cloned at runtime. The length cannot grow beyond
+    /// `clone_limit`
+    clones: Vec<CellId>,
+}
+
+impl CellSlot {
+    /// Constructor. List of clones always starts empty.
+    pub fn new(provisioned_cell: Option<CellId>, clone_limit: usize) -> Self {
+        Self {
+            provisioned_cell,
+            clone_limit,
+            clones: Vec::new(),
+        }
+    }
 }

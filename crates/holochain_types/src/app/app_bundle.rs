@@ -1,10 +1,13 @@
 use std::sync::Arc;
 
+use self::error::AppBundleResult;
+
 use super::{dna_gamut::DnaGamut, AppManifest, AppManifestValidated};
 use crate::prelude::*;
 
 #[allow(missing_docs)]
-pub mod error;
+mod error;
+pub use error::*;
 
 /// A bundle of an AppManifest and collection of DNAs
 #[derive(Debug, Serialize, Deserialize, derive_more::From, shrinkwraprs::Shrinkwrap)]
@@ -102,16 +105,17 @@ mod tests {
 
     use super::AppBundle;
 
-    pub async fn app_bundle_fixture() -> AppBundle {
-        let path1 = PathBuf::from("1");
-        let path2 = PathBuf::from("2");
-        let dna1 = fixt!(DnaDef);
-        let dna2 = fixt!(DnaDef);
+    async fn app_bundle_fixture() -> AppBundle {
+        todo!();
+        // let path1 = PathBuf::from("1");
+        // let path2 = PathBuf::from("2");
+        // let dna1 = fixt!(DnaDef);
+        // let dna2 = fixt!(DnaDef);
 
-        let (manifest, dna_hashes) =
-            app_manifest_fixture(todo!("better fixture generator (sweet)"), vec![dna1, dna2]).await;
+        // let (manifest, dna_hashes) =
+        //     app_manifest_fixture(todo!("better fixture generator (sweet)"), vec![dna1, dna2]).await;
 
-        let resources = vec![(path1, dna1), (path2, dna2)];
+        // let resources = vec![(path1, dna1), (path2, dna2)];
     }
 
     #[tokio::test]

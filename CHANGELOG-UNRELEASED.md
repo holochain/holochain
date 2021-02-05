@@ -23,6 +23,7 @@ See [#546](https://github.com/holochain/holochain/pull/546) or the docs for the 
 - Admin interface method `install_app` has its `app_id` field renamed to `installed_app_id` so as not to conflict with the future concept of an "app id"
 - Admin interface method `list_active_app_ids` renamed to `list_active_apps`
 - BREAKING: JSON replaced with YAML for DNA Properties as well as the DNA manifest (dna.yaml instead of dna.json) [#592](https://github.com/holochain/holochain/pull/592)
+- BREAKING: format of AppInfo changed
 
 ### Deprecated
 

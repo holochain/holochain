@@ -1,8 +1,7 @@
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    error::{BundleError, BundleResult, MrBundleError, MrBundleResult},
-    io_error::IoError,
+    error::{BundleError, MrBundleResult},
     location::Location,
     manifest::Manifest,
     resource::ResourceBytes,
@@ -203,6 +202,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::error::MrBundleError;
+
     use super::*;
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

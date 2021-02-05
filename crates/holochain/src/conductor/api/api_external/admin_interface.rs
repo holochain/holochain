@@ -107,6 +107,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 }
                 Ok(AdminResponse::DnaRegistered(hash))
             }
+            CreateCloneCell(payload) => {
+                self.conductor_handle
+                    .clone()
+                    .create_clone_cell(*payload)
+                    .await?;
+                todo!()
+            }
             InstallApp(payload) => {
                 trace!(?payload.dnas);
                 let InstallAppPayload {
@@ -164,14 +171,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .install_app(installed_app_id.clone(), cell_ids_with_proofs.clone())
                     .await?;
 
-                let cell_data = cell_ids_with_proofs
+                let installed_cells = cell_ids_with_proofs
                     .into_iter()
-                    .map(|(cell_data, _)| cell_data)
-                    .collect();
-                let app = InstalledApp {
-                    installed_app_id,
-                    cell_data,
-                };
+                    .map(|(cell_data, _)| cell_data);
+                let app = InstalledApp::new_legacy(installed_app_id, installed_cells);
                 Ok(AdminResponse::AppInstalled(app))
             }
             InstallAppBundle(payload) => {
@@ -465,10 +468,10 @@ mod test {
         let agent_key2 = fake_agent_pubkey_2();
         let path_payload = InstallAppDnaPayload::path_only(dna_path, "".to_string());
         let cell_id2 = CellId::new(dna_hash.clone(), agent_key2.clone());
-        let expected_cell_ids = InstalledApp {
-            installed_app_id: "test-by-path".to_string(),
-            cell_data: vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
-        };
+        let expected_cell_ids = InstalledApp::new_legacy(
+            "test-by-path".to_string(),
+            vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
+        );
         let path_install_payload: InstallAppPayload = InstallAppPayload {
             dnas: vec![path_payload],
             installed_app_id: "test-by-path".to_string(),
