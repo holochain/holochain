@@ -227,6 +227,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.65"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=2021-02-05-error#c86958afded1fca0a03a3902384e8b7e90ea8467"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -237,6 +238,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_guest"
 version = "0.0.65"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=2021-02-05-error#c86958afded1fca0a03a3902384e8b7e90ea8467"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
