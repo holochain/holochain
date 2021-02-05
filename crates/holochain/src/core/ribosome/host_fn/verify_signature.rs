@@ -1,22 +1,22 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 pub fn verify_signature(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     input: VerifySignature,
-) -> RibosomeResult<bool> {
+) -> Result<bool, WasmError> {
     Ok(
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             input
                 .key
                 .verify_signature_raw(input.as_ref(), input.as_data_ref().bytes())
                 .await
-        })?,
+        }).map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))?,
     )
 }
 

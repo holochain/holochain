@@ -36,8 +36,10 @@ macro_rules! map_extern {
                         $crate::host_fn::trace::WasmSubscriber::default()
                     ) {
                         Ok(_) => {},
-                        Err(e) => return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Zome(e.to_string())),
+                        Err(e) => return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Guest(e.to_string())),
                     }
+
+                    debug!("foo");
 
                     // Deserialize the input from the host.
                     let extern_io: $crate::prelude::ExternIO = match $crate::prelude::host_args(guest_ptr) {

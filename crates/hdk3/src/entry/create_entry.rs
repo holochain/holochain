@@ -21,5 +21,6 @@ where
     EntryWithDefId: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
+    debug!("create_entry");
     create(EntryWithDefId::try_from(input)?)
 }

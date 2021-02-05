@@ -94,7 +94,7 @@ macro_rules! entry_def {
                             Err(WasmError::Serialize(serialized_bytes_error))
                         }
                         EntryError::EntryTooLarge(_) => {
-                            Err(WasmError::Zome(entry_error.to_string()))
+                            Err(WasmError::Guest(entry_error.to_string()))
                         }
                     },
                 }
@@ -203,6 +203,7 @@ macro_rules! entry_defs {
     [ $( $def:expr ),* ] => {
         #[hdk_extern]
         fn entry_defs(_: ()) -> $crate::prelude::ExternResult<$crate::prelude::EntryDefsCallbackResult> {
+            debug!("entry_defs");
             Ok($crate::prelude::EntryDefsCallbackResult::from(vec![ $( $def ),* ]))
         }
     };

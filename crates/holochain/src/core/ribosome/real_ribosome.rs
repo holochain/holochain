@@ -139,19 +139,45 @@ impl RealRibosome {
                 let closure_self_arc = std::sync::Arc::clone(&self_arc);
                 let closure_call_context_arc = std::sync::Arc::clone(&call_context_arc);
                 move |ctx: &mut Ctx, guest_allocation_ptr: GuestPtr| -> Result<Len, WasmError> {
-                    let input = $crate::holochain_wasmer_host::guest::from_guest_ptr(
+                    match $crate::holochain_wasmer_host::guest::from_guest_ptr(
                         ctx,
                         guest_allocation_ptr,
-                    )?;
+                    ) {
+                        Ok(input) => {
+                            match $host_function(
+                                std::sync::Arc::clone(&closure_self_arc),
+                                std::sync::Arc::clone(&closure_call_context_arc),
+                                input,
+                            ) {
+                                Ok(output) => $crate::holochain_wasmer_host::import::set_context_data(ctx, Ok::<_, WasmError>(output)),
+                                // Err(ribosome_error) => {
+                                //     let output: Result<(), WasmError> = match ribosome_error {
+                                //         // If there is an issue with the DNA how did we get here???
+                                //         RibosomeError::DnaError(_) => unreachable!(),
+                                //         // Forward wasm errors straight through.
+                                //         RibosomeError::WasmError(e) => Err(e),
+                                //         // Serialization errors can be mapped to Deserialize (probably).
+                                //         RibosomeError::SerializationError(e) => match e {
+                                //             SerializedBytesError::Serialize(se) => WasmError::Serialize(SerializedBytesError::Serialize(se)),
+                                //             SerializedBytesError::Deserialize(de) => WasmError::Deserialize(SerializedBytesError::Deserialize(de)),
+                                //         },
+                                //         // This makes no sense at this point because we already just called a function.
+                                //         RibosomeError::ZomeNotExists(_) => unreachable!(),
+                                //         // Same as above, we just called a function so we know it exists.
+                                //         RibosomeError::ZomeFnNotExists(_, _) => unreachable!(),
+                                //         //
 
-                    let output = $host_function(
-                        std::sync::Arc::clone(&closure_self_arc),
-                        std::sync::Arc::clone(&closure_call_context_arc),
-                        input,
-                    )
-                    .map_err(|e| WasmError::Zome(format!("{:?}", e)))?;
+                                //     };
+                                //     $crate::holochain_wasmer_host::import::set_context_data(ctx, output)
+                                // }
+                                Err(wasm_error) => $crate::holochain_wasmer_host::import::set_context_data(ctx, Err::<(), WasmError>(wasm_error)),
+                            }
+                        },
+                        Err(wasm_error) => {
+                            $crate::holochain_wasmer_host::import::set_context_data(ctx, Err::<(), WasmError>(wasm_error))
+                        }
+                    }
 
-                    $crate::holochain_wasmer_host::import::set_context_data(ctx, output)
                 }
             }};
         }
