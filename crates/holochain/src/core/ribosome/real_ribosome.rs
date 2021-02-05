@@ -139,25 +139,22 @@ impl RealRibosome {
                 let closure_self_arc = std::sync::Arc::clone(&self_arc);
                 let closure_call_context_arc = std::sync::Arc::clone(&call_context_arc);
                 move |ctx: &mut Ctx, guest_allocation_ptr: GuestPtr| -> Result<Len, WasmError> {
-                    let result =
-                        match $crate::holochain_wasmer_host::guest::from_guest_ptr(
-                            ctx,
-                            guest_allocation_ptr,
-                        ) {
-                            Ok(input) => {
-                                match $host_function(
-                                    std::sync::Arc::clone(&closure_self_arc),
-                                    std::sync::Arc::clone(&closure_call_context_arc),
-                                    input,
-                                ) {
-                                    Ok(output) => Ok::<_, WasmError>(output),
-                                    Err(wasm_error) => Err::<_, WasmError>(wasm_error),
-                                }
-                            },
-                            Err(wasm_error) => {
-                                Err::<_, WasmError>(wasm_error)
+                    let result = match $crate::holochain_wasmer_host::guest::from_guest_ptr(
+                        ctx,
+                        guest_allocation_ptr,
+                    ) {
+                        Ok(input) => {
+                            match $host_function(
+                                std::sync::Arc::clone(&closure_self_arc),
+                                std::sync::Arc::clone(&closure_call_context_arc),
+                                input,
+                            ) {
+                                Ok(output) => Ok::<_, WasmError>(output),
+                                Err(wasm_error) => Err::<_, WasmError>(wasm_error),
                             }
-                        };
+                        }
+                        Err(wasm_error) => Err::<_, WasmError>(wasm_error),
+                    };
                     $crate::holochain_wasmer_host::import::set_context_data(ctx, result)
                 }
             }};
