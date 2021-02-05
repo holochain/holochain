@@ -91,7 +91,9 @@ async fn inner() -> TransportResult<()> {
         TlsConfig::new_ephemeral().await?
     };
 
-    let (listener, events) = spawn_transport_listener_quic(opt.into()).await?;
+    let (listener, events) =
+        spawn_transport_listener_quic(opt.into(), Arc::new(KitsuneP2pTuningParams::default()))
+            .await?;
 
     let proxy_config = ProxyConfig::local_proxy_server(tls_conf, AcceptProxyCallback::accept_all());
 

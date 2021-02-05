@@ -8,6 +8,7 @@ mod tests {
     async fn test_message() {
         let (listener1, _events1) = spawn_transport_listener_quic(
             ConfigListenerQuic::default().set_override_host(Some("127.0.0.1")),
+            Arc::new(kitsune_p2p_types::config::KitsuneP2pTuningParams::default()),
         )
         .await
         .unwrap();
@@ -16,9 +17,12 @@ mod tests {
         assert_eq!("127.0.0.1", bound1.host_str().unwrap());
         println!("listener1 bound to: {}", bound1);
 
-        let (listener2, mut events2) = spawn_transport_listener_quic(ConfigListenerQuic::default())
-            .await
-            .unwrap();
+        let (listener2, mut events2) = spawn_transport_listener_quic(
+            ConfigListenerQuic::default(),
+            Arc::new(kitsune_p2p_types::config::KitsuneP2pTuningParams::default()),
+        )
+        .await
+        .unwrap();
 
         metric_task(async move {
             while let Some(evt) = events2.next().await {
@@ -49,6 +53,7 @@ mod tests {
     async fn test_large_message() {
         let (listener1, _events1) = spawn_transport_listener_quic(
             ConfigListenerQuic::default().set_override_host(Some("127.0.0.1")),
+            Arc::new(kitsune_p2p_types::config::KitsuneP2pTuningParams::default()),
         )
         .await
         .unwrap();
@@ -57,9 +62,12 @@ mod tests {
         assert_eq!("127.0.0.1", bound1.host_str().unwrap());
         println!("listener1 bound to: {}", bound1);
 
-        let (listener2, mut events2) = spawn_transport_listener_quic(ConfigListenerQuic::default())
-            .await
-            .unwrap();
+        let (listener2, mut events2) = spawn_transport_listener_quic(
+            ConfigListenerQuic::default(),
+            Arc::new(kitsune_p2p_types::config::KitsuneP2pTuningParams::default()),
+        )
+        .await
+        .unwrap();
 
         metric_task(async move {
             while let Some(evt) = events2.next().await {

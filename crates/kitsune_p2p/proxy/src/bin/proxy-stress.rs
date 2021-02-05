@@ -85,7 +85,11 @@ async fn gen_base_con(
         ProxyTransport::Quic => {
             let mut cfg = ConfigListenerQuic::default();
             cfg.bind_to = Some(url2::url2!("kitsune-quic://127.0.0.1:0"));
-            spawn_transport_listener_quic(cfg).await
+            spawn_transport_listener_quic(
+                cfg,
+                Arc::new(kitsune_p2p_types::config::KitsuneP2pTuningParams::default()),
+            )
+            .await
         }
     }
 }

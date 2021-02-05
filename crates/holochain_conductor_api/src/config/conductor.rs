@@ -198,6 +198,7 @@ pub mod tests {
         tls_in_mem_session_storage: 42
         proxy_keepalive_ms: 42
         proxy_to_expire_ms: 42
+        quic_connection_channel_limit: 42
 
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
@@ -226,6 +227,7 @@ pub mod tests {
         tuning_params.tls_in_mem_session_storage = 42;
         tuning_params.proxy_keepalive_ms = 42;
         tuning_params.proxy_to_expire_ms = 42;
+        tuning_params.quic_connection_channel_limit = 42;
         network_config.tuning_params = std::sync::Arc::new(tuning_params);
         assert_eq!(
             result.unwrap(),

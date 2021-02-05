@@ -66,7 +66,11 @@ fn build_transport(
                     .set_bind_to(bind_to)
                     .set_override_host(override_host)
                     .set_override_port(override_port);
-                Ok(kitsune_p2p_transport_quic::spawn_transport_listener_quic(sub_conf).await?)
+                Ok(kitsune_p2p_transport_quic::spawn_transport_listener_quic(
+                    sub_conf,
+                    tuning_params.clone(),
+                )
+                .await?)
             }
             TransportConfig::Proxy {
                 sub_transport,

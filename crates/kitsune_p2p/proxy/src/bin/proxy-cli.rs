@@ -38,7 +38,8 @@ async fn inner() -> TransportResult<()> {
 
     let tuning_params = Arc::new(KitsuneP2pTuningParams::default());
 
-    let (listener, events) = spawn_transport_listener_quic(ConfigListenerQuic::default()).await?;
+    let (listener, events) =
+        spawn_transport_listener_quic(ConfigListenerQuic::default(), tuning_params.clone()).await?;
 
     let proxy_config = ProxyConfig::local_proxy_server(
         TlsConfig::new_ephemeral().await?,

@@ -10,22 +10,12 @@ use kitsune_p2p_types::dependencies::url2;
 use kitsune_p2p_types::transport::*;
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::Arc;
 
-struct DropMe(Option<tokio::sync::oneshot::Sender<()>>);
-
-impl Drop for DropMe {
-    fn drop(&mut self) {
-        if let Some(send) = self.0.take() {
-            let _ = send.send(());
-        }
-    }
-}
+struct DropMe(tokio::sync::OwnedSemaphorePermit);
 
 impl DropMe {
-    pub fn new() -> (Arc<Self>, tokio::sync::oneshot::Receiver<()>) {
-        let (send, recv) = tokio::sync::oneshot::channel();
-        (Arc::new(Self(Some(send))), recv)
+    pub fn new(permit: tokio::sync::OwnedSemaphorePermit) -> Arc<Self> {
+        Arc::new(Self(permit))
     }
 }
 
@@ -46,10 +36,7 @@ impl futures::sink::Sink<Vec<u8>> for TrackedTransportChannelWrite {
         futures::sink::Sink::poll_ready(write, cx)
     }
 
-    fn start_send(
-        mut self: std::pin::Pin<&mut Self>,
-        item: Vec<u8>,
-    ) -> Result<(), Self::Error> {
+    fn start_send(mut self: std::pin::Pin<&mut Self>, item: Vec<u8>) -> Result<(), Self::Error> {
         let write = &mut self.write;
         tokio::pin!(write);
         futures::sink::Sink::start_send(write, item)
@@ -98,7 +85,8 @@ impl futures::stream::Stream for TrackedTransportChannelRead {
 fn tx_bi_chan(
     mut bi_send: quinn::SendStream,
     mut bi_recv: quinn::RecvStream,
-) -> (TransportChannelWrite, TransportChannelRead, tokio::sync::oneshot::Reciver<()>) {
+    permit: tokio::sync::OwnedSemaphorePermit,
+) -> (TransportChannelWrite, TransportChannelRead) {
     let (write_send, mut write_recv) = futures::channel::mpsc::channel::<Vec<u8>>(10);
     let write_send = write_send.sink_map_err(TransportError::other);
     metric_task(async move {
@@ -130,20 +118,22 @@ fn tx_bi_chan(
         }
         TransportResult::Ok(())
     });
-    let (drop_me, _drop_recv) = DropMe::new();
-    let write_send: TransportChannelWrite = Box::new(
-        TrackedTransportChannelWrite {
-            write: Box::new(write_send),
-            _drop_me: drop_me.clone(),
-        }
-    );
-    let read_recv: TransportChannelRead = Box::new(
-        TrackedTransportChannelRead {
-            read: Box::new(read_recv),
-            _drop_me: drop_me,
-        }
-    );
+    let drop_me = DropMe::new(permit);
+    let write_send: TransportChannelWrite = Box::new(TrackedTransportChannelWrite {
+        write: Box::new(write_send),
+        _drop_me: drop_me.clone(),
+    });
+    let read_recv: TransportChannelRead = Box::new(TrackedTransportChannelRead {
+        read: Box::new(read_recv),
+        _drop_me: drop_me,
+    });
     (write_send, read_recv)
+}
+
+#[derive(Clone)]
+struct ConItem {
+    pub con: quinn::Connection,
+    pub channel_limit: Arc<tokio::sync::Semaphore>,
 }
 
 /// QUIC implementation of kitsune TransportListener actor.
@@ -157,7 +147,9 @@ struct TransportListenerQuic {
     /// the quinn binding (akin to a socket listener)
     quinn_endpoint: quinn::Endpoint,
     /// pool of active connections
-    connections: HashMap<Url2, quinn::Connection>,
+    connections: HashMap<Url2, ConItem>,
+    /// tuning params
+    tuning_params: Arc<kitsune_p2p_types::config::KitsuneP2pTuningParams>,
 }
 
 impl ghost_actor::GhostControlHandler for TransportListenerQuic {
@@ -171,7 +163,7 @@ impl ghost_actor::GhostControlHandler for TransportListenerQuic {
             // then we could use `quinn_endpoint.wait_idle().await`.
             let _ = self.incoming_channel_sender.close_channel();
             for (_, con) in self.connections.into_iter() {
-                con.close(0_u8.into(), b"");
+                con.con.close(0_u8.into(), b"");
                 drop(con);
             }
             self.quinn_endpoint.close(0_u8.into(), b"");
@@ -203,7 +195,7 @@ ghost_actor::ghost_chan! {
         /// Places it in our hash map for use establishing outgoing channels.
         fn set_connection(
             url: Url2,
-            con: quinn::Connection,
+            con: ConItem,
         ) -> ();
 
         /// If we get an error making outgoing channels,
@@ -234,6 +226,7 @@ impl ListenerInnerHandler for TransportListenerQuic {
         with_channel: bool,
     ) -> ListenerInnerHandlerResult<Option<(Url2, TransportChannelWrite, TransportChannelRead)>>
     {
+        let channel_limit = self.tuning_params.quic_connection_channel_limit;
         let i_s = self.internal_sender.clone();
         let mut incoming_channel_sender = self.incoming_channel_sender.clone();
         Ok(async move {
@@ -245,18 +238,28 @@ impl ListenerInnerHandler for TransportListenerQuic {
                 ..
             } = maybe_con.await.map_err(TransportError::other)?;
 
+            let con = ConItem {
+                con,
+                channel_limit: Arc::new(tokio::sync::Semaphore::new(channel_limit as usize)),
+            };
+
             // if we are making an outgoing connection
             // we also need to make an initial channel
             let out = if with_channel {
-                let (bi_send, bi_recv) = con.open_bi().await.map_err(TransportError::other)?;
-                Some(tx_bi_chan(bi_send, bi_recv))
+                let permit = con.channel_limit.clone().acquire_owned().await;
+                let (bi_send, bi_recv) = con.con.open_bi().await.map_err(TransportError::other)?;
+                Some(tx_bi_chan(bi_send, bi_recv, permit))
             } else {
                 None
             };
 
             // Construct our url from the low-level data
-            let url = url2!("{}://{}", crate::SCHEME, con.remote_address());
+            let url = url2!("{}://{}", crate::SCHEME, con.con.remote_address());
             tracing::debug!("QUIC handle connection: {}", url);
+
+            // clone our channel limiter semaphore
+            // so we pause awaiting incoming streams for a permit
+            let channel_limit = con.channel_limit.clone();
 
             // pass the connection off to our actor
             i_s.set_connection(url.clone(), con).await?;
@@ -264,18 +267,27 @@ impl ListenerInnerHandler for TransportListenerQuic {
             // pass any incoming channels off to our actor
             let url_clone = url.clone();
             metric_task(async move {
-                while let Some(Ok((bi_send, bi_recv))) = bi_streams.next().await {
-                    let (write, read) = tx_bi_chan(bi_send, bi_recv);
-                    if incoming_channel_sender
-                        .send(TransportEvent::IncomingChannel(
-                            url_clone.clone(),
-                            write,
-                            read,
-                        ))
-                        .await
-                        .is_err()
-                    {
-                        break;
+                loop {
+                    let permit = channel_limit.clone().acquire_owned().await;
+                    match bi_streams.next().await {
+                        Some(Err(e)) => {
+                            tracing::warn!("incoming stream close: {:?}", e);
+                        }
+                        Some(Ok((bi_send, bi_recv))) => {
+                            let (write, read) = tx_bi_chan(bi_send, bi_recv, permit);
+                            if incoming_channel_sender
+                                .send(TransportEvent::IncomingChannel(
+                                    url_clone.clone(),
+                                    write,
+                                    read,
+                                ))
+                                .await
+                                .is_err()
+                            {
+                                break;
+                            }
+                        }
+                        _ => (),
                     }
                 }
                 <Result<(), ()>>::Ok(())
@@ -287,11 +299,7 @@ impl ListenerInnerHandler for TransportListenerQuic {
         .into())
     }
 
-    fn handle_set_connection(
-        &mut self,
-        url: Url2,
-        con: quinn::Connection,
-    ) -> ListenerInnerHandlerResult<()> {
+    fn handle_set_connection(&mut self, url: Url2, con: ConItem) -> ListenerInnerHandlerResult<()> {
         self.connections.insert(url, con);
         Ok(async move { Ok(()) }.boxed().into())
     }
@@ -329,16 +337,17 @@ impl TransportListenerHandler for TransportListenerQuic {
     ) -> TransportListenerHandlerResult<(Url2, TransportChannelWrite, TransportChannelRead)> {
         // if we already have an open connection to the remote end,
         // just directly try to open the bi-stream channel.
-        let maybe_bi = self.connections.get(&url).map(|con| con.open_bi());
+        let maybe_con = self.connections.get(&url).cloned();
 
         let i_s = self.internal_sender.clone();
         Ok(async move {
             // if we already had a connection and the bi-stream
             // channel is successfully opened, return early using that
-            if let Some(maybe_bi) = maybe_bi {
-                match maybe_bi.await {
+            if let Some(con) = maybe_con {
+                let permit = con.channel_limit.acquire_owned().await;
+                match con.con.open_bi().await {
                     Ok((bi_send, bi_recv)) => {
-                        let (write, read) = tx_bi_chan(bi_send, bi_recv);
+                        let (write, read) = tx_bi_chan(bi_send, bi_recv, permit);
                         return Ok((url, write, read));
                     }
                     Err(_) => {
@@ -365,6 +374,7 @@ impl TransportListenerHandler for TransportListenerQuic {
 /// Spawn a new QUIC TransportListenerSender.
 pub async fn spawn_transport_listener_quic(
     config: ConfigListenerQuic,
+    tuning_params: Arc<kitsune_p2p_types::config::KitsuneP2pTuningParams>,
 ) -> TransportListenerResult<(
     ghost_actor::GhostSender<TransportListener>,
     TransportEventReceiver,
@@ -443,6 +453,7 @@ pub async fn spawn_transport_listener_quic(
         bound_url,
         quinn_endpoint,
         connections: HashMap::new(),
+        tuning_params,
     };
 
     metric_task(builder.spawn(actor));

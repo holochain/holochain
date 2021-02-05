@@ -43,6 +43,9 @@ pub struct KitsuneP2pTuningParams {
     /// Note - to function this should be > proxy_keepalive_ms.
     /// [Default: 5 minutes]
     pub proxy_to_expire_ms: u32,
+
+    /// Quic channel limit per connection
+    pub quic_connection_channel_limit: u32,
 }
 
 impl Default for KitsuneP2pTuningParams {
@@ -58,6 +61,7 @@ impl Default for KitsuneP2pTuningParams {
             tls_in_mem_session_storage: 512,
             proxy_keepalive_ms: 1000 * 60 * 2, // 2 minutes
             proxy_to_expire_ms: 1000 * 60 * 5, // 5 minutes
+            quic_connection_channel_limit: 32,
         }
     }
 }
@@ -108,6 +112,10 @@ impl serde::Serialize for KitsuneP2pTuningParams {
         m.serialize_entry(
             "proxy_to_expire_ms",
             &format!("{}", self.proxy_to_expire_ms),
+        )?;
+        m.serialize_entry(
+            "quic_connection_channel_limit",
+            &format!("{}", self.quic_connection_channel_limit),
         )?;
         m.end()
     }
@@ -160,6 +168,10 @@ impl<'de> serde::Deserialize<'de> for KitsuneP2pTuningParams {
                 },
                 "proxy_to_expire_ms" => match v.parse::<u32>() {
                     Ok(v) => out.proxy_to_expire_ms = v,
+                    Err(e) => tracing::warn!("failed to parse {}: {}", k, e),
+                },
+                "quic_connection_channel_limit" => match v.parse::<u32>() {
+                    Ok(v) => out.quic_connection_channel_limit = v,
                     Err(e) => tracing::warn!("failed to parse {}: {}", k, e),
                 },
                 _ => tracing::warn!("INVALID TUNING PARAM: '{}'", k),
