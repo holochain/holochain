@@ -10,6 +10,87 @@ use kitsune_p2p_types::dependencies::url2;
 use kitsune_p2p_types::transport::*;
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::sync::Arc;
+
+struct DropMe(Option<tokio::sync::oneshot::Sender<()>>);
+
+impl Drop for DropMe {
+    fn drop(&mut self) {
+        if let Some(send) = self.0.take() {
+            let _ = send.send(());
+        }
+    }
+}
+
+impl DropMe {
+    pub fn new() -> (Arc<Self>, tokio::sync::oneshot::Receiver<()>) {
+        let (send, recv) = tokio::sync::oneshot::channel();
+        (Arc::new(Self(Some(send))), recv)
+    }
+}
+
+struct TrackedTransportChannelWrite {
+    write: TransportChannelWrite,
+    _drop_me: Arc<DropMe>,
+}
+
+impl futures::sink::Sink<Vec<u8>> for TrackedTransportChannelWrite {
+    type Error = TransportError;
+
+    fn poll_ready(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        let write = &mut self.write;
+        tokio::pin!(write);
+        futures::sink::Sink::poll_ready(write, cx)
+    }
+
+    fn start_send(
+        mut self: std::pin::Pin<&mut Self>,
+        item: Vec<u8>,
+    ) -> Result<(), Self::Error> {
+        let write = &mut self.write;
+        tokio::pin!(write);
+        futures::sink::Sink::start_send(write, item)
+    }
+
+    fn poll_flush(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        let write = &mut self.write;
+        tokio::pin!(write);
+        futures::sink::Sink::poll_flush(write, cx)
+    }
+
+    fn poll_close(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        let write = &mut self.write;
+        tokio::pin!(write);
+        futures::sink::Sink::poll_close(write, cx)
+    }
+}
+
+struct TrackedTransportChannelRead {
+    read: TransportChannelRead,
+    _drop_me: Arc<DropMe>,
+}
+
+impl futures::stream::Stream for TrackedTransportChannelRead {
+    type Item = Vec<u8>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let read = &mut self.read;
+        tokio::pin!(read);
+        futures::stream::Stream::poll_next(read, cx)
+    }
+}
 
 /// Convert quinn async read/write streams into Vec<u8> senders / receivers.
 /// Quic bi-streams are Async Read/Write - But the kitsune transport api
@@ -17,7 +98,7 @@ use std::net::SocketAddr;
 fn tx_bi_chan(
     mut bi_send: quinn::SendStream,
     mut bi_recv: quinn::RecvStream,
-) -> (TransportChannelWrite, TransportChannelRead) {
+) -> (TransportChannelWrite, TransportChannelRead, tokio::sync::oneshot::Reciver<()>) {
     let (write_send, mut write_recv) = futures::channel::mpsc::channel::<Vec<u8>>(10);
     let write_send = write_send.sink_map_err(TransportError::other);
     metric_task(async move {
@@ -49,8 +130,19 @@ fn tx_bi_chan(
         }
         TransportResult::Ok(())
     });
-    let write_send: TransportChannelWrite = Box::new(write_send);
-    let read_recv: TransportChannelRead = Box::new(read_recv);
+    let (drop_me, _drop_recv) = DropMe::new();
+    let write_send: TransportChannelWrite = Box::new(
+        TrackedTransportChannelWrite {
+            write: Box::new(write_send),
+            _drop_me: drop_me.clone(),
+        }
+    );
+    let read_recv: TransportChannelRead = Box::new(
+        TrackedTransportChannelRead {
+            read: Box::new(read_recv),
+            _drop_me: drop_me,
+        }
+    );
     (write_send, read_recv)
 }
 
