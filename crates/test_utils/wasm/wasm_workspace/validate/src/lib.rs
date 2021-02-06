@@ -2,7 +2,7 @@ use element::ElementEntry;
 use hdk3::prelude::*;
 
 /// an example inner value that can be serialized into the contents of Entry::App()
-#[derive(Deserialize, Serialize, SerializedBytes)]
+#[derive(Deserialize, Serialize, SerializedBytes, Debug)]
 enum ThisWasmEntry {
     AlwaysValidates,
     NeverValidates,
@@ -54,7 +54,7 @@ impl TryFrom<&Entry> for ThisWasmEntry {
         match entry {
             Entry::App(eb) => Ok(Self::try_from(SerializedBytes::from(eb.to_owned()))?),
             _ => Err(
-                SerializedBytesError::FromBytes("failed to deserialize ThisWasmEntry".into())
+                SerializedBytesError::Deserialize("failed to deserialize ThisWasmEntry".into())
                     .into(),
             ),
         }

@@ -15,7 +15,7 @@ macro_rules! app_entry {
                     $crate::prelude::Entry::App(eb) => Ok(Self::try_from(
                         $crate::prelude::SerializedBytes::from(eb.to_owned()),
                     )?),
-                    _ => Err($crate::prelude::SerializedBytesError::FromBytes(format!(
+                    _ => Err($crate::prelude::SerializedBytesError::Deserialize(format!(
                         "{:?} is not an Entry::App so has no serialized bytes",
                         entry
                     ))

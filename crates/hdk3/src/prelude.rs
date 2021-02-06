@@ -4,7 +4,6 @@ pub use crate::capability::create_cap_grant::create_cap_grant;
 pub use crate::capability::delete_cap_grant::delete_cap_grant;
 pub use crate::capability::generate_cap_secret::generate_cap_secret;
 pub use crate::capability::update_cap_grant::update_cap_grant;
-pub use crate::debug;
 pub use crate::entry::create_entry::create_entry;
 pub use crate::entry::delete_entry::delete_entry;
 pub use crate::entry::hash_entry::hash_entry;
@@ -62,6 +61,9 @@ pub use holochain_zome_types;
 pub use holochain_zome_types::prelude::*;
 pub use std::collections::HashSet;
 pub use std::convert::TryFrom;
+pub use tracing;
+pub use tracing::{debug, error, info, instrument, trace, warn};
+pub use tracing_subscriber;
 
 // This needs to be called at least once _somewhere_ and is idempotent.
 #[macro_export]
@@ -69,7 +71,7 @@ macro_rules! holochain_externs {
     () => {
         holochain_wasmer_guest::memory_externs!();
         holochain_wasmer_guest::host_externs!(
-            __debug,
+            __trace,
             __hash_entry,
             __unreachable,
             __verify_signature,

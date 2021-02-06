@@ -286,7 +286,7 @@ impl DhtOpLight {
 
 // FIXME: need to use this in HashableContent
 #[allow(missing_docs)]
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub enum UniqueForm<'a> {
     // As an optimization, we don't include signatures. They would be redundant
     // with headers and therefore would waste hash/comparison time to include.
@@ -506,7 +506,7 @@ impl<'a> TryFrom<&UniqueForm<'a>> for SerializedBytes {
             Ok(v) => Ok(SerializedBytes::from(
                 holochain_serialized_bytes::UnsafeBytes::from(v),
             )),
-            Err(e) => Err(SerializedBytesError::ToBytes(e.to_string())),
+            Err(e) => Err(SerializedBytesError::Serialize(e.to_string())),
         }
     }
 }
