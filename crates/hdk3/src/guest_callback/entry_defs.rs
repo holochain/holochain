@@ -1,3 +1,17 @@
+/// Trait for binding static `EntryDef` property access for a type.
+/// @see entry_interface!
+pub trait EntryDefRegistration {
+    fn entry_def() -> crate::prelude::EntryDef;
+
+    fn entry_def_id() -> crate::prelude::EntryDefId;
+
+    fn entry_visibility() -> crate::prelude::EntryVisibility;
+
+    fn crdt_type() -> crate::prelude::CrdtType;
+
+    fn required_validations() -> crate::prelude::RequiredValidations;
+}
+
 /// Implements conversion traits to allow a struct to be handled as an app entry.
 /// If you have some need to implement custom serialization logic or metadata injection
 /// you can do so by implementing these traits manually instead.
@@ -67,53 +81,68 @@ macro_rules! app_entry {
 #[macro_export]
 macro_rules! entry_interface {
     ( $t:ident $def:expr ) => {
-        impl $t {
-            pub fn entry_def() -> $crate::prelude::EntryDef {
+        impl $crate::prelude::EntryDefRegistration for $t {
+            fn entry_def() -> $crate::prelude::EntryDef {
                 $def
             }
 
-            pub fn entry_def_id() -> $crate::prelude::EntryDefId {
+            fn entry_def_id() -> $crate::prelude::EntryDefId {
                 Self::entry_def().id
             }
 
-            pub fn entry_visibility() -> $crate::prelude::EntryVisibility {
+            fn entry_visibility() -> $crate::prelude::EntryVisibility {
                 Self::entry_def().visibility
             }
 
-            pub fn crdt_type() -> $crate::prelude::CrdtType {
+            fn crdt_type() -> $crate::prelude::CrdtType {
                 Self::entry_def().crdt_type
             }
 
-            pub fn required_validations() -> $crate::prelude::RequiredValidations {
+            fn required_validations() -> $crate::prelude::RequiredValidations {
                 Self::entry_def().required_validations
             }
         }
 
-        impl From<$t> for $crate::prelude::EntryDef {
+        impl From<$t> for $crate::prelude::EntryDef
+        where
+            $t: $crate::prelude::EntryDefRegistration,
+        {
             fn from(_: $t) -> Self {
                 $t::entry_def()
             }
         }
 
-        impl From<&$t> for $crate::prelude::EntryDef {
+        impl From<&$t> for $crate::prelude::EntryDef
+        where
+            $t: $crate::prelude::EntryDefRegistration,
+        {
             fn from(_: &$t) -> Self {
                 $t::entry_def()
             }
         }
 
-        impl From<$t> for $crate::prelude::EntryDefId {
+        impl From<$t> for $crate::prelude::EntryDefId
+        where
+            $t: $crate::prelude::EntryDefRegistration,
+        {
             fn from(_: $t) -> Self {
                 $t::entry_def_id()
             }
         }
 
-        impl From<&$t> for $crate::prelude::EntryDefId {
+        impl From<&$t> for $crate::prelude::EntryDefId
+        where
+            $t: $crate::prelude::EntryDefRegistration,
+        {
             fn from(_: &$t) -> Self {
                 $t::entry_def_id()
             }
         }
 
-        impl TryFrom<&$t> for $crate::prelude::EntryWithDefId {
+        impl TryFrom<&$t> for $crate::prelude::EntryWithDefId
+        where
+            $t: $crate::prelude::EntryDefRegistration,
+        {
             type Error = $crate::prelude::WasmError;
             fn try_from(t: &$t) -> Result<Self, Self::Error> {
                 Ok(Self::new($t::entry_def_id(), t.try_into()?))
@@ -127,37 +156,55 @@ macro_rules! entry_interface {
             }
         }
 
-        impl From<$t> for $crate::prelude::EntryVisibility {
+        impl From<$t> for $crate::prelude::EntryVisibility
+        where
+            $t: $crate::prelude::EntryDefRegistration,
+        {
             fn from(_: $t) -> Self {
                 $t::entry_visibility()
             }
         }
 
-        impl From<&$t> for $crate::prelude::EntryVisibility {
+        impl From<&$t> for $crate::prelude::EntryVisibility
+        where
+            $t: $crate::prelude::EntryDefRegistration,
+        {
             fn from(_: &$t) -> Self {
                 $t::entry_visibility()
             }
         }
 
-        impl From<$t> for $crate::prelude::CrdtType {
+        impl From<$t> for $crate::prelude::CrdtType
+        where
+            $t: $crate::prelude::EntryDefRegistration,
+        {
             fn from(_: $t) -> Self {
                 $t::crdt_type()
             }
         }
 
-        impl From<&$t> for $crate::prelude::CrdtType {
+        impl From<&$t> for $crate::prelude::CrdtType
+        where
+            $t: $crate::prelude::EntryDefRegistration,
+        {
             fn from(_: &$t) -> Self {
                 $t::crdt_type()
             }
         }
 
-        impl From<$t> for $crate::prelude::RequiredValidations {
+        impl From<$t> for $crate::prelude::RequiredValidations
+        where
+            $t: $crate::prelude::EntryDefRegistration,
+        {
             fn from(_: $t) -> Self {
                 $t::required_validations()
             }
         }
 
-        impl From<&$t> for $crate::prelude::RequiredValidations {
+        impl From<&$t> for $crate::prelude::RequiredValidations
+        where
+            $t: $crate::prelude::EntryDefRegistration,
+        {
             fn from(_: &$t) -> Self {
                 $t::required_validations()
             }
