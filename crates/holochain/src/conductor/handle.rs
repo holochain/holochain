@@ -493,21 +493,26 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self: Arc<Self>,
         payload: InstallAppBundlePayload,
     ) -> ConductorResult<()> {
-        // let InstallAppBundlePayload {
-        //     bundle,
-        //     agent_key,
-        //     installed_app_id,
-        //     membrane_proofs,
-        // } = payload;
-        // let manifest = bundle.manifest();
-        // let bundled_dnas = bundle.resolve_all().await?;
+        let InstallAppBundlePayload {
+            bundle,
+            agent_key,
+            installed_app_id,
+            membrane_proofs,
+        } = payload;
 
-        // self.clone().register_dna(todo!("get dnas")).await?;
+        let manifest = bundle.manifest();
+        let ops = bundle.resolve_cells(DnaGamut::placeholder()).await?;
 
-        // self.clone().install_app(todo!(), todo!()).await?;
+        let slots = todo!();
+        let app = InstalledApp::new(installed_app_id, slots);
+        self.clone().register_dna(todo!("get dnas")).await?;
 
-        // for dna_bytes in bundled_dnas.values()
-        todo!()
+        // Update the db
+        self.conductor
+            .write()
+            .await
+            .add_inactive_app_to_db(app)
+            .await
     }
 
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>> {

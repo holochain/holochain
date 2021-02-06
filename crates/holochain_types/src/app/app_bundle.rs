@@ -48,7 +48,7 @@ impl AppBundle {
                     .await?,
             ),
             CellManifestValidated::CreateClone { .. } => {
-                todo!("Come back to this after implementing DNA cloning")
+                unimplemented!("`create_clone` provisioning strategy is currently unimplemented")
             }
             CellManifestValidated::UseExisting { version, .. } => {
                 Some(self.resolve_cell_existing(&version))
@@ -60,9 +60,11 @@ impl AppBundle {
                     Some(self.resolve_cell_create(&location, Some(&version)).await?)
                 }
                 op @ CellProvisioningOp::Existing(_) => Some(op),
-                CellProvisioningOp::Conflict(_) => unimplemented!("conflicts not possible yet"),
+                CellProvisioningOp::Conflict(_) => {
+                    unimplemented!("conflicts are not handled, or even possible yet")
+                }
                 CellProvisioningOp::Create(_) => {
-                    unreachable!("resolve_cell_existing will not return a Create op")
+                    unreachable!("resolve_cell_existing will never return a Create op")
                 }
             },
             CellManifestValidated::Disabled { .. } => None,
@@ -76,19 +78,30 @@ impl AppBundle {
     ) -> AppBundleResult<CellProvisioningOp> {
         let bytes = self.resolve(location).await?;
         let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(&bytes)?.into();
-        todo!()
+        let dna_file = dna_bundle.into_dna_file().await?;
+        if let Some(spec) = version {
+            if !spec.matches(dna_file.dna_hash().clone()) {
+                return Ok(CellProvisioningOp::NoMatch);
+            }
+        }
+        Ok(CellProvisioningOp::Create(dna_file))
     }
 
-    fn resolve_cell_existing(&self, version: &DnaVersionSpec) -> CellProvisioningOp {
+    fn resolve_cell_existing(&self, _version: &DnaVersionSpec) -> CellProvisioningOp {
         unimplemented!("Reusing existing cells is not yet implemented")
     }
 }
 
 #[warn(missing_docs)]
+/// Specifies what step should be taken to provision a cell while installing an App
 pub enum CellProvisioningOp {
-    Create(DnaHash),
+    /// Create a new Cell
+    Create(DnaFile),
+    /// Use an existing Cell
     Existing(CellId),
+    /// Couldn't find a DNA that matches the version spec; can't provision (should this be an Err?)
     NoMatch,
+    /// Ambiguous result, needs manual resolution; can't provision (should this be an Err?)
     Conflict(CellProvisioningConflict),
 }
 

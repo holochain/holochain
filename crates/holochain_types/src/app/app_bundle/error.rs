@@ -1,6 +1,6 @@
 use mr_bundle::error::MrBundleError;
 
-use crate::prelude::AppManifestError;
+use crate::prelude::{AppManifestError, DnaError};
 
 /// Errors occurring while installing an AppBundle
 #[derive(thiserror::Error, Debug)]
@@ -12,6 +12,9 @@ pub enum AppBundleError {
 
     #[error(transparent)]
     AppManifestError(#[from] AppManifestError),
+
+    #[error(transparent)]
+    DnaError(#[from] DnaError),
 
     #[error(transparent)]
     MrBundleError(#[from] MrBundleError),

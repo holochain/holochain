@@ -41,6 +41,11 @@ impl DnaGamut {
         Self(map)
     }
 
+    #[deprecated("Stop using the placeholder")]
+    pub fn placeholder() -> Self {
+        Self::new(std::iter::empty())
+    }
+
     /// Given a version spec, return the best-matching DNA in the gamut
     pub fn resolve_dna(&self, spec: DnaVersionSpec) -> DnaResolution {
         for hash in spec.dna_hashes() {

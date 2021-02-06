@@ -105,7 +105,7 @@ pub struct DnaVersionSpec(Vec<DnaHashB64>);
 // NB: the following is likely to remain in the API for DnaVersionSpec
 impl DnaVersionSpec {
     /// Check if a DNA satisfies this version spec
-    pub fn _matches(&self, hash: DnaHash) -> bool {
+    pub fn matches(&self, hash: DnaHash) -> bool {
         self.0.contains(&hash.into())
     }
 }
