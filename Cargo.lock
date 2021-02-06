@@ -2105,6 +2105,7 @@ dependencies = [
  "rustls 0.19.0",
  "serde",
  "serde_bytes",
+ "serde_yaml",
  "structopt",
  "tokio",
  "tracing-subscriber",

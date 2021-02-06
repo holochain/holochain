@@ -7,6 +7,17 @@ pub struct Opt {
     #[structopt(long)]
     pub danger_gen_unenc_cert: Option<std::path::PathBuf>,
 
+    #[structopt(default_value = "./kitsune-p2p-proxy-conf.yml")]
+    pub config_file: std::path::PathBuf,
+}
+
+/*
+pub struct Opt {
+    /// Generate a new self-signed certificate file/priv key and exit.
+    /// Danger - this cert is written unencrypted to disk.
+    #[structopt(long)]
+    pub danger_gen_unenc_cert: Option<std::path::PathBuf>,
+
     /// Use a dangerous unencryted tls cert/priv key for this proxy.
     #[structopt(long)]
     pub danger_use_unenc_cert: Option<std::path::PathBuf>,
@@ -42,3 +53,4 @@ impl From<Opt> for kitsune_p2p_transport_quic::ConfigListenerQuic {
         (&o).into()
     }
 }
+*/

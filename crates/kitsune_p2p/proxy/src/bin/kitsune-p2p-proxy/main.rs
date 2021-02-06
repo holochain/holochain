@@ -10,9 +10,6 @@ use kitsune_p2p_types::transport::*;
 use std::sync::Arc;
 use structopt::StructOpt;
 
-mod opt;
-use opt::*;
-
 #[tokio::main]
 async fn main() {
     let _ = ghost_actor::dependencies::tracing::subscriber::set_global_default(
@@ -57,9 +54,96 @@ impl From<TlsFileCert> for TlsConfig {
     }
 }
 
+/// Option Parsing
+#[derive(structopt::StructOpt, Debug)]
+#[structopt(name = "kitsune-p2p-proxy")]
+struct Opt {
+    /// Generate a new self-signed certificate file/priv key and exit.
+    /// Danger - this cert is written unencrypted to disk.
+    #[structopt(long)]
+    pub danger_gen_unenc_cert: Option<std::path::PathBuf>,
+
+    /// Dump a default config file example to stdout and exit.
+    #[structopt(long)]
+    pub gen_example_config: bool,
+
+    /// Use this config file for proxy configuration.
+    #[structopt(default_value = "./proxy-config.yml")]
+    pub config_file: std::path::PathBuf,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct Config {
+    /// Use a dangerous unencryted tls cert/priv key for this proxy.
+    pub danger_use_unenc_cert: Option<std::path::PathBuf>,
+
+    /// To which network interface / port should we bind?
+    /// Default: "kitsune-quic://0.0.0.0:0".
+    pub bind_to: Option<String>,
+
+    /// If you have port-forwarding set up,
+    /// or wish to apply a vanity domain name,
+    /// you may need to override the local NIC ip.
+    /// Default: None = use NIC ip.
+    pub override_host: Option<String>,
+
+    /// KitsuneP2p Tuning Parameters
+    pub tuning_params: Option<KitsuneP2pTuningParams>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            danger_use_unenc_cert: None,
+            bind_to: None,
+            override_host: None,
+            tuning_params: Some(KitsuneP2pTuningParams::default()),
+        }
+    }
+}
+
+impl From<&Config> for kitsune_p2p_transport_quic::ConfigListenerQuic {
+    fn from(o: &Config) -> Self {
+        let mut out = Self::default();
+        if let Some(b) = &o.bind_to {
+            out = out.set_bind_to(Some(kitsune_p2p_types::dependencies::url2::url2!("{}", b)));
+        }
+        if let Some(h) = &o.override_host {
+            out = out.set_override_host(Some(h));
+        }
+        out
+    }
+}
+
+const EXAMPLE_CONFIG: &[u8] = br#"---
+# Use a dangerous unencryted tls cert/priv key for this proxy.
+# [OPTIONAL, Default: ephemeral certificate]
+danger_use_unenc_cert: "my.cert.file.path"
+
+# To which network interface / port should we bind?
+# [OPTIONAL, Default: "kitsune-quic://0.0.0.0:0"]
+bind_to: "kitsune-quic://0.0.0.0:0"
+
+# If you have port-forwarding set up,
+# or wish to apply a vanity domain name,
+# you may need to override the local NIC ip.
+# [OPTIONAL, Default: use NIC ip]
+override_host: "my.dns.name"
+
+# If you want to override kitsune tuning:
+# [OPTIONAL]
+tuning_params:
+  tls_in_mem_session_storage: 512
+  proxy_to_expire_ms: 300000
+  concurrent_recv_buffer: 512
+  quic_max_idle_timeout: 30000
+  quic_connection_channel_limit: 512
+  quic_window_multiplier: 1
+  quic_crypto_buffer_multiplier: 1
+"#;
+
 async fn inner() -> TransportResult<()> {
     let opt = Opt::from_args();
-    let tuning_params = Arc::new(KitsuneP2pTuningParams::default());
 
     if let Some(gen_cert) = &opt.danger_gen_unenc_cert {
         let tls = TlsConfig::new_ephemeral().await?;
@@ -77,7 +161,41 @@ async fn inner() -> TransportResult<()> {
         return Ok(());
     }
 
-    let tls_conf = if let Some(use_cert) = &opt.danger_use_unenc_cert {
+    if opt.gen_example_config {
+        let _config: Config = serde_yaml::from_slice(EXAMPLE_CONFIG).unwrap();
+        use std::io::Write;
+        std::io::stdout()
+            .write(EXAMPLE_CONFIG)
+            .map_err(TransportError::other)?;
+        println!();
+        return Ok(());
+    }
+
+    let config = opt.config_file.clone();
+    let config = match tokio::task::spawn_blocking(move || {
+        let config: Config =
+            serde_yaml::from_slice(&std::fs::read(config).map_err(TransportError::other)?)
+                .map_err(TransportError::other)?;
+        TransportResult::Ok(config)
+    })
+    .await
+    .map_err(TransportError::other)
+    {
+        Ok(Ok(config)) => config,
+        _ => Config::default(),
+    };
+
+    println!(
+        "Executing proxy with config: {}",
+        serde_yaml::to_string(&config).unwrap()
+    );
+
+    let tuning_params = Arc::new(match &config.tuning_params {
+        Some(tuning_params) => tuning_params.clone(),
+        None => KitsuneP2pTuningParams::default(),
+    });
+
+    let tls_conf = if let Some(use_cert) = &config.danger_use_unenc_cert {
         let use_cert = use_cert.clone();
         tokio::task::spawn_blocking(move || {
             let tls = std::fs::read(use_cert).map_err(TransportError::other)?;
@@ -93,7 +211,7 @@ async fn inner() -> TransportResult<()> {
     };
 
     let (listener, events) =
-        spawn_transport_listener_quic(opt.into(), tuning_params.clone()).await?;
+        spawn_transport_listener_quic((&config).into(), tuning_params.clone()).await?;
 
     let proxy_config = ProxyConfig::local_proxy_server(tls_conf, AcceptProxyCallback::accept_all());
 
