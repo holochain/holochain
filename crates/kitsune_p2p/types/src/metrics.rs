@@ -42,7 +42,7 @@ where
     F: 'static + Send + std::future::Future<Output = Result<T, E>>,
 {
     let mut full = false;
-    let ref mut full_ref = full;
+    let full_ref = &mut full;
     let start = std::time::Instant::now();
     let r = spawn_queue_limit(
         limit,
