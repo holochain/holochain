@@ -9,7 +9,6 @@ use std::{
     ops::{Add, Sub},
     str::FromStr,
 };
-//use chrono::Duration;
 
 use crate::prelude::*;
 
@@ -99,23 +98,9 @@ impl From<&chrono::DateTime<chrono::Utc>> for Timestamp {
     }
 }
 
-// There is *no* infallible conversion from a Timestamp to a DateTime.  These may panic in
-// from_timestamp due to out-of-range secs or nsecs, making all code using/displaying a Timestamp
-// this way dangerously fragile!
-/*
-impl From<Timestamp> for chrono::DateTime<chrono::Utc> {
-    fn from(t: Timestamp) -> Self {
-        std::convert::From::from(&t)
-    }
-}
-
-impl From<&Timestamp> for chrono::DateTime<chrono::Utc> {
-    fn from(t: &Timestamp) -> Self {
-        let t = chrono::naive::NaiveDateTime::from_timestamp(t.0, t.1);
-        chrono::DateTime::from_utc(t, chrono::Utc)
-    }
-}
-*/
+// Implementation note: There are *no* infallible conversions from a Timestamp to a DateTime.  These
+// may panic in from_timestamp due to out-of-range secs or nsecs, making all code using/displaying a
+// Timestamp this way dangerously fragile!  Use try_from, and handle any failures.
 
 impl TryFrom<Timestamp> for chrono::DateTime<chrono::Utc> {
     type Error = TimestampError;
@@ -208,27 +193,6 @@ impl<D: Into<core::time::Duration>> Sub<D> for &Timestamp {
         self.to_owned() - rhs
     }
 }
-
-/*
-/// Timestamp +/- Into<chrono::Duration>: chrono::Duration allows +/- offsets.  Conflicts with
-/// Into<core::time::Duration>.
-impl Add<chrono::Duration> for Timestamp {
-    type Output = TimestampResult<Timestamp>;
-
-    fn add(self, rhs: chrono::Duration) -> Self::Output {
-	Ok(self.checked_add_signed(rhs.into())
-	   .ok_or(TimestampError::Overflow)?)
-    }
-}
-
-impl Add<chrono::Duration> for &Timestamp {
-    type Output = TimestampResult<Timestamp>;
-
-    fn add(self, rhs: chrono::Duration) -> Self::Output {
-        self.to_owned() + rhs
-    }
-}
-*/
 
 macro_rules! try_opt {
     ($e:expr) => (match $e { Some(v) => v, None => return None })
@@ -389,10 +353,7 @@ pub mod tests {
 	let d1: TimestampResult<chrono::DateTime<chrono::Utc>> = t1.try_into();
 	assert_eq!( d1,  Err(TimestampError::Overflow));
 
-	let t2 = Timestamp( 0, 0 ) + core::time::Duration::new(0,1);//nanoseconds( 1 );//chrono::Duration::nanoseconds( 1 );
+	let t2 = Timestamp( 0, 0 ) + core::time::Duration::new(0,1);
 	assert_eq!( t2,  Ok(Timestamp( 0, 1 )));
-
-	//let t3 = Timestamp( 0, 0 ) - chrono::Duration::nanoseconds( 1 );
-	//assert_eq!( t3,  Ok(Timestamp( -1, 999_999_999 )));
     }
 }
