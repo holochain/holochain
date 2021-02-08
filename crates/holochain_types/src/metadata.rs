@@ -1,7 +1,7 @@
 //! Types for getting and storing metadata
 
-use crate::Timestamp;
 use crate::timestamp;
+use crate::Timestamp;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 pub use holochain_zome_types::metadata::EntryDhtStatus;
@@ -41,7 +41,7 @@ impl From<HeaderHashed> for TimedHeaderHash {
     fn from(h: HeaderHashed) -> Self {
         let (header, hash) = h.into_inner();
         TimedHeaderHash {
-            timestamp: header.timestamp().into(),
+            timestamp: header.timestamp(),
             header_hash: hash,
         }
     }

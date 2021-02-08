@@ -93,7 +93,7 @@ pub async fn publish_dht_ops_workflow_inner(
                 let needs_publish = r
                     .last_publish_time
                     .and_then(|last| now.checked_difference_signed(&last))
-                    .and_then(|duration| Some(duration > interval))
+                    .map(|duration| duration > interval)
                     .unwrap_or(true);
                 if needs_publish {
                     r.last_publish_time = Some(now);

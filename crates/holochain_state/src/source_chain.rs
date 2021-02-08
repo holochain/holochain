@@ -57,7 +57,7 @@ impl SourceChain {
     ) -> SourceChainResult<HeaderHash> {
         let common = HeaderBuilderCommon {
             author: self.agent_pubkey()?,
-            timestamp: timestamp::now().into(),
+            timestamp: timestamp::now(),
             header_seq: self.len() as u32,
             prev_header: self.chain_head()?.to_owned(),
         };

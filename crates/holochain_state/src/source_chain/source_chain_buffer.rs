@@ -229,7 +229,7 @@ impl SourceChainBuf {
         // create a DNA chain element and add it directly to the store
         let dna_header = Header::Dna(header::Dna {
             author: agent_pubkey.clone(),
-            timestamp: timestamp::now().into(),
+            timestamp: timestamp::now(),
             hash: dna_hash,
         });
         let dna_header_address = self.put_raw(dna_header, None).await?;
@@ -237,7 +237,7 @@ impl SourceChainBuf {
         // create the agent validation entry and add it directly to the store
         let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
             author: agent_pubkey.clone(),
-            timestamp: timestamp::now().into(),
+            timestamp: timestamp::now(),
             header_seq: 1,
             prev_header: dna_header_address,
             membrane_proof,
@@ -247,7 +247,7 @@ impl SourceChainBuf {
         // create a agent chain element and add it directly to the store
         let agent_header = Header::Create(header::Create {
             author: agent_pubkey.clone(),
-            timestamp: timestamp::now().into(),
+            timestamp: timestamp::now(),
             header_seq: 2,
             prev_header: avh_addr,
             entry_type: header::EntryType::AgentPubKey,

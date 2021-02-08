@@ -826,7 +826,7 @@ async fn test_ops_state() {
 
     for t in tests.iter() {
         clear_dbs(env.clone());
-	println!("test_ops_state on function {:?}", t);
+        println!("test_ops_state on function {:?}", t);
         let td = TestData::new().await;
         let (pre_state, expect, name) = t(td);
         Db::set(pre_state, env.clone()).await;

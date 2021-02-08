@@ -149,7 +149,7 @@ impl EntryHeader {
         let (header, header_hash): (Header, HeaderHash) =
             HeaderHashed::from_content_sync(header).into();
         Ok(TimedHeaderHash {
-            timestamp: header.timestamp().into(),
+            timestamp: header.timestamp(),
             header_hash,
         })
     }
