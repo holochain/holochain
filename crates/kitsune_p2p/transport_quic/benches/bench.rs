@@ -1,6 +1,10 @@
 use std::sync::Arc;
 
-use bencher::{benchmark_group, benchmark_main, Bencher};
+use criterion::criterion_group;
+use criterion::criterion_main;
+use criterion::BenchmarkId;
+use criterion::Criterion;
+use criterion::Throughput;
 use futures::StreamExt;
 use ghost_actor::dependencies::observability;
 use kitsune_p2p_transport_quic::*;
@@ -11,32 +15,13 @@ use kitsune_p2p_types::transport::*;
 use once_cell::sync::OnceCell;
 use tokio::runtime::{Builder, Runtime};
 
-benchmark_group!(
-    benches,
-    large_data_1_stream,
-    large_data_10_streams,
-    small_data_1_stream,
-    small_data_100_streams
-);
-benchmark_main!(benches);
+const DATA: &[u8] = &[0xAB; 100];
 
-fn large_data_1_stream(bench: &mut Bencher) {
-    send_data(bench, LARGE_DATA, 1);
-}
+criterion_group!(benches, send_data,);
 
-fn large_data_10_streams(bench: &mut Bencher) {
-    send_data(bench, LARGE_DATA, 10);
-}
+criterion_main!(benches);
 
-fn small_data_1_stream(bench: &mut Bencher) {
-    send_data(bench, SMALL_DATA, 1);
-}
-
-fn small_data_100_streams(bench: &mut Bencher) {
-    send_data(bench, SMALL_DATA, 100);
-}
-
-fn send_data(bench: &mut Bencher, data: &'static [u8], concurrent_streams: usize) {
+fn send_data(bench: &mut Criterion) {
     let _g = observability::test_run().ok();
 
     let addr = spawn_server();
@@ -44,24 +29,60 @@ fn send_data(bench: &mut Bencher, data: &'static [u8], concurrent_streams: usize
     let client = Arc::new(client);
     let mut runtime = runtime.lock().unwrap();
 
-    bench.bytes = ((data.len() * 2) as u64) * (concurrent_streams as u64);
-    bench.iter(|| {
-        let mut handles = Vec::new();
+    let mut group = bench.benchmark_group("send_data");
+    for &(data, messages, series) in [
+        (DATA, 1000, true),
+        (DATA, 1000, false),
+    ]
+    .iter()
+    {
+        let bytes = ((data.len() * 2) as u64) * (messages as u64);
+        group.throughput(Throughput::Bytes(bytes));
+        group.sample_size(10);
+        group.bench_with_input(
+            BenchmarkId::new(
+                "send_msg",
+                format!(
+                    "messages_{}_series_{}_bytes_{}",
+                    messages,
+                    series,
+                    bytes,
+                ),
+            ),
+            &(data, messages),
+            |b, &(data, messages)| {
+                b.iter(|| {
+                    let mut handles = Vec::new();
 
-        for _ in 0..concurrent_streams {
-            let addr = addr.clone();
-            let client = client.clone();
-            handles.push(runtime.spawn(async move {
-                client.request(addr, data.to_vec()).await.unwrap();
-            }));
-        }
+                    let addr = addr.clone();
+                    let client = client.clone();
+                    if series {
+                        handles.push(runtime.spawn(async move {
+                            for _ in 0..messages {
+                                let addr = addr.clone();
+                                let client = client.clone();
+                                client.request(addr, data.to_vec()).await.unwrap();
+                            }
+                        }));
+                    } else {
+                        for _ in 0..messages {
+                            let addr = addr.clone();
+                            let client = client.clone();
+                            handles.push(runtime.spawn(async move {
+                                client.request(addr, data.to_vec()).await.unwrap();
+                            }));
+                        }
+                    }
 
-        runtime.block_on(async {
-            for handle in handles {
-                handle.await.unwrap();
-            }
-        });
-    });
+                    runtime.block_on(async {
+                        for handle in handles {
+                            handle.await.unwrap();
+                        }
+                    });
+                })
+            },
+        );
+    }
 }
 
 fn spawn_server() -> Url2 {
@@ -141,7 +162,3 @@ fn rt() -> Runtime {
         .build()
         .unwrap()
 }
-
-const LARGE_DATA: &[u8] = &[0xAB; 1024 * 1024];
-
-const SMALL_DATA: &[u8] = &[0xAB; 1];
