@@ -23,3 +23,12 @@ rustls = { version = "0.17", features = [ "dangerous_configuration" ] }
 serde = { version = "1.0.104", features = [ "derive" ] }
 tokio = { version = "0.2", features = [ "full" ] }
 webpki = "0.21.2"
+
+[dev-dependencies]
+anyhow = "1.0.22"
+crc = "1.8.1"
+bencher = "0.1.5"
+
+[[bench]]
+name = "bench"
+harness = false
