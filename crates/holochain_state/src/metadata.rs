@@ -656,7 +656,7 @@ where
             LinkMetaVal {
                 link_add_hash,
                 target: link_add.target_address,
-                timestamp: link_add.timestamp.into(),
+                timestamp: link_add.timestamp,
                 zome_id: link_add.zome_id,
                 tag: link_add.tag,
             },
@@ -823,7 +823,7 @@ where
     ) -> DatabaseResult<()> {
         let key = ChainItemKey::new(header, validation_status);
         let key = MiscMetaKey::chain_item(&key).into();
-        let value = MiscMetaValue::ChainItem(header.timestamp().clone().into());
+        let value = MiscMetaValue::ChainItem(header.timestamp());
         self.misc_meta.put(key, value)?;
         self.update_activity_status(header.author())
     }
@@ -849,7 +849,7 @@ where
             let key = ChainItemKey::Full(agent.clone(), validation_status, seq, hash);
             let key = MiscMetaKey::chain_item(&key).into();
             // TODO: Remove timestamp value as headers are already ordered
-            let value = MiscMetaValue::ChainItem(Timestamp::now());
+            let value = MiscMetaValue::ChainItem(timestamp::now());
             self.misc_meta.put(key, value)?;
         }
         self.update_activity_status(agent)
