@@ -9,11 +9,12 @@
 
 mod app_bundle;
 mod app_manifest;
-pub mod dna_gamut;
+mod dna_gamut;
 pub mod error;
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
+pub use dna_gamut::*;
 
 use crate::dna::{DnaFile, YamlProperties};
 use derive_more::Into;
@@ -288,7 +289,7 @@ impl InstalledApp {
             .slots
             .get_mut(cell_nick)
             .ok_or_else(|| AppError::CellNickMissing(cell_nick.clone()))?;
-        if slot.clones.len() >= slot.clone_limit {
+        if slot.clones.len() as u32 >= slot.clone_limit {
             return Err(AppError::CloneLimitExceeded(slot.clone_limit, slot.clone()));
         }
         Ok(slot.clones.insert(cell_id))
@@ -312,7 +313,7 @@ pub struct CellSlot {
     /// once the cell is created.
     provisioned_cell: Option<CellId>,
     /// The number of cloned cells allowed
-    clone_limit: usize,
+    clone_limit: u32,
     /// Cells which were cloned at runtime. The length cannot grow beyond
     /// `clone_limit`
     clones: HashSet<CellId>,
@@ -320,7 +321,7 @@ pub struct CellSlot {
 
 impl CellSlot {
     /// Constructor. List of clones always starts empty.
-    pub fn new(provisioned_cell: Option<CellId>, clone_limit: usize) -> Self {
+    pub fn new(provisioned_cell: Option<CellId>, clone_limit: u32) -> Self {
         Self {
             provisioned_cell,
             clone_limit,

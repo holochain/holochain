@@ -6,7 +6,7 @@ use crate::prelude::*;
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("Clone limit of {0} exceeded for cell: {1:?}")]
-    CloneLimitExceeded(usize, CellSlot),
+    CloneLimitExceeded(u32, CellSlot),
 
     #[error("Tried to access missing cell nick: '{0}'")]
     CellNickMissing(CellNick),

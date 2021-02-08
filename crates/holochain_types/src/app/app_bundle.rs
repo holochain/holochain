@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use self::error::AppBundleResult;
 
@@ -18,56 +18,104 @@ impl AppBundle {
     /// used for each cell in this app.
     pub async fn resolve_cells(
         self,
+        agent: AgentPubKey,
         gamut: DnaGamut,
-    ) -> AppBundleResult<Vec<(CellNick, CellProvisioningOp)>> {
+        membrane_proofs: HashMap<CellNick, MembraneProof>,
+    ) -> AppBundleResult<CellSlotResolution> {
         let AppManifestValidated { name: _, cells } = self.manifest().clone().validate()?;
         let bundle = Arc::new(self);
         let tasks = cells.into_iter().map(|(cell_nick, cell)| async {
             let bundle = bundle.clone();
-            Ok(bundle.resolve_cell(cell).await?.map(|op| (cell_nick, op)))
+            Ok((cell_nick, bundle.resolve_cell(cell).await?))
         });
-        Ok(futures::future::join_all(tasks)
+        let resolution = futures::future::join_all(tasks)
             .await
             .into_iter()
             .collect::<AppBundleResult<Vec<_>>>()?
             .into_iter()
-            // Remove the `None` items
-            .flatten()
-            .collect())
+            .fold(
+                Ok(CellSlotResolution::new(agent.clone())),
+                |acc: AppBundleResult<CellSlotResolution>, (cell_nick, op)| {
+                    if let Ok(mut resolution) = acc {
+                        match op {
+                            CellProvisioningOp::Create(dna, clone_limit) => {
+                                let dna_hash = dna.dna_hash().clone();
+                                let cell_id = CellId::new(dna_hash, agent.clone());
+                                let slot = CellSlot::new(Some(cell_id.clone()), clone_limit);
+                                // TODO: could sequentialize this to remove the clone
+                                let proof = membrane_proofs.get(&cell_nick).cloned();
+                                resolution.dnas_to_register.push((dna, proof));
+                                resolution.slots.push((cell_nick, slot));
+                            }
+                            CellProvisioningOp::Existing(cell_id, clone_limit) => {
+                                let slot = CellSlot::new(Some(cell_id.clone()), clone_limit);
+                                resolution.slots.push((cell_nick, slot));
+                            }
+                            CellProvisioningOp::Noop(clone_limit) => {
+                                resolution
+                                    .slots
+                                    .push((cell_nick, CellSlot::new(None, clone_limit)));
+                            }
+                            _ => todo!(),
+                        }
+                        Ok(resolution)
+                    } else {
+                        acc
+                    }
+                },
+            )?;
+
+        // let resolution = cells.into_iter();
+        Ok(resolution)
     }
 
     async fn resolve_cell(
         &self,
         cell: CellManifestValidated,
-    ) -> AppBundleResult<Option<CellProvisioningOp>> {
+    ) -> AppBundleResult<CellProvisioningOp> {
         Ok(match cell {
             CellManifestValidated::Create {
-                location, version, ..
-            } => Some(
-                self.resolve_cell_create(&location, version.as_ref())
-                    .await?,
-            ),
+                location,
+                version,
+                clone_limit,
+                ..
+            } => {
+                self.resolve_cell_create(&location, version.as_ref(), clone_limit)
+                    .await?
+            }
+
             CellManifestValidated::CreateClone { .. } => {
                 unimplemented!("`create_clone` provisioning strategy is currently unimplemented")
             }
-            CellManifestValidated::UseExisting { version, .. } => {
-                Some(self.resolve_cell_existing(&version))
-            }
+            CellManifestValidated::UseExisting {
+                version,
+                clone_limit,
+                ..
+            } => self.resolve_cell_existing(&version, clone_limit),
             CellManifestValidated::CreateIfNotExists {
-                location, version, ..
-            } => match self.resolve_cell_existing(&version) {
+                location,
+                version,
+                clone_limit,
+                ..
+            } => match self.resolve_cell_existing(&version, clone_limit) {
+                op @ CellProvisioningOp::Existing(_, _) => op,
                 CellProvisioningOp::NoMatch => {
-                    Some(self.resolve_cell_create(&location, Some(&version)).await?)
+                    self.resolve_cell_create(&location, Some(&version), clone_limit)
+                        .await?
                 }
-                op @ CellProvisioningOp::Existing(_) => Some(op),
                 CellProvisioningOp::Conflict(_) => {
                     unimplemented!("conflicts are not handled, or even possible yet")
                 }
-                CellProvisioningOp::Create(_) => {
+                CellProvisioningOp::Create(_, _) => {
                     unreachable!("resolve_cell_existing will never return a Create op")
                 }
+                CellProvisioningOp::Noop(_) => {
+                    unreachable!("resolve_cell_existing will never return a Noop")
+                }
             },
-            CellManifestValidated::Disabled { .. } => None,
+            CellManifestValidated::Disabled { clone_limit } => {
+                CellProvisioningOp::Noop(clone_limit)
+            }
         })
     }
 
@@ -75,6 +123,7 @@ impl AppBundle {
         &self,
         location: &mr_bundle::Location,
         version: Option<&DnaVersionSpec>,
+        clone_limit: u32,
     ) -> AppBundleResult<CellProvisioningOp> {
         let bytes = self.resolve(location).await?;
         let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(&bytes)?.into();
@@ -84,11 +133,50 @@ impl AppBundle {
                 return Ok(CellProvisioningOp::NoMatch);
             }
         }
-        Ok(CellProvisioningOp::Create(dna_file))
+        Ok(CellProvisioningOp::Create(dna_file, clone_limit))
     }
 
-    fn resolve_cell_existing(&self, _version: &DnaVersionSpec) -> CellProvisioningOp {
+    fn resolve_cell_existing(
+        &self,
+        _version: &DnaVersionSpec,
+        clone_limit: u32,
+    ) -> CellProvisioningOp {
         unimplemented!("Reusing existing cells is not yet implemented")
+    }
+}
+
+/// The result of running Cell resolution
+// TODO: rework, make fields private
+#[allow(missing_docs)]
+pub struct CellSlotResolution {
+    pub agent: AgentPubKey,
+    pub dnas_to_register: Vec<(DnaFile, Option<MembraneProof>)>,
+    pub slots: Vec<(CellNick, CellSlot)>,
+}
+
+#[allow(missing_docs)]
+impl CellSlotResolution {
+    pub fn new(agent: AgentPubKey) -> Self {
+        Self {
+            agent,
+            dnas_to_register: Default::default(),
+            slots: Default::default(),
+        }
+    }
+
+    /// Return the IDs of new cells to be created as part of the resolution.
+    /// Does not return existing cells to be reused.
+    // TODO: remove clone of MembraneProof
+    pub fn cells_to_create(&self) -> Vec<(CellId, Option<MembraneProof>)> {
+        self.dnas_to_register
+            .iter()
+            .map(|(dna, proof)| {
+                (
+                    CellId::new(dna.dna_hash().clone(), self.agent.clone()),
+                    proof.clone(),
+                )
+            })
+            .collect()
     }
 }
 
@@ -96,9 +184,11 @@ impl AppBundle {
 /// Specifies what step should be taken to provision a cell while installing an App
 pub enum CellProvisioningOp {
     /// Create a new Cell
-    Create(DnaFile),
+    Create(DnaFile, u32),
     /// Use an existing Cell
-    Existing(CellId),
+    Existing(CellId, u32),
+    /// No provisioning needed (but there might be a clone_limit)
+    Noop(u32),
     /// Couldn't find a DNA that matches the version spec; can't provision (should this be an Err?)
     NoMatch,
     /// Ambiguous result, needs manual resolution; can't provision (should this be an Err?)

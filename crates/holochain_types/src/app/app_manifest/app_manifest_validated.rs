@@ -6,11 +6,8 @@
 //! are structured to ensure validity, and are used internally by Holochain.
 
 use super::error::{AppManifestError, AppManifestResult};
+use crate::app::app_manifest::current::{DnaLocation, DnaVersionSpec};
 use crate::prelude::{CellNick, YamlProperties};
-use crate::{
-    app::app_manifest::current::{DnaLocation, DnaVersionSpec},
-    prelude::dna_gamut::DnaGamut,
-};
 use std::collections::HashMap;
 
 /// Normalized, validated representation of the App Manifest.

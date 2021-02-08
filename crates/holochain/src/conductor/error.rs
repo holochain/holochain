@@ -4,7 +4,7 @@ use crate::conductor::cell::error::CellError;
 use crate::core::workflow::error::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_lmdb::error::DatabaseError;
-use holochain_types::{app::InstalledAppId, prelude::AppError};
+use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
 
@@ -17,6 +17,9 @@ pub enum ConductorError {
 
     #[error(transparent)]
     AppError(#[from] AppError),
+
+    #[error(transparent)]
+    AppBundleError(#[from] AppBundleError),
 
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),

@@ -500,12 +500,26 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             membrane_proofs,
         } = payload;
 
-        let manifest = bundle.manifest();
-        let ops = bundle.resolve_cells(DnaGamut::placeholder()).await?;
+        let installed_app_id =
+            installed_app_id.unwrap_or_else(|| bundle.manifest().app_name().to_owned());
+        let ops = bundle
+            .resolve_cells(agent_key, DnaGamut::placeholder(), membrane_proofs)
+            .await?;
 
-        let slots = todo!();
+        let cells_to_create = ops.cells_to_create();
+
+        for (dna, _) in ops.dnas_to_register {
+            self.clone().register_dna(dna).await?;
+        }
+
+        self.conductor
+            .read()
+            .await
+            .genesis_cells(cells_to_create, self.clone())
+            .await?;
+
+        let slots = ops.slots;
         let app = InstalledApp::new(installed_app_id, slots);
-        self.clone().register_dna(todo!("get dnas")).await?;
 
         // Update the db
         self.conductor

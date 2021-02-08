@@ -15,6 +15,7 @@ pub use current::*;
 pub use error::*;
 
 use self::{app_manifest_validated::AppManifestValidated, error::AppManifestResult};
+use app_manifest_v1::AppManifestV1;
 
 /// Container struct which uses the `manifest_version` field to determine
 /// which manifest version to deserialize to.
@@ -24,13 +25,13 @@ use self::{app_manifest_validated::AppManifestValidated, error::AppManifestResul
 pub enum AppManifest {
     #[serde(rename = "1")]
     #[serde(alias = "\"1\"")]
-    V1(app_manifest_v1::AppManifestV1),
+    V1(AppManifestV1),
 }
 
 impl Manifest for AppManifest {
     fn locations(&self) -> Vec<Location> {
         match self {
-            AppManifest::V1(app_manifest_v1::AppManifestV1 { cells, .. }) => cells
+            AppManifest::V1(AppManifestV1 { cells, .. }) => cells
                 .iter()
                 .filter_map(|cell| cell.dna.location.clone())
                 .collect(),
@@ -43,6 +44,13 @@ impl Manifest for AppManifest {
 }
 
 impl AppManifest {
+    /// Get the supplied name of the app
+    pub fn app_name(&self) -> &str {
+        match self {
+            Self::V1(AppManifestV1 { name, .. }) => name,
+        }
+    }
+
     /// Convert this human-focused manifest into a validated, concise representation
     pub fn validate(self) -> AppManifestResult<AppManifestValidated> {
         match self {
