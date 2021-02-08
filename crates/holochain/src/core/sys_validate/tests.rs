@@ -9,7 +9,6 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_lmdb::env::EnvironmentRead;
 use holochain_lmdb::test_utils::test_cell_env;
 use holochain_serialized_bytes::SerializedBytes;
-
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
 use matches::assert_matches;
@@ -92,7 +91,7 @@ async fn check_valid_if_dna_test() {
 async fn check_previous_timestamp() {
     let mut header = fixt!(CreateLink);
     let mut prev_header = fixt!(CreateLink);
-    header.timestamp = Timestamp::now().into();
+    header.timestamp = timestamp::now().into();
     let before = chrono::Utc::now() - chrono::Duration::weeks(1);
     let after = chrono::Utc::now() + chrono::Duration::weeks(1);
 
