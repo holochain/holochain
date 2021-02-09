@@ -17,7 +17,7 @@ pub use crate::{
             anchor, get_anchor, list_anchor_addresses, list_anchor_tags,
             list_anchor_type_addresses, Anchor,
         },
-        path::Path,
+        path::{Path, Component},
     },
     host_fn::{
         agent_info::agent_info, call::call, call_remote::call_remote, create::create,
@@ -45,7 +45,7 @@ pub use holochain_zome_types::call_remote::CallRemote;
 pub use holochain_zome_types::capability::*;
 pub use holochain_zome_types::cell::*;
 pub use holochain_zome_types::crdt::CrdtType;
-pub use holochain_zome_types::debug_msg;
+pub use holochain_zome_types::trace_msg;
 pub use holochain_zome_types::element::{Element, ElementVec};
 pub use holochain_zome_types::entry::*;
 pub use holochain_zome_types::entry_def::*;

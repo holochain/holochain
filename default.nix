@@ -18,7 +18,7 @@ let
    ;
   holonix = import (holonixPath) {
     inherit config;
-    use-stable-rust = true;
+    includeHolochainBinaries = config.includeHolochainBinaries or false;
   };
   # END HOLONIX IMPORT BOILERPLATE
 
@@ -28,17 +28,18 @@ let
 
       hcToplevelDir = builtins.toString ./.;
 
-      hcTargetPrefixEval = ''
+      nixEnvPrefixEval = ''
         if [[ -n "$NIX_ENV_PREFIX" ]]; then
-          export HC_TARGET_PREFIX="$NIX_ENV_PREFIX"
+          # don't touch it
+          :
         elif test -d "${builtins.toString self.hcToplevelDir}" &&
             test -w "${builtins.toString self.hcToplevelDir}"; then
-          export HC_TARGET_PREFIX="${builtins.toString self.hcToplevelDir}"
+          export NIX_ENV_PREFIX="${builtins.toString self.hcToplevelDir}"
         elif test -d "$HOME" && test -w "$HOME"; then
-          export HC_TARGET_PREFIX="$HOME/.cache/holochain-dev"
-          mkdir -p "$HC_TARGET_PREFIX"
+          export NIX_ENV_PREFIX="$HOME/.cache/holochain-dev"
+          mkdir -p "$NIX_ENV_PREFIX"
         else
-          export HC_TARGET_PREFIX="$(${self.coreutils}/bin/mktemp -d)"
+          export NIX_ENV_PREFIX="$(${self.coreutils}/bin/mktemp -d)"
         fi
       '';
 

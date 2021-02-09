@@ -30,6 +30,7 @@ pub use crate::header::*;
 pub use crate::link::*;
 pub use crate::metadata::*;
 pub use crate::signal::*;
+pub use crate::timestamp; // for timestmap::now()
 pub use crate::timestamp::*;
 pub use crate::validate::*;
 

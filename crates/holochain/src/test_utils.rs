@@ -650,7 +650,7 @@ pub fn new_zome_call<P, Z: Into<ZomeName>>(
     zome: Z,
 ) -> Result<ZomeCall, SerializedBytesError>
 where
-    P: serde::Serialize,
+    P: serde::Serialize + std::fmt::Debug,
 {
     Ok(ZomeCall {
         cell_id: cell_id.clone(),
@@ -670,7 +670,7 @@ pub fn new_invocation<P, Z: Into<Zome>>(
     zome: Z,
 ) -> Result<ZomeCallInvocation, SerializedBytesError>
 where
-    P: serde::Serialize,
+    P: serde::Serialize + std::fmt::Debug,
 {
     Ok(ZomeCallInvocation {
         cell_id: cell_id.clone(),

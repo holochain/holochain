@@ -1,5 +1,4 @@
 use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
@@ -7,13 +6,14 @@ use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use holochain_cascade::error::CascadeResult;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn delete_link<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: HeaderHash,
-) -> RibosomeResult<HeaderHash> {
+) -> Result<HeaderHash, WasmError> {
 
     // get the base address from the add link header
     // don't allow the wasm developer to get this wrong
@@ -39,7 +39,7 @@ pub fn delete_link<'a>(
                     .await?
                     .map(|el| el.into_inner().0),
             )
-        })?;
+        }).map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
 
     let base_address = match maybe_add_link {
         Some(add_link_signed_header_hash) => {
@@ -56,7 +56,7 @@ pub fn delete_link<'a>(
         // to fail in that case (e.g. the local cache could have GC'd at the same moment the
         // network connection dropped out)
         None => Err(RibosomeError::ElementDeps(input.clone().into())),
-    }?;
+    }.map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
 
     let workspace_lock = call_context.host_access.workspace();
 
@@ -71,16 +71,17 @@ pub fn delete_link<'a>(
             link_add_address: input,
             base_address,
         };
-        let header_hash = source_chain.put(header_builder, None).await?;
+        let header_hash = source_chain.put(header_builder, None).await.map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
         let element = source_chain
-            .get_element(&header_hash)?
+            .get_element(&header_hash)
+            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?
             .expect("Element we just put in SourceChain must be gettable");
         integrate_to_authored(
             &element,
             workspace.source_chain.elements(),
             &mut workspace.meta_authored,
         )
-        .map_err(Box::new)?;
+        .map_err(|dht_op_convert_error| WasmError::Host(dht_op_convert_error.to_string()))?;
         Ok(header_hash)
     })
 }
