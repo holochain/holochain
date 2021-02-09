@@ -51,7 +51,9 @@ lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }
 # observability = { path = "../../rust/observability" }
 # observability = { git = "https://github.com/freesig/observability.git", branch = "main" }
 # holochain_wasmer_guest = { path = "../holochain-wasmer/crates/guest" }
-# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "remote_signal" }
+# holochain_wasmer_host = { path = "../holochain-wasmer/crates/host" }
+# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2021-02-05-error" }
+# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2021-02-05-error" }
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "remote_signal" }
 # ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 # ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "add_observability" }
