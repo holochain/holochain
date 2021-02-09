@@ -3,19 +3,11 @@
 , lib
 , writeShellScriptBin
 
+, holonix
 , holonixPath
-, hcToplevelDir
-, hcRunCrate
 }:
 
 rec {
-  inherit hcRunCrate;
-
-  # TODO: potentially remove these
-  hnRustClippy = builtins.elemAt (callPackage "${holonixPath}/rust/clippy" {}).buildInputs 0;
-  hnRustFmtCheck = builtins.elemAt (callPackage "${holonixPath}/rust/fmt/check" {}).buildInputs 0;
-  hnRustFmtFmt = builtins.elemAt (callPackage "${holonixPath}/rust/fmt/fmt" {}).buildInputs 0;
-
   hcTest = writeShellScriptBin "hc-test" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
@@ -25,15 +17,21 @@ rec {
 
     # alas, we cannot specify --features in the virtual workspace
     cargo test warm_wasm_tests --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms
+    # run the specific slow tests in the holochain crate
     cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests -- --nocapture
+    # run all the remaining cargo tests
+    cargo test -- --nocapture
   '';
 
   hcMergeTest = let
-      pathPrefix = lib.makeBinPath [
-        hcTest
-        hnRustClippy
-        hnRustFmtCheck
-      ];
+      pathPrefix = lib.makeBinPath
+        (builtins.attrValues { inherit (holonix.pkgs)
+          hnRustClippy
+          hnRustFmtCheck
+          hnRustFmtFmt
+          ;
+        })
+      ;
     in writeShellScriptBin "hc-merge-test" ''
     export PATH=${pathPrefix}:$PATH
 

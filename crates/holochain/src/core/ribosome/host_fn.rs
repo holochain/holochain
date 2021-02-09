@@ -101,9 +101,9 @@ host_fn_api_impls! {
     // Emit a Signal::App to subscribers on the interface
     fn emit_signal (zt::signal::AppSignal) -> ();
 
-    // The debug host import takes a DebugMsg to output wherever the host wants to display it.
-    // DebugMsg includes line numbers. so the wasm tells the host about it's own code structure.
-    fn debug (zt::debug::DebugMsg) -> ();
+    // The trace host import takes a TraceMsg to output wherever the host wants to display it.
+    // TraceMsg includes line numbers. so the wasm tells the host about it's own code structure.
+    fn trace (zt::trace::TraceMsg) -> ();
 
     // Attempt to get a live entry from the cascade.
     fn get (zt::entry::GetInput) -> Option<zt::element::Element>;

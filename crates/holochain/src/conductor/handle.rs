@@ -475,7 +475,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.clone().install_app(todo!(), todo!()).await?;
 
         // for dna_bytes in bundled_dnas.values()
-        todo!()
+        todo!();
+        Ok(())
     }
 
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>> {

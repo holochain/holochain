@@ -196,7 +196,7 @@ pub fn hdk_entry(attrs: TokenStream, code: TokenStream) -> TokenStream {
     let entry_def = syn::parse_macro_input!(attrs as EntryDef);
 
     (quote::quote! {
-        #[derive(serde::Serialize, serde::Deserialize, hdk3::prelude::SerializedBytes)]
+        #[derive(serde::Serialize, serde::Deserialize, hdk3::prelude::SerializedBytes, std::fmt::Debug)]
         #item
         hdk3::prelude::entry_def!(#struct_ident #entry_def);
     })

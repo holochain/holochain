@@ -1,11 +1,11 @@
 use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
+use holochain_wasmer_host::prelude::WasmError;
 
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
@@ -17,7 +17,7 @@ pub fn create<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: EntryWithDefId,
-) -> RibosomeResult<HeaderHash> {
+) -> Result<HeaderHash, WasmError> {
 
     // build the entry hash
     let async_entry = AsRef::<Entry>::as_ref(&input).to_owned();
@@ -25,7 +25,7 @@ pub fn create<'a>(
         holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
 
     // extract the zome position
-    let header_zome_id = ribosome.zome_to_id(&call_context.zome)?;
+    let header_zome_id = ribosome.zome_to_id(&call_context.zome).expect("Failed to get ID for current zome");
 
     // extract the entry defs for a zome
     let entry_type = match AsRef::<EntryDefId>::as_ref(&input) {
@@ -56,17 +56,17 @@ pub fn create<'a>(
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
         // push the header and the entry into the source chain
-        let header_hash = source_chain.put(header_builder, Some(entry)).await?;
+        let header_hash = source_chain.put(header_builder, Some(entry)).await.map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
         // fetch the element we just added so we can integrate its DhtOps
         let element = source_chain
-            .get_element(&header_hash)?
+            .get_element(&header_hash).map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?
             .expect("Element we just put in SourceChain must be gettable");
         integrate_to_authored(
             &element,
             workspace.source_chain.elements(),
             &mut workspace.meta_authored,
         )
-        .map_err(Box::new)?;
+        .map_err(|dht_op_convert_error| WasmError::Host(dht_op_convert_error.to_string()))?;
         Ok(header_hash)
     })
 }
@@ -75,9 +75,10 @@ pub fn extract_entry_def(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     entry_def_id: EntryDefId,
-) -> RibosomeResult<(holochain_zome_types::header::EntryDefIndex, EntryVisibility)> {
+) -> Result<(holochain_zome_types::header::EntryDefIndex, EntryVisibility), WasmError> {
     let app_entry_type = match ribosome
-        .run_entry_defs((&call_context.host_access).into(), EntryDefsInvocation)?
+        .run_entry_defs((&call_context.host_access).into(), EntryDefsInvocation)
+        .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?
     {
         // the ribosome returned some defs
         EntryDefsResult::Defs(defs) => {
@@ -99,10 +100,10 @@ pub fn extract_entry_def(
     };
     match app_entry_type {
         Some(app_entry_type) => Ok(app_entry_type),
-        None => Err(RibosomeError::EntryDefs(
+        None => Err(WasmError::Host(RibosomeError::EntryDefs(
             call_context.zome.zome_name().clone(),
             format!("entry def not found for {:?}", entry_def_id),
-        )),
+        ).to_string())),
     }
 }
 
@@ -157,12 +158,12 @@ pub mod wasm_test {
         let output = create(Arc::new(ribosome), Arc::new(call_context), input);
 
         assert_eq!(
-            format!("{:?}", output.unwrap_err()),
+            format!("{}", output.unwrap_err().to_string()),
             format!(
-                "{:?}",
-                RibosomeError::SourceChainError(SourceChainError::InvalidStructure(
+                "{}",
+                WasmError::Host(RibosomeError::SourceChainError(SourceChainError::InvalidStructure(
                     ChainInvalidReason::GenesisDataMissing
-                ))
+                )).to_string())
             ),
         );
     }

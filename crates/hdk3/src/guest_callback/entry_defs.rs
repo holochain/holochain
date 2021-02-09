@@ -68,7 +68,7 @@ macro_rules! entry_def {
                     $crate::prelude::Entry::App(eb) => Ok(Self::try_from(
                         $crate::prelude::SerializedBytes::from(eb.to_owned()),
                     )?),
-                    _ => Err($crate::prelude::SerializedBytesError::FromBytes(format!(
+                    _ => Err($crate::prelude::SerializedBytesError::Deserialize(format!(
                         "{:?} is not an Entry::App so has no serialized bytes",
                         entry
                     ))
@@ -94,7 +94,7 @@ macro_rules! entry_def {
                             Err(WasmError::Serialize(serialized_bytes_error))
                         }
                         EntryError::EntryTooLarge(_) => {
-                            Err(WasmError::Zome(entry_error.to_string()))
+                            Err(WasmError::Guest(entry_error.to_string()))
                         }
                     },
                 }

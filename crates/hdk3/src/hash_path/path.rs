@@ -81,7 +81,7 @@ impl TryFrom<&Component> for String {
     type Error = SerializedBytesError;
     fn try_from(component: &Component) -> Result<Self, Self::Error> {
         if component.as_ref().len() % 4 != 0 {
-            return Err(SerializedBytesError::FromBytes(format!(
+            return Err(SerializedBytesError::Deserialize(format!(
                 "attempted to create u32s from utf8 bytes of length not a factor of 4: length {}",
                 component.as_ref().len()
             )));
@@ -107,7 +107,7 @@ impl TryFrom<&Component> for String {
                                     build = vec![];
                                 }
                                 None => {
-                                    error = Some(Err(SerializedBytesError::FromBytes(format!(
+                                    error = Some(Err(SerializedBytesError::Deserialize(format!(
                                         "unknown char for u32: {}",
                                         u
                                     ))));
@@ -362,13 +362,13 @@ fn hash_path_component() {
 
     assert_eq!(
         String::try_from(&Component::from(vec![1])),
-        Err(SerializedBytesError::FromBytes(
+        Err(SerializedBytesError::Deserialize(
             "attempted to create u32s from utf8 bytes of length not a factor of 4: length 1".into()
         )),
     );
     assert_eq!(
         String::try_from(&Component::from(vec![9, 9, 9, 9])),
-        Err(SerializedBytesError::FromBytes(
+        Err(SerializedBytesError::Deserialize(
             "unknown char for u32: 151587081".into()
         )),
     );

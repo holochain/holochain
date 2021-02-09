@@ -31,7 +31,7 @@ pub fn call_remote<I>(
     payload: I,
 ) -> ExternResult<ZomeCallResponse>
 where
-    I: serde::Serialize,
+    I: serde::Serialize + std::fmt::Debug,
 {
     host_call::<CallRemote, ZomeCallResponse>(
         __call_remote,

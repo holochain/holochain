@@ -1,15 +1,15 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_details<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: GetInput,
-) -> RibosomeResult<Option<Details>> {
+) -> Result<Option<Details>, WasmError> {
     let GetInput{ any_dht_hash, get_options } = input;
 
     // Get the network from the context
@@ -24,7 +24,8 @@ pub fn get_details<'a>(
             .await
             .cascade(network)
             .get_details(any_dht_hash, get_options)
-            .await?;
+            .await
+            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
         Ok(maybe_details)
     })
 }

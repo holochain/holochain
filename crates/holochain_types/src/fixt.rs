@@ -9,20 +9,12 @@ use crate::dna::zome::ZomeDef;
 use crate::dna::DnaDef;
 use crate::dna::Zomes;
 use crate::header::NewEntryHeader;
-use crate::Timestamp;
 use ::fixt::prelude::*;
 use holochain_zome_types::prelude::*;
 use rand::seq::IteratorRandom;
 use std::iter::Iterator;
 
 pub use holochain_zome_types::fixt::*;
-
-pub use holochain_zome_types::fixt::TimestampFixturator as ZomeTimestampFixturator;
-
-fixturator!(
-    Timestamp;
-    constructor fn now();
-);
 
 fixturator!(
     Permission;

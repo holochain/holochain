@@ -1,10 +1,10 @@
 use super::create::extract_entry_def;
 use super::delete::get_original_address;
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use crate::core::workflow::CallZomeWorkspace;
+use holochain_wasmer_host::prelude::WasmError;
 
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
@@ -15,7 +15,7 @@ pub fn update<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: UpdateInput,
-) -> RibosomeResult<HeaderHash> {
+) -> Result<HeaderHash, WasmError> {
     // destructure the args out into an app type def id and entry
     let UpdateInput { original_header_address, entry_with_def_id } = input;
 
@@ -25,7 +25,7 @@ pub fn update<'a>(
         holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
 
     // extract the zome position
-    let header_zome_id = ribosome.zome_to_id(&call_context.zome)?;
+    let header_zome_id = ribosome.zome_to_id(&call_context.zome).map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
 
     // extract the entry defs for a zome
     let entry_type = match AsRef::<EntryDefId>::as_ref(&entry_with_def_id) {
@@ -63,17 +63,17 @@ pub fn update<'a>(
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
         // push the header and the entry into the source chain
-        let header_hash = source_chain.put(header_builder, Some(entry)).await?;
+        let header_hash = source_chain.put(header_builder, Some(entry)).await.map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
         // fetch the element we just added so we can integrate its DhtOps
         let element = source_chain
-            .get_element(&header_hash)?
+            .get_element(&header_hash).map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?
             .expect("Element we just put in SourceChain must be gettable");
         integrate_to_authored(
             &element,
             workspace.source_chain.elements(),
             &mut workspace.meta_authored,
         )
-        .map_err(Box::new)?;
+        .map_err(|dht_op_convert_error| WasmError::Host(dht_op_convert_error.to_string()))?;
         Ok(header_hash)
     })
 }

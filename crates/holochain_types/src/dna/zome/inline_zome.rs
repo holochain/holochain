@@ -51,7 +51,7 @@ impl InlineZome {
     pub fn callback<F, I, O>(mut self, name: &str, f: F) -> Self
     where
         F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
-        I: DeserializeOwned,
+        I: DeserializeOwned + std::fmt::Debug,
         O: Serialize + std::fmt::Debug,
     {
         let z = move |api: BoxApi, input: ExternIO| -> InlineZomeResult<ExternIO> {
