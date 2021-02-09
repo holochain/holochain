@@ -117,7 +117,7 @@ impl EntryDefs {
         self.0
             .iter()
             .position(|entry_def| entry_def.id == entry_def_id)
-            .map(|u_size| EntryDefIndex((u_size as u8).into()))
+            .map(|u_size| EntryDefIndex(u_size as u8))
     }
 }
 
