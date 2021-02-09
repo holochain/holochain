@@ -26,7 +26,7 @@ where
 /// This is best to use if you have literal bytes from somewhere.
 /// If you pass in a Vec<u8> expecting it to be serialized here, the signature won't verify correctly.
 ///
-/// @see verify_signature
+/// See [`verify_signature`](fn@verify_signature)
 pub fn verify_signature_raw<K, S>(key: K, signature: S, data: Vec<u8>) -> ExternResult<bool>
 where
     K: Into<AgentPubKey>,
