@@ -47,5 +47,5 @@ opt-level = "z"
 
 [patch.crates-io]
 # holochain_wasmer_guest = { path = "../../../../../holochain-wasmer/crates/guest" }
-holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2021-02-05-error" }
+# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2021-02-05-error" }
 # holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "try_from_ref" }
