@@ -1,4 +1,3 @@
-use element::ElementEntry;
 use hdk3::prelude::*;
 
 /// an example inner value that can be serialized into the contents of Entry::App()
