@@ -1,10 +1,10 @@
 use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeError;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
+use holochain_wasmer_host::prelude::WasmError;
 
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
@@ -16,7 +16,7 @@ pub fn delete<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: HeaderHash,
-) -> RibosomeResult<HeaderHash> {
+) -> Result<HeaderHash, WasmError> {
 
     let deletes_entry_address =
         get_original_address(call_context.clone(), input.clone())?;
@@ -32,9 +32,10 @@ pub fn delete<'a>(
             deletes_address: input,
             deletes_entry_address,
         };
-        let header_hash = source_chain.put(header_builder, None).await?;
+        let header_hash = source_chain.put(header_builder, None).await.map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
         let element = source_chain
-            .get_element(&header_hash)?
+            .get_element(&header_hash)
+            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?
             .expect("Element we just put in SourceChain must be gettable");
         tracing::debug!(in_delete_entry = ?header_hash);
         integrate_to_authored(
@@ -42,7 +43,7 @@ pub fn delete<'a>(
             workspace.source_chain.elements(),
             &mut workspace.meta_authored,
         )
-        .map_err(Box::new)?;
+        .map_err(|dht_op_convert_error| WasmError::Host(dht_op_convert_error.to_string()))?;
         Ok(header_hash)
     })
 }
@@ -51,7 +52,7 @@ pub fn delete<'a>(
 pub(crate) fn get_original_address<'a>(
     call_context: Arc<CallContext>,
     address: HeaderHash,
-) -> RibosomeResult<EntryHash> {
+) -> Result<EntryHash, WasmError> {
     let network = call_context.host_access.network().clone();
     let workspace_lock = call_context.host_access.workspace();
 
@@ -84,7 +85,7 @@ pub(crate) fn get_original_address<'a>(
             }
             None => Err(RibosomeError::ElementDeps(address.into())),
         }
-    })
+    }).map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))
 }
 
 #[cfg(test)]

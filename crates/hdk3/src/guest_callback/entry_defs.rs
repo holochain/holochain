@@ -94,7 +94,7 @@ macro_rules! entry_def {
                             Err(WasmError::Serialize(serialized_bytes_error))
                         }
                         EntryError::EntryTooLarge(_) => {
-                            Err(WasmError::Zome(entry_error.to_string()))
+                            Err(WasmError::Guest(entry_error.to_string()))
                         }
                     },
                 }

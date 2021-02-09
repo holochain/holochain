@@ -72,7 +72,7 @@ impl TryFrom<&ThisWasmEntry> for Entry {
                     Ok(app_entry_bytes) => app_entry_bytes,
                     Err(entry_error) => match entry_error {
                         EntryError::SerializedBytes(serialized_bytes_error) => return Err(WasmError::Serialize(serialized_bytes_error)),
-                        EntryError::EntryTooLarge(_) => return Err(WasmError::Zome(entry_error.to_string())),
+                        EntryError::EntryTooLarge(_) => return Err(WasmError::Guest(entry_error.to_string())),
                     },
                 }
             )

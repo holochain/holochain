@@ -1,21 +1,21 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_state::metadata::LinkMetaKey;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_links<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: GetLinksInput,
-) -> RibosomeResult<Links> {
+) -> Result<Links, WasmError> {
     let GetLinksInput { base_address, tag_prefix } = input;
 
     // Get zome id
-    let zome_id = ribosome.zome_to_id(&call_context.zome)?;
+    let zome_id = ribosome.zome_to_id(&call_context.zome).expect("Failed to get ID for current zome.");
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
@@ -35,7 +35,8 @@ pub fn get_links<'a>(
             .await
             .cascade(network)
             .dht_get_links(&key, GetLinksOptions::default())
-            .await?;
+            .await
+            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
 
         Ok(links.into())
     })
