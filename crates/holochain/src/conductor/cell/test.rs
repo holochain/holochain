@@ -52,7 +52,7 @@ async fn test_cell_handle_publish() {
     let sig = fixt!(Signature);
     let header = header::Header::Dna(header::Dna {
         author: agent.clone(),
-        timestamp: Timestamp::now().into(),
+        timestamp: timestamp::now().into(),
         hash: dna.clone(),
     });
     let op = DhtOp::StoreElement(sig, header.clone(), None);
