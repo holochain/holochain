@@ -7,7 +7,7 @@ use crate::prelude::*;
 /// be passed through the canonical serialization process, guaranteeing consistent behaviour.
 /// If you pass in a Vec<u8> expecting it to be verified literally the signature won't verify correctly.
 ///
-/// @see verify_signature_raw
+/// See [`verify_signature_raw`](fn@verify_signature_raw)
 pub fn verify_signature<K, S, D>(key: K, signature: S, data: D) -> ExternResult<bool>
 where
     K: Into<AgentPubKey>,
