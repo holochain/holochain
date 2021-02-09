@@ -14,7 +14,7 @@ pub fn verify_signature(
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             input
                 .key
-                .verify_signature_raw(input.as_ref(), input.as_data_ref().bytes())
+                .verify_signature_raw(input.as_ref(), input.as_data_ref())
                 .await
         }).map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))?,
     )
@@ -31,7 +31,7 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
-    async fn ribosome_verify_signature_test() {
+    async fn ribosome_verify_signature_raw_test() {
         let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
@@ -45,9 +45,9 @@ pub mod wasm_test {
         host_access.workspace = workspace_lock;
 
         // signatures should not change for a given pubkey
-        for (expect, k, sig, data) in vec![
+        for (name, expect, k, sig, data) in vec![
             (
-                // first bit corrupted to a zero
+                "first bit corrupted to a zero",
                 false,
                 fake_agent_pubkey_1(),
                 vec![
@@ -59,7 +59,7 @@ pub mod wasm_test {
                 vec![100_u8, 200_u8, 50_u8],
             ),
             (
-                // valid sig
+                "valid sig",
                 true,
                 fake_agent_pubkey_1(),
                 vec![
@@ -71,7 +71,7 @@ pub mod wasm_test {
                 vec![100_u8, 200_u8, 50_u8],
             ),
             (
-                // valid sig
+                "valid sig",
                 true,
                 fake_agent_pubkey_2(),
                 vec![
@@ -83,7 +83,7 @@ pub mod wasm_test {
                 vec![100_u8, 200_u8, 50_u8],
             ),
             (
-                // last bit corrupted to zero
+                "last bit corrupted to zero",
                 false,
                 fake_agent_pubkey_2(),
                 vec![
@@ -95,7 +95,7 @@ pub mod wasm_test {
                 vec![100_u8, 200_u8, 50_u8],
             ),
             (
-                // first bit corrupted to a zero
+                "first bit corrupted to a zero",
                 false,
                 fake_agent_pubkey_1(),
                 vec![
@@ -107,7 +107,7 @@ pub mod wasm_test {
                 vec![1_u8, 2_u8, 3_u8],
             ),
             (
-                // valid sig
+                "valid sig",
                 true,
                 fake_agent_pubkey_1(),
                 vec![
@@ -119,7 +119,7 @@ pub mod wasm_test {
                 vec![1_u8, 2_u8, 3_u8],
             ),
             (
-                // valid sig
+                "valid sig",
                 true,
                 fake_agent_pubkey_2(),
                 vec![
@@ -131,7 +131,7 @@ pub mod wasm_test {
                 vec![1_u8, 2_u8, 3_u8],
             ),
             (
-                // last bit corrupted to zero
+                "last bit corrupted to zero",
                 false,
                 fake_agent_pubkey_2(),
                 vec![
@@ -144,15 +144,38 @@ pub mod wasm_test {
             ),
         ] {
             for _ in 0..2_usize {
-                let output: bool = crate::call_test_ribosome!(
+                let output_raw: bool = crate::call_test_ribosome!(
                     host_access,
                     TestWasm::Sign,
-                    "verify_signature",
+                    "verify_signature_raw",
                     VerifySignature::new_raw(k.clone(), sig.clone().into(), data.clone())
                 );
 
-                assert_eq!(expect, output);
+                assert_eq!(expect, output_raw, "raw: {}", name);
             }
         }
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn ribosome_verify_signature_test() {
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let env = test_env.env();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+
+        let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
+        host_access.workspace = workspace_lock;
+
+
+        let _nothing: () = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Sign,
+            "verify_signature",
+            fake_agent_pubkey_1()
+        );
     }
 }
