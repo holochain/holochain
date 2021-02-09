@@ -39,10 +39,10 @@ impl From<WasmMapSerialized> for WasmMap {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, SerializedBytes)]
 pub struct DnaFile {
     /// The hashable portion that can be shared with hApp code.
-    dna: DnaDefHashed,
+    pub(super) dna: DnaDefHashed,
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
-    code: WasmMap,
+    pub(super) code: WasmMap,
 }
 
 impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
@@ -105,6 +105,7 @@ impl DnaFile {
     pub async fn from_file_content(data: &[u8]) -> Result<Self, DnaError> {
         // Not super efficient memory-wise, but doesn't block any threads
         let data = data.to_vec();
+        // MD: why are we blocking here?
         let dna_file = tokio::task::spawn_blocking(move || {
             let mut gz = flate2::read::GzDecoder::new(&data[..]);
             let mut bytes = Vec::new();
@@ -153,6 +154,7 @@ impl DnaFile {
         let dna_file = self.clone();
         // TODO: remove
         dna_file.verify_hash().await.expect("TODO, remove");
+        // MD: why are we blocking here?
         tokio::task::spawn_blocking(move || {
             let data: SerializedBytes = dna_file.try_into()?;
             let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());

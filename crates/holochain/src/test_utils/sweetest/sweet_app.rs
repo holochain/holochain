@@ -15,7 +15,10 @@ impl SweetApp {
     /// Constructor
     pub(super) fn new(installed_app_id: InstalledAppId, cells: Vec<SweetCell>) -> Self {
         // Ensure that all Agents are the same
-        assert!(cells.iter().map(|c| c.agent_pubkey()).dedup().count() == 1);
+        assert!(
+            cells.iter().map(|c| c.agent_pubkey()).dedup().count() == 1,
+            "Agent key differs across Cells in this app"
+        );
         Self {
             installed_app_id,
             cells,

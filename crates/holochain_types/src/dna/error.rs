@@ -55,6 +55,10 @@ pub enum DnaError {
     /// WasmHashMismatch
     #[error("Wasm hash mismatch.\nExpected: {0}\nActual: {1}")]
     WasmHashMismatch(WasmHash, WasmHash),
+
+    /// DnaFileToBundleConversionError
+    #[error("Error converting DnaFile to DnaBundle: {0}")]
+    DnaFileToBundleConversionError(String),
 }
 
 impl From<std::io::Error> for DnaError {

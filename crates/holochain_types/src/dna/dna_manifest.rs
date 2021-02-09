@@ -62,3 +62,17 @@ impl ZomeManifest {
         &self.location
     }
 }
+
+// impl From<DnaManifest> for DnaDef {
+//     fn from(m: DnaManifest) -> Self {
+//         let zomes = m.zomes.into_iter().map(|z| {
+//             (z.name, ZomeDef::Wasm(WasmZome::new(z.)))
+//         })
+//         Self {
+//             name: m.name,
+//             uuid: m.uuid.unwrap_or_default(),
+//             properties: m.uuid.unwrap_or_else(|| ().try_into().unwrap()),
+//             zomes
+//         }
+//     }
+// }

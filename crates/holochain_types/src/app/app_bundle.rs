@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use self::error::AppBundleResult;
 
@@ -8,12 +8,28 @@ use crate::prelude::*;
 #[allow(missing_docs)]
 mod error;
 pub use error::*;
+use futures::future::join_all;
 
 /// A bundle of an AppManifest and collection of DNAs
 #[derive(Debug, Serialize, Deserialize, derive_more::From, shrinkwraprs::Shrinkwrap)]
 pub struct AppBundle(mr_bundle::Bundle<AppManifest>);
 
 impl AppBundle {
+    /// Create an AppBundle from a manifest and DNA files
+    pub async fn new<R: IntoIterator<Item = (PathBuf, DnaFile)>>(
+        manifest: AppManifest,
+        resources: R,
+        root_dir: PathBuf,
+    ) -> AppBundleResult<Self> {
+        let resources = join_all(resources.into_iter().map(|(path, dna)| async move {
+            dna.to_file_content().await.map(|bytes| (path, bytes))
+        }))
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?;
+        Ok(mr_bundle::Bundle::new(manifest, resources, root_dir)?.into())
+    }
+
     /// Given a DnaGamut, decide which of the available DNAs or Cells should be
     /// used for each cell in this app.
     pub async fn resolve_cells(
@@ -209,18 +225,44 @@ mod tests {
     use super::AppBundle;
 
     async fn app_bundle_fixture() -> AppBundle {
-        todo!();
-        // let path1 = PathBuf::from("1");
-        // let path2 = PathBuf::from("2");
-        // let dna1 = fixt!(DnaDef);
-        // let dna2 = fixt!(DnaDef);
+        let path1 = PathBuf::from("1");
+        let path2 = PathBuf::from("2");
 
-        // let (manifest, dna_hashes) =
-        //     app_manifest_fixture(todo!("better fixture generator (sweet)"), vec![dna1, dna2]).await;
+        let dna1 = DnaFile::new(fixt!(DnaDef), vec![DnaWasm::new_invalid()])
+            .await
+            .unwrap();
+        let dna2 = DnaFile::new(fixt!(DnaDef), vec![DnaWasm::new_invalid()])
+            .await
+            .unwrap();
 
-        // let resources = vec![(path1, dna1), (path2, dna2)];
+        let (manifest, dna_hashes) = app_manifest_fixture(
+            Some(DnaLocation::Bundled("1".into())),
+            vec![dna1.dna_def().clone(), dna2.dna_def().clone()],
+        )
+        .await;
+
+        let resources = vec![(path1, dna1), (path2, dna2)];
+
+        let bundle = AppBundle::new(manifest, resources, PathBuf::from("."))
+            .await
+            .unwrap();
+        bundle
     }
 
     #[tokio::test]
-    async fn provisioning_1() {}
+    async fn provisioning_1() {
+        let agent = fixt!(AgentPubKey);
+        let bundle = app_bundle_fixture().await;
+
+        // Build DnaBundles. It doesn't matter what the DNAs are
+
+        // let dna_bundle_1 = DnaBundle::new(DnaManifest::new())
+
+        // Build AppBundle from various DnaBundles with various provisionings
+
+        let resolution = bundle
+            .resolve_cells(agent, DnaGamut::placeholder(), Default::default())
+            .await
+            .unwrap();
+    }
 }

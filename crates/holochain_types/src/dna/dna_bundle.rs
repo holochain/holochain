@@ -1,8 +1,9 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::PathBuf};
 
 use super::{DnaDef, DnaFile, WasmMap};
-use crate::prelude::*;
+use crate::{macros, prelude::*};
 use holo_hash::*;
+use mr_bundle::Location;
 
 /// A bundle of Wasm zomes, respresented as a file.
 #[derive(
@@ -18,10 +19,19 @@ use holo_hash::*;
 pub struct DnaBundle(mr_bundle::Bundle<DnaManifest>);
 
 impl DnaBundle {
+    /// Constructor
+    pub fn new(
+        manifest: DnaManifest,
+        resources: Vec<(PathBuf, Vec<u8>)>,
+        root_dir: PathBuf,
+    ) -> DnaResult<Self> {
+        Ok(mr_bundle::Bundle::new(manifest, resources, root_dir)?.into())
+    }
+
     /// Convert to a DnaFile
     pub async fn into_dna_file(self) -> DnaResult<DnaFile> {
         let (zomes, wasms) = self.inner_maps().await?;
-        let dna_def = self.dna_def(zomes).await?;
+        let dna_def = self.to_dna_def(zomes).await?;
 
         Ok(DnaFile::from_parts(dna_def, wasms))
     }
@@ -80,7 +90,7 @@ impl DnaBundle {
     }
 
     /// Convert to a DnaDef
-    pub async fn dna_def(&self, zomes: Zomes) -> DnaResult<DnaDefHashed> {
+    pub async fn to_dna_def(&self, zomes: Zomes) -> DnaResult<DnaDefHashed> {
         let manifest = self.manifest();
         let properties: SerializedBytes = manifest
             .properties
@@ -95,6 +105,52 @@ impl DnaBundle {
         };
 
         Ok(DnaDefHashed::from_content(dna_def).await)
+    }
+
+    /// Build a bundle from a DnaFile. Useful for tests.
+    #[cfg(feature = "test_utils")]
+    pub async fn from_dna_file(dna_file: DnaFile) -> DnaResult<Self> {
+        let DnaFile { dna, code } = dna_file;
+        let manifest = Self::manifest_from_dna_def(dna.into_content())?;
+        let resources = code
+            .into_iter()
+            .map(|(hash, wasm)| (PathBuf::from(hash.to_string()), wasm.code.to_vec()))
+            .collect();
+        DnaBundle::new(manifest, resources, PathBuf::from("."))
+    }
+
+    #[cfg(feature = "test_utils")]
+    fn manifest_from_dna_def(dna_def: DnaDef) -> DnaResult<DnaManifest> {
+        let zomes = dna_def
+            .zomes
+            .into_iter()
+            .filter_map(|(name, zome)| {
+                match zome {
+                    ZomeDef::Wasm(wz) => Some(wz.wasm_hash),
+                    ZomeDef::Inline(_) => None,
+                }
+                .map(|hash| {
+                    let hash = WasmHashB64::from(hash);
+                    let filename = format!("{}", hash);
+                    ZomeManifest {
+                        name,
+                        hash: Some(hash),
+                        location: Location::Bundled(PathBuf::from(filename)),
+                    }
+                })
+            })
+            .collect();
+        Ok(DnaManifest {
+            name: dna_def.name,
+            uuid: Some(dna_def.uuid),
+            properties: Some(dna_def.properties.try_into().map_err(|e| {
+                DnaError::DnaFileToBundleConversionError(format!(
+                    "DnaDef properties were not YAML-deserializable: {}",
+                    e
+                ))
+            })?),
+            zomes,
+        })
     }
 }
 
