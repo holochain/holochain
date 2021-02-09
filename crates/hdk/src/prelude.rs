@@ -17,7 +17,7 @@ pub use crate::{
             anchor, get_anchor, list_anchor_addresses, list_anchor_tags,
             list_anchor_type_addresses, Anchor,
         },
-        path::Path,
+        path::{Path, Component},
     },
     host_fn::{
         agent_info::agent_info, call::call, call_remote::call_remote, create::create,
