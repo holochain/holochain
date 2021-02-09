@@ -764,7 +764,7 @@ impl SysValidationWorkspace {
         hash: DhtOpHash,
         mut vlv: ValidationLimboValue,
     ) -> WorkflowResult<()> {
-        vlv.last_try = Some(Timestamp::now());
+        vlv.last_try = Some(timestamp::now());
         vlv.num_tries += 1;
         self.validation_limbo.put(hash, vlv)?;
         Ok(())
