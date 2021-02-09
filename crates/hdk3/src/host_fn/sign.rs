@@ -14,7 +14,7 @@ where
 /// Assuming the private key for the provided pubkey exists in lair this will work.
 /// If we don't have the private key for the public key then we can't sign anything!
 ///
-/// @see sign
+/// See [`sign`](fn@sign)
 pub fn sign_raw<K>(key: K, data: Vec<u8>) -> ExternResult<Signature>
 where
     K: Into<AgentPubKey>,
