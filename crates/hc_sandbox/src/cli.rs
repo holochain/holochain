@@ -4,12 +4,12 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-/// Helper for generating, running, and interacting with Holochain Conductor "setups".
+/// Helper for generating, running, and interacting with Holochain Conductor "sandboxes".
 ///
-/// A setup is a directory containing a conductor config, databases, and keystore,
+/// A sandbox is a directory containing a conductor config, databases, and keystore,
 /// with a single Holochain app installed in the conductor:
 /// Everything you need to quickly run your app in holochain,
-/// or create complex multi-conductor setups for testing.
+/// or create complex multi-conductor sandboxes for testing.
 pub struct HcSandbox {
     #[structopt(subcommand)]
     command: HcSandboxSubcommand,
@@ -26,18 +26,18 @@ pub struct HcSandbox {
 #[derive(Debug, StructOpt)]
 #[structopt(setting = structopt::clap::AppSettings::InferSubcommands)]
 pub enum HcSandboxSubcommand {
-    /// Generate one or more new Holochain Conductor setup(s) for later use.
+    /// Generate one or more new Holochain Conductor sandbox(es) for later use.
     ///
-    /// A single app will be installed as part of this setup.
+    /// A single app will be installed as part of this sandbox.
     /// See the help for the `<dnas>` argument below to learn how to define the app to be installed.
     Generate {
         #[structopt(short, long, default_value = "1")]
-        /// Number of conductor setups to create.
+        /// Number of conductor sandboxes to create.
         num_conductors: usize,
         #[structopt(flatten)]
         gen: Create,
         #[structopt(short, long, value_delimiter = ",")]
-        /// Automatically run the setup(s) that were created.
+        /// Automatically run the sandbox(es) that were created.
         /// This is effectively a combination of `hc generate` and `hc run`
         ///
         /// You may optionally specify app interface ports to bind when running.
@@ -48,23 +48,23 @@ pub enum HcSandboxSubcommand {
         ///
         /// This follows the same structure as `hc run --ports`
         run: Option<Vec<u16>>,
-        /// List of DNAs to use when installing the App for this setup.
+        /// List of DNAs to use when installing the App for this sandbox.
         /// Defaults to searching the current directory for a single `*.dna.gz` file.
         dnas: Vec<PathBuf>,
     },
-    /// Run conductor(s) from existing setup(s).
+    /// Run conductor(s) from existing sandbox(es).
     Run(Run),
     /// Make a call to a conductor's admin interface.
     Call(crate::calls::Call),
     // /// [WIP unimplemented]: Run custom tasks using cargo task
     // Task,
-    /// List setups found in `$(pwd)/.hc`.
+    /// List sandboxes found in `$(pwd)/.hc`.
     List {
         /// Show more verbose information.
         #[structopt(short, long, parse(from_occurrences))]
         verbose: usize,
     },
-    /// Clean (completely remove) setups that are listed in the `$(pwd)/.hc` file.
+    /// Clean (completely remove) sandboxes that are listed in the `$(pwd)/.hc` file.
     Clean,
 }
 
@@ -111,7 +111,7 @@ impl HcSandbox {
             // HcSandboxSubcommand::Run(Run { ports, .. }) => {
             //     // Check if current directory has saved existing
             //     let existing = crate::save::load(std::env::current_dir()?)?;
-            //     // If we have existing setups and we are not trying to generate and
+            //     // If we have existing sandboxes and we are not trying to generate and
             //     // we are not trying to load specific dnas then use existing.
             //     let paths = if !existing.is_empty() && gen.is_none() && dnas.is_empty() {
             //         existing
@@ -168,7 +168,7 @@ async fn generate(
     create: Create,
 ) -> anyhow::Result<Vec<PathBuf>> {
     let dnas = crate::dna::parse_dnas(dnas)?;
-    let paths = crate::setups::default_n(holochain_path, num_conductors, create, dnas).await?;
+    let paths = crate::sandbox::default_n(holochain_path, num_conductors, create, dnas).await?;
     crate::save::save(std::env::current_dir()?, paths.clone())?;
     Ok(paths)
 }

@@ -8,7 +8,7 @@ use url2::Url2;
 
 const DEFAULT_APP_ID: &str = "test-app";
 #[derive(Debug, StructOpt, Clone)]
-// This creates a new holochain setup
+// This creates a new holochain sandbox
 // which is a
 // - conductor config
 // - databases
@@ -21,19 +21,19 @@ pub struct Create {
     /// ID for the installed app.
     /// This is just a String to identify the app by.
     pub app_id: InstalledAppId,
-    /// Set a root directory for conductor setups to be placed into.
+    /// Set a root directory for conductor sandboxes to be placed into.
     /// Defaults to the system's temp directory.
     /// This directory must already exist.
     #[structopt(long)]
     pub root: Option<PathBuf>,
     #[structopt(short, long)]
-    /// Specify the directory name for each setup that is created.
-    /// By default, new setup directories get a random name
+    /// Specify the directory name for each sandbox that is created.
+    /// By default, new sandbox directories get a random name
     /// like "kAOXQlilEtJKlTM_W403b".
     /// Use this option to override those names with something explicit.
     ///
     /// For example `hc gen -r path/to/my/chains -n 3 -d=first,second,third`
-    /// will create three setups with directories named "first", "second", and "third".
+    /// will create three sandboxes with directories named "first", "second", and "third".
     pub directories: Vec<PathBuf>,
 }
 
@@ -95,19 +95,18 @@ pub struct Quic {
 #[derive(Debug, StructOpt, Clone)]
 pub struct Existing {
     #[structopt(short, long, value_delimiter = ",")]
-    /// Paths to existing setup directories.
+    /// Paths to existing sandbox directories.
     /// For example `hc run -e=/tmp/kAOXQlilEtJKlTM_W403b,/tmp/kddsajkaasiIII_sJ`.
     pub existing_paths: Vec<PathBuf>,
     #[structopt(short, long, conflicts_with_all = &["last", "indices"])]
-    /// Run all the existing conductor setups.
+    /// Run all the existing conductor sandboxes.
     pub all: bool,
     #[structopt(short, long, conflicts_with_all = &["all", "indices"])]
-    /// Run the last created conductor setup.
+    /// Run the last created conductor sandbox.
     pub last: bool,
-    /// Run a selection of existing conductor setups.
-    /// Conductors that have been setup and are
-    /// available in `hc list`.
-    /// Use the index to choose which setups to use.
+    /// Run a selection of existing conductor sandboxes.
+    /// Existing sandboxes are visible via `hc list`.
+    /// Use the index to choose which sandboxes to use.
     /// For example `hc run 1 3 5` or `hc run 1`
     #[structopt(conflicts_with_all = &["all", "last"])]
     pub indices: Vec<usize>,
@@ -115,46 +114,46 @@ pub struct Existing {
 
 impl Existing {
     pub fn load(mut self) -> anyhow::Result<Vec<PathBuf>> {
-        let setups = crate::save::load(std::env::current_dir()?)?;
+        let sandboxes = crate::save::load(std::env::current_dir()?)?;
         if self.all {
-            // Get all the setups
-            self.existing_paths.extend(setups.into_iter())
-        } else if self.last && setups.last().is_some() {
-            // Get just the last setup
+            // Get all the sandboxes
+            self.existing_paths.extend(sandboxes.into_iter())
+        } else if self.last && sandboxes.last().is_some() {
+            // Get just the last sandbox
             self.existing_paths
-                .push(setups.last().cloned().expect("Safe due to check above"));
+                .push(sandboxes.last().cloned().expect("Safe due to check above"));
         } else if !self.indices.is_empty() {
             // Get the indices
             let e = self
                 .indices
                 .into_iter()
-                .filter_map(|i| setups.get(i).cloned());
+                .filter_map(|i| sandboxes.get(i).cloned());
             self.existing_paths.extend(e);
         } else if !self.existing_paths.is_empty() {
             // If there is existing paths then use those
-        } else if setups.len() == 1 {
-            // If there is only one setup then use that
+        } else if sandboxes.len() == 1 {
+            // If there is only one sandbox then use that
             self.existing_paths
-                .push(setups.last().cloned().expect("Safe due to check above"));
-        } else if setups.len() > 1 {
-            // There is multiple setups, the use must disambiguate
+                .push(sandboxes.last().cloned().expect("Safe due to check above"));
+        } else if sandboxes.len() > 1 {
+            // There is multiple sandboxes, the use must disambiguate
             msg!(
                 "
-There are multiple setups and hc doesn't know which to run.
+There are multiple sandboxes and hc doesn't know which to run.
 You can run:
-    - `--all` `-a` run all setups.
-    - `--last` `-l` run the last created setup.
-    - `--existing-paths` `-e` run a list of existing paths to setups.
+    - `--all` `-a` run all sandboxes.
+    - `--last` `-l` run the last created sandbox.
+    - `--existing-paths` `-e` run a list of existing paths to sandboxes.
     - `1` run a index from the list below.
     - `0 2` run multiple indices from the list below.
-Run `hc list` to see the setups or `hc r --help` for more information."
+Run `hc list` to see the sandboxes or `hc r --help` for more information."
             );
             crate::save::list(std::env::current_dir()?, 0)?;
         } else {
-            // There is no setups
+            // There is no sandboxes
             msg!(
                 "
-Before running or calling you need to generate a setup.
+Before running or calling you need to generate a sandbox.
 You can use `hc generate` or `hc g` to do this.
 Run `hc g --help` for more options."
             );

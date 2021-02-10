@@ -45,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
         // This runs the conductor in the background and cleans
         // up the process when the guard is dropped.
         let (mut cmd, _conductor_guard) =
-            CmdRunner::from_setup_with_bin_path(&input.holochain_path, path.clone()).await?;
+            CmdRunner::from_sandbox_with_bin_path(&input.holochain_path, path.clone()).await?;
 
         // Generate a new agent key using the simple calls api.
         let agent_key = hc_sandbox::calls::generate_agent_pub_key(&mut cmd).await?;

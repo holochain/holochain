@@ -19,7 +19,7 @@ pub fn force_admin_port(path: PathBuf, port: u16) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// List the admin ports for each setup.
+/// List the admin ports for each sandbox.
 pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
     let mut ports = Vec::new();
     for p in paths {
