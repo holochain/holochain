@@ -67,7 +67,7 @@ pub enum HcAppBundle {
     ///
     /// will create file `./some/directory/foo.happ`
     Pack {
-        /// The path to the unpacked directory containing a `app.yaml` manifest
+        /// The path to the unpacked directory containing a `happ.yaml` manifest
         path: std::path::PathBuf,
 
         /// Specify the output path for the packed bundle file.

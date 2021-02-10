@@ -38,7 +38,7 @@ impl Manifest for AppManifest {
     }
 
     fn path(&self) -> PathBuf {
-        "app.yaml".into()
+        "happ.yaml".into()
     }
 }
 
