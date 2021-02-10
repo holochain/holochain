@@ -1,8 +1,8 @@
-pub use crate::capability::create_cap_claim::create_cap_claim;
-pub use crate::capability::create_cap_grant::create_cap_grant;
-pub use crate::capability::delete_cap_grant::delete_cap_grant;
-pub use crate::capability::generate_cap_secret::generate_cap_secret;
-pub use crate::capability::update_cap_grant::update_cap_grant;
+pub use crate::capability::create_cap_claim;
+pub use crate::capability::create_cap_grant;
+pub use crate::capability::delete_cap_grant;
+pub use crate::capability::generate_cap_secret;
+pub use crate::capability::update_cap_grant;
 pub use crate::entry::create_entry::create_entry;
 pub use crate::entry::delete_entry::delete_entry;
 pub use crate::entry::hash_entry::hash_entry;

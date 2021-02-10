@@ -7,7 +7,7 @@ use crate::prelude::*;
 /// A lot of that is handled by the holochain_wasmer crates but this handles the boilerplate of
 /// writing an extern function as they have awkward input and output signatures:
 ///
-/// - requires remembering #[no_mangle]
+/// - requires remembering `#[no_mangle]`
 /// - requires remembering pub extern "C"
 /// - requires juggling GuestPtr on the input and output with the memory/serialization
 /// - doesn't support Result returns at all, so breaks things as simple as `?`
