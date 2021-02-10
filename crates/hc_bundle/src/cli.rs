@@ -16,6 +16,9 @@ pub const APP_BUNDLE_EXT: &str = "happ";
 /// Work with Holochain DNA bundles
 #[derive(Debug, StructOpt)]
 pub enum HcDnaBundle {
+    /// Create a new, empty Holochain DNA bundle
+    Init {},
+
     /// Pack the contents of a directory into a `.dna` bundle file.
     ///
     /// e.g.:
@@ -59,6 +62,9 @@ pub enum HcDnaBundle {
 /// Work with Holochain hApp bundles
 #[derive(Debug, StructOpt)]
 pub enum HcAppBundle {
+    /// Create a new, empty Holochain app (hApp)
+    Init {},
+
     /// Pack the contents of a directory into a `.happ` bundle file.
     ///
     /// e.g.:
@@ -103,6 +109,7 @@ impl HcDnaBundle {
     /// Run this command
     pub async fn run(self) -> HcBundleResult<()> {
         match self {
+            Self::Init {} => todo!(),
             Self::Pack { path, output } => {
                 let (bundle_path, _) = crate::packing::pack::<DnaManifest>(&path, output).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
@@ -126,6 +133,7 @@ impl HcAppBundle {
     /// Run this command
     pub async fn run(self) -> HcBundleResult<()> {
         match self {
+            Self::Init {} => todo!(),
             Self::Pack { path, output } => {
                 let (bundle_path, _) = crate::packing::pack::<AppManifest>(&path, output).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());

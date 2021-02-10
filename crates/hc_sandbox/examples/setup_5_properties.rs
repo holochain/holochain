@@ -88,7 +88,7 @@ async fn main() -> anyhow::Result<()> {
         hc_sandbox::calls::activate_app(
             &mut cmd,
             ActivateApp {
-                app_id: installed_app.installed_app_id().clone(),
+                app_id: installed_app.installed_app_id.clone(),
             },
         )
         .await?;
