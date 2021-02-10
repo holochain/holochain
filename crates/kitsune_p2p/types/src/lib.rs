@@ -13,6 +13,51 @@ pub mod dependencies {
     pub use ::url2;
 }
 
+use std::sync::Arc;
+
+/// Error related to remote communication.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum KitsuneError {
+    /// Unspecified error.
+    #[error(transparent)]
+    Other(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl KitsuneError {
+    /// promote a custom error type to a KitsuneError
+    pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        Self::Other(e.into())
+    }
+}
+
+impl From<String> for KitsuneError {
+    fn from(s: String) -> Self {
+        #[derive(Debug, thiserror::Error)]
+        struct OtherError(String);
+        impl std::fmt::Display for OtherError {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
+
+        KitsuneError::other(OtherError(s))
+    }
+}
+
+impl From<&str> for KitsuneError {
+    fn from(s: &str) -> Self {
+        s.to_string().into()
+    }
+}
+
+impl From<KitsuneError> for () {
+    fn from(_: KitsuneError) {}
+}
+
+/// Result type for remote communication.
+pub type KitsuneResult<T> = Result<T, KitsuneError>;
+
 pub mod async_lazy;
 mod auto_stream_select;
 pub use auto_stream_select::*;
@@ -22,3 +67,4 @@ pub mod metrics;
 pub mod transport;
 pub mod transport_mem;
 pub mod transport_pool;
+pub mod tx2;
