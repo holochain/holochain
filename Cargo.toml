@@ -9,6 +9,7 @@ members = [
 
   "crates/hc",
   "crates/hc_bundle",
+  "crates/hc_sandbox",
 
   "crates/holochain",
   "crates/holochain_cascade",

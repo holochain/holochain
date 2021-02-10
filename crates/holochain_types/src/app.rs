@@ -123,7 +123,7 @@ impl InstallAppDnaPayload {
 pub type MembraneProof = SerializedBytes;
 
 /// Data about an installed Cell
-#[derive(Clone, Debug, Into, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Into, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct InstalledCell(CellId, CellNick);
 
 impl InstalledCell {

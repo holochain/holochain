@@ -4,9 +4,9 @@
 //! then calling the [`CmdRunner`] directly.
 //! For simple calls like [`AdminRequest::ListDnas`] this is probably easier
 //! but if you want more control use [`CmdRunner::command`].
-use std::convert::TryInto;
 use std::path::Path;
 use std::path::PathBuf;
+use std::{collections::HashSet, convert::TryInto};
 
 use anyhow::anyhow;
 use anyhow::bail;
@@ -323,7 +323,7 @@ pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyho
 pub async fn install_app(
     cmd: &mut CmdRunner,
     args: InstallApp,
-) -> anyhow::Result<Vec<InstalledCell>> {
+) -> anyhow::Result<HashSet<InstalledCell>> {
     let InstallApp {
         app_id,
         agent_key,
@@ -358,11 +358,15 @@ pub async fn install_app(
     activate_app(
         cmd,
         ActivateApp {
-            app_id: installed_app.installed_app_id,
+            app_id: installed_app.installed_app_id.clone(),
         },
     )
     .await?;
-    Ok(installed_app.cell_data)
+    Ok(installed_app
+        .cell_data
+        .into_iter()
+        // .map(|(n, c)| InstalledCell::new(c.clone(), n.clone()))
+        .collect())
 }
 
 /// Calls [`AdminRequest::ListCellIds`].
