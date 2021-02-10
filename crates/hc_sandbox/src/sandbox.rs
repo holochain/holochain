@@ -1,4 +1,4 @@
-//! Common use setups with lots of default choices.
+//! Common use sandboxes with lots of default choices.
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -7,7 +7,7 @@ use crate::cmds::*;
 use crate::run::run_async;
 use crate::CmdRunner;
 
-/// Generates a new setup with a default [`ConductorConfig`]
+/// Generates a new sandbox with a default [`ConductorConfig`]
 /// and optional network.
 /// Then installs the dnas with a new app per dna.
 pub async fn default_with_network(
@@ -35,7 +35,7 @@ pub async fn default_with_network(
 }
 
 /// Same as [`default_with_network`] but creates n copies
-/// of this setup in thier own directory.
+/// of this sandbox in their own directories.
 pub async fn default_n(
     holochain_path: &Path,
     n: usize,

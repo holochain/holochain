@@ -1,5 +1,5 @@
 [package]
-name = "hc_bundle"
+name = "holochain_cli_bundle"
 version = "0.0.1"
 description = "DNA and hApp bundling functionality for the `hc` Holochain CLI utility"
 license = "Apache-2.0"
@@ -9,6 +9,14 @@ authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo" ]
 categories = [ "command-line-utilities", "development-tools::build-utils", "filesystem" ]
 edition = "2018"
+
+[[bin]]
+name = "hc-app"
+path = "src/bin/hc-app.rs"
+
+[[bin]]
+name = "hc-dna"
+path = "src/bin/hc-dna.rs"
 
 [dependencies]
 holo_hash = { version = "0.0.1", path = "../holo_hash" }

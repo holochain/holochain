@@ -18,18 +18,18 @@ use crate::CmdRunner;
 /// Use [`run_async`] to run in the background.
 /// Requires the holochain binary is available
 /// on the `holochain_path`.
-/// Uses the setup provided by the `setup_path`.
+/// Uses the sandbox provided by the `sandbox_path`.
 /// Adds an app interface in the `app_ports`.
 /// Can optionally force the admin port used. Otherwise
 /// the port in the config will be used if it's free or
 /// a random free port will be chosen.
 pub async fn run(
     holochain_path: &Path,
-    setup_path: PathBuf,
+    sandbox_path: PathBuf,
     app_ports: Vec<u16>,
     force_admin_port: Option<u16>,
 ) -> anyhow::Result<()> {
-    let (port, holochain) = run_async(holochain_path, setup_path.clone(), force_admin_port).await?;
+    let (port, holochain) = run_async(holochain_path, sandbox_path.clone(), force_admin_port).await?;
     msg!("Running conductor on admin port {}", port);
     for app_port in app_ports {
         msg!("Attaching app port {}", app_port);
@@ -43,7 +43,7 @@ pub async fn run(
         .await?;
     }
     msg!("Connected successfully to a running holochain");
-    let e = format!("Failed to run holochain at {}", setup_path.display());
+    let e = format!("Failed to run holochain at {}", sandbox_path.display());
 
     holochain.await.expect(&e);
     Ok(())
@@ -52,18 +52,18 @@ pub async fn run(
 /// Run a conductor in the background.
 /// Requires the holochain binary is available
 /// on the `holochain_path`.
-/// Uses the setup provided by the `setup_path`.
+/// Uses the sandbox provided by the `sandbox_path`.
 /// Can optionally force the admin port used. Otherwise
 /// the port in the config will be used if it's free or
 /// a random free port will be chosen.
 pub async fn run_async(
     holochain_path: &Path,
-    setup_path: PathBuf,
+    sandbox_path: PathBuf,
     force_admin_port: Option<u16>,
 ) -> anyhow::Result<(u16, Child)> {
-    let mut config = match read_config(setup_path.clone())? {
+    let mut config = match read_config(sandbox_path.clone())? {
         Some(c) => c,
-        None => create_config(setup_path.clone()),
+        None => create_config(sandbox_path.clone()),
     };
     match force_admin_port {
         Some(port) => {
@@ -71,7 +71,7 @@ pub async fn run_async(
         }
         None => random_admin_port_if_busy(&mut config),
     }
-    let config_path = write_config(setup_path.clone(), &config);
+    let config_path = write_config(sandbox_path.clone(), &config);
     let (tx_config, rx_config) = oneshot::channel();
     let mut child = start_holochain(holochain_path, config_path, tx_config).await;
     check_started(&mut child).await;
@@ -120,7 +120,7 @@ fn spawn_output(holochain: &mut Child, config: oneshot::Sender<u16>) {
             let mut reader = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = reader.next_line().await {
                 if needs_setup {
-                    match check_setup(&line, &mut needs_setup) {
+                    match check_sandbox(&line, &mut needs_setup) {
                         (true, Some(port)) => {
                             if let Some(config) = config.take() {
                                 config
@@ -147,12 +147,12 @@ fn spawn_output(holochain: &mut Child, config: oneshot::Sender<u16>) {
     });
 }
 
-fn check_setup(line: &str, needs_setup: &mut bool) -> (bool, Option<u16>) {
+fn check_sandbox(line: &str, needs_setup: &mut bool) -> (bool, Option<u16>) {
     if let Some(line) = line.strip_prefix("###") {
         if let Some(line) = line.strip_suffix("###") {
             match line {
-                "HOLOCHAIN_SETUP" => tracing::info!("Found config"),
-                "HOLOCHAIN_SETUP_END" => *needs_setup = false,
+                "HOLOCHAIN_SANDBOX" => tracing::info!("Found config"),
+                "HOLOCHAIN_SANDBOX_END" => *needs_setup = false,
                 _ => {
                     if let Some(v) = line.strip_prefix("ADMIN_PORT:") {
                         if let Ok(port) = v.parse::<u16>() {

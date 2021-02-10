@@ -8,12 +8,12 @@ use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
 use crate::config::create_config;
 use crate::config::write_config;
 
-/// Generate a new setup.
+/// Generate a new sandbox.
 /// This creates a directory and a [`ConductorConfig`]
 /// from an optional network.
 /// The root directory and inner directory
-/// (where this setup will be created) can be overridden.
-/// For example `my_root_dir/this_setups_dir/`
+/// (where this sandbox will be created) can be overridden.
+/// For example `my_root_dir/this_sandbox_dir/`
 pub fn generate(
     network: Option<KitsuneP2pConfig>,
     root: Option<PathBuf>,
@@ -34,13 +34,13 @@ pub fn generate(
             .paint(dir.display().to_string()),
         ansi_term::Style::new()
             .bold()
-            .paint("Keep this path to rerun the same setup")
+            .paint("Keep this path to rerun the same sandbox")
     );
     msg!("Created config at {}", path.display());
     Ok(dir)
 }
 
-/// Generate a new setup from a full config.
+/// Generate a new sandbox from a full config.
 pub fn generate_with_config(
     config: Option<ConductorConfig>,
     root: Option<PathBuf>,
@@ -52,7 +52,7 @@ pub fn generate_with_config(
     Ok(dir)
 }
 
-/// Generate a new directory structure for a setup.
+/// Generate a new directory structure for a sandbox.
 pub fn generate_directory(
     root: Option<PathBuf>,
     directory: Option<PathBuf>,

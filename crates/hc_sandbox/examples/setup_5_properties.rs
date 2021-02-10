@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use hc::calls::ActivateApp;
-use hc::expect_match;
-use hc::CmdRunner;
+use hc_sandbox::calls::ActivateApp;
+use hc_sandbox::expect_match;
+use hc_sandbox::CmdRunner;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
-use holochain_cli as hc;
+use holochain_cli_sandbox as hc_sandbox;
 use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
 use holochain_types::prelude::InstallAppDnaPayload;
 use holochain_types::prelude::InstallAppPayload;
@@ -23,7 +23,7 @@ struct Input {
 async fn main() -> anyhow::Result<()> {
     // Get and parse any input.
     let input = Input::from_args();
-    let dnas = hc::dna::parse_dnas(input.dnas)?;
+    let dnas = hc_sandbox::dna::parse_dnas(input.dnas)?;
 
     // Using the default mem network.
     let network = KitsuneP2pConfig::default();
@@ -39,16 +39,16 @@ async fn main() -> anyhow::Result<()> {
         let properties = properties.clone();
 
         // Create a conductor config with the network.
-        let path = hc::generate::generate(Some(network.clone()), None, None)?;
+        let path = hc_sandbox::generate::generate(Some(network.clone()), None, None)?;
 
         // Create a command runner to run admin commands.
         // This runs the conductor in the background and cleans
         // up the process when the guard is dropped.
         let (mut cmd, _conductor_guard) =
-            CmdRunner::from_setup_with_bin_path(&input.holochain_path, path.clone()).await?;
+            CmdRunner::from_sandbox_with_bin_path(&input.holochain_path, path.clone()).await?;
 
         // Generate a new agent key using the simple calls api.
-        let agent_key = hc::calls::generate_agent_pub_key(&mut cmd).await?;
+        let agent_key = hc_sandbox::calls::generate_agent_pub_key(&mut cmd).await?;
 
         // Turn dnas into payloads.
         let dnas = dnas
@@ -85,7 +85,7 @@ async fn main() -> anyhow::Result<()> {
             expect_match!(installed_app => AdminResponse::AppInstalled, "Failed to install app");
 
         // Activate the app using the simple calls api.
-        hc::calls::activate_app(
+        hc_sandbox::calls::activate_app(
             &mut cmd,
             ActivateApp {
                 app_id: installed_app.installed_app_id().clone(),

@@ -38,8 +38,8 @@ use structopt::StructOpt;
 pub struct Call {
     #[structopt(short, long, conflicts_with_all = &["existing_paths", "existing_indices"], value_delimiter = ",")]
     /// Ports to running conductor admin interfaces.
-    /// If this is empty existing setups will be used.
-    /// Cannot be combined with existing setups.
+    /// If this is empty existing sandboxes will be used.
+    /// Cannot be combined with existing sandboxes.
     pub running: Vec<u16>,
     #[structopt(flatten)]
     pub existing: Existing,
