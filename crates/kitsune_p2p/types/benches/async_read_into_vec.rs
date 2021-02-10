@@ -26,7 +26,12 @@ impl futures::io::AsyncRead for FakeRead {
         buf: &mut [u8],
     ) -> std::task::Poll<Result<usize, futures::io::Error>> {
         static DATA: &'static [u8; 4096] = &[0xdb; 4096];
-        buf.copy_from_slice(&DATA[0..buf.len()]);
+        let mut offset = 0;
+        while offset < buf.len() {
+            let len = std::cmp::min(4096, buf.len() - offset);
+            buf[offset..offset + len].copy_from_slice(&DATA[0..len]);
+            offset += len;
+        }
         std::task::Poll::Ready(Ok(buf.len()))
     }
 }

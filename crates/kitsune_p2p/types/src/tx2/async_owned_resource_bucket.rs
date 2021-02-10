@@ -151,7 +151,8 @@ mod tests {
         let j2 = tokio::task::spawn(bucket.acquire());
         bucket.release("1").await;
         bucket.release("2").await;
-        assert_eq!("1", j1.await.unwrap().unwrap());
-        assert_eq!("2", j2.await.unwrap().unwrap());
+        let j1 = j1.await.unwrap().unwrap();
+        let j2 = j2.await.unwrap().unwrap();
+        assert!((j1 == "1" && j2 == "2") || (j2 == "1" && j1 == "2"));
     }
 }

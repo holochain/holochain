@@ -17,6 +17,7 @@ pub trait AsyncReadIntoVec: 'static + Send + Unpin {
         struct Read<'a, P>(std::pin::Pin<&'a mut P>, &'a mut Vec<u8>, usize)
         where
             P: ?Sized + AsyncReadIntoVec;
+
         impl<'a, P> std::future::Future for Read<'a, P>
         where
             P: ?Sized + AsyncReadIntoVec,
@@ -60,15 +61,26 @@ impl AsyncReadIntoVec for AsyncReadIntoVecFilter {
     ) -> std::task::Poll<Result<usize, futures::io::Error>> {
         let mut got_pending = false;
         let mut read = 0;
+
+        // grab our buffer
         let mut buf = self.1.take().unwrap_or_else(|| [0; 4096]);
+
+        // loop to gather up to our max_bytes
         loop {
+            // calculate how many more bytes to read
             let want_read = std::cmp::min(max_bytes - read, 4096);
             if want_read < 1 {
+                // if we don't want to read anything, break out
                 break;
             }
+
+            // size our buffer appropriately
             let buf = &mut buf[0..want_read];
+
             let sub = &mut self.0;
             tokio::pin!(sub);
+
+            // poll our sub future
             match futures::io::AsyncRead::poll_read(sub, cx, buf) {
                 std::task::Poll::Pending => {
                     got_pending = true;
@@ -83,6 +95,10 @@ impl AsyncReadIntoVec for AsyncReadIntoVecFilter {
                 }
             }
         }
+
+        // restore our buffer
+        self.1 = Some(buf);
+
         if read == 0 && got_pending {
             std::task::Poll::Pending
         } else {
@@ -103,8 +119,12 @@ mod tests {
             _cx: &mut std::task::Context<'_>,
             buf: &mut [u8],
         ) -> std::task::Poll<Result<usize, futures::io::Error>> {
-            for i in 0..buf.len() {
-                buf[i] = 0xdb;
+            static DATA: &'static [u8; 4096] = &[0xdb; 4096];
+            let mut offset = 0;
+            while offset < buf.len() {
+                let len = std::cmp::min(4096, buf.len() - offset);
+                buf[offset..offset + len].copy_from_slice(&DATA[0..len]);
+                offset += len;
             }
             std::task::Poll::Ready(Ok(buf.len()))
         }
