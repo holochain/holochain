@@ -1,8 +1,11 @@
-use holochain_types::dna::{
-    error::DnaResult,
-    wasm,
-    zome::{inline_zome::InlineZome, Zome, ZomeDef},
-    DnaDefBuilder, DnaFile,
+use holochain_types::{
+    dna::{
+        error::DnaResult,
+        wasm,
+        zome::{inline_zome::InlineZome, Zome, ZomeDef},
+        DnaDefBuilder, DnaFile,
+    },
+    prelude::DnaDef,
 };
 use holochain_zome_types::zome::ZomeName;
 
@@ -28,7 +31,7 @@ impl SweetDnaFile {
         Ok((dna_file, zomes))
     }
 
-    /// Create a DnaFile from a collection of InlineZomes (no Wasm),
+    /// Create a DnaFile from a collection of Zomes,
     /// with a random UUID
     pub async fn unique_from_zomes(
         zomes: Vec<(ZomeName, ZomeDef)>,
@@ -100,6 +103,16 @@ impl SweetDnaFile {
         zome: InlineZome,
     ) -> DnaResult<(DnaFile, Zome)> {
         Self::from_inline_zome(random_uuid(), zome_name, zome).await
+    }
+}
+
+pub struct SweetDnaDef;
+
+impl SweetDnaDef {
+    /// Create a DnaDef with a random UUID, useful for testing
+    // TODO: move fully into sweettest when possible
+    pub fn unique_from_zomes(zomes: Vec<Zome>) -> DnaDef {
+        DnaDef::unique_from_zomes(zomes)
     }
 }
 

@@ -16,13 +16,13 @@ pub struct AppBundle(mr_bundle::Bundle<AppManifest>);
 
 impl AppBundle {
     /// Create an AppBundle from a manifest and DNA files
-    pub async fn new<R: IntoIterator<Item = (PathBuf, DnaFile)>>(
+    pub async fn new<R: IntoIterator<Item = (PathBuf, DnaBundle)>>(
         manifest: AppManifest,
         resources: R,
         root_dir: PathBuf,
     ) -> AppBundleResult<Self> {
-        let resources = join_all(resources.into_iter().map(|(path, dna)| async move {
-            dna.to_file_content().await.map(|bytes| (path, bytes))
+        let resources = join_all(resources.into_iter().map(|(path, dna_bundle)| async move {
+            dna_bundle.encode().map(|bytes| (path, bytes))
         }))
         .await
         .into_iter()
@@ -164,6 +164,7 @@ impl AppBundle {
 /// The result of running Cell resolution
 // TODO: rework, make fields private
 #[allow(missing_docs)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct CellSlotResolution {
     pub agent: AgentPubKey,
     pub dnas_to_register: Vec<(DnaFile, Option<MembraneProof>)>,
@@ -224,45 +225,54 @@ mod tests {
 
     use super::AppBundle;
 
-    async fn app_bundle_fixture() -> AppBundle {
-        let path1 = PathBuf::from("1");
-        let path2 = PathBuf::from("2");
+    async fn app_bundle_fixture() -> (AppBundle, DnaFile) {
+        let dna_wasm = DnaWasmHashed::from_content(DnaWasm::new_invalid()).await;
+        let fake_wasms = vec![dna_wasm.clone().into_content()];
+        let fake_zomes = vec![Zome::new(
+            "hi".into(),
+            ZomeDef::from(WasmZome::new(dna_wasm.as_hash().clone())),
+        )];
+        let dna_def_1 = DnaDef::unique_from_zomes(fake_zomes.clone());
+        let dna_def_2 = DnaDef::unique_from_zomes(fake_zomes);
 
-        let dna1 = DnaFile::new(fixt!(DnaDef), vec![DnaWasm::new_invalid()])
-            .await
-            .unwrap();
-        let dna2 = DnaFile::new(fixt!(DnaDef), vec![DnaWasm::new_invalid()])
-            .await
-            .unwrap();
+        let dna1 = DnaFile::new(dna_def_1, fake_wasms.clone()).await.unwrap();
+        let dna2 = DnaFile::new(dna_def_2, fake_wasms.clone()).await.unwrap();
 
-        let (manifest, dna_hashes) = app_manifest_fixture(
-            Some(DnaLocation::Bundled("1".into())),
+        let path1 = PathBuf::from(format!("{}", dna1.dna_hash()));
+
+        let (manifest, _dna_hashes) = app_manifest_fixture(
+            Some(DnaLocation::Bundled(path1.clone())),
             vec![dna1.dna_def().clone(), dna2.dna_def().clone()],
         )
         .await;
 
-        let resources = vec![(path1, dna1), (path2, dna2)];
+        let resources = vec![(path1, DnaBundle::from_dna_file(dna1.clone()).await.unwrap())];
 
         let bundle = AppBundle::new(manifest, resources, PathBuf::from("."))
             .await
             .unwrap();
-        bundle
+        (bundle, dna1)
     }
 
+    /// Test that an app with a single Created cell can be provisioned
     #[tokio::test]
-    async fn provisioning_1() {
+    async fn provisioning_1_create() {
         let agent = fixt!(AgentPubKey);
-        let bundle = app_bundle_fixture().await;
-
-        // Build DnaBundles. It doesn't matter what the DNAs are
-
-        // let dna_bundle_1 = DnaBundle::new(DnaManifest::new())
-
-        // Build AppBundle from various DnaBundles with various provisionings
+        let (bundle, dna) = app_bundle_fixture().await;
 
         let resolution = bundle
-            .resolve_cells(agent, DnaGamut::placeholder(), Default::default())
+            .resolve_cells(agent.clone(), DnaGamut::placeholder(), Default::default())
             .await
             .unwrap();
+
+        // Build the expected output.
+        // NB: this relies heavily on the particulars of the `app_manifest_fixture`
+        let slot = CellSlot::new(Some(CellId::new(dna.dna_hash().clone(), agent.clone())), 50);
+        let expected = CellSlotResolution {
+            agent,
+            dnas_to_register: vec![(dna, None)],
+            slots: vec![("nick".into(), slot)],
+        };
+        assert_eq!(resolution, expected);
     }
 }

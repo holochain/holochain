@@ -52,7 +52,7 @@ pub struct DnaDef {
 #[cfg(feature = "test_utils")]
 impl DnaDef {
     /// Create a DnaDef with a random UUID, useful for testing
-    pub fn unique_from_zomes(zomes: Vec<Zome>) -> Self {
+    pub fn unique_from_zomes(zomes: Vec<Zome>) -> DnaDef {
         let zomes = zomes.into_iter().map(|z| z.into_inner()).collect();
         DnaDefBuilder::default()
             .zomes(zomes)

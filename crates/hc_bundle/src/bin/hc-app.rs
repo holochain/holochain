@@ -1,4 +1,4 @@
-use hc_bundle::cli::HcAppBundle;
+use holochain_cli_bundle::cli::HcAppBundle;
 use structopt::StructOpt;
 
 /// Main `hc-app` executable entrypoint.
