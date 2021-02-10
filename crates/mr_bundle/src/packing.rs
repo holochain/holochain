@@ -59,7 +59,7 @@ impl<M: Manifest> Bundle<M> {
         let base_path = prune_path(manifest_path.clone(), &manifest_relative_path)?;
         let resources = futures::future::join_all(manifest.bundled_paths().into_iter().map(
             |relative_path| async {
-                let resource_path = base_path.join(&relative_path).canonicalize().expect("TODO");
+                let resource_path = base_path.join(&relative_path).canonicalize()?;
                 crate::fs(&resource_path)
                     .read()
                     .await

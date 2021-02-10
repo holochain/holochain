@@ -37,11 +37,8 @@ pub enum HcBundleError {
     #[error("Unknown error: {0}")]
     MiscError(#[from] Box<dyn std::error::Error + Send + Sync>),
 
-    #[error(
-        "This file should have a '.{}' extension: {0}",
-        crate::dna::DNA_BUNDLE_EXT
-    )]
-    FileExtensionMissing(PathBuf),
+    #[error("This file should have a '.{0}' extension: {1}")]
+    FileExtensionMissing(&'static str, PathBuf),
 }
 
 /// HcBundle Result type.

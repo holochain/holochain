@@ -470,7 +470,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let manifest = bundle.manifest();
         let bundled_dnas = bundle.resolve_all().await?;
 
-        self.clone().register_dna(todo!("get dnas")).await?;
+        let dnas = todo!("get dnas");
+        self.clone().register_dna(dnas).await?;
 
         self.clone().install_app(todo!(), todo!()).await?;
 
