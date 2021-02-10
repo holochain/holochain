@@ -148,6 +148,11 @@ pub enum TransportEvent {
     /// A remote is establishing an incoming channel.
     IncomingChannel(url2::Url2, TransportChannelWrite, TransportChannelRead),
 }
+/// faster
+pub enum TransportEventFast {
+    /// faster
+    IncomingChannel(url2::Url2, tokio::sync::oneshot::Sender<Vec<u8>>, tokio::sync::oneshot::Receiver<Vec<u8>>),
+}
 
 /// Send new incoming channel data.
 pub type TransportEventSender = futures::channel::mpsc::Sender<TransportEvent>;

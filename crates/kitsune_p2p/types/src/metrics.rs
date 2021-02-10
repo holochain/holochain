@@ -317,3 +317,43 @@ async fn test_sys_info() {
     let sys_info = get_sys_info();
     ghost_actor::dependencies::tracing::info!(?sys_info);
 }
+
+/// Measure throughput of an async function.
+/// This is accurate up to about 1 GiB/s
+pub async fn throughput<F, Fut>(bytes: u64, seconds: u64, mut f: F)
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    let start = std::time::Instant::now();
+    let mut count = 0;
+    while start.elapsed().as_secs() < seconds {
+        count += 1;
+        f().await;
+    }
+    let el: std::time::Duration = start.elapsed();
+    let avg = el.checked_div(count as u32).unwrap_or_default();
+    let bps = (bytes * count).checked_div(el.as_secs()).unwrap_or(0);
+    let kbps = bps / 1_000;
+    let mbps = bps / 1_000_000;
+    println!(
+        "mean time {:?}, {} MiB/s, {} KiB/s, {} B/s",
+        avg, mbps, kbps, bps
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_throughput() {
+        observability::test_run().ok();
+
+        // Expect to see around 500bps
+        throughput(100, 10, || async move {
+            tokio::time::delay_for(std::time::Duration::from_millis(200)).await;
+        })
+        .await;
+    }
+}

@@ -205,6 +205,7 @@ impl TransportListenerHandler for Inner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::metrics::throughput;
     use crate::transport_mem::*;
     use futures::stream::StreamExt;
 
@@ -265,6 +266,32 @@ mod tests {
             &format!("echo({}): test2", suburl2),
             &String::from_utf8_lossy(&res),
         );
+
+        Ok(())
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn pool_tp() -> TransportResult<()> {
+        let (c1, p1, e1) = spawn_transport_pool().await?;
+        let (sub1, sube1) = spawn_bind_transport_mem().await?;
+        let suburl1 = sub1.bound_url().await?;
+        c1.push_sub_transport(sub1, sube1).await?;
+        test_receiver(e1);
+
+        let _ = p1.bound_url().await?;
+
+        let bytes = 100;
+        let p1 = &p1;
+        throughput(bytes, 10, || {
+            let suburl1 = suburl1.clone();
+            async move {
+                let _ = p1
+                    .request(suburl1, vec![0u8; bytes as usize])
+                    .await
+                    .unwrap();
+            }
+        })
+        .await;
 
         Ok(())
     }

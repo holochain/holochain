@@ -3,7 +3,9 @@ mod tests {
     use crate::*;
     use futures::stream::StreamExt;
     use kitsune_p2p_types::dependencies::spawn_pressure;
+    use kitsune_p2p_types::metrics;
     use kitsune_p2p_types::metrics::metric_task_warn_limit;
+    use kitsune_p2p_types::metrics::throughput;
     use kitsune_p2p_types::transport::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -86,5 +88,49 @@ mod tests {
             String::from_utf8_lossy(&resp)
         );
         assert_eq!(resp.len(), 70_006);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn pool_tp() -> TransportResult<()> {
+        use kitsune_p2p_types::transport_pool::*;
+        let (c1, p1, e1) = spawn_transport_pool().await?;
+        let (sub1, sube1) = spawn_transport_listener_quic(ConfigListenerQuic::default())
+            .await
+            .unwrap();
+        let suburl1 = sub1.bound_url().await?;
+        c1.push_sub_transport(sub1, sube1).await?;
+        test_receiver(e1);
+
+        let _ = p1.bound_url().await?;
+
+        let bytes = 100;
+        let p1 = &p1;
+        throughput(bytes, 10, || {
+            let suburl1 = suburl1.clone();
+            async move {
+                let _ = p1
+                    .request(suburl1, vec![0u8; bytes as usize])
+                    .await
+                    .unwrap();
+            }
+        })
+        .await;
+
+        Ok(())
+    }
+
+    fn test_receiver(mut recv: TransportEventReceiver) {
+        metrics::metric_task_warn_limit(spawn_pressure::spawn_limit!(500), async move {
+            while let Some(evt) = recv.next().await {
+                match evt {
+                    TransportEvent::IncomingChannel(url, mut write, read) => {
+                        let data = read.read_to_end().await;
+                        let data = format!("echo({}): {}", url, String::from_utf8_lossy(&data),);
+                        write.write_and_close(data.into_bytes()).await?;
+                    }
+                }
+            }
+            TransportResult::Ok(())
+        });
     }
 }

@@ -17,26 +17,26 @@ use once_cell::sync::OnceCell;
 use tokio::runtime::{Builder, Runtime};
 
 const DATA: &[u8] = &[0xAB; 100];
+const LARGE_DATA: &[u8] = &[0xAB; 1024 * 10];
 
 const NUM_RECV_CONCURRENT: usize = 100;
 
-const PROCESS_DELAY_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+// const PROCESS_DELAY_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
-criterion_group!(benches, request,);
+criterion_group!(benches, request, to_proxy, channels, mem, send_recv, send);
 
 criterion_main!(benches);
 
-fn request(bench: &mut Criterion) {
+fn to_proxy(bench: &mut Criterion) {
     let _g = observability::test_run().ok();
 
     let proxy_url = spawn_proxy_quic();
-    let responder_url = spawn_responder_quic(proxy_url.clone());
-    let (client, runtime) = make_client_quic(proxy_url);
+    let (client, runtime) = make_client_quic(proxy_url.clone());
     let client = Arc::new(client);
     let mut runtime = runtime.lock().unwrap();
 
-    let mut group = bench.benchmark_group("request");
-    for &(data, messages, series) in [(DATA, 1000, true), (DATA, 1000, false)].iter() {
+    let mut group = bench.benchmark_group("to_proxy");
+    for &(data, messages, series) in [(DATA, 1000, true)].iter() {
         let bytes = ((data.len() * 2) as u64) * (messages as u64);
         group.throughput(Throughput::Bytes(bytes));
         group.sample_size(10);
@@ -50,29 +50,107 @@ fn request(bench: &mut Criterion) {
                 b.iter(|| {
                     let mut handles = Vec::new();
 
-                    let responder_url = responder_url.clone();
+                    let proxy_url = proxy_url.clone();
                     let client = client.clone();
                     if series {
                         handles.push(runtime.spawn(async move {
                             for _ in 0..messages {
-                                let responder_url = responder_url.clone();
+                                let proxy_url = proxy_url.clone();
                                 let client = client.clone();
                                 let (_, mut write, read) =
-                                    client.create_channel(responder_url.clone()).await.unwrap();
+                                    client.create_channel(proxy_url.clone()).await.unwrap();
                                 write.write_and_close(data.to_vec()).await.unwrap();
                                 read.read_to_end().await;
                             }
                         }));
-                    } else {
-                        for _ in 0..messages {
+                    }
+
+                    runtime.block_on(async {
+                        for handle in handles {
+                            handle.await.unwrap();
+                        }
+                    });
+                })
+            },
+        );
+    }
+}
+
+fn request(bench: &mut Criterion) {
+    let _g = observability::test_run().ok();
+
+    let proxy_url = spawn_proxy_quic();
+    let responder_url = spawn_responder_quic(proxy_url.clone());
+    let (client, runtime) = make_client_quic(proxy_url.clone());
+    let client = Arc::new(client);
+    let mut runtime = runtime.lock().unwrap();
+
+    let mut group = bench.benchmark_group("request");
+    for &(data, messages, series, do_channel, do_write, do_read) in [
+        (DATA, 1000, true, true, true, true),
+        (LARGE_DATA, 1000, true, true, true, true),
+        (DATA, 1000, false, true, true, true),
+        (DATA, 1000, true, false, false, false),
+        (DATA, 1000, true, true, false, false),
+        (DATA, 1000, true, true, true, false),
+    ]
+    .iter()
+    {
+        let bytes = ((data.len() * 2) as u64) * (messages as u64);
+        group.throughput(Throughput::Bytes(bytes));
+        group.sample_size(10);
+        group.bench_with_input(
+            BenchmarkId::new(
+                "baseline",
+                format!(
+                    "messages_{}_series_{}_bytes_{}_chan_{}_write_{}_read_{}",
+                    messages, series, bytes, do_channel, do_write, do_read
+                ),
+            ),
+            &(data, messages),
+            |b, &(_data, messages)| {
+                b.iter(|| {
+                    let mut handles = Vec::new();
+
+                    let client = client.clone();
+                    let test = {
+                        let responder_url = responder_url.clone();
+                        let client = client.clone();
+                        let data = data.to_vec();
+                        let do_channel = do_channel;
+                        let do_write = do_write;
+                        let do_read = do_read;
+                        move || {
                             let responder_url = responder_url.clone();
                             let client = client.clone();
-                            handles.push(runtime.spawn(async move {
-                                let (_, mut write, read) =
-                                    client.create_channel(responder_url.clone()).await.unwrap();
-                                write.write_and_close(data.to_vec()).await.unwrap();
-                                read.read_to_end().await;
-                            }));
+                            let data = data.to_vec();
+                            let do_channel = do_channel;
+                            let do_write = do_write;
+                            let do_read = do_read;
+                            async move {
+                                if do_channel {
+                                    let (_, mut write, read) =
+                                        client.create_channel(responder_url.clone()).await.unwrap();
+                                    if do_write {
+                                        write.write_and_close(data).await.unwrap();
+                                        if do_read {
+                                            read.read_to_end().await;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    };
+                    if series {
+                        handles.push(runtime.spawn(async move {
+                            for _ in 0..messages {
+                                test().await;
+                            }
+                        }));
+                    } else {
+                        for _ in 0..messages {
+                            let f = test();
+                            handles.push(runtime.spawn(f));
                         }
                     }
 
@@ -87,10 +165,235 @@ fn request(bench: &mut Criterion) {
     }
 }
 
+fn mem(bench: &mut Criterion) {
+    let _g = observability::test_run().ok();
+
+    let proxy_url = spawn_proxy_mem();
+    let responder_url = spawn_responder_mem(proxy_url.clone());
+    let (client, runtime) = make_client_mem(proxy_url.clone());
+    let client = Arc::new(client);
+    let mut runtime = runtime.lock().unwrap();
+
+    let mut group = bench.benchmark_group("mem");
+    for &(data, messages) in [(DATA, 1000), (LARGE_DATA, 1000)].iter() {
+        let bytes = ((data.len() * 2) as u64) * (messages as u64);
+        group.throughput(Throughput::Bytes(bytes));
+        group.sample_size(10);
+        group.bench_with_input(
+            BenchmarkId::new(
+                "mem_baseline",
+                format!("messages_{}_bytes_{}", messages, bytes,),
+            ),
+            &(data, messages),
+            |b, &(_data, messages)| {
+                b.iter(|| {
+                    let mut handles = Vec::new();
+
+                    let responder_url = responder_url.clone();
+                    let client = client.clone();
+                    handles.push(runtime.spawn(async move {
+                        for _ in 0..messages {
+                            let responder_url = responder_url.clone();
+                            let client = client.clone();
+                            let (_, mut write, read) =
+                                client.create_channel(responder_url.clone()).await.unwrap();
+                            write.write_and_close(data.to_vec()).await.unwrap();
+                            read.read_to_end().await;
+                        }
+                    }));
+
+                    runtime.block_on(async {
+                        for handle in handles {
+                            handle.await.unwrap();
+                        }
+                    });
+                })
+            },
+        );
+    }
+}
+
+fn channels(bench: &mut Criterion) {
+    let _g = observability::test_run().ok();
+
+    let proxy_url = spawn_proxy_quic();
+    let (_client, runtime) = make_client_quic(proxy_url.clone());
+    let mut runtime = runtime.lock().unwrap();
+
+    let mut group = bench.benchmark_group("channels");
+    static ONE: &'static [u8] = &[0u8];
+    for &(data, messages) in [(DATA, 1000), (ONE, 1000), (LARGE_DATA, 1000)].iter() {
+        let bytes = (data.len() as u64) * (messages as u64);
+        group.throughput(Throughput::Bytes(bytes));
+        group.sample_size(100);
+        group.bench_with_input(
+            BenchmarkId::new(
+                "channel_speed",
+                format!("messages_{}_bytes_{}", messages, bytes,),
+            ),
+            &(data, messages),
+            |b, &(data, messages)| {
+                b.iter(|| {
+                    let mut handles = Vec::new();
+
+                    use futures::SinkExt;
+                    handles.push(runtime.spawn(async move {
+                        for _ in 0..messages {
+                            let (tx, mut rx) = futures::channel::mpsc::channel(10);
+                            let mut tx =
+                                Box::new(tx.sink_map_err(|e| TransportError::Other(e.into())));
+                            tx.send(data).await.unwrap();
+                            tx.close().await.unwrap();
+                            rx.next().await.unwrap();
+                        }
+                    }));
+
+                    runtime.block_on(async {
+                        for handle in handles {
+                            handle.await.unwrap();
+                        }
+                    });
+                })
+            },
+        );
+    }
+}
+
+fn send_recv(bench: &mut Criterion) {
+    let _g = observability::test_run().ok();
+
+    let proxy_url = spawn_proxy_quic();
+    let (_client, runtime) = make_client_quic(proxy_url.clone());
+    let mut runtime = runtime.lock().unwrap();
+
+    let mut group = bench.benchmark_group("send_recv");
+    static ONE: &'static [u8] = &[0u8];
+    for &(data, messages) in [(DATA, 1000), (ONE, 1000), (LARGE_DATA, 1000)].iter() {
+        let bytes = (data.len() as u64) * (messages as u64);
+        group.throughput(Throughput::Bytes(bytes));
+        group.sample_size(100);
+        use futures::SinkExt;
+        group.bench_with_input(
+            BenchmarkId::new(
+                "channel_speed",
+                format!("messages_{}_bytes_{}", messages, bytes,),
+            ),
+            &(data, messages),
+            |b, &(data, messages)| {
+                b.iter(|| {
+                    let mut handles = Vec::new();
+
+                    handles.push(runtime.spawn(async move {
+                        let (tx, mut rx) = futures::channel::mpsc::channel(messages);
+                        let mut jhs = Vec::new();
+                        for _ in 0..messages {
+                            let jh = tokio::spawn({
+                                let tx = tx.clone();
+                                async move {
+                                    let mut tx = Box::new(
+                                        tx.sink_map_err(|e| TransportError::Other(e.into())),
+                                    );
+                                    tx.send(data).await.unwrap();
+                                    tx
+                                }
+                            });
+                            jhs.push(jh);
+                        }
+
+                        for _ in 0..messages {
+                            rx.next().await.unwrap();
+                        }
+                    }));
+
+                    runtime.block_on(async {
+                        for handle in handles {
+                            handle.await.unwrap();
+                        }
+                    });
+                })
+            },
+        );
+    }
+}
+
+fn send(bench: &mut Criterion) {
+    let _g = observability::test_run().ok();
+
+    let proxy_url = spawn_proxy_quic();
+    let (_client, runtime) = make_client_quic(proxy_url.clone());
+    let mut runtime = runtime.lock().unwrap();
+
+    let mut group = bench.benchmark_group("send");
+    static ONE: &'static [u8] = &[0u8];
+    for &(data, messages, create_fresh) in [
+        (DATA, 1000, true),
+        (ONE, 1000, true),
+        (LARGE_DATA, 1000, true),
+        (DATA, 1000, false),
+        (ONE, 1000, false),
+        (LARGE_DATA, 1000, false),
+    ]
+    .iter()
+    {
+        let bytes = (data.len() as u64) * (messages as u64);
+        group.throughput(Throughput::Bytes(bytes));
+        group.sample_size(100);
+        use futures::SinkExt;
+        group.bench_with_input(
+            BenchmarkId::new(
+                "channel_speed",
+                format!(
+                    "messages_{}_create_{}_bytes_{}",
+                    messages, create_fresh, bytes,
+                ),
+            ),
+            &(data, messages),
+            |b, &(data, messages)| {
+                b.iter(|| {
+                    let mut handles = Vec::new();
+
+                    handles.push(runtime.spawn(async move {
+                        if create_fresh {
+                            for _ in 0..messages {
+                                let (tx, _rx) = futures::channel::mpsc::channel(10);
+                                let mut tx =
+                                    Box::new(tx.sink_map_err(|e| TransportError::Other(e.into())));
+                                tx.send(data).await.unwrap();
+                                // tx.close().await.unwrap();
+                            }
+                        } else {
+                            let (tx, _rx) = futures::channel::mpsc::channel(messages);
+                            let mut tx =
+                                Box::new(tx.sink_map_err(|e| TransportError::Other(e.into())));
+                            for _ in 0..messages {
+                                let mut tx = tx.clone();
+                                tx.send(data).await.unwrap();
+                            }
+                            tx.close().await.unwrap();
+                        }
+                    }));
+
+                    runtime.block_on(async {
+                        for handle in handles {
+                            handle.await.unwrap();
+                        }
+                    });
+                })
+            },
+        );
+    }
+}
 fn spawn_responder_quic(proxy_url: Url2) -> Url2 {
     static INSTANCE: OnceCell<Url2> = OnceCell::new();
     INSTANCE
         .get_or_init(|| spawn_responder_inner(ProxyTransport::Quic, proxy_url))
+        .clone()
+}
+
+fn spawn_responder_mem(proxy_url: Url2) -> Url2 {
+    static INSTANCE: OnceCell<Url2> = OnceCell::new();
+    INSTANCE
+        .get_or_init(|| spawn_responder_inner(ProxyTransport::Mem, proxy_url))
         .clone()
 }
 
@@ -124,6 +427,23 @@ fn make_client_quic(
     (c.outgoing.clone(), &c.runtime)
 }
 
+fn make_client_mem(
+    proxy_url: Url2,
+) -> (
+    ghost_actor::GhostSender<TransportListener>,
+    &'static std::sync::Mutex<Runtime>,
+) {
+    static INSTANCE: OnceCell<Client> = OnceCell::new();
+    let c = INSTANCE.get_or_init(|| {
+        let mut c = make_client_inner(ProxyTransport::Mem, proxy_url);
+
+        let f = gen_client(c.incoming.take().unwrap());
+        c.runtime.get_mut().unwrap().spawn(f);
+        c
+    });
+    (c.outgoing.clone(), &c.runtime)
+}
+
 fn make_client_inner(transport: ProxyTransport, proxy_url: Url2) -> Client {
     let mut runtime = rt();
     let (outgoing, incoming, con_url) = runtime.block_on(async {
@@ -146,6 +466,13 @@ fn spawn_proxy_quic() -> Url2 {
         .clone()
 }
 
+fn spawn_proxy_mem() -> Url2 {
+    static INSTANCE: OnceCell<Url2> = OnceCell::new();
+    INSTANCE
+        .get_or_init(|| spawn_proxy_inner(ProxyTransport::Mem))
+        .clone()
+}
+
 fn spawn_proxy_inner(transport: ProxyTransport) -> Url2 {
     let (tx, rx) = std::sync::mpsc::sync_channel(1);
     let _handle = std::thread::spawn(move || {
@@ -159,9 +486,9 @@ fn spawn_proxy_inner(transport: ProxyTransport) -> Url2 {
 
             while let Some(evt) = events.next().await {
                 match evt {
-                    TransportEvent::IncomingChannel(url, mut write, _read) => {
-                        debug!("{} is trying to talk directly to us", url);
-                        let _ = write.write_and_close(b"".to_vec()).await;
+                    TransportEvent::IncomingChannel(_url, mut write, read) => {
+                        let data = read.read_to_end().await;
+                        write.write_and_close(data).await.unwrap();
                     }
                 }
             }
@@ -253,12 +580,13 @@ async fn gen_client(incoming: futures::channel::mpsc::Receiver<TransportEvent>) 
     incoming
         .for_each_concurrent(NUM_RECV_CONCURRENT, move |evt| async move {
             match evt {
-                TransportEvent::IncomingChannel(_url, mut write, _read) => {
-                    tokio::time::delay_for(std::time::Duration::from_millis(
-                        PROCESS_DELAY_MS.load(std::sync::atomic::Ordering::Relaxed),
-                    ))
-                    .await;
-                    let _ = write.write_and_close(b"".to_vec()).await;
+                TransportEvent::IncomingChannel(_url, mut write, read) => {
+                    // tokio::time::delay_for(std::time::Duration::from_millis(
+                    //     PROCESS_DELAY_MS.load(std::sync::atomic::Ordering::Relaxed),
+                    // ))
+                    // .await;
+                    let data = read.read_to_end().await;
+                    write.write_and_close(data).await.unwrap();
                 }
             }
         })
