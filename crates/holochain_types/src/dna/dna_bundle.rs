@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::PathBuf};
 
 use super::{DnaDef, DnaFile, WasmMap};
 use crate::prelude::*;
@@ -19,6 +19,15 @@ use mr_bundle::error::MrBundleResult;
 pub struct DnaBundle(mr_bundle::Bundle<DnaManifest>);
 
 impl DnaBundle {
+    /// Constructor
+    pub fn new(
+        manifest: DnaManifest,
+        resources: Vec<(PathBuf, Vec<u8>)>,
+        root_dir: PathBuf,
+    ) -> DnaResult<Self> {
+        Ok(mr_bundle::Bundle::new(manifest, resources, root_dir)?.into())
+    }
+
     /// Convert to a DnaFile
     pub async fn into_dna_file(self) -> DnaResult<DnaFile> {
         let (zomes, wasms) = self.inner_maps().await?;

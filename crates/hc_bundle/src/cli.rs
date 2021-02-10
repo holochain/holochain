@@ -1,10 +1,8 @@
 #![forbid(missing_docs)]
 //! Binary `hc-dna` command executable.
 
-use std::path::PathBuf;
-
-use crate::error::HcBundleResult;
 use holochain_types::prelude::{AppManifest, DnaManifest};
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 /// The file extension to use for DNA bundles
@@ -16,8 +14,11 @@ pub const APP_BUNDLE_EXT: &str = "happ";
 /// Work with Holochain DNA bundles
 #[derive(Debug, StructOpt)]
 pub enum HcDnaBundle {
-    /// Create a new, empty Holochain DNA bundle
-    Init {},
+    /// Create a new, empty Holochain DNA bundle working directory
+    Init {
+        /// The path to create the working directory
+        path: PathBuf,
+    },
 
     /// Pack the contents of a directory into a `.dna` bundle file.
     ///
@@ -62,8 +63,11 @@ pub enum HcDnaBundle {
 /// Work with Holochain hApp bundles
 #[derive(Debug, StructOpt)]
 pub enum HcAppBundle {
-    /// Create a new, empty Holochain app (hApp)
-    Init {},
+    /// Create a new, empty Holochain app (hApp) working directory
+    Init {
+        /// The path to create the directory
+        path: PathBuf,
+    },
 
     /// Pack the contents of a directory into a `.happ` bundle file.
     ///
@@ -107,9 +111,11 @@ pub enum HcAppBundle {
 
 impl HcDnaBundle {
     /// Run this command
-    pub async fn run(self) -> HcBundleResult<()> {
+    pub async fn run(self) -> anyhow::Result<()> {
         match self {
-            Self::Init {} => todo!(),
+            Self::Init { path } => {
+                crate::init::init_dna(path).await?;
+            }
             Self::Pack { path, output } => {
                 let (bundle_path, _) = crate::packing::pack::<DnaManifest>(&path, output).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
@@ -131,9 +137,9 @@ impl HcDnaBundle {
 
 impl HcAppBundle {
     /// Run this command
-    pub async fn run(self) -> HcBundleResult<()> {
+    pub async fn run(self) -> anyhow::Result<()> {
         match self {
-            Self::Init {} => todo!(),
+            Self::Init { path } => todo!(),
             Self::Pack { path, output } => {
                 let (bundle_path, _) = crate::packing::pack::<AppManifest>(&path, output).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());

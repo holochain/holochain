@@ -6,7 +6,7 @@ use holochain_zome_types::ZomeName;
 
 /// The structure of data that goes in the DNA bundle manifest,
 /// i.e. "dna.yaml"
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, derive_more::Constructor)]
 pub struct DnaManifest {
     /// The friendly "name" of a Holochain DNA.
     pub(crate) name: String,
