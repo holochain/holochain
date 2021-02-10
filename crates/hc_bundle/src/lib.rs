@@ -1,4 +1,3 @@
-
-pub mod error;
-pub mod dna;
 pub mod cli;
+pub mod error;
+pub mod packing;
