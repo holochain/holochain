@@ -196,7 +196,7 @@ where
     /// supplied.
     #[cfg(feature = "packing")]
     pub fn find_root_dir(&self, path: &Path) -> MrBundleResult<PathBuf> {
-        crate::util::prune_path(path.into(), self.manifest.path()).map_err(Into::into)
+        crate::util::prune_path(path.into(), M::path()).map_err(Into::into)
     }
 }
 
@@ -213,7 +213,12 @@ mod tests {
         }
 
         #[cfg(feature = "packing")]
-        fn path(&self) -> PathBuf {
+        fn path() -> PathBuf {
+            unimplemented!()
+        }
+
+        #[cfg(feature = "packing")]
+        fn bundle_extension() -> &'static str {
             unimplemented!()
         }
     }

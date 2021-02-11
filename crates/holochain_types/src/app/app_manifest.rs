@@ -37,8 +37,12 @@ impl Manifest for AppManifest {
         }
     }
 
-    fn path(&self) -> PathBuf {
+    fn path() -> PathBuf {
         "happ.yaml".into()
+    }
+
+    fn bundle_extension() -> &'static str {
+        "happ"
     }
 }
 

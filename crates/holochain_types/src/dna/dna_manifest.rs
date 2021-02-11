@@ -31,16 +31,12 @@ impl mr_bundle::Manifest for DnaManifest {
             .collect()
     }
 
-    fn path(&self) -> PathBuf {
-        Self::relative_path()
-    }
-}
-
-impl DnaManifest {
-    /// The path of the manifest, relative to an unpacked working directory.
-    /// The manifest must live at the root and be named "dna.yaml".
-    pub fn relative_path() -> PathBuf {
+    fn path() -> PathBuf {
         "dna.yaml".into()
+    }
+
+    fn bundle_extension() -> &'static str {
+        unimplemented!()
     }
 }
 

@@ -36,7 +36,7 @@ impl<M: Manifest> Bundle<M> {
             ffs::write(&path, resource).await?;
         }
         let yaml_str = serde_yaml::to_string(self.manifest())?;
-        let manifest_path = base_path.join(self.manifest().path());
+        let manifest_path = base_path.join(M::path());
         ffs::write(&manifest_path, yaml_str.as_bytes()).await?;
         Ok(())
     }
@@ -50,7 +50,7 @@ impl<M: Manifest> Bundle<M> {
             PackingError::BadManifestPath(manifest_path.clone(), err.into_inner())
         })?;
         let manifest: M = serde_yaml::from_str(&manifest_yaml).map_err(UnpackingError::from)?;
-        let manifest_relative_path = manifest.path();
+        let manifest_relative_path = M::path();
         let base_path = prune_path(manifest_path.clone(), &manifest_relative_path)?;
         let resources = futures::future::join_all(manifest.bundled_paths().into_iter().map(
             |relative_path| async {

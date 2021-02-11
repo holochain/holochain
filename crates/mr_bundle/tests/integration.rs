@@ -18,8 +18,13 @@ impl Manifest for TestManifest {
     }
 
     #[cfg(feature = "packing")]
-    fn path(&self) -> PathBuf {
+    fn path() -> PathBuf {
         "test-manifest.yaml".into()
+    }
+
+    #[cfg(feature = "packing")]
+    fn bundle_extension() -> &'static str {
+        unimplemented!()
     }
 }
 

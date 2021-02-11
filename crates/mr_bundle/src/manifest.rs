@@ -12,7 +12,12 @@ pub trait Manifest:
     /// When unpacking the bundle into a directory structure, this becomes
     /// the relative path of the manifest file.
     #[cfg(feature = "packing")]
-    fn path(&self) -> PathBuf;
+    fn path() -> PathBuf;
+
+    /// When packing a bundle from a directory structure, the bundle file gets
+    /// this extension.
+    #[cfg(feature = "packing")]
+    fn bundle_extension() -> &'static str;
 
     /// Get only the Bundled locations
     fn bundled_paths(&self) -> Vec<PathBuf> {
