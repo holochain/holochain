@@ -284,7 +284,11 @@ impl InstalledApp {
     }
 
     /// Add a cloned cell
-    pub fn add_clone(&mut self, cell_nick: &CellNick, cell_id: CellId) -> AppResult<bool> {
+    pub fn add_clone(
+        &mut self,
+        cell_nick: &CellNick,
+        properties: YamlProperties,
+    ) -> AppResult<CellId> {
         let slot = self
             .slots
             .get_mut(cell_nick)
@@ -292,7 +296,10 @@ impl InstalledApp {
         if slot.clones.len() as u32 >= slot.clone_limit {
             return Err(AppError::CloneLimitExceeded(slot.clone_limit, slot.clone()));
         }
-        Ok(slot.clones.insert(cell_id))
+        let cell_id = todo!("Create cell with new UUID and specified properties");
+        // cell_id is guaranteed to be unique
+        let _ = slot.clones.insert(cell_id);
+        Ok(cell_id)
     }
 
     /// Remove a cloned cell
@@ -334,7 +341,6 @@ impl AppSlot {
 mod tests {
     use super::{AppSlot, InstalledApp};
     use crate::prelude::*;
-    use ::fixt::prelude::*;
     use std::collections::HashSet;
 
     #[test]
@@ -344,32 +350,35 @@ mod tests {
         let mut app = InstalledApp::new("app", vec![(nick.clone(), slot1)]);
 
         // Can add clones up to the limit
-        let cell_ids = vec![fixt!(CellId), fixt!(CellId), fixt!(CellId)];
-        app.add_clone(&nick, cell_ids[0].clone()).unwrap();
-        app.add_clone(&nick, cell_ids[1].clone()).unwrap();
-        app.add_clone(&nick, cell_ids[2].clone()).unwrap();
+        let clone_id_0 = app.add_clone(&nick, ().into()).unwrap();
+        let clone_id_1 = app.add_clone(&nick, ().into()).unwrap();
+        let clone_id_2 = app.add_clone(&nick, ().into()).unwrap();
+
+        assert_eq!(
+            maplit::hashset! { &clone_id_0, &clone_id_1, &clone_id_2}.len(),
+            3,
+            "All clone IDs are unique"
+        );
 
         // Adding a clone beyond the clone_limit is an error
         matches::assert_matches!(
-            app.add_clone(&nick, fixt!(CellId)),
+            app.add_clone(&nick, ().into()),
             Err(AppError::CloneLimitExceeded(3, _))
         );
 
         assert_eq!(
             app.cloned_cells().collect::<HashSet<_>>(),
-            maplit::hashset! { &cell_ids[0], &cell_ids[1], &cell_ids[2] }
+            maplit::hashset! { &clone_id_0, &clone_id_1, &clone_id_2 },
+            "All CellIds are present"
         );
 
-        assert_eq!(app.remove_clone(&nick, &cell_ids[1]).unwrap(), true);
-        assert_eq!(app.remove_clone(&nick, &cell_ids[1]).unwrap(), false);
+        assert_eq!(app.remove_clone(&nick, &clone_id_1).unwrap(), true);
+        assert_eq!(app.remove_clone(&nick, &clone_id_1).unwrap(), false);
 
         assert_eq!(
             app.cloned_cells().collect::<HashSet<_>>(),
-            maplit::hashset! { &cell_ids[0], &cell_ids[2] }
+            maplit::hashset! { &clone_id_0, &clone_id_2 }
         );
-
-        // Can't add the same clone twice
-        assert_eq!(app.add_clone(&nick, cell_ids[0].clone()).unwrap(), false);
 
         assert_eq!(app.cloned_cells().count(), 2);
 

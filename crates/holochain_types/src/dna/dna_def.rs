@@ -23,7 +23,18 @@ pub struct YamlProperties(serde_yaml::Value);
 impl YamlProperties {
     /// Create new properties from json value
     pub fn new(properties: serde_yaml::Value) -> Self {
-        YamlProperties(properties)
+        Self(properties)
+    }
+
+    /// Create a null set of properties
+    pub fn empty() -> Self {
+        Self(serde_yaml::Value::Null)
+    }
+}
+
+impl From<()> for YamlProperties {
+    fn from(_: ()) -> Self {
+        Self::empty()
     }
 }
 
