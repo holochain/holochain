@@ -9,5 +9,5 @@ use crate::prelude::*;
 pub enum Version {
     /// The version from before we really had versions.
     /// Meaningless.
-    Zero
+    Zero,
 }

@@ -215,6 +215,42 @@
 //! The `Result` from the host in the case of host calls indicates whether the execution _completed_ successfully and is _in addition to_ other Result-like enums.
 //! For example, a remote call can be `Ok` from the host's perspective but contain an `Unauthorized` "failure" enum variant from the remote agent, both need to be handled in context.
 
+/// Capability claims and grants.
+///
+/// Every exposed function in holochain uses capability grants/claims to secure access.
+///
+/// Capability grants are system entries committed to the source chain that define access.
+///
+/// Capability claims are system entries that reference a grant on a source chain.
+///
+/// 0. When Alice wants Bob to be able to call a function on her running conductor she commits a grant for Bob.
+/// 0. Bob commits the grant as a claim on his source chain.
+/// 0. When Bob wants to call Alice's function he sends the claim back to Alice along with the function call information.
+/// 0. Alice cross references Bob's claim against her grant, e.g. to check it is still valid, before granting access.
+///
+/// There are four types of capability grant:
+///
+/// - Author: The author of the local source chain provides their agent key as a claim and has full access to all functions.
+/// - Unrestricted: Anyone can call this function without providing a claim.
+/// - Unassigned: Anyone with the randomly generated secret associated with the grant can call this function.
+/// - Assigned: The specific named agents can call this function if they provide the associated secret.
+///
+/// Capability grants and claims reference each other by a shared, unique, unpredictable secret.
+/// The security properties of a capability secret are roughly the same as an API key for a server.
+///
+/// - If an attacker knows or guesses the secret they can call Unassigned functions
+/// - An attacker cannot call Assigned functions even if they know or guess the secret
+/// - If a secret is compromised the grant can be deleted and new claims can be distributed
+/// - The secret only grants access to live function calls against a running conductor reachable on the network
+/// - Holochain compares capability secrets using constant time equality checks to mitigate timing attacks
+/// - Grant secrets are stored in WASM memory so are NOT as secure as a dedicated keystore
+///
+/// Grant secrets are less sensitive than cryptographic keys but are not intended to be public data.
+/// Don't store them to the DHT in plaintext, or commit them to github repositories, etc!
+///
+/// For best security, assign grants to specific agents if you can as the assignment check _does_ cryptographically validate the caller.
+///
+/// @todo in the future grant secrets may be moved to lair somehow.
 pub mod capability;
 
 /// Working with app and system entries.
@@ -287,14 +323,94 @@ pub mod entry;
 /// - `shard` is a string based DSL for creating lexical shards out of strings as utf-32 (e.g. usernames)
 /// - `anchor` implements the "anchor" pattern (two level string based tree, "type" and "text") in terms of paths
 pub mod hash_path;
+
+/// Maps a Rust function to an extern that WASM can expose to the Holochain host.
+///
+/// Annotate any compatible function with `#[hdk_extern]` to expose it to Holochain as a WASM extern.
+/// The `map_extern!` macro is used internally by the `#[hdk_extern]` attribute.
+///
+/// Compatible functions:
+///
+/// - Have a globally unique name
+/// - Accept `serde::Serialize + std::fmt::Debug` input
+/// - Return `Result<O, WasmError>` (`ExternResult`) output where `O: serde::Serialize + std::fmt::Debug`
+///
+/// This module only defines macros so check the HDK3 crate root to see more documentation.
+///
+/// A _new_ extern function is created with the same name as the function with the `#[hdk_extern]` attribute.
+/// The new extern is placed in a child module of the current scope.
+/// This new extern is hoisted by WASM to share a global namespace with all other externs so names must be globally unique even if the base function is scoped.
+///
+/// The new extern handles:
+///
+/// - Extern syntax for Rust
+/// - Receiving the serialized bytes from the host at a memory pointer specified by the guest
+/// - Setting the HDK3 wasm tracing subscriber as the global default
+/// - Deserializing the input from the host
+/// - Calling the function annotated with `#[hdk_extern]`
+/// - Serializing the result
+/// - Converting the serialized result to a memory pointer for the host
+/// - Error handling for all the above
+///
+/// If you want to do something different to the default you will need to understand and reimplement all the above.
 pub mod map_extern;
+
+/// Exports common types and functions according to the Rust prelude pattern.
 pub mod prelude;
 pub mod x_salsa20_poly1305;
 pub use paste;
-pub mod link;
-pub mod info;
-pub mod p2p;
+
+/// Tools to interrogate source chains.
+///
+/// Interacting with a source chain is very different to the DHT.
+///
+/// - Source chains have a linear history guaranteed by header hashes
+/// - Source chains have a single owner/author signing every chain element
+/// - Source chains can be iterated over from most recent back to genesis by following the header hashes as references
+/// - Source chains contain interspersed system and application entries
+/// - Source chains contain both private (local only) and public (broadcast to DHT) elements
+///
+/// There is a small DSL provided by `query` that allows for inspecting the current agent's local source chain.
+/// Typically it will be faster, more direct and efficient to query local data than dial out to the network.
+/// It is also possible to query local private entries.
+///
+/// Agent activity for any other agent on the network can be fetched.
+/// The agent activity is _only the headers_ of the remote agent's source chain.
+/// Agent activity allows efficient building of the history of an agent.
+/// Agent activity is retrieved from a dedicated neighbourhood centered around the agent.
+/// The agent's neighbourhood also maintains a passive security net that guards against attempted chain forks and/or rollbacks.
 pub mod chain;
-pub mod util;
+
+/// Create and verify signatures for serializable Rust structures and raw binary data.
+///
+/// The signatures are always created with the [Ed25519](https://en.wikipedia.org/wiki/EdDSA) algorithm by the secure keystore (lair).
+///
+/// Agent public keys that identify agents are the public half of a signing keypair.
+/// The private half of the signing keypair never leaves the secure keystore and certainly never touches wasm.
+///
+/// If a signature is requested for a public key that has no corresponding private key in lair, the signing will fail.
+///
+/// Signatures can always be verified with the public key alone so can be done remotely (by other agents) and offline, etc.
+///
+/// The elliptic curve used by the signing algorithm is the same as the curve used by the encryption algorithms but is _not_ constant time (because signature verification doesn't need to be).
+///
+/// In general it is __not a good idea to reuse signing keys for encryption__ even if the curve is the same, without mathematically translating the keypair, and even then it's dubious to do so.
 pub mod ed25519;
+
+/// Request contextual information from the holochain host.
+///
+/// The holochain host has additional runtime context that the wasm may find useful and cannot produce for itself including:
+///
+/// - The calling agent
+/// - The current bundle
+/// - The current DNA
+/// - The current Zome
+/// - The function call itself
+/// - The current system time
+pub mod info;
+
+/// 
+pub mod link;
+pub mod p2p;
 pub mod trace;
+pub mod util;

@@ -21,11 +21,11 @@ pub mod anchor;
 ///
 /// All possible paths for the above tree:
 ///
-/// - []
-/// - [ A ]
-/// - [ A B ]
-/// - [ A B C ]
-/// - [ A D ]
+/// - `[]`
+/// - `[ A ]`
+/// - `[ A B ]`
+/// - `[ A B C ]`
+/// - `[ A D ]`
 ///
 /// Note:
 ///

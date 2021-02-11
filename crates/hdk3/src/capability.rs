@@ -1,40 +1,3 @@
-//! Capability claims and grants.
-//!
-//! Every exposed function in holochain uses capability grants/claims to secure access.
-//!
-//! Capability grants are system entries committed to the source chain that define access.
-//!
-//! Capability claims are system entries that reference a grant on a source chain.
-//!
-//! 0. When Alice wants Bob to be able to call a function on her running conductor she commits a grant for Bob.
-//! 0. Bob commits the grant as a claim on his source chain.
-//! 0. When Bob wants to call Alice's function he sends the claim back to Alice along with the function call information.
-//! 0. Alice cross references Bob's claim against her grant, e.g. to check it is still valid, before granting access.
-//!
-//! There are four types of capability grant:
-//!
-//! - Author: The author of the local source chain provides their agent key as a claim and has full access to all functions.
-//! - Unrestricted: Anyone can call this function without providing a claim.
-//! - Unassigned: Anyone with the randomly generated secret associated with the grant can call this function.
-//! - Assigned: The specific named agents can call this function if they provide the associated secret.
-//!
-//! Capability grants and claims reference each other by a shared, unique, unpredictable secret.
-//! The security properties of a capability secret are roughly the same as an API key for a server.
-//!
-//! - If an attacker knows or guesses the secret they can call Unassigned functions
-//! - An attacker cannot call Assigned functions even if they know or guess the secret
-//! - If a secret is compromised the grant can be deleted and new claims can be distributed
-//! - The secret only grants access to live function calls against a running conductor reachable on the network
-//! - Holochain compares capability secrets using constant time equality checks to mitigate timing attacks
-//! - Grant secrets are stored in WASM memory so are NOT as secure as a dedicated keystore
-//!
-//! Grant secrets are less sensitive than cryptographic keys but are not intended to be public data.
-//! Don't store them to the DHT in plaintext, or commit them to github repositories, etc!
-//!
-//! For best security, assign grants to specific agents if you can as the assignment check _does_ cryptographically validate the caller.
-//!
-//! @todo in the future grant secrets may be moved to lair somehow.
-
 use crate::prelude::*;
 
 /// Create capability claims on the local source chain.
@@ -225,7 +188,10 @@ pub fn generate_cap_secret() -> ExternResult<CapSecret> {
 ///
 /// @see create_cap_grant
 /// @see delete_cap_grant
-pub fn update_cap_grant(old_grant_header_hash: HeaderHash, new_grant_value: CapGrantEntry) -> ExternResult<HeaderHash> {
+pub fn update_cap_grant(
+    old_grant_header_hash: HeaderHash,
+    new_grant_value: CapGrantEntry,
+) -> ExternResult<HeaderHash> {
     update(
         old_grant_header_hash,
         EntryWithDefId::new(EntryDefId::CapGrant, Entry::CapGrant(new_grant_value)),

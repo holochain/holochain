@@ -124,7 +124,6 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
     )
 }
 
-
 /// Libsodium keypair based authenticated encryption: box_open
 ///
 /// Opens encrypted data created by box.
@@ -149,4 +148,3 @@ pub fn x_25519_x_salsa20_poly1305_decrypt(
         ),
     )
 }
-
