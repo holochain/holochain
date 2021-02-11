@@ -118,27 +118,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "695579f0f2520f3774bb40461e5adb066459d4e0af4d59d20175484fb8e9edf1"
 
 [[package]]
-name = "async-stream"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3670df70cbc01729f901f94c887814b3c68db038aad1329a418bae178bc5295c"
-dependencies = [
- "async-stream-impl",
- "futures-core",
-]
-
-[[package]]
-name = "async-stream-impl"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3548b8efc9f8e8a5a0a2808c5bd8451a9031b9e5b879a79590304ae928b0a70"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1564,7 +1543,7 @@ dependencies = [
  "portpicker",
  "serde_yaml",
  "structopt",
- "tokio",
+ "tokio 0.2.24",
  "tracing",
  "url2",
  "walkdir",
@@ -1812,7 +1791,6 @@ dependencies = [
 name = "holochain_websocket"
 version = "0.0.1"
 dependencies = [
- "async-stream",
  "futures",
  "ghost_actor 0.4.0-alpha.5",
  "holochain_serialized_bytes",

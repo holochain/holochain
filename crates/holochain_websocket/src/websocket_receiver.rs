@@ -8,8 +8,11 @@ use url2::Url2;
 
 use crate::websocket::PairShutdown;
 use crate::websocket::RxFromWebsocket;
+use crate::websocket::TxToWebsocket;
+use crate::OutgoingMessage;
 use crate::WebsocketResult;
 
+/// Receive signals and requests from a connection.
 pub struct WebsocketReceiver {
     rx_from_websocket: Valved<Valved<RxFromWebsocket>>,
     remote_addr: Url2,
@@ -17,6 +20,7 @@ pub struct WebsocketReceiver {
     __pair_shutdown: Arc<PairShutdown>,
 }
 
+/// Closure for responding to a [`Respond::Request`]
 pub type Response = Box<
     dyn FnOnce(SerializedBytes) -> MustBoxFuture<'static, WebsocketResult<()>>
         + 'static
@@ -24,10 +28,19 @@ pub type Response = Box<
         + Sync,
 >;
 
+/// The response half to a [`WebsocketMessage`].
+/// If this message is a request [`Respond::is_request`] you can
+/// respond with [`Respond::respond`].
 pub enum Respond {
+    /// This message is a signal so there is nothing to respond to.
     Signal,
+    /// Respond to an incoming request.
     Request(Response),
 }
+
+/// If a request is in the queue at shutdown this will send
+/// a cancellation response on drop.
+pub(crate) struct CancelResponse(bool, TxToWebsocket, u32);
 
 /// Shuts down the receiver on drop or
 /// if you call close.
@@ -35,6 +48,7 @@ pub struct ReceiverHandle {
     shutdown: Trigger,
 }
 
+/// A message coming **in** from the external socket.
 pub(crate) enum IncomingMessage {
     Close {
         acknowledge: tokio::sync::oneshot::Sender<()>,
@@ -42,6 +56,7 @@ pub(crate) enum IncomingMessage {
     Msg(SerializedBytes, Respond),
 }
 
+/// The [`SerializedBytes`] message contents and the [`Respond`] from the [`WebsocketReceiver`] [`Stream`].
 pub type WebsocketMessage = (SerializedBytes, Respond);
 
 impl WebsocketReceiver {
@@ -59,6 +74,8 @@ impl WebsocketReceiver {
             __pair_shutdown: pair_shutdown,
         }
     }
+
+    /// Take the [`ReceiverHandle`] from this receiver so you can shut down the stream.
     pub fn take_handle(&mut self) -> Option<ReceiverHandle> {
         self.handle.take()
     }
@@ -108,18 +125,46 @@ impl ReceiverHandle {
 }
 
 impl Respond {
+    /// Check if this message is a request or a signal.
     pub fn is_request(&self) -> bool {
         match self {
             Respond::Signal => false,
             Respond::Request(_) => true,
         }
     }
-    /// Try to respond. If this is a signal then
-    /// the call is a noop.
+    /// Respond to a request.
+    /// If this is a signal then the call is a noop.
     pub async fn respond(self, msg: SerializedBytes) -> WebsocketResult<()> {
         match self {
             Respond::Signal => Ok(()),
             Respond::Request(r) => r(msg).await,
+        }
+    }
+}
+
+impl CancelResponse {
+    /// To cancel the response we need the channel to the websocket
+    /// and the id of the request.
+    pub fn new(send_response: TxToWebsocket, id: u32) -> Self {
+        Self(true, send_response, id)
+    }
+    /// The response has been sent so don't cancel on drop.
+    pub fn response_sent(mut self) {
+        self.0 = false;
+    }
+}
+
+impl Drop for CancelResponse {
+    fn drop(&mut self) {
+        // If this response hasn't been sent then send a None response.
+        if self.0 {
+            let mut tx = self.1.clone();
+            let id = self.2;
+            tokio::spawn(async move {
+                if let Err(e) = tx.send(OutgoingMessage::Response(None, id)).await {
+                    tracing::warn!("Failed to cancel response on drop {:?}", e);
+                }
+            });
         }
     }
 }

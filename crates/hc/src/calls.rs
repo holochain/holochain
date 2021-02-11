@@ -171,18 +171,19 @@ pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
             match CmdRunner::try_new(port).await {
                 Ok(cmd) => cmds.push((cmd, None)),
-                Err(e) => match e.kind() {
-                    std::io::ErrorKind::ConnectionRefused => {
-                        let (port, holochain) = run_async(holochain_path, path, None).await?;
-                        cmds.push((CmdRunner::new(port).await, Some(holochain)))
+                Err(e) => {
+                    if let holochain_websocket::WebsocketError::Io(e) = &e {
+                        if let std::io::ErrorKind::ConnectionRefused = e.kind() {
+                            let (port, holochain) = run_async(holochain_path, path, None).await?;
+                            cmds.push((CmdRunner::new(port).await, Some(holochain)));
+                            continue;
+                        }
                     }
-                    _ => {
-                        bail!(
-                            "Failed to connect to running conductor or start one {:?}",
-                            e
-                        )
-                    }
-                },
+                    bail!(
+                        "Failed to connect to running conductor or start one {:?}",
+                        e
+                    )
+                }
             }
         }
         cmds

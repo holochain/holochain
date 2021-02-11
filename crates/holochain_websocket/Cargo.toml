@@ -9,7 +9,6 @@ authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 
 [dependencies]
-async-stream = "0.3"
 futures = "0.3"
 ghost_actor = "0.4.0-alpha.5"
 holochain_serialized_bytes = "=0.0.48"

@@ -6,6 +6,7 @@ use holochain_websocket::connect;
 use holochain_websocket::ListenerHandle;
 use holochain_websocket::ListenerItem;
 use holochain_websocket::WebsocketConfig;
+use holochain_websocket::WebsocketError;
 use holochain_websocket::WebsocketListener;
 use stream_cancel::Tripwire;
 use tracing::Instrument;
@@ -406,6 +407,43 @@ async fn drop_receiver() {
         }
     });
 
+    c_jh.await.unwrap();
+    s_jh.await.unwrap();
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn cancel_response() {
+    observability::test_run().ok();
+    let (handle, mut listener) = server().await;
+    let s_jh = tokio::task::spawn(async move {
+        let (mut sender, _receiver) = listener
+            .next()
+            .instrument(tracing::debug_span!("next_server_connection"))
+            .await
+            .unwrap()
+            .unwrap();
+
+        let r = sender
+            .request::<_, TestString, _, _>(TestString("Hey from server".into()))
+            .instrument(tracing::debug_span!("server_sending_request"))
+            .await;
+        assert!(matches!(r, Err(WebsocketError::FailedToRecvResp)));
+    });
+    let binding = handle.local_addr().clone();
+    let (_sender, mut receiver) = connect(binding, Arc::new(WebsocketConfig::default()))
+        .instrument(tracing::debug_span!("client"))
+        .await
+        .unwrap();
+    let rh = receiver.take_handle().unwrap();
+    let c_jh = tokio::task::spawn(async move {
+        while let Some(_) = receiver
+            .next()
+            .instrument(tracing::debug_span!("client_recv_message"))
+            .await
+        {}
+    });
+
+    rh.close();
     c_jh.await.unwrap();
     s_jh.await.unwrap();
 }

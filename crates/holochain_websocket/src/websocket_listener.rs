@@ -20,24 +20,30 @@ use crate::WebsocketReceiver;
 use crate::WebsocketResult;
 use crate::WebsocketSender;
 
+/// Listens for connecting clients.
 pub struct WebsocketListener {
     handle: ListenerHandle,
     stream: ListenerStream,
 }
 
+/// Handle for shutting down a listener stream.
 pub struct ListenerHandle {
     shutdown: Trigger,
     config: Arc<WebsocketConfig>,
     local_addr: Url2,
 }
 
+/// [`WebsocketSender`] and [`WebsocketReceiver`] for an active connection.
 pub type Pair = (WebsocketSender, WebsocketReceiver);
 
+/// New connection result returned from the [`ListenerStream`].
 pub type ListenerItem = WebsocketResult<Pair>;
 
+/// Stream of new connections.
 pub type ListenerStream = BoxStream<'static, ListenerItem>;
 
 impl WebsocketListener {
+    /// Bind to a socket to accept incoming connections.
     pub async fn bind(addr: Url2, config: Arc<WebsocketConfig>) -> WebsocketResult<Self> {
         let (handle, stream) = Self::bind_with_handle(addr, config).await?;
         Ok(Self {
@@ -47,6 +53,8 @@ impl WebsocketListener {
     }
 
     #[instrument(skip(config, addr))]
+    /// Same as [`WebsocketListener::bind`] but gives you a [`ListenerHandle`] to shutdown
+    /// the listener and any open connections.
     pub async fn bind_with_handle(
         addr: Url2,
         config: Arc<WebsocketConfig>,
@@ -69,6 +77,8 @@ impl WebsocketListener {
         self.handle.get_config()
     }
 
+    /// Turn into a [`ListenerHandle`] and [`ListenerStream`].
+    /// Can be done in place with [`WebsocketListener::bind_with_handle`]
     pub fn into_handle_and_stream(self) -> (ListenerHandle, ListenerStream) {
         (self.handle, self.stream)
     }

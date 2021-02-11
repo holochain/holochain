@@ -19,6 +19,7 @@ use tungstenite::protocol::CloseFrame;
 use crate::util::addr_to_url;
 use crate::util::ToFromSocket;
 use crate::util::CLOSE_TIMEOUT;
+use crate::CancelResponse;
 use crate::IncomingMessage;
 use crate::OutgoingMessage;
 use crate::RegisterResponse;
@@ -54,10 +55,25 @@ struct WebsocketInner {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(tag = "type")]
 enum WireMessage {
-    Signal(SerializedBytes),
-    Request(SerializedBytes, u32),
-    Response(SerializedBytes, u32),
+    Signal {
+        #[serde(with = "serde_bytes")]
+        data: Vec<u8>,
+    },
+    Request {
+        id: u32,
+        #[serde(with = "serde_bytes")]
+        data: Vec<u8>,
+    },
+    Response {
+        id: u32,
+        #[serde(with = "serde_bytes")]
+        data: Option<Vec<u8>>,
+    },
+    // Signal(SerializedBytes),
+    // Request(SerializedBytes, u32),
+    // Response(Option<SerializedBytes>, u32),
 }
 
 // Channel to the websocket
@@ -254,11 +270,16 @@ impl Websocket {
                 tracing::trace!(sending_msg = ?msg);
                 let msg = match msg {
                     OutgoingMessage::Close => return Task::exit(),
-                    OutgoingMessage::Signal(msg) => WireMessage::Signal(msg),
+                    OutgoingMessage::Signal(msg) => WireMessage::Signal {
+                        data: UnsafeBytes::from(msg).into(),
+                    },
                     OutgoingMessage::Request(msg, register_response) => {
                         self.handle_outgoing_request(msg, register_response).await?
                     }
-                    OutgoingMessage::Response(msg, id) => WireMessage::Response(msg, id),
+                    OutgoingMessage::Response(msg, id) => WireMessage::Response {
+                        id,
+                        data: msg.map(|m| UnsafeBytes::from(m).into()),
+                    },
                     OutgoingMessage::Pong(data) => {
                         to_socket.send(tungstenite::Message::Pong(data)).await.ok();
                         return Task::cont();
@@ -340,12 +361,27 @@ impl Websocket {
                     tungstenite::Message::Binary(bytes) => {
                         let msg = Self::deserialize_message(bytes)?;
                         let (msg, resp) = match msg {
-                            WireMessage::Signal(msg) => (msg, Respond::Signal),
-                            WireMessage::Request(msg, id) => {
-                                Self::handle_incoming_request(send_response, msg, id)
+                            WireMessage::Signal { data } => {
+                                (Self::deserialize_bytes(data)?, Respond::Signal)
                             }
-                            WireMessage::Response(msg, id) => {
-                                return self.handle_incoming_response(msg, id).await;
+                            WireMessage::Request { data, id } => Self::handle_incoming_request(
+                                send_response,
+                                Self::deserialize_bytes(data)?,
+                                id,
+                            ),
+                            WireMessage::Response {
+                                data: Some(data),
+                                id,
+                            } => {
+                                return self
+                                    .handle_incoming_response(
+                                        Some(Self::deserialize_bytes(data)?),
+                                        id,
+                                    )
+                                    .await;
+                            }
+                            WireMessage::Response { data: None, id } => {
+                                return self.handle_incoming_response(None, id).await;
                             }
                         };
                         if from_websocket
@@ -399,17 +435,19 @@ impl Websocket {
     ) -> (SerializedBytes, Respond) {
         let resp = {
             let mut send_response = send_response.clone();
+            let cancel_response = CancelResponse::new(send_response.clone(), id);
 
             // Callback to respond to the request
             move |msg| {
                 async move {
-                    let msg = OutgoingMessage::Response(msg, id);
+                    let msg = OutgoingMessage::Response(Some(msg), id);
 
                     // Send the response to the to_socket task
                     send_response
                         .send(msg)
                         .await
                         .map_err(|_| WebsocketError::FailedToSendResp)?;
+                    cancel_response.response_sent();
                     tracing::trace!("Sent response");
 
                     Ok(())
@@ -444,11 +482,12 @@ impl Websocket {
                 return Task::exit();
             }
         };
-        Ok(WireMessage::Request(msg, id))
+        let data = UnsafeBytes::from(msg).into();
+        Ok(WireMessage::Request { data, id })
     }
 
     /// Handle a response coming in from the network.
-    async fn handle_incoming_response(&self, msg: SerializedBytes, id: u32) -> Loop<()> {
+    async fn handle_incoming_response(&self, msg: Option<SerializedBytes>, id: u32) -> Loop<()> {
         if !self.0.is_active() {
             tracing::error!("Actor is closed");
             return Task::exit();
@@ -502,6 +541,20 @@ impl Websocket {
             .map_err(WebsocketError::from)
             .and_then(|sb| Ok(WireMessage::try_from(sb)?))
         {
+            Ok(msg) => Ok(msg),
+            Err(e) => {
+                tracing::error!("Websocket failed to deserialize {:?}", e,);
+                // Should not kill the websocket just because a single message
+                // failed serialization.
+                Task::cont()
+            }
+        }
+    }
+    /// Try to deserialize the data and continue to next
+    /// message if failure.
+    fn deserialize_bytes(data: Vec<u8>) -> Loop<SerializedBytes> {
+        let msg: Result<SerializedBytes, _> = UnsafeBytes::from(data).try_into();
+        match msg {
             Ok(msg) => Ok(msg),
             Err(e) => {
                 tracing::error!("Websocket failed to deserialize {:?}", e,);

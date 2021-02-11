@@ -13,6 +13,7 @@ use std::convert::TryInto;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
+/// The sender half of an active connection.
 pub struct WebsocketSender {
     tx_to_websocket: TxToWebsocket,
     listener_shutdown: Valve,
@@ -20,12 +21,15 @@ pub struct WebsocketSender {
 }
 
 #[derive(Debug)]
+/// Register a response for an outgoing request.
 pub(crate) struct RegisterResponse {
-    respond: tokio::sync::oneshot::Sender<SerializedBytes>,
+    respond: tokio::sync::oneshot::Sender<Option<SerializedBytes>>,
 }
 
 impl RegisterResponse {
-    pub(crate) fn respond(self, msg: SerializedBytes) -> WebsocketResult<()> {
+    /// The request has comeback from the other side so we can respond to
+    /// the awaiting future here.
+    pub(crate) fn respond(self, msg: Option<SerializedBytes>) -> WebsocketResult<()> {
         self.respond
             .send(msg)
             .map_err(|_| WebsocketError::FailedToSendResp)
@@ -33,11 +37,12 @@ impl RegisterResponse {
 }
 
 #[derive(Debug)]
+/// A message going **out** to the external socket.
 pub(crate) enum OutgoingMessage {
     Close,
     Signal(SerializedBytes),
     Request(SerializedBytes, RegisterResponse),
-    Response(SerializedBytes, u32),
+    Response(Option<SerializedBytes>, u32),
     Pong(Vec<u8>),
 }
 
@@ -55,6 +60,7 @@ impl WebsocketSender {
     }
 
     #[tracing::instrument(skip(self))]
+    /// Make a request to for the other side to respond to.
     pub async fn request<I, O, E, E2>(&mut self, msg: I) -> WebsocketResult<O>
     where
         I: std::fmt::Debug,
@@ -82,10 +88,12 @@ impl WebsocketSender {
             .await
             .ok_or(WebsocketError::Shutdown)?
             .map_err(|_| WebsocketError::FailedToRecvResp)?
+            .ok_or(WebsocketError::FailedToRecvResp)?
             .try_into()?)
     }
 
     #[tracing::instrument(skip(self))]
+    /// Send a message to the other side that doesn't require a response.
     pub async fn signal<I, E>(&mut self, msg: I) -> WebsocketResult<()>
     where
         I: std::fmt::Debug,

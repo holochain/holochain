@@ -22,6 +22,7 @@ See [#546](https://github.com/holochain/holochain/pull/546) or the docs for the 
 - BREAKING: (Almost) all HDK functions have been converted from macros to functions [#478](https://github.com/holochain/holochain/pull/478)
 - Admin interface method `install_app` has its `app_id` field renamed to `installed_app_id` so as not to conflict with the future concept of an "app id"
 - Admin interface method `list_active_app_ids` renamed to `list_active_apps`
+- Websocket responses now return an `Option<Msg>` where `None` indicates the other side has closed before responding.
 
 ### Deprecated
 
