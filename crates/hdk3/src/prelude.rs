@@ -19,6 +19,7 @@ pub use crate::entry::hash_entry;
 pub use crate::entry::update;
 pub use crate::entry::update_entry;
 pub use crate::entry_def;
+pub use crate::entry_def_index;
 pub use crate::entry_defs;
 pub use crate::hash_path::anchor::anchor;
 pub use crate::hash_path::anchor::get_anchor;
