@@ -240,7 +240,7 @@ pub struct ZomeId(u8);
     Deserialize,
     SerializedBytes,
 )]
-pub struct EntryDefIndex(u8);
+pub struct EntryDefIndex(pub u8);
 
 /// The Dna Header is always the first header in a source chain
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
