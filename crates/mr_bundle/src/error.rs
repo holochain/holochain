@@ -1,6 +1,4 @@
-use std::path::PathBuf;
-
-use crate::io_error::IoError;
+use ffs::IoError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum MrBundleError {

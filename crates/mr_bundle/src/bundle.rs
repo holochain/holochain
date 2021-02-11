@@ -1,12 +1,11 @@
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
 use crate::{
     error::{BundleError, BundleResult, MrBundleError, MrBundleResult},
-    io_error::IoError,
     location::Location,
     manifest::Manifest,
     resource::ResourceBytes,
 };
+use ffs::IoError;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
@@ -115,11 +114,11 @@ where
     }
 
     pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
-        Ok(Self::decode(&crate::fs(path).read().await?)?)
+        Ok(Self::decode(&ffs::read(path).await?)?)
     }
 
     pub async fn write_to_file(&self, path: &Path) -> MrBundleResult<()> {
-        Ok(crate::fs(path).write(&self.encode()?).await?)
+        Ok(ffs::write(path, &self.encode()?).await?)
     }
 
     pub async fn resolve<'a>(

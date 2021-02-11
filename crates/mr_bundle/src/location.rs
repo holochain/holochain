@@ -1,8 +1,8 @@
 use crate::{
     error::{BundleError, MrBundleResult},
-    io_error::IoError,
     ResourceBytes,
 };
+use ffs::IoError;
 use std::path::{Path, PathBuf};
 
 /// Where to find a file.
@@ -48,7 +48,7 @@ impl Location {
 
 pub(crate) async fn resolve_local(path: &Path) -> MrBundleResult<ResourceBytes> {
     dbg!(path);
-    Ok(crate::fs(path).read().await?)
+    Ok(ffs::read(path).await?)
 }
 
 pub(crate) async fn resolve_remote(url: &str) -> MrBundleResult<ResourceBytes> {

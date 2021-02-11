@@ -1,0 +1,12 @@
+[package]
+name = "ffs"
+version = "0.0.1"
+authors = ["Michael Dougherty <maackle.d@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+derive_more = "0.99"
+thiserror = "1.0"
+tokio = { version = "0.2", features = ["fs"], optional = true}
+
+[features]

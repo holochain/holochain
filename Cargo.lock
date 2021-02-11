@@ -981,6 +981,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
+name = "ffs"
+version = "0.0.1"
+dependencies = [
+ "derive_more",
+ "thiserror",
+ "tokio 0.2.25",
+]
+
+[[package]]
 name = "fixt"
 version = "0.0.1"
 dependencies = [
@@ -2532,6 +2541,7 @@ dependencies = [
  "bytes 1.0.1",
  "derive_more",
  "either",
+ "ffs",
  "futures",
  "maplit",
  "matches",
