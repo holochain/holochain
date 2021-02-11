@@ -155,7 +155,7 @@ impl AppBundle {
     fn resolve_cell_existing(
         &self,
         _version: &DnaVersionSpec,
-        clone_limit: u32,
+        _clone_limit: u32,
     ) -> CellProvisioningOp {
         unimplemented!("Reusing existing cells is not yet implemented")
     }

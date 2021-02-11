@@ -3,7 +3,6 @@
 //! Defines the CLI commands for packing/unpacking both DNA and hApp bundles
 
 use crate::error::{HcBundleError, HcBundleResult};
-use holochain_types::prelude::*;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
@@ -69,6 +68,7 @@ fn dir_to_bundle_path(dir_path: &Path, extension: &str) -> HcBundleResult<PathBu
 
 #[cfg(test)]
 mod tests {
+    use holochain_types::prelude::DnaManifest;
     use mr_bundle::error::{MrBundleError, UnpackingError};
 
     use super::*;

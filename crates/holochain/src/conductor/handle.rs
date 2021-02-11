@@ -62,7 +62,7 @@ use futures::future::FutureExt;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
 
@@ -457,7 +457,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(())
     }
 
-    async fn destroy_clone_cell(self: Arc<Self>, cell_id: CellId) -> ConductorResult<()> {
+    async fn destroy_clone_cell(self: Arc<Self>, _cell_id: CellId) -> ConductorResult<()> {
         todo!()
     }
 

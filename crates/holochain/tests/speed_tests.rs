@@ -15,6 +15,8 @@
 //! hard to automate piping from tests stderr.
 //!
 
+#![allow(deprecated)]
+
 use ::fixt::prelude::*;
 use hdk3::prelude::*;
 use holochain::conductor::api::AdminRequest;

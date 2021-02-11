@@ -4,7 +4,6 @@ use crate::{
     manifest::Manifest,
     resource::ResourceBytes,
 };
-use ffs::IoError;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     borrow::Cow,

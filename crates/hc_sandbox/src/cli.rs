@@ -1,3 +1,5 @@
+//! Definitions of StructOpt options for use in the CLI
+
 use crate::cmds::*;
 use std::path::Path;
 use std::path::PathBuf;
@@ -23,6 +25,7 @@ pub struct HcSandbox {
     holochain_path: PathBuf,
 }
 
+/// The list of subcommands for `hc sandbox`
 #[derive(Debug, StructOpt)]
 #[structopt(setting = structopt::clap::AppSettings::InferSubcommands)]
 pub enum HcSandboxSubcommand {
@@ -31,12 +34,14 @@ pub enum HcSandboxSubcommand {
     /// A single app will be installed as part of this sandbox.
     /// See the help for the `<dnas>` argument below to learn how to define the app to be installed.
     Generate {
-        #[structopt(short, long, default_value = "1")]
         /// Number of conductor sandboxes to create.
+        #[structopt(short, long, default_value = "1")]
         num_conductors: usize,
+
+        /// (flattened)
         #[structopt(flatten)]
         gen: Create,
-        #[structopt(short, long, value_delimiter = ",")]
+
         /// Automatically run the sandbox(es) that were created.
         /// This is effectively a combination of `hc generate` and `hc run`
         ///
@@ -47,39 +52,46 @@ pub enum HcSandboxSubcommand {
         /// Or, use `hc generate -r` to run without attaching any app interfaces.
         ///
         /// This follows the same structure as `hc run --ports`
+        #[structopt(short, long, value_delimiter = ",")]
         run: Option<Vec<u16>>,
+
         /// List of DNAs to use when installing the App for this sandbox.
         /// Defaults to searching the current directory for a single `*.dna.gz` file.
         dnas: Vec<PathBuf>,
     },
     /// Run conductor(s) from existing sandbox(es).
     Run(Run),
+
     /// Make a call to a conductor's admin interface.
     Call(crate::calls::Call),
-    // /// [WIP unimplemented]: Run custom tasks using cargo task
-    // Task,
+
     /// List sandboxes found in `$(pwd)/.hc`.
     List {
         /// Show more verbose information.
         #[structopt(short, long, parse(from_occurrences))]
         verbose: usize,
     },
+
     /// Clean (completely remove) sandboxes that are listed in the `$(pwd)/.hc` file.
     Clean,
 }
 
+/// Options for running a sandbox
 #[derive(Debug, StructOpt)]
 pub struct Run {
-    #[structopt(short, long, value_delimiter = ",")]
     /// Optionally specifies app interface ports to bind when running.
     /// This allows your UI to talk to the conductor.
     /// For example, `hc -p=0,9000,0` will create three app interfaces.
+    #[structopt(short, long, value_delimiter = ",")]
     ports: Vec<u16>,
+
+    /// (flattened)
     #[structopt(flatten)]
     existing: Existing,
 }
 
 impl HcSandbox {
+    /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
         match self.command {
             HcSandboxSubcommand::Generate {
@@ -121,16 +133,19 @@ impl HcSandbox {
             //     };
             //     run_n(&self.holochain_path, paths, ports, self.force_admin_ports).await?;
             // }
-            HcSandboxSubcommand::Call(call) => crate::calls::call(&self.holochain_path, call).await?,
+            HcSandboxSubcommand::Call(call) => {
+                crate::calls::call(&self.holochain_path, call).await?
+            }
             // HcSandboxSubcommand::Task => todo!("Running custom tasks is coming soon"),
-            HcSandboxSubcommand::List { verbose } => crate::save::list(std::env::current_dir()?, verbose)?,
+            HcSandboxSubcommand::List { verbose } => {
+                crate::save::list(std::env::current_dir()?, verbose)?
+            }
             HcSandboxSubcommand::Clean => crate::save::clean(std::env::current_dir()?, Vec::new())?,
         }
 
         Ok(())
     }
 }
-
 
 async fn run_n(
     holochain_path: &Path,

@@ -11,8 +11,10 @@ use crate::prelude::{CellNick, YamlProperties};
 use holo_hash::{DnaHash, DnaHashB64};
 use std::collections::HashMap;
 
+/// Placeholder for a real UUID type
 pub type Uuid = String;
 
+/// Version 1 of the App manifest schema
 #[derive(
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_builder::Builder,
 )]
@@ -28,7 +30,9 @@ pub struct AppManifestV1 {
     pub(super) slots: Vec<AppSlotManifest>,
 }
 
-/// Description of a new or existing Cell referenced by this Bundle
+/// Description of an app "slot" defined by this app.
+/// Slots get filled according to the provisioning rules, as well as by
+/// potential runtime clones.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct AppSlotManifest {
@@ -40,12 +44,13 @@ pub struct AppSlotManifest {
 
     /// Declares where to find the DNA, and options to modify it before
     /// inclusion in a Cell
-    pub(super) dna: AppDnaManifest,
+    pub(super) dna: AppSlotDnaManifest,
 }
 
+/// The DNA portion of an app slot
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub struct AppDnaManifest {
+pub struct AppSlotDnaManifest {
     /// Where to find this Dna. To specify a DNA included in a hApp Bundle,
     /// use a local relative path that corresponds with the bundle structure.
     ///
@@ -114,8 +119,9 @@ impl DnaVersionSpec {
 
 // NB: the following is likely to be removed from the API for DnaVersionSpec
 // after our versioning becomes more sophisticated
-
 impl DnaVersionSpec {
+    /// Return the list of hashes covered by a version (obviously temporary,
+    /// while we don't have real versioning)
     pub fn dna_hashes(&self) -> Vec<&DnaHashB64> {
         self.0.iter().collect()
     }
@@ -125,6 +131,7 @@ impl DnaVersionSpec {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "strategy")]
+#[allow(missing_docs)]
 pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
     Create { deferred: bool },
@@ -164,7 +171,7 @@ impl AppManifestV1 {
                      provisioning,
                      dna,
                  }| {
-                    let AppDnaManifest {
+                    let AppSlotDnaManifest {
                         location,
                         properties,
                         version,
@@ -257,7 +264,7 @@ pub mod tests {
 
         let slots = vec![AppSlotManifest {
             nick: "nick".into(),
-            dna: AppDnaManifest {
+            dna: AppSlotDnaManifest {
                 location,
                 properties: Some(YamlProperties::new(serde_yaml::to_value(props).unwrap())),
                 uuid: Some("uuid".into()),

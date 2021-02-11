@@ -2,7 +2,6 @@ use crate::{
     error::{BundleError, MrBundleResult},
     ResourceBytes,
 };
-use ffs::IoError;
 use std::path::{Path, PathBuf};
 
 /// Where to find a file.

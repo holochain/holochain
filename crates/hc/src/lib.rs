@@ -119,12 +119,16 @@ use structopt::StructOpt;
 /// and more.
 #[derive(Debug, StructOpt)]
 pub enum Opt {
+    /// Work with hApp bundles
     App(hc_bundle::HcAppBundle),
+    /// Work with DNA bundles
     Dna(hc_bundle::HcDnaBundle),
+    /// Work with sandboxed environments for testing and development
     Sandbox(hc_sandbox::HcSandbox),
 }
 
 impl Opt {
+    /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
         match self {
             Self::App(cmd) => cmd.run().await?,

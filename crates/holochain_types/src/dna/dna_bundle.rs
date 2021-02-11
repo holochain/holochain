@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use super::{DnaDef, DnaFile, WasmMap};
-use crate::{macros, prelude::*};
+use crate::prelude::*;
 use holo_hash::*;
 use mr_bundle::Location;
 

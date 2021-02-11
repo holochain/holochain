@@ -79,7 +79,7 @@ mod tests {
     // TODO: make these functions able to take an arbitrary stream so that
     //       they can be tested
 
-    use super::*;
+    // use super::*;
 
     // #[tokio::test]
     // async fn can_init_dna() {

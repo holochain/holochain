@@ -7,6 +7,7 @@
 //! itself depends on.
 
 #![deny(missing_docs)]
+#![allow(deprecated)]
 
 pub mod activity;
 pub mod app;

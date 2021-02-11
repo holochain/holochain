@@ -108,6 +108,8 @@
 //! ```
 //! and the examples.
 
+#![allow(deprecated)]
+
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -128,15 +130,15 @@ macro_rules! msg {
 }
 
 pub mod calls;
+pub mod cli;
 #[doc(hidden)]
 pub mod cmds;
 pub mod config;
 pub mod dna;
 pub mod generate;
 pub mod run;
-pub mod save;
 pub mod sandbox;
-pub mod cli;
+pub mod save;
 pub use cli::HcSandbox;
 
 mod ports;
@@ -164,7 +166,9 @@ impl CmdRunner {
 
     /// Create a command runner from a sandbox path.
     /// This expects holochain to be on the path.
-    pub async fn from_sandbox(sandbox_path: PathBuf) -> anyhow::Result<(Self, tokio::process::Child)> {
+    pub async fn from_sandbox(
+        sandbox_path: PathBuf,
+    ) -> anyhow::Result<(Self, tokio::process::Child)> {
         Self::from_sandbox_with_bin_path(&Path::new(Self::HOLOCHAIN_PATH), sandbox_path).await
     }
 

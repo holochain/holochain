@@ -18,7 +18,7 @@ pub use dna_gamut::*;
 
 use crate::dna::{DnaFile, YamlProperties};
 use derive_more::Into;
-use holo_hash::{AgentPubKey, DnaHash, DnaHashB64};
+use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::cell::CellId;
 use std::{
@@ -155,9 +155,9 @@ impl InstallAppDnaPayload {
 /// App-specific payload for proving membership in the membrane of the app
 pub type MembraneProof = SerializedBytes;
 
-/// Data about an installed Cell
-// TODO: is this still what we want?
-#[deprecated = "this may not be the right thing"]
+/// Data about an installed Cell. It's deprecated because it is not used in
+/// the new installation scheme using AppBundles.
+#[deprecated = "can be removed after the old way of installing apps (`InstallApp`) is phased out"]
 #[derive(Clone, Debug, Into, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct InstalledCell {
     cell_id: CellId,
@@ -196,7 +196,7 @@ impl InstalledCell {
     }
 }
 
-/// A collection of [InstalledCell]s paired with an app id
+/// An installed app is merely its collection of "slots", associated with an ID.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct InstalledApp {
     /// The unique identifier for an installed app in this conductor
