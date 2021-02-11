@@ -16,6 +16,11 @@ use std::collections::{hash_map, HashMap, HashSet};
 /// NB: since our DnaVersionSpec is currently very simplistic, so is the gamut.
 /// As our versioning becomes more expressive, so will this type. For instance,
 /// if we introduce semver, the gamut will include versions of DNAs as well.
+///
+/// This type basically exists as an abstract adapter between the conductor's
+/// DNA store and the app installation process. Without needing to know exactly
+/// what we will need from the DNA store, we can define what questions we will
+/// need to ask of it through this type.
 pub struct DnaGamut(HashMap<DnaHash, HashSet<AgentPubKey>>);
 
 /// We don't have any notion of DNA versioning other than the hash, but this is

@@ -106,6 +106,7 @@ impl SweetDnaFile {
     }
 }
 
+/// Helpful constructors for DnaDefs used in tests
 pub struct SweetDnaDef;
 
 impl SweetDnaDef {

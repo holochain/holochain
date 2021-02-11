@@ -19,7 +19,7 @@ use app_manifest_v1::AppManifestV1;
 
 /// Container struct which uses the `manifest_version` field to determine
 /// which manifest version to deserialize to.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
 #[serde(tag = "manifest_version")]
 #[allow(missing_docs)]
 pub enum AppManifest {
@@ -38,8 +38,12 @@ impl Manifest for AppManifest {
         }
     }
 
-    fn path(&self) -> PathBuf {
+    fn path() -> PathBuf {
         "happ.yaml".into()
+    }
+
+    fn bundle_extension() -> &'static str {
+        "happ"
     }
 }
 

@@ -6,7 +6,7 @@ use holochain_zome_types::ZomeName;
 
 /// The structure of data that goes in the DNA bundle manifest,
 /// i.e. "dna.yaml"
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, derive_more::Constructor)]
 pub struct DnaManifest {
     /// The friendly "name" of a Holochain DNA.
     pub(crate) name: String,
@@ -31,16 +31,12 @@ impl mr_bundle::Manifest for DnaManifest {
             .collect()
     }
 
-    fn path(&self) -> PathBuf {
-        Self::relative_path()
-    }
-}
-
-impl DnaManifest {
-    /// The path of the manifest, relative to an unpacked working directory.
-    /// The manifest must live at the root and be named "dna.yaml".
-    pub fn relative_path() -> PathBuf {
+    fn path() -> PathBuf {
         "dna.yaml".into()
+    }
+
+    fn bundle_extension() -> &'static str {
+        unimplemented!()
     }
 }
 

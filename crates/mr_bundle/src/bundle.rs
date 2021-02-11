@@ -1,11 +1,11 @@
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
 use crate::{
     error::{BundleError, MrBundleResult},
     location::Location,
     manifest::Manifest,
     resource::ResourceBytes,
 };
+use ffs::IoError;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
@@ -114,11 +114,11 @@ where
     }
 
     pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
-        Ok(Self::decode(&crate::fs(path).read().await?)?)
+        Ok(Self::decode(&ffs::read(path).await?)?)
     }
 
     pub async fn write_to_file(&self, path: &Path) -> MrBundleResult<()> {
-        Ok(crate::fs(path).write(&self.encode()?).await?)
+        Ok(ffs::write(path, &self.encode()?).await?)
     }
 
     pub async fn resolve<'a>(
@@ -196,7 +196,7 @@ where
     /// supplied.
     #[cfg(feature = "packing")]
     pub fn find_root_dir(&self, path: &Path) -> MrBundleResult<PathBuf> {
-        crate::util::prune_path(path.into(), self.manifest.path()).map_err(Into::into)
+        crate::util::prune_path(path.into(), M::path()).map_err(Into::into)
     }
 }
 
@@ -215,7 +215,12 @@ mod tests {
         }
 
         #[cfg(feature = "packing")]
-        fn path(&self) -> PathBuf {
+        fn path() -> PathBuf {
+            unimplemented!()
+        }
+
+        #[cfg(feature = "packing")]
+        fn bundle_extension() -> &'static str {
             unimplemented!()
         }
     }

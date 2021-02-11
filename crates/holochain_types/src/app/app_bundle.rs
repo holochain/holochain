@@ -35,7 +35,7 @@ impl AppBundle {
     pub async fn resolve_cells(
         self,
         agent: AgentPubKey,
-        gamut: DnaGamut,
+        _gamut: DnaGamut,
         membrane_proofs: HashMap<CellNick, MembraneProof>,
     ) -> AppBundleResult<CellSlotResolution> {
         let AppManifestValidated { name: _, cells } = self.manifest().clone().validate()?;

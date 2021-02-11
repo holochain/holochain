@@ -15,7 +15,7 @@ pub async fn unpack<M: Manifest>(
     target_dir: Option<PathBuf>,
     force: bool,
 ) -> HcBundleResult<PathBuf> {
-    let bundle_path = bundle_path.canonicalize()?;
+    let bundle_path = ffs::canonicalize(bundle_path).await?;
     let bundle: Bundle<M> = Bundle::read_from_file(&bundle_path).await?.into();
 
     let target_dir = if let Some(d) = target_dir {
@@ -51,20 +51,20 @@ pub async fn pack<M: Manifest>(
     dir_path: &std::path::Path,
     target_path: Option<PathBuf>,
 ) -> HcBundleResult<(PathBuf, Bundle<M>)> {
-    let dir_path = dir_path.canonicalize()?;
-    let manifest_path = dir_path.join(&DnaManifest::relative_path());
+    let dir_path = ffs::canonicalize(dir_path).await?;
+    let manifest_path = dir_path.join(&M::path());
     let bundle: Bundle<M> = Bundle::pack_yaml(&manifest_path).await?.into();
     let target_path = target_path
         .map(Ok)
-        .unwrap_or_else(|| dir_to_bundle_path(&dir_path))?;
+        .unwrap_or_else(|| dir_to_bundle_path(&dir_path, M::bundle_extension()))?;
     bundle.write_to_file(&target_path).await?;
     Ok((target_path, bundle))
 }
 
-fn dir_to_bundle_path(dir_path: &Path) -> HcBundleResult<PathBuf> {
+fn dir_to_bundle_path(dir_path: &Path, extension: &str) -> HcBundleResult<PathBuf> {
     let dir_name = dir_path.file_name().expect("Cannot pack `/`");
     let parent_path = dir_path.parent().expect("Cannot pack `/`");
-    Ok(parent_path.join(format!("{}.dna", dir_name.to_string_lossy())))
+    Ok(parent_path.join(format!("{}.{}", dir_name.to_string_lossy(), extension)))
 }
 
 #[cfg(test)]

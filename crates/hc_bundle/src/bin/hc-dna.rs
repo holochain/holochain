@@ -1,4 +1,4 @@
-use holochain_cli_bundle::cli::HcDnaBundle;
+use holochain_cli_bundle::HcDnaBundle;
 use structopt::StructOpt;
 
 /// Main `hc-dna` executable entrypoint.

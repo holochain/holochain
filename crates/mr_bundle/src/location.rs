@@ -1,8 +1,8 @@
 use crate::{
     error::{BundleError, MrBundleResult},
-    io_error::IoError,
     ResourceBytes,
 };
+use ffs::IoError;
 use std::path::{Path, PathBuf};
 
 /// Where to find a file.
@@ -29,11 +29,7 @@ impl Location {
         if let Location::Path(path) = self {
             if path.is_relative() {
                 if let Some(dir) = root_dir {
-                    Ok(Location::Path(
-                        dir.join(&path)
-                            .canonicalize()
-                            .map_err(|e| IoError::new(e, Some(path.to_owned())))?,
-                    ))
+                    Ok(Location::Path(ffs::sync::canonicalize(dir.join(&path))?))
                 } else {
                     Err(BundleError::RelativeLocalPath(path.to_owned()).into())
                 }
@@ -48,7 +44,7 @@ impl Location {
 
 pub(crate) async fn resolve_local(path: &Path) -> MrBundleResult<ResourceBytes> {
     dbg!(path);
-    Ok(crate::fs(path).read().await?)
+    Ok(ffs::read(path).await?)
 }
 
 pub(crate) async fn resolve_remote(url: &str) -> MrBundleResult<ResourceBytes> {
