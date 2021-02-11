@@ -31,9 +31,9 @@ pub enum AppManifest {
 impl Manifest for AppManifest {
     fn locations(&self) -> Vec<Location> {
         match self {
-            AppManifest::V1(AppManifestV1 { cells, .. }) => cells
+            AppManifest::V1(AppManifestV1 { slots, .. }) => slots
                 .iter()
-                .filter_map(|cell| cell.dna.location.clone())
+                .filter_map(|slot| slot.dna.location.clone())
                 .collect(),
         }
     }

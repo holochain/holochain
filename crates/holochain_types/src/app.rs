@@ -202,7 +202,7 @@ pub struct InstalledApp {
     /// The unique identifier for an installed app in this conductor
     installed_app_id: InstalledAppId,
     /// The "slots" as specified in the AppManifest
-    slots: HashMap<CellNick, CellSlot>,
+    slots: HashMap<CellNick, AppSlot>,
 }
 
 impl automap::AutoMapped for InstalledApp {
@@ -218,7 +218,7 @@ pub type InstalledAppMap = automap::AutoHashMap<InstalledApp>;
 
 impl InstalledApp {
     /// Constructor
-    pub fn new<S: ToString, I: IntoIterator<Item = (CellNick, CellSlot)>>(
+    pub fn new<S: ToString, I: IntoIterator<Item = (CellNick, AppSlot)>>(
         installed_app_id: S,
         slots: I,
     ) -> Self {
@@ -238,7 +238,7 @@ impl InstalledApp {
         let slots = installed_cells
             .into_iter()
             .map(|InstalledCell { cell_nick, cell_id }| {
-                let slot = CellSlot {
+                let slot = AppSlot {
                     provisioned_cell: Some(cell_id),
                     clones: HashSet::new(),
                     clone_limit: 0,
@@ -307,7 +307,7 @@ impl InstalledApp {
 
 /// Cell "slots" correspond to cell entries in the AppManifest.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct CellSlot {
+pub struct AppSlot {
     /// A cells which was provisioned at install-time.
     /// If provisioning was deferred, this will be None, and will become Some
     /// once the cell is created.
@@ -319,7 +319,7 @@ pub struct CellSlot {
     clones: HashSet<CellId>,
 }
 
-impl CellSlot {
+impl AppSlot {
     /// Constructor. List of clones always starts empty.
     pub fn new(provisioned_cell: Option<CellId>, clone_limit: u32) -> Self {
         Self {
@@ -332,14 +332,14 @@ impl CellSlot {
 
 #[cfg(test)]
 mod tests {
-    use super::{CellSlot, InstalledApp};
+    use super::{AppSlot, InstalledApp};
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use std::collections::HashSet;
 
     #[test]
     fn clone_management() {
-        let slot1 = CellSlot::new(None, 3);
+        let slot1 = AppSlot::new(None, 3);
         let nick: CellNick = "nick".into();
         let mut app = InstalledApp::new("app", vec![(nick.clone(), slot1)]);
 

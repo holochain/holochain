@@ -67,7 +67,7 @@ async fn can_associate_clone_cell_with_app() {
 
     let cell_id = fake_cell_id(1);
     let installed_cell = InstalledCell::new(cell_id.clone(), "nick".to_string());
-    let slot = CellSlot::new(Some(cell_id.clone()), 1);
+    let slot = AppSlot::new(Some(cell_id.clone()), 1);
     let app1 = InstalledApp::new_legacy("no clone", vec![installed_cell.clone()]);
     let app2 = InstalledApp::new("yes clone", vec![("nick".into(), slot.clone())]);
 

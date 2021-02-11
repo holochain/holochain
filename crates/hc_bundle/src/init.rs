@@ -54,7 +54,7 @@ fn prompt_app_init(root_dir: PathBuf) -> anyhow::Result<AppBundle> {
     let manifest: AppManifest = AppManifestInnerBuilder::default()
         .name(name)
         .description(description.unwrap_or("".into()))
-        .cells(vec![])
+        .slots(vec![])
         .build()
         .unwrap()
         .into();

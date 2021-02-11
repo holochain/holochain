@@ -16,8 +16,8 @@ pub struct AppManifestValidated {
     /// Name of the App. This may be used as the installed_app_id.
     pub(in crate::app) name: String,
 
-    /// The Cell manifests that make up this app.
-    pub(in crate::app) cells: HashMap<CellNick, CellManifestValidated>,
+    /// The slot descriptions that make up this app.
+    pub(in crate::app) slots: HashMap<CellNick, AppSlotManifestValidated>,
 }
 
 impl AppManifestValidated {
@@ -27,23 +27,23 @@ impl AppManifestValidated {
     /// the only way to instantiate this type.
     pub(in crate::app) fn new(
         name: String,
-        cells: HashMap<CellNick, CellManifestValidated>,
+        slots: HashMap<CellNick, AppSlotManifestValidated>,
     ) -> AppManifestResult<Self> {
-        for (nick, cell) in cells.iter() {
-            if let CellManifestValidated::Disabled { clone_limit } = cell {
+        for (nick, cell) in slots.iter() {
+            if let AppSlotManifestValidated::Disabled { clone_limit } = cell {
                 if *clone_limit == 0 {
                     return Err(AppManifestError::InvalidStrategyDisabled(nick.to_owned()));
                 }
             }
         }
-        Ok(AppManifestValidated { name, cells })
+        Ok(AppManifestValidated { name, slots })
     }
 }
 
 /// Rules to determine if and how a Cell will be created for this Dna
 #[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum CellManifestValidated {
+pub enum AppSlotManifestValidated {
     /// Always create a new Cell when installing this App
     Create {
         clone_limit: u32,
@@ -80,14 +80,6 @@ pub enum CellManifestValidated {
         version: DnaVersionSpec,
     },
     /// Disallow provisioning altogether. In this case, we expect
-    /// `clone_limit > 0`: otherwise, no Cells will ever be created.
+    /// `clone_limit > 0`: otherwise, no cells will ever be created.
     Disabled { clone_limit: u32 },
 }
-
-// impl CellManifestValidated {
-//     pub fn resolve(&self, gamut: DnaGamut) {
-//         match self {
-//             Self::Create
-//         }
-//     }
-// }

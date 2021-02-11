@@ -4,7 +4,7 @@
 //! the spec and leave this one alone to maintain backwards compatibility.
 
 use super::{
-    app_manifest_validated::{AppManifestValidated, CellManifestValidated},
+    app_manifest_validated::{AppManifestValidated, AppSlotManifestValidated},
     error::{AppManifestError, AppManifestResult},
 };
 use crate::prelude::{CellNick, YamlProperties};
@@ -25,13 +25,13 @@ pub struct AppManifestV1 {
     pub(super) description: String,
 
     /// The Cell manifests that make up this app.
-    pub(super) cells: Vec<CellManifest>,
+    pub(super) slots: Vec<AppSlotManifest>,
 }
 
 /// Description of a new or existing Cell referenced by this Bundle
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub struct CellManifest {
+pub struct AppSlotManifest {
     /// The CellNick which will be given to the installed Cell for this Dna.
     pub(super) nick: CellNick,
 
@@ -153,13 +153,13 @@ impl AppManifestV1 {
     pub fn validate(self) -> AppManifestResult<AppManifestValidated> {
         let AppManifestV1 {
             name,
-            cells,
+            slots,
             description: _,
         } = self;
-        let cells = cells
+        let slots = slots
             .into_iter()
             .map(
-                |CellManifest {
+                |AppSlotManifest {
                      nick,
                      provisioning,
                      dna,
@@ -174,49 +174,49 @@ impl AppManifestV1 {
                     // Go from "flexible" enum into proper DnaVersionSpec.
                     let version = version.map(Into::into);
                     let validated = match provisioning.unwrap_or_default() {
-                        CellProvisioning::Create { deferred } => CellManifestValidated::Create {
+                        CellProvisioning::Create { deferred } => AppSlotManifestValidated::Create {
                             deferred,
                             clone_limit,
-                            location: Self::require(location, "cells.dna.(path|url)")?,
+                            location: Self::require(location, "slots.dna.(path|url)")?,
                             properties,
                             uuid,
                             version,
                         },
                         CellProvisioning::CreateClone { deferred } => {
-                            CellManifestValidated::CreateClone {
+                            AppSlotManifestValidated::CreateClone {
                                 deferred,
                                 clone_limit,
-                                location: Self::require(location, "cells.dna.(path|url)")?,
+                                location: Self::require(location, "slots.dna.(path|url)")?,
                                 properties,
                                 version,
                             }
                         }
                         CellProvisioning::UseExisting { deferred } => {
-                            CellManifestValidated::UseExisting {
+                            AppSlotManifestValidated::UseExisting {
                                 deferred,
                                 clone_limit,
-                                version: Self::require(version, "cells.dna.version")?,
+                                version: Self::require(version, "slots.dna.version")?,
                             }
                         }
                         CellProvisioning::CreateIfNotExists { deferred } => {
-                            CellManifestValidated::CreateIfNotExists {
+                            AppSlotManifestValidated::CreateIfNotExists {
                                 deferred,
                                 clone_limit,
-                                location: Self::require(location, "cells.dna.(path|url)")?,
-                                version: Self::require(version, "cells.dna.version")?,
+                                location: Self::require(location, "slots.dna.(path|url)")?,
+                                version: Self::require(version, "slots.dna.version")?,
                                 properties,
                                 uuid,
                             }
                         }
                         CellProvisioning::Disabled => {
-                            CellManifestValidated::Disabled { clone_limit }
+                            AppSlotManifestValidated::Disabled { clone_limit }
                         }
                     };
                     Ok((nick, validated))
                 },
             )
             .collect::<Result<HashMap<_, _>, _>>()?;
-        AppManifestValidated::new(name, cells)
+        AppManifestValidated::new(name, slots)
     }
 
     fn require<T>(maybe: Option<T>, context: &str) -> AppManifestResult<T> {
@@ -255,7 +255,7 @@ pub mod tests {
 
         let version = DnaVersionSpec::from(hashes.clone()).into();
 
-        let cells = vec![CellManifest {
+        let slots = vec![AppSlotManifest {
             nick: "nick".into(),
             dna: AppDnaManifest {
                 location,
@@ -269,7 +269,7 @@ pub mod tests {
         let manifest = AppManifest::V1(AppManifestV1 {
             name: "Test app".to_string(),
             description: "Serialization roundtrip test".to_string(),
-            cells,
+            slots,
         });
         (manifest, hashes)
     }
@@ -290,7 +290,7 @@ pub mod tests {
 manifest_version: "1"
 name: "Test app"
 description: "Serialization roundtrip test"
-cells:
+slots:
   - nick: "nick"
     provisioning:
       strategy: "create"
@@ -314,10 +314,10 @@ cells:
         // Check a handful of fields. Order matters in YAML, so to check the
         // entire structure would be too fragile for testing.
         let fields = &[
-            "cells[0].nick",
-            "cells[0].provisioning.deferred",
-            "cells[0].dna.version[1]",
-            "cells[0].dna.properties",
+            "slots[0].nick",
+            "slots[0].provisioning.deferred",
+            "slots[0].dna.version[1]",
+            "slots[0].dna.properties",
         ];
         assert_eq!(actual.get(fields[0]), expected.get(fields[0]));
         assert_eq!(actual.get(fields[1]), expected.get(fields[1]));
