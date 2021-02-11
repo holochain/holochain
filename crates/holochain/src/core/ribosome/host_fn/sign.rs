@@ -1,24 +1,24 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 pub fn sign(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: SignInput,
-) -> RibosomeResult<SignOutput> {
-    Ok(SignOutput::new(
+    input: Sign,
+) -> Result<Signature, WasmError> {
+    Ok(
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             call_context
                 .host_access
                 .keystore()
-                .sign(input.into_inner())
+                .sign(input)
                 .await
-        })?,
-    ))
+        }).map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))?,
+    )
 }
 
 #[cfg(test)]
@@ -94,10 +94,10 @@ pub mod wasm_test {
                     host_access,
                     TestWasm::Sign,
                     "sign",
-                    holochain_zome_types::zome_io::SignInput::new(Sign::new_raw(
+                    Sign::new_raw(
                         k.clone(),
                         data.clone()
-                    ))
+                    )
                 );
 
                 assert_eq!(expect, output.as_ref().to_vec());

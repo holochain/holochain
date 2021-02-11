@@ -1,13 +1,12 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 pub fn unreachable(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    _input: UnreachableInput,
-) -> RibosomeResult<UnreachableOutput> {
+    _input: (),
+) -> Result<(), WasmError> {
     unreachable!();
 }

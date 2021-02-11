@@ -29,16 +29,16 @@ use crate::prelude::*;
 ///
 /// This requirements will likely be removed in the future as
 /// we design a better way to grant the capability to remote signal.
-pub fn remote_signal<D, E>(data: D, agents: Vec<AgentPubKey>) -> HdkResult<()>
+pub fn remote_signal<I>(input: I, agents: Vec<AgentPubKey>) -> ExternResult<()>
 where
-    SerializedBytes: TryFrom<D, Error = E>,
-    HdkError: From<E>,
+    I: serde::Serialize + std::fmt::Debug,
 {
-    let sb = SerializedBytes::try_from(data)?;
     #[allow(clippy::unit_arg)]
-    Ok(host_call::<RemoteSignalInput, RemoteSignalOutput>(
+    host_call::<RemoteSignal, ()>(
         __remote_signal,
-        &RemoteSignalInput::new(RemoteSignal { signal: sb, agents }),
-    )?
-    .into_inner())
+        RemoteSignal {
+            signal: ExternIO::encode(input)?,
+            agents,
+        },
+    )
 }

@@ -12,7 +12,7 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use fallible_iterator::FallibleIterator;
 use holochain_types::dna::zome::Zome;
-use holochain_zome_types::ExternOutput;
+use holochain_zome_types::ExternIO;
 
 pub struct CallIterator<R: RibosomeT, I: Invocation> {
     host_access: HostAccess,
@@ -35,7 +35,7 @@ impl<R: RibosomeT, I: Invocation> CallIterator<R, I> {
 }
 
 impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R, I> {
-    type Item = (Zome, ExternOutput);
+    type Item = (Zome, ExternIO);
     type Error = RibosomeError;
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         Ok(match self.remaining_zomes.first() {
@@ -82,7 +82,6 @@ mod tests {
     use holochain_types::prelude::*;
     use mockall::predicate::*;
     use mockall::Sequence;
-    use std::convert::TryInto;
 
     #[tokio::test(threaded_scheduler)]
     async fn call_iterator_iterates() {
@@ -137,9 +136,7 @@ mod tests {
                     .times(1)
                     .in_sequence(&mut sequence)
                     .returning(|_, _, _, _| {
-                        Ok(Some(ExternOutput::new(
-                            InitCallbackResult::Pass.try_into().unwrap(),
-                        )))
+                        Ok(Some(ExternIO::encode(InitCallbackResult::Pass).unwrap()))
                     });
             }
 
@@ -153,7 +150,7 @@ mod tests {
 
         let call_iterator = CallIterator::new(host_access.into(), ribosome, invocation);
 
-        let output: Vec<(_, ExternOutput)> = call_iterator.collect().unwrap();
+        let output: Vec<(_, ExternIO)> = call_iterator.collect().unwrap();
         assert_eq!(output.len(), zomes.len() * fn_components.0.len());
     }
 }

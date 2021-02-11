@@ -8,8 +8,8 @@ pub use crate::{
     capability::*,
     cell::*,
     crdt::CrdtType,
-    debug_msg,
-    element::{Element, ElementVec},
+    trace_msg,
+    element::*,
     entry::*,
     entry_def::*,
     header::*,
@@ -21,6 +21,7 @@ pub use crate::{
     query::{ActivityRequest, AgentActivity, ChainQueryFilter, ChainQueryFilter as QueryFilter},
     signal::{AppSignal, RemoteSignal},
     signature::{Sign, Signature, VerifySignature},
+    timestamp::*,
     validate::{
         RequiredValidationType, ValidateCallbackResult, ValidateData, ValidationPackage,
         ValidationPackageCallbackResult,

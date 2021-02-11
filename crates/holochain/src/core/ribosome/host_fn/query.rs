@@ -1,14 +1,14 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 pub fn query(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: QueryInput,
-) -> RibosomeResult<QueryOutput> {
+    input: ChainQueryFilter,
+) -> Result<ElementVec, WasmError> {
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let elements: Vec<Element> = call_context
             .host_access
@@ -16,8 +16,8 @@ pub fn query(
             .write()
             .await
             .source_chain
-            .query(input.inner_ref())?;
-        Ok(QueryOutput::new(ElementVec(elements)))
+            .query(&input).map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+        Ok(ElementVec(elements))
     })
 }
 
@@ -32,7 +32,6 @@ pub mod slow_tests {
     use holochain_lmdb::test_utils::TestEnvironment;
     use query::ChainQueryFilter;
 
-    use holochain_test_wasm_common::*;
     use holochain_wasm_test_utils::TestWasm;
 
     // TODO: use this setup function to DRY up a lot of duplicated code
@@ -63,13 +62,13 @@ pub mod slow_tests {
             host_access,
             TestWasm::Query,
             "add_path",
-            TestString::from("a".to_string())
+            "a".to_string()
         );
         let _hash_b: EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::Query,
             "add_path",
-            TestString::from("b".to_string())
+            "b".to_string()
         );
 
         let elements: ElementVec = crate::call_test_ribosome!(

@@ -61,26 +61,25 @@ pub(crate) enum WireMessage {
 }
 
 impl WireMessage {
-    pub fn encode(self) -> Result<Vec<u8>, SerializedBytesError> {
-        Ok(UnsafeBytes::from(SerializedBytes::try_from(self)?).into())
+    pub fn encode(&self) -> Result<Vec<u8>, SerializedBytesError> {
+        holochain_serialized_bytes::encode(&self)
     }
 
-    pub fn decode(data: Vec<u8>) -> Result<Self, SerializedBytesError> {
-        let request: SerializedBytes = UnsafeBytes::from(data).into();
-        Ok(request.try_into()?)
+    pub fn decode(data: &[u8]) -> Result<Self, SerializedBytesError> {
+        holochain_serialized_bytes::decode(&data)
     }
 
     pub fn call_remote(
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
-        request: SerializedBytes,
+        payload: ExternIO,
     ) -> WireMessage {
         Self::CallRemote {
             zome_name,
             fn_name,
             cap,
-            data: UnsafeBytes::from(request).into(),
+            data: payload.into_vec(),
         }
     }
 

@@ -1,10 +1,10 @@
 use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeError;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
+use holochain_wasmer_host::prelude::WasmError;
 
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
@@ -15,12 +15,11 @@ use std::sync::Arc;
 pub fn delete<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: DeleteInput,
-) -> RibosomeResult<DeleteOutput> {
-    let deletes_address = input.into_inner();
+    input: HeaderHash,
+) -> Result<HeaderHash, WasmError> {
 
     let deletes_entry_address =
-        get_original_address(call_context.clone(), deletes_address.clone())?;
+        get_original_address(call_context.clone(), input.clone())?;
 
     let host_access = call_context.host_access();
 
@@ -30,12 +29,13 @@ pub fn delete<'a>(
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
         let header_builder = builder::Delete {
-            deletes_address,
+            deletes_address: input,
             deletes_entry_address,
         };
-        let header_hash = source_chain.put(header_builder, None).await?;
+        let header_hash = source_chain.put(header_builder, None).await.map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
         let element = source_chain
-            .get_element(&header_hash)?
+            .get_element(&header_hash)
+            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?
             .expect("Element we just put in SourceChain must be gettable");
         tracing::debug!(in_delete_entry = ?header_hash);
         integrate_to_authored(
@@ -43,8 +43,8 @@ pub fn delete<'a>(
             workspace.source_chain.elements(),
             &mut workspace.meta_authored,
         )
-        .map_err(Box::new)?;
-        Ok(DeleteOutput::new(header_hash))
+        .map_err(|dht_op_convert_error| WasmError::Host(dht_op_convert_error.to_string()))?;
+        Ok(header_hash)
     })
 }
 
@@ -52,7 +52,7 @@ pub fn delete<'a>(
 pub(crate) fn get_original_address<'a>(
     call_context: Arc<CallContext>,
     address: HeaderHash,
-) -> RibosomeResult<EntryHash> {
+) -> Result<EntryHash, WasmError> {
     let network = call_context.host_access.network().clone();
     let workspace_lock = call_context.host_access.workspace();
 
@@ -85,7 +85,7 @@ pub(crate) fn get_original_address<'a>(
             }
             None => Err(RibosomeError::ElementDeps(address.into())),
         }
-    })
+    }).map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))
 }
 
 #[cfg(test)]
@@ -117,9 +117,9 @@ pub mod wasm_test {
 
         let thing_a: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "create", ());
-        let get_thing: GetOutput =
+        let get_thing: Option<Element> =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "read", thing_a);
-        match get_thing.into_inner() {
+        match get_thing {
             Some(element) => assert!(element.entry().as_option().is_some()),
 
             None => unreachable!(),
@@ -128,9 +128,9 @@ pub mod wasm_test {
         let _: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete", thing_a);
 
-        let get_thing: GetOutput =
+        let get_thing: Option<Element> =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "read", thing_a);
-        match get_thing.into_inner() {
+        match get_thing {
             None => {
                 // this is what we want, deletion => None for a get
             }

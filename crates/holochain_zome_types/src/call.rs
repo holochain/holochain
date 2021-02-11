@@ -2,8 +2,8 @@ use crate::capability::CapSecret;
 use crate::cell::CellId;
 use crate::zome::FunctionName;
 use crate::zome::ZomeName;
+use crate::ExternIO;
 use holo_hash::AgentPubKey;
-use holochain_serialized_bytes::prelude::SerializedBytes;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Call {
@@ -11,7 +11,7 @@ pub struct Call {
     pub zome_name: ZomeName,
     pub fn_name: FunctionName,
     pub cap: Option<CapSecret>,
-    pub request: SerializedBytes,
+    pub payload: ExternIO,
     pub provenance: AgentPubKey,
 }
 
@@ -21,7 +21,7 @@ impl Call {
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
-        request: SerializedBytes,
+        payload: ExternIO,
         provenance: AgentPubKey,
     ) -> Self {
         Self {
@@ -29,7 +29,7 @@ impl Call {
             zome_name,
             fn_name,
             cap,
-            request,
+            payload,
             provenance,
         }
     }

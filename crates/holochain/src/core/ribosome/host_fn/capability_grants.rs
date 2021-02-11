@@ -1,16 +1,15 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 /// list all the grants stored locally in the chain filtered by tag
 /// this is only the current grants as per local CRUD
 pub fn capability_grants(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    _input: CapabilityGrantsInput,
-) -> RibosomeResult<CapabilityGrantsOutput> {
+    _input: (),
+) -> Result<(), WasmError> {
     unimplemented!();
 }
 
@@ -18,10 +17,10 @@ pub fn capability_grants(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::{conductor::dna_store::MockDnaStore, test_utils::cool::MaybeElement};
-    use crate::{conductor::ConductorBuilder, test_utils::cool::CoolConductor};
+    use crate::{conductor::dna_store::MockDnaStore, test_utils::sweetest::MaybeElement};
+    use crate::{conductor::ConductorBuilder, test_utils::sweetest::SweetConductor};
     use crate::{
-        core::workflow::call_zome_workflow::CallZomeWorkspace, test_utils::cool::CoolDnaFile,
+        core::workflow::call_zome_workflow::CallZomeWorkspace, test_utils::sweetest::SweetDnaFile,
     };
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
@@ -74,10 +73,10 @@ pub mod wasm_test {
             "transferable_cap_grant",
             secret
         );
-        let entry: GetOutput =
+        let maybe_element: Option<Element> =
             crate::call_test_ribosome!(host_access, TestWasm::Capability, "get_entry", header);
 
-        let entry_secret: CapSecret = match entry.into_inner() {
+        let entry_secret: CapSecret = match maybe_element {
             Some(element) => {
                 let cap_grant_entry: CapGrantEntry = element.entry().to_grant_option().unwrap();
                 match cap_grant_entry.access {
@@ -94,7 +93,7 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_authorized_call() {
         observability::test_run().ok();
-        let (dna_file, _) = CoolDnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
             .await
             .unwrap();
 
@@ -110,7 +109,7 @@ pub mod wasm_test {
         dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
 
         let mut conductor =
-            CoolConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
 
         let apps = conductor
             .setup_app_for_agents(
@@ -127,7 +126,7 @@ pub mod wasm_test {
 
         // ALICE FAILING AN UNAUTHED CALL
 
-        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
         pub struct CapFor(CapSecret, AgentPubKey);
 
         let original_secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
@@ -160,7 +159,7 @@ pub mod wasm_test {
 
         assert_eq!(
             response,
-            ZomeCallResponse::Ok(ExternOutput::new(().try_into().unwrap())),
+            ZomeCallResponse::Ok(ExternIO::encode(()).unwrap()),
         );
 
         // BOB ROLLS THE GRANT SO ONLY THE NEW ONE WILL WORK FOR ALICE
@@ -203,7 +202,7 @@ pub mod wasm_test {
             .await;
         assert_eq!(
             output,
-            ZomeCallResponse::Ok(ExternOutput::new(().try_into().unwrap())),
+            ZomeCallResponse::Ok(ExternIO::encode(()).unwrap()),
         );
 
         // BOB DELETES THE GRANT SO NO SECRETS WORK

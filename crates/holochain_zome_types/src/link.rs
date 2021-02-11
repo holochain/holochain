@@ -62,11 +62,51 @@ pub struct Link {
     /// The [Entry] being linked to
     pub target: holo_hash::EntryHash,
     /// When the link was added
-    pub timestamp: std::time::SystemTime,
+    pub timestamp: crate::Timestamp,
     /// A tag used to find this link
     pub tag: LinkTag,
     /// The hash of this link's create header
     pub create_link_hash: HeaderHash,
+}
+
+/// Zome IO inner type for link creation.
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct CreateLinkInput {
+    pub base_address: holo_hash::EntryHash,
+    pub target_address: holo_hash::EntryHash,
+    pub tag: LinkTag,
+}
+
+impl CreateLinkInput {
+    pub fn new(
+        base_address: holo_hash::EntryHash,
+        target_address: holo_hash::EntryHash,
+        tag: LinkTag,
+    ) -> Self {
+        Self {
+            base_address,
+            target_address,
+            tag,
+        }
+    }
+}
+
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct GetLinksInput {
+    pub base_address: holo_hash::EntryHash,
+    pub tag_prefix: Option<crate::link::LinkTag>,
+}
+
+impl GetLinksInput {
+    pub fn new(
+        base_address: holo_hash::EntryHash,
+        tag_prefix: Option<crate::link::LinkTag>,
+    ) -> Self {
+        Self {
+            base_address,
+            tag_prefix,
+        }
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]

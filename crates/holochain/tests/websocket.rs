@@ -4,9 +4,9 @@ use assert_cmd::prelude::*;
 use futures::future;
 use futures::Future;
 use hdk3::prelude::RemoteSignal;
-use holochain::test_utils::cool::CoolAgents;
-use holochain::test_utils::cool::CoolConductorBatch;
-use holochain::test_utils::cool::CoolDnaFile;
+use holochain::test_utils::sweetest::SweetAgents;
+use holochain::test_utils::sweetest::SweetConductorBatch;
+use holochain::test_utils::sweetest::SweetDnaFile;
 use holochain::{
     conductor::api::ZomeCall,
     conductor::{
@@ -229,19 +229,21 @@ pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &
     .await;
 }
 
-pub async fn call_zome_fn<SB: TryInto<SerializedBytes, Error = SerializedBytesError>>(
+pub async fn call_zome_fn<S>(
     holochain: &mut Child,
     app_tx: &mut WebsocketSender,
     cell_id: CellId,
     wasm: TestWasm,
     fn_name: String,
-    input: SB,
-) {
+    input: S,
+) where
+    S: Serialize + std::fmt::Debug,
+{
     let call: ZomeCall = ZomeCallInvocationFixturator::new(NamedInvocation(
         cell_id,
         wasm,
         fn_name,
-        ExternInput::new(input.try_into().unwrap()),
+        ExternIO::encode(input).unwrap(),
     ))
     .next()
     .unwrap()
@@ -390,13 +392,13 @@ async fn remote_signals() {
     observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 5;
 
-    let mut conductors = CoolConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
+    let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
     // TODO: write helper for agents across conductors
     let all_agents: Vec<HoloHash<hash_type::Agent>> =
-        future::join_all(conductors.iter().map(|c| CoolAgents::one(c.keystore()))).await;
+        future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
 
-    let dna_file = CoolDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
         .unwrap()
         .0;
@@ -411,11 +413,11 @@ async fn remote_signals() {
 
     let mut rxs = Vec::new();
     for h in conductors.iter().map(|c| c) {
-        rxs.push(h.signal_broadcaster().await.subscribe())
+        rxs.push(h.signal_broadcaster().await.subscribe_separately())
     }
     let rxs = rxs.into_iter().flatten().collect::<Vec<_>>();
 
-    let signal = fixt!(SerializedBytes);
+    let signal = fixt!(ExternIo);
 
     let _: () = conductors[0]
         .call(
@@ -434,7 +436,6 @@ async fn remote_signals() {
     for mut rx in rxs {
         let r = rx.try_recv();
         // Each handle should recv a signal
-
         assert_matches!(r, Ok(Signal::App(_, a)) if a == signal);
     }
 }
@@ -525,7 +526,7 @@ async fn emit_signals() {
     assert!(!msg2.is_request());
 
     assert_eq!(
-        Signal::App(cell_id, AppSignal::new(().try_into().unwrap())),
+        Signal::App(cell_id, AppSignal::new(ExternIO::encode(()).unwrap())),
         Signal::try_from(sig1.clone()).unwrap(),
     );
     assert_eq!(sig1, sig2);
