@@ -47,7 +47,17 @@ host_fn_api_impls! {
     // holochain_zome_types::zome_io
     // TODO: is there a way to unhygienically import this code in both places?
 
-    fn agent_info (()) -> zt::agent_info::AgentInfo;
+    // Info about the calling agent.
+    fn agent_info (()) -> zt::info::AgentInfo;
+
+    // @todo
+    fn bundle_info (()) -> zt::info::BundleInfo;
+
+    // @todo
+    fn dna_info (()) -> zt::info::DnaInfo;
+
+    // @todo
+    fn call_info (()) -> zt::info::CallInfo;
 
     fn call (zt::call::Call) -> zt::ZomeCallResponse;
 
@@ -94,9 +104,6 @@ host_fn_api_impls! {
     // Header hash of the CreateLink element.
     fn delete_link (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
 
-    // @todo
-    fn entry_type_properties (()) -> ();
-
     // Header hash of the newly committed element.
     // Emit a Signal::App to subscribers on the interface
     fn emit_signal (zt::signal::AppSignal) -> ();
@@ -108,7 +115,7 @@ host_fn_api_impls! {
     // Attempt to get a live entry from the cascade.
     fn get (zt::entry::GetInput) -> Option<zt::element::Element>;
 
-    fn get_agent_activity (zt::agent_info::GetAgentActivityInput) -> zt::query::AgentActivity;
+    fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
     fn get_details (zt::entry::GetInput) -> Option<zt::metadata::Details>;
 
@@ -119,9 +126,6 @@ host_fn_api_impls! {
 
     // Hash an entry on the host.
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
-
-    // @todo
-    fn property (()) -> ();
 
     // Query the source chain for data.
     fn query (zt::query::ChainQueryFilter) -> zt::element::ElementVec;
@@ -139,7 +143,10 @@ host_fn_api_impls! {
     fn schedule (core::time::Duration) -> ();
 
     // @todo
-    fn show_env (()) -> ();
+    fn sleep (core::time::Duration) -> ();
+
+    // @todo
+    fn version (()) -> zt::version::Version;
 
     // Attempt to have the keystore sign some data
     // The pubkey in the input needs to be found in the keystore for this to work
@@ -160,6 +167,6 @@ host_fn_api_impls! {
     // The zome and agent info are constants specific to the current zome and chain.
     // All the information is provided by core so there is no input value.
     // These are constant for the lifetime of a zome call.
-    fn zome_info (()) -> zt::zome_info::ZomeInfo;
+    fn zome_info (()) -> zt::info::ZomeInfo;
 
 }

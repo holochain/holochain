@@ -3,10 +3,10 @@ use crate::core::ribosome::RibosomeT;
 use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
 
-pub fn property(
+pub fn sleep(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    _input: (),
+    _input: core::time::Duration,
 ) -> Result<(), WasmError> {
-    unimplemented!();
+    unimplemented!()
 }

@@ -3,11 +3,24 @@ use crate::hash_path::path::Path;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
 
-/// "hdk3anchor"
+/// This is the root of the Path tree.
+///
+/// Forms the entry point to all anchors so that agents can navigate down the tree from here.
+///
+/// The string "hdk3anchor".
 pub const ROOT: &str = "hdk3anchor";
 
 #[derive(PartialEq, SerializedBytes, serde::Serialize, serde::Deserialize, Debug, Clone)]
-/// Historically an anchor could only be 1 or 2 levels deep as "type" and "text".
+/// An anchor can only be 1 or 2 levels deep as "type" and "text".
+///
+/// The second level is optional and the Strings use the standard `TryInto` for path `Component` internally.
+///
+/// __Anchors are required to be included in an application `entry_defs`__ callback and so implement all the standard methods.
+/// Technically the `Anchor` entry definition is the `Path` definition.
+///
+/// e.g. `entry_defs![Anchor::entry_def()]`
+///
+/// The methods implemented on anchor follow the patterns that predate the Path module but `Path::from(&anchor)` is always possible to use the newer APIs.
 pub struct Anchor {
     pub anchor_type: String,
     pub anchor_text: Option<String>,

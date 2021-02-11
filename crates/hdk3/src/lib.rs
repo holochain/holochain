@@ -217,17 +217,84 @@
 
 pub mod capability;
 
-/// Working with app entries.
+/// Working with app and system entries.
 ///
 /// Most holochain applications will define their own app entry types.
 ///
 /// App entries are all entries that are not system entries.
 /// They are defined in the `entry_defs` callback and then the application can call CRUD functions with them.
+///
+/// CRUD in holochain is represented as a graph/tree of entries referencing each other representing new states of a shared identity.
+/// Because the network is always subject to the possibility of partitions, there is no way to assert an objective truth about the 'current' or 'real' value that all participants will agree on.
+/// This is a key difference between holochain and blockchains.
+/// Where blockchains define a consensus algorithm that brings all participants as close as possible to a single value while holochain lets each paritipant discover their own truth.
+///
+/// The practical implication of this is that agents fetch as much information as they can from the network then follow an algorithm to 'walk' or 'reduce' the revisions and discover 'current' for themselves.
+///
+/// In holochain terms, blockchain consensus is walking all the known 'updates' (blocks) that pass validation then walking/reducing down them to disover the 'chain with the most work' or similar.
+/// For example, to implement a blockchain in holochain, attach a proof of work to each update and then follow the updates with the most work to the end.
+///
+/// There are many other ways to discover the correct path through updates, for example a friendly game of chess between two players could involve consensual re-orgs or 'undos' of moves by countersigning a different update higher up the tree, to branch out a new revision history.
+///
+/// Two agents with the same information may even disagree on the 'correct' path through updates and this may be valid for a particular application.
+/// For example, an agent could choose to 'block' another agent and ignore all their updates.
 pub mod entry;
-pub mod guest_callback;
+
+/// Distributed Hash Tables (DHTs) are fundamentally all key/value stores (content addressable).
+///
+/// This has lots of benefits but can make discoverability difficult.
+///
+/// When agents have the hash for some content they can directly fetch it but they need a way to discover the hash.
+/// For example, Alice can create new usernames or chat messages while Bob is offline.
+/// Unless there is a registry at a known location for Bob to lookup new usernames and chat messages he will never discover them.
+///
+/// The most basic solution is to create a single entry with constant content, e.g. "chat-messages" and link all messages from this.
+///
+/// The basic solution has two main issues:
+///
+/// - Fetching _all_ chat messages may be something like fetching _all_ tweets (impossible, too much data)
+/// - Holochain neighbourhoods (who needs to hold the data) center around the content address so the poor nodes closest to "chat-messages" will be forced to hold _all_ messages (DHT hotspots)
+///
+/// To address this problem we can introduce a tree structure.
+/// Ideally the tree structure embeds some domain specific _granularity_ into each "hop".
+/// For example the root level for chat messages could link to years, each year can link to months, then days and minutes.
+/// The "minutes" level will link to all chat messages in that exact minute.
+/// Any minutes with no chat messages will simply never be linked to.
+/// A GUI can poll from as deep in the tree as makes sense, for example it could start at the current day when the application first loads and then poll the past 5 minutes in parallel every 2 minutes (just a conceptual example).
+///
+/// If the tree embeds granularity then it can replace the need for 'pagination' which is a problematic concept in a partitioned p2p network.
+/// If the tree cannot embed meaningful granularity, for example maybe the only option is to build a tree based on the binary representation of the hash of the content, then we solve DHT hotspots but our applications will have no way to narrow down polling, other than to brute force the tree.
+///
+/// Examples of granularity include:
+///
+/// - Latitude/longitude for geo data
+/// - Timestamps
+/// - Lexical (alphabetical) ordering
+/// - Orders of magnitude
+/// - File system paths
+/// - Etc.
+///
+/// When modelling your data into open sets/collections that need to be looked up, try to find a way to create buckets of granularity that don't need to be brute forced.
+///
+/// In the case that granularity can be defined the tree structure solves both our main issues:
+///
+/// - We never need to fetch _all_ messages because we can start as deeply down the tree as is appropriate and
+/// - We avoid DHT hotspots because each branch of the tree has its own hash and set of links, therefore a different neighbourhood of agents
+///
+/// The `hash_path` module includes 3 submodules to help build and navigate these tree structures efficiently:
+///
+/// - `path` is the basic general purpose implementation of tree structures as `Vec<Vec<u8>>`
+/// - `shard` is a string based DSL for creating lexical shards out of strings as utf-32 (e.g. usernames)
+/// - `anchor` implements the "anchor" pattern (two level string based tree, "type" and "text") in terms of paths
 pub mod hash_path;
-pub mod host_fn;
 pub mod map_extern;
 pub mod prelude;
 pub mod x_salsa20_poly1305;
 pub use paste;
+pub mod link;
+pub mod info;
+pub mod p2p;
+pub mod chain;
+pub mod util;
+pub mod ed25519;
+pub mod trace;

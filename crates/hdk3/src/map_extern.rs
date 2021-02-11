@@ -33,7 +33,7 @@ macro_rules! map_extern {
                     // Setup tracing.
                     // @TODO feature flag this?
                     match $crate::prelude::tracing::subscriber::set_global_default(
-                        $crate::host_fn::trace::WasmSubscriber::default()
+                        $crate::trace::WasmSubscriber::default()
                     ) {
                         Ok(_) => {},
                         Err(e) => return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Guest(e.to_string())),

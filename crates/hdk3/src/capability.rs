@@ -74,7 +74,7 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<HeaderHa
     ))
 }
 
-/// High level interface to creating capability grants.
+/// Create a capability grant.
 ///
 /// Wraps the `create` HDK3 function with system type parameters set.
 /// This guards against sending application entry data or setting the wrong entry type.

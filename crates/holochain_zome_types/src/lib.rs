@@ -10,7 +10,7 @@
 #![deny(missing_docs)]
 
 #[allow(missing_docs)]
-pub mod agent_info;
+pub mod agent_activity;
 pub mod bytes;
 #[allow(missing_docs)]
 pub mod call;
@@ -44,6 +44,10 @@ pub mod timestamp;
 pub mod trace;
 #[allow(missing_docs)]
 pub mod validate;
+/// Tracking versions between the WASM host and guests and other interfaces.
+///
+/// Needed to ensure compatibility as code develops.
+pub mod version;
 #[allow(missing_docs)]
 pub mod validate_link;
 pub mod warrant;
@@ -52,7 +56,7 @@ pub mod x_salsa20_poly1305;
 #[allow(missing_docs)]
 pub mod zome;
 #[allow(missing_docs)]
-pub mod zome_info;
+pub mod info;
 #[allow(missing_docs)]
 pub mod zome_io;
 

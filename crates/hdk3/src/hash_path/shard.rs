@@ -35,11 +35,17 @@ impl ShardStrategy {
 
 #[derive(Debug)]
 pub enum ParseShardStrategyError {
+    /// Could not parse the shard depth.
     BadDepth,
+    /// Could not parse the shard width.
     BadWidth,
+    /// Failed to find the separator between width and depth.
     ShardSplitNotFound,
+    /// Failed to find the end of the sharding definition.
     ShardEndNotFound,
+    /// The sharding definition does not start with a number.
     FirstCharNotADigit,
+    /// The sharding definition is empty.
     EmptyString,
 }
 
