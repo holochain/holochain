@@ -20,6 +20,7 @@ path = "src/bin/hc-dna.rs"
 
 [dependencies]
 anyhow = "1.0"
+ffs = { path = "../ffs", features =["backtrace"] }
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
 holochain = { path = "../holochain", default-features = false }
 holochain_serialized_bytes = "=0.0.48"
@@ -35,4 +36,4 @@ tokio = { version = "0.2", features = [ "full" ] }
 
 [dev-dependencies]
 matches = "0.1"
-tempdir = "0.3.7"
+tempdir = "0.3"

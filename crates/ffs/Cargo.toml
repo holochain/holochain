@@ -5,8 +5,10 @@ authors = ["Michael Dougherty <maackle.d@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+backtrace = { version = "0.3", optional = true }
+cfg-if = "0.1"
 derive_more = "0.99"
-thiserror = "1.0"
+# thiserror = "1.0"
 tokio = { version = "0.2", features = ["fs"], optional = true}
 
 [features]

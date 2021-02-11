@@ -139,7 +139,9 @@ impl HcAppBundle {
     /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
         match self {
-            Self::Init { path } => todo!(),
+            Self::Init { path } => {
+                crate::init::init_app(path).await?;
+            }
             Self::Pack { path, output } => {
                 let (bundle_path, _) = crate::packing::pack::<AppManifest>(&path, output).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());

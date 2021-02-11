@@ -13,7 +13,9 @@ use std::collections::HashMap;
 
 pub type Uuid = String;
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_builder::Builder,
+)]
 #[serde(rename_all = "snake_case")]
 pub struct AppManifestV1 {
     /// Name of the App. This may be used as the installed_app_id.

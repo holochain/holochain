@@ -984,8 +984,9 @@ checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 name = "ffs"
 version = "0.0.1"
 dependencies = [
+ "backtrace",
+ "cfg-if 0.1.10",
  "derive_more",
- "thiserror",
  "tokio 0.2.25",
 ]
 
@@ -1509,6 +1510,7 @@ name = "holochain_cli_bundle"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "ffs",
  "holo_hash",
  "holochain",
  "holochain_serialized_bytes",

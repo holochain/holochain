@@ -29,11 +29,7 @@ impl Location {
         if let Location::Path(path) = self {
             if path.is_relative() {
                 if let Some(dir) = root_dir {
-                    Ok(Location::Path(
-                        dir.join(&path)
-                            .canonicalize()
-                            .map_err(|e| IoError::new(e, Some(path.to_owned())))?,
-                    ))
+                    Ok(Location::Path(ffs::sync::canonicalize(dir.join(&path))?))
                 } else {
                     Err(BundleError::RelativeLocalPath(path.to_owned()).into())
                 }

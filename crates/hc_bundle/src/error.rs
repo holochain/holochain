@@ -9,9 +9,8 @@ pub enum HcBundleError {
     #[error("IO error: {0}")]
     StdIoError(#[from] std::io::Error),
 
-    /// Missing filesystem path
-    #[error("Couldn't find path: {1:?}. Detail: {0}")]
-    PathNotFound(std::io::Error, PathBuf),
+    #[error("ffs::IoError: {0}")]
+    FfsIoError(#[from] ffs::IoError),
 
     /// DnaError
     #[error("DNA error: {0}")]
@@ -28,10 +27,6 @@ pub enum HcBundleError {
     /// serde_yaml::Error
     #[error("YAML serialization error: {0}")]
     SerdeYamlError(#[from] serde_yaml::Error),
-
-    /// InvalidInput
-    #[error("Invalid input: {0}")]
-    InvalidInput(String),
 
     /// anything else
     #[error("Unknown error: {0}")]

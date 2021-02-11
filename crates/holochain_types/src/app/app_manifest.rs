@@ -18,7 +18,7 @@ use self::{app_manifest_validated::AppManifestValidated, error::AppManifestResul
 
 /// Container struct which uses the `manifest_version` field to determine
 /// which manifest version to deserialize to.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
 #[serde(tag = "manifest_version")]
 #[allow(missing_docs)]
 pub enum AppManifest {
