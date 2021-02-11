@@ -67,13 +67,3 @@ impl_try_from_random!(
     SecretBoxKeyRef,
     holochain_zome_types::x_salsa20_poly1305::key_ref::KEY_REF_BYTES
 );
-
-/// @todo Not implemented
-pub fn schedule(execute_after: std::time::Duration) -> ExternResult<()> {
-    host_call::<std::time::Duration, ()>(__schedule, execute_after)
-}
-
-/// @todo Not implemented
-pub fn sleep(wake_after: std::time::Duration) -> ExternResult<()> {
-    host_call::<std::time::Duration, ()>(__sleep, wake_after)
-}

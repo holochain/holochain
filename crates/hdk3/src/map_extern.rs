@@ -66,4 +66,5 @@ macro_rules! map_extern {
     };
 }
 
+/// Every extern _must_ retern a `WasmError` in the case of failure.
 pub type ExternResult<T> = Result<T, WasmError>;

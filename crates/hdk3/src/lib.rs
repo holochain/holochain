@@ -357,7 +357,26 @@ pub mod map_extern;
 
 /// Exports common types and functions according to the Rust prelude pattern.
 pub mod prelude;
+
+/// Encryption and decryption using the (secret)box algorithms popularised by Libsodium.
+///
+/// Libsodium defines and implements two encryption functions `secretbox` and `box`.
+/// The former implements shared secret encryption and the latter does the same but with a DH key exchange to generate the shared secret.
+/// This has the effect of being able to encrypt data so that only the intended recipient can read it.
+/// This is also repudiable so both participants know the data must have been encrypted by the other (because they didn't encrypt it themselves) but cannot prove this to anybody else (because they _could have_ encrypted it themselves).
+/// If repudiability is not something you want, you need to use a different approach.
+///
+/// Note that the secrets are located within the secure lair keystore (@todo actually secretbox puts the secret in wasm, but this will be fixed soon) and never touch wasm memory.
+/// The wasm must provide either the public key for box or an opaque _reference_ to the secret key so that lair can encrypt or decrypt as required.
+///
+/// @todo implement a way to export/send an encrypted shared secret for a peer from lair
+///
+/// Note that even though the elliptic curve is the same as is used by ed25519, the keypairs cannot be shared because the curve is mathematically translated in the signing vs. encryption algorithms.
+/// In theory the keypairs could also be translated to move between the two algorithms but holochain doesn't offer a way to do this (yet?).
+/// Create new keypairs for encryption and save the associated public key to your local source chain, and send it to peers you want to interact with.
 pub mod x_salsa20_poly1305;
+
+/// Rexporting the paste macro as it is used internally and may help structure downstream code.
 pub use paste;
 
 /// Tools to interrogate source chains.
@@ -379,6 +398,7 @@ pub use paste;
 /// Agent activity allows efficient building of the history of an agent.
 /// Agent activity is retrieved from a dedicated neighbourhood centered around the agent.
 /// The agent's neighbourhood also maintains a passive security net that guards against attempted chain forks and/or rollbacks.
+/// The same query DSL for local chain queries is used to filter remote agent activity headers.
 pub mod chain;
 
 /// Create and verify signatures for serializable Rust structures and raw binary data.
@@ -406,11 +426,57 @@ pub mod ed25519;
 /// - The current DNA
 /// - The current Zome
 /// - The function call itself
-/// - The current system time
 pub mod info;
 
-/// 
+/// Links in holochain are analogous to a join table in a traditional SQL schema.
+///
+/// Links embody navigable graph structures between entires in a more general format than CRUD trees.
+///
+/// At a high level:
+///
+/// - Can implement direct or indirect circular references
+/// - Have a base and target entry
+/// - Can either exist or be deleted (i.e. there is no revision history, deleting removes a link permanently)
+/// - Many links can point from/to the same entry
+/// - Links reference entry hashes not headers
+///
+/// Links are retrived from the DHT by performing `get_links` or `get_link_details` against the _base_ of a link.
+///
+/// Links also support short (about 500 bytes) binary data to encode contextual data on a domain specific basis.
+///
+/// __Links are not entries__, there is only a header with no associated entry, so links cannot reference other links or maintain or participate in a revision history.
 pub mod link;
+
+/// Methods for interacting with peers in the same DHT network.
+///
+/// Data on the DHT generally propagates at the speed of gossip and must be explicitly polled and retrieved.
+///
+/// Often we want more responsive and direct interactions between peers.
+/// These interactions come in two flavours, RPC style function calls and notification style 'signals'.
+///
+/// All function calls use capability grants and claims to authenticate and authorize.
+/// Signals simply forward information about the introduction of new data on the DHT so that agents can push updates to each other rather than relying purely on polling.
+///
+/// @todo introduce a pubsub mechanism
 pub mod p2p;
+
+/// Integrates HDK3 with the Rust tracing crate.
+///
+/// The functions and structs in this module do _not_ need to be used directly.
+/// The `#[hdk_extern]` attribute on functions exposed externally all set the `WasmSubscriber` as the global default.
+///
+/// This module defines a `WasmSubscriber` that forwards all tracing macro calls to another subscriber on the host.
+/// The logging level can be changed for the host at runtime using the `WASM_LOG` environment variable that works exactly as `RUST_LOG` for other tracing.
 pub mod trace;
-pub mod util;
+
+/// Everything related to inspecting or responding to time.
+///
+/// Currently only fetching the host's opinion of the local time is supported.
+///
+/// @todo implement scheduled execution and sleeping
+pub mod time;
+
+/// Generate cryptographic strength random data
+///
+/// The host provides the random bytes because any/all wasm implementations of randomness is flawed and insecure.
+pub mod random;
