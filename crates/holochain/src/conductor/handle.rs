@@ -161,7 +161,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn create_clone_cell(
         self: Arc<Self>,
         payload: CreateCloneCellPayload,
-    ) -> ConductorResult<()>;
+    ) -> ConductorResult<CellId>;
 
     /// Destroy a cloned Cell
     async fn destroy_clone_cell(self: Arc<Self>, cell_id: CellId) -> ConductorResult<()>;
@@ -438,7 +438,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn create_clone_cell(
         self: Arc<Self>,
         payload: CreateCloneCellPayload,
-    ) -> ConductorResult<()> {
+    ) -> ConductorResult<CellId> {
         let CreateCloneCellPayload {
             properties,
             dna_hash,
@@ -451,10 +451,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let cell_id = CellId::new(dna_hash, agent_key);
         let cells = vec![(cell_id.clone(), membrane_proof)];
         conductor.genesis_cells(cells, self.clone()).await?;
-        conductor
-            .associate_clone_cell_with_app(&installed_app_id, &cell_nick, cell_id)
+        let properties = properties.unwrap_or(().into());
+        let cell_id = conductor
+            .add_clone_cell_to_app(&installed_app_id, &cell_nick, properties)
             .await?;
-        Ok(())
+        Ok(cell_id)
     }
 
     async fn destroy_clone_cell(self: Arc<Self>, _cell_id: CellId) -> ConductorResult<()> {

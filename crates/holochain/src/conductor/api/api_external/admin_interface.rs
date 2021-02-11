@@ -179,12 +179,12 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::AppInstalled(app))
             }
             InstallAppBundle(payload) => {
-                let result = self
+                let _result = self
                     .conductor_handle
                     .clone()
                     .install_app_bundle(*payload)
                     .await?;
-                todo!()
+                todo!("implement app bundle installation")
                 // Ok(AdminResponse::AppBundleInstalled(todo!()));
             }
             ListDnas => {

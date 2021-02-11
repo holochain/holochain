@@ -48,7 +48,7 @@ async fn can_update_state() {
 }
 
 #[tokio::test(threaded_scheduler)]
-async fn can_associate_clone_cell_with_app() {
+async fn can_add_clone_cell_to_app() {
     let envs = test_environments();
     let dna_store = MockDnaStore::new();
     let keystore = envs.conductor().keystore().clone();
@@ -82,21 +82,13 @@ async fn can_associate_clone_cell_with_app() {
 
     matches::assert_matches!(
         conductor
-            .associate_clone_cell_with_app(
-                &"no clone".to_string(),
-                &"nick".to_string(),
-                cell_id.clone()
-            )
+            .add_clone_cell_to_app(&"no clone".to_string(), &"nick".to_string(), ().into())
             .await,
         Err(ConductorError::AppError(AppError::CloneLimitExceeded(0, _)))
     );
 
     conductor
-        .associate_clone_cell_with_app(
-            &"yes clone".to_string(),
-            &"nick".to_string(),
-            cell_id.clone(),
-        )
+        .add_clone_cell_to_app(&"yes clone".to_string(), &"nick".to_string(), ().into())
         .await
         .unwrap();
 

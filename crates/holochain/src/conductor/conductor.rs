@@ -627,22 +627,23 @@ where
     }
 
     /// Associate a Cell with an existing App
-    pub(super) async fn associate_clone_cell_with_app(
+    pub(super) async fn add_clone_cell_to_app(
         &mut self,
         installed_app_id: &InstalledAppId,
         cell_nick: &CellNick,
-        cell_id: CellId,
-    ) -> ConductorResult<()> {
-        self.update_state(|mut state| {
-            if let Some(app) = state.active_apps.get_mut(installed_app_id) {
-                app.add_clone(cell_nick, cell_id)?;
-                Ok(state)
-            } else {
-                Err(ConductorError::AppNotActive(installed_app_id.clone()))
-            }
-        })
-        .await?;
-        Ok(())
+        properties: YamlProperties,
+    ) -> ConductorResult<CellId> {
+        let (_, cell_id) = self
+            .update_state_prime(|mut state| {
+                if let Some(app) = state.active_apps.get_mut(installed_app_id) {
+                    let cell_id = app.add_clone(cell_nick, properties)?;
+                    Ok((state, cell_id))
+                } else {
+                    Err(ConductorError::AppNotActive(installed_app_id.clone()))
+                }
+            })
+            .await?;
+        Ok(cell_id)
     }
 
     pub(super) async fn load_wasms_into_dna_files(
@@ -857,19 +858,31 @@ where
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
     }
 
+    /// Update the internal state with a pure function mapping old state to new
     async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
     where
         F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
     {
+        let (state, _) = self.update_state_prime(|s| Ok((f(s)?, ()))).await?;
+        Ok(state)
+    }
+
+    /// Update the internal state with a pure function mapping old state to new,
+    /// which may also produce an output value which will be the output of
+    /// this function
+    async fn update_state_prime<F: Send, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
+    where
+        F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)>,
+    {
         self.check_running()?;
         let guard = self.env.guard();
-        let new_state = guard.with_commit(|txn| {
+        let output = guard.with_commit(|txn| {
             let state: ConductorState = self.state_db.get(txn, &UnitDbKey)?.unwrap_or_default();
-            let new_state = f(state)?;
+            let (new_state, output) = f(state)?;
             self.state_db.put(txn, &UnitDbKey, &new_state)?;
-            Result::<_, ConductorError>::Ok(new_state)
+            Result::<_, ConductorError>::Ok((new_state, output))
         })?;
-        Ok(new_state)
+        Ok(output)
     }
 
     fn add_admin_port(&mut self, port: u16) {
