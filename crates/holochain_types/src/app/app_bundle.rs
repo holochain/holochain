@@ -133,8 +133,8 @@ impl AppBundle {
                 }
             },
             AppSlotManifestValidated::Disabled {
-                version,
-                clone_limit,
+                version: _,
+                clone_limit: _,
             } => {
                 unimplemented!("`disabled` provisioning strategy is currently unimplemented")
                 // CellProvisioningOp::Noop(clone_limit)

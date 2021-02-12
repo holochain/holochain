@@ -486,7 +486,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let installed_app_id =
             installed_app_id.unwrap_or_else(|| bundle.manifest().app_name().to_owned());
         let ops = bundle
-            .resolve_cells(agent_key, DnaGamut::placeholder(), membrane_proofs)
+            .resolve_cells(agent_key.clone(), DnaGamut::placeholder(), membrane_proofs)
             .await?;
 
         let cells_to_create = ops.cells_to_create();
@@ -502,7 +502,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await?;
 
         let slots = ops.slots;
-        let app = InstalledApp::new(installed_app_id, slots);
+        let app = InstalledApp::new(installed_app_id, agent_key, slots);
 
         // Update the db
         self.conductor

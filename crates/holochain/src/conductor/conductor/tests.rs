@@ -65,10 +65,11 @@ async fn can_add_clone_cell_to_app() {
     .unwrap();
 
     let cell_id = fake_cell_id(1);
+    let agent = cell_id.agent_pubkey().clone();
     let installed_cell = InstalledCell::new(cell_id.clone(), "nick".to_string());
     let slot = AppSlot::new(cell_id.dna_hash().to_owned(), Some(cell_id.clone()), 1);
     let app1 = InstalledApp::new_legacy("no clone", vec![installed_cell.clone()]);
-    let app2 = InstalledApp::new("yes clone", vec![("nick".into(), slot.clone())]);
+    let app2 = InstalledApp::new("yes clone", agent, vec![("nick".into(), slot.clone())]);
 
     conductor
         .update_state(|mut state| {

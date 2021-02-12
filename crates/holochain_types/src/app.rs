@@ -201,6 +201,9 @@ impl InstalledCell {
 pub struct InstalledApp {
     /// The unique identifier for an installed app in this conductor
     installed_app_id: InstalledAppId,
+    /// The agent key used to install this app. All Cells created by this app
+    /// either through provisioning or cloning will use this agent key.
+    agent_key: AgentPubKey,
     /// The "slots" as specified in the AppManifest
     slots: HashMap<CellNick, AppSlot>,
 }
@@ -220,10 +223,12 @@ impl InstalledApp {
     /// Constructor
     pub fn new<S: ToString, I: IntoIterator<Item = (CellNick, AppSlot)>>(
         installed_app_id: S,
+        agent_key: AgentPubKey,
         slots: I,
     ) -> Self {
         Self {
             installed_app_id: installed_app_id.to_string(),
+            agent_key,
             slots: slots.into_iter().collect(),
         }
     }
@@ -235,6 +240,24 @@ impl InstalledApp {
         installed_cells: I,
     ) -> Self {
         let installed_app_id = installed_app_id.to_string();
+        let installed_cells: Vec<_> = installed_cells.into_iter().collect();
+
+        // Get the agent key
+        let agent_key = installed_cells
+            .get(0)
+            .expect("Can't create app with 0 cells")
+            .cell_id
+            .agent_pubkey()
+            .to_owned();
+
+        // ensure all cells use the same agent key
+        if installed_cells
+            .iter()
+            .any(|c| *c.cell_id.agent_pubkey() != agent_key)
+        {
+            panic!("All cells must use the same agent key for a legacy installation");
+        }
+
         let slots = installed_cells
             .into_iter()
             .map(|InstalledCell { cell_nick, cell_id }| {
@@ -249,6 +272,7 @@ impl InstalledApp {
             .collect();
         Self {
             installed_app_id,
+            agent_key,
             slots,
         }
     }
@@ -289,9 +313,18 @@ impl InstalledApp {
         &self.slots
     }
 
+    /// Accessor
+    pub fn agent_key(&self) -> &AgentPubKey {
+        &self.agent_key
+    }
+
     /// Add a cloned cell
     pub fn add_clone(&mut self, cell_nick: &CellNick, cell_id: CellId) -> AppResult<()> {
-        todo!("ensure cell is unique and agent is same as app agent");
+        assert_eq!(
+            *cell_id.agent_pubkey(),
+            self.agent_key,
+            "A clone cell must use the same agent key as its app"
+        );
         let slot = self
             .slots
             .get_mut(cell_nick)
@@ -356,8 +389,9 @@ mod tests {
     #[test]
     fn clone_management() {
         let slot1 = AppSlot::new(fixt!(DnaHash), None, 3);
+        let agent = fixt!(AgentPubKey);
         let nick: CellNick = "nick".into();
-        let mut app = InstalledApp::new("app", vec![(nick.clone(), slot1)]);
+        let mut app = InstalledApp::new("app", agent, vec![(nick.clone(), slot1)]);
 
         // Can add clones up to the limit
         let cell_ids = vec![fixt!(CellId), fixt!(CellId), fixt!(CellId)];
