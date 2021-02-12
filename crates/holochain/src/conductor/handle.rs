@@ -88,7 +88,6 @@ pub trait ConductorHandleT: Send + Sync {
     /// around having a circular reference in the types.
     ///
     /// Never use a ConductorHandle for different Conductor here!
-    #[allow(clippy::ptr_arg)]
     async fn add_admin_interfaces(
         self: Arc<Self>,
         configs: Vec<AdminInterfaceConfig>,
@@ -166,7 +165,6 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Install Cells into ConductorState based on installation info, and run
     /// genesis on all new source chains
-    #[allow(clippy::ptr_arg)]
     async fn install_app(
         self: Arc<Self>,
         installed_app_id: InstalledAppId,
@@ -184,11 +182,9 @@ pub trait ConductorHandleT: Send + Sync {
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>>;
 
     /// Activate an app
-    #[allow(clippy::ptr_arg)]
     async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()>;
 
     /// Deactivate an app
-    #[allow(clippy::ptr_arg)]
     async fn deactivate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()>;
 
     /// List Cell Ids
@@ -198,7 +194,6 @@ pub trait ConductorHandleT: Send + Sync {
     async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
 
     /// Dump the cells state
-    #[allow(clippy::ptr_arg)]
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
     /// Access the broadcast Sender which will send a Signal across every
@@ -206,7 +201,6 @@ pub trait ConductorHandleT: Send + Sync {
     async fn signal_broadcaster(&self) -> SignalBroadcaster;
 
     /// Get info about an installed App, whether active or inactive
-    #[allow(clippy::ptr_arg)]
     async fn get_app_info(
         &self,
         installed_app_id: &InstalledAppId,
