@@ -21,12 +21,54 @@ use crate::WebsocketResult;
 use crate::WebsocketSender;
 
 /// Listens for connecting clients.
+///
+/// # Example
+/// ```no_run
+/// use futures::stream::StreamExt;
+/// use holochain_websocket::*;
+/// use url2::url2;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let mut listener = WebsocketListener::bind(
+///         url2!("ws://127.0.0.1:12345"),
+///         std::sync::Arc::new(WebsocketConfig::default()),
+///     )
+///     .await
+///     .unwrap();
+///
+///     while let Some(Ok((_send, _recv))) = listener.next().await {
+///         // New connection
+///     }
+/// }
+///```
 pub struct WebsocketListener {
     handle: ListenerHandle,
     stream: ListenerStream,
 }
 
 /// Handle for shutting down a listener stream.
+///
+/// # Example
+///
+/// ```
+/// use futures::stream::StreamExt;
+/// use holochain_websocket::*;
+/// use url2::url2;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let (listener_handle, mut listener_stream) = WebsocketListener::bind_with_handle(
+///         url2!("ws://127.0.0.1:12345"),
+///         std::sync::Arc::new(WebsocketConfig::default()),
+///     )
+///     .await
+///     .unwrap();
+///
+///     tokio::spawn(async move { while let Some(Ok(_)) = listener_stream.next().await {} });
+///     listener_handle.close();
+/// }
+/// ```
 pub struct ListenerHandle {
     shutdown: Trigger,
     config: Arc<WebsocketConfig>,
@@ -100,6 +142,26 @@ impl ListenerHandle {
 
     /// Close the listener when the future resolves to true.
     /// If the future returns false the listener will not be closed.
+    /// ```
+    /// # use futures::stream::StreamExt;
+    /// # use holochain_websocket::*;
+    /// # use url2::url2;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #     let (listener_handle, mut listener_stream) = WebsocketListener::bind_with_handle(
+    /// #         url2!("ws://127.0.0.1:12345"),
+    /// #         std::sync::Arc::new(WebsocketConfig::default()),
+    /// #     )
+    /// #     .await
+    /// #     .unwrap();
+    /// #
+    ///  tokio::spawn(async move { while let Some(Ok(_)) = listener_stream.next().await {} });
+    ///  let (tx, rx) = tokio::sync::oneshot::channel();
+    ///  tokio::task::spawn(listener_handle.close_on(async move { rx.await.unwrap_or(true) }));
+    ///  tx.send(true).unwrap();
+    /// # }
+    /// ```
     pub async fn close_on<F>(self, f: F)
     where
         F: std::future::Future<Output = bool>,

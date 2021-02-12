@@ -15,6 +15,8 @@ pub enum WebsocketError {
     FailedToRecvResp,
     #[error("Failed to send response to request")]
     FailedToSendResp,
+    #[error("Response to request timed out")]
+    RespTimeout,
     #[error("The websocket connection has shutdown")]
     Shutdown,
 }

@@ -30,55 +30,49 @@
 //! #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 //! struct TestMessage(pub String);
 //!
-//! # async fn doc_test() {
-//! // Create a new server listening for connections
-//! let mut server = WebsocketListener::bind(
-//!     url2!("ws://127.0.0.1:0"),
-//!     std::sync::Arc::new(WebsocketConfig::default()),
-//! )
-//! .await
-//! .unwrap();
-//!
-//! // Get the address of the server
-//! let binding = server.local_addr().clone();
-//!
-//! tokio::task::spawn(async move {
-//!     // Handle new connections
-//!     while let Some(Ok((_send, mut recv))) = server.next().await {
-//!         tokio::task::spawn(async move {
-//!             // Receive a message and echo it back
-//!             if let Some((msg, resp)) = recv.next().await {
-//!                 // Deserialize the message
-//!                 let msg: TestMessage = msg.try_into().unwrap();
-//!                 // If this message is a request then we can respond
-//!                 if resp.is_request() {
-//!                     let msg = TestMessage(format!("echo: {}", msg.0));
-//!                     resp.respond(msg.try_into().unwrap()).await.unwrap();
-//!                 }
-//!             }
-//!         });
-//!     }
-//! });
-//!
-//! // Connect the client to the server
-//! let (mut send, _recv) = connect(binding, std::sync::Arc::new(WebsocketConfig::default()))
+//! #[tokio::main]
+//! async fn main() {
+//!     // Create a new server listening for connections
+//!     let mut server = WebsocketListener::bind(
+//!         url2!("ws://127.0.0.1:0"),
+//!         std::sync::Arc::new(WebsocketConfig::default()),
+//!     )
 //!     .await
 //!     .unwrap();
 //!
-//! let msg = TestMessage("test".to_string());
-//! // Make a request and get the echoed response
-//! let rsp: TestMessage = send.request(msg).await.unwrap();
+//!     // Get the address of the server
+//!     let binding = server.local_addr().clone();
 //!
-//! assert_eq!("echo: test", &rsp.0,);
-//! # }
-//! # fn main() {
-//! #     tokio::runtime::Builder::new()
-//! #         .threaded_scheduler()
-//! #         .enable_all()
-//! #         .build()
-//! #         .unwrap()
-//! #         .block_on(doc_test());
-//! # }
+//!     tokio::task::spawn(async move {
+//!         // Handle new connections
+//!         while let Some(Ok((_send, mut recv))) = server.next().await {
+//!             tokio::task::spawn(async move {
+//!                 // Receive a message and echo it back
+//!                 if let Some((msg, resp)) = recv.next().await {
+//!                     // Deserialize the message
+//!                     let msg: TestMessage = msg.try_into().unwrap();
+//!                     // If this message is a request then we can respond
+//!                     if resp.is_request() {
+//!                         let msg = TestMessage(format!("echo: {}", msg.0));
+//!                         resp.respond(msg.try_into().unwrap()).await.unwrap();
+//!                     }
+//!                 }
+//!             });
+//!         }
+//!     });
+//!
+//!     // Connect the client to the server
+//!     let (mut send, _recv) = connect(binding, std::sync::Arc::new(WebsocketConfig::default()))
+//!         .await
+//!         .unwrap();
+//!
+//!     let msg = TestMessage("test".to_string());
+//!     // Make a request and get the echoed response
+//!     let rsp: TestMessage = send.request(msg).await.unwrap();
+//!
+//!     assert_eq!("echo: test", &rsp.0,);
+//! }
+//!
 //! ```
 //!
 
@@ -86,6 +80,7 @@ use std::io::Error;
 use std::io::ErrorKind;
 use std::sync::Arc;
 
+use holochain_serialized_bytes::prelude::*;
 use stream_cancel::Valve;
 use tracing::instrument;
 use url2::Url2;
@@ -107,6 +102,10 @@ pub use websocket_sender::*;
 
 mod websocket_receiver;
 pub use websocket_receiver::*;
+
+mod websocket;
+
+mod util;
 
 #[instrument(skip(config))]
 /// Create a new external websocket connection.
@@ -135,6 +134,33 @@ pub async fn connect(
     Websocket::create_ends(config, socket, valve)
 }
 
-mod websocket;
-
-mod util;
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(tag = "type")]
+/// The messages actually sent over the wire by this library.
+/// If you want to impliment your own server or client you
+/// will need this type or be able to serialize / deserialize it.
+pub enum WireMessage {
+    /// A message without a response.
+    Signal {
+        #[serde(with = "serde_bytes")]
+        /// Actual bytes of the message serialized as [message pack](https://msgpack.org/).
+        data: Vec<u8>,
+    },
+    /// A request that requires a response.
+    Request {
+        /// The id of this request.
+        /// Note ids are recycled once they are used.
+        id: u32,
+        #[serde(with = "serde_bytes")]
+        /// Actual bytes of the message serialized as [message pack](https://msgpack.org/).
+        data: Vec<u8>,
+    },
+    /// The response to a request.
+    Response {
+        /// The id of the request that this response is for.
+        id: u32,
+        #[serde(with = "serde_bytes")]
+        /// Actual bytes of the message serialized as [message pack](https://msgpack.org/).
+        data: Option<Vec<u8>>,
+    },
+}

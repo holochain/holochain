@@ -345,7 +345,7 @@ async fn client_shutdown() {
     let (handle, listener) = server().await;
     let s_jh = server_wait(listener);
     let binding = handle.local_addr().clone();
-    let (_sender, mut receiver) = connect(binding, Arc::new(WebsocketConfig::default()))
+    let (_, mut receiver) = connect(binding, Arc::new(WebsocketConfig::default()))
         .instrument(tracing::debug_span!("client"))
         .await
         .unwrap();
@@ -358,6 +358,7 @@ async fn client_shutdown() {
         {}
     });
 
+    tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
     rh.close();
     c_jh.await.unwrap();
     s_jh.await.unwrap();
@@ -418,27 +419,31 @@ async fn cancel_response() {
     let s_jh = tokio::task::spawn(async move {
         let (mut sender, _receiver) = listener
             .next()
-            .instrument(tracing::debug_span!("next_server_connection"))
+            .instrument(tracing::debug_span!(
+                "next_server_connection:cancel_response"
+            ))
             .await
             .unwrap()
             .unwrap();
 
         let r = sender
             .request::<_, TestString, _, _>(TestString("Hey from server".into()))
-            .instrument(tracing::debug_span!("server_sending_request"))
+            .instrument(tracing::debug_span!(
+                "server_sending_request:cancel_response"
+            ))
             .await;
         assert!(matches!(r, Err(WebsocketError::FailedToRecvResp)));
     });
     let binding = handle.local_addr().clone();
     let (_sender, mut receiver) = connect(binding, Arc::new(WebsocketConfig::default()))
-        .instrument(tracing::debug_span!("client"))
+        .instrument(tracing::debug_span!("client:cancel_response"))
         .await
         .unwrap();
     let rh = receiver.take_handle().unwrap();
     let c_jh = tokio::task::spawn(async move {
         while let Some(_) = receiver
             .next()
-            .instrument(tracing::debug_span!("client_recv_message"))
+            .instrument(tracing::debug_span!("client_recv_message:cancel_response"))
             .await
         {}
     });

@@ -29,15 +29,20 @@ use crate::WebsocketError;
 use crate::WebsocketReceiver;
 use crate::WebsocketResult;
 use crate::WebsocketSender;
+use crate::WireMessage;
 
 type GhostResult<T> = std::result::Result<T, GhostError>;
 
 #[derive(Debug, Clone)]
+/// Actor that tracks responses.
 pub struct Websocket(GhostActor<WebsocketInner>);
 
 #[derive(Debug)]
 struct ResponseTracker {
+    /// List of responses where Some is an registered response
+    /// while None is a free slot.
     responses: Vec<Option<RegisterResponse>>,
+    /// Queue of free slots to avoid ever growing memory.
     free_indices: VecDeque<usize>,
 }
 
@@ -50,66 +55,72 @@ impl ResponseTracker {
     }
 }
 
+/// Inner GhostActor data.
 struct WebsocketInner {
     responses: ResponseTracker,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(tag = "type")]
-enum WireMessage {
-    Signal {
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
-    },
-    Request {
-        id: u32,
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
-    },
-    Response {
-        id: u32,
-        #[serde(with = "serde_bytes")]
-        data: Option<Vec<u8>>,
-    },
-    // Signal(SerializedBytes),
-    // Request(SerializedBytes, u32),
-    // Response(Option<SerializedBytes>, u32),
-}
+// Channel from the application to the websocket and out to the external socket.
 
-// Channel to the websocket
+/// Send from application to the websocket.
 pub(crate) type TxToWebsocket = tokio::sync::mpsc::Sender<OutgoingMessage>;
+/// Receive in the websocket from the application.
 type RxToWebsocket = tokio::sync::mpsc::Receiver<OutgoingMessage>;
 
-// Channel from the websocket
+// Channel from external socket then from the websocket to the application.
+
+/// Send from the websocket to the application.
 pub(crate) type TxFromWebsocket = tokio::sync::mpsc::Sender<IncomingMessage>;
+/// Receive in the application from the websocket.
 pub(crate) type RxFromWebsocket = tokio::sync::mpsc::Receiver<IncomingMessage>;
 
 #[derive(Debug)]
+/// When dropped both to / from socket tasks are shutdown.
 pub struct PairShutdown {
     close_from_socket: Trigger,
     close_to_socket: TxToWebsocket,
 }
 
+/// Allows returning from inner functions with
+/// success (continue to next line not continue loop),
+/// continue (continue the loop), break for the outer task loop.
 type Loop<T> = std::result::Result<T, Task>;
 
 #[derive(Clone, Copy)]
 enum Task {
+    /// Same as
+    /// ```no_run
+    /// loop {
+    ///   continue;
+    /// }
+    /// ```
     Continue,
+    /// Same as
+    /// ```no_run
+    /// loop {
+    ///   break;
+    /// }
+    /// ```
     Exit,
+    /// Same as exit but skips sending
+    /// a websocket close message.
+    /// This happens when something fails that
+    /// would prevent any graceful shutdown.
     ExitNow,
 }
 
 impl Task {
+    /// Continue the loop.
     fn cont<T>() -> Loop<T> {
         Err(Task::Continue)
     }
 
-    /// Exit and allow channels to empty
+    /// Exit and allow channels to empty.
     fn exit<T>() -> Loop<T> {
         Err(Task::Exit)
     }
 
-    /// Exit immediately with emptying channels
+    /// Exit immediately with emptying channels.
     fn exit_now<T>() -> Loop<T> {
         Err(Task::Exit)
     }
@@ -117,6 +128,7 @@ impl Task {
 
 impl Websocket {
     #[instrument(skip(config, socket, listener_shutdown))]
+    /// Create the ends of this websocket channel.
     pub fn create_ends(
         config: Arc<WebsocketConfig>,
         socket: ToFromSocket,
@@ -128,12 +140,14 @@ impl Websocket {
             nanoid::nanoid!(),
         );
 
+        // Channel to the websocket from the application
         let (tx_to_websocket, rx_to_websocket) = tokio::sync::mpsc::channel(config.max_send_queue);
+        // Channel from the websocket to the application
         let (tx_from_websocket, rx_from_websocket) =
             tokio::sync::mpsc::channel(config.max_send_queue);
 
         // ---- PAIR SHUTDOWN ---- //
-        // If both handles are dropped then we want to shutdown the to/from socket tasks
+        // If both channel ends are dropped then we want to shutdown the to/from socket tasks
         let (close_from_socket, pair_shutdown) = Valve::new();
         let pair_shutdown_handle = PairShutdown {
             close_to_socket: tx_to_websocket.clone(),
@@ -145,9 +159,10 @@ impl Websocket {
         // ---- LISTENER SHUTDOWN ---- //
 
         // Shutdown the receiver stream if the listener is dropped
-        // TODO: Should this shutdown immediately or gracefully
+        // TODO: Should this shutdown immediately or gracefully. Currently it is immediately.
         let rx_from_websocket = listener_shutdown.wrap(rx_from_websocket);
 
+        // Run the to and from external socket tasks.
         Websocket::run(
             socket,
             tx_to_websocket.clone(),
@@ -156,11 +171,13 @@ impl Websocket {
             pair_shutdown,
         );
 
+        // Create the sender end.
         let sender = WebsocketSender::new(
             tx_to_websocket,
             listener_shutdown,
             pair_shutdown_handle.clone(),
         );
+        // Create the receiver end.
         let receiver = WebsocketReceiver::new(rx_from_websocket, remote_addr, pair_shutdown_handle);
         Ok((sender, receiver))
     }
@@ -179,6 +196,7 @@ impl Websocket {
         tx_from_websocket: TxFromWebsocket,
         pair_shutdown: Valve,
     ) {
+        // Spawn the actor and run the socket tasks
         let (actor, driver) = GhostActor::new(WebsocketInner {
             responses: ResponseTracker::new(),
         });
@@ -201,19 +219,27 @@ impl Websocket {
         from_websocket: TxFromWebsocket,
         pair_shutdown: Valve,
     ) {
+        // Get the ends to the external socket.
         let (to_socket, from_socket) = socket.split();
 
         // ---- TASK SHUTDOWN ---- //
-        // These cause immediate shutdown
+        // These cause immediate shutdown:
+        // - Shutdown from_socket task because to_socket task has shutdown.
         let (shutdown_from_socket, from_socket) = Valved::new(from_socket);
+        // - Shutdown from_socket task because both channel ends have dropped.
+        // PairShutdown will also send a close message to to_socket.
         let from_socket = pair_shutdown.wrap(from_socket);
+        // - Shutdown to_socket task because from_socket task has shutdown.
+        // This valve will not close is to_socket can successfully send a close message to from_socket.
         let (shutdown_to_socket, to_websocket) = Valved::new(to_websocket);
 
+        // Spawn the to external task.
         tokio::task::spawn(
             self.clone()
                 .run_to_socket(to_socket, to_websocket, shutdown_from_socket)
                 .in_current_span(),
         );
+        // Spawn the from external task.
         tokio::task::spawn(
             self.run_from_socket(
                 from_socket,
@@ -234,25 +260,36 @@ impl Websocket {
         // When dropped this will shutdown the `from_socket` task.
         _shutdown_from_socket: Trigger,
     ) {
+        let mut task = Task::Continue;
         tracing::trace!("starting sending external socket");
         futures::pin_mut!(to_socket);
-        'send_loop: loop {
-            if let Err(Task::Exit) = self
+        loop {
+            if let Err(t) = self
                 .process_to_websocket(to_websocket.next().await, &mut to_socket)
                 .await
             {
-                break 'send_loop;
+                task = t;
+            }
+            // If during processing a message we encounter
+            // a problem that can't be resolved then exit the loop.
+            if let Task::Exit | Task::ExitNow = task {
+                break;
             }
         }
-        // Send close frame. If it fails to send there's
-        // not much we can do.
-        to_socket
-            .send(tungstenite::Message::Close(Some(CloseFrame {
-                code: CloseCode::Normal,
-                reason: "Shutting down sender".into(),
-            })))
-            .await
-            .ok();
+        // Send close frame so the connection is
+        // gracefully shutdown if we can.
+        if let Task::Exit = task {
+            to_socket
+                .send(tungstenite::Message::Close(Some(CloseFrame {
+                    code: CloseCode::Normal,
+                    reason: "Shutting down sender".into(),
+                })))
+                .await
+                // If we fail to send there's not much we can do.
+                // Logging this will just create noise on shutdown.
+                .ok();
+        }
+        self.0.shutdown();
         tracing::trace!("exiting sending to external socket");
     }
 
@@ -265,9 +302,13 @@ impl Websocket {
             &mut impl futures::sink::Sink<tungstenite::Message, Error = tungstenite::error::Error>,
         >,
     ) -> Loop<()> {
+        // Note that this task awaits on the outgoing messages
+        // application stream and will close when that stream is closed.
         match msg {
             Some(msg) => {
                 tracing::trace!(sending_msg = ?msg);
+
+                // Map outgoing messages to wire messages.
                 let msg = match msg {
                     OutgoingMessage::Close => return Task::exit(),
                     OutgoingMessage::Signal(msg) => WireMessage::Signal {
@@ -281,22 +322,28 @@ impl Websocket {
                         data: msg.map(|m| UnsafeBytes::from(m).into()),
                     },
                     OutgoingMessage::Pong(data) => {
+                        // No need to deserialize, just send the data back
+                        // and continue.
                         to_socket.send(tungstenite::Message::Pong(data)).await.ok();
                         return Task::cont();
                     }
                 };
                 let msg = Self::serialize_msg(msg)?;
+
                 // Write to_socket
                 match to_socket.send(msg).await {
+                    // Successful send.
                     Ok(_) => Task::cont(),
-                    Err(tungstenite::Error::ConnectionClosed) => Task::exit(),
+                    // Connection is already closed so exit immediately.
+                    Err(tungstenite::Error::ConnectionClosed) => Task::exit_now(),
                     Err(e) => {
-                        // If write fails then close both connections
-                        tracing::error!(?e);
+                        // If write fails then close both connections gracefully.
+                        tracing::error!(to_socket_error = ?e);
                         Task::exit()
                     }
                 }
             }
+            // Stream from the application has closed.
             None => Task::exit(),
         }
     }
@@ -306,7 +353,7 @@ impl Websocket {
         from_socket,
         from_websocket,
         send_response,
-        shutdown_from_socket_immediately
+        shutdown_to_socket_immediately
     ))]
     /// Task that takes in messages from the network.
     async fn run_from_socket(
@@ -316,12 +363,15 @@ impl Websocket {
         >,
         mut from_websocket: TxFromWebsocket,
         mut send_response: TxToWebsocket,
-        shutdown_from_socket_immediately: Trigger,
+        shutdown_to_socket_immediately: Trigger,
     ) {
+        let mut task = Task::Continue;
         tracing::trace!("starting receiving from external socket");
         futures::pin_mut!(from_socket);
-        let mut task = Task::Continue;
-        'recv_loop: loop {
+
+        // Note that this task awaits on the incoming external socket stream
+        // and will close when that connection closes.
+        loop {
             let msg = from_socket.next().await;
             if let Err(t) = self
                 .process_from_websocket(msg, &mut from_websocket, &mut send_response)
@@ -329,25 +379,33 @@ impl Websocket {
             {
                 task = t;
             }
+            // If during processing a message we encounter
+            // a problem that can't be resolved then exit the loop.
             if let Task::Exit | Task::ExitNow = task {
-                break 'recv_loop;
+                break;
             }
         }
-        // Try a graceful shutdown
+        // Try a graceful shutdown.
         if let Task::Exit = task {
+            // If we can successfully send a close message
+            // to the "to socket" task then we don't need to
+            // force it to shutdown immediately.
             if send_response
                 .send_timeout(OutgoingMessage::Close, CLOSE_TIMEOUT)
                 .await
                 .is_ok()
             {
-                shutdown_from_socket_immediately.disable();
+                // Stops this from canceling the to socket
+                // stream on drop.
+                shutdown_to_socket_immediately.disable();
             }
         }
+        self.0.shutdown();
         tracing::trace!("exiting receiving from external socket");
     }
 
-    /// Process messages coming from the network and pass
-    /// them onto the `FromWebsocket` channel.
+    /// Process messages coming from the network and forward
+    /// them onto the application.
     async fn process_from_websocket(
         &self,
         msg: Option<std::result::Result<tungstenite::Message, tungstenite::Error>>,
@@ -357,6 +415,8 @@ impl Websocket {
         match msg {
             Some(Ok(msg)) => {
                 tracing::trace!(received_msg = ?msg);
+
+                // Deserialize the incoming wire message.
                 match msg {
                     tungstenite::Message::Binary(bytes) => {
                         let msg = Self::deserialize_message(bytes)?;
@@ -373,6 +433,8 @@ impl Websocket {
                                 data: Some(data),
                                 id,
                             } => {
+                                // Send this response to the WebsocketSender who
+                                // made the original request.
                                 return self
                                     .handle_incoming_response(
                                         Some(Self::deserialize_bytes(data)?),
@@ -381,14 +443,24 @@ impl Websocket {
                                     .await;
                             }
                             WireMessage::Response { data: None, id } => {
+                                tracing::trace!(canceled = ?id);
+                                // A response that has been canceled.
+                                // This means the other sides receiver has shutdown.
                                 return self.handle_incoming_response(None, id).await;
                             }
                         };
+
+                        // Forward the incoming message to the WebsocketReceiver.
                         if from_websocket
                             .send(IncomingMessage::Msg(msg, resp))
                             .await
                             .is_err()
                         {
+                            // We received a message for the receiver but the
+                            // receiver has been dropped so we need to shutdown this
+                            // connection because the other side is expecting there to
+                            // be a receiver.
+                            // Note this will not happen if we are only receiving responses.
                             Task::exit()
                         } else {
                             Task::cont()
@@ -404,24 +476,35 @@ impl Websocket {
                             .await
                             .is_ok()
                         {
+                            // We successfully sent the close to the receiver now we
+                            // wait for acknowledgement or timeout.
                             tokio::time::timeout(CLOSE_TIMEOUT, resp).await.ok();
                         }
                         Task::exit_now()
                     }
                     tungstenite::Message::Ping(data) => {
+                        // Received a ping, immediately respond with a pong.
                         send_response.send(OutgoingMessage::Pong(data)).await.ok();
                         Task::cont()
                     }
                     m => {
+                        // Received a text message which we don't support.
                         tracing::error!("Websocket: Bad message type {:?}", m);
                         Task::cont()
                     }
                 }
             }
             Some(Err(e)) => {
-                tracing::error!(error_from_incoming_websocket = ?e);
+                // We got an error from the connection so we should
+                // exit immediately.
+
+                // TODO: Check if some of these errors are recoverable.
+                tracing::error!(websocket_error_from_network = ?e);
                 Task::exit_now()
             }
+            // Incoming network stream has closed.
+            // Try closing the outgoing stream incase it
+            // hasn't already closed.
             None => Task::exit(),
         }
     }
@@ -434,7 +517,10 @@ impl Websocket {
         id: u32,
     ) -> (SerializedBytes, Respond) {
         let resp = {
+            // Get the sender to the "to socket" task so we can reply.
             let mut send_response = send_response.clone();
+            // If the reply closure is never run and only dropped we want
+            // to send a canceled response to the other sides WebsocketSender.
             let cancel_response = CancelResponse::new(send_response.clone(), id);
 
             // Callback to respond to the request
@@ -447,6 +533,7 @@ impl Websocket {
                         .send(msg)
                         .await
                         .map_err(|_| WebsocketError::FailedToSendResp)?;
+                    // Response sent, don't send cancel.
                     cancel_response.response_sent();
                     tracing::trace!("Sent response");
 
@@ -460,17 +547,18 @@ impl Websocket {
         (msg, resp)
     }
 
-    /// Handle a requesting going out to the network.
+    /// Handle a request going out to the network.
     async fn handle_outgoing_request(
         &self,
         msg: SerializedBytes,
         register_response: RegisterResponse,
     ) -> Loop<WireMessage> {
-        // register outgoing message
+        // If the actor has closed we can't register this response.
         if !self.0.is_active() {
             tracing::error!("Actor is closed");
             return Task::exit();
         }
+        // Register outgoing message with the actor.
         let id = match self
             .0
             .invoke(move |state| GhostResult::Ok(state.responses.register(register_response)))
@@ -478,6 +566,8 @@ impl Websocket {
         {
             Ok(id) => id,
             Err(e) => {
+                // Failed to register so something is
+                // wrong with the actor and we should shutdown.
                 tracing::error!(?e);
                 return Task::exit();
             }
@@ -488,10 +578,12 @@ impl Websocket {
 
     /// Handle a response coming in from the network.
     async fn handle_incoming_response(&self, msg: Option<SerializedBytes>, id: u32) -> Loop<()> {
+        // If the actor has closed we can't find the registered response.
         if !self.0.is_active() {
             tracing::error!("Actor is closed");
             return Task::exit();
         }
+        // Find the registered response and respond.
         let r = self
             .0
             .invoke(move |state| GhostResult::Ok(state.responses.pop(id)))
@@ -500,6 +592,8 @@ impl Websocket {
             .and_then(|response| match response {
                 Some(r) => r.respond(msg),
                 None => {
+                    // We don't want to error here because a bad response
+                    // shouldn't shutdown the connection.
                     tracing::error!("Websocket: Received response for request that doesn't exist");
                     Ok(())
                 }
@@ -507,10 +601,14 @@ impl Websocket {
 
         match r {
             Ok(_) => {
+                // We are done responding, nothing
+                // else to do in this loop so continue.
                 return Task::cont();
             }
             Err(e) => {
-                tracing::error!(?e);
+                // Failed to handle the response so we need to
+                // shutdown.
+                tracing::error!(handle_response_error = ?e);
                 return Task::exit();
             }
         }
@@ -567,16 +665,27 @@ impl Websocket {
 }
 
 impl ResponseTracker {
+    /// Register an outgoing request with it's response.
     fn register(&mut self, response: RegisterResponse) -> u32 {
-        match self
-            .free_indices
-            .pop_front()
-            .map(|i| self.responses.get_mut(i).map(|e| (e, i as u32)))
-        {
+        // Find the next free slot or allocate one.
+        match self.free_indices.pop_front().map(|i| {
+            // Got a free index, now check it's valid.
+            self.responses.get_mut(i).and_then(|e| {
+                // It's valid, now check it's free.
+                if e.is_none() {
+                    Some((e, i as u32))
+                } else {
+                    None
+                }
+            })
+        }) {
+            // Index is free and empty so we can use it.
             Some(Some((empty, i))) => {
                 *empty = Some(response);
                 i
             }
+            // There are not free slots or the free slot was
+            // invalid so allocate a new one.
             None | Some(None) => {
                 let i = self.responses.len();
                 self.responses.push(Some(response));
@@ -584,19 +693,71 @@ impl ResponseTracker {
             }
         }
     }
+    /// Retrieve the response at this id and leave and leave a free slot.
     fn pop(&mut self, id: u32) -> Option<RegisterResponse> {
         let index = id as usize;
         let r = self.responses.get_mut(index).and_then(|slot| slot.take());
         if r.is_some() {
+            // Got a new free slot, add it to the queue.
             self.free_indices.push_back(index);
         }
         r
     }
+    // TODO: Maybe want to think about shrinking the memory here over time.
+    // If we get a burst of requests the `self.responses` vec will be that big
+    // for the rest of the application. Although might not be an issue.
 }
 
 impl Drop for PairShutdown {
     fn drop(&mut self) {
-        // Try to send a close to the "to socket task"
+        // Try to send a close to the "to socket task".
+        // This is optimistic because the task may already be
+        // shutting down.
         self.close_to_socket.try_send(OutgoingMessage::Close).ok();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_register_response() {
+        let mut tracker = ResponseTracker::new();
+        for i in 0..10 {
+            let (respond, _rx) = tokio::sync::oneshot::channel();
+            let resp = RegisterResponse::new(respond);
+            assert_eq!(tracker.register(resp), i);
+        }
+        assert_eq!(tracker.responses.len(), 10);
+
+        assert!(tracker.pop(5).is_some());
+        assert_eq!(tracker.responses.len(), 10);
+        assert_eq!(tracker.free_indices.len(), 1);
+        assert!(tracker.responses.get(5).unwrap().is_none());
+
+        assert!(tracker.pop(5).is_none());
+        assert_eq!(tracker.responses.len(), 10);
+        assert_eq!(tracker.free_indices.len(), 1);
+
+        assert!(tracker.pop(3).is_some());
+        assert_eq!(tracker.responses.len(), 10);
+        assert_eq!(tracker.free_indices.len(), 2);
+        assert!(tracker.responses.get(3).unwrap().is_none());
+
+        let (respond, _rx) = tokio::sync::oneshot::channel();
+        let resp = RegisterResponse::new(respond);
+        assert_eq!(tracker.register(resp), 5);
+
+        let (respond, _rx) = tokio::sync::oneshot::channel();
+        let resp = RegisterResponse::new(respond);
+        assert_eq!(tracker.register(resp), 3);
+
+        let (respond, _rx) = tokio::sync::oneshot::channel();
+        let resp = RegisterResponse::new(respond);
+        assert_eq!(tracker.register(resp), 10);
+
+        assert_eq!(tracker.free_indices.len(), 0);
+        assert_eq!(tracker.responses.len(), 11);
     }
 }

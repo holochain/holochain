@@ -13,6 +13,28 @@ use crate::OutgoingMessage;
 use crate::WebsocketResult;
 
 /// Receive signals and requests from a connection.
+///
+/// # Example
+/// ```no_run
+/// use futures::stream::StreamExt;
+/// use holochain_websocket::*;
+/// use url2::url2;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let (_, mut recv) = connect(
+///         url2!("ws://127.0.0.1:12345"),
+///         std::sync::Arc::new(WebsocketConfig::default()),
+///     )
+///     .await
+///     .unwrap();
+///     while let Some((msg, resp)) = recv.next().await {
+///         if resp.is_request() {
+///             resp.respond(msg).await.unwrap();
+///         }
+///     }
+/// }
+/// ```
 pub struct WebsocketReceiver {
     rx_from_websocket: Valved<Valved<RxFromWebsocket>>,
     remote_addr: Url2,
@@ -56,7 +78,7 @@ pub(crate) enum IncomingMessage {
     Msg(SerializedBytes, Respond),
 }
 
-/// The [`SerializedBytes`] message contents and the [`Respond`] from the [`WebsocketReceiver`] [`Stream`].
+/// The [`SerializedBytes`] message contents and the [`Respond`] from the [`WebsocketReceiver`] [`Stream`](futures::Stream).
 pub type WebsocketMessage = (SerializedBytes, Respond);
 
 impl WebsocketReceiver {
@@ -109,6 +131,7 @@ impl futures::stream::Stream for WebsocketReceiver {
 impl ReceiverHandle {
     /// Shutdown the receiver stream.
     pub fn close(self) {
+        tracing::trace!("Closing Receiver");
         self.shutdown.cancel()
     }
 
