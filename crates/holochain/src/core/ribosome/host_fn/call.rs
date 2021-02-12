@@ -115,7 +115,7 @@ pub mod wasm_test {
 	// eg. WasmError(Zome("inner function \'whoarethey_local\' failed: UnauthorizedZomeCall(CellId(DnaHash(uhC0kCnAyTh2eEgAex-paR8zCKrmcz25tA8qkrk2UdfOJGkEjuPRb), AgentPubKey(uhCAkmrkoAHPVf_eufG7eC5fm6QKrW5pPMoktvG5LOC0SnJ4vV1Uv)), ZomeName(\"whoami\"), FunctionName(\"whoami\"), AgentPubKey(uhCAke1j8Z2a-_min0h0pGuEMcYlo_V1l1mt9OtBuywKmHlg4L_R-))")),
 
 	match cap_fail {
-            Ok(Err(RibosomeError::WasmError(WasmError::Zome(s)))) => {
+            Ok(Err(RibosomeError::WasmError(WasmError::Guest(s)))) => {
 		assert!(s.contains(
 		    "inner function \'whoarethey_local\' failed: UnauthorizedZomeCall"));
 	    },
