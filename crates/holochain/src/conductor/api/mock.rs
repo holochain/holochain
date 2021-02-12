@@ -1,5 +1,4 @@
 #![allow(missing_docs)]
-#![allow(clippy::ptr_arg)]
 
 use super::CellConductorApiT;
 use super::ZomeCall;

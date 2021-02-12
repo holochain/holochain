@@ -55,8 +55,9 @@ impl AppBundle {
                     if let Ok(mut resolution) = acc {
                         match op {
                             CellProvisioningOp::Create(dna, clone_limit) => {
+                                let agent = resolution.agent.clone();
                                 let dna_hash = dna.dna_hash().clone();
-                                let cell_id = CellId::new(dna_hash.clone(), agent.clone());
+                                let cell_id = CellId::new(dna_hash, agent);
                                 let slot = AppSlot::new(cell_id, true, clone_limit);
                                 // TODO: could sequentialize this to remove the clone
                                 let proof = membrane_proofs.get(&cell_nick).cloned();
