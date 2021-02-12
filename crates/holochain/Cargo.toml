@@ -11,7 +11,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.26"
 async-trait = "0.1"
-base64 = "0.10.1"
+base64 = "0.13"
 byteorder = "1.3.4"
 cfg-if = "0.1"
 chrono = "0.4.6"
@@ -33,7 +33,7 @@ holochain_serialized_bytes = "=0.0.48"
 holochain_state = { version = "0.0.1", path = "../holochain_state" }
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
 holochain_wasm_test_utils = { version = "0.0.1", path = "../test_utils/wasm" }
-holochain_wasmer_host = "0.0.65"
+holochain_wasmer_host = "=0.0.66"
 holochain_websocket = { version = "0.0.1", path = "../holochain_websocket" }
 holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
 human-panic = "1.0.3"

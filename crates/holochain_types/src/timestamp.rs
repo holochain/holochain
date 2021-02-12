@@ -11,97 +11,16 @@ use std::convert::TryInto;
 /// Timestamp implements `Serialize` and `Display` as rfc3339 time strings.
 /// - Field 0: i64 - Seconds since UNIX epoch UTC (midnight 1970-01-01).
 /// - Field 1: u32 - Nanoseconds in addition to above seconds.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
-)]
-pub struct Timestamp(
-    // sec
-    pub i64,
-    // nsec
-    pub u32,
-);
+///
+/// Supports +/- std::time::Duration directly
+pub use holochain_zome_types::timestamp::*; // Timestamp, TimestampError
 
-impl Timestamp {
-    /// Create a new Timestamp instance from current system time.
-    pub fn now() -> Self {
-        chrono::offset::Utc::now().into()
-    }
-}
-
-impl std::fmt::Display for Timestamp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let t: chrono::DateTime<chrono::Utc> = self.into();
-        write!(
-            f,
-            "{}",
-            t.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true)
-        )
-    }
-}
-
-impl From<chrono::DateTime<chrono::Utc>> for Timestamp {
-    fn from(t: chrono::DateTime<chrono::Utc>) -> Self {
-        std::convert::From::from(&t)
-    }
-}
-
-impl From<&chrono::DateTime<chrono::Utc>> for Timestamp {
-    fn from(t: &chrono::DateTime<chrono::Utc>) -> Self {
-        let t = t.naive_utc();
-        Timestamp(t.timestamp(), t.timestamp_subsec_nanos())
-    }
-}
-
-impl From<Timestamp> for chrono::DateTime<chrono::Utc> {
-    fn from(t: Timestamp) -> Self {
-        std::convert::From::from(&t)
-    }
-}
-
-impl From<&Timestamp> for chrono::DateTime<chrono::Utc> {
-    fn from(t: &Timestamp) -> Self {
-        let t = chrono::naive::NaiveDateTime::from_timestamp(t.0, t.1);
-        chrono::DateTime::from_utc(t, chrono::Utc)
-    }
-}
-
-impl std::convert::TryFrom<String> for Timestamp {
-    type Error = chrono::ParseError;
-
-    fn try_from(t: String) -> Result<Self, Self::Error> {
-        std::convert::TryFrom::try_from(&t)
-    }
-}
-
-impl std::convert::TryFrom<&String> for Timestamp {
-    type Error = chrono::ParseError;
-
-    fn try_from(t: &String) -> Result<Self, Self::Error> {
-        let t: &str = &t;
-        std::convert::TryFrom::try_from(t)
-    }
-}
-
-impl std::convert::TryFrom<&str> for Timestamp {
-    type Error = chrono::ParseError;
-
-    fn try_from(t: &str) -> Result<Self, Self::Error> {
-        let t = chrono::DateTime::parse_from_rfc3339(t)?;
-        let t = chrono::DateTime::from_utc(t.naive_utc(), chrono::Utc);
-        Ok(t.into())
-    }
-}
-
-impl From<Timestamp> for holochain_zome_types::timestamp::Timestamp {
-    fn from(ts: Timestamp) -> Self {
-        Self(ts.0, ts.1)
-    }
-}
-
-impl From<holochain_zome_types::timestamp::Timestamp> for Timestamp {
-    fn from(ts: holochain_zome_types::timestamp::Timestamp) -> Self {
-        Self(ts.0, ts.1)
-    }
+/// Returns the current system time as a Timestamp.  We do not make this a holochain_zome_types
+/// timestamp::Timestamp impl now() method, because we need Timestamp to be WASM compatible, and
+/// chrono doesn't have a now() implementation for WASM.  So, use holochain_types timestamp::now()
+/// instead.
+pub fn now() -> Timestamp {
+    Timestamp::from(chrono::offset::Utc::now())
 }
 
 const SEC: usize = std::mem::size_of::<i64>();
@@ -123,7 +42,7 @@ pub struct TimestampKey([u8; TS_SIZE]);
 impl TimestampKey {
     /// Constructor based on current time
     pub fn now() -> Self {
-        Timestamp::now().into()
+        crate::timestamp::now().into()
     }
 }
 

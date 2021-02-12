@@ -55,7 +55,7 @@ macro_rules! app_entry {
                             Err(WasmError::Serialize(serialized_bytes_error))
                         }
                         EntryError::EntryTooLarge(_) => {
-                            Err(WasmError::Zome(entry_error.to_string()))
+                            Err(WasmError::Guest(entry_error.to_string()))
                         }
                     },
                 }
@@ -278,6 +278,56 @@ macro_rules! entry_defs {
         #[hdk_extern]
         fn entry_defs(_: ()) -> $crate::prelude::ExternResult<$crate::prelude::EntryDefsCallbackResult> {
             Ok($crate::prelude::EntryDefsCallbackResult::from(vec![ $( $def ),* ]))
+        }
+    };
+}
+
+/// Attempts to lookup the EntryDefIndex given an EntryDefId.
+///
+/// The EntryDefId is a String newtype and the EntryDefIndex is a u8 newtype.
+/// The EntryDefIndex is used to reference the entry type in headers on the DHT and as the index of the type exported to tooling.
+/// The EntryDefId is the 'human friendly' string that the entry_defs callback maps to the index.
+///
+/// The host actually has no idea how to do this mapping, it is provided by the wasm!
+///
+/// Therefore this is a macro that calls the `entry_defs` callback as defined within a zome directly from the zome.
+/// It is a macro so that we can call a function with a known name `crate::entry_defs` from the HDK before the function is defined.
+///
+/// Obviously this assumes and requires that a compliant `entry_defs` callback _is_ defined at the root of the crate.
+#[macro_export]
+macro_rules! entry_def_index {
+    ( $t:ty ) => {
+        match crate::entry_defs(()) {
+            Ok($crate::prelude::EntryDefsCallbackResult::Defs(entry_defs)) => {
+                match entry_defs.entry_def_index_from_id(<$t>::entry_def_id()) {
+                    Some(entry_def_index) => Ok::<
+                        $crate::prelude::EntryDefIndex,
+                        $crate::prelude::WasmError,
+                    >(entry_def_index),
+                    None => {
+                        $crate::prelude::tracing::error!(
+                            entry_def_type = stringify!($t),
+                            ?entry_defs,
+                            "Failed to lookup index for entry def id."
+                        );
+                        Err::<$crate::prelude::EntryDefIndex, $crate::prelude::WasmError>(
+                            $crate::prelude::WasmError::Guest(
+                                "Failed to lookup index for entry def id.".into(),
+                            ),
+                        )
+                    }
+                }
+            }
+            Ok($crate::prelude::EntryDefsCallbackResult::Err(error)) => {
+                $crate::prelude::tracing::error!(?error, "Failed to lookup entry defs.");
+                Err::<$crate::prelude::EntryDefIndex, $crate::prelude::WasmError>(
+                    $crate::prelude::WasmError::Guest(error),
+                )
+            }
+            Err(error) => {
+                $crate::prelude::tracing::error!(?error, "Failed to lookup entry defs.");
+                Err::<$crate::prelude::EntryDefIndex, $crate::prelude::WasmError>(error)
+            }
         }
     };
 }

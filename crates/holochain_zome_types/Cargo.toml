@@ -15,6 +15,7 @@ edition = "2018"
 holo_hash = { path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.48"
 paste = "=1.0.3"
+chrono = "0.4.6"
 serde = { version = "1.0.104", features = [ "derive" ] }
 serde_bytes = "0.11"
 subtle = "2"
