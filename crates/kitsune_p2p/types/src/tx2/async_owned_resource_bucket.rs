@@ -121,9 +121,7 @@ impl<T: 'static + Send> AsyncOwnedResourceBucket<T> {
                     .await
                     {
                         futures::future::Either::Left((v, _)) => v.map_err(KitsuneError::other),
-                        futures::future::Either::Right(_) => {
-                            return Err("timeout".into());
-                        }
+                        futures::future::Either::Right(_) => Err("timeout".into()),
                     }
                 }
             }

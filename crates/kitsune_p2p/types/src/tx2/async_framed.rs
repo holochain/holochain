@@ -69,19 +69,21 @@ impl std::fmt::Debug for MsgId {
     }
 }
 
+type RR = Result<Vec<(MsgId, Box<[u8]>)>, futures::io::Error>;
+
 /// Read Frames one at a time from an async source.
 pub trait AsyncReadFramed: 'static + Send + Unpin {
     /// low-level poll for reading a frame.
     fn poll_read_framed(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<Vec<(MsgId, Box<[u8]>)>, futures::io::Error>>;
+    ) -> std::task::Poll<RR>;
 }
 
 /// Extension trait providing higher-level access API.
 pub trait AsyncReadFramedExt: AsyncReadFramed {
     /// high-level async read frames fn.
-    fn read_frame<'a>(&'a mut self) -> AsyncReadFramedFut<'a, Self> {
+    fn read_frame(&mut self) -> AsyncReadFramedFut<'_, Self> {
         let this = std::pin::Pin::new(&mut *self);
         AsyncReadFramedFut(this)
     }
@@ -99,7 +101,7 @@ impl<'a, P> std::future::Future for AsyncReadFramedFut<'a, P>
 where
     P: ?Sized + AsyncReadFramed,
 {
-    type Output = Result<Vec<(MsgId, Box<[u8]>)>, futures::io::Error>;
+    type Output = RR;
 
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
@@ -140,7 +142,7 @@ impl AsyncReadFramed for AsyncReadFramedFilter {
     fn poll_read_framed(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<Vec<(MsgId, Box<[u8]>)>, futures::io::Error>> {
+    ) -> std::task::Poll<RR> {
         let mut buf = self.buf.take().unwrap_or_else(|| Vec::with_capacity(4096));
         let mut out = Vec::new();
 
@@ -184,7 +186,7 @@ impl AsyncReadFramed for AsyncReadFramedFilter {
             }
         }
         self.buf = Some(buf);
-        if got_pending == true && out.is_empty() {
+        if got_pending && out.is_empty() {
             std::task::Poll::Pending
         } else {
             std::task::Poll::Ready(Ok(out))

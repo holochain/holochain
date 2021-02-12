@@ -1,11 +1,12 @@
+#![allow(clippy::never_loop)] // using for block breaking
 //! Utilities to help with developing / testing tx2.
 
-const TAG: &[u8; 16] = &[
-    0xff, 0xff, 0xff, 0xfe, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0xfe, 0xff, 0xff, 0xff,
-];
+use futures::io::{Error, ErrorKind};
+
+const TAG: &[u8; 8] = &[0xff, 0xff, 0xff, 0xfe, 0xfe, 0xff, 0xff, 0xff];
 
 /// Fill a buffer with data that is readable as latency information.
-/// Note, the minimum message size to get the timing data across is 32 bytes.
+/// Note, the minimum message size to get the timing data across is 16 bytes.
 pub fn fill_with_latency_info(buf: &mut [u8]) {
     if buf.is_empty() {
         return;
@@ -15,11 +16,11 @@ pub fn fill_with_latency_info(buf: &mut [u8]) {
     let now = now
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
-        .as_micros() as u128;
+        .as_secs_f64();
 
-    let mut pat = [0_u8; 32];
-    pat[0..16].copy_from_slice(TAG);
-    pat[16..32].copy_from_slice(&now.to_le_bytes());
+    let mut pat = [0_u8; 16];
+    pat[0..8].copy_from_slice(TAG);
+    pat[8..16].copy_from_slice(&now.to_le_bytes());
 
     let mut offset = 0;
     while offset < buf.len() {
@@ -31,15 +32,17 @@ pub fn fill_with_latency_info(buf: &mut [u8]) {
 
 /// Return the timestamp microseconds encoded in a latency info buffer.
 /// Returns a unit error if we could not parse the buffer into time data.
-pub fn parse_latency_info(buf: &[u8]) -> Result<u128, ()> {
-    if buf.len() < 32 {
+pub fn parse_latency_info(buf: &[u8]) -> Result<std::time::SystemTime, ()> {
+    if buf.len() < 16 {
         return Err(());
     }
-    for i in 0..buf.len() - 31 {
-        if &buf[i..i + 16] == TAG {
-            let mut time = [0; 16];
-            time.copy_from_slice(&buf[i + 16..i + 32]);
-            return Ok(u128::from_le_bytes(time));
+    for i in 0..buf.len() - 15 {
+        if &buf[i..i + 8] == TAG {
+            let mut time = [0; 8];
+            time.copy_from_slice(&buf[i + 8..i + 16]);
+            let time = f64::from_le_bytes(time);
+            let time = std::time::UNIX_EPOCH + std::time::Duration::from_secs_f64(time);
+            return Ok(time);
         }
     }
     Err(())
@@ -62,7 +65,10 @@ pub fn bound_async_mem_channel(
 
     let (w_lock, r_lock) = futures::lock::BiLock::new(inner);
 
-    (Box::new(MemWrite(w_lock)), Box::new(MemRead(r_lock)))
+    (
+        Box::new(MemWrite(Some(w_lock))),
+        Box::new(MemRead(Some(r_lock))),
+    )
 }
 
 struct MemInner {
@@ -73,94 +79,163 @@ struct MemInner {
     want_write_waker: Option<std::task::Waker>,
 }
 
-struct MemWrite(futures::lock::BiLock<MemInner>);
+struct MemWrite(Option<futures::lock::BiLock<MemInner>>);
 
 impl futures::io::AsyncWrite for MemWrite {
     fn poll_write(
-        self: std::pin::Pin<&mut Self>,
+        mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> std::task::Poll<Result<usize, futures::io::Error>> {
-        match self.0.poll_lock(cx) {
-            std::task::Poll::Pending => std::task::Poll::Pending,
-            std::task::Poll::Ready(mut lock) => {
-                if lock.closed {
-                    return std::task::Poll::Ready(Err(futures::io::Error::new(
-                        futures::io::ErrorKind::ConnectionAborted,
-                        "attempt to write to closed writer",
-                    )));
-                }
-
-                let amount =
-                    std::cmp::max(4096, std::cmp::min(buf.len(), lock.max - lock.buf.len()));
-
-                if amount == 0 {
-                    lock.want_write_waker = Some(cx.waker().clone());
-                    return std::task::Poll::Pending;
-                }
-
-                lock.buf.extend_from_slice(&buf[..amount]);
-                if let Some(waker) = lock.want_read_waker.take() {
-                    waker.wake();
-                }
-
-                std::task::Poll::Ready(Ok(amount))
+        let inner = match self.0.take() {
+            None => {
+                return std::task::Poll::Ready(Err(Error::new(
+                    ErrorKind::Other,
+                    "PreviouslyClosed",
+                )))
             }
-        }
+            Some(inner) => inner,
+        };
+        let res = 'res: loop {
+            match inner.poll_lock(cx) {
+                std::task::Poll::Pending => break 'res std::task::Poll::Pending,
+                std::task::Poll::Ready(mut lock) => {
+                    if lock.closed {
+                        // this should never happen, as we should not
+                        // restore the `Some(inner)` on close.
+                        unreachable!();
+                    }
+
+                    let amount = std::cmp::min(
+                        4096, //
+                        std::cmp::min(
+                            buf.len(),                 //
+                            lock.max - lock.buf.len(), //
+                        ),
+                    );
+
+                    if amount == 0 {
+                        lock.want_write_waker = Some(cx.waker().clone());
+                        break 'res std::task::Poll::Pending;
+                    }
+
+                    lock.buf.extend_from_slice(&buf[..amount]);
+                    if let Some(waker) = lock.want_read_waker.take() {
+                        waker.wake();
+                    }
+
+                    break 'res std::task::Poll::Ready(Ok(amount));
+                }
+            }
+        };
+        self.0 = Some(inner);
+        res
     }
 
     fn poll_flush(
         self: std::pin::Pin<&mut Self>,
         _cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), futures::io::Error>> {
+        if self.0.is_none() {
+            return std::task::Poll::Ready(Err(Error::new(ErrorKind::Other, "PreviouslyClosed")));
+        }
         std::task::Poll::Ready(Ok(()))
     }
 
     fn poll_close(
-        self: std::pin::Pin<&mut Self>,
+        mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), futures::io::Error>> {
-        match self.0.poll_lock(cx) {
-            std::task::Poll::Pending => std::task::Poll::Pending,
-            std::task::Poll::Ready(mut lock) => {
-                lock.closed = true;
-                std::task::Poll::Ready(Ok(()))
+        let inner = match self.0.take() {
+            None => {
+                return std::task::Poll::Ready(Err(Error::new(
+                    ErrorKind::Other,
+                    "PreviouslyClosed",
+                )))
             }
+            Some(inner) => inner,
+        };
+        let mut closed = false;
+        let res = 'res: loop {
+            match inner.poll_lock(cx) {
+                std::task::Poll::Pending => break 'res std::task::Poll::Pending,
+                std::task::Poll::Ready(mut lock) => {
+                    lock.closed = true;
+                    closed = true;
+                    if let Some(waker) = lock.want_read_waker.take() {
+                        waker.wake();
+                    }
+                    break 'res std::task::Poll::Ready(Ok(()));
+                }
+            }
+        };
+        if !closed {
+            self.0 = Some(inner);
         }
+        res
     }
 }
 
-struct MemRead(futures::lock::BiLock<MemInner>);
+struct MemRead(Option<futures::lock::BiLock<MemInner>>);
 
 impl futures::io::AsyncRead for MemRead {
     fn poll_read(
-        self: std::pin::Pin<&mut Self>,
+        mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
         buf: &mut [u8],
     ) -> std::task::Poll<Result<usize, futures::io::Error>> {
-        match self.0.poll_lock(cx) {
-            std::task::Poll::Pending => std::task::Poll::Pending,
-            std::task::Poll::Ready(mut lock) => {
-                if lock.buf.is_empty() {
-                    if lock.closed {
-                        return std::task::Poll::Ready(Ok(0));
-                    } else {
-                        lock.want_read_waker = Some(cx.waker().clone());
-                        return std::task::Poll::Pending;
-                    }
-                }
-
-                let amount = std::cmp::max(4096, std::cmp::min(buf.len(), lock.buf.len()));
-
-                buf[..amount].copy_from_slice(&lock.buf[..amount]);
-                lock.buf.drain(..amount);
-                if let Some(waker) = lock.want_write_waker.take() {
-                    waker.wake();
-                }
-
-                std::task::Poll::Ready(Ok(amount))
-            }
+        if buf.is_empty() {
+            return std::task::Poll::Ready(Err(Error::new(
+                ErrorKind::InvalidInput,
+                "AmbiguousZeroBuffer",
+            )));
         }
+        let inner = match self.0.take() {
+            None => {
+                return std::task::Poll::Ready(Err(Error::new(
+                    ErrorKind::Other,
+                    "PreviouslyClosed",
+                )))
+            }
+            Some(inner) => inner,
+        };
+        let mut closed = false;
+        let res = 'res: loop {
+            match inner.poll_lock(cx) {
+                std::task::Poll::Pending => break 'res std::task::Poll::Pending,
+                std::task::Poll::Ready(mut lock) => {
+                    if lock.buf.is_empty() {
+                        if lock.closed {
+                            closed = true;
+                            break 'res std::task::Poll::Ready(Ok(0));
+                        } else {
+                            lock.want_read_waker = Some(cx.waker().clone());
+                            break 'res std::task::Poll::Pending;
+                        }
+                    }
+
+                    let amount = std::cmp::min(
+                        4096, //
+                        std::cmp::min(
+                            buf.len(),      //
+                            lock.buf.len(), //
+                        ),
+                    );
+
+                    buf[..amount].copy_from_slice(&lock.buf[..amount]);
+                    lock.buf.drain(..amount);
+                    if let Some(waker) = lock.want_write_waker.take() {
+                        waker.wake();
+                    }
+
+                    break 'res std::task::Poll::Ready(Ok(amount));
+                }
+            }
+        };
+        if !closed {
+            self.0 = Some(inner);
+        }
+        res
     }
 }
 
@@ -170,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_bad_latency_buffer_sizes() {
-        for i in 0..32 {
+        for i in 0..16 {
             let mut buf = vec![0; i];
             fill_with_latency_info(&mut buf);
             assert!(parse_latency_info(&buf).is_err());
@@ -184,16 +259,48 @@ mod tests {
 
     #[test]
     fn test_good_latency_buffers() {
-        for i in 32..64 {
+        for i in 16..64 {
             let mut buf = vec![0; i];
             fill_with_latency_info(&mut buf);
-            let now = std::time::SystemTime::now();
-            let now = now
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_micros() as u128;
-            let val = now - parse_latency_info(&buf).unwrap();
-            assert!(val < 10_000);
+            let val = parse_latency_info(&buf).unwrap();
+            assert!(val.elapsed().unwrap().as_micros() < 10_000);
         }
+    }
+
+    async fn _inner_test_async_bound_mem_channel(bind_size: usize, buf_size: usize) {
+        let (mut send, mut recv) = bound_async_mem_channel(bind_size);
+
+        let rt = tokio::task::spawn(async move {
+            let mut read_buf = vec![0_u8; buf_size];
+            use futures::io::AsyncReadExt;
+            recv.read_exact(&mut read_buf).await.unwrap();
+            println!(
+                "mem_chan(bind-{},buf-{}) in: {} us",
+                bind_size,
+                buf_size,
+                parse_latency_info(&read_buf)
+                    .unwrap()
+                    .elapsed()
+                    .unwrap()
+                    .as_micros()
+            );
+        });
+
+        use futures::io::AsyncWriteExt;
+        let mut write_buf = vec![0_u8; buf_size];
+        fill_with_latency_info(&mut write_buf);
+        send.write_all(&write_buf).await.unwrap();
+
+        rt.await.unwrap();
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_async_bound_mem_channel_sm_buf() {
+        _inner_test_async_bound_mem_channel(15, 4096).await;
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_async_bound_mem_channel_lg_buf() {
+        _inner_test_async_bound_mem_channel(4096 * 3, 4096 * 4).await;
     }
 }
