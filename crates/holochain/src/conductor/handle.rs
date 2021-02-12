@@ -290,23 +290,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-        let is_full_wasm_dna = dna
-            .dna_def()
-            .zomes
-            .iter()
-            .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
-
-        let mut lock = self.conductor.write().await;
-
-        // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
-        if is_full_wasm_dna {
-            let entry_defs = lock.put_wasm(dna.clone()).await?;
-            lock.dna_store_mut().add_entry_defs(entry_defs);
-        }
-
-        lock.dna_store_mut().add_dna(dna);
-
-        Ok(())
+        self.conductor.write().await.register_dna(dna).await
     }
 
     async fn load_dnas(&self) -> ConductorResult<()> {

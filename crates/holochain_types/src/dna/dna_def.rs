@@ -99,9 +99,19 @@ impl DnaDef {
                 }
             })
     }
+
+    /// Change the "phenotype" of this DNA -- the UUID and properties -- while
+    /// leaving the "genotype" of actual DNA code intact
+    pub fn modify_phenotype(&self, uuid: Uuid, properties: YamlProperties) -> DnaResult<Self> {
+        let mut clone = self.clone();
+        clone.properties = properties.try_into()?;
+        clone.uuid = uuid;
+        Ok(clone)
+    }
 }
 
-fn random_uuid() -> String {
+/// Get a random UUID
+pub fn random_uuid() -> String {
     nanoid::nanoid!()
 }
 

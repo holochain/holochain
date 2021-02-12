@@ -1,5 +1,5 @@
 use fallible_iterator::FallibleIterator;
-use holochain_lmdb::buffer::CasBufFreshAsync;
+use holochain_lmdb::buffer::CasBufFreshSync;
 use holochain_lmdb::env::EnvironmentRead;
 use holochain_lmdb::error::DatabaseError;
 use holochain_lmdb::error::DatabaseResult;
@@ -20,7 +20,7 @@ pub struct RealDnaStore {
 }
 
 pub struct DnaDefBuf {
-    dna_defs: CasBufFreshAsync<DnaDef>,
+    dna_defs: CasBufFreshSync<DnaDef>,
 }
 
 impl DnaStore for RealDnaStore {
@@ -65,16 +65,16 @@ impl RealDnaStore {
 impl DnaDefBuf {
     pub fn new(env: EnvironmentRead, dna_def_store: SingleStore) -> DatabaseResult<Self> {
         Ok(Self {
-            dna_defs: CasBufFreshAsync::new(env, dna_def_store),
+            dna_defs: CasBufFreshSync::new(env, dna_def_store),
         })
     }
 
     pub async fn get(&self, dna_hash: &DnaHash) -> DatabaseResult<Option<DnaDefHashed>> {
-        self.dna_defs.get(dna_hash).await
+        self.dna_defs.get(dna_hash)
     }
 
     pub async fn put(&mut self, dna_def: DnaDef) -> DatabaseResult<()> {
-        self.dna_defs.put(DnaDefHashed::from_content(dna_def).await);
+        self.dna_defs.put(DnaDefHashed::from_content_sync(dna_def));
         Ok(())
     }
 

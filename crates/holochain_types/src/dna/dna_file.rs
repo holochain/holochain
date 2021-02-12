@@ -65,7 +65,7 @@ impl DnaFile {
             let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
             code.insert(wasm_hash, wasm);
         }
-        let dna = DnaDefHashed::from_content(dna).await;
+        let dna = DnaDefHashed::from_content_sync(dna);
         Ok(Self {
             dna,
             code: code.into(),
@@ -94,18 +94,18 @@ impl DnaFile {
     }
 
     /// Verify that the DNA hash in the file matches the DnaDef
-    pub async fn verify_hash(&self) -> Result<(), DnaError> {
+    pub fn verify_hash(&self) -> Result<(), DnaError> {
         self.dna
-            .verify_hash()
-            .await
+            .verify_hash_sync()
             .map_err(|hash| DnaError::DnaHashMismatch(self.dna.as_hash().clone(), hash))
     }
 
     /// Load dna_file bytecode into this rust struct.
+    #[deprecated = "remove after app bundles become standard; use DnaBundle instead"]
     pub async fn from_file_content(data: &[u8]) -> Result<Self, DnaError> {
         // Not super efficient memory-wise, but doesn't block any threads
         let data = data.to_vec();
-        // MD: why are we blocking here?
+        // Block because gzipping could take some time
         let dna_file = tokio::task::spawn_blocking(move || {
             let mut gz = flate2::read::GzDecoder::new(&data[..]);
             let mut bytes = Vec::new();
@@ -117,7 +117,7 @@ impl DnaFile {
         })
         .await
         .expect("blocking thread panicked - panicking here too")?;
-        dna_file.verify_hash().await?;
+        dna_file.verify_hash()?;
         Ok(dna_file)
     }
 
@@ -148,13 +148,13 @@ impl DnaFile {
         self.code.0.get(wasm_hash).ok_or(DnaError::InvalidWasmHash)
     }
 
+    #[deprecated = "remove after app bundles become standard; use DnaBundle instead"]
     /// Render this dna_file as bytecode to send over the wire, or store in a file.
     pub async fn to_file_content(&self) -> Result<Vec<u8>, DnaError> {
         // Not super efficient memory-wise, but doesn't block any threads
         let dna_file = self.clone();
-        // TODO: remove
-        dna_file.verify_hash().await.expect("TODO, remove");
-        // MD: why are we blocking here?
+        dna_file.verify_hash()?;
+        // Block because gzipping could take some time
         tokio::task::spawn_blocking(move || {
             let data: SerializedBytes = dna_file.try_into()?;
             let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
@@ -164,6 +164,14 @@ impl DnaFile {
         })
         .await
         .expect("blocking thread panic!d - panicing here too")
+    }
+
+    /// Change the "phenotype" of this DNA -- the UUID and properties -- while
+    /// leaving the "genotype" of actual DNA code intact
+    pub fn modify_phenotype(&self, uuid: Uuid, properties: YamlProperties) -> DnaResult<Self> {
+        let mut clone = self.clone();
+        clone.dna = DnaDefHashed::from_content_sync(clone.dna.modify_phenotype(uuid, properties)?);
+        Ok(clone)
     }
 }
 

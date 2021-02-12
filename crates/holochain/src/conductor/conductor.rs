@@ -337,6 +337,23 @@ where
         Ok(port)
     }
 
+    pub(super) async fn register_dna(&mut self, dna: DnaFile) -> ConductorResult<()> {
+        let is_full_wasm_dna = dna
+            .dna_def()
+            .zomes
+            .iter()
+            .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
+
+        // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
+        if is_full_wasm_dna {
+            let entry_defs = self.put_wasm(dna.clone()).await?;
+            self.dna_store_mut().add_entry_defs(entry_defs);
+        }
+
+        self.dna_store_mut().add_dna(dna);
+        Ok(())
+    }
+
     /// Start all app interfaces currently in state.
     /// This should only be run at conductor initialization.
     #[allow(irrefutable_let_patterns)]
@@ -630,10 +647,33 @@ where
         cell_nick: &CellNick,
         properties: YamlProperties,
     ) -> ConductorResult<CellId> {
+        let (_, child_dna) = self
+            .update_state_prime(|mut state| {
+                if let Some(app) = state.active_apps.get_mut(installed_app_id) {
+                    let slot = app
+                        .slots()
+                        .get(cell_nick)
+                        .ok_or_else(|| AppError::CellNickMissing(cell_nick.to_owned()))?;
+                    let parent_dna_hash = slot.dna_hash();
+                    let mut dna = self
+                        .dna_store
+                        .get(parent_dna_hash)
+                        .ok_or_else(|| DnaError::DnaMissing(parent_dna_hash.to_owned()))?
+                        .modify_phenotype(random_uuid(), properties)?;
+                    Ok((state, dna))
+                } else {
+                    Err(ConductorError::AppNotActive(installed_app_id.clone()))
+                }
+            })
+            .await?;
+        let child_dna_hash = child_dna.dna_hash().to_owned();
+        self.register_dna(child_dna).await?;
         let (_, cell_id) = self
             .update_state_prime(|mut state| {
                 if let Some(app) = state.active_apps.get_mut(installed_app_id) {
-                    let cell_id = app.add_clone(cell_nick, properties)?;
+                    let agent = todo!("get agent for app");
+                    let cell_id = CellId::new(child_dna_hash, agent);
+                    app.add_clone(cell_nick, properties, cell_id)?;
                     Ok((state, cell_id))
                 } else {
                     Err(ConductorError::AppNotActive(installed_app_id.clone()))

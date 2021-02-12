@@ -31,7 +31,7 @@ impl DnaBundle {
     /// Convert to a DnaFile
     pub async fn into_dna_file(self) -> DnaResult<DnaFile> {
         let (zomes, wasms) = self.inner_maps().await?;
-        let dna_def = self.to_dna_def(zomes).await?;
+        let dna_def = self.to_dna_def(zomes)?;
 
         Ok(DnaFile::from_parts(dna_def, wasms))
     }
@@ -90,7 +90,7 @@ impl DnaBundle {
     }
 
     /// Convert to a DnaDef
-    pub async fn to_dna_def(&self, zomes: Zomes) -> DnaResult<DnaDefHashed> {
+    pub fn to_dna_def(&self, zomes: Zomes) -> DnaResult<DnaDefHashed> {
         let manifest = self.manifest();
         let properties: SerializedBytes = manifest
             .properties
@@ -104,7 +104,7 @@ impl DnaBundle {
             zomes,
         };
 
-        Ok(DnaDefHashed::from_content(dna_def).await)
+        Ok(DnaDefHashed::from_content_sync(dna_def))
     }
 
     /// Build a bundle from a DnaFile. Useful for tests.

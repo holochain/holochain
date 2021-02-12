@@ -1,7 +1,7 @@
 use holochain_types::{
     dna::{
         error::DnaResult,
-        wasm,
+        random_uuid, wasm,
         zome::{inline_zome::InlineZome, Zome, ZomeDef},
         DnaDefBuilder, DnaFile,
     },
@@ -115,8 +115,4 @@ impl SweetDnaDef {
     pub fn unique_from_zomes(zomes: Vec<Zome>) -> DnaDef {
         DnaDef::unique_from_zomes(zomes)
     }
-}
-
-fn random_uuid() -> String {
-    nanoid::nanoid!()
 }

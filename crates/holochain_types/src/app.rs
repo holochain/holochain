@@ -284,12 +284,14 @@ impl InstalledApp {
             .chain(self.cloned_cells())
     }
 
+    /// Accessor
+    pub fn slots(&self) -> &HashMap<CellNick, AppSlot> {
+        &self.slots
+    }
+
     /// Add a cloned cell
-    pub fn add_clone(
-        &mut self,
-        cell_nick: &CellNick,
-        properties: YamlProperties,
-    ) -> AppResult<CellId> {
+    pub fn add_clone(&mut self, cell_nick: &CellNick, cell_id: CellId) -> AppResult<()> {
+        todo!("ensure cell is unique and agent is same as app agent");
         let slot = self
             .slots
             .get_mut(cell_nick)
@@ -297,10 +299,8 @@ impl InstalledApp {
         if slot.clones.len() as u32 >= slot.clone_limit {
             return Err(AppError::CloneLimitExceeded(slot.clone_limit, slot.clone()));
         }
-        let cell_id = todo!("Create cell with new UUID and specified properties");
-        // cell_id is guaranteed to be unique
         let _ = slot.clones.insert(cell_id);
-        Ok(cell_id)
+        Ok(())
     }
 
     /// Remove a cloned cell
@@ -338,6 +338,11 @@ impl AppSlot {
             clones: HashSet::new(),
             dna_hash,
         }
+    }
+
+    /// Accessor
+    pub fn dna_hash(&self) -> &DnaHash {
+        &self.dna_hash
     }
 }
 

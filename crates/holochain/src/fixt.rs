@@ -137,7 +137,7 @@ fixturator!(
     {
         DnaFile::from_parts(
             tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-                DnaDefHashed::from_content(DnaDefFixturator::new(Empty).next().unwrap()).await
+                DnaDefHashed::from_content_sync(DnaDefFixturator::new(Empty).next().unwrap())
             }),
             WasmMapFixturator::new(Empty).next().unwrap(),
         )
@@ -159,7 +159,7 @@ fixturator!(
         let mut dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
         dna_def.zomes = zomes;
         let dna = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            DnaDefHashed::from_content(dna_def).await
+            DnaDefHashed::from_content_sync(dna_def)
         });
         DnaFile::from_parts(dna, WasmMapFixturator::new(Unpredictable).next().unwrap())
     },
@@ -185,7 +185,7 @@ fixturator!(
             .unwrap();
         dna_def.zomes = zomes;
         let dna = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            DnaDefHashed::from_content(dna_def).await
+            DnaDefHashed::from_content_sync(dna_def)
         });
         DnaFile::from_parts(
             dna,

@@ -257,7 +257,7 @@ pub mod tests {
 
         let hashes = join_all(
             dnas.into_iter()
-                .map(|dna| async move { DnaHash::with_data(&dna).await.into() }),
+                .map(|dna| async move { DnaHash::with_data_sync(&dna).into() }),
         )
         .await;
 
