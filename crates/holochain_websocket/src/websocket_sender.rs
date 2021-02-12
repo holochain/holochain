@@ -16,7 +16,7 @@ use std::sync::Arc;
 /// The sender half of an active connection.
 ///
 /// # Example
-/// ```
+/// ```no_run
 /// use holochain_serialized_bytes::prelude::*;
 /// use holochain_websocket::*;
 /// use std::time::Duration;
