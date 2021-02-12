@@ -7,36 +7,42 @@ pub trait AsyncReadIntoVec: 'static + Send + Unpin {
         vec: &mut Vec<u8>,
         max_bytes: usize,
     ) -> std::task::Poll<Result<usize, futures::io::Error>>;
+}
 
+/// Extension trait providing higher-level access API.
+pub trait AsyncReadIntoVecExt: AsyncReadIntoVec {
     /// high-level async read data into a vec.
     fn read_into_vec<'a>(
         &'a mut self,
         vec: &'a mut Vec<u8>,
         max_bytes: usize,
-    ) -> futures::future::BoxFuture<'a, Result<usize, futures::io::Error>> {
-        struct Read<'a, P>(std::pin::Pin<&'a mut P>, &'a mut Vec<u8>, usize)
-        where
-            P: ?Sized + AsyncReadIntoVec;
-
-        impl<'a, P> std::future::Future for Read<'a, P>
-        where
-            P: ?Sized + AsyncReadIntoVec,
-        {
-            type Output = Result<usize, futures::io::Error>;
-
-            fn poll(
-                mut self: std::pin::Pin<&mut Self>,
-                cx: &mut std::task::Context<'_>,
-            ) -> std::task::Poll<Self::Output> {
-                let this = &mut *self;
-                let rdr: std::pin::Pin<&mut P> = std::pin::Pin::new(&mut this.0);
-                AsyncReadIntoVec::poll_read_into_vec(rdr, cx, this.1, this.2)
-            }
-        }
-
+    ) -> AsyncReadIntoVecFut<'a, Self> {
         let this = std::pin::Pin::new(&mut *self);
-        let read: Read<'a, Self> = Read(this, vec, max_bytes);
-        futures::future::FutureExt::boxed(read)
+        AsyncReadIntoVecFut(this, vec, max_bytes)
+    }
+}
+
+impl<A: AsyncReadIntoVec> AsyncReadIntoVecExt for A {}
+
+/// Future returned from `AsyncReadIntoVec::read_into_vec()`.
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+pub struct AsyncReadIntoVecFut<'a, P>(std::pin::Pin<&'a mut P>, &'a mut Vec<u8>, usize)
+where
+    P: ?Sized + AsyncReadIntoVec;
+
+impl<'a, P> std::future::Future for AsyncReadIntoVecFut<'a, P>
+where
+    P: ?Sized + AsyncReadIntoVec,
+{
+    type Output = Result<usize, futures::io::Error>;
+
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let this = &mut *self;
+        let rdr: std::pin::Pin<&mut P> = std::pin::Pin::new(&mut this.0);
+        AsyncReadIntoVec::poll_read_into_vec(rdr, cx, this.1, this.2)
     }
 }
 
@@ -109,7 +115,7 @@ impl AsyncReadIntoVec for AsyncReadIntoVecFilter {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::tx2::*;
 
     struct FakeRead;
 
@@ -119,13 +125,7 @@ mod tests {
             _cx: &mut std::task::Context<'_>,
             buf: &mut [u8],
         ) -> std::task::Poll<Result<usize, futures::io::Error>> {
-            static DATA: &'static [u8; 4096] = &[0xdb; 4096];
-            let mut offset = 0;
-            while offset < buf.len() {
-                let len = std::cmp::min(4096, buf.len() - offset);
-                buf[offset..offset + len].copy_from_slice(&DATA[0..len]);
-                offset += len;
-            }
+            util::fill_with_latency_info(buf);
             std::task::Poll::Ready(Ok(buf.len()))
         }
     }
@@ -134,11 +134,9 @@ mod tests {
     async fn test_async_read_into_vec_filter() {
         let mut r = AsyncReadIntoVecFilter::new(Box::new(FakeRead));
         let mut v = Vec::new();
-        r.read_into_vec(&mut v, 1).await.unwrap();
-        assert_eq!(&[0xdb], v.as_slice());
+        r.read_into_vec(&mut v, 32).await.unwrap();
+        assert!(util::parse_latency_info(v.as_slice()).is_ok());
         r.read_into_vec(&mut v, 10000).await.unwrap();
-        for i in v.iter() {
-            assert_eq!(0xdb, *i);
-        }
+        assert_eq!(10032, v.len());
     }
 }

@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use kitsune_p2p_types::tx2::{AsyncReadIntoVec, AsyncReadIntoVecFilter};
+use kitsune_p2p_types::tx2::*;
 use once_cell::sync::Lazy;
 
 static RUNTIME: Lazy<tokio::runtime::Handle> = Lazy::new(|| {
@@ -25,13 +25,7 @@ impl futures::io::AsyncRead for FakeRead {
         _cx: &mut std::task::Context<'_>,
         buf: &mut [u8],
     ) -> std::task::Poll<Result<usize, futures::io::Error>> {
-        static DATA: &'static [u8; 4096] = &[0xdb; 4096];
-        let mut offset = 0;
-        while offset < buf.len() {
-            let len = std::cmp::min(4096, buf.len() - offset);
-            buf[offset..offset + len].copy_from_slice(&DATA[0..len]);
-            offset += len;
-        }
+        util::fill_with_latency_info(buf);
         std::task::Poll::Ready(Ok(buf.len()))
     }
 }
