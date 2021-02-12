@@ -91,7 +91,7 @@
 //!
 //! All host functions can be called directly as:
 //!
-//! ```rust
+//! ```ignore
 //! use crate::prelude::*;
 //! let _output: ExternResult<OutputType> = host_call::<InputType, OutputType>(__host_extern_name, input);
 //! ```
@@ -109,7 +109,7 @@
 //!
 //! For example:
 //!
-//! ```rust
+//! ```ignore
 //! use crate::prelude::*;
 //!
 //! // This function can be called by any external process that can provide and accept messagepack serialized u32 integers.
