@@ -433,7 +433,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let cell_id = CellId::new(dna_hash, agent_key);
         let cells = vec![(cell_id.clone(), membrane_proof)];
         conductor.genesis_cells(cells, self.clone()).await?;
-        let properties = properties.unwrap_or(().into());
+        let properties = properties.unwrap_or_else(|| ().into());
         let cell_id = conductor
             .add_clone_cell_to_app(&installed_app_id, &cell_nick, properties)
             .await?;

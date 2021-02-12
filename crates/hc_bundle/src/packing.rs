@@ -15,7 +15,7 @@ pub async fn unpack<M: Manifest>(
     force: bool,
 ) -> HcBundleResult<PathBuf> {
     let bundle_path = ffs::canonicalize(bundle_path).await?;
-    let bundle: Bundle<M> = Bundle::read_from_file(&bundle_path).await?.into();
+    let bundle: Bundle<M> = Bundle::read_from_file(&bundle_path).await?;
 
     let target_dir = if let Some(d) = target_dir {
         d
@@ -52,7 +52,7 @@ pub async fn pack<M: Manifest>(
 ) -> HcBundleResult<(PathBuf, Bundle<M>)> {
     let dir_path = ffs::canonicalize(dir_path).await?;
     let manifest_path = dir_path.join(&M::path());
-    let bundle: Bundle<M> = Bundle::pack_yaml(&manifest_path).await?.into();
+    let bundle: Bundle<M> = Bundle::pack_yaml(&manifest_path).await?;
     let target_path = target_path
         .map(Ok)
         .unwrap_or_else(|| dir_to_bundle_path(&dir_path, M::bundle_extension()))?;

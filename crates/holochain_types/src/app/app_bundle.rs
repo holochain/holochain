@@ -57,8 +57,7 @@ impl AppBundle {
                             CellProvisioningOp::Create(dna, clone_limit) => {
                                 let dna_hash = dna.dna_hash().clone();
                                 let cell_id = CellId::new(dna_hash.clone(), agent.clone());
-                                let slot =
-                                    AppSlot::new(dna_hash, Some(cell_id.clone()), clone_limit);
+                                let slot = AppSlot::new(dna_hash, Some(cell_id), clone_limit);
                                 // TODO: could sequentialize this to remove the clone
                                 let proof = membrane_proofs.get(&cell_nick).cloned();
                                 resolution.dnas_to_register.push((dna, proof));
@@ -66,8 +65,7 @@ impl AppBundle {
                             }
                             CellProvisioningOp::Existing(cell_id, clone_limit) => {
                                 let dna_hash = cell_id.dna_hash().to_owned();
-                                let slot =
-                                    AppSlot::new(dna_hash, Some(cell_id.clone()), clone_limit);
+                                let slot = AppSlot::new(dna_hash, Some(cell_id), clone_limit);
                                 resolution.slots.push((cell_nick, slot));
                             }
                             CellProvisioningOp::Noop(dna_hash, clone_limit) => {

@@ -3,7 +3,6 @@
 //! Defines the hApp Manifest YAML format, including validation.
 
 use mr_bundle::{Location, Manifest};
-use serde;
 use std::path::PathBuf;
 
 pub(crate) mod app_manifest_v1;

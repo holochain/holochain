@@ -5,7 +5,7 @@ use holochain_types::prelude::{
     AppBundle, AppManifest, AppManifestInnerBuilder, DnaBundle, DnaManifest,
 };
 
-fn readline<'a>(prompt: Option<&'a str>) -> io::Result<Option<String>> {
+fn readline(prompt: Option<&str>) -> io::Result<Option<String>> {
     let mut input = String::new();
     if let Some(prompt) = prompt {
         print!("{} ", prompt);
@@ -20,17 +20,17 @@ fn readline<'a>(prompt: Option<&'a str>) -> io::Result<Option<String>> {
     })
 }
 
-fn prompt_default<'a, S: Into<String>>(prompt: &'a str, default: S) -> io::Result<String> {
+fn prompt_default<S: Into<String>>(prompt: &str, default: S) -> io::Result<String> {
     let default = default.into();
     let prompt = format!("{} ({})", prompt, default);
     Ok(readline(Some(&prompt))?.unwrap_or(default))
 }
 
-fn prompt_optional<'a>(prompt: &'a str) -> io::Result<Option<String>> {
+fn prompt_optional(prompt: &str) -> io::Result<Option<String>> {
     Ok(readline(Some(prompt))?)
 }
 
-fn prompt_required<'a>(prompt: &'a str) -> io::Result<String> {
+fn prompt_required(prompt: &str) -> io::Result<String> {
     loop {
         if let Some(line) = readline(Some(prompt))? {
             return Ok(line);
@@ -53,7 +53,7 @@ fn prompt_app_init(root_dir: PathBuf) -> anyhow::Result<AppBundle> {
     let description = prompt_optional("description:")?;
     let manifest: AppManifest = AppManifestInnerBuilder::default()
         .name(name)
-        .description(description.unwrap_or("".into()))
+        .description(description.unwrap_or_else(|| "".into()))
         .slots(vec![])
         .build()
         .unwrap()

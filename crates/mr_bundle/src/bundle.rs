@@ -120,10 +120,7 @@ where
         Ok(ffs::write(path, &self.encode()?).await?)
     }
 
-    pub async fn resolve<'a>(
-        &'a self,
-        location: &Location,
-    ) -> MrBundleResult<Cow<'a, ResourceBytes>> {
+    pub async fn resolve(&self, location: &Location) -> MrBundleResult<Cow<'_, ResourceBytes>> {
         let bytes = match &location.normalize(self.root_dir.as_ref())? {
             Location::Bundled(path) => Cow::Borrowed(
                 self.resources
@@ -139,9 +136,7 @@ where
     /// Return the full set of resources specified by this bundle's manifest.
     /// References to bundled resources can be returned directly, while all
     /// others will be fetched from the filesystem or the network.
-    pub async fn resolve_all<'a>(
-        &'a self,
-    ) -> MrBundleResult<HashMap<Location, Cow<'a, ResourceBytes>>> {
+    pub async fn resolve_all(&self) -> MrBundleResult<HashMap<Location, Cow<'_, ResourceBytes>>> {
         futures::future::join_all(
             self.manifest.locations().into_iter().map(|loc| async move {
                 MrBundleResult::Ok((loc.clone(), self.resolve(&loc).await?))
@@ -149,7 +144,7 @@ where
         )
         .await
         .into_iter()
-        .collect::<MrBundleResult<HashMap<Location, Cow<'a, ResourceBytes>>>>()
+        .collect::<MrBundleResult<HashMap<Location, Cow<'_, ResourceBytes>>>>()
     }
 
     /// Resolve all resources, but with fully owned references
@@ -158,7 +153,7 @@ where
             .resolve_all()
             .await?
             .into_iter()
-            .map(|(k, v)| (k, v.into_owned().into()))
+            .map(|(k, v)| (k, v.into_owned()))
             .collect())
     }
 

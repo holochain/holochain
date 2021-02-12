@@ -95,7 +95,7 @@ impl DnaBundle {
         let properties: SerializedBytes = manifest
             .properties
             .as_ref()
-            .map(|p| SerializedBytes::try_from(p))
+            .map(SerializedBytes::try_from)
             .unwrap_or_else(|| SerializedBytes::try_from(()))?;
         let dna_def = DnaDef {
             name: manifest.name.clone(),

@@ -59,7 +59,7 @@ impl DnaGamut {
                 return DnaResolution::Match(hash.clone(), DnaVersion);
             }
         }
-        return DnaResolution::NoMatch;
+        DnaResolution::NoMatch
     }
 
     /// Given a version spec, return the best-matching CellId
@@ -81,7 +81,7 @@ impl DnaGamut {
                 );
             }
         }
-        return CellResolution::NoMatch;
+        CellResolution::NoMatch
     }
 }
 

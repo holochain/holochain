@@ -332,6 +332,7 @@ impl InstalledApp {
     }
 
     /// Add a cloned cell
+    #[allow(clippy::ptr_arg)]
     pub fn add_clone(&mut self, cell_nick: &CellNick, cell_id: CellId) -> AppResult<()> {
         assert_eq!(
             *cell_id.agent_pubkey(),
@@ -350,6 +351,7 @@ impl InstalledApp {
     }
 
     /// Remove a cloned cell
+    #[allow(clippy::ptr_arg)]
     pub fn remove_clone(&mut self, cell_nick: &CellNick, cell_id: &CellId) -> AppResult<bool> {
         let slot = self
             .slots
