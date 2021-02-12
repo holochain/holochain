@@ -360,35 +360,33 @@ mod tests {
         let mut app = InstalledApp::new("app", vec![(nick.clone(), slot1)]);
 
         // Can add clones up to the limit
-        let clone_id_0 = app.add_clone(&nick, ().into()).unwrap();
-        let clone_id_1 = app.add_clone(&nick, ().into()).unwrap();
-        let clone_id_2 = app.add_clone(&nick, ().into()).unwrap();
-
-        assert_eq!(
-            maplit::hashset! { &clone_id_0, &clone_id_1, &clone_id_2}.len(),
-            3,
-            "All clone IDs are unique"
-        );
+        let cell_ids = vec![fixt!(CellId), fixt!(CellId), fixt!(CellId)];
+        app.add_clone(&nick, cell_ids[0].clone()).unwrap();
+        app.add_clone(&nick, cell_ids[1].clone()).unwrap();
+        app.add_clone(&nick, cell_ids[2].clone()).unwrap();
 
         // Adding a clone beyond the clone_limit is an error
         matches::assert_matches!(
-            app.add_clone(&nick, ().into()),
+            app.add_clone(&nick, fixt!(CellId)),
             Err(AppError::CloneLimitExceeded(3, _))
         );
 
         assert_eq!(
             app.cloned_cells().collect::<HashSet<_>>(),
-            maplit::hashset! { &clone_id_0, &clone_id_1, &clone_id_2 },
-            "All CellIds are present"
+            maplit::hashset! { &cell_ids[0], &cell_ids[1], &cell_ids[2] }
         );
 
-        assert_eq!(app.remove_clone(&nick, &clone_id_1).unwrap(), true);
-        assert_eq!(app.remove_clone(&nick, &clone_id_1).unwrap(), false);
+        assert_eq!(app.remove_clone(&nick, &cell_ids[1]).unwrap(), true);
+        assert_eq!(app.remove_clone(&nick, &cell_ids[1]).unwrap(), false);
 
         assert_eq!(
             app.cloned_cells().collect::<HashSet<_>>(),
-            maplit::hashset! { &clone_id_0, &clone_id_2 }
+            maplit::hashset! { &cell_ids[0], &cell_ids[2] }
         );
+
+        // Adding the same clone twice should probably be a panic, but if this
+        // line is still here, I never got around to making it panic...
+        app.add_clone(&nick, cell_ids[0].clone()).unwrap();
 
         assert_eq!(app.cloned_cells().count(), 2);
 

@@ -673,7 +673,7 @@ where
                 if let Some(app) = state.active_apps.get_mut(installed_app_id) {
                     let agent = todo!("get agent for app");
                     let cell_id = CellId::new(child_dna_hash, agent);
-                    app.add_clone(cell_nick, properties, cell_id)?;
+                    app.add_clone(cell_nick, cell_id)?;
                     Ok((state, cell_id))
                 } else {
                     Err(ConductorError::AppNotActive(installed_app_id.clone()))

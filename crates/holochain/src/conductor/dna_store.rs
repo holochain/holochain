@@ -8,7 +8,6 @@ use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::entry_def::EntryDef;
-use mockall::automock;
 use std::collections::HashMap;
 use tracing::*;
 
