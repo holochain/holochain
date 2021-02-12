@@ -57,21 +57,20 @@ impl AppBundle {
                             CellProvisioningOp::Create(dna, clone_limit) => {
                                 let dna_hash = dna.dna_hash().clone();
                                 let cell_id = CellId::new(dna_hash.clone(), agent.clone());
-                                let slot = AppSlot::new(dna_hash, Some(cell_id), clone_limit);
+                                let slot = AppSlot::new(cell_id, true, clone_limit);
                                 // TODO: could sequentialize this to remove the clone
                                 let proof = membrane_proofs.get(&cell_nick).cloned();
                                 resolution.dnas_to_register.push((dna, proof));
                                 resolution.slots.push((cell_nick, slot));
                             }
                             CellProvisioningOp::Existing(cell_id, clone_limit) => {
-                                let dna_hash = cell_id.dna_hash().to_owned();
-                                let slot = AppSlot::new(dna_hash, Some(cell_id), clone_limit);
+                                let slot = AppSlot::new(cell_id, true, clone_limit);
                                 resolution.slots.push((cell_nick, slot));
                             }
-                            CellProvisioningOp::Noop(dna_hash, clone_limit) => {
+                            CellProvisioningOp::Noop(cell_id, clone_limit) => {
                                 resolution
                                     .slots
-                                    .push((cell_nick, AppSlot::new(dna_hash, None, clone_limit)));
+                                    .push((cell_nick, AppSlot::new(cell_id, false, clone_limit)));
                             }
                             _ => todo!(),
                         }
@@ -210,8 +209,8 @@ pub enum CellProvisioningOp {
     /// Use an existing Cell
     Existing(CellId, u32),
     /// No provisioning needed, but there might be a clone_limit, and so we need
-    /// to know which DNA to use for making clones
-    Noop(DnaHash, u32),
+    /// to know which DNA and Agent to use for making clones
+    Noop(CellId, u32),
     /// Couldn't find a DNA that matches the version spec; can't provision (should this be an Err?)
     NoMatch,
     /// Ambiguous result, needs manual resolution; can't provision (should this be an Err?)
@@ -265,6 +264,7 @@ mod tests {
     async fn provisioning_1_create() {
         let agent = fixt!(AgentPubKey);
         let (bundle, dna) = app_bundle_fixture().await;
+        let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
 
         let resolution = bundle
             .resolve_cells(agent.clone(), DnaGamut::placeholder(), Default::default())
@@ -273,11 +273,7 @@ mod tests {
 
         // Build the expected output.
         // NB: this relies heavily on the particulars of the `app_manifest_fixture`
-        let slot = AppSlot::new(
-            dna.dna_hash().to_owned(),
-            Some(CellId::new(dna.dna_hash().clone(), agent.clone())),
-            50,
-        );
+        let slot = AppSlot::new(cell_id, true, 50);
         let expected = CellSlotResolution {
             agent,
             dnas_to_register: vec![(dna, None)],

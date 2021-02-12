@@ -671,7 +671,7 @@ where
         let (_, cell_id) = self
             .update_state_prime(|mut state| {
                 if let Some(app) = state.active_apps.get_mut(installed_app_id) {
-                    let agent_key = app.agent_key().to_owned();
+                    let agent_key = app.slot(cell_nick)?.agent_key().to_owned();
                     let cell_id = CellId::new(child_dna_hash, agent_key);
                     app.add_clone(cell_nick, cell_id.clone())?;
                     Ok((state, cell_id))

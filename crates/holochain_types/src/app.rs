@@ -201,9 +201,10 @@ impl InstalledCell {
 pub struct InstalledApp {
     /// The unique identifier for an installed app in this conductor
     installed_app_id: InstalledAppId,
-    /// The agent key used to install this app. All Cells created by this app
-    /// either through provisioning or cloning will use this agent key.
-    agent_key: AgentPubKey,
+    /// The agent key used to install this app. Currently this is meaningless,
+    /// but I'm leaving it here as a placeholder in case we ever want it to
+    /// have formal significance.
+    _agent_key: AgentPubKey,
     /// The "slots" as specified in the AppManifest
     slots: HashMap<CellNick, AppSlot>,
 }
@@ -223,12 +224,12 @@ impl InstalledApp {
     /// Constructor
     pub fn new<S: ToString, I: IntoIterator<Item = (CellNick, AppSlot)>>(
         installed_app_id: S,
-        agent_key: AgentPubKey,
+        _agent_key: AgentPubKey,
         slots: I,
     ) -> Self {
         Self {
             installed_app_id: installed_app_id.to_string(),
-            agent_key,
+            _agent_key,
             slots: slots.into_iter().collect(),
         }
     }
@@ -242,8 +243,9 @@ impl InstalledApp {
         let installed_app_id = installed_app_id.to_string();
         let installed_cells: Vec<_> = installed_cells.into_iter().collect();
 
-        // Get the agent key
-        let agent_key = installed_cells
+        // Get the agent key of the first cell
+        // NB: currently this has no significance.
+        let _agent_key = installed_cells
             .get(0)
             .expect("Can't create app with 0 cells")
             .cell_id
@@ -253,30 +255,20 @@ impl InstalledApp {
         // ensure all cells use the same agent key
         if installed_cells
             .iter()
-            .any(|c| *c.cell_id.agent_pubkey() != agent_key)
+            .any(|c| *c.cell_id.agent_pubkey() != _agent_key)
         {
-            // TODO: make this a panic even for tests, and rewrite all instances of this situation
-            // cfg_if::cfg_if! {
-            //     if #[cfg(test)] {
             tracing::warn!(
                         "All cells should use the same agent key for a legacy installation. Cell data: {:#?}",
                         installed_cells
                     );
-            //     } else {
-            //         panic!(format!(
-            //             "All cells must use the same agent key for a legacy installation. Cell data: {:#?}",
-            //             installed_cells
-            //         ));
-            //     }
-            // }
         }
 
         let slots = installed_cells
             .into_iter()
             .map(|InstalledCell { cell_nick, cell_id }| {
                 let slot = AppSlot {
-                    dna_hash: cell_id.dna_hash().to_owned(),
-                    provisioned_cell: Some(cell_id),
+                    base_cell_id: cell_id,
+                    is_provisioned: true,
                     clones: HashSet::new(),
                     clone_limit: 0,
                 };
@@ -285,7 +277,7 @@ impl InstalledApp {
             .collect();
         Self {
             installed_app_id,
-            agent_key,
+            _agent_key,
             slots,
         }
     }
@@ -299,14 +291,14 @@ impl InstalledApp {
     pub fn provisioned_cells(&self) -> impl Iterator<Item = (&CellNick, &CellId)> {
         self.slots
             .iter()
-            .filter_map(|(nick, slot)| slot.provisioned_cell.as_ref().map(|c| (nick, c)))
+            .filter_map(|(nick, slot)| slot.provisioned_cell().map(|c| (nick, c)))
     }
 
     /// Accessor
     pub fn into_provisioned_cells(self) -> impl Iterator<Item = (CellNick, CellId)> {
         self.slots
             .into_iter()
-            .filter_map(|(nick, slot)| slot.provisioned_cell.map(|c| (nick, c)))
+            .filter_map(|(nick, slot)| slot.into_provisioned_cell().map(|c| (nick, c)))
     }
 
     /// Accessor
@@ -321,14 +313,27 @@ impl InstalledApp {
             .chain(self.cloned_cells())
     }
 
+    /// Accessor for particular slot
+    pub fn slot(&self, cell_nick: &CellNick) -> AppResult<&AppSlot> {
+        self.slots
+            .get(cell_nick)
+            .ok_or_else(|| AppError::CellNickMissing(cell_nick.clone()))
+    }
+
+    fn slot_mut(&mut self, cell_nick: &CellNick) -> AppResult<&mut AppSlot> {
+        self.slots
+            .get_mut(cell_nick)
+            .ok_or_else(|| AppError::CellNickMissing(cell_nick.clone()))
+    }
+
     /// Accessor
     pub fn slots(&self) -> &HashMap<CellNick, AppSlot> {
         &self.slots
     }
 
     /// Accessor
-    pub fn agent_key(&self) -> &AgentPubKey {
-        &self.agent_key
+    pub fn _agent_key(&self) -> &AgentPubKey {
+        &self._agent_key
     }
 
     /// Add a cloned cell
@@ -336,13 +341,10 @@ impl InstalledApp {
     pub fn add_clone(&mut self, cell_nick: &CellNick, cell_id: CellId) -> AppResult<()> {
         assert_eq!(
             *cell_id.agent_pubkey(),
-            self.agent_key,
+            self._agent_key,
             "A clone cell must use the same agent key as its app"
         );
-        let slot = self
-            .slots
-            .get_mut(cell_nick)
-            .ok_or_else(|| AppError::CellNickMissing(cell_nick.clone()))?;
+        let slot = self.slot_mut(cell_nick)?;
         if slot.clones.len() as u32 >= slot.clone_limit {
             return Err(AppError::CloneLimitExceeded(slot.clone_limit, slot.clone()));
         }
@@ -353,10 +355,7 @@ impl InstalledApp {
     /// Remove a cloned cell
     #[allow(clippy::ptr_arg)]
     pub fn remove_clone(&mut self, cell_nick: &CellNick, cell_id: &CellId) -> AppResult<bool> {
-        let slot = self
-            .slots
-            .get_mut(cell_nick)
-            .ok_or_else(|| AppError::CellNickMissing(cell_nick.clone()))?;
+        let slot = self.slot_mut(cell_nick)?;
         Ok(slot.clones.remove(cell_id))
     }
 }
@@ -364,33 +363,59 @@ impl InstalledApp {
 /// Cell "slots" correspond to cell entries in the AppManifest.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct AppSlot {
-    /// A cells which was provisioned at install-time.
-    /// If provisioning was deferred, this will be None, and will become Some
-    /// once the cell is created.
-    provisioned_cell: Option<CellId>,
+    /// The Id of the Cell which will be provisioned for this slot.
+    /// This also identifies the basis for cloned DNAs, and this is how the
+    /// Agent is determined for clones (always the same as the provisioned cell).
+    base_cell_id: CellId,
+    /// Records whether the base cell has actually been provisioned or not.
+    /// If true, then `base_cell_id` refers to an actual existing Cell.
+    /// If false, then `base_cell_id` is just recording what that cell will be
+    /// called in the future.
+    is_provisioned: bool,
     /// The number of cloned cells allowed
     clone_limit: u32,
     /// Cells which were cloned at runtime. The length cannot grow beyond
     /// `clone_limit`
     clones: HashSet<CellId>,
-    /// DNA used to make clones in this slot
-    dna_hash: DnaHash,
 }
 
 impl AppSlot {
     /// Constructor. List of clones always starts empty.
-    pub fn new(dna_hash: DnaHash, provisioned_cell: Option<CellId>, clone_limit: u32) -> Self {
+    pub fn new(base_cell_id: CellId, is_provisioned: bool, clone_limit: u32) -> Self {
         Self {
-            provisioned_cell,
+            base_cell_id,
+            is_provisioned,
             clone_limit,
             clones: HashSet::new(),
-            dna_hash,
         }
     }
 
     /// Accessor
     pub fn dna_hash(&self) -> &DnaHash {
-        &self.dna_hash
+        &self.base_cell_id.dna_hash()
+    }
+
+    /// Accessor
+    pub fn agent_key(&self) -> &AgentPubKey {
+        &self.base_cell_id.agent_pubkey()
+    }
+
+    /// Accessor
+    pub fn provisioned_cell(&self) -> Option<&CellId> {
+        if self.is_provisioned {
+            Some(&self.base_cell_id)
+        } else {
+            None
+        }
+    }
+
+    /// Transformer
+    pub fn into_provisioned_cell(self) -> Option<CellId> {
+        if self.is_provisioned {
+            Some(self.base_cell_id)
+        } else {
+            None
+        }
     }
 }
 
@@ -403,7 +428,7 @@ mod tests {
 
     #[test]
     fn clone_management() {
-        let slot1 = AppSlot::new(fixt!(DnaHash), None, 3);
+        let slot1 = AppSlot::new(fixt!(CellId), true, 3);
         let agent = fixt!(AgentPubKey);
         let nick: CellNick = "nick".into();
         let mut app = InstalledApp::new("app", agent, vec![(nick.clone(), slot1)]);
