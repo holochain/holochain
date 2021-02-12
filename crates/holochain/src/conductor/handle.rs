@@ -44,8 +44,6 @@
 use super::api::error::ConductorApiResult;
 use super::api::ZomeCall;
 use super::config::AdminInterfaceConfig;
-use super::dna_store::DnaStore;
-use super::entry_def_store::EntryDefBufferKey;
 use super::error::ConductorResult;
 use super::error::CreateAppError;
 use super::interface::SignalBroadcaster;

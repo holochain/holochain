@@ -1752,6 +1752,7 @@ dependencies = [
  "lazy_static",
  "maplit",
  "matches",
+ "mockall",
  "mr_bundle",
  "must_future",
  "nanoid",

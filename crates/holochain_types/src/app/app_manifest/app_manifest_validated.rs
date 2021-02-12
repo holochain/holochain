@@ -30,7 +30,7 @@ impl AppManifestValidated {
         slots: HashMap<CellNick, AppSlotManifestValidated>,
     ) -> AppManifestResult<Self> {
         for (nick, cell) in slots.iter() {
-            if let AppSlotManifestValidated::Disabled { clone_limit } = cell {
+            if let AppSlotManifestValidated::Disabled { clone_limit, .. } = cell {
                 if *clone_limit == 0 {
                     return Err(AppManifestError::InvalidStrategyDisabled(nick.to_owned()));
                 }
@@ -81,5 +81,8 @@ pub enum AppSlotManifestValidated {
     },
     /// Disallow provisioning altogether. In this case, we expect
     /// `clone_limit > 0`: otherwise, no cells will ever be created.
-    Disabled { clone_limit: u32 },
+    Disabled {
+        version: DnaVersionSpec,
+        clone_limit: u32,
+    },
 }

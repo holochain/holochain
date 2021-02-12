@@ -20,8 +20,6 @@ pub enum CellError {
     DatabaseError(#[from] DatabaseError),
     #[error(transparent)]
     CascadeError(#[from] CascadeError),
-    #[error("The Dna was not found in the store")]
-    DnaMissing,
     #[error("Failed to join the create cell task: {0}")]
     JoinError(#[from] tokio::task::JoinError),
     #[error("Genesis failed: {0}")]

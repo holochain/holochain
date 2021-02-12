@@ -287,11 +287,10 @@ where
 pub mod test_utils {
     use crate::conductor::api::RealAppInterfaceApi;
     use crate::conductor::conductor::ConductorBuilder;
-    use crate::conductor::dna_store::MockDnaStore;
     use crate::conductor::ConductorHandle;
     use holochain_lmdb::test_utils::test_environments;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::app::InstalledCell;
+    use holochain_types::prelude::*;
     use std::sync::Arc;
     use tempdir::TempDir;
 
@@ -341,7 +340,6 @@ pub mod test {
     use crate::conductor::api::AdminResponse;
     use crate::conductor::api::RealAdminInterfaceApi;
     use crate::conductor::conductor::ConductorBuilder;
-    use crate::conductor::dna_store::MockDnaStore;
     use crate::conductor::p2p_store::AgentKv;
     use crate::conductor::p2p_store::AgentKvKey;
     use crate::conductor::state::ConductorState;
@@ -357,9 +355,7 @@ pub mod test {
     use holochain_lmdb::test_utils::test_environments;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::source_chain::SourceChainBuf;
-    use holochain_types::app::InstalledCell;
-    use holochain_types::dna::DnaDef;
-    use holochain_types::dna::DnaFile;
+    use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_types::test_utils::fake_dna_zomes;

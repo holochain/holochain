@@ -239,6 +239,7 @@ impl InstalledApp {
             .into_iter()
             .map(|InstalledCell { cell_nick, cell_id }| {
                 let slot = AppSlot {
+                    dna_hash: cell_id.dna_hash().to_owned(),
                     provisioned_cell: Some(cell_id),
                     clones: HashSet::new(),
                     clone_limit: 0,
@@ -324,15 +325,18 @@ pub struct AppSlot {
     /// Cells which were cloned at runtime. The length cannot grow beyond
     /// `clone_limit`
     clones: HashSet<CellId>,
+    /// DNA used to make clones in this slot
+    dna_hash: DnaHash,
 }
 
 impl AppSlot {
     /// Constructor. List of clones always starts empty.
-    pub fn new(provisioned_cell: Option<CellId>, clone_limit: u32) -> Self {
+    pub fn new(dna_hash: DnaHash, provisioned_cell: Option<CellId>, clone_limit: u32) -> Self {
         Self {
             provisioned_cell,
             clone_limit,
             clones: HashSet::new(),
+            dna_hash,
         }
     }
 }
@@ -341,11 +345,12 @@ impl AppSlot {
 mod tests {
     use super::{AppSlot, InstalledApp};
     use crate::prelude::*;
+    use ::fixt::prelude::*;
     use std::collections::HashSet;
 
     #[test]
     fn clone_management() {
-        let slot1 = AppSlot::new(None, 3);
+        let slot1 = AppSlot::new(fixt!(DnaHash), None, 3);
         let nick: CellNick = "nick".into();
         let mut app = InstalledApp::new("app", vec![(nick.clone(), slot1)]);
 

@@ -2,8 +2,8 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_types::prelude::*;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
 
 pub fn call_remote(
     _ribosome: Arc<impl RibosomeT>,
@@ -11,18 +11,19 @@ pub fn call_remote(
     input: CallRemote,
 ) -> Result<ZomeCallResponse, WasmError> {
     // it is the network's responsibility to handle timeouts and return an Err result in that case
-    let result: Result<SerializedBytes, _> = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let mut network = call_context.host_access().network().clone();
-        network
-            .call_remote(
-                input.target_agent_as_ref().to_owned(),
-                input.zome_name_as_ref().to_owned(),
-                input.fn_name_as_ref().to_owned(),
-                input.cap_as_ref().to_owned(),
-                input.payload_as_ref().to_owned(),
-            )
-            .await
-    });
+    let result: Result<SerializedBytes, _> =
+        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            let mut network = call_context.host_access().network().clone();
+            network
+                .call_remote(
+                    input.target_agent_as_ref().to_owned(),
+                    input.zome_name_as_ref().to_owned(),
+                    input.fn_name_as_ref().to_owned(),
+                    input.cap_as_ref().to_owned(),
+                    input.payload_as_ref().to_owned(),
+                )
+                .await
+        });
     let result = match result {
         Ok(r) => ZomeCallResponse::try_from(r)?,
         Err(e) => ZomeCallResponse::NetworkError(e.to_string()),
@@ -34,13 +35,11 @@ pub fn call_remote(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
+    use crate::conductor::api::ZomeCall;
     use crate::conductor::interface::websocket::test_utils::setup_app;
-    use crate::conductor::{api::ZomeCall, dna_store::MockDnaStore};
     use crate::core::ribosome::ZomeCallResponse;
     use hdk3::prelude::*;
-    use holochain_types::app::InstalledCell;
-    use holochain_types::dna::DnaDef;
-    use holochain_types::dna::DnaFile;
+    use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
@@ -141,9 +140,7 @@ pub mod wasm_test {
                 zome_name: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "whoarethey".into(),
-                payload: ExternIO::encode(
-                    &bob_agent_id
-                ).unwrap(),
+                payload: ExternIO::encode(&bob_agent_id).unwrap(),
                 provenance: alice_agent_id,
             })
             .await

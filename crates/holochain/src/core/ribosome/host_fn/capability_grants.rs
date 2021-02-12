@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
 
 /// list all the grants stored locally in the chain filtered by tag
 /// this is only the current grants as per local CRUD
@@ -17,7 +17,7 @@ pub fn capability_grants(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::{conductor::dna_store::MockDnaStore, test_utils::sweetest::MaybeElement};
+    use crate::test_utils::sweetest::MaybeElement;
     use crate::{conductor::ConductorBuilder, test_utils::sweetest::SweetConductor};
     use crate::{
         core::workflow::call_zome_workflow::CallZomeWorkspace, test_utils::sweetest::SweetDnaFile,
@@ -25,6 +25,7 @@ pub mod wasm_test {
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_types::fixt::CapSecretFixturator;
+    use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
@@ -200,10 +201,7 @@ pub mod wasm_test {
                 CapFor(new_secret, bob_agent_id.clone().try_into().unwrap()),
             )
             .await;
-        assert_eq!(
-            output,
-            ZomeCallResponse::Ok(ExternIO::encode(()).unwrap()),
-        );
+        assert_eq!(output, ZomeCallResponse::Ok(ExternIO::encode(()).unwrap()),);
 
         // BOB DELETES THE GRANT SO NO SECRETS WORK
 

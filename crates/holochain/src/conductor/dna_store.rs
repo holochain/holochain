@@ -1,4 +1,3 @@
-use super::entry_def_store::EntryDefBufferKey;
 use fallible_iterator::FallibleIterator;
 use holochain_lmdb::buffer::CasBufFreshAsync;
 use holochain_lmdb::env::EnvironmentRead;
@@ -22,21 +21,6 @@ pub struct RealDnaStore {
 
 pub struct DnaDefBuf {
     dna_defs: CasBufFreshAsync<DnaDef>,
-}
-
-#[automock]
-pub trait DnaStore: Default + Send + Sync {
-    fn add_dna(&mut self, dna: DnaFile);
-    fn add_dnas<T: IntoIterator<Item = (DnaHash, DnaFile)> + 'static>(&mut self, dnas: T);
-    fn add_entry_def(&mut self, k: EntryDefBufferKey, entry_def: EntryDef);
-    fn add_entry_defs<T: IntoIterator<Item = (EntryDefBufferKey, EntryDef)> + 'static>(
-        &mut self,
-        entry_defs: T,
-    );
-    // TODO: FAST: Make this return an iterator to avoid allocating
-    fn list(&self) -> Vec<DnaHash>;
-    fn get(&self, hash: &DnaHash) -> Option<DnaFile>;
-    fn get_entry_def(&self, k: &EntryDefBufferKey) -> Option<EntryDef>;
 }
 
 impl DnaStore for RealDnaStore {

@@ -8,7 +8,6 @@ use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
 use holochain::conductor::api::RealAppInterfaceApi;
 use holochain::conductor::api::ZomeCall;
-use holochain::conductor::dna_store::MockDnaStore;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 

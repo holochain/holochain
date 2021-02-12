@@ -3,17 +3,14 @@
 
 use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetZome};
 use crate::conductor::{
-    api::ZomeCall, config::ConductorConfig, dna_store::DnaStore, handle::ConductorHandle,
-    Conductor, ConductorBuilder,
+    api::ZomeCall, config::ConductorConfig, handle::ConductorHandle, Conductor, ConductorBuilder,
 };
 use futures::future;
 use hdk3::prelude::*;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
 use holochain_lmdb::test_utils::{test_environments, TestEnvironments};
-use holochain_types::{app::InstalledCell, signal::Signal};
-
-use holochain_types::dna::DnaFile;
+use holochain_types::prelude::*;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::sync::Arc;
 use unwrap_to::unwrap_to;
@@ -142,7 +139,7 @@ fn standard_config() -> ConductorConfig {
 
 impl SweetConductor {
     /// Create a SweetConductor from an already-built ConductorHandle and environments
-    ///
+    ///DnaStore
     /// The conductor will be supplied with a single test AppInterface named
     /// "sweet-interface" so that signals may be emitted
     pub async fn new(

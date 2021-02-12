@@ -215,9 +215,10 @@ impl AppManifestV1 {
                                 uuid,
                             }
                         }
-                        CellProvisioning::Disabled => {
-                            AppSlotManifestValidated::Disabled { clone_limit }
-                        }
+                        CellProvisioning::Disabled => AppSlotManifestValidated::Disabled {
+                            clone_limit,
+                            version: Self::require(version, "slots.dna.version")?,
+                        },
                     };
                     Ok((nick, validated))
                 },

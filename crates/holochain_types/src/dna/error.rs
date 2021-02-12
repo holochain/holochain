@@ -19,6 +19,10 @@ pub enum DnaError {
     #[error("DNA is invalid: {0}")]
     Invalid(String),
 
+    /// DNA not found in a DnaStore
+    #[error("The DNA of the following hash was not found in the store: {0}")]
+    DnaMissing(DnaHash),
+
     /// TraitNotFound
     #[error("Trait not found: {0}")]
     TraitNotFound(String),

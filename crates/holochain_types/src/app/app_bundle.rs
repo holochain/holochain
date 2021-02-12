@@ -56,21 +56,24 @@ impl AppBundle {
                         match op {
                             CellProvisioningOp::Create(dna, clone_limit) => {
                                 let dna_hash = dna.dna_hash().clone();
-                                let cell_id = CellId::new(dna_hash, agent.clone());
-                                let slot = AppSlot::new(Some(cell_id.clone()), clone_limit);
+                                let cell_id = CellId::new(dna_hash.clone(), agent.clone());
+                                let slot =
+                                    AppSlot::new(dna_hash, Some(cell_id.clone()), clone_limit);
                                 // TODO: could sequentialize this to remove the clone
                                 let proof = membrane_proofs.get(&cell_nick).cloned();
                                 resolution.dnas_to_register.push((dna, proof));
                                 resolution.slots.push((cell_nick, slot));
                             }
                             CellProvisioningOp::Existing(cell_id, clone_limit) => {
-                                let slot = AppSlot::new(Some(cell_id.clone()), clone_limit);
+                                let dna_hash = cell_id.dna_hash().to_owned();
+                                let slot =
+                                    AppSlot::new(dna_hash, Some(cell_id.clone()), clone_limit);
                                 resolution.slots.push((cell_nick, slot));
                             }
-                            CellProvisioningOp::Noop(clone_limit) => {
+                            CellProvisioningOp::Noop(dna_hash, clone_limit) => {
                                 resolution
                                     .slots
-                                    .push((cell_nick, AppSlot::new(None, clone_limit)));
+                                    .push((cell_nick, AppSlot::new(dna_hash, None, clone_limit)));
                             }
                             _ => todo!(),
                         }
@@ -125,12 +128,16 @@ impl AppBundle {
                 CellProvisioningOp::Create(_, _) => {
                     unreachable!("resolve_cell_existing will never return a Create op")
                 }
-                CellProvisioningOp::Noop(_) => {
+                CellProvisioningOp::Noop(_, _) => {
                     unreachable!("resolve_cell_existing will never return a Noop")
                 }
             },
-            AppSlotManifestValidated::Disabled { clone_limit } => {
-                CellProvisioningOp::Noop(clone_limit)
+            AppSlotManifestValidated::Disabled {
+                version,
+                clone_limit,
+            } => {
+                unimplemented!("`disabled` provisioning strategy is currently unimplemented")
+                // CellProvisioningOp::Noop(clone_limit)
             }
         })
     }
@@ -204,8 +211,9 @@ pub enum CellProvisioningOp {
     Create(DnaFile, u32),
     /// Use an existing Cell
     Existing(CellId, u32),
-    /// No provisioning needed (but there might be a clone_limit)
-    Noop(u32),
+    /// No provisioning needed, but there might be a clone_limit, and so we need
+    /// to know which DNA to use for making clones
+    Noop(DnaHash, u32),
     /// Couldn't find a DNA that matches the version spec; can't provision (should this be an Err?)
     NoMatch,
     /// Ambiguous result, needs manual resolution; can't provision (should this be an Err?)
@@ -267,7 +275,11 @@ mod tests {
 
         // Build the expected output.
         // NB: this relies heavily on the particulars of the `app_manifest_fixture`
-        let slot = AppSlot::new(Some(CellId::new(dna.dna_hash().clone(), agent.clone())), 50);
+        let slot = AppSlot::new(
+            dna.dna_hash().to_owned(),
+            Some(CellId::new(dna.dna_hash().clone(), agent.clone())),
+            50,
+        );
         let expected = CellSlotResolution {
             agent,
             dnas_to_register: vec![(dna, None)],

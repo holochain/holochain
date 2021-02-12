@@ -36,7 +36,7 @@ impl mr_bundle::Manifest for DnaManifest {
     }
 
     fn bundle_extension() -> &'static str {
-        unimplemented!()
+        "dna"
     }
 }
 

@@ -13,7 +13,6 @@ use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
-use holochain::conductor::dna_store::MockDnaStore;
 use holochain::conductor::interface::websocket::test_utils::setup_app;
 use holochain::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
 use holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;

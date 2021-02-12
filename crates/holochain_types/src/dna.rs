@@ -7,6 +7,7 @@ mod dna_bundle;
 mod dna_def;
 mod dna_file;
 mod dna_manifest;
+mod dna_store;
 
 pub mod error;
 pub mod wasm;
@@ -15,5 +16,7 @@ pub use dna_bundle::*;
 pub use dna_def::*;
 pub use dna_file::*;
 pub use dna_manifest::*;
+pub use dna_store::MockDnaStore;
+pub use dna_store::*;
 pub use error::DnaError;
 pub use holo_hash::*;

@@ -168,7 +168,7 @@ impl Cell {
         let dna_file = conductor_handle
             .get_dna(id.dna_hash())
             .await
-            .ok_or(CellError::DnaMissing)?;
+            .ok_or(DnaError::DnaMissing(id.dna_hash().to_owned()))?;
 
         let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
 
@@ -719,7 +719,7 @@ impl Cell {
         let dna_file = conductor_api
             .get_dna(id.dna_hash())
             .await
-            .ok_or(CellError::DnaMissing)?;
+            .ok_or(DnaError::DnaMissing(id.dna_hash().to_owned()))?;
         let dna_def = dna_file.dna_def().clone();
 
         // Get the ribosome
@@ -763,7 +763,7 @@ impl Cell {
     pub(crate) async fn get_ribosome(&self) -> CellResult<RealRibosome> {
         match self.conductor_api.get_dna(self.dna_hash()).await {
             Some(dna) => Ok(RealRibosome::new(dna)),
-            None => Err(CellError::DnaMissing),
+            None => Err(DnaError::DnaMissing(self.dna_hash().to_owned()).into()),
         }
     }
 
