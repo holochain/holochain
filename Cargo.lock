@@ -1738,6 +1738,7 @@ dependencies = [
  "automap",
  "backtrace",
  "base64 0.13.0",
+ "cfg-if 0.1.10",
  "chrono",
  "derive_builder",
  "derive_more",

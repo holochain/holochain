@@ -19,10 +19,8 @@ impl<M: Manifest> Bundle<M> {
     }
 
     async fn unpack_yaml_inner(&self, base_path: &Path, force: bool) -> UnpackingResult<()> {
-        if !force {
-            if base_path.exists() {
-                return Err(UnpackingError::DirectoryExists(base_path.to_owned()));
-            }
+        if !force && base_path.exists() {
+            return Err(UnpackingError::DirectoryExists(base_path.to_owned()));
         }
         ffs::create_dir_all(&base_path).await?;
         for (relative_path, resource) in self.bundled_resources() {

@@ -18,6 +18,7 @@ async-trait = "0.1"
 automap = { git = "https://github.com/maackle/automap-rs.git", branch = "main", features = ["serde"] }
 backtrace = "0.3.27"
 base64 = "0.13"
+cfg-if = "0.1"
 chrono = "0.4.6"
 derive_more = "0.99.3"
 either = "1.5"
