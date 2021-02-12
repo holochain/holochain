@@ -29,7 +29,8 @@ pub async fn run(
     app_ports: Vec<u16>,
     force_admin_port: Option<u16>,
 ) -> anyhow::Result<()> {
-    let (port, holochain) = run_async(holochain_path, sandbox_path.clone(), force_admin_port).await?;
+    let (port, holochain) =
+        run_async(holochain_path, sandbox_path.clone(), force_admin_port).await?;
     msg!("Running conductor on admin port {}", port);
     for app_port in app_ports {
         msg!("Attaching app port {}", app_port);

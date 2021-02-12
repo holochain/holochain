@@ -33,7 +33,10 @@ pub fn clean(mut hc_dir: PathBuf, sandboxes: Vec<usize>) -> anyhow::Result<()> {
     let to_remove: Vec<_> = if sandboxes.is_empty() {
         existing.iter().collect()
     } else {
-        sandboxes.into_iter().filter_map(|i| existing.get(i)).collect()
+        sandboxes
+            .into_iter()
+            .filter_map(|i| existing.get(i))
+            .collect()
     };
     let to_remove_len = to_remove.len();
     for p in to_remove {
