@@ -25,7 +25,7 @@ impl DnaBundle {
         resources: Vec<(PathBuf, Vec<u8>)>,
         root_dir: PathBuf,
     ) -> DnaResult<Self> {
-        Ok(mr_bundle::Bundle::new(manifest, resources, root_dir)?.into())
+        Ok(mr_bundle::Bundle::new(manifest.into(), resources, root_dir)?.into())
     }
 
     /// Convert to a DnaFile
@@ -38,21 +38,22 @@ impl DnaBundle {
 
     async fn inner_maps(&self) -> DnaResult<(Zomes, WasmMap)> {
         let mut resources = self.resolve_all_cloned().await?;
-        let intermediate: Vec<_> = self
-            .manifest()
-            .zomes
-            .iter()
-            .map(|z| {
-                let bytes = resources
-                    .remove(&z.location)
-                    .expect("resource referenced in manifest must exist");
-                (
-                    z.name.clone(),
-                    z.hash.clone().map(WasmHash::from),
-                    DnaWasm::from(bytes),
-                )
-            })
-            .collect();
+        let intermediate: Vec<_> = match self.manifest() {
+            DnaManifest::V1(manifest) => manifest
+                .zomes
+                .iter()
+                .map(|z| {
+                    let bytes = resources
+                        .remove(&z.location)
+                        .expect("resource referenced in manifest must exist");
+                    (
+                        z.name.clone(),
+                        z.hash.clone().map(WasmHash::from),
+                        DnaWasm::from(bytes),
+                    )
+                })
+                .collect(),
+        };
 
         let data = futures::future::join_all(intermediate.into_iter().map(
             |(zome_name, expected_hash, wasm)| async {
@@ -91,20 +92,23 @@ impl DnaBundle {
 
     /// Convert to a DnaDef
     pub fn to_dna_def(&self, zomes: Zomes) -> DnaResult<DnaDefHashed> {
-        let manifest = self.manifest();
-        let properties: SerializedBytes = manifest
-            .properties
-            .as_ref()
-            .map(SerializedBytes::try_from)
-            .unwrap_or_else(|| SerializedBytes::try_from(()))?;
-        let dna_def = DnaDef {
-            name: manifest.name.clone(),
-            uuid: manifest.uuid.clone().unwrap_or_default(),
-            properties,
-            zomes,
-        };
+        match self.manifest() {
+            DnaManifest::V1(manifest) => {
+                let properties: SerializedBytes = manifest
+                    .properties
+                    .as_ref()
+                    .map(SerializedBytes::try_from)
+                    .unwrap_or_else(|| SerializedBytes::try_from(()))?;
+                let dna_def = DnaDef {
+                    name: manifest.name.clone(),
+                    uuid: manifest.uuid.clone().unwrap_or_default(),
+                    properties,
+                    zomes,
+                };
 
-        Ok(DnaDefHashed::from_content_sync(dna_def))
+                Ok(DnaDefHashed::from_content_sync(dna_def))
+            }
+        }
     }
 
     /// Build a bundle from a DnaFile. Useful for tests.
@@ -140,7 +144,7 @@ impl DnaBundle {
                 })
             })
             .collect();
-        Ok(DnaManifest {
+        Ok(DnaManifestCurrent {
             name: dna_def.name,
             uuid: Some(dna_def.uuid),
             properties: Some(dna_def.properties.try_into().map_err(|e| {
@@ -150,7 +154,8 @@ impl DnaBundle {
                 ))
             })?),
             zomes,
-        })
+        }
+        .into())
     }
 }
 
@@ -169,7 +174,7 @@ mod tests {
         let wasm2 = vec![4, 5, 6];
         let hash1 = WasmHash::with_data(&DnaWasm::from(wasm1.clone())).await;
         let hash2 = WasmHash::with_data(&DnaWasm::from(wasm2.clone())).await;
-        let mut manifest = DnaManifest {
+        let mut manifest = DnaManifestCurrent {
             name: "name".into(),
             uuid: None,
             properties: None,
@@ -191,7 +196,7 @@ mod tests {
 
         // Show that conversion fails due to hash mismatch
         let bad_bundle: DnaBundle =
-            mr_bundle::Bundle::new_unchecked(manifest.clone(), resources.clone())
+            mr_bundle::Bundle::new_unchecked(manifest.clone().into(), resources.clone())
                 .unwrap()
                 .into();
         matches::assert_matches!(
@@ -202,7 +207,7 @@ mod tests {
 
         // Correct the hash and try again
         manifest.zomes[1].hash = Some(hash2.into());
-        let bundle: DnaBundle = mr_bundle::Bundle::new_unchecked(manifest, resources)
+        let bundle: DnaBundle = mr_bundle::Bundle::new_unchecked(manifest.into(), resources)
             .unwrap()
             .into();
         let dna_file: DnaFile = bundle.into_dna_file().await.unwrap();
