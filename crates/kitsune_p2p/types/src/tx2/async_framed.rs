@@ -1,4 +1,5 @@
 use crate::tx2::*;
+use crate::*;
 
 const R_MASK: u64 = 1 << 63;
 const R_FILT: u64 = !R_MASK;
@@ -69,7 +70,7 @@ impl std::fmt::Debug for MsgId {
     }
 }
 
-type RR = Result<Vec<(MsgId, Box<[u8]>)>, futures::io::Error>;
+type RR = KitsuneResult<Vec<(MsgId, Box<[u8]>)>>;
 
 /// Read Frames one at a time from an async source.
 pub trait AsyncReadFramed: 'static + Send + Unpin {
@@ -83,9 +84,9 @@ pub trait AsyncReadFramed: 'static + Send + Unpin {
 /// Extension trait providing higher-level access API.
 pub trait AsyncReadFramedExt: AsyncReadFramed {
     /// high-level async read frames fn.
-    fn read_frame(&mut self) -> AsyncReadFramedFut<'_, Self> {
+    fn read_frame(&mut self, timeout: KitsuneTimeout) -> AsyncReadFramedFut<'_, Self> {
         let this = std::pin::Pin::new(&mut *self);
-        AsyncReadFramedFut(this)
+        AsyncReadFramedFut(this, timeout)
     }
 }
 
@@ -93,7 +94,7 @@ impl<A: AsyncReadFramed> AsyncReadFramedExt for A {}
 
 /// Future returned from `AsyncReadFramed::read_framed()`.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct AsyncReadFramedFut<'a, P>(std::pin::Pin<&'a mut P>)
+pub struct AsyncReadFramedFut<'a, P>(std::pin::Pin<&'a mut P>, KitsuneTimeout)
 where
     P: ?Sized + AsyncReadFramed;
 
@@ -108,6 +109,8 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let this = &mut *self;
+        // TODO - we should be looping here, not underneath
+        let _timeout = this.1;
         let rdr: std::pin::Pin<&mut P> = std::pin::Pin::new(&mut this.0);
         AsyncReadFramed::poll_read_framed(rdr, cx)
     }
@@ -146,45 +149,38 @@ impl AsyncReadFramed for AsyncReadFramedFilter {
         let mut buf = self.buf.take().unwrap_or_else(|| Vec::with_capacity(4096));
         let mut out = Vec::new();
 
-        // currently, technically, the below loop cannot break
-        // without setting got_pending to true...
-        // but keeping this check here incase refactors in the future
-        // might break this
-        #[allow(unused_assignments)]
         let mut got_pending = false;
 
-        loop {
-            let max_bytes = if buf.len() < 4 {
-                4096
-            } else {
-                std::cmp::max(4096, read_size(&buf))
-            };
+        let max_bytes = if buf.len() < 4 {
+            4096
+        } else {
+            std::cmp::max(4096, read_size(&buf))
+        };
 
-            let sub: &mut dyn AsyncReadIntoVec = &mut *self.sub;
-            let sub: std::pin::Pin<&mut dyn AsyncReadIntoVec> = std::pin::Pin::new(sub);
+        let sub: &mut dyn AsyncReadIntoVec = &mut *self.sub;
+        let sub: std::pin::Pin<&mut dyn AsyncReadIntoVec> = std::pin::Pin::new(sub);
 
-            match AsyncReadIntoVec::poll_read_into_vec(sub, cx, &mut buf, max_bytes) {
-                std::task::Poll::Pending => {
-                    got_pending = true;
-                    break;
-                }
-                std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Err(e));
-                }
-                std::task::Poll::Ready(Ok(_size)) => (),
+        match AsyncReadIntoVec::poll_read_into_vec(sub, cx, &mut buf, max_bytes) {
+            std::task::Poll::Pending => {
+                got_pending = true;
             }
-
-            while buf.len() >= 4 + 8 {
-                let want_size = read_size(&buf);
-                if buf.len() < want_size {
-                    break;
-                }
-                let msg_id = read_msg_id(&buf);
-                let mut data = buf.drain(..want_size).collect::<Vec<_>>();
-                data.drain(..12);
-                out.push((msg_id, data.into_boxed_slice()));
+            std::task::Poll::Ready(Err(e)) => {
+                return std::task::Poll::Ready(Err(KitsuneError::other(e)));
             }
+            std::task::Poll::Ready(Ok(_size)) => (),
         }
+
+        while buf.len() >= 4 + 8 {
+            let want_size = read_size(&buf);
+            if buf.len() < want_size {
+                break;
+            }
+            let msg_id = read_msg_id(&buf);
+            let mut data = buf.drain(..want_size).collect::<Vec<_>>();
+            data.drain(..12);
+            out.push((msg_id, data.into_boxed_slice()));
+        }
+
         self.buf = Some(buf);
         if got_pending && out.is_empty() {
             std::task::Poll::Pending
@@ -201,7 +197,8 @@ pub trait AsyncWriteFramed: 'static + Send + Unpin {
     /// there is already data queued for sending,
     /// will return false.
     /// You also need to call `poll_write_framed` to send the data.
-    fn push_frame(self: std::pin::Pin<&mut Self>, msg_id: MsgId, buf: &[u8]) -> bool;
+    fn push_frame(self: std::pin::Pin<&mut Self>, msg_id: MsgId, buf: &[u8])
+        -> KitsuneResult<bool>;
 
     /// low-level poll for writing framed data.
     /// Call `push_frame` first to enqueue data for sending.
@@ -210,19 +207,19 @@ pub trait AsyncWriteFramed: 'static + Send + Unpin {
     fn poll_write_framed(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<bool, futures::io::Error>>;
+    ) -> std::task::Poll<KitsuneResult<bool>>;
 
     /// delegates to the underlying stream `poll_flush`.
     fn poll_flush(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), futures::io::Error>>;
+    ) -> std::task::Poll<KitsuneResult<()>>;
 
     /// delegates to the underlying stream `poll_close`.
     fn poll_close(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), futures::io::Error>>;
+    ) -> std::task::Poll<KitsuneResult<()>>;
 }
 
 /// Extension trait providing higher-level access API.
@@ -232,6 +229,7 @@ pub trait AsyncWriteFramedExt: AsyncWriteFramed {
         &'a mut self,
         msg_id: MsgId,
         buf: &'a [u8],
+        timeout: KitsuneTimeout,
     ) -> AsyncWriteFramedFut<'a, Self> {
         let this = std::pin::Pin::new(&mut *self);
         AsyncWriteFramedFut {
@@ -239,6 +237,7 @@ pub trait AsyncWriteFramedExt: AsyncWriteFramed {
             msg_id,
             buf,
             is_pre_push: true,
+            timeout,
         }
     }
 }
@@ -255,19 +254,23 @@ where
     msg_id: MsgId,
     buf: &'a [u8],
     is_pre_push: bool,
+    timeout: KitsuneTimeout,
 }
 
 impl<'a, P> std::future::Future for AsyncWriteFramedFut<'a, P>
 where
     P: ?Sized + AsyncWriteFramed,
 {
-    type Output = Result<(), futures::io::Error>;
+    type Output = KitsuneResult<()>;
 
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let this = &mut *self;
+
+        // TODO - actually use the timeout
+        let _timeout = this.timeout;
 
         if this.is_pre_push {
             loop {
@@ -282,7 +285,8 @@ where
 
             {
                 let stream: std::pin::Pin<&mut P> = std::pin::Pin::new(&mut this.stream);
-                AsyncWriteFramed::push_frame(stream, this.msg_id, this.buf);
+                // TODO - fix this unwarp()
+                AsyncWriteFramed::push_frame(stream, this.msg_id, this.buf).unwrap();
             }
 
             this.is_pre_push = false;
@@ -323,9 +327,13 @@ impl AsyncWriteFramedFilter {
 }
 
 impl AsyncWriteFramed for AsyncWriteFramedFilter {
-    fn push_frame(mut self: std::pin::Pin<&mut Self>, msg_id: MsgId, buf: &[u8]) -> bool {
+    fn push_frame(
+        mut self: std::pin::Pin<&mut Self>,
+        msg_id: MsgId,
+        buf: &[u8],
+    ) -> KitsuneResult<bool> {
         if !self.to_send.as_ref().unwrap().is_empty() {
-            return false;
+            return Ok(false);
         }
         let size: u32 = buf.len() as u32 + 4 + 8;
         self.to_send
@@ -337,36 +345,34 @@ impl AsyncWriteFramed for AsyncWriteFramedFilter {
             .unwrap()
             .extend_from_slice(&msg_id.inner().to_le_bytes());
         self.to_send.as_mut().unwrap().extend_from_slice(buf);
-        true
+        Ok(true)
     }
 
     fn poll_write_framed(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<bool, futures::io::Error>> {
+    ) -> std::task::Poll<KitsuneResult<bool>> {
         if self.did_err {
             // TODO - fix me
             panic!();
         }
 
         let mut to_send = self.to_send.take().unwrap();
-        loop {
-            let sub = &mut self.sub;
-            tokio::pin!(sub);
-            match futures::io::AsyncWrite::poll_write(sub, cx, &to_send) {
-                std::task::Poll::Pending => break,
-                std::task::Poll::Ready(Err(e)) => {
-                    self.did_err = true;
-                    return std::task::Poll::Ready(Err(e));
-                }
-                std::task::Poll::Ready(Ok(size)) => {
-                    to_send.drain(..size);
-                    if to_send.is_empty() {
-                        break;
-                    }
-                }
+
+        let sub = &mut self.sub;
+        tokio::pin!(sub);
+
+        match futures::io::AsyncWrite::poll_write(sub, cx, &to_send) {
+            std::task::Poll::Pending => (),
+            std::task::Poll::Ready(Err(e)) => {
+                self.did_err = true;
+                return std::task::Poll::Ready(Err(KitsuneError::other(e)));
+            }
+            std::task::Poll::Ready(Ok(size)) => {
+                to_send.drain(..size);
             }
         }
+
         self.to_send = Some(to_send);
         if self.to_send.as_ref().unwrap().is_empty() {
             std::task::Poll::Ready(Ok(true))
@@ -378,19 +384,27 @@ impl AsyncWriteFramed for AsyncWriteFramedFilter {
     fn poll_flush(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), futures::io::Error>> {
+    ) -> std::task::Poll<KitsuneResult<()>> {
         let sub = &mut self.sub;
         tokio::pin!(sub);
-        futures::io::AsyncWrite::poll_flush(sub, cx)
+        match futures::io::AsyncWrite::poll_flush(sub, cx) {
+            std::task::Poll::Ready(Ok(o)) => std::task::Poll::Ready(Ok(o)),
+            std::task::Poll::Ready(Err(e)) => std::task::Poll::Ready(Err(KitsuneError::other(e))),
+            std::task::Poll::Pending => std::task::Poll::Pending,
+        }
     }
 
     fn poll_close(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), futures::io::Error>> {
+    ) -> std::task::Poll<KitsuneResult<()>> {
         let sub = &mut self.sub;
         tokio::pin!(sub);
-        futures::io::AsyncWrite::poll_close(sub, cx)
+        match futures::io::AsyncWrite::poll_close(sub, cx) {
+            std::task::Poll::Ready(Ok(o)) => std::task::Poll::Ready(Ok(o)),
+            std::task::Poll::Ready(Err(e)) => std::task::Poll::Ready(Err(KitsuneError::other(e))),
+            std::task::Poll::Pending => std::task::Poll::Pending,
+        }
     }
 }
 
