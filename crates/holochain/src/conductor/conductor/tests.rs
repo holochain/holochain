@@ -1,6 +1,8 @@
 use super::Conductor;
 use super::ConductorState;
 use super::*;
+use crate::{fixt::*, test_utils::fake_valid_dna_file};
+use ::fixt::prelude::*;
 use holochain_lmdb::test_utils::test_environments;
 use holochain_types::test_utils::fake_cell_id;
 use matches::assert_matches;
@@ -49,9 +51,16 @@ async fn can_update_state() {
 #[tokio::test(threaded_scheduler)]
 async fn can_add_clone_cell_to_app() {
     let envs = test_environments();
-    let dna_store = MockDnaStore::new();
     let keystore = envs.conductor().keystore().clone();
     let holochain_p2p = holochain_p2p::stub_network().await;
+
+    let agent = fixt!(AgentPubKey);
+    let dna = fake_valid_dna_file("");
+    let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
+    dbg!(&cell_id);
+
+    let dna_store = RealDnaStore::new();
+
     let mut conductor = Conductor::new(
         envs.conductor(),
         envs.wasm(),
@@ -64,13 +73,12 @@ async fn can_add_clone_cell_to_app() {
     .await
     .unwrap();
 
-    let cell_id = fake_cell_id(1);
-    let agent = cell_id.agent_pubkey().clone();
     let installed_cell = InstalledCell::new(cell_id.clone(), "nick".to_string());
     let slot = AppSlot::new(cell_id.clone(), true, 1);
     let app1 = InstalledApp::new_legacy("no clone", vec![installed_cell.clone()]);
     let app2 = InstalledApp::new("yes clone", agent, vec![("nick".into(), slot.clone())]);
 
+    conductor.register_dna(dna).await.unwrap();
     conductor
         .update_state(|mut state| {
             state.active_apps.insert(app1.clone());
@@ -87,7 +95,7 @@ async fn can_add_clone_cell_to_app() {
         Err(ConductorError::AppError(AppError::CloneLimitExceeded(0, _)))
     );
 
-    conductor
+    let cloned_cell_id = conductor
         .add_clone_cell_to_app(&"yes clone".to_string(), &"nick".to_string(), ().into())
         .await
         .unwrap();
@@ -101,7 +109,7 @@ async fn can_add_clone_cell_to_app() {
             .cloned_cells()
             .cloned()
             .collect::<Vec<CellId>>(),
-        vec![cell_id]
+        vec![cloned_cell_id]
     );
 }
 
