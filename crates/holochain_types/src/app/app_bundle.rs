@@ -30,6 +30,13 @@ impl AppBundle {
         Ok(mr_bundle::Bundle::new(manifest, resources, root_dir)?.into())
     }
 
+    /// Construct from raw bytes
+    pub fn decode(bytes: &[u8]) -> AppBundleResult<Self> {
+        mr_bundle::Bundle::decode(bytes)
+            .map(Into::into)
+            .map_err(Into::into)
+    }
+
     /// Given a DnaGamut, decide which of the available DNAs or Cells should be
     /// used for each cell in this app.
     pub async fn resolve_cells(

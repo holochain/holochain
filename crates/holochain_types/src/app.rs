@@ -100,7 +100,7 @@ pub struct InstallAppPayload {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct InstallAppBundlePayload {
     /// The unique identifier for an installed app in this conductor.
-    pub bundle: AppBundle,
+    pub source: AppBundleSource,
 
     /// The agent to use when creating Cells for this App.
     pub agent_key: AgentPubKey,
@@ -112,6 +112,30 @@ pub struct InstallAppBundlePayload {
     /// Include proof-of-membrane-membership data for cells that require it,
     /// keyed by the CellNick specified in the app bundle manifest.
     pub membrane_proofs: HashMap<CellNick, MembraneProof>,
+}
+
+/// The possible locations of an AppBundle
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[serde(untagged)]
+pub enum AppBundleSource {
+    /// The actual serialized bytes of a bundle
+    Bundle(AppBundle),
+    /// A local file path
+    Path(PathBuf),
+    // /// A URL
+    // Url(String),
+}
+
+impl AppBundleSource {
+    /// Get the bundle from the source. Consumes the source.
+    pub async fn resolve(self) -> Result<AppBundle, AppBundleError> {
+        Ok(match self {
+            Self::Bundle(bundle) => bundle,
+            Self::Path(path) => AppBundle::decode(&ffs::read(&path).await?)?,
+            // Self::Url(url) => todo!("reqwest::get"),
+        })
+    }
 }
 
 /// Information needed to specify a Dna as part of an App

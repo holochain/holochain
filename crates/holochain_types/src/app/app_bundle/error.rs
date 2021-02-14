@@ -18,6 +18,9 @@ pub enum AppBundleError {
 
     #[error(transparent)]
     MrBundleError(#[from] MrBundleError),
+
+    #[error(transparent)]
+    FfsIoError(#[from] ffs::IoError),
 }
 
 pub type AppBundleResult<T> = Result<T, AppBundleError>;

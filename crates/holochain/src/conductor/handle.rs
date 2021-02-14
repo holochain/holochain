@@ -175,7 +175,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn install_app_bundle(
         self: Arc<Self>,
         payload: InstallAppBundlePayload,
-    ) -> ConductorResult<()>;
+    ) -> ConductorResult<InstalledApp>;
 
     /// Setup the cells from the database
     /// Only creates any cells that are not already created
@@ -469,13 +469,15 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn install_app_bundle(
         self: Arc<Self>,
         payload: InstallAppBundlePayload,
-    ) -> ConductorResult<()> {
+    ) -> ConductorResult<InstalledApp> {
         let InstallAppBundlePayload {
-            bundle,
+            source,
             agent_key,
             installed_app_id,
             membrane_proofs,
         } = payload;
+
+        let bundle = source.resolve().await?;
 
         let installed_app_id =
             installed_app_id.unwrap_or_else(|| bundle.manifest().app_name().to_owned());
@@ -502,8 +504,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor
             .write()
             .await
-            .add_inactive_app_to_db(app)
-            .await
+            .add_inactive_app_to_db(app.clone())
+            .await?;
+
+        Ok(app)
     }
 
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>> {

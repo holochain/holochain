@@ -179,13 +179,12 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::AppInstalled(app))
             }
             InstallAppBundle(payload) => {
-                let _result = self
+                let app = self
                     .conductor_handle
                     .clone()
                     .install_app_bundle(*payload)
                     .await?;
-                todo!("implement app bundle installation")
-                // Ok(AdminResponse::AppBundleInstalled(todo!()));
+                Ok(AdminResponse::AppBundleInstalled(app))
             }
             ListDnas => {
                 let dna_list = self.conductor_handle.list_dnas().await?;
