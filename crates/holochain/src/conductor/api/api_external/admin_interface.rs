@@ -472,7 +472,8 @@ mod test {
         let expected_cell_ids = InstalledApp::new_legacy(
             "test-by-path".to_string(),
             vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
-        ).unwrap();
+        )
+        .unwrap();
         let path_install_payload: InstallAppPayload = InstallAppPayload {
             dnas: vec![path_payload],
             installed_app_id: "test-by-path".to_string(),
