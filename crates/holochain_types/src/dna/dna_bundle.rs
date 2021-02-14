@@ -25,7 +25,7 @@ impl DnaBundle {
         resources: Vec<(PathBuf, Vec<u8>)>,
         root_dir: PathBuf,
     ) -> DnaResult<Self> {
-        Ok(mr_bundle::Bundle::new(manifest.into(), resources, root_dir)?.into())
+        Ok(mr_bundle::Bundle::new(manifest, resources, root_dir)?.into())
     }
 
     /// Convert to a DnaFile
