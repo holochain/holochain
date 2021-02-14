@@ -74,7 +74,7 @@ hdk3 = { path = "../hdk3", optional = true }
 matches = {version = "0.1.8", optional = true }
 holochain_test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_common", optional = true  }
 unwrap_to = { version = "0.1.0", optional = true }
-itertools = { version = "0.9", optional = true }
+itertools = { version = "0.10", optional = true }
 
 
 [dev-dependencies]

@@ -1,7 +1,7 @@
 use super::Conductor;
 use super::ConductorState;
 use super::*;
-use crate::{fixt::*, test_utils::fake_valid_dna_file};
+use crate::test_utils::fake_valid_dna_file;
 use ::fixt::prelude::*;
 use holochain_lmdb::test_utils::test_environments;
 use holochain_types::test_utils::fake_cell_id;
@@ -29,7 +29,7 @@ async fn can_update_state() {
 
     let cell_id = fake_cell_id(1);
     let installed_cell = InstalledCell::new(cell_id.clone(), "nick".to_string());
-    let app = InstalledApp::new_legacy("fake app", vec![installed_cell]);
+    let app = InstalledApp::new_legacy("fake app", vec![installed_cell]).unwrap();
 
     conductor
         .update_state(|mut state| {
@@ -57,7 +57,6 @@ async fn can_add_clone_cell_to_app() {
     let agent = fixt!(AgentPubKey);
     let dna = fake_valid_dna_file("");
     let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
-    dbg!(&cell_id);
 
     let dna_store = RealDnaStore::new();
 
@@ -75,7 +74,7 @@ async fn can_add_clone_cell_to_app() {
 
     let installed_cell = InstalledCell::new(cell_id.clone(), "nick".to_string());
     let slot = AppSlot::new(cell_id.clone(), true, 1);
-    let app1 = InstalledApp::new_legacy("no clone", vec![installed_cell.clone()]);
+    let app1 = InstalledApp::new_legacy("no clone", vec![installed_cell.clone()]).unwrap();
     let app2 = InstalledApp::new("yes clone", agent, vec![("nick".into(), slot.clone())]);
 
     conductor.register_dna(dna).await.unwrap();
@@ -134,7 +133,7 @@ async fn app_ids_are_unique() {
 
     let cell_id = fake_cell_id(1);
     let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
-    let app = InstalledApp::new_legacy("id".to_string(), vec![installed_cell]);
+    let app = InstalledApp::new_legacy("id".to_string(), vec![installed_cell]).unwrap();
 
     conductor.add_inactive_app_to_db(app.clone()).await.unwrap();
 
@@ -154,6 +153,21 @@ async fn app_ids_are_unique() {
         conductor.add_inactive_app_to_db(app.clone()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
         if id == "id".to_string()
+    );
+}
+
+/// App can't be installed if it contains duplicate CellNicks
+#[tokio::test(threaded_scheduler)]
+async fn cell_nicks_are_unique() {
+    let cells = vec![
+        InstalledCell::new(fixt!(CellId), "1".into()),
+        InstalledCell::new(fixt!(CellId), "1".into()),
+        InstalledCell::new(fixt!(CellId), "2".into()),
+    ];
+    let result = InstalledApp::new_legacy("id", cells.into_iter());
+    matches::assert_matches!(
+        result,
+        Err(AppError::DuplicateCellNicks(_, nicks)) if nicks == vec!["1".to_string()]
     );
 }
 

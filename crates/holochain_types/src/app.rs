@@ -11,16 +11,16 @@ mod app_bundle;
 mod app_manifest;
 mod dna_gamut;
 pub mod error;
+use crate::dna::{DnaFile, YamlProperties};
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
-pub use dna_gamut::*;
-
-use crate::dna::{DnaFile, YamlProperties};
 use derive_more::Into;
+pub use dna_gamut::*;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::cell::CellId;
+use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
@@ -239,7 +239,7 @@ impl InstalledApp {
     pub fn new_legacy<S: ToString, I: IntoIterator<Item = InstalledCell>>(
         installed_app_id: S,
         installed_cells: I,
-    ) -> Self {
+    ) -> AppResult<Self> {
         let installed_app_id = installed_app_id.to_string();
         let installed_cells: Vec<_> = installed_cells.into_iter().collect();
 
@@ -258,9 +258,21 @@ impl InstalledApp {
             .any(|c| *c.cell_id.agent_pubkey() != _agent_key)
         {
             tracing::warn!(
-                        "All cells should use the same agent key for a legacy installation. Cell data: {:#?}",
+                        "It's kind of an informal convention that all cells in a legacy installation should use the same agent key. But, no big deal... Cell data: {:#?}",
                         installed_cells
                     );
+        }
+
+        // ensure all cells use the same agent key
+        let duplicates: Vec<CellNick> = installed_cells
+            .iter()
+            .map(|c| c.cell_nick.to_owned())
+            .counts()
+            .into_iter()
+            .filter_map(|(nick, count)| if count > 1 { Some(nick) } else { None })
+            .collect();
+        if !duplicates.is_empty() {
+            return Err(AppError::DuplicateCellNicks(installed_app_id, duplicates));
         }
 
         let slots = installed_cells
@@ -275,11 +287,11 @@ impl InstalledApp {
                 (cell_nick, slot)
             })
             .collect();
-        Self {
+        Ok(Self {
             installed_app_id,
             _agent_key,
             slots,
-        }
+        })
     }
 
     /// Accessor

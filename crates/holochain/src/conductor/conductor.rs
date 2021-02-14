@@ -488,7 +488,6 @@ where
                     // Create each cell
                     let cells_tasks = cells_to_create.map(
                         |(cell_id, dir, keystore, conductor_handle)| async move {
-                            tracing::info!(?cell_id, "CREATE CELL");
                             let holochain_p2p_cell = self.holochain_p2p.to_cell(
                                 cell_id.dna_hash().clone(),
                                 cell_id.agent_pubkey().clone(),

@@ -175,7 +175,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let installed_cells = cell_ids_with_proofs
                     .into_iter()
                     .map(|(cell_data, _)| cell_data);
-                let app = InstalledApp::new_legacy(installed_app_id, installed_cells);
+                let app = InstalledApp::new_legacy(installed_app_id, installed_cells)?;
                 Ok(AdminResponse::AppInstalled(app))
             }
             InstallAppBundle(payload) => {
@@ -472,7 +472,7 @@ mod test {
         let expected_cell_ids = InstalledApp::new_legacy(
             "test-by-path".to_string(),
             vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
-        );
+        ).unwrap();
         let path_install_payload: InstallAppPayload = InstallAppPayload {
             dnas: vec![path_payload],
             installed_app_id: "test-by-path".to_string(),

@@ -17,10 +17,6 @@ use thiserror::Error;
 /// Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 #[derive(Error, Debug)]
 pub enum ConductorApiError {
-    /// Cell was referenced, but is missing from the conductor.
-    #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
-    CellMissing(CellId),
-
     /// The Dna for this Cell is not installed in the conductor.
     #[error("The Dna for this Cell is not installed in the conductor! DnaHash: {0}")]
     DnaMissing(DnaHash),
@@ -77,6 +73,10 @@ pub enum ConductorApiError {
     /// Cell error
     #[error(transparent)]
     CellError(#[from] CellError),
+
+    /// App error
+    #[error(transparent)]
+    AppError(#[from] AppError),
 
     /// Error in the Interface
     #[error("An error occurred in the interface: {0:?}")]

@@ -456,7 +456,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await?;
 
         let cell_data = cell_data.into_iter().map(|(c, _)| c);
-        let app = InstalledApp::new_legacy(installed_app_id, cell_data);
+        let app = InstalledApp::new_legacy(installed_app_id, cell_data)?;
 
         // Update the db
         self.conductor

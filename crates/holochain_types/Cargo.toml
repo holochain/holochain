@@ -29,6 +29,7 @@ holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["string-enco
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.48"
 holochain_zome_types = { path = "../holochain_zome_types" }
+itertools = { version = "0.10" }
 lazy_static = "1.4.0"
 mockall = "0.8"
 mr_bundle = { path = "../mr_bundle", features = ["packing"] }

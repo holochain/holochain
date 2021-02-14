@@ -42,7 +42,6 @@ impl Location {
 }
 
 pub(crate) async fn resolve_local(path: &Path) -> MrBundleResult<ResourceBytes> {
-    dbg!(path);
     Ok(ffs::read(path).await?)
 }
 
