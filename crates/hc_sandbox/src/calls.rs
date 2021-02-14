@@ -17,12 +17,12 @@ use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_p2p::kitsune_p2p;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
-use holochain_types::prelude::AgentPubKey;
-use holochain_types::prelude::CellId;
-use holochain_types::prelude::DnaHash;
 use holochain_types::prelude::InstallAppDnaPayload;
 use holochain_types::prelude::InstallAppPayload;
 use holochain_types::prelude::InstalledCell;
+use holochain_types::prelude::{AgentPubKey, AppBundleSource};
+use holochain_types::prelude::{CellId, InstallAppBundlePayload};
+use holochain_types::prelude::{DnaHash, InstalledApp};
 use portpicker::is_free;
 use std::convert::TryFrom;
 
@@ -56,6 +56,7 @@ pub enum AdminRequestCli {
     AddAdminWs(AddAdminWs),
     AddAppWs(AddAppWs),
     InstallApp(InstallApp),
+    InstallAppBundle(InstallAppBundle),
     /// Calls AdminRequest::ListDnas.
     ListDnas,
     /// Calls AdminRequest::GenerateAgentPubKey.
@@ -109,6 +110,29 @@ pub struct InstallApp {
     #[structopt(required = true, min_values = 1)]
     /// List of dnas to install.
     pub dnas: Vec<PathBuf>,
+}
+
+#[derive(Debug, StructOpt, Clone)]
+/// Calls AdminRequest::InstallAppBundle
+/// and installs a new app.
+///
+/// Setting properties and membrane proofs is not
+/// yet supported.
+/// CellNicks are set to `my-app-0`, `my-app-1` etc.
+pub struct InstallAppBundle {
+    #[structopt(short, long)]
+    /// Sets the InstalledAppId.
+    pub app_id: Option<String>,
+
+    #[structopt(short, long, parse(try_from_str = parse_agent_key))]
+    /// If not set then a key will be generated.
+    /// Agent key is Base64 (same format that is used in logs).
+    /// e.g. `uhCAk71wNXTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF4b_o`
+    pub agent_key: Option<AgentPubKey>,
+
+    #[structopt(required = true)]
+    /// Location of the *.happ bundle file to install.
+    pub path: PathBuf,
 }
 
 #[derive(Debug, StructOpt, Clone)]
@@ -211,6 +235,15 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
             let app_id = args.app_id.clone();
             let cells = install_app(cmd, args).await?;
             msg!("Installed App: {} with cells {:?}", app_id, cells);
+        }
+        AdminRequestCli::InstallAppBundle(args) => {
+            let app = install_app_bundle(cmd, args).await?;
+            let cells: Vec<_> = app.cells().collect();
+            msg!(
+                "Installed App: {} with cells {:?}",
+                app.installed_app_id(),
+                cells
+            );
         }
         AdminRequestCli::ListDnas => {
             let dnas = list_dnas(cmd).await?;
@@ -366,6 +399,45 @@ pub async fn install_app(
         .provisioned_cells()
         .map(|(n, c)| InstalledCell::new(c.clone(), n.clone()))
         .collect())
+}
+
+/// Calls [`AdminRequest::InstallApp`] and installs a new app.
+pub async fn install_app_bundle(
+    cmd: &mut CmdRunner,
+    args: InstallAppBundle,
+) -> anyhow::Result<InstalledApp> {
+    let InstallAppBundle {
+        app_id,
+        agent_key,
+        path,
+    } = args;
+
+    let bundle = AppBundleSource::Path(path).resolve().await?;
+
+    let agent_key = match agent_key {
+        Some(agent) => agent,
+        None => generate_agent_pub_key(cmd).await?,
+    };
+
+    let payload = InstallAppBundlePayload {
+        installed_app_id: app_id,
+        agent_key,
+        source: AppBundleSource::Bundle(bundle),
+        membrane_proofs: Default::default(),
+    };
+
+    let r = AdminRequest::InstallAppBundle(Box::new(payload));
+    let installed_app = cmd.command(r).await?;
+    let installed_app =
+        expect_match!(installed_app => AdminResponse::AppBundleInstalled, "Failed to install app");
+    activate_app(
+        cmd,
+        ActivateApp {
+            app_id: installed_app.installed_app_id().clone(),
+        },
+    )
+    .await?;
+    Ok(installed_app)
 }
 
 /// Calls [`AdminRequest::ListCellIds`].

@@ -81,6 +81,7 @@ mod tests {
 
         let manifest_yaml = r#"
 ---
+manifest_version: "1"
 name: test dna
 uuid: blablabla
 properties:
