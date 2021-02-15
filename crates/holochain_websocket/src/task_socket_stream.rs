@@ -175,7 +175,7 @@ mod tests {
         complete.send(()).unwrap();
         assert_eq!("Pong([116, 101, 115, 116])", &format!("{:?}", msg));
 
-        #[derive(serde::Serialize, serde::Deserialize)]
+        #[derive(serde::Serialize, serde::Deserialize, Debug)]
         struct Bob(String);
         try_from_serialized_bytes!(Bob);
         let msg = Bob("test".to_string());

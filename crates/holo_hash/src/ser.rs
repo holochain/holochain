@@ -66,7 +66,7 @@ impl<T: HashType> std::convert::TryFrom<&HoloHash<T>> for SerializedBytes {
     fn try_from(t: &HoloHash<T>) -> std::result::Result<SerializedBytes, SerializedBytesError> {
         match holochain_serialized_bytes::encode(t) {
             Ok(v) => Ok(SerializedBytes::from(UnsafeBytes::from(v))),
-            Err(e) => Err(SerializedBytesError::ToBytes(e.to_string())),
+            Err(e) => Err(SerializedBytesError::Serialize(e.to_string())),
         }
     }
 }
@@ -83,7 +83,7 @@ impl<T: HashType> std::convert::TryFrom<SerializedBytes> for HoloHash<T> {
     fn try_from(sb: SerializedBytes) -> std::result::Result<HoloHash<T>, SerializedBytesError> {
         match holochain_serialized_bytes::decode(sb.bytes()) {
             Ok(v) => Ok(v),
-            Err(e) => Err(SerializedBytesError::FromBytes(e.to_string())),
+            Err(e) => Err(SerializedBytesError::Deserialize(e.to_string())),
         }
     }
 }
@@ -94,7 +94,7 @@ mod tests {
     use holochain_serialized_bytes::prelude::*;
     use std::convert::TryInto;
 
-    #[derive(serde::Deserialize)]
+    #[derive(serde::Deserialize, Debug)]
     #[serde(transparent)]
     struct TestByteArray(#[serde(with = "serde_bytes")] Vec<u8>);
 

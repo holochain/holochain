@@ -177,7 +177,7 @@ async fn integrate_single_dht_op(
                 let integrated = IntegratedDhtOpsValue {
                     validation_status: iv.validation_status,
                     op: iv.op,
-                    when_integrated: Timestamp::now(),
+                    when_integrated: timestamp::now(),
                 };
                 Ok(Outcome::Integrated(integrated))
             }
@@ -199,7 +199,7 @@ fn integrate_data_and_meta<P: PrefixType>(
     let integrated = IntegratedDhtOpsValue {
         validation_status: iv.validation_status,
         op: iv.op,
-        when_integrated: Timestamp::now(),
+        when_integrated: timestamp::now(),
     };
     debug!("integrating");
     Ok(Outcome::Integrated(integrated))
@@ -215,7 +215,7 @@ fn integrate_data<P: PrefixType>(
     let integrated = IntegratedDhtOpsValue {
         validation_status: iv.validation_status,
         op: iv.op,
-        when_integrated: Timestamp::now(),
+        when_integrated: timestamp::now(),
     };
     debug!("integrating");
     Ok(Outcome::Integrated(integrated))

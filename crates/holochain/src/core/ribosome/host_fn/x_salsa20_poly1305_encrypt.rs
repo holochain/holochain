@@ -1,4 +1,3 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use ring::rand::SecureRandom;
@@ -7,15 +6,18 @@ use std::sync::Arc;
 use xsalsa20poly1305::aead::{generic_array::GenericArray, Aead, NewAead};
 use xsalsa20poly1305::XSalsa20Poly1305;
 use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::WasmError;
 
 pub fn x_salsa20_poly1305_encrypt(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     input: XSalsa20Poly1305Encrypt,
-) -> RibosomeResult<XSalsa20Poly1305EncryptedData> {
+) -> Result<XSalsa20Poly1305EncryptedData, WasmError> {
     let system_random = ring::rand::SystemRandom::new();
     let mut nonce_bytes = [0; holochain_zome_types::x_salsa20_poly1305::nonce::NONCE_BYTES];
-    system_random.fill(&mut nonce_bytes)?;
+    system_random.fill(&mut nonce_bytes).map_err(|ring_unspecified|
+        WasmError::Host(ring_unspecified.to_string())
+    )?;
 
     // @todo use the real libsodium somehow instead of this rust crate.
     // The main issue here is dependency management - it's not necessarily simple to get libsodium
@@ -24,11 +26,14 @@ pub fn x_salsa20_poly1305_encrypt(
     let lib_key = GenericArray::from_slice(input.as_key_ref_ref().as_ref());
     let cipher = XSalsa20Poly1305::new(lib_key);
     let lib_nonce = GenericArray::from_slice(&nonce_bytes);
-    let lib_encrypted_data = cipher.encrypt(lib_nonce, input.as_data_ref().as_ref())?;
+    let lib_encrypted_data = cipher.encrypt(lib_nonce, input.as_data_ref().as_ref()).map_err(|aead_error| WasmError::Host(aead_error.to_string()))?;
 
     Ok(
         holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData::new(
-            lib_nonce.as_slice().try_into()?,
+            match lib_nonce.as_slice().try_into() {
+                Ok(nonce) => nonce,
+                Err(secure_primitive_error) => return Err(WasmError::Host(secure_primitive_error.to_string())),
+            },
             lib_encrypted_data,
         ),
     )

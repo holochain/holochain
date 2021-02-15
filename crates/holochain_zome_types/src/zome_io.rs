@@ -38,13 +38,13 @@ pub struct ExternIO(#[serde(with = "serde_bytes")] pub Vec<u8>);
 impl ExternIO {
     pub fn encode<I>(input: I) -> Result<Self, SerializedBytesError>
     where
-        I: serde::Serialize,
+        I: serde::Serialize + std::fmt::Debug,
     {
         Ok(Self(holochain_serialized_bytes::encode(&input)?))
     }
     pub fn decode<O>(&self) -> Result<O, SerializedBytesError>
     where
-        O: serde::de::DeserializeOwned,
+        O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
         Ok(holochain_serialized_bytes::decode(&self.0)?)
     }
@@ -106,9 +106,9 @@ wasm_io_types! {
     // Returns HeaderHash of the newly created element.
     fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
 
-    // The debug host import takes a DebugMsg to output wherever the host wants to display it.
-    // DebugMsg includes line numbers. so the wasm tells the host about it's own code structure.
-    fn debug (zt::debug::DebugMsg) -> ();
+    // The debug host import takes a TraceMsg to output wherever the host wants to display it.
+    // TraceMsg includes line numbers. so the wasm tells the host about it's own code structure.
+    fn trace (zt::trace::TraceMsg) -> ();
 
     // Header hash of the CreateLink element.
     fn delete_link (holo_hash::HeaderHash) -> holo_hash::HeaderHash;

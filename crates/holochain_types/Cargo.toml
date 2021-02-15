@@ -15,7 +15,7 @@ edition = "2018"
 anyhow = "1.0.26"
 async-trait = "0.1"
 backtrace = "0.3.27"
-base64 = "0.10.1"
+base64 = "0.13"
 chrono = "0.4.6"
 derive_more = "0.99.3"
 fixt = { path = "../fixt" }
@@ -23,14 +23,14 @@ flate2 = "1.0.14"
 futures = "0.3"
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.47"
+holochain_serialized_bytes = "=0.0.48"
 holochain_zome_types = { path = "../holochain_zome_types" }
 lazy_static = "1.4.0"
 must_future = "0.1.1"
 nanoid = "0.3"
-observability = "0.1"
+observability = "0.1.3"
 rand = "0.7"
-regex = "1.1.2"
+regex = "1.4"
 serde = { version = "1.0.104", features = [ "derive", "rc" ] }
 serde_bytes = "0.11"
 serde_derive = "1.0.104"

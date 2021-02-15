@@ -213,7 +213,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
         payload: P,
     ) -> Result<ZomeCall, SerializedBytesError>
     where
-        P: serde::Serialize,
+        P: serde::Serialize + std::fmt::Debug,
     {
         Ok(ZomeCall {
             cell_id: cell_id.clone(),

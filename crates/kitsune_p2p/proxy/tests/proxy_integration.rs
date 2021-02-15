@@ -71,6 +71,13 @@ async fn test_inner() -> TransportResult<()> {
     let bind3 = connect(proxy_config3).await?;
     let addr3 = bind3.bound_url().await?;
 
+    let (_url, mut write, read) = bind2.create_channel(addr3.clone()).await?;
+    write.write_and_close(b"test".to_vec()).await?;
+    let data = read.read_to_end().await;
+    let data = String::from_utf8_lossy(&data);
+    assert_eq!("echo: test", data);
+
+    // run a second time to prove out session resumption
     let (_url, mut write, read) = bind2.create_channel(addr3).await?;
     write.write_and_close(b"test".to_vec()).await?;
     let data = read.read_to_end().await;

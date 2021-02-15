@@ -4,6 +4,7 @@ use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
 use kitsune_p2p_types::dependencies::ghost_actor;
 use kitsune_p2p_types::dependencies::serde_json;
+use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::transport::*;
 use structopt::StructOpt;
 
@@ -17,6 +18,7 @@ async fn main() {
             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
             .finish(),
     );
+    kitsune_p2p_types::metrics::init_sys_info_poll();
 
     if let Err(e) = inner().await {
         eprintln!("{:?}", e);
@@ -94,9 +96,24 @@ async fn inner() -> TransportResult<()> {
     let (listener, mut events) =
         spawn_kitsune_proxy_listener(proxy_config, listener, events).await?;
 
+    let listener_clone = listener.clone();
+    metric_task(async move {
+        loop {
+            tokio::time::delay_for(std::time::Duration::from_secs(60)).await;
+
+            let debug_dump = listener_clone.debug().await.unwrap();
+
+            tracing::info!("{}", serde_json::to_string_pretty(&debug_dump).unwrap());
+        }
+
+        // needed for types
+        #[allow(unreachable_code)]
+        <Result<(), ()>>::Ok(())
+    });
+
     println!("{}", listener.bound_url().await?);
 
-    tokio::task::spawn(async move {
+    metric_task(async move {
         while let Some(evt) = events.next().await {
             match evt {
                 TransportEvent::IncomingChannel(url, mut write, _read) => {
@@ -116,6 +133,7 @@ async fn inner() -> TransportResult<()> {
                 }
             }
         }
+        <Result<(), ()>>::Ok(())
     });
 
     // wait for ctrl-c

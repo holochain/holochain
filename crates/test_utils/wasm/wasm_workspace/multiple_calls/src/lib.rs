@@ -8,7 +8,7 @@ entry_defs![Val::entry_def()];
 #[hdk_extern]
 fn create_entry_multiple(n: u32) -> ExternResult<()> {
     for i in 0..n {
-        debug!(format!("{}", i));
+        debug!("{}", i);
         create_entry(&Val(i))?;
     }
 
