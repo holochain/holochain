@@ -46,7 +46,10 @@ macro_rules! map_extern {
                     };
                     let inner: $input = match extern_io.decode() {
                         Ok(v) => v,
-                        Err(_) => return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Deserialize(vec![0])),
+                        Err(_decode_error) => {
+			    debug!("Failed to decode {:?}: {:?}", extern_io, _decode_error);
+			    return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Deserialize(extern_io.into_vec()))
+			},
                     };
 
                     // Call the function.
