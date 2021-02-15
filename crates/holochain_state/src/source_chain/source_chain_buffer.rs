@@ -192,7 +192,7 @@ impl SourceChainBuf {
     }
 
     /// dump the entire source chain as a pretty-printed json string
-    pub async fn dump_as_json(&self) -> Result<SourceChainJsonDump, SourceChainError> {
+    pub async fn dump_state(&self) -> Result<SourceChainJsonDump, SourceChainError> {
         let mut iter = self.iter_back();
         let mut elements = Vec::new();
         let mut published_ops_count = 0;
@@ -472,7 +472,7 @@ pub mod tests {
 
         {
             let store = SourceChainBuf::new(arc.clone().into()).unwrap();
-            let json = store.dump_as_json().await?;
+            let json = store.dump_state().await?;
             let json = serde_json::to_string_pretty(&json)?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 

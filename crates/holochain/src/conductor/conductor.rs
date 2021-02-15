@@ -760,7 +760,7 @@ where
         let source_chain = SourceChainBuf::new(arc.clone().into())?;
 
         let peer_dump = p2p_store::dump_state(self.p2p_env.clone().into(), Some(cell_id.clone()))?;
-        let source_chain_dump = source_chain.dump_as_json().await?;
+        let source_chain_dump = source_chain.dump_state().await?;
         let integration_dump = integrate_dht_ops_workflow::dump_state(arc.clone().into())?;
 
         let out = JsonDump {
