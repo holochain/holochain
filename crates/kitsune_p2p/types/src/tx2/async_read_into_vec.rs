@@ -80,6 +80,9 @@ where
                     break;
                 }
                 std::task::Poll::Ready(Ok(Some(size))) => {
+                    if size == 0 {
+                        unreachable!();
+                    }
                     read += size;
                     if read >= inner.byte_count {
                         break;
@@ -126,7 +129,7 @@ impl AsyncReadIntoVec for AsyncReadIntoVecFilter {
         byte_count: usize,
     ) -> std::task::Poll<KitsuneResult<Option<usize>>> {
         let mut inner = match self.0.take() {
-            None => return std::task::Poll::Ready(Err("PreviouslyClosed".into())),
+            None => return std::task::Poll::Ready(Ok(None)),
             Some(inner) => inner,
         };
 
@@ -161,7 +164,7 @@ impl AsyncReadIntoVec for AsyncReadIntoVecFilter {
         vec.resize(orig_len + read, 0);
 
         if let Some(e) = error {
-            return std::task::Poll::Ready(Err(e));
+            std::task::Poll::Ready(Err(e))
         } else if read == 0 && got_pending {
             self.0 = Some(inner);
             std::task::Poll::Pending

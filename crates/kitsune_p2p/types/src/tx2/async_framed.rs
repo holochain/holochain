@@ -70,7 +70,7 @@ impl std::fmt::Debug for MsgId {
     }
 }
 
-type RR = KitsuneResult<Vec<(MsgId, Box<[u8]>)>>;
+type FramedVec = Vec<(MsgId, Box<[u8]>)>;
 
 /// Read Frames one at a time from an async source.
 pub trait AsyncReadFramed: 'static + Send + Unpin {
@@ -78,23 +78,41 @@ pub trait AsyncReadFramed: 'static + Send + Unpin {
     fn poll_read_framed(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<RR>;
+        out: &mut Option<FramedVec>,
+    ) -> std::task::Poll<KitsuneResult<Option<usize>>>;
 }
 
 /// Extension trait providing higher-level access API.
 pub trait AsyncReadFramedExt: AsyncReadFramed {
     /// high-level async read frames fn.
-    fn read_frame(&mut self, timeout: KitsuneTimeout) -> AsyncReadFramedFut<'_, Self> {
+    fn read_frame<'a>(
+        &'a mut self,
+        timeout: KitsuneTimeout,
+        out: &'a mut Option<FramedVec>,
+    ) -> AsyncReadFramedFut<'a, Self> {
         let this = std::pin::Pin::new(&mut *self);
-        AsyncReadFramedFut(this, timeout)
+        AsyncReadFramedFut(Some(AsyncReadFramedFutInner {
+            sub: this,
+            timeout,
+            out,
+        }))
     }
 }
 
 impl<A: AsyncReadFramed> AsyncReadFramedExt for A {}
 
+struct AsyncReadFramedFutInner<'a, P>
+where
+    P: ?Sized + AsyncReadFramed,
+{
+    sub: std::pin::Pin<&'a mut P>,
+    timeout: KitsuneTimeout,
+    out: &'a mut Option<FramedVec>,
+}
+
 /// Future returned from `AsyncReadFramed::read_framed()`.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct AsyncReadFramedFut<'a, P>(std::pin::Pin<&'a mut P>, KitsuneTimeout)
+pub struct AsyncReadFramedFut<'a, P>(Option<AsyncReadFramedFutInner<'a, P>>)
 where
     P: ?Sized + AsyncReadFramed;
 
@@ -102,30 +120,71 @@ impl<'a, P> std::future::Future for AsyncReadFramedFut<'a, P>
 where
     P: ?Sized + AsyncReadFramed,
 {
-    type Output = RR;
+    type Output = KitsuneResult<Option<usize>>;
 
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        let this = &mut *self;
-        // TODO - we should be looping here, not underneath
-        let _timeout = this.1;
-        let rdr: std::pin::Pin<&mut P> = std::pin::Pin::new(&mut this.0);
-        AsyncReadFramed::poll_read_framed(rdr, cx)
+        let mut inner = match self.0.take() {
+            None => return std::task::Poll::Ready(Ok(None)),
+            Some(inner) => inner,
+        };
+
+        let mut got_pending = false;
+        let mut frame_count = 0;
+        let mut closed = false;
+
+        while !inner.timeout.is_expired() {
+            let rdr: std::pin::Pin<&mut P> = std::pin::Pin::new(&mut inner.sub);
+            match AsyncReadFramed::poll_read_framed(rdr, cx, inner.out) {
+                std::task::Poll::Pending => {
+                    got_pending = true;
+                    break;
+                }
+                std::task::Poll::Ready(Ok(None)) => {
+                    closed = true;
+                    break;
+                }
+                std::task::Poll::Ready(Ok(Some(count))) => {
+                    frame_count += count;
+                    if frame_count > 0 {
+                        break;
+                    }
+                }
+                std::task::Poll::Ready(Err(e)) => {
+                    // do not re-set our inner, we got an error
+                    return std::task::Poll::Ready(Err(e));
+                }
+            }
+        }
+
+        if !closed {
+            self.0 = Some(inner);
+        }
+
+        if frame_count > 0 {
+            std::task::Poll::Ready(Ok(Some(frame_count)))
+        } else if got_pending {
+            std::task::Poll::Pending
+        } else {
+            std::task::Poll::Ready(Ok(None))
+        }
     }
 }
 
-/// A filter allowing AsyncReadFramed.
-pub struct AsyncReadFramedFilter {
+struct AsyncReadFramedFilterInner {
     sub: Box<dyn AsyncReadIntoVec>,
     buf: Option<Vec<u8>>,
 }
 
+/// A filter allowing AsyncReadFramed.
+pub struct AsyncReadFramedFilter(Option<AsyncReadFramedFilterInner>);
+
 impl AsyncReadFramedFilter {
     /// Create a new AsyncReadFramedFilter instance.
     pub fn new(sub: Box<dyn AsyncReadIntoVec>) -> Self {
-        Self { sub, buf: None }
+        Self(Some(AsyncReadFramedFilterInner { sub, buf: None }))
     }
 }
 
@@ -145,11 +204,17 @@ impl AsyncReadFramed for AsyncReadFramedFilter {
     fn poll_read_framed(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<RR> {
-        let mut buf = self.buf.take().unwrap_or_else(|| Vec::with_capacity(4096));
-        let mut out = Vec::new();
+        out: &mut Option<FramedVec>,
+    ) -> std::task::Poll<KitsuneResult<Option<usize>>> {
+        let mut inner = match self.0.take() {
+            None => return std::task::Poll::Ready(Ok(None)),
+            Some(inner) => inner,
+        };
+
+        let mut buf = inner.buf.unwrap_or_else(|| Vec::with_capacity(4096));
 
         let mut got_pending = false;
+        let mut closed = false;
 
         let max_bytes = if buf.len() < 4 {
             4096
@@ -157,7 +222,7 @@ impl AsyncReadFramed for AsyncReadFramedFilter {
             std::cmp::max(4096, read_size(&buf))
         };
 
-        let sub: &mut dyn AsyncReadIntoVec = &mut *self.sub;
+        let sub: &mut dyn AsyncReadIntoVec = &mut *inner.sub;
         let sub: std::pin::Pin<&mut dyn AsyncReadIntoVec> = std::pin::Pin::new(sub);
 
         match AsyncReadIntoVec::poll_read_into_vec(sub, cx, &mut buf, max_bytes) {
@@ -165,11 +230,15 @@ impl AsyncReadFramed for AsyncReadFramedFilter {
                 got_pending = true;
             }
             std::task::Poll::Ready(Err(e)) => {
-                return std::task::Poll::Ready(Err(KitsuneError::other(e)));
+                return std::task::Poll::Ready(Err(e));
             }
-            std::task::Poll::Ready(Ok(_size)) => (),
+            std::task::Poll::Ready(Ok(None)) => {
+                closed = true;
+            }
+            std::task::Poll::Ready(Ok(Some(_size))) => (),
         }
 
+        let mut frame_count = 0;
         while buf.len() >= 4 + 8 {
             let want_size = read_size(&buf);
             if buf.len() < want_size {
@@ -178,14 +247,34 @@ impl AsyncReadFramed for AsyncReadFramedFilter {
             let msg_id = read_msg_id(&buf);
             let mut data = buf.drain(..want_size).collect::<Vec<_>>();
             data.drain(..12);
-            out.push((msg_id, data.into_boxed_slice()));
+            if out.is_none() {
+                *out = Some(Vec::new());
+            }
+            out.as_mut()
+                .unwrap()
+                .push((msg_id, data.into_boxed_slice()));
+            frame_count += 1;
         }
 
-        self.buf = Some(buf);
-        if got_pending && out.is_empty() {
+        if closed && !buf.is_empty() {
+            return std::task::Poll::Ready(Err(KitsuneError::other(futures::io::Error::new(
+                futures::io::ErrorKind::UnexpectedEof,
+                "remaining buffer after sub-reader closed",
+            ))));
+        }
+
+        inner.buf = Some(buf);
+
+        if !closed {
+            self.0 = Some(inner);
+        }
+
+        if frame_count == 0 && got_pending {
             std::task::Poll::Pending
+        } else if frame_count == 0 && closed {
+            std::task::Poll::Ready(Ok(None))
         } else {
-            std::task::Poll::Ready(Ok(out))
+            std::task::Poll::Ready(Ok(Some(frame_count)))
         }
     }
 }
@@ -308,21 +397,21 @@ where
 
 type AW = Box<dyn futures::io::AsyncWrite + 'static + Send + Unpin>;
 
-/// A filter that will frame outgoing async writes.
-pub struct AsyncWriteFramedFilter {
+struct AsyncWriteFramedFilterInner {
     sub: AW,
-    to_send: Option<Vec<u8>>,
-    did_err: bool,
+    to_send: Vec<u8>,
 }
+
+/// A filter that will frame outgoing async writes.
+pub struct AsyncWriteFramedFilter(Option<AsyncWriteFramedFilterInner>);
 
 impl AsyncWriteFramedFilter {
     /// Create a new AsyncWriteFramedFilter instance.
     pub fn new(sub: AW) -> Self {
-        Self {
+        Self(Some(AsyncWriteFramedFilterInner {
             sub,
-            to_send: Some(Vec::with_capacity(4096)),
-            did_err: false,
-        }
+            to_send: Vec::with_capacity(4096),
+        }))
     }
 }
 
@@ -332,19 +421,24 @@ impl AsyncWriteFramed for AsyncWriteFramedFilter {
         msg_id: MsgId,
         buf: &[u8],
     ) -> KitsuneResult<bool> {
-        if !self.to_send.as_ref().unwrap().is_empty() {
+        let mut inner = match self.0.take() {
+            None => return Err("PreviouslyClosed".into()),
+            Some(inner) => inner,
+        };
+
+        if !inner.to_send.is_empty() {
             return Ok(false);
         }
+
         let size: u32 = buf.len() as u32 + 4 + 8;
-        self.to_send
-            .as_mut()
-            .unwrap()
-            .extend_from_slice(&size.to_le_bytes());
-        self.to_send
-            .as_mut()
-            .unwrap()
+        inner.to_send.extend_from_slice(&size.to_le_bytes());
+        inner
+            .to_send
             .extend_from_slice(&msg_id.inner().to_le_bytes());
-        self.to_send.as_mut().unwrap().extend_from_slice(buf);
+        inner.to_send.extend_from_slice(buf);
+
+        self.0 = Some(inner);
+
         Ok(true)
     }
 
@@ -352,59 +446,80 @@ impl AsyncWriteFramed for AsyncWriteFramedFilter {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<KitsuneResult<bool>> {
-        if self.did_err {
-            // TODO - fix me
-            panic!();
-        }
+        let mut inner = match self.0.take() {
+            None => return std::task::Poll::Ready(Err("PreviouslyClosed".into())),
+            Some(inner) => inner,
+        };
 
-        let mut to_send = self.to_send.take().unwrap();
-
-        let sub = &mut self.sub;
+        let sub = &mut inner.sub;
         tokio::pin!(sub);
 
-        match futures::io::AsyncWrite::poll_write(sub, cx, &to_send) {
+        match futures::io::AsyncWrite::poll_write(sub, cx, &inner.to_send) {
             std::task::Poll::Pending => (),
             std::task::Poll::Ready(Err(e)) => {
-                self.did_err = true;
                 return std::task::Poll::Ready(Err(KitsuneError::other(e)));
             }
             std::task::Poll::Ready(Ok(size)) => {
-                to_send.drain(..size);
+                inner.to_send.drain(..size);
             }
         }
 
-        self.to_send = Some(to_send);
-        if self.to_send.as_ref().unwrap().is_empty() {
+        let res = if inner.to_send.is_empty() {
             std::task::Poll::Ready(Ok(true))
         } else {
             std::task::Poll::Ready(Ok(false))
-        }
+        };
+
+        self.0 = Some(inner);
+        res
     }
 
     fn poll_flush(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<KitsuneResult<()>> {
-        let sub = &mut self.sub;
+        let mut inner = match self.0.take() {
+            None => return std::task::Poll::Ready(Err("PreviouslyClosed".into())),
+            Some(inner) => inner,
+        };
+
+        let sub = &mut inner.sub;
         tokio::pin!(sub);
-        match futures::io::AsyncWrite::poll_flush(sub, cx) {
-            std::task::Poll::Ready(Ok(o)) => std::task::Poll::Ready(Ok(o)),
-            std::task::Poll::Ready(Err(e)) => std::task::Poll::Ready(Err(KitsuneError::other(e))),
+
+        let res = match futures::io::AsyncWrite::poll_flush(sub, cx) {
+            std::task::Poll::Ready(Ok(_)) => std::task::Poll::Ready(Ok(())),
+            std::task::Poll::Ready(Err(e)) => {
+                return std::task::Poll::Ready(Err(KitsuneError::other(e)))
+            }
             std::task::Poll::Pending => std::task::Poll::Pending,
-        }
+        };
+
+        self.0 = Some(inner);
+        res
     }
 
     fn poll_close(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<KitsuneResult<()>> {
-        let sub = &mut self.sub;
+        let mut inner = match self.0.take() {
+            None => return std::task::Poll::Ready(Err("PreviouslyClosed".into())),
+            Some(inner) => inner,
+        };
+
+        let sub = &mut inner.sub;
         tokio::pin!(sub);
-        match futures::io::AsyncWrite::poll_close(sub, cx) {
-            std::task::Poll::Ready(Ok(o)) => std::task::Poll::Ready(Ok(o)),
-            std::task::Poll::Ready(Err(e)) => std::task::Poll::Ready(Err(KitsuneError::other(e))),
+
+        let res = match futures::io::AsyncWrite::poll_close(sub, cx) {
+            std::task::Poll::Ready(Ok(_)) => std::task::Poll::Ready(Ok(())),
+            std::task::Poll::Ready(Err(e)) => {
+                return std::task::Poll::Ready(Err(KitsuneError::other(e)))
+            }
             std::task::Poll::Pending => std::task::Poll::Pending,
-        }
+        };
+
+        self.0 = Some(inner);
+        res
     }
 }
 
