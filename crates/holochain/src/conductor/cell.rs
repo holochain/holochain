@@ -126,7 +126,7 @@ impl Cell {
         };
 
         if has_genesis {
-            holochain_p2p_cell.join().await?;
+            tokio::spawn(holochain_p2p_cell.join());
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 &env,
                 holochain_p2p_cell.clone(),
