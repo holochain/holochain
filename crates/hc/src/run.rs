@@ -42,7 +42,7 @@ pub async fn run(
         )
         .await?;
     }
-    crate::save::save_port(std::env::current_dir()?, &setup_path, port).await?;
+    crate::save::lock_live(std::env::current_dir()?, &setup_path, port).await?;
     msg!("Connected successfully to a running holochain");
     let e = format!("Failed to run holochain at {}", setup_path.display());
 

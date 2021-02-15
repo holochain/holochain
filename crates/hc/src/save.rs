@@ -45,6 +45,16 @@ pub fn clean(mut hc_dir: PathBuf, setups: Vec<usize>) -> anyhow::Result<()> {
         }
     }
     if setups_len == 0 || setups_len == to_remove_len {
+        for entry in std::fs::read_dir(&hc_dir)? {
+            let entry = entry?;
+            if entry.file_type()?.is_file() {
+                if let Some(s) = entry.file_name().to_str() {
+                    if s.starts_with(".hc_live_") {
+                        std::fs::remove_file(entry.path())?;
+                    }
+                }
+            }
+        }
         hc_dir.push(".hc");
         if hc_dir.exists() {
             std::fs::remove_file(hc_dir)?;
@@ -103,7 +113,7 @@ lazy_static::lazy_static! {
 }
 
 /// Lock this setup as running live and advertise the port
-pub async fn save_port(mut hc_dir: PathBuf, path: &Path, port: u16) -> anyhow::Result<()> {
+pub async fn lock_live(mut hc_dir: PathBuf, path: &Path, port: u16) -> anyhow::Result<()> {
     use std::io::Write;
     std::fs::create_dir_all(&hc_dir)?;
     let paths = load(hc_dir.clone())?;
