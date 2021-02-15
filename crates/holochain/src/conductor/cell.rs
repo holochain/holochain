@@ -113,7 +113,7 @@ impl Cell {
         id: CellId,
         conductor_handle: ConductorHandle,
         env: EnvironmentWrite,
-        mut holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+        holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
@@ -126,7 +126,12 @@ impl Cell {
         };
 
         if has_genesis {
-            tokio::spawn(holochain_p2p_cell.join());
+            tokio::spawn({
+                let mut network = holochain_p2p_cell.clone();
+                async move {
+                    network.join().await
+                }
+            });
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 &env,
                 holochain_p2p_cell.clone(),
