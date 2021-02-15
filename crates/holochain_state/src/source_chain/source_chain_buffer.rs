@@ -476,16 +476,16 @@ pub mod tests {
             let json = serde_json::to_string_pretty(&json)?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-            assert_eq!(parsed[0]["element"]["header"]["type"], "Create");
-            assert_eq!(parsed[0]["element"]["header"]["entry_type"], "AgentPubKey");
-            assert_eq!(parsed[0]["element"]["entry"]["entry_type"], "Agent");
+            assert_eq!(parsed["elements"][0]["header"]["type"], "Create");
+            assert_eq!(parsed["elements"][0]["header"]["entry_type"], "AgentPubKey");
+            assert_eq!(parsed["elements"][0]["entry"]["entry_type"], "Agent");
             assert_ne!(
-                parsed[0]["element"]["entry"]["entry"],
+                parsed["elements"][0]["entry"]["entry"],
                 serde_json::Value::Null
             );
 
-            assert_eq!(parsed[1]["element"]["header"]["type"], "Dna");
-            assert_eq!(parsed[1]["element"]["entry"], serde_json::Value::Null);
+            assert_eq!(parsed["elements"][1]["header"]["type"], "Dna");
+            assert_eq!(parsed["elements"][1]["entry"], serde_json::Value::Null);
         }
 
         Ok(())
