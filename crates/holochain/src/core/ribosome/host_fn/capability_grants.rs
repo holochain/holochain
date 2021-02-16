@@ -92,7 +92,7 @@ pub mod wasm_test {
 
     // TODO: [ B-03669 ] can move this to an integration test (may need to switch to using a RealDnaStore)
     #[tokio::test(threaded_scheduler)]
-    async fn ribosome_authorized_call() {
+    async fn ribosome_authorized_call() -> anyhow::Result<()> {
         observability::test_run().ok();
         let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
             .await
@@ -232,5 +232,7 @@ pub mod wasm_test {
 
         let mut conductor = conductor;
         conductor.shutdown().await;
+
+        Ok(())
     }
 }
