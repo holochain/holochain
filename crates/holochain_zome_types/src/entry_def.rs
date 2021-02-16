@@ -2,6 +2,7 @@ use crate::crdt::CrdtType;
 use crate::validate::RequiredValidationType;
 use crate::zome_io::ExternIO;
 use crate::CallbackResult;
+use crate::EntryDefIndex;
 use holochain_serialized_bytes::prelude::*;
 
 const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
@@ -112,10 +113,11 @@ impl EntryDef {
 pub struct EntryDefs(Vec<EntryDef>);
 
 impl EntryDefs {
-    pub fn entry_def_id_position(&self, entry_def_id: EntryDefId) -> Option<usize> {
+    pub fn entry_def_index_from_id(&self, entry_def_id: EntryDefId) -> Option<EntryDefIndex> {
         self.0
             .iter()
             .position(|entry_def| entry_def.id == entry_def_id)
+            .map(|u_size| EntryDefIndex(u_size as u8))
     }
 }
 

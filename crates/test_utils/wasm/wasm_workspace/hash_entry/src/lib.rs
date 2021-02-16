@@ -1,6 +1,6 @@
 use hdk3::prelude::*;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 enum TemperatureUnit {
     Kelvin,
     Farenheit,

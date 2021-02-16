@@ -49,14 +49,14 @@ impl TryFrom<&Path> for Anchor {
                     },
                 })
             } else {
-                Err(SerializedBytesError::FromBytes(format!(
+                Err(SerializedBytesError::Deserialize(format!(
                     "Bad anchor path root {:0?} should be {:1?}",
                     components[0].as_ref(),
                     ROOT.as_bytes(),
                 )))
             }
         } else {
-            Err(SerializedBytesError::FromBytes(format!(
+            Err(SerializedBytesError::Deserialize(format!(
                 "Bad anchor path length {}",
                 components.len()
             )))
@@ -141,7 +141,7 @@ pub fn list_anchor_tags(anchor_type: String) -> ExternResult<Vec<String>> {
             Ok(path) => match Anchor::try_from(&path) {
                 Ok(anchor) => match anchor.anchor_text {
                     Some(text) => Ok(text),
-                    None => Err(SerializedBytesError::FromBytes(
+                    None => Err(SerializedBytesError::Deserialize(
                         "missing anchor text".into(),
                     )),
                 },

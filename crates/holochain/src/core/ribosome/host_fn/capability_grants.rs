@@ -1,6 +1,6 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
+use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 
 /// list all the grants stored locally in the chain filtered by tag
@@ -9,7 +9,7 @@ pub fn capability_grants(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     _input: (),
-) -> RibosomeResult<()> {
+) -> Result<(), WasmError> {
     unimplemented!();
 }
 
@@ -91,7 +91,7 @@ pub mod wasm_test {
 
     // TODO: [ B-03669 ] can move this to an integration test (may need to switch to using a RealDnaStore)
     #[tokio::test(threaded_scheduler)]
-    async fn ribosome_authorized_call() {
+    async fn ribosome_authorized_call() -> anyhow::Result<()> {
         observability::test_run().ok();
         let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
             .await
@@ -200,10 +200,7 @@ pub mod wasm_test {
                 CapFor(new_secret, bob_agent_id.clone().try_into().unwrap()),
             )
             .await;
-        assert_eq!(
-            output,
-            ZomeCallResponse::Ok(ExternIO::encode(()).unwrap()),
-        );
+        assert_eq!(output, ZomeCallResponse::Ok(ExternIO::encode(()).unwrap()),);
 
         // BOB DELETES THE GRANT SO NO SECRETS WORK
 
@@ -234,5 +231,7 @@ pub mod wasm_test {
 
         let mut conductor = conductor;
         conductor.shutdown().await;
+
+        Ok(())
     }
 }

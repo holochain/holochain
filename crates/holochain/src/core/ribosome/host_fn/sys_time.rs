@@ -1,13 +1,13 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 pub fn sys_time(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     _input: (),
-) -> RibosomeResult<core::time::Duration> {
+) -> Result<core::time::Duration, WasmError> {
     let start = std::time::SystemTime::now();
     let since_the_epoch = start
         .duration_since(std::time::UNIX_EPOCH)

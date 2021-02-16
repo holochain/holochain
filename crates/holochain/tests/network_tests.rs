@@ -15,10 +15,10 @@ use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 use holochain::conductor::dna_store::MockDnaStore;
 use holochain::conductor::interface::websocket::test_utils::setup_app;
-use holochain::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
 use holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
 use holochain::core::workflow::CallZomeWorkspace;
 use holochain::test_utils::test_network;
+use holochain_cascade::integrate_single_metadata;
 use holochain_lmdb::env::EnvironmentWrite;
 use holochain_lmdb::env::ReadManager;
 use holochain_lmdb::prelude::BufferedStore;
@@ -35,6 +35,7 @@ use holochain_state::metadata::MetadataBuf;
 use holochain_state::metadata::MetadataBufT;
 use holochain_types::prelude::*;
 use holochain_types::prelude::*;
+
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Entry;
 use holochain_zome_types::HeaderHashed;
@@ -576,7 +577,7 @@ async fn generate_fixt_store() -> (
     meta_store.insert(
         entry_hash.into(),
         TimedHeaderHash {
-            timestamp: Timestamp::now(),
+            timestamp: timestamp::now(),
             header_hash: hash.clone(),
         },
     );

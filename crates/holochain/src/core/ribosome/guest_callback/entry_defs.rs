@@ -218,6 +218,8 @@ mod slow_tests {
     use crate::fixt::curve::Zomes;
     use crate::fixt::EntryDefsInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use ::fixt::prelude::*;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::entry_def::EntryVisibility;
@@ -236,6 +238,25 @@ mod slow_tests {
             .run_entry_defs(EntryDefsHostAccess, entry_defs_invocation)
             .unwrap();
         assert_eq!(result, EntryDefsResult::Defs(BTreeMap::new()),);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_entry_defs_index_lookup() {
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let env = test_env.env();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = workspace_lock;
+        let output: () =
+            crate::call_test_ribosome!(host_access, TestWasm::EntryDefs, "assert_indexes", ());
+
+        assert_eq!(&(), &output);
     }
 
     #[tokio::test(threaded_scheduler)]
