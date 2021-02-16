@@ -21,7 +21,7 @@ pub enum ValidationStatus {
     Abandoned,
 }
 
-#[derive(Serialize, Deserialize, SerializedBytes, Debug)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct ValidateData {
     pub element: Element,
     pub validation_package: Option<ValidationPackage>,

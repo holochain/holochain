@@ -195,7 +195,7 @@ impl Db {
                     let value = IntegratedDhtOpsValue {
                         validation_status: ValidationStatus::Valid,
                         op: op.to_light(),
-                        when_integrated: Timestamp::now().into(),
+                        when_integrated: timestamp::now().into(),
                     };
                     let mut r = workspace
                         .integrated_dht_ops
@@ -826,6 +826,7 @@ async fn test_ops_state() {
 
     for t in tests.iter() {
         clear_dbs(env.clone());
+        println!("test_ops_state on function {:?}", t);
         let td = TestData::new().await;
         let (pre_state, expect, name) = t(td);
         Db::set(pre_state, env.clone()).await;

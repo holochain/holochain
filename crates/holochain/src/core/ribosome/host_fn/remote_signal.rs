@@ -1,7 +1,7 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_wasmer_host::prelude::WasmError;
 use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
@@ -13,7 +13,7 @@ pub fn remote_signal(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: RemoteSignal,
-) -> RibosomeResult<()> {
+) -> Result<(), WasmError> {
     const FN_NAME: &str = "recv_remote_signal";
     // Timeouts and errors are ignored,
     // this is a send and forget operation.
@@ -94,8 +94,11 @@ mod tests {
                     access: ().into(),
                     functions,
                 };
-                api.create(EntryWithDefId::new(EntryDefId::CapGrant, Entry::CapGrant(cap_grant_entry)))
-                    .unwrap();
+                api.create(EntryWithDefId::new(
+                    EntryDefId::CapGrant,
+                    Entry::CapGrant(cap_grant_entry),
+                ))
+                .unwrap();
 
                 Ok(InitCallbackResult::Pass)
             })

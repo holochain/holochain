@@ -10,4 +10,5 @@ ADD https://github.com/holochain/holochain/archive/$DOCKER_BRANCH.tar.gz /holoch
 RUN tar --strip-components=1 -zxvf $DOCKER_BRANCH.tar.gz
 
 # warm things
+RUN `nix-build . --no-link -A pkgs.ci.ciSetupNixConf`/bin/hc-ci-setup-nix-conf.sh
 RUN nix-shell --run echo

@@ -242,7 +242,7 @@ pub async fn call_zome_fn<S>(
     fn_name: String,
     input: S,
 ) where
-    S: Serialize,
+    S: Serialize + std::fmt::Debug,
 {
     let call: ZomeCall = ZomeCallInvocationFixturator::new(NamedInvocation(
         cell_id,
@@ -394,7 +394,7 @@ async fn call_zome() {
 
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "slow_tests")]
-async fn remote_signals() {
+async fn remote_signals() -> anyhow::Result<()> {
     observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 5;
 
@@ -444,6 +444,8 @@ async fn remote_signals() {
         // Each handle should recv a signal
         assert_matches!(r, Ok(Signal::App(_, a)) if a == signal);
     }
+
+    Ok(())
 }
 
 #[tokio::test(threaded_scheduler)]
