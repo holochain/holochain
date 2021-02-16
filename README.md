@@ -32,11 +32,21 @@ nix-shell --argstr flavor happDev
 
 This nix-shell flavor installs wrapper binaries for `holochain` and `dna-util` that will automatically compile and run the binaries.  This is very useful if you are tracking changes in the holochain repo because when you check out a new rev, running holochain will compile automatically to the version at that rev.
 
-### Building with cargo if you already have rust installed:
+### Building with cargo:
+
+Another way to install the `holochain` and `dna-util` binaries (if the previous didn't work) is by using rust
+
+[Install Rust](https://www.cloudbooklet.com/install-rust-on-ubuntu-18-04-lts/) 
+
+Install holochain binaries:
 ```
 cargo install --path crates/holochain
 cargo install --path crates/dna_util
 ```
+
+be sure to add `holochain/.cargo/bin` to your PATH to be able to run the installed binaries
+
+
 ## Usage
 
 ``` bash
