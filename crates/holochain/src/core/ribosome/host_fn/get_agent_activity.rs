@@ -1,16 +1,16 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 pub fn get_agent_activity(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: GetAgentActivityInput,
-) -> RibosomeResult<GetAgentActivityOutput> {
-    let (agent, query, activity_request) = input.into_inner();
+) -> Result<AgentActivity, WasmError> {
+    let GetAgentActivityInput{ agent_pubkey, chain_query_filter, activity_request } = input;
     let options = match activity_request {
         ActivityRequest::Status => GetActivityOptions {
             include_valid_activity: false,
@@ -35,10 +35,11 @@ pub fn get_agent_activity(
             .write()
             .await
             .cascade(network)
-            .get_agent_activity(agent, query, options)
-            .await?;
+            .get_agent_activity(agent_pubkey, chain_query_filter, options)
+            .await
+            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
 
-        Ok(GetAgentActivityOutput::new(activity.into()))
+        Ok(activity.into())
     })
 }
 

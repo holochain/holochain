@@ -1,19 +1,19 @@
-use super::CoolCell;
+use super::SweetCell;
 use holo_hash::AgentPubKey;
 use holochain_types::app::InstalledAppId;
 use itertools::traits::HomogeneousTuple;
 use itertools::Itertools;
 
-/// An installed app, with prebuilt CoolCells
+/// An installed app, with prebuilt SweetCells
 #[derive(Clone)]
-pub struct CoolApp {
+pub struct SweetApp {
     installed_app_id: InstalledAppId,
-    cells: Vec<CoolCell>,
+    cells: Vec<SweetCell>,
 }
 
-impl CoolApp {
+impl SweetApp {
     /// Constructor
-    pub(super) fn new(installed_app_id: InstalledAppId, cells: Vec<CoolCell>) -> Self {
+    pub(super) fn new(installed_app_id: InstalledAppId, cells: Vec<SweetCell>) -> Self {
         // Ensure that all Agents are the same
         assert!(cells.iter().map(|c| c.agent_pubkey()).dedup().count() == 1);
         Self {
@@ -28,12 +28,12 @@ impl CoolApp {
     }
 
     /// Accessor
-    pub fn cells(&self) -> &Vec<CoolCell> {
+    pub fn cells(&self) -> &Vec<SweetCell> {
         &self.cells
     }
 
     /// Accessor
-    pub fn into_cells(self) -> Vec<CoolCell> {
+    pub fn into_cells(self) -> Vec<SweetCell> {
         self.cells
     }
 
@@ -48,11 +48,11 @@ impl CoolApp {
 #[derive(
     Clone, derive_more::From, derive_more::Into, derive_more::AsRef, derive_more::IntoIterator,
 )]
-pub struct CoolAppBatch(pub(super) Vec<CoolApp>);
+pub struct SweetAppBatch(pub(super) Vec<SweetApp>);
 
-impl CoolAppBatch {
+impl SweetAppBatch {
     /// Get the underlying data
-    pub fn into_inner(self) -> Vec<CoolApp> {
+    pub fn into_inner(self) -> Vec<SweetApp> {
         self.0
     }
 
@@ -64,11 +64,11 @@ impl CoolAppBatch {
     pub fn into_tuples<Outer, Inner>(self) -> Outer
     where
         Outer: HomogeneousTuple<Item = Inner>,
-        Inner: HomogeneousTuple<Item = CoolCell>,
+        Inner: HomogeneousTuple<Item = SweetCell>,
         Outer::Buffer: std::convert::AsRef<[Option<Inner>]>,
         Outer::Buffer: std::convert::AsMut<[Option<Inner>]>,
-        Inner::Buffer: std::convert::AsRef<[Option<CoolCell>]>,
-        Inner::Buffer: std::convert::AsMut<[Option<CoolCell>]>,
+        Inner::Buffer: std::convert::AsRef<[Option<SweetCell>]>,
+        Inner::Buffer: std::convert::AsMut<[Option<SweetCell>]>,
     {
         self.into_inner()
             .into_iter()
@@ -83,12 +83,12 @@ impl CoolAppBatch {
     }
 
     /// Access all Cells across all Apps, with Cells from the same App being contiguous
-    pub fn cells_flattened(&self) -> Vec<&CoolCell> {
+    pub fn cells_flattened(&self) -> Vec<&SweetCell> {
         self.0.iter().flat_map(|app| app.cells().iter()).collect()
     }
 
     /// Get the underlying data
-    pub fn iter(&self) -> impl Iterator<Item = &CoolApp> {
+    pub fn iter(&self) -> impl Iterator<Item = &SweetApp> {
         self.0.iter()
     }
 }

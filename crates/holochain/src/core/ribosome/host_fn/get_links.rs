@@ -1,29 +1,29 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_state::metadata::LinkMetaKey;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_links<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: GetLinksInput,
-) -> RibosomeResult<GetLinksOutput> {
-    let (base_address, tag) = input.into_inner();
+) -> Result<Links, WasmError> {
+    let GetLinksInput { base_address, tag_prefix } = input;
 
     // Get zome id
-    let zome_id = ribosome.zome_to_id(&call_context.zome)?;
+    let zome_id = ribosome.zome_to_id(&call_context.zome).expect("Failed to get ID for current zome.");
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
 
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         // Create the key
-        let key = match tag.as_ref() {
-            Some(tag) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag),
+        let key = match tag_prefix.as_ref() {
+            Some(tag_prefix) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag_prefix),
             None => LinkMetaKey::BaseZome(&base_address, zome_id),
         };
 
@@ -35,9 +35,10 @@ pub fn get_links<'a>(
             .await
             .cascade(network)
             .dht_get_links(&key, GetLinksOptions::default())
-            .await?;
+            .await
+            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
 
-        Ok(GetLinksOutput::new(links.into()))
+        Ok(links.into())
     })
 }
 
@@ -77,13 +78,13 @@ pub mod slow_tests {
             host_access,
             TestWasm::HashPath,
             "ensure",
-            TestString::from("foo.bar".to_string())
+            "foo.bar".to_string()
         );
         let _: () = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "ensure",
-            TestString::from("foo.bar".to_string())
+            "foo.bar".to_string()
         );
 
         // ensure foo.baz
@@ -91,37 +92,37 @@ pub mod slow_tests {
             host_access,
             TestWasm::HashPath,
             "ensure",
-            TestString::from("foo.baz".to_string())
+            "foo.baz".to_string()
         );
 
-        let exists_output: TestBool = crate::call_test_ribosome!(
+        let exists_output: bool = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "exists",
-            TestString::from("foo".to_string())
+            "foo".to_string()
         );
 
-        assert_eq!(TestBool(true), exists_output,);
+        assert_eq!(true, exists_output,);
 
         let foo_bar: holo_hash::EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "hash",
-            TestString::from("foo.bar".to_string())
+            "foo.bar".to_string()
         );
 
         let foo_baz: holo_hash::EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "hash",
-            TestString::from("foo.baz".to_string())
+            "foo.baz".to_string()
         );
 
         let children_output: holochain_zome_types::link::Links = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children",
-            TestString::from("foo".to_string())
+            "foo".to_string()
         );
 
         let links = children_output.into_inner();
@@ -179,7 +180,7 @@ pub mod slow_tests {
             ],
         );
 
-        let get_output: MaybeAnchor = crate::call_test_ribosome!(
+        let get_output: Option<Anchor> = crate::call_test_ribosome!(
             host_access,
             TestWasm::Anchor,
             "get_anchor",
@@ -187,10 +188,10 @@ pub mod slow_tests {
         );
 
         assert_eq!(
-            MaybeAnchor(Some(Anchor {
+            Some(Anchor {
                 anchor_type: "foo".into(),
                 anchor_text: Some("bar".into()),
-            })),
+            }),
             get_output,
         );
 
@@ -218,7 +219,7 @@ pub mod slow_tests {
                 host_access,
                 TestWasm::Anchor,
                 "list_anchor_addresses",
-                TestString("foo".into())
+                "foo".to_string()
             )
         };
 
@@ -233,15 +234,15 @@ pub mod slow_tests {
             anchor_address_two.get_raw_32().to_vec(),
         );
 
-        let list_anchor_tags_output: AnchorTags = crate::call_test_ribosome!(
+        let list_anchor_tags_output: Vec<String> = crate::call_test_ribosome!(
             host_access,
             TestWasm::Anchor,
             "list_anchor_tags",
-            TestString("foo".into())
+            "foo".to_string()
         );
 
         assert_eq!(
-            AnchorTags(vec!["bar".to_string(), "baz".to_string()]),
+            vec!["bar".to_string(), "baz".to_string()],
             list_anchor_tags_output,
         );
     }
@@ -288,13 +289,10 @@ pub mod slow_tests {
         .unwrap();
 
         let result = handle.call_zome(invocation).await.unwrap().unwrap();
-        let result: hdk3::prelude::Links = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
-            .clone()
-            .into_inner()
-            .try_into()
+        let links: hdk3::prelude::Links = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+            .decode()
             .unwrap();
-        let links = result.into_inner();
-        assert_eq!(links.len(), 1);
+        assert_eq!(links.into_inner().len(), 1);
         conductor_test.shutdown_conductor().await;
     }
 }

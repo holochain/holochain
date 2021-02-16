@@ -102,12 +102,9 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 }
                 let hash = dna.dna_hash().clone();
                 let dna_list = self.conductor_handle.list_dnas().await?;
-                if dna_list.contains(&hash) {
-                    return Err(ConductorApiError::DnaReadError(
-                        "Given dna has already been registered".to_string(),
-                    ));
+                if !dna_list.contains(&hash) {
+                    self.conductor_handle.install_dna(dna).await?;
                 }
-                self.conductor_handle.install_dna(dna).await?;
                 Ok(AdminResponse::DnaRegistered(hash))
             }
             InstallApp(payload) => {
@@ -337,13 +334,13 @@ mod test {
             AdminResponse::DnaRegistered(h) if h == dna_hash
         );
 
-        // re-register
+        // re-register idempotent
         let path1_install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload.clone())))
             .await;
         assert_matches!(
             path1_install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Given dna has already been registered")
+            AdminResponse::DnaRegistered(h) if h == dna_hash
         );
 
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
@@ -383,19 +380,26 @@ mod test {
         let hash2_install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
             .await;
+
+        let new_hash = if let AdminResponse::DnaRegistered(ref h) = hash2_install_response {
+            h.clone()
+        } else {
+            unreachable!()
+        };
+
         assert_matches!(
             hash2_install_response,
             AdminResponse::DnaRegistered(hash) if hash != dna_hash
         );
 
-        // from a path with a same uuid should be already registered
+        // from a path with a same uuid should return the already registered hash so it's idempotent
         path_payload.uuid = Some(String::from("12345678900000000000000"));
         let path2_install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload.clone())))
             .await;
         assert_matches!(
             path2_install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Given dna has already been registered")
+            AdminResponse::DnaRegistered(hash) if hash == new_hash
         );
 
         // from a path with different uuid should produce different hash

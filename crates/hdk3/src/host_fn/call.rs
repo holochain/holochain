@@ -11,38 +11,27 @@ use crate::prelude::*;
 /// - fn_name: The name of the function in the zome you are calling.
 /// - cap_secret: The capability secret if required.
 /// - payload: The arguments to the function you are calling.
-pub fn call<I, IE, O, OE>(
+pub fn call<I>(
     to_cell: Option<CellId>,
     zome_name: ZomeName,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
     payload: I,
-) -> HdkResult<O>
+) -> ExternResult<ZomeCallResponse>
 where
-    SerializedBytes: TryFrom<I, Error = IE>,
-    O: TryFrom<SerializedBytes, Error = OE>,
-    HdkError: From<IE>,
-    HdkError: From<OE>,
+    I: serde::Serialize + std::fmt::Debug,
 {
-    let payload = SerializedBytes::try_from(payload)?;
     // @todo is this secure to set this in the wasm rather than have the host inject it?
     let provenance = agent_info()?.agent_latest_pubkey;
-    let out: ZomeCallResponse = host_call::<CallInput, CallOutput>(
+    host_call::<Call, ZomeCallResponse>(
         __call,
-        &CallInput::new(Call::new(
-            to_cell, zome_name, fn_name, cap_secret, payload, provenance,
-        )),
-    )?
-    .into_inner();
-
-    match out {
-        ZomeCallResponse::Ok(o) => Ok(O::try_from(o.into_inner())?),
-        ZomeCallResponse::Unauthorized(c, z, f, p) => {
-            Err(HdkError::UnauthorizedZomeCall(c, z, f, p))
-        }
-        ZomeCallResponse::NetworkError(e) => unreachable!(
-            "Calls should never be routed to the network. This is a bug. Got {}",
-            e
+        Call::new(
+            to_cell,
+            zome_name,
+            fn_name,
+            cap_secret,
+            ExternIO::encode(payload)?,
+            provenance,
         ),
-    }
+    )
 }

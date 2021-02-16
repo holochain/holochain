@@ -80,6 +80,9 @@ use crate::prelude::*;
 /// @see CapAccess
 /// @see create_cap_claim
 /// @see generate_cap_secret
-pub fn create_cap_grant(cap_grant_entry: CapGrantEntry) -> HdkResult<HeaderHash> {
-    create(EntryDefId::CapGrant, Entry::CapGrant(cap_grant_entry))
+pub fn create_cap_grant(cap_grant_entry: CapGrantEntry) -> ExternResult<HeaderHash> {
+    create(EntryWithDefId::new(
+        EntryDefId::CapGrant,
+        Entry::CapGrant(cap_grant_entry),
+    ))
 }
