@@ -18,7 +18,7 @@ static RUNTIME: Lazy<tokio::runtime::Handle> = Lazy::new(|| {
 static BUCKET: Lazy<AsyncOwnedResourceBucket<&'static str>> =
     Lazy::new(|| AsyncOwnedResourceBucket::new(None));
 
-fn async_bucket(_black_box: ()) {
+fn async_bucket() {
     futures::executor::block_on(RUNTIME.enter(|| {
         tokio::task::spawn(async move {
             let mut all = Vec::new();
@@ -27,7 +27,7 @@ fn async_bucket(_black_box: ()) {
                     for _ in 0..100 {
                         let res = BUCKET.acquire().await.unwrap();
                         assert!(res == "1" || res == "2");
-                        BUCKET.release(res).await;
+                        BUCKET.release(black_box(res)).await;
                     }
                 }));
             }
@@ -42,7 +42,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         BUCKET.release("1").await;
         BUCKET.release("2").await;
     });
-    c.bench_function("async_bucket", |b| b.iter(|| async_bucket(black_box(()))));
+    c.bench_function("async_bucket", |b| b.iter(|| async_bucket()));
 }
 
 criterion_group!(benches, criterion_benchmark);

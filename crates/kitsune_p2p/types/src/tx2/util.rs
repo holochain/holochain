@@ -87,6 +87,12 @@ impl futures::io::AsyncWrite for MemWrite {
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> std::task::Poll<Result<usize, futures::io::Error>> {
+        if buf.is_empty() {
+            return std::task::Poll::Ready(Err(Error::new(
+                ErrorKind::InvalidInput,
+                "AmbiguousZeroBuffer",
+            )));
+        }
         let inner = match self.0.take() {
             None => {
                 return std::task::Poll::Ready(Err(Error::new(
@@ -302,5 +308,10 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_async_bound_mem_channel_lg_buf() {
         _inner_test_async_bound_mem_channel(4096 * 3, 4096 * 4).await;
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_async_bound_mem_channel_disparity() {
+        _inner_test_async_bound_mem_channel(4096, 1024 * 1024 * 8).await;
     }
 }

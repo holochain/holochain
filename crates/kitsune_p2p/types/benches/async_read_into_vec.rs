@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use kitsune_p2p_types::tx2::*;
+use kitsune_p2p_types::{tx2::*, KitsuneTimeout};
 use once_cell::sync::Lazy;
 
 static RUNTIME: Lazy<tokio::runtime::Handle> = Lazy::new(|| {
@@ -16,6 +16,7 @@ static RUNTIME: Lazy<tokio::runtime::Handle> = Lazy::new(|| {
 });
 
 const SIZE: usize = 1024 * 1024 * 8;
+const DATA: &[u8] = &[0xdb; SIZE];
 
 struct FakeRead;
 
@@ -25,7 +26,8 @@ impl futures::io::AsyncRead for FakeRead {
         _cx: &mut std::task::Context<'_>,
         buf: &mut [u8],
     ) -> std::task::Poll<Result<usize, futures::io::Error>> {
-        util::fill_with_latency_info(buf);
+        assert_eq!(buf.len(), SIZE);
+        buf.copy_from_slice(DATA);
         std::task::Poll::Ready(Ok(buf.len()))
     }
 }
@@ -33,7 +35,7 @@ impl futures::io::AsyncRead for FakeRead {
 static VEC: Lazy<tokio::sync::Mutex<Option<Vec<u8>>>> =
     Lazy::new(|| tokio::sync::Mutex::new(Some(Vec::with_capacity(SIZE))));
 
-fn async_read_into_vec(_black_box: ()) {
+fn async_read_into_vec() {
     futures::executor::block_on(RUNTIME.enter(|| {
         tokio::task::spawn(async move {
             let mut vec = VEC.lock().await.take().unwrap();
@@ -41,7 +43,9 @@ fn async_read_into_vec(_black_box: ()) {
 
             let mut r = AsyncReadIntoVecFilter::new(Box::new(FakeRead));
 
-            r.read_into_vec(&mut vec, SIZE).await.unwrap();
+            r.read_into_vec(black_box(&mut vec), SIZE, KitsuneTimeout::from_millis(100))
+                .await
+                .unwrap();
             assert_eq!(vec.len(), SIZE);
 
             (*VEC.lock().await) = Some(vec);
@@ -51,9 +55,7 @@ fn async_read_into_vec(_black_box: ()) {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("async_read_into_vec", |b| {
-        b.iter(|| async_read_into_vec(black_box(())))
-    });
+    c.bench_function("async_read_into_vec", |b| b.iter(|| async_read_into_vec()));
 }
 
 criterion_group!(benches, criterion_benchmark);

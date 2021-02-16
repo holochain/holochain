@@ -163,10 +163,10 @@ where
             self.0 = Some(inner);
         }
 
-        if frame_count > 0 {
-            std::task::Poll::Ready(Ok(Some(frame_count)))
-        } else if got_pending {
+        if frame_count == 0 && got_pending {
             std::task::Poll::Pending
+        } else if frame_count > 0 || !closed {
+            std::task::Poll::Ready(Ok(Some(frame_count)))
         } else {
             std::task::Poll::Ready(Ok(None))
         }
@@ -235,7 +235,9 @@ impl AsyncReadFramed for AsyncReadFramedFilter {
             std::task::Poll::Ready(Ok(None)) => {
                 closed = true;
             }
-            std::task::Poll::Ready(Ok(Some(_size))) => (),
+            std::task::Poll::Ready(Ok(Some(_size))) => {
+                //println!("LFramed: read {} bytes", _size);
+            }
         }
 
         let mut frame_count = 0;
@@ -245,14 +247,14 @@ impl AsyncReadFramed for AsyncReadFramedFilter {
                 break;
             }
             let msg_id = read_msg_id(&buf);
-            let mut data = buf.drain(..want_size).collect::<Vec<_>>();
-            data.drain(..12);
+            let data = buf[4 + 8..want_size].to_vec().into_boxed_slice();
+            let rlen = buf.len() - want_size;
+            buf.copy_within(want_size..want_size + rlen, 0);
+            buf.resize(rlen, 0);
             if out.is_none() {
                 *out = Some(Vec::new());
             }
-            out.as_mut()
-                .unwrap()
-                .push((msg_id, data.into_boxed_slice()));
+            out.as_mut().unwrap().push((msg_id, data));
             frame_count += 1;
         }
 
@@ -314,6 +316,8 @@ pub trait AsyncWriteFramed: 'static + Send + Unpin {
 /// Extension trait providing higher-level access API.
 pub trait AsyncWriteFramedExt: AsyncWriteFramed {
     /// high-level async write frames fn.
+    /// returns true if we were able to write all data within timeout.
+    /// returns false if there is still pending data.
     fn write_frame<'a>(
         &'a mut self,
         msg_id: MsgId,
@@ -321,21 +325,24 @@ pub trait AsyncWriteFramedExt: AsyncWriteFramed {
         timeout: KitsuneTimeout,
     ) -> AsyncWriteFramedFut<'a, Self> {
         let this = std::pin::Pin::new(&mut *self);
-        AsyncWriteFramedFut {
+        AsyncWriteFramedFut(Some(AsyncWriteFramedFutInner {
             stream: this,
             msg_id,
             buf,
             is_pre_push: true,
             timeout,
-        }
+        }))
+    }
+
+    /// high-level close fn.
+    fn close(&mut self) -> AsyncWriteFramedCloseFut<'_, Self> {
+        AsyncWriteFramedCloseFut(std::pin::Pin::new(&mut *self))
     }
 }
 
 impl<A: AsyncWriteFramed> AsyncWriteFramedExt for A {}
 
-/// Future returned from `AsyncWriteFramed::write_frame()`.
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct AsyncWriteFramedFut<'a, P>
+struct AsyncWriteFramedFutInner<'a, P>
 where
     P: ?Sized + AsyncWriteFramed,
 {
@@ -345,6 +352,12 @@ where
     is_pre_push: bool,
     timeout: KitsuneTimeout,
 }
+
+/// Future returned from `AsyncWriteFramed::write_frame()`.
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+pub struct AsyncWriteFramedFut<'a, P>(Option<AsyncWriteFramedFutInner<'a, P>>)
+where
+    P: ?Sized + AsyncWriteFramed;
 
 impl<'a, P> std::future::Future for AsyncWriteFramedFut<'a, P>
 where
@@ -356,42 +369,87 @@ where
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        let this = &mut *self;
+        let mut inner = match self.0.take() {
+            None => return std::task::Poll::Ready(Err(KitsuneError::Closed)),
+            Some(inner) => inner,
+        };
 
-        // TODO - actually use the timeout
-        let _timeout = this.timeout;
+        let mut got_pending = false;
+        let mut is_complete = false;
+        let mut timing_break = false;
 
-        if this.is_pre_push {
-            loop {
-                let stream: std::pin::Pin<&mut P> = std::pin::Pin::new(&mut this.stream);
-                match AsyncWriteFramed::poll_write_framed(stream, cx) {
-                    std::task::Poll::Ready(Ok(true)) => break,
-                    std::task::Poll::Ready(Ok(false)) => continue,
-                    std::task::Poll::Pending => return std::task::Poll::Pending,
-                    std::task::Poll::Ready(Err(e)) => return std::task::Poll::Ready(Err(e)),
-                }
+        let start = std::time::Instant::now();
+
+        while !inner.timeout.is_expired() {
+            if start.elapsed().as_micros() >= 10_000 {
+                timing_break = true;
+                break;
             }
 
-            {
-                let stream: std::pin::Pin<&mut P> = std::pin::Pin::new(&mut this.stream);
-                // TODO - fix this unwarp()
-                AsyncWriteFramed::push_frame(stream, this.msg_id, this.buf).unwrap();
-            }
+            let stream: std::pin::Pin<&mut P> = std::pin::Pin::new(&mut inner.stream);
 
-            this.is_pre_push = false;
-        }
-
-        loop {
-            let stream: std::pin::Pin<&mut P> = std::pin::Pin::new(&mut this.stream);
+            let mut ready = false;
             match AsyncWriteFramed::poll_write_framed(stream, cx) {
-                std::task::Poll::Ready(Ok(true)) => break,
-                std::task::Poll::Ready(Ok(false)) => continue,
-                std::task::Poll::Pending => return std::task::Poll::Pending,
+                std::task::Poll::Ready(Ok(true)) => ready = true,
+                std::task::Poll::Ready(Ok(false)) => (),
+                std::task::Poll::Pending => {
+                    got_pending = true;
+                    break;
+                }
                 std::task::Poll::Ready(Err(e)) => return std::task::Poll::Ready(Err(e)),
             }
+
+            if ready && inner.is_pre_push {
+                let stream: std::pin::Pin<&mut P> = std::pin::Pin::new(&mut inner.stream);
+                match AsyncWriteFramed::push_frame(stream, inner.msg_id, inner.buf) {
+                    Err(e) => return std::task::Poll::Ready(Err(e)),
+                    Ok(true) => {
+                        inner.is_pre_push = false;
+                    }
+                    Ok(false) => (),
+                }
+            } else if ready {
+                is_complete = true;
+                break;
+            }
         }
 
-        std::task::Poll::Ready(Ok(()))
+        if timing_break {
+            self.0 = Some(inner);
+            let mut fut = futures::future::FutureExt::boxed(tokio::task::yield_now());
+            match std::future::Future::poll(std::pin::Pin::new(&mut fut), cx) {
+                std::task::Poll::Pending => std::task::Poll::Pending,
+                _ => unreachable!(),
+            }
+        } else if got_pending {
+            self.0 = Some(inner);
+            std::task::Poll::Pending
+        } else if !is_complete {
+            std::task::Poll::Ready(Err(KitsuneError::TimedOut))
+        } else {
+            self.0 = Some(inner);
+            std::task::Poll::Ready(Ok(()))
+        }
+    }
+}
+
+/// Future returned from `AsyncWriteFramed::close()`.
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+pub struct AsyncWriteFramedCloseFut<'a, P>(std::pin::Pin<&'a mut P>)
+where
+    P: ?Sized + AsyncWriteFramed;
+
+impl<'a, P> std::future::Future for AsyncWriteFramedCloseFut<'a, P>
+where
+    P: ?Sized + AsyncWriteFramed,
+{
+    type Output = KitsuneResult<()>;
+
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        std::pin::Pin::new(&mut *self.0).poll_close(cx)
     }
 }
 
@@ -422,7 +480,7 @@ impl AsyncWriteFramed for AsyncWriteFramedFilter {
         buf: &[u8],
     ) -> KitsuneResult<bool> {
         let mut inner = match self.0.take() {
-            None => return Err("PreviouslyClosed".into()),
+            None => return Err(KitsuneError::Closed),
             Some(inner) => inner,
         };
 
@@ -447,15 +505,22 @@ impl AsyncWriteFramed for AsyncWriteFramedFilter {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<KitsuneResult<bool>> {
         let mut inner = match self.0.take() {
-            None => return std::task::Poll::Ready(Err("PreviouslyClosed".into())),
+            None => return std::task::Poll::Ready(Err(KitsuneError::Closed)),
             Some(inner) => inner,
         };
+
+        if inner.to_send.is_empty() {
+            self.0 = Some(inner);
+            return std::task::Poll::Ready(Ok(true));
+        }
 
         let sub = &mut inner.sub;
         tokio::pin!(sub);
 
+        let mut got_pending = false;
+
         match futures::io::AsyncWrite::poll_write(sub, cx, &inner.to_send) {
-            std::task::Poll::Pending => (),
+            std::task::Poll::Pending => got_pending = true,
             std::task::Poll::Ready(Err(e)) => {
                 return std::task::Poll::Ready(Err(KitsuneError::other(e)));
             }
@@ -466,6 +531,8 @@ impl AsyncWriteFramed for AsyncWriteFramedFilter {
 
         let res = if inner.to_send.is_empty() {
             std::task::Poll::Ready(Ok(true))
+        } else if got_pending {
+            std::task::Poll::Pending
         } else {
             std::task::Poll::Ready(Ok(false))
         };
@@ -479,7 +546,7 @@ impl AsyncWriteFramed for AsyncWriteFramedFilter {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<KitsuneResult<()>> {
         let mut inner = match self.0.take() {
-            None => return std::task::Poll::Ready(Err("PreviouslyClosed".into())),
+            None => return std::task::Poll::Ready(Err(KitsuneError::Closed)),
             Some(inner) => inner,
         };
 
@@ -503,7 +570,7 @@ impl AsyncWriteFramed for AsyncWriteFramedFilter {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<KitsuneResult<()>> {
         let mut inner = match self.0.take() {
-            None => return std::task::Poll::Ready(Err("PreviouslyClosed".into())),
+            None => return std::task::Poll::Ready(Err(KitsuneError::Closed)),
             Some(inner) => inner,
         };
 
@@ -526,6 +593,7 @@ impl AsyncWriteFramed for AsyncWriteFramedFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tx2::util::*;
 
     #[test]
     fn test_msgid() {
@@ -559,5 +627,67 @@ mod tests {
         assert!(req.is_req());
         assert!(!req.is_res());
         assert_eq!(1, req.as_id());
+    }
+
+    async fn _inner_test_async_framed(rcount: usize, byte_count: usize) {
+        let (send, recv) = bound_async_mem_channel(4096 * 10);
+
+        use std::sync::atomic;
+        let count1 = Arc::new(atomic::AtomicUsize::new(0));
+        let count2 = count1.clone();
+
+        let rt = tokio::task::spawn(async move {
+            let recv = AsyncReadIntoVecFilter::new(recv);
+            let mut recv = AsyncReadFramedFilter::new(Box::new(recv));
+
+            let mut frames = Some(Vec::new());
+
+            while let Some(frame_count) = recv
+                .read_frame(KitsuneTimeout::from_millis(1000 * 30), &mut frames)
+                .await
+                .unwrap()
+            {
+                if frame_count > 0 {
+                    println!("GOT {} FRAMES", frame_count);
+                }
+                for (id, data) in frames.as_mut().unwrap().drain(..) {
+                    assert_eq!(data.len(), byte_count);
+                    let lat = parse_latency_info(&data).unwrap();
+                    println!(
+                        " - {} {} us",
+                        id.as_id(),
+                        lat.elapsed().unwrap().as_micros()
+                    );
+                    count2.fetch_add(1, atomic::Ordering::SeqCst);
+                }
+            }
+        });
+
+        {
+            let mut send = AsyncWriteFramedFilter::new(send);
+            let mut frame = vec![0_u8; byte_count];
+            for _ in 0..rcount {
+                fill_with_latency_info(&mut frame);
+
+                send.write_frame(0.into(), &frame, KitsuneTimeout::from_millis(1000 * 30))
+                    .await
+                    .unwrap();
+            }
+            send.close().await.unwrap();
+        }
+
+        rt.await.unwrap();
+
+        assert_eq!(rcount, count1.load(atomic::Ordering::SeqCst));
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_async_framed_512() {
+        _inner_test_async_framed(10, 512).await;
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_async_framed_8_mb() {
+        _inner_test_async_framed(2, 1024 * 1024 * 8).await;
     }
 }

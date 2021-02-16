@@ -1,3 +1,5 @@
+use crate::*;
+
 /// Kitsune Timeout
 #[derive(Debug, Clone, Copy)]
 pub struct KitsuneTimeout(std::time::Instant);
@@ -21,6 +23,15 @@ impl KitsuneTimeout {
     /// Has this timeout expired?
     pub fn is_expired(&self) -> bool {
         self.0 <= std::time::Instant::now()
+    }
+
+    /// `Ok(())` if not expired, `Err(KitsuneError::TimedOut)` if expired.
+    pub fn ok(&self) -> KitsuneResult<()> {
+        if self.is_expired() {
+            Err(KitsuneError::TimedOut)
+        } else {
+            Ok(())
+        }
     }
 }
 

@@ -10,7 +10,7 @@ struct Inner<T: 'static + Send> {
     timeout_ms: Option<u64>,
 }
 
-/// Control sync efficient sync access to shared resource pool.
+/// Control efficient access to shared resource pool.
 #[derive(Clone)]
 pub struct AsyncOwnedResourceBucket<T: 'static + Send> {
     inner: Arc<tokio::sync::Mutex<Inner<T>>>,
@@ -63,28 +63,51 @@ impl<T: 'static + Send> AsyncOwnedResourceBucket<T> {
         }
     }
 
+    /// Acquire a resource that is immediately available from the bucket
+    /// or generate a new one.
+    pub fn acquire_or_else<F>(&self, f: F) -> impl std::future::Future<Output = T> + 'static + Send
+    where
+        F: FnOnce() -> T + 'static + Send,
+    {
+        let inner = self.inner.clone();
+        async move {
+            let r = {
+                let mut inner = inner.lock().await;
+                if inner.resources.is_empty() {
+                    None
+                } else {
+                    Some(inner.resources.remove(0))
+                }
+            };
+            r.unwrap_or_else(f)
+        }
+    }
+
     /// Acquire a resource from the bucket.
     pub fn acquire(&self) -> impl std::future::Future<Output = KitsuneResult<T>> + 'static + Send {
         let inner = self.inner.clone();
         async move {
             // check if a resource is available,
             // or get a space in the waiting line.
-            let (permit_fut, timeout_ms) = {
+            let (permit_fut, timeout) = {
                 let mut inner = inner.lock().await;
                 if !inner.resources.is_empty() {
                     return Ok(inner.resources.remove(0));
                 }
-                (inner.wait_limit.clone().acquire_owned(), inner.timeout_ms)
+                (
+                    inner.wait_limit.clone().acquire_owned(),
+                    inner.timeout_ms.map(KitsuneTimeout::from_millis),
+                )
             };
 
             // await the waiting permit (or maybe timeout)
             tokio::pin!(permit_fut);
-            let permit = match timeout_ms {
+            let permit = match timeout {
                 None => permit_fut.await,
-                Some(timeout_ms) => {
+                Some(timeout) => {
                     match futures::future::select(
                         permit_fut,
-                        tokio::time::delay_for(std::time::Duration::from_millis(timeout_ms)),
+                        tokio::time::delay_for(timeout.time_remaining()),
                     )
                     .await
                     {
@@ -111,12 +134,12 @@ impl<T: 'static + Send> AsyncOwnedResourceBucket<T> {
             }
 
             // now await on our waiting receiver (or maybe timeout)
-            match timeout_ms {
+            match timeout {
                 None => r.await.map_err(KitsuneError::other),
-                Some(timeout_ms) => {
+                Some(timeout) => {
                     match futures::future::select(
                         r,
-                        tokio::time::delay_for(std::time::Duration::from_millis(timeout_ms)),
+                        tokio::time::delay_for(timeout.time_remaining()),
                     )
                     .await
                     {
@@ -152,5 +175,16 @@ mod tests {
         let j1 = j1.await.unwrap().unwrap();
         let j2 = j2.await.unwrap().unwrap();
         assert!((j1 == "1" && j2 == "2") || (j2 == "1" && j1 == "2"));
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_async_bucket_acquire_or_else() {
+        let bucket = <AsyncOwnedResourceBucket<&'static str>>::new(None);
+        let j1 = tokio::task::spawn(bucket.acquire());
+        let j2 = bucket.acquire_or_else(|| "2").await;
+        bucket.release("1").await;
+        let j1 = j1.await.unwrap().unwrap();
+        assert_eq!(j1, "1");
+        assert_eq!(j2, "2");
     }
 }

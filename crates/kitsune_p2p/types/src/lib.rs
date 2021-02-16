@@ -19,6 +19,14 @@ use std::sync::Arc;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum KitsuneError {
+    /// The operation timed out.
+    #[error("TimedOut")]
+    TimedOut,
+
+    /// This object is closed, calls on it are invalid.
+    #[error("Closed")]
+    Closed,
+
     /// Unspecified error.
     #[error(transparent)]
     Other(Box<dyn std::error::Error + Send + Sync>),

@@ -39,3 +39,7 @@ harness = false
 [[bench]]
 name = "async_read_into_vec"
 harness = false
+
+[[bench]]
+name = "async_framed"
+harness = false

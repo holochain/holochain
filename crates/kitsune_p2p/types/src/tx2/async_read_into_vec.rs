@@ -24,7 +24,8 @@ pub trait AsyncReadIntoVecExt: AsyncReadIntoVec {
         AsyncReadIntoVecFut(Some(AsyncReadIntoVecFutInner {
             sub: this,
             vec,
-            byte_count,
+            bytes_read: 0,
+            remaining_bytes_wanted: byte_count,
             timeout,
         }))
     }
@@ -38,7 +39,8 @@ where
 {
     sub: std::pin::Pin<&'a mut P>,
     vec: &'a mut Vec<u8>,
-    byte_count: usize,
+    bytes_read: usize,
+    remaining_bytes_wanted: usize,
     timeout: KitsuneTimeout,
 }
 
@@ -64,13 +66,13 @@ where
         };
 
         let mut got_pending = false;
-        let mut read = 0;
         let mut closed = false;
+        let mut bytes_read = inner.bytes_read;
+        let mut remaining_bytes_wanted = inner.remaining_bytes_wanted;
 
         while !inner.timeout.is_expired() {
             let rdr: std::pin::Pin<&mut P> = std::pin::Pin::new(&mut inner.sub);
-            match AsyncReadIntoVec::poll_read_into_vec(rdr, cx, inner.vec, inner.byte_count - read)
-            {
+            match AsyncReadIntoVec::poll_read_into_vec(rdr, cx, inner.vec, remaining_bytes_wanted) {
                 std::task::Poll::Pending => {
                     got_pending = true;
                     break;
@@ -83,8 +85,9 @@ where
                     if size == 0 {
                         unreachable!();
                     }
-                    read += size;
-                    if read >= inner.byte_count {
+                    bytes_read += size;
+                    remaining_bytes_wanted -= size;
+                    if remaining_bytes_wanted == 0 {
                         break;
                     }
                 }
@@ -95,14 +98,19 @@ where
             }
         }
 
+        inner.bytes_read = bytes_read;
+        inner.remaining_bytes_wanted = remaining_bytes_wanted;
+
         if !closed {
             self.0 = Some(inner);
         }
 
-        if read > 0 {
-            std::task::Poll::Ready(Ok(Some(read)))
+        if remaining_bytes_wanted == 0 || (closed && bytes_read > 0) {
+            std::task::Poll::Ready(Ok(Some(bytes_read)))
         } else if got_pending {
             std::task::Poll::Pending
+        } else if bytes_read > 0 {
+            std::task::Poll::Ready(Ok(Some(bytes_read)))
         } else {
             std::task::Poll::Ready(Ok(None))
         }
@@ -138,30 +146,40 @@ impl AsyncReadIntoVec for AsyncReadIntoVecFilter {
 
         // allocate enough space for byte_count
         let orig_len = vec.len();
-        vec.resize(orig_len + byte_count, 0);
+        vec.reserve(orig_len + byte_count);
 
-        let read = {
-            let vec = &mut vec[orig_len..orig_len + byte_count];
+        // SAFETY:
+        //   - above reserve is large enough
+        //   - only initialized bytes are retained
+        let read = unsafe {
+            // grow our vec without slow initialization
+            vec.set_len(orig_len + byte_count);
 
-            let sub = &mut inner;
-            tokio::pin!(sub);
+            let read = {
+                let vec = &mut vec[orig_len..orig_len + byte_count];
 
-            // poll our sub future
-            match futures::io::AsyncRead::poll_read(sub, cx, vec) {
-                std::task::Poll::Pending => {
-                    got_pending = true;
-                    0
+                let sub = &mut inner;
+                tokio::pin!(sub);
+
+                // poll our sub future
+                match futures::io::AsyncRead::poll_read(sub, cx, vec) {
+                    std::task::Poll::Pending => {
+                        got_pending = true;
+                        0
+                    }
+                    std::task::Poll::Ready(Err(e)) => {
+                        error = Some(KitsuneError::other(e));
+                        0
+                    }
+                    std::task::Poll::Ready(Ok(size)) => size,
                 }
-                std::task::Poll::Ready(Err(e)) => {
-                    error = Some(KitsuneError::other(e));
-                    0
-                }
-                std::task::Poll::Ready(Ok(size)) => size,
-            }
+            };
+
+            // shrink our vec to the size we actually read
+            vec.set_len(orig_len + read);
+
+            read
         };
-
-        // shrink our vec to the size we actually read
-        vec.resize(orig_len + read, 0);
 
         if let Some(e) = error {
             std::task::Poll::Ready(Err(e))
@@ -182,27 +200,46 @@ mod tests {
     use crate::tx2::*;
     use crate::*;
 
-    struct FakeRead;
+    async fn _inner_test(byte_count: usize) {
+        let (mut send, recv) = util::bound_async_mem_channel(4096);
+        let mut recv = AsyncReadIntoVecFilter::new(recv);
 
-    impl futures::io::AsyncRead for FakeRead {
-        fn poll_read(
-            self: std::pin::Pin<&mut Self>,
-            _cx: &mut std::task::Context<'_>,
-            buf: &mut [u8],
-        ) -> std::task::Poll<Result<usize, futures::io::Error>> {
-            util::fill_with_latency_info(buf);
-            std::task::Poll::Ready(Ok(buf.len()))
-        }
+        let wt = tokio::task::spawn(async move {
+            let mut data = vec![0_u8; byte_count];
+            util::fill_with_latency_info(&mut data);
+            use futures::io::AsyncWriteExt;
+            send.write_all(&data).await.unwrap();
+        });
+
+        let mut read = Vec::new();
+        recv.read_into_vec(
+            &mut read,
+            byte_count,
+            KitsuneTimeout::from_millis(1000 * 30),
+        )
+        .await
+        .unwrap();
+        assert_eq!(read.len(), byte_count);
+        println!(
+            "into_vec({}) in: {} us",
+            byte_count,
+            util::parse_latency_info(&read)
+                .unwrap()
+                .elapsed()
+                .unwrap()
+                .as_micros()
+        );
+
+        wt.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn test_async_read_into_vec_filter() {
-        let timeout = KitsuneTimeout::from_millis(1000);
-        let mut r = AsyncReadIntoVecFilter::new(Box::new(FakeRead));
-        let mut v = Vec::new();
-        r.read_into_vec(&mut v, 32, timeout).await.unwrap();
-        assert!(util::parse_latency_info(v.as_slice()).is_ok());
-        r.read_into_vec(&mut v, 10000, timeout).await.unwrap();
-        assert_eq!(10032, v.len());
+    async fn test_async_read_into_vec_filter_sm() {
+        _inner_test(512).await;
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_async_read_into_vec_filter_lg() {
+        _inner_test(1024 * 1024 * 8).await;
     }
 }
