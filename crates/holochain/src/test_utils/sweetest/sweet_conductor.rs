@@ -3,7 +3,10 @@
 
 use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetZome};
 use crate::conductor::{
-    api::ZomeCall, config::ConductorConfig, dna_store::DnaStore, handle::ConductorHandle,
+    api::{error::ConductorApiResult, ZomeCall},
+    config::ConductorConfig,
+    dna_store::DnaStore,
+    handle::ConductorHandle,
     Conductor, ConductorBuilder,
 };
 use futures::future;
@@ -428,7 +431,22 @@ impl SweetConductorHandle {
         I: serde::Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        self.call_from(zome.cell_id().agent_pubkey(), None, zome, fn_name, payload)
+        self.call_fallible(zome, fn_name, payload).await.unwrap()
+    }
+
+    /// Like `call`, but without the unwrap
+    pub async fn call_fallible<I, O, F>(
+        &self,
+        zome: &SweetZome,
+        fn_name: F,
+        payload: I,
+    ) -> ConductorApiResult<O>
+    where
+        FunctionName: From<F>,
+        I: serde::Serialize + std::fmt::Debug,
+        O: serde::de::DeserializeOwned + std::fmt::Debug,
+    {
+        self.call_from_fallible(zome.cell_id().agent_pubkey(), None, zome, fn_name, payload)
             .await
     }
 
@@ -447,6 +465,25 @@ impl SweetConductorHandle {
         I: Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
+        self.call_from_fallible(provenance, cap, zome, fn_name, payload)
+            .await
+            .unwrap()
+    }
+
+    /// Like `call_from`, but without the unwrap
+    pub async fn call_from_fallible<I, O, F>(
+        &self,
+        provenance: &AgentPubKey,
+        cap: Option<CapSecret>,
+        zome: &SweetZome,
+        fn_name: F,
+        payload: I,
+    ) -> ConductorApiResult<O>
+    where
+        FunctionName: From<F>,
+        I: Serialize + std::fmt::Debug,
+        O: serde::de::DeserializeOwned + std::fmt::Debug,
+    {
         let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
         let call = ZomeCall {
             cell_id: zome.cell_id().clone(),
@@ -456,10 +493,11 @@ impl SweetConductorHandle {
             provenance: provenance.clone(),
             payload,
         };
-        let response = self.0.call_zome(call).await.unwrap().unwrap();
-        unwrap_to!(response => ZomeCallResponse::Ok)
-            .decode()
-            .expect("Couldn't deserialize zome call output")
+        self.0.call_zome(call).await.map(|r| {
+            unwrap_to!(r.unwrap() => ZomeCallResponse::Ok)
+                .decode()
+                .expect("Couldn't deserialize zome call output")
+        })
     }
 
     // /// Get a stream of all Signals emitted since the time of this function call.

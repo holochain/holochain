@@ -1,10 +1,14 @@
 #![cfg(feature = "test_utils")]
 
 use hdk3::prelude::*;
-use holochain::test_utils::WaitOps;
 use holochain::{
     conductor::api::error::ConductorApiResult,
     test_utils::sweetest::{MaybeElement, SweetAgents, SweetConductor, SweetDnaFile},
+};
+use holochain::{
+    conductor::{api::error::ConductorApiError, CellError},
+    core::workflow::error::WorkflowError,
+    test_utils::WaitOps,
 };
 use holochain::{
     core::ribosome::guest_callback::validate::ValidateResult, test_utils::wait_for_integration_10s,
@@ -355,30 +359,29 @@ async fn simple_validation() -> anyhow::Result<()> {
     let s1: AppString = e1.0.unwrap().entry().to_app_option().unwrap().unwrap();
     assert_eq!(s1, AppString::new("A"));
 
-    todo!("uncomment the following");
+    // This call fails validation, and so results in an error
+    let err: ConductorApiResult<HeaderHash> = conductor
+        .call_fallible(&alice, "create", AppString::new(""))
+        .await;
 
-    // // This call fails validation, and so results in an error
-    // let err: ConductorApiResult<HeaderHash> =
-    //     conductor.call(&alice, "create", AppString::new("")).await;
-
-    // // This is kind of ridiculous, but we can't use assert_matches! because
-    // // there is a Box in the mix.
-    // let correct = match err {
-    //     Err(ConductorApiError::CellError(e)) => match e {
-    //         CellError::WorkflowError(e) => match *e {
-    //             WorkflowError::SourceChainError(e) => match e {
-    //                 SourceChainError::InvalidCommit(reason) => {
-    //                     &reason == "No empty strings allowed"
-    //                 }
-    //                 _ => false,
-    //             },
-    //             _ => false,
-    //         },
-    //         _ => false,
-    //     },
-    //     _ => false,
-    // };
-    // assert!(correct);
+    // This is kind of ridiculous, but we can't use assert_matches! because
+    // there is a Box in the mix.
+    let correct = match err {
+        Err(ConductorApiError::CellError(e)) => match e {
+            CellError::WorkflowError(e) => match *e {
+                WorkflowError::SourceChainError(e) => match e {
+                    SourceChainError::InvalidCommit(reason) => {
+                        &reason == "No empty strings allowed"
+                    }
+                    _ => false,
+                },
+                _ => false,
+            },
+            _ => false,
+        },
+        _ => false,
+    };
+    assert!(correct);
 
     Ok(())
 }
