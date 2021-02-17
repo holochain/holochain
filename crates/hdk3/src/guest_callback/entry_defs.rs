@@ -1,5 +1,5 @@
 /// Trait for binding static `EntryDef` property access for a type.
-/// @see entry_interface!
+/// @see register_entry!
 pub trait EntryDefRegistration {
     fn entry_def() -> crate::prelude::EntryDef;
 
@@ -79,7 +79,7 @@ macro_rules! app_entry {
 ///
 /// For most normal applications, you should use the `entry_def!` macro instead.
 #[macro_export]
-macro_rules! entry_interface {
+macro_rules! register_entry {
     ( $t:ident $def:expr ) => {
         impl $crate::prelude::EntryDefRegistration for $t {
             fn entry_def() -> $crate::prelude::EntryDef {
@@ -254,7 +254,7 @@ macro_rules! entry_interface {
 macro_rules! entry_def {
     ( $t:ident $def:expr ) => {
         app_entry!($t);
-        entry_interface!($t $def);
+        register_entry!($t $def);
     };
 }
 
