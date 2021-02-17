@@ -24,7 +24,7 @@ impl From<u8> for EntryDefIndex {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct WrongHeaderError(pub String);
 
 impl std::fmt::Display for WrongHeaderError {
