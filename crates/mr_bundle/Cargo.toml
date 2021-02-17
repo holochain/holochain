@@ -8,6 +8,7 @@ edition = "2018"
 bytes = "1.0"
 derive_more = "0.99"
 either = "1.5"
+flate2 = "1.0"
 ffs = { path = "../ffs", features = ["tokio"] }
 futures = "0.3"
 reqwest = "0.11"

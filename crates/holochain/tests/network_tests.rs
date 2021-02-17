@@ -1,6 +1,7 @@
 #![cfg(feature = "test_utils")]
 #![allow(unused_imports)]
 #![allow(dead_code)]
+#![allow(deprecated)]
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use futures::future::Either;

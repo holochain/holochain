@@ -150,10 +150,13 @@ async fn unpack_roundtrip() {
         ],
     });
 
+    let unpacked_dir = dir.path().join("unpacked");
+
     // Put the bundled resource into a Bundle (excluding the local resource)
-    let bundle = Bundle::new_unchecked(
+    let bundle = Bundle::new(
         manifest,
         vec![(bundled_path.clone(), bundled_thing_encoded.clone())],
+        unpacked_dir.clone(),
     )
     .unwrap();
     assert_eq!(
@@ -165,7 +168,6 @@ async fn unpack_roundtrip() {
     );
 
     // Unpack the bundle to a directory on the filesystem
-    let unpacked_dir = dir.path().join("unpacked");
     bundle.unpack_yaml(&unpacked_dir, false).await.unwrap();
 
     assert!(unpacked_dir.join("test-manifest.yaml").is_file());

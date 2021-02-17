@@ -1,4 +1,5 @@
 mod bundle;
+mod encoding;
 pub mod error;
 mod location;
 mod manifest;
@@ -9,7 +10,7 @@ pub(crate) mod util;
 mod packing;
 
 pub use bundle::Bundle;
+pub use encoding::{decode, encode};
 pub use location::Location;
 pub use manifest::Manifest;
 pub use resource::ResourceBytes;
-pub use util::{decode, encode};

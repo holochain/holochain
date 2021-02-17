@@ -2561,6 +2561,7 @@ dependencies = [
  "derive_more",
  "either",
  "ffs",
+ "flate2",
  "futures",
  "maplit",
  "matches",
