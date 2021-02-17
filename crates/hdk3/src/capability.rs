@@ -24,9 +24,9 @@ use crate::prelude::*;
 /// If the author of the CapGrant is reachable on the network and has not revoked the grant they will allow any
 /// agent with a valid secret and pubkey to `call_remote` externs on the grant author's machine.
 ///
-/// Functions executed on the grant author's machine that change the grantor's source chain will be signed by
-/// the grantor.
-/// Delegating responsibility to grantee claimants is a serious responsibility!
+/// Commits to the grantor's source chain will be signed by the grantor, even if initiated.
+/// by a claimant.
+/// Delegating agency to grantee claimants is a serious responsibility!
 ///
 /// @see CapClaim
 /// @see other cap grant functions
