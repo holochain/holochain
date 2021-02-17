@@ -55,7 +55,7 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
 pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
     let tmp_dir = tempdir::TempDir::new("fake_dna")?;
     let mut path: PathBuf = tmp_dir.path().into();
-    path.push("test-dna.dna.gz");
+    path.push("test-dna.dna");
     tokio::fs::write(path.clone(), dna.to_file_content().await?).await?;
     Ok((path, tmp_dir))
 }

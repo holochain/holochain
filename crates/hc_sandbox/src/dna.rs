@@ -9,7 +9,7 @@ use walkdir::WalkDir;
 /// Parse a list of dnas.
 /// If paths are directories then each directory
 /// will be searched for the first file that matches
-/// `*.dna.gz`.
+/// `*.dna`.
 pub fn parse_dnas(mut dnas: Vec<PathBuf>) -> anyhow::Result<Vec<PathBuf>> {
     if dnas.is_empty() {
         dnas.push(std::env::current_dir()?);
@@ -21,9 +21,9 @@ pub fn parse_dnas(mut dnas: Vec<PathBuf>) -> anyhow::Result<Vec<PathBuf>> {
         }
         ensure!(
             dna.file_name()
-                .map(|f| f.to_string_lossy().ends_with(".dna.gz"))
+                .map(|f| f.to_string_lossy().ends_with(".dna"))
                 .unwrap_or(false),
-            "File {} is not a valid dna file name: (e.g. my-dna.dna.gz)",
+            "File {} is not a valid dna file name: (e.g. my-dna.dna)",
             dna.display()
         );
     }
@@ -36,12 +36,12 @@ fn search_for_dna(dna: &Path) -> anyhow::Result<PathBuf> {
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|d| d.file_type().is_file())
-        .filter(|f| f.file_name().to_string_lossy().ends_with(".dna.gz"))
+        .filter(|f| f.file_name().to_string_lossy().ends_with(".dna"))
         .map(|f| f.into_path())
         .collect();
     if dir.len() != 1 {
         bail!(
-            "Could not find a dna (e.g. my-dna.dna.gz) in directory {}",
+            "Could not find a DNA file (e.g. my-dna.dna) in directory {}",
             dna.display()
         )
     }

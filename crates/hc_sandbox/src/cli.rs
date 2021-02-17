@@ -56,7 +56,7 @@ pub enum HcSandboxSubcommand {
         run: Option<Vec<u16>>,
 
         /// List of DNAs to use when installing the App for this sandbox.
-        /// Defaults to searching the current directory for a single `*.dna.gz` file.
+        /// Defaults to searching the current directory for a single `*.dna` file.
         dnas: Vec<PathBuf>,
     },
     /// Run conductor(s) from existing sandbox(es).

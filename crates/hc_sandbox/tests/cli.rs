@@ -59,7 +59,7 @@ async fn run_holochain() {
     let mut cmd = Command::from(cmd);
     cmd.arg("run")
         .arg(format!("-p={}", port))
-        .arg("../../../elemental-chat/elemental-chat.dna.gz")
+        .arg("../../../elemental-chat/elemental-chat.dna")
         .kill_on_drop(true);
     let _hc_admin = cmd.spawn().expect("Failed to spawn holochain");
     tokio::time::delay_for(std::time::Duration::from_secs(4)).await;
@@ -78,7 +78,7 @@ async fn run_multiple_on_same_port() {
     cmd.arg(format!("-f={}", port))
         .arg("run")
         .arg(format!("-p={}", app_port))
-        .arg("../../../elemental-chat/elemental-chat.dna.gz")
+        .arg("../../../elemental-chat/elemental-chat.dna")
         .kill_on_drop(true);
     let _hc_admin = cmd.spawn().expect("Failed to spawn holochain");
     tokio::time::delay_for(std::time::Duration::from_secs(4)).await;

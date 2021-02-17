@@ -32,7 +32,7 @@ The best place to start is:
 ```shell
 hc -h
 ```
-This will be more up to date then this readme.
+This will be more up to date than this readme.
 ##### Run
 This command can be used to generate and run conductor sandboxes.
 ```shell
@@ -40,7 +40,7 @@ hc run -h
 # or shorter
 hc r -h
 ```
- In a folder with where your `my-dna.dna.gz` is you can generate and run
+ In a folder with where your `my-dna.dna` is you can generate and run
  a new sandbox with:
 ```shell
 hc r
@@ -55,16 +55,16 @@ hc generate
 hc g
 ```
 For example this will generate 5 sandboxes with app ids set to `my-app`
-using the `elemental-chat.dna.gz` from the current directory with a quic
+using the `elemental-chat.dna` from the current directory with a quic
 network configured to use localhost.
 _You don't need to specify dnas when they are in the directory._
 ```shell
- hc gen -a "my-app" -n 5 ./elemental-chat.dna.gz network quic
+ hc gen -a "my-app" -n 5 ./elemental-chat.dna network quic
 ```
 You can also generate and run in the same command:
 (Notice the number of conductors and dna path must come before the gen sub-command).
 ```shell
- hc r -n 5 ./elemental-chat.dna.gz gen -a "my-app" network quic
+ hc r -n 5 ./elemental-chat.dna gen -a "my-app" network quic
 ```
 ##### Call
 Allows calling the [`AdminRequest`] api.

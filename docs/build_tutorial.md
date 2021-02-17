@@ -85,7 +85,7 @@ and they will be available in `target/wasm32-unknown-unknown/release/`
 dna-util -c demo.dna.workdir
 ```
 
-This will produce a `demo.dna.gz` file as a sibling of the `demo.dna.workdir` directory.
+This will produce a `demo.dna` file as a sibling of the `demo.dna.workdir` directory.
 
 ### 4. Use the Conductor's admin interface to install your DNA
 

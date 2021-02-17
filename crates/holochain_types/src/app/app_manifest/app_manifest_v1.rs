@@ -284,7 +284,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn manifest_v1_roundtrip() {
-        let location = Some(mr_bundle::Location::Path(PathBuf::from("/tmp/test.dna.gz")));
+        let location = Some(mr_bundle::Location::Path(PathBuf::from("/tmp/test.dna")));
         let (manifest, dna_hashes) =
             app_manifest_fixture(location, vec![fixt!(DnaDef), fixt!(DnaDef)]).await;
         let manifest_yaml = serde_yaml::to_string(&manifest).unwrap();
@@ -304,7 +304,7 @@ slots:
       strategy: "create"
       deferred: false
     dna:
-      path: /tmp/test.dna.gz
+      path: /tmp/test.dna
       version:
         - {}
         - {}
