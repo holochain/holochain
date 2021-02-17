@@ -59,10 +59,12 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<HeaderHa
 ///
 /// Provided the grant author agent is reachable on the network:
 ///
-/// - The author always has access to all their own extern calls, bypassing `CapAccess`
 /// - Unrestricted access means any external agent can call the extern
 /// - Transferable access means any external agent with a valid secret can call the extern
 /// - Assigned access means only explicitly approved agents with a valid secret can call the extern
+
+The authoring agent itself always has an implicit capability which grants access to its own externs,
+and needs no special capability grant.
 ///
 /// All logic runs on the author agent's machine against their own source chain:
 ///
