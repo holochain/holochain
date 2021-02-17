@@ -38,7 +38,15 @@ impl From<()> for YamlProperties {
     }
 }
 
-/// Represents the top-level holochain dna object.
+/// The definition of a DNA: the hash of this data is what produces the DnaHash.
+///
+/// Historical note: This struct was written before `DnaManifest` appeared.
+/// It is included as part of a `DnaFile`. There is still a lot of code that uses
+/// this type, but in function, it has mainly been superseded by `DnaManifest`.
+///
+/// TODO: after removing the `InstallApp` admin method, we can remove the Serialize
+///       impl on this type, and document it/rename it to show that it is
+///       basically a fully validated, normalized DnaManifest
 #[derive(
     Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes, derive_builder::Builder,
 )]

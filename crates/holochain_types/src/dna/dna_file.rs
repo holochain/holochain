@@ -35,7 +35,17 @@ impl From<WasmMapSerialized> for WasmMap {
     }
 }
 
-/// Represents a full DNA file including WebAssembly bytecode.
+/// Represents a full DNA, including DnaDef and WebAssembly bytecode.
+///
+/// Historical note: This struct was written before `DnaBundle` was introduced.
+/// This used to be our file representation of a full distributable DNA.
+/// That function has been superseded by `DnaBundle`, but we use this type
+/// widely, so there is simply a way to convert from `DnaBundle` to `DnaFile`.
+///
+/// TODO: Once we remove the `InstallApp` command which accepts a `DnaFile`,
+///       we should remove the Serialize impl on this type, and perhaps rename
+///       to indicate that this is simply a validated, fully-formed DnaBundle
+///       (i.e. all Wasms are bundled and immediately available, not remote.)
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, SerializedBytes)]
 pub struct DnaFile {
     /// The hashable portion that can be shared with hApp code.
