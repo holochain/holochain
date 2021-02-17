@@ -390,7 +390,7 @@ async fn call_zome() {
 
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "slow_tests")]
-async fn remote_signals() {
+async fn remote_signals() -> anyhow::Result<()> {
     observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 5;
 
@@ -440,6 +440,8 @@ async fn remote_signals() {
         // Each handle should recv a signal
         assert_matches!(r, Ok(Signal::App(_, a)) if a == signal);
     }
+
+    Ok(())
 }
 
 #[tokio::test(threaded_scheduler)]

@@ -77,8 +77,7 @@ pub async fn publish_dht_ops_workflow_inner(
     // TODO: PERF: We need to check all ops every time this runs
     // instead we could have a queue of ops where count < R and a kv for count > R.
     // Then if the count for an ops reduces below R move it to the queue.
-    let now_ts = Timestamp::now();
-    let now: chrono::DateTime<chrono::Utc> = now_ts.into();
+    let now = timestamp::now();
     // chrono cannot create const durations
     let interval =
         chrono::Duration::from_std(MIN_PUBLISH_INTERVAL).expect("const interval must be positive");
@@ -93,13 +92,11 @@ pub async fn publish_dht_ops_workflow_inner(
             Ok(if r.receipt_count < DEFAULT_RECEIPT_BUNDLE_SIZE {
                 let needs_publish = r
                     .last_publish_time
-                    .map(|last| {
-                        let duration = now.signed_duration_since(last.into());
-                        duration > interval
-                    })
+                    .and_then(|last| now.checked_difference_signed(&last))
+                    .map(|duration| duration > interval)
                     .unwrap_or(true);
                 if needs_publish {
-                    r.last_publish_time = Some(now_ts);
+                    r.last_publish_time = Some(now);
                     // HACK: Incrementing the receipt count to prevent publishing
                     // forever although without receipts this could lead to data loss
                     // and relies on gossip for data integrity.

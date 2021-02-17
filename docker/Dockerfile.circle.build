@@ -2,4 +2,4 @@ ARG DOCKER_BRANCH=develop
 FROM holochain/holochain:latest.${DOCKER_BRANCH}
 
 RUN `nix-build . --no-link -A pkgs.ci.ciSetupNixConf`/bin/hc-ci-setup-nix-conf.sh
-RUN nix-shell --pure --argstr flavor ci --run hc-merge-test
+RUN nix-shell --pure --argstr flavor coreDev --run hc-merge-test

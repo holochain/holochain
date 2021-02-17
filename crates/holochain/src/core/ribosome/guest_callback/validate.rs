@@ -50,10 +50,11 @@ impl From<&ValidateHostAccess> for HostFnAccess {
 
 impl Invocation for ValidateInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        // Entries are specific to zomes so only validate in the zome the entry is defined in
-        // note that here it is possible there is a zome/entry mismatch
+        // Entries are specific to zomes, so they only validate in the zome the entry is defined in.
+        // However, agent entries need to be validated on all zomes.
+        //
+        // Note that here it is possible there is a zome/entry mismatch:
         // we rely on the invocation to be built correctly.
-        // However agent entries need to run on all zomes.
         self.zomes_to_invoke.clone()
     }
     fn fn_components(&self) -> FnComponents {
