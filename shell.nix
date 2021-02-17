@@ -1,9 +1,16 @@
-{ nixpkgs ? null
-, flavor ? "coreDev"
+{ flavor ? null
+, flavour ? null
 , ... } @ args:
 
 let
-  default = import (builtins.toString ./default.nix) { inherit nixpkgs; };
+  flavor' =
+    if flavor != null then flavor
+    else if flavour != null then flavour
+    else "coreDev";
+  default = import (builtins.toString ./default.nix) (builtins.removeAttrs args [
+    "flavor"
+    "flavour"
+  ]);
 in
 
-builtins.getAttr flavor default.shells
+builtins.getAttr flavor' default.shells

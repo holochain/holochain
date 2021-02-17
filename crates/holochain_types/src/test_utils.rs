@@ -7,13 +7,13 @@ use crate::dna::JsonProperties;
 use crate::element::SignedHeaderHashedExt;
 use crate::fixt::*;
 use crate::prelude::*;
-use crate::Timestamp;
+use crate::timestamp;
 use crate::{dna::wasm::DnaWasm, EntryHashed};
 use std::path::PathBuf;
 
 pub use holochain_zome_types::test_utils::*;
 
-#[derive(Serialize, Deserialize, SerializedBytes)]
+#[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 struct FakeProperties {
     test: String,
 }
@@ -93,7 +93,7 @@ pub async fn fake_unique_element(
     let app_entry_type = AppEntryTypeFixturator::new(visibility).next().unwrap();
     let header_1 = Header::Create(Create {
         author: agent_key,
-        timestamp: Timestamp::now().into(),
+        timestamp: timestamp::now(),
         header_seq: 0,
         prev_header: fake_header_hash(1),
 

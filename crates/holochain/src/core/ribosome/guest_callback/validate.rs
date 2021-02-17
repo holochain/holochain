@@ -50,10 +50,11 @@ impl From<&ValidateHostAccess> for HostFnAccess {
 
 impl Invocation for ValidateInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        // Entries are specific to zomes so only validate in the zome the entry is defined in
-        // note that here it is possible there is a zome/entry mismatch
+        // Entries are specific to zomes, so they only validate in the zome the entry is defined in.
+        // However, agent entries need to be validated on all zomes.
+        //
+        // Note that here it is possible there is a zome/entry mismatch:
         // we rely on the invocation to be built correctly.
-        // However agent entries need to run on all zomes.
         self.zomes_to_invoke.clone()
     }
     fn fn_components(&self) -> FnComponents {
@@ -76,8 +77,8 @@ impl Invocation for ValidateInvocation {
         }
         fns.into()
     }
-    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
-        Ok(ExternInput::new(ValidateData::from(self).try_into()?))
+    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
+        ExternIO::encode(ValidateData::from(self))
     }
 }
 
@@ -135,7 +136,6 @@ mod test {
     use crate::fixt::ZomeCallCapGrantFixturator;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
-    use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_types::dna::zome::Permission;
     use holochain_types::prelude::*;
@@ -271,9 +271,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            ExternInput::new(
-                SerializedBytes::try_from(&ValidateData::from(validate_invocation)).unwrap()
-            ),
+            ExternIO::encode(&ValidateData::from(validate_invocation)).unwrap(),
         );
     }
 }
@@ -384,7 +382,7 @@ mod slow_tests {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
 
-        let output: CreateOutput =
+        let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
 
         // the chain head should be the committed entry header
@@ -400,7 +398,7 @@ mod slow_tests {
         })
         .unwrap();
 
-        assert_eq!(chain_head, output.into_inner(),);
+        assert_eq!(chain_head, output);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -420,7 +418,7 @@ mod slow_tests {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
 
-        let output: CreateOutput =
+        let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ());
 
         // the chain head should be the committed entry header
@@ -436,6 +434,6 @@ mod slow_tests {
         })
         .unwrap();
 
-        assert_eq!(chain_head, output.into_inner());
+        assert_eq!(chain_head, output);
     }
 }

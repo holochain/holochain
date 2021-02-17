@@ -10,25 +10,25 @@ pub struct Sign {
     pub key: holo_hash::AgentPubKey,
 
     /// The data that should be signed.
-    pub data: SerializedBytes,
+    #[serde(with = "serde_bytes")]
+    pub data: Vec<u8>,
 }
 
 impl Sign {
     /// construct a new Sign struct.
-    pub fn new<D>(key: holo_hash::AgentPubKey, data: D) -> Result<Self, SerializedBytesError>
+    pub fn new<S>(key: holo_hash::AgentPubKey, input: S) -> Result<Self, SerializedBytesError>
     where
-        D: TryInto<SerializedBytes, Error = SerializedBytesError>,
+        S: Serialize + std::fmt::Debug,
     {
-        let data: SerializedBytes = data.try_into()?;
-        Ok(Self { key, data })
+        Ok(Self {
+            key,
+            data: holochain_serialized_bytes::encode(&input)?,
+        })
     }
 
     /// construct a new Sign struct from raw bytes.
     pub fn new_raw(key: holo_hash::AgentPubKey, data: Vec<u8>) -> Self {
-        Self {
-            key,
-            data: UnsafeBytes::from(data).into(),
-        }
+        Self { key, data }
     }
 
     /// key getter
@@ -37,7 +37,7 @@ impl Sign {
     }
 
     /// data getter
-    pub fn data(&self) -> &SerializedBytes {
+    pub fn data(&self) -> &[u8] {
         &self.data
     }
 }
@@ -80,7 +80,8 @@ pub struct VerifySignature {
     pub signature: Signature,
 
     /// The signed data
-    pub data: SerializedBytes,
+    #[serde(with = "serde_bytes")]
+    pub data: Vec<u8>,
 }
 
 impl AsRef<Signature> for VerifySignature {
@@ -95,16 +96,10 @@ impl AsRef<holo_hash::AgentPubKey> for VerifySignature {
     }
 }
 
-impl AsRef<SerializedBytes> for VerifySignature {
-    fn as_ref(&self) -> &SerializedBytes {
-        &self.data
-    }
-}
-
 impl VerifySignature {
     /// Alias for as_ref for data.
-    pub fn as_data_ref(&self) -> &SerializedBytes {
-        &self.as_ref()
+    pub fn as_data_ref(&self) -> &[u8] {
+        &self.data.as_ref()
     }
 
     /// Alias for as_ref for signature.
@@ -124,13 +119,12 @@ impl VerifySignature {
         data: D,
     ) -> Result<Self, SerializedBytesError>
     where
-        D: TryInto<SerializedBytes, Error = SerializedBytesError>,
+        D: serde::Serialize + std::fmt::Debug,
     {
-        let data: SerializedBytes = data.try_into()?;
         Ok(Self {
             key,
             signature,
-            data,
+            data: holochain_serialized_bytes::encode(&data)?,
         })
     }
 
@@ -139,7 +133,7 @@ impl VerifySignature {
         Self {
             key,
             signature,
-            data: UnsafeBytes::from(data).into(),
+            data,
         }
     }
 }

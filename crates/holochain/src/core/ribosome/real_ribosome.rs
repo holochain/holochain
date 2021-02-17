@@ -35,7 +35,6 @@ use crate::core::ribosome::host_fn::capability_info::capability_info;
 use crate::core::ribosome::host_fn::create::create;
 use crate::core::ribosome::host_fn::create_link::create_link;
 use crate::core::ribosome::host_fn::create_x25519_keypair::create_x25519_keypair;
-use crate::core::ribosome::host_fn::debug::debug;
 use crate::core::ribosome::host_fn::delete::delete;
 use crate::core::ribosome::host_fn::delete_link::delete_link;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
@@ -52,6 +51,7 @@ use crate::core::ribosome::host_fn::schedule::schedule;
 use crate::core::ribosome::host_fn::show_env::show_env;
 use crate::core::ribosome::host_fn::sign::sign;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
+use crate::core::ribosome::host_fn::trace::trace;
 use crate::core::ribosome::host_fn::unreachable::unreachable;
 use crate::core::ribosome::host_fn::update::update;
 use crate::core::ribosome::host_fn::verify_signature::verify_signature;
@@ -139,24 +139,23 @@ impl RealRibosome {
                 let closure_self_arc = std::sync::Arc::clone(&self_arc);
                 let closure_call_context_arc = std::sync::Arc::clone(&call_context_arc);
                 move |ctx: &mut Ctx, guest_allocation_ptr: GuestPtr| -> Result<Len, WasmError> {
-                    let input = $crate::holochain_wasmer_host::guest::from_guest_ptr(
+                    let result = match $crate::holochain_wasmer_host::guest::from_guest_ptr(
                         ctx,
                         guest_allocation_ptr,
-                    )?;
-                    // this will be run in a tokio background thread
-                    // designed for doing blocking work.
-                    let output_sb: holochain_wasmer_host::prelude::SerializedBytes =
-                        $host_function(
-                            std::sync::Arc::clone(&closure_self_arc),
-                            std::sync::Arc::clone(&closure_call_context_arc),
-                            input,
-                        )
-                        .map_err(|e| WasmError::Zome(format!("{:?}", e)))?
-                        .try_into()?;
-
-                    Ok($crate::holochain_wasmer_host::import::set_context_data(
-                        ctx, output_sb,
-                    ))
+                    ) {
+                        Ok(input) => {
+                            match $host_function(
+                                std::sync::Arc::clone(&closure_self_arc),
+                                std::sync::Arc::clone(&closure_call_context_arc),
+                                input,
+                            ) {
+                                Ok(output) => Ok::<_, WasmError>(output),
+                                Err(wasm_error) => Err::<_, WasmError>(wasm_error),
+                            }
+                        }
+                        Err(wasm_error) => Err::<_, WasmError>(wasm_error),
+                    };
+                    $crate::holochain_wasmer_host::import::set_context_data(ctx, result)
                 }
             }};
         }
@@ -170,7 +169,7 @@ impl RealRibosome {
         );
 
         // imported host functions for core
-        ns.insert("__debug", func!(invoke_host_function!(debug)));
+        ns.insert("__trace", func!(invoke_host_function!(trace)));
         ns.insert("__hash_entry", func!(invoke_host_function!(hash_entry)));
         ns.insert("__unreachable", func!(invoke_host_function!(unreachable)));
 
@@ -404,7 +403,7 @@ impl RibosomeT for RealRibosome {
         invocation: &I,
         zome: &Zome,
         to_call: &FunctionName,
-    ) -> Result<Option<ExternOutput>, RibosomeError> {
+    ) -> Result<Option<ExternIO>, RibosomeError> {
         let call_context = CallContext {
             zome: zome.clone(),
             host_access,
@@ -420,16 +419,16 @@ impl RibosomeT for RealRibosome {
                     // because it builds guards against memory leaks and handles imports correctly
                     let mut instance = self.instance(call_context)?;
 
-                    let result: ExternOutput = holochain_wasmer_host::guest::call(
+                    let result: Result<ExternIO, WasmError> = holochain_wasmer_host::guest::call(
                         &mut instance,
                         to_call.as_ref(),
                         // be aware of this clone!
                         // the whole invocation is cloned!
                         // @todo - is this a problem for large payloads like entries?
                         invocation.to_owned().host_input()?,
-                    )?;
+                    );
 
-                    Ok(Some(result))
+                    Ok(Some(result?))
                 } else {
                     // the func doesn't exist
                     // the callback is not implemented
@@ -465,7 +464,7 @@ impl RibosomeT for RealRibosome {
             let zome_name = invocation.zome.zome_name().clone();
             let fn_name = invocation.fn_name.clone();
 
-            let guest_output: ExternOutput =
+            let guest_output: ExternIO =
                 match self.call_iterator(host_access.into(), invocation).next()? {
                     Some(result) => result.1,
                     None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
@@ -545,7 +544,6 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use holochain_test_wasm_common::TestString;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
@@ -564,14 +562,14 @@ pub mod wasm_test {
         let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
         host_access.workspace = workspace_lock;
 
-        let foo_result: TestString =
+        let foo_result: String =
             crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "foo", ());
 
-        assert_eq!("foo", foo_result.0.as_str());
+        assert_eq!("foo", foo_result.as_str());
 
-        let bar_result: TestString =
+        let bar_result: String =
             crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "bar", ());
 
-        assert_eq!("foobar", bar_result.0.as_str());
+        assert_eq!("foobar", bar_result.as_str());
     }
 }

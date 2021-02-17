@@ -25,23 +25,23 @@ impl CounTree {
     pub fn ensure(countree: CounTree) -> ExternResult<HeaderHash> {
         match get(hash_entry(&countree)?, GetOptions::latest())? {
             Some(element) => Ok(element.header_address().to_owned()),
-            None => Ok(create_entry(&countree)?),
+            None => create_entry(&countree),
         }
     }
 
-    pub fn header_details(header_hash: HeaderHash) -> ExternResult<GetDetailsOutput> {
-        Ok(GetDetailsOutput::new(get_details(
+    pub fn header_details(header_hash: HeaderHash) -> ExternResult<Option<Details>> {
+        get_details(
             header_hash,
             GetOptions::latest(),
-        )?))
+        )
     }
 
-    /// return the GetDetailsOutput for the entry hash from the header
-    pub fn entry_details(entry_hash: EntryHash) -> ExternResult<GetDetailsOutput> {
-        Ok(GetDetailsOutput::new(get_details(
+    /// return the Option<Details> for the entry hash from the header
+    pub fn entry_details(entry_hash: EntryHash) -> ExternResult<Option<Details>> {
+        get_details(
             entry_hash,
             GetOptions::latest(),
-        )?))
+        )
     }
 
     /// increments the given header hash by 1 or creates it if not found
@@ -55,10 +55,10 @@ impl CounTree {
             None => return Self::new(),
         };
 
-        Ok(update_entry(header_hash, &(current + CounTree(1)))?)
+        update_entry(header_hash, &(current + CounTree(1)))
     }
 
     pub fn dec(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
-        Ok(delete_entry(header_hash)?)
+        delete_entry(header_hash)
     }
 }

@@ -53,7 +53,7 @@ pub async fn spawn_kitsune_proxy_listener(
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
 
     // spawn the actor
-    tokio::task::spawn(
+    metric_task(
         builder.spawn(
             InnerListen::new(
                 i_s.clone(),
@@ -70,11 +70,17 @@ pub async fn spawn_kitsune_proxy_listener(
     // if we want to be proxied, we need to connect to our proxy
     // and manage that connection contract
     if let Some(proxy_url) = proxy_url {
-        i_s.req_proxy(proxy_url.clone()).await?;
+        if let Err(e) = i_s.req_proxy(proxy_url.clone()).await {
+            tracing::error!(
+                msg = "Request proxy failed. Check proxy_url / network status.",
+                ?proxy_url,
+                ?e
+            );
+        }
 
         // Set up a timer to refresh our proxy contract at keepalive interval
         let i_s_c = i_s.clone();
-        tokio::task::spawn(async move {
+        metric_task(async move {
             loop {
                 tokio::time::delay_for(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS)).await;
 
@@ -92,18 +98,20 @@ pub async fn spawn_kitsune_proxy_listener(
                 }
             }
             tracing::error!("Keep alive closed");
+            <Result<(), ()>>::Ok(())
         });
     }
 
     // handle incoming channels from our sub transport
-    tokio::task::spawn(async move {
+    metric_task(async move {
         while let Some(evt) = sub_receiver.next().await {
             match evt {
                 TransportEvent::IncomingChannel(url, write, read) => {
                     // spawn so we can process incoming requests in parallel
                     let i_s = i_s.clone();
-                    tokio::task::spawn(async move {
+                    metric_task(async move {
                         let _ = i_s.incoming_channel(url, write, read).await;
+                        <Result<(), ()>>::Ok(())
                     });
                 }
             }
@@ -231,7 +239,7 @@ fn cross_join_channel_forward(
     mut write: futures::channel::mpsc::Sender<ProxyWire>,
     mut read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) {
-    tokio::task::spawn(async move {
+    metric_task(async move {
         while let Some(msg) = read.next().await {
             // do we need to inspect these??
             // for now just forwarding everything
@@ -517,22 +525,15 @@ impl TransportListenerHandler for InnerListen {
     fn handle_debug(&mut self) -> TransportListenerHandlerResult<serde_json::Value> {
         let url = self.this_url.to_string();
         let sub = self.sub_sender.debug();
-        let proxy = self
-            .proxy_list
-            .iter()
-            .map(|(k, v)| {
-                serde_json::json! {{
-                    "proxy_url": k.to_string(),
-                    "base_url": v.base_connection_url.to_string(),
-                }}
-            })
-            .collect::<Vec<_>>();
+        let proxy_count = self.proxy_list.iter().count();
         Ok(async move {
             let sub = sub.await?;
             Ok(serde_json::json! {{
                 "sub_transport": sub,
                 "url": url,
-                "proxy": proxy,
+                "proxy_count": proxy_count,
+                "tokio_task_count": kitsune_p2p_types::metrics::metric_task_count(),
+                "sys_info": kitsune_p2p_types::metrics::get_sys_info(),
             }})
         }
         .boxed()

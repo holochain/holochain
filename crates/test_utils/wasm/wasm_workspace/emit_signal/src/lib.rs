@@ -8,14 +8,12 @@ fn emit(_: ()) -> ExternResult<()> {
 
 #[hdk_extern]
 fn signal_others(signal: RemoteSignal) -> ExternResult<()> {
-    remote_signal(&signal.signal, signal.agents)?;
-    Ok(())
+    remote_signal(&signal.signal, signal.agents)
 }
 
 #[hdk_extern]
-fn recv_remote_signal(signal: SerializedBytes) -> ExternResult<()> {
-    emit_signal(&signal)?;
-    Ok(())
+fn recv_remote_signal(signal: ExternIO) -> ExternResult<()> {
+    host_call::<AppSignal, ()>(__emit_signal, AppSignal::new(signal))
 }
 
 #[hdk_extern]

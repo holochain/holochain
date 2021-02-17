@@ -9,6 +9,6 @@ use crate::prelude::*;
 ///
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
-pub fn delete(hash: HeaderHash) -> HdkResult<HeaderHash> {
-    Ok(host_call::<DeleteInput, DeleteOutput>(__delete, &DeleteInput::new(hash))?.into_inner())
+pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
+    host_call::<HeaderHash, HeaderHash>(__delete, hash)
 }

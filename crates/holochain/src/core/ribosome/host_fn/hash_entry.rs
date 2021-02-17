@@ -1,20 +1,18 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 pub fn hash_entry(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    input: HashEntryInput,
-) -> RibosomeResult<HashEntryOutput> {
-    let entry: Entry = input.into_inner();
+    input: Entry,
+) -> Result<EntryHash, WasmError> {
+    let entry_hash = holochain_types::entry::EntryHashed::from_content_sync(input).into_hash();
 
-    let entry_hash = holochain_types::entry::EntryHashed::from_content_sync(entry).into_hash();
-
-    Ok(HashEntryOutput::new(entry_hash))
+    Ok(entry_hash)
 }
 
 #[cfg(test)]
@@ -29,10 +27,7 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holo_hash::EntryHash;
-    use holochain_test_wasm_common::TestString;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::HashEntryInput;
-    use holochain_zome_types::HashEntryOutput;
     use std::convert::TryInto;
     use std::sync::Arc;
 
@@ -45,14 +40,13 @@ pub mod wasm_test {
         let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        let entry = EntryFixturator::new(::fixt::Predictable).next().unwrap();
-        let input = HashEntryInput::new(entry);
+        let input = EntryFixturator::new(::fixt::Predictable).next().unwrap();
 
-        let output: HashEntryOutput =
+        let output: EntryHash =
             hash_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
         assert_eq!(
-            *output.into_inner().hash_type(),
+            *output.hash_type(),
             holo_hash::hash_type::Entry
         );
     }
@@ -70,14 +64,13 @@ pub mod wasm_test {
 
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
-        let entry = EntryFixturator::new(::fixt::Predictable).next().unwrap();
-        let input = HashEntryInput::new(entry);
+        let input = EntryFixturator::new(::fixt::Predictable).next().unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        let output: HashEntryOutput =
+        let output: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::HashEntry, "hash_entry", input);
         assert_eq!(
-            *output.into_inner().hash_type(),
+            *output.hash_type(),
             holo_hash::hash_type::Entry
         );
 
@@ -103,7 +96,7 @@ pub mod wasm_test {
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        let input = TestString::from("foo.bar".to_string());
+        let input = "foo.bar".to_string();
         let output: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::HashPath, "hash", input);
 

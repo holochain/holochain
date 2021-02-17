@@ -10,50 +10,31 @@ use crate::prelude::*;
 /// - cap_secret: Optional cap claim secret to allow access to the remote call.
 /// - payload: The payload to send to the remote function; receiver needs to deserialize cleanly.
 ///
-/// Response is HdkResult which can either return HdkResult::Ok with the deserialized result
-/// of the function call, HdkError::ZomeCallNetworkError if there was a network error,
-/// or HdkError::UnauthorizedZomeCall if the provided cap grant is invalid. The Unauthorized case
-/// should always be handled gracefully because gap grants can be revoked at any time and the claim
-/// holder has no way of knowing until they provide a secret for a call.
+/// Response is ExternResult which returns ZomeCallResponse of the function call.
+/// ZomeCallResponse::ZomeCallNetworkError if there was a network error.
+/// ZomeCallResponse::UnauthorizedZomeCall if the provided cap grant is invalid.
+/// The Unauthorized case should always be handled gracefully because gap grants can be revoked at
+/// any time and the claim holder has no way of knowing until they provide a secret for a call.
 ///
-/// An Ok response already includes the deserialized type. Note that this type must be specified
-/// should derive from `SerializedBytes`, and it should be the same one as the return type
-/// from the remote function call.
-///
+/// An Ok response already includes an `ExternIO` to be deserialized with `extern_io.decode()?`.
 ///
 /// ```ignore
-/// #[derive(SerializedBytes, Serialize, Deserialize)]
-/// struct Foo(String);
-///
 /// ...
-/// let foo: Foo = call_remote(bob, "foo_zome", "do_it", secret, serialized_payload)?;
+/// let foo: Foo = call_remote(bob, "foo_zome", "do_it", secret, serializable_payload)?;
 /// ...
 /// ```
-pub fn call_remote<I, IE, O, OE>(
+pub fn call_remote<I>(
     agent: AgentPubKey,
     zome: ZomeName,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
     payload: I,
-) -> HdkResult<O>
+) -> ExternResult<ZomeCallResponse>
 where
-    SerializedBytes: TryFrom<I, Error = IE>,
-    O: TryFrom<SerializedBytes, Error = OE>,
-    HdkError: From<IE>,
-    HdkError: From<OE>,
+    I: serde::Serialize + std::fmt::Debug,
 {
-    let payload = SerializedBytes::try_from(payload)?;
-    let out = host_call::<CallRemoteInput, CallRemoteOutput>(
+    host_call::<CallRemote, ZomeCallResponse>(
         __call_remote,
-        &CallRemoteInput::new(CallRemote::new(agent, zome, fn_name, cap_secret, payload)),
-    )?
-    .into_inner();
-
-    match out {
-        ZomeCallResponse::Ok(o) => Ok(O::try_from(o.into_inner())?),
-        ZomeCallResponse::Unauthorized(c, z, f, p) => {
-            Err(HdkError::UnauthorizedZomeCall(c, z, f, p))
-        }
-        ZomeCallResponse::NetworkError(e) => Err(HdkError::ZomeCallNetworkError(e)),
-    }
+        CallRemote::new(agent, zome, fn_name, cap_secret, ExternIO::encode(payload)?),
+    )
 }

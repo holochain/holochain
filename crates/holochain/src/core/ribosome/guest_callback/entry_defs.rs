@@ -46,15 +46,8 @@ impl Invocation for EntryDefsInvocation {
     fn fn_components(&self) -> FnComponents {
         vec!["entry_defs".into()].into()
     }
-    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
-        Ok(ExternInput::new(().try_into()?))
-    }
-}
-
-impl TryFrom<EntryDefsInvocation> for ExternInput {
-    type Error = SerializedBytesError;
-    fn try_from(_: EntryDefsInvocation) -> Result<Self, Self::Error> {
-        Ok(Self::new(().try_into()?))
+    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
+        ExternIO::encode(())
     }
 }
 
@@ -98,10 +91,9 @@ mod test {
     use crate::fixt::EntryDefsInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
-    use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::entry_def::EntryDefsCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::ExternIO;
     use std::collections::BTreeMap;
 
     #[test]
@@ -213,10 +205,7 @@ mod test {
 
         let host_input = entry_defs_invocation.clone().host_input().unwrap();
 
-        assert_eq!(
-            host_input,
-            ExternInput::new(SerializedBytes::try_from(()).unwrap()),
-        );
+        assert_eq!(host_input, ExternIO::encode(()).unwrap());
     }
 }
 
@@ -229,6 +218,8 @@ mod slow_tests {
     use crate::fixt::curve::Zomes;
     use crate::fixt::EntryDefsInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use ::fixt::prelude::*;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::entry_def::EntryVisibility;
@@ -247,6 +238,25 @@ mod slow_tests {
             .run_entry_defs(EntryDefsHostAccess, entry_defs_invocation)
             .unwrap();
         assert_eq!(result, EntryDefsResult::Defs(BTreeMap::new()),);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_entry_defs_index_lookup() {
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let env = test_env.env();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = workspace_lock;
+        let output: () =
+            crate::call_test_ribosome!(host_access, TestWasm::EntryDefs, "assert_indexes", ());
+
+        assert_eq!(&(), &output);
     }
 
     #[tokio::test(threaded_scheduler)]

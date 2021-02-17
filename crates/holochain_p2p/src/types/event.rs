@@ -88,7 +88,7 @@ ghost_actor::ghost_chan! {
             zome_name: ZomeName,
             fn_name: FunctionName,
             cap: Option<CapSecret>,
-            request: SerializedBytes,
+            payload: ExternIO,
         ) -> SerializedBytes;
 
         /// A remote node is publishing data in a range we claim to be holding.
@@ -207,7 +207,7 @@ impl HolochainP2pEvent {
     }
 
     /// The agent_pub_key associated with this network p2p event.
-    pub fn as_to_agent(&self) -> &AgentPubKey {
+    pub fn target_agent_as_ref(&self) -> &AgentPubKey {
         match_p2p_evt!(self => |to_agent| { to_agent })
     }
 }

@@ -196,7 +196,7 @@ pub fn hdk_entry(attrs: TokenStream, code: TokenStream) -> TokenStream {
     let entry_def = syn::parse_macro_input!(attrs as EntryDef);
 
     (quote::quote! {
-        #[derive(serde::Serialize, serde::Deserialize, hdk3::prelude::SerializedBytes)]
+        #[derive(serde::Serialize, serde::Deserialize, hdk3::prelude::SerializedBytes, std::fmt::Debug)]
         #item
         hdk3::prelude::entry_def!(#struct_ident #entry_def);
     })
@@ -211,10 +211,21 @@ pub fn hdk_extern(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     // extract the ident of the fn
     // this will be exposed as the external facing extern
     let external_fn_ident = item_fn.sig.ident.clone();
+    let input_type = if let Some(syn::FnArg::Typed(pat_type)) = item_fn.sig.inputs.first() {
+        pat_type.ty.clone()
+    } else {
+        unreachable!();
+    };
+    let output_type = if let syn::ReturnType::Type(_, ref ty) = item_fn.sig.output {
+        ty.clone()
+    } else {
+        unreachable!();
+    };
+
     let internal_fn_ident = external_fn_ident.clone();
 
     (quote::quote! {
-        map_extern!(#external_fn_ident, #internal_fn_ident);
+        map_extern!(#external_fn_ident, #internal_fn_ident, #input_type, #output_type);
         #item_fn
     })
     .into()

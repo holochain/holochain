@@ -1,36 +1,34 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_types::prelude::*;
-use std::convert::TryInto;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 pub fn call_remote(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: CallRemoteInput,
-) -> RibosomeResult<CallRemoteOutput> {
+    input: CallRemote,
+) -> Result<ZomeCallResponse, WasmError> {
     // it is the network's responsibility to handle timeouts and return an Err result in that case
-    let result = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    let result: Result<SerializedBytes, _> = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let mut network = call_context.host_access().network().clone();
-        let call_remote = input.into_inner();
         network
             .call_remote(
-                call_remote.to_agent(),
-                call_remote.zome_name(),
-                call_remote.fn_name(),
-                call_remote.cap(),
-                call_remote.request(),
+                input.target_agent_as_ref().to_owned(),
+                input.zome_name_as_ref().to_owned(),
+                input.fn_name_as_ref().to_owned(),
+                input.cap_as_ref().to_owned(),
+                input.payload_as_ref().to_owned(),
             )
             .await
     });
     let result = match result {
-        Ok(r) => r.try_into()?,
+        Ok(r) => ZomeCallResponse::try_from(r)?,
         Err(e) => ZomeCallResponse::NetworkError(e.to_string()),
     };
 
-    Ok(CallRemoteOutput::new(result))
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -48,7 +46,7 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::capability::CapSecret;
     use holochain_zome_types::cell::CellId;
-    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::ExternIO;
 
     #[tokio::test(threaded_scheduler)]
     /// we can call a fn on a remote
@@ -129,7 +127,7 @@ pub mod wasm_test {
                 zome_name: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "set_access".into(),
-                payload: ExternInput::new(().try_into().unwrap()),
+                payload: ExternIO::encode(()).unwrap(),
                 provenance: bob_agent_id.clone(),
             })
             .await
@@ -143,7 +141,9 @@ pub mod wasm_test {
                 zome_name: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "whoarethey".into(),
-                payload: ExternInput::new(bob_agent_id.clone().try_into().unwrap()),
+                payload: ExternIO::encode(
+                    &bob_agent_id
+                ).unwrap(),
                 provenance: alice_agent_id,
             })
             .await
@@ -152,8 +152,7 @@ pub mod wasm_test {
 
         match output {
             ZomeCallResponse::Ok(guest_output) => {
-                let response: SerializedBytes = guest_output.into_inner();
-                let agent_info: AgentInfo = response.try_into().unwrap();
+                let agent_info: AgentInfo = guest_output.decode().unwrap();
                 assert_eq!(
                     agent_info,
                     AgentInfo {

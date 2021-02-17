@@ -1,21 +1,23 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use ring::rand::SecureRandom;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 /// return n crypto secure random bytes from the standard holochain crypto lib
 pub fn random_bytes(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    input: RandomBytesInput,
-) -> RibosomeResult<RandomBytesOutput> {
+    input: u32,
+) -> Result<Bytes, WasmError> {
     let system_random = ring::rand::SystemRandom::new();
-    let mut bytes = vec![0; input.into_inner() as _];
-    system_random.fill(&mut bytes)?;
+    let mut bytes = vec![0; input as _];
+    system_random.fill(&mut bytes).map_err(|ring_unspecified_error|
+        WasmError::Host(ring_unspecified_error.to_string())
+    )?;
 
-    Ok(RandomBytesOutput::new(Bytes::from(bytes)))
+    Ok(Bytes::from(bytes))
 }
 
 #[cfg(test)]
@@ -28,9 +30,6 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::RandomBytesInput;
-    use holochain_zome_types::RandomBytesOutput;
-    use std::convert::TryInto;
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
@@ -42,15 +41,14 @@ pub mod wasm_test {
         let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        const LEN: usize = 10;
-        let input = RandomBytesInput::new(LEN.try_into().unwrap());
+        const LEN: u32 = 10;
 
-        let output: RandomBytesOutput =
-            random_bytes(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
+        let output: holochain_zome_types::prelude::Bytes =
+            random_bytes(Arc::new(ribosome), Arc::new(call_context), LEN).unwrap();
 
         println!("{:?}", output);
 
-        assert_ne!(&[0; LEN], output.into_inner().as_ref(),);
+        assert_ne!(&[0; LEN as usize], output.as_ref(),);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -65,16 +63,16 @@ pub mod wasm_test {
             .unwrap();
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
-        const LEN: usize = 5;
+        const LEN: u32 = 5;
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        let output: RandomBytesOutput = crate::call_test_ribosome!(
+        let output: hdk3::prelude::Bytes = crate::call_test_ribosome!(
             host_access,
             TestWasm::RandomBytes,
             "random_bytes",
-            RandomBytesInput::new(5 as _)
+            LEN
         );
 
-        assert_ne!(&[0; LEN], output.into_inner().as_ref(),);
+        assert_ne!(&vec![0; LEN as usize], &output.to_vec());
     }
 }
