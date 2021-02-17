@@ -10,3 +10,6 @@ pub use async_read_into_vec::*;
 
 mod async_framed;
 pub use async_framed::*;
+
+mod play;
+pub use play::*;

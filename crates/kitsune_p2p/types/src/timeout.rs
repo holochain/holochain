@@ -33,6 +33,19 @@ impl KitsuneTimeout {
             Ok(())
         }
     }
+
+    pub fn mix<R, F>(&self, f: F) -> impl std::future::Future<Output = KitsuneResult<R>> + Send
+    where
+        F: std::future::Future<Output = KitsuneResult<R>> + Unpin + Send
+    {
+        let t_fut = tokio::time::delay_for(self.time_remaining());
+        async move {
+            match futures::future::select(f, t_fut).await {
+                futures::future::Either::Left((v, _)) => v,
+                futures::future::Either::Right(_) => Err(KitsuneError::TimedOut),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
