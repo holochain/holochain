@@ -45,7 +45,7 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<HeaderHa
 /// Capability grants are explicit entries in the local source chain that grant access to functions running in the current conductor.
 /// The grant must be sent (e.g. with a remote call) to the grantees so they can commit a claim and then call back with it in the future.
 ///
-/// When an agent wants to expose externs to be called remotely by other agents they need to select
+/// When an agent wants to expose zome functions to be called remotely by other agents they need to select
 /// a security model and probably generate a secret.
 ///
 /// The input needs to evalute to a `ZomeCallCapGrant` struct which defines the tag, access and
