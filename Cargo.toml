@@ -35,13 +35,13 @@ exclude = [
 
 # These are the default params for RELEASE target
 # Setting these for all dependencies... we'll only debug our own code
-[profile.dev.package."*"]
-opt-level = 3
-debug = false
-debug-assertions = false
-overflow-checks = false
-incremental = false
-codegen-units = 16
+# [profile.dev.package."*"]
+# opt-level = 3
+# debug = false
+# debug-assertions = false
+# overflow-checks = false
+# incremental = false
+# codegen-units = 16
 
 [patch.crates-io]
 
