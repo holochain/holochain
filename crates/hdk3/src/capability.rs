@@ -57,7 +57,7 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<HeaderHa
 /// recipient chain when a `CapGrant` is committed and shared. The tags are not checked or compared
 /// in any security sensitive contexts.
 ///
-/// Provided the grant author agent is is reachable on the network:
+/// Provided the grant author agent is reachable on the network:
 ///
 /// - The author always has access to all their own extern calls, bypassing `CapAccess`
 /// - Unrestricted access means any external agent can call the extern
