@@ -18,7 +18,7 @@ use crate::prelude::*;
 /// There is no guarantee that any CapClaim is currently usable without trying it.
 /// The author of the corresponding CapGrant can revoke it at any time or be unreachable on the network.
 ///
-/// Any `call_remote` will return a `ZomeCallResponse::Unauthorized` when the grantor considers the
+/// Any [`call_remote`] will return a `ZomeCallResponse::Unauthorized` when the grantor considers the
 /// secret invalid for the call. The caller is expected to handle this gracefully.
 ///
 /// If the author of the CapGrant is reachable on the network and has not revoked the grant they will allow any
