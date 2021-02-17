@@ -151,6 +151,38 @@ fn conductors_boot_gossip(num_committers: usize, num_conductors: usize, new_cond
 #[test_case(8, 8, 8)]
 #[test_case(10, 10, 1)]
 #[ignore = "Don't want network tests running on ci"]
+fn conductors_local_boot_gossip(
+    num_committers: usize,
+    num_conductors: usize,
+    new_conductors: usize,
+) {
+    let mut network = KitsuneP2pConfig::default();
+    network.bootstrap_service = Some(url2::url2!("http://127.0.0.1:8787"));
+    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+        bind_to: None,
+        override_host: None,
+        override_port: None,
+    }];
+    let f = conductors_gossip_inner(
+        num_committers,
+        num_conductors,
+        new_conductors,
+        network,
+        false,
+    );
+    crate::conductor::tokio_runtime().block_on(f);
+}
+
+#[test_case(2, 1, 1)]
+#[test_case(5, 1, 1)]
+#[test_case(1, 5, 5)]
+#[test_case(5, 5, 5)]
+#[test_case(1, 10, 1)]
+#[test_case(1, 1, 1)]
+#[test_case(10, 10, 10)]
+#[test_case(8, 8, 8)]
+#[test_case(10, 10, 1)]
+#[ignore = "Don't want network tests running on ci"]
 fn conductors_remote_gossip(num_committers: usize, num_conductors: usize, new_conductors: usize) {
     let mut network = KitsuneP2pConfig::default();
     let transport = kitsune_p2p::TransportConfig::Quic {
