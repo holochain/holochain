@@ -628,6 +628,15 @@ pub mod test {
 
         assert_eq!(expected, cell_ids);
 
+        // Check that it is returned in get_app_info as active
+        let maybe_info = state.get_app_info(&"test app".to_string());
+        if let Some(info) = maybe_info {
+            assert_eq!(info.installed_app_id, "test app");
+            assert!(info.active);
+        } else {
+            assert!(false);
+        }
+
         // Now deactivate app
         let msg = AdminRequest::DeactivateApp {
             installed_app_id: "test app".to_string(),
@@ -663,6 +672,16 @@ pub mod test {
             .collect();
 
         assert_eq!(expected, cell_ids);
+
+        // Check that it is returned in get_app_info as not active
+        let maybe_info = state.get_app_info(&"test app".to_string());
+        if let Some(info) = maybe_info {
+            assert_eq!(info.installed_app_id, "test app");
+            assert!(!info.active);
+        } else {
+            assert!(false);
+        }
+
         conductor_handle.shutdown().await;
         shutdown.await.unwrap();
     }

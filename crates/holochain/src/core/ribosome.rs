@@ -599,12 +599,3 @@ pub mod wasm_test {
         assert_eq!(fn_components.into_iter().collect::<Vec<String>>(), expected,);
     }
 }
-
-#[cfg(test)]
-#[cfg(feature = "slow_tests")]
-mod slow_tests {
-    #[tokio::test(threaded_scheduler)]
-    async fn warm_wasm_tests() {
-        crate::test_utils::warm_wasm_tests();
-    }
-}
