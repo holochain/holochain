@@ -293,7 +293,6 @@ pub mod test {
     use holochain_lmdb::fresh_reader_test;
     use holochain_lmdb::test_utils::test_environments;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_state::source_chain::SourceChainBuf;
     use holochain_types::app::InstallAppDnaPayload;
     use holochain_types::app::InstallAppPayload;
     use holochain_types::app::InstalledCell;
@@ -648,14 +647,8 @@ pub mod test {
         let conductor_handle = activate(conductor_handle).await;
         let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
 
-        // Set some state
-        let cell_env = conductor_handle.get_cell_env(&cell_id).await.unwrap();
-
         // Get state
-        let expected = {
-            let source_chain = SourceChainBuf::new(cell_env.clone().into()).unwrap();
-            source_chain.dump_as_json().await.unwrap()
-        };
+        let expected = conductor_handle.dump_cell_state(&cell_id).await.unwrap();
 
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::DumpState {
