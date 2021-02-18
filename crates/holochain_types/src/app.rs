@@ -130,4 +130,6 @@ pub struct InstalledApp {
     pub installed_app_id: InstalledAppId,
     /// Cell data for this app
     pub cell_data: Vec<InstalledCell>,
+    /// Is this app active
+    pub active: bool,
 }
