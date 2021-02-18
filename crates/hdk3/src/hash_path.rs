@@ -1,4 +1,4 @@
-/// The anchor pattern implemented in terms of `Path`
+/// The anchor pattern implemented in terms of [ `path::Path` ]
 ///
 /// The anchor pattern predates the path crate.
 ///
@@ -10,9 +10,9 @@
 /// - The second level is optional as `Option<String>`
 pub mod anchor;
 
-/// The generic `Path` pattern.
+/// The generic [ `path::Path` ] pattern.
 ///
-/// As explained in the parent module documentation the `Path` defines a tree structure.
+/// As explained in the parent module documentation the [ `path::Path` ] defines a tree structure.
 ///
 /// The path is _not_ an entire tree but simply one path from the root to the current depth of the tree.
 ///
@@ -30,9 +30,9 @@ pub mod anchor;
 /// Note:
 ///
 /// - The path must always start at the root
-/// - Paths are sequential and contigious
-/// - Paths may be empty
-/// - Paths only track one branch
+/// - [ `path::Path` ] are sequential and contigious
+/// - [ `path::Path` ] may be empty
+/// - [ `path::Path` ] only track one branch
 ///
 /// Applications can discover all links from a path to all children by constructing the known path components.
 ///
@@ -41,7 +41,7 @@ pub mod anchor;
 /// If an application knows `[ A B ]` then a link to `C` will be discoverable.
 pub mod path;
 
-/// A `String` based DSL for `Paths` that builds trees based on lexical granularity.
+/// A [ `String` ] based DSL for [ `path::Path` ] that builds trees based on lexical granularity.
 ///
 /// The basic form is `width:depth#` in the string with `.` separators for each component.
 ///

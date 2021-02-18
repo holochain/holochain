@@ -46,13 +46,13 @@ where
 /// - cap_secret: Optional cap claim secret to allow access to the remote call.
 /// - payload: The payload to send to the remote function; receiver needs to deserialize cleanly.
 ///
-/// Response is ExternResult which returns ZomeCallResponse of the function call.
-/// ZomeCallResponse::ZomeCallNetworkError if there was a network error.
-/// ZomeCallResponse::UnauthorizedZomeCall if the provided cap grant is invalid.
-/// The Unauthorized case should always be handled gracefully because gap grants can be revoked at
+/// Response is [ `ExternResult` ] which returns [ `ZomeCallResponse` ] of the function call.
+/// [ `ZomeCallResponse::NetworkError` ] if there was a network error.
+/// [ `ZomeCallResponse::Unauthorized` ] if the provided cap grant is invalid.
+/// The unauthorized case should always be handled gracefully because gap grants can be revoked at
 /// any time and the claim holder has no way of knowing until they provide a secret for a call.
 ///
-/// An Ok response already includes an `ExternIO` to be deserialized with `extern_io.decode()?`.
+/// An Ok response already includes an [ `ExternIO` ] to be deserialized with `extern_io.decode()?`.
 ///
 /// ```ignore
 /// ...
@@ -94,7 +94,7 @@ where
 
 /// ## Remote Signal
 /// Send a signal to a list of other agents.
-/// This will send the data as an [AppSignal] to
+/// This will send the data as an [ `AppSignal` ] to
 /// this zome for all the agents supplied.
 ///
 /// ### Non-blocking

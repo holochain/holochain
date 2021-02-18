@@ -28,8 +28,8 @@ use crate::prelude::*;
 /// - model "mutability" for a single thing/identity in an immutable/append-only way
 /// - only reference other entries of the same entry type (e.g. comments can _not_ update posts)
 ///
-/// @see get_details and get for more information about CRUD
-/// @see get_links and get_link_details for more information about filtering by tag
+/// See [ `get_details` ] and get for more information about CRUD
+/// See [ `get_links` ] and [ `get_link_details` ] for more information about filtering by tag
 ///
 /// Generally links and CRUDs _do not interact_ beyond the fact that links need entry hashes to
 /// reference for the base and target to already exist due to a prior create or update.
@@ -85,7 +85,7 @@ pub fn create_link<T: Into<LinkTag>>(
 ///   either "there are N more/less creates than deletes" or "there is at least one delete", the
 ///   former leads to flakiness as above and the latter means it would be impossible to create a
 ///   link after any previous delete of any link.
-/// All of this is bad so link creates point to entries (@see link_entries!) and deletes point to
+/// All of this is bad so link creates point to entries (See [ `create_link` ]) and deletes point to
 /// creates.
 pub fn delete_link(add_link_header: HeaderHash) -> ExternResult<HeaderHash> {
     host_call::<HeaderHash, HeaderHash>(__delete_link, add_link_header)
@@ -109,7 +109,7 @@ pub fn delete_link(add_link_header: HeaderHash) -> ExternResult<HeaderHash> {
 /// This is mostly identical to `get_link_details` but returns only creates that have not been
 /// deleted c.f. get_link_details that returns all the creates and all the deletes together.
 ///
-/// @see get_link_details
+/// See [ `get_link_details` ].
 pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Links> {
     host_call::<GetLinksInput, Links>(__get_links, GetLinksInput::new(base, link_tag))
 }
@@ -132,7 +132,7 @@ pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Lin
 /// This is mostly identical to get_links but it returns all the creates and all the deletes.
 /// c.f. get_links that returns only the creates that have not been deleted.
 ///
-/// @see get_links
+/// See [ `get_links` ].
 pub fn get_link_details(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<LinkDetails> {
     host_call::<GetLinksInput, LinkDetails>(__get_link_details, GetLinksInput::new(base, link_tag))
 }

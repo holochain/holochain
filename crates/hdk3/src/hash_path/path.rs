@@ -8,8 +8,9 @@ use validate::RequiredValidationType;
 
 /// Allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components.
 /// Technically it's moving each string component in as bytes.
-/// If this is a problem for you simply build the components yourself as a Vec<Vec<u8>>
-/// @see `impl From<String> for Path` below
+/// If this is a problem for you simply build the components yourself as a Vec<Vec<u8>>.
+///
+/// See `impl From<String> for Path` below.
 pub const DELIMITER: &str = ".";
 
 /// "hdk.path" as utf8 bytes
@@ -17,8 +18,9 @@ pub const DELIMITER: &str = ".";
 /// Different pathing schemes/systems/implementations should namespace themselves by their path
 /// components rather than trying to layer different link namespaces over the same path components.
 /// Similarly there is no need to define different entry types for different pathing strategies.
+///
 /// @todo - revisit whether there is a need/use-case for different link tags or entries
-/// @see anchors implementation
+/// See anchors implementation.
 pub const NAME: [u8; 8] = [0x68, 0x64, 0x6b, 0x2e, 0x70, 0x61, 0x74, 0x68];
 
 /// Each path component is arbitrary bytes to be hashed together in a predictable way when the path
@@ -49,6 +51,7 @@ impl From<Component> for Vec<u8> {
 }
 
 /// Build a component from a String.
+///
 /// For many simple use cases we can construct a path out of a string similar to a URI.
 /// We represent this using the utf32 bytes rather than the utf8 bytes for the chars in the string
 /// which gives us a fixed width encoding for strings, which gives us a clean/easy way to support
@@ -76,7 +79,7 @@ impl From<String> for Component {
     }
 }
 
-/// Restoring a String from a Component requires Vec<u8> to u32 to utf8 handling.
+/// Restoring a [ `String` ] from a [ `Component` ] requires [ `Vec<u8>` ] to [ `u32` ] to utf8 handling.
 impl TryFrom<&Component> for String {
     type Error = SerializedBytesError;
     fn try_from(component: &Component) -> Result<Self, Self::Error> {
@@ -125,7 +128,7 @@ impl TryFrom<&Component> for String {
     }
 }
 
-/// A Path is a vector of components.
+/// A [ `Path` ] is a vector of [ `Component` ].
 /// It represents a single traversal of a tree structure down to some arbitrary point.
 /// The main intent is that we can recursively walk back up the tree, hashing, committing and
 /// linking each sub-path along the way until we reach the root.
@@ -255,7 +258,7 @@ impl TryFrom<&LinkTag> for Path {
 }
 
 impl Path {
-    /// What is the hash for the current Path?
+    /// What is the hash for the current [ `Path` ]?
     pub fn hash(&self) -> ExternResult<holo_hash::EntryHash> {
         hash_entry(Entry::try_from(self)?)
     }

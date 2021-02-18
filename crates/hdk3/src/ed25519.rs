@@ -14,7 +14,7 @@ where
 /// Assuming the private key for the provided pubkey exists in lair this will work.
 /// If we don't have the private key for the public key then we can't sign anything!
 ///
-/// See [`sign`](fn@sign)
+/// See [ `sign` ]
 pub fn sign_raw<K>(key: K, data: Vec<u8>) -> ExternResult<Signature>
 where
     K: Into<AgentPubKey>,
@@ -29,7 +29,7 @@ where
 /// be passed through the canonical serialization process, guaranteeing consistent behaviour.
 /// If you pass in a Vec<u8> expecting it to be verified literally the signature won't verify correctly.
 ///
-/// See [`verify_signature_raw`](fn@verify_signature_raw)
+/// See [ `verify_signature_raw` ]
 pub fn verify_signature<K, S, D>(key: K, signature: S, data: D) -> ExternResult<bool>
 where
     K: Into<AgentPubKey>,
@@ -48,7 +48,7 @@ where
 /// This is best to use if you have literal bytes from somewhere.
 /// If you pass in a Vec<u8> expecting it to be serialized here, the signature won't verify correctly.
 ///
-/// See [`verify_signature`](fn@verify_signature)
+/// See [ `verify_signature` ]
 pub fn verify_signature_raw<K, S>(key: K, signature: S, data: Vec<u8>) -> ExternResult<bool>
 where
     K: Into<AgentPubKey>,

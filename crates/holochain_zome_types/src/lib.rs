@@ -183,7 +183,7 @@ macro_rules! secure_primitive {
         /// @todo maybe we want something like **HIDDEN** by default and putting the actual bytes
         ///       behind a feature flag?
         ///
-        /// @see https://docs.rs/subtle-encoding/0.5.1/subtle_encoding/
+        /// See https://docs.rs/subtle-encoding/0.5.1/subtle_encoding/
         impl std::fmt::Debug for $t {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 std::fmt::Debug::fmt(&self.0.to_vec(), f)

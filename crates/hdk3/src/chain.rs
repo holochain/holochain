@@ -5,7 +5,7 @@ use crate::prelude::*;
 /// The agent activity is only the headers of their source chain.
 /// The agent activity is held by the neighbourhood centered on the agent's public key, rather than a content hash like the rest of the DHT.
 ///
-/// The agent activity can be filtered with `ChainQueryFilter` like a local chain query.
+/// The agent activity can be filtered with [ `ChainQueryFilter` ] like a local chain query.
 pub fn get_agent_activity(
     agent: AgentPubKey,
     query: ChainQueryFilter,
@@ -19,7 +19,7 @@ pub fn get_agent_activity(
 
 /// Walks the source chain in reverse (latest to oldest) filtering by header and/or entry type
 ///
-/// Given a header and entry type, returns an ElementVec
+/// Given a header and entry type, returns an [ `ElementVec` ]
 ///
 /// @todo document this better with examples
 /// @todo do we want to return elements rather than hashes?

@@ -15,7 +15,7 @@
 //! The code is not strictly organised this way but you'll get a feel for it as you write your own happs.
 //!
 //! Roughly speaking, 80% of your apps can be production ready using just 20% of the HDK3 features and code.
-//! These are the 'high level' functions such as `create_entry` and macros like `#[hdk_extern]`.
+//! These are the 'high level' functions such as [ `crate::entry::create_entry` ] and macros like [ `#[hdk_extern]` ].
 //! Every holochain function is available with a typed and documented wrapper and there is a set of macros for exposing functions and defining entries.
 //!
 //! The 20% of the time that you need to go deeper there is another layer followng its own 80/20 rule.
@@ -213,7 +213,7 @@
 //! The __guest must handle this error__ and either return it back to the host which _then_ rolls back writes (see above) or implement some kind of graceful failure or retry logic.
 //!
 //! The `Result` from the host in the case of host calls indicates whether the execution _completed_ successfully and is _in addition to_ other Result-like enums.
-//! For example, a remote call can be `Ok` from the host's perspective but contain an `Unauthorized` "failure" enum variant from the remote agent, both need to be handled in context.
+//! For example, a remote call can be `Ok` from the host's perspective but contain an [ `crate::prelude::ZomeCallResponse::Unauthorized` ] "failure" enum variant from the remote agent, both need to be handled in context.
 
 /// Capability claims and grants.
 ///
@@ -317,17 +317,17 @@ pub mod entry;
 /// - We never need to fetch _all_ messages because we can start as deeply down the tree as is appropriate and
 /// - We avoid DHT hotspots because each branch of the tree has its own hash and set of links, therefore a different neighbourhood of agents
 ///
-/// The `hash_path` module includes 3 submodules to help build and navigate these tree structures efficiently:
+/// The [ `hash_path` ] module includes 3 submodules to help build and navigate these tree structures efficiently:
 ///
-/// - `path` is the basic general purpose implementation of tree structures as `Vec<Vec<u8>>`
-/// - `shard` is a string based DSL for creating lexical shards out of strings as utf-32 (e.g. usernames)
-/// - `anchor` implements the "anchor" pattern (two level string based tree, "type" and "text") in terms of paths
+/// - [ `hash_path::path` ] is the basic general purpose implementation of tree structures as `Vec<Vec<u8>>`
+/// - [ `hash_path::shard` ] is a string based DSL for creating lexical shards out of strings as utf-32 (e.g. usernames)
+/// - [ `hash_path::anchor` ] implements the "anchor" pattern (two level string based tree, "type" and "text") in terms of paths
 pub mod hash_path;
 
 /// Maps a Rust function to an extern that WASM can expose to the Holochain host.
 ///
 /// Annotate any compatible function with `#[hdk_extern]` to expose it to Holochain as a WASM extern.
-/// The `map_extern!` macro is used internally by the `#[hdk_extern]` attribute.
+/// The [ `map_extern!` ] macro is used internally by the `#[hdk_extern]` attribute.
 ///
 /// Compatible functions:
 ///
@@ -440,7 +440,7 @@ pub mod info;
 /// - Many links can point from/to the same entry
 /// - Links reference entry hashes not headers
 ///
-/// Links are retrived from the DHT by performing `get_links` or `get_link_details` against the _base_ of a link.
+/// Links are retrived from the DHT by performing [ `link::get_links` ] or [ `link::get_link_details` ] against the _base_ of a link.
 ///
 /// Links also support short (about 500 bytes) binary data to encode contextual data on a domain specific basis.
 ///
@@ -465,7 +465,7 @@ pub mod p2p;
 /// The functions and structs in this module do _not_ need to be used directly.
 /// The `#[hdk_extern]` attribute on functions exposed externally all set the `WasmSubscriber` as the global default.
 ///
-/// This module defines a `WasmSubscriber` that forwards all tracing macro calls to another subscriber on the host.
+/// This module defines a [ `trace::WasmSubscriber` ] that forwards all tracing macro calls to another subscriber on the host.
 /// The logging level can be changed for the host at runtime using the `WASM_LOG` environment variable that works exactly as `RUST_LOG` for other tracing.
 pub mod trace;
 
