@@ -103,7 +103,15 @@ async fn main() -> anyhow::Result<()> {
                 hc::force_admin_port(path, port)?;
             }
             if let Some(ports) = run {
-                run_n(&ops.holochain_path, paths, ports, ops.force_admin_ports).await?;
+                let holochain_path = ops.holochain_path.clone();
+                let force_admin_ports = ops.force_admin_ports.clone();
+                tokio::task::spawn(async move {
+                    if let Err(e) = run_n(&holochain_path, paths, ports, force_admin_ports).await {
+                        tracing::error!(failed_to_run = ?e);
+                    }
+                });
+                tokio::signal::ctrl_c().await?;
+                hc::save::release_ports(std::env::current_dir()?).await?;
             }
         }
         Op::Run(Run { ports, existing }) => {
@@ -111,21 +119,16 @@ async fn main() -> anyhow::Result<()> {
             if paths.is_empty() {
                 return Ok(());
             }
-            run_n(&ops.holochain_path, paths, ports, ops.force_admin_ports).await?;
+            let holochain_path = ops.holochain_path.clone();
+            let force_admin_ports = ops.force_admin_ports.clone();
+            tokio::task::spawn(async move {
+                if let Err(e) = run_n(&holochain_path, paths, ports, force_admin_ports).await {
+                    tracing::error!(failed_to_run = ?e);
+                }
+            });
+            tokio::signal::ctrl_c().await?;
+            hc::save::release_ports(std::env::current_dir()?).await?;
         }
-        // Op::Run(Run { ports, .. }) => {
-        //     // Check if current directory has saved existing
-        //     let existing = hc::save::load(std::env::current_dir()?)?;
-        //     // If we have existing setups and we are not trying to generate and
-        //     // we are not trying to load specific dnas then use existing.
-        //     let paths = if !existing.is_empty() && gen.is_none() && dnas.is_empty() {
-        //         existing
-        //     } else {
-        //         let create = gen.map(|g| g.into_inner()).unwrap_or_default();
-        //         generate(&ops.holochain_path, dnas, num_conductors, create).await?
-        //     };
-        //     run_n(&ops.holochain_path, paths, ports, ops.force_admin_ports).await?;
-        // }
         Op::Call(call) => hc::calls::call(&ops.holochain_path, call).await?,
         // Op::Task => todo!("Running custom tasks is coming soon"),
         Op::List { verbose } => hc::save::list(std::env::current_dir()?, verbose)?,

@@ -22,8 +22,13 @@ pub fn force_admin_port(path: PathBuf, port: u16) -> anyhow::Result<()> {
 
 /// List the admin ports for each setup.
 pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
+    let live_ports = crate::save::load_ports(std::env::current_dir()?)?;
     let mut ports = Vec::new();
-    for p in paths {
+    for (p, port) in paths.into_iter().zip(live_ports) {
+        if let Some(port) = port {
+            ports.push(port);
+            continue;
+        }
         if let Some(config) = read_config(p)? {
             if let Some(ai) = config.admin_interfaces {
                 if let Some(AdminInterfaceConfig {
