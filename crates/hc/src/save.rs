@@ -142,7 +142,7 @@ pub async fn lock_live(mut hc_dir: PathBuf, path: &Path, port: u16) -> anyhow::R
 }
 
 /// For each registered setup, if it has a lockfile, return the port of the running conductor,
-/// otherwise return None. 
+/// otherwise return None.
 /// The resulting Vec has the same number of elements as lines in the `.hc` file
 pub fn load_ports(hc_dir: PathBuf) -> anyhow::Result<Vec<Option<u16>>> {
     let mut ports = Vec::new();
