@@ -96,7 +96,7 @@ pub struct AgentInfo {
 /// Extra info that is not used by the bootstrap server.
 pub struct AgentMetaInfo {
     /// The half length of the [`DhtArc`]
-    pub dht_arc_half_length: u32,
+    pub dht_storage_arc_half_length: u32,
 }
 
 impl std::convert::TryFrom<&AgentInfoSigned> for AgentInfo {
@@ -141,7 +141,7 @@ impl AgentInfo {
             urls,
             signed_at_ms,
             expires_after_ms,
-            meta_info: Vec::new(),
+            meta_info: Vec::with_capacity(0),
         }
     }
 
@@ -220,7 +220,7 @@ mod tests {
         };
         let info = agent
             .with_meta_info(AgentMetaInfo {
-                dht_arc_half_length: 10,
+                dht_storage_arc_half_length: 10,
             })
             .unwrap();
         let mut data = Vec::new();
@@ -228,6 +228,6 @@ mod tests {
         let result: AgentInfo = kitsune_p2p_types::codec::rmp_decode(&mut &data[..]).unwrap();
         assert_eq!(result, info);
         let meta = result.meta_info().unwrap();
-        assert_eq!(meta.dht_arc_half_length, 10);
+        assert_eq!(meta.dht_storage_arc_half_length, 10);
     }
 }
