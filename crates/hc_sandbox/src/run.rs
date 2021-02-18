@@ -43,6 +43,7 @@ pub async fn run(
         )
         .await?;
     }
+    crate::save::lock_live(std::env::current_dir()?, &sandbox_path, port).await?;
     msg!("Connected successfully to a running holochain");
     let e = format!("Failed to run holochain at {}", sandbox_path.display());
 

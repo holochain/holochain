@@ -295,9 +295,11 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                     .collect::<Vec<_>>();
 
                 let info: kitsune_p2p::agent_store::AgentInfo = (&info).try_into().unwrap();
-                let this_agent = agents.iter().find(|a| *info.as_agent_ref() == a.1).unwrap();
+                let this_agent = agents.iter().find(|a| *info.as_agent_ref() == a.1);
                 let this_dna = dnas.iter().find(|d| *info.as_space_ref() == d.1).unwrap();
-                writeln!(out, "This Agent {:?} is {:?}", this_agent.0, this_agent.1)?;
+                if let Some(this_agent) = this_agent {
+                    writeln!(out, "This Agent {:?} is {:?}", this_agent.0, this_agent.1)?;
+                }
                 writeln!(out, "This DNA {:?} is {:?}", this_dna.0, this_dna.1)?;
 
                 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
