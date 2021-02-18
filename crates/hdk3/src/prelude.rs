@@ -23,8 +23,6 @@ pub use crate::entry::EntryDefRegistration;
 pub use crate::entry_def;
 pub use crate::entry_def_index;
 pub use crate::entry_defs;
-pub use crate::entry_interface;
-pub use crate::guest_callback::entry_defs::EntryDefRegistration;
 pub use crate::hash_path::anchor::anchor;
 pub use crate::hash_path::anchor::get_anchor;
 pub use crate::hash_path::anchor::list_anchor_addresses;
