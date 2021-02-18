@@ -18,15 +18,15 @@ use crate::prelude::*;
 /// There is no guarantee that any CapClaim is currently usable without trying it.
 /// The author of the corresponding CapGrant can revoke it at any time or be unreachable on the network.
 ///
-/// Any `call_remote` will return a `ZomeCallResponse::Unauthorized` when the grantor considers the
+/// Any [`call_remote`] will return a `ZomeCallResponse::Unauthorized` when the grantor considers the
 /// secret invalid for the call. The caller is expected to handle this gracefully.
 ///
 /// If the author of the CapGrant is reachable on the network and has not revoked the grant they will allow any
 /// agent with a valid secret and pubkey to `call_remote` externs on the grant author's machine.
 ///
-/// Functions executed on the grant author's machine that change the grantor's source chain will be signed by
-/// the grantor.
-/// Delegating responsibility to grantee claimants is a serious responsibility!
+/// Commits to the grantor's source chain will be signed by the grantor, even if initiated.
+/// by a claimant.
+/// Delegating agency to grantee claimants is a serious responsibility!
 ///
 /// @see CapClaim
 /// @see other cap grant functions
@@ -45,7 +45,7 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<HeaderHa
 /// Capability grants are explicit entries in the local source chain that grant access to functions running in the current conductor.
 /// The grant must be sent (e.g. with a remote call) to the grantees so they can commit a claim and then call back with it in the future.
 ///
-/// When an agent wants to expose externs to be called remotely by other agents they need to select
+/// When an agent wants to expose zome functions to be called remotely by other agents they need to select
 /// a security model and probably generate a secret.
 ///
 /// The input needs to evalute to a `ZomeCallCapGrant` struct which defines the tag, access and
@@ -57,12 +57,14 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<HeaderHa
 /// recipient chain when a `CapGrant` is committed and shared. The tags are not checked or compared
 /// in any security sensitive contexts.
 ///
-/// Provided the grant author agent is is reachable on the network:
+/// Provided the grant author agent is reachable on the network:
 ///
-/// - The author always has access to all their own extern calls, bypassing `CapAccess`
 /// - Unrestricted access means any external agent can call the extern
 /// - Transferable access means any external agent with a valid secret can call the extern
 /// - Assigned access means only explicitly approved agents with a valid secret can call the extern
+
+The authoring agent itself always has an implicit capability which grants access to its own externs,
+and needs no special capability grant.
 ///
 /// All logic runs on the author agent's machine against their own source chain:
 ///

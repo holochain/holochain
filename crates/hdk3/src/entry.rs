@@ -10,9 +10,10 @@ use crate::prelude::*;
 /// Usually you don't need to use this function directly; it is the most general way to create an
 /// entry and standardises the internals of higher level create functions.
 ///
-/// @see create_entry
-/// @see create_cap_grant
-/// @see create_cap_claim
+### See
+/// [`create_entry`]
+/// [`create_cap_grant`]
+/// [`create_cap_claim`]
 pub fn create(entry_def_with_id: EntryWithDefId) -> ExternResult<HeaderHash> {
     host_call::<EntryWithDefId, HeaderHash>(__create, entry_def_with_id)
 }
