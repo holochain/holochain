@@ -608,7 +608,7 @@ pub mod test {
             .active_apps
             .get("test app")
             .unwrap()
-            .cells()
+            .all_cells()
             .cloned()
             .collect();
 
@@ -658,7 +658,7 @@ pub mod test {
             .inactive_apps
             .get("test app")
             .unwrap()
-            .cells()
+            .all_cells()
             .cloned()
             .collect();
 

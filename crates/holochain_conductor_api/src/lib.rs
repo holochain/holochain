@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 mod admin_interface;
 mod app_interface;
 pub mod config;

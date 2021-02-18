@@ -238,7 +238,7 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
         }
         AdminRequestCli::InstallAppBundle(args) => {
             let app = install_app_bundle(cmd, args).await?;
-            let cells: Vec<_> = app.cells().collect();
+            let cells: Vec<_> = app.all_cells().collect();
             msg!(
                 "Installed App: {} with cells {:?}",
                 app.installed_app_id(),

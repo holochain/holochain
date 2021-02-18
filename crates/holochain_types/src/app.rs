@@ -343,7 +343,7 @@ impl InstalledApp {
     }
 
     /// Iterator of all cells, both provisioned and cloned
-    pub fn cells(&self) -> impl Iterator<Item = &CellId> {
+    pub fn all_cells(&self) -> impl Iterator<Item = &CellId> {
         self.provisioned_cells()
             .map(|(_, c)| c)
             .chain(self.cloned_cells())
@@ -425,6 +425,11 @@ impl AppSlot {
     }
 
     /// Accessor
+    pub fn cell_id(&self) -> &CellId {
+        &self.base_cell_id
+    }
+
+    /// Accessor
     pub fn dna_hash(&self) -> &DnaHash {
         &self.base_cell_id.dna_hash()
     }
@@ -500,7 +505,7 @@ mod tests {
 
         assert_eq!(
             app.cloned_cells().collect::<HashSet<_>>(),
-            app.cells().collect::<HashSet<_>>()
+            app.all_cells().collect::<HashSet<_>>()
         );
     }
 }

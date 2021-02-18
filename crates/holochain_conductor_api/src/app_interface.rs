@@ -131,6 +131,15 @@ pub struct InstalledAppInfo {
 
 impl InstalledAppInfo {
     pub fn from_installed_app(app: &InstalledApp, active: bool) -> Self {
-        todo!("implement")
+        let installed_app_id = app.installed_app_id().clone();
+        let cell_data = app
+            .provisioned_cells()
+            .map(|(nick, id)| InstalledCell::new(id.clone(), nick.clone()))
+            .collect();
+        Self {
+            installed_app_id,
+            cell_data,
+            active,
+        }
     }
 }

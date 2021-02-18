@@ -41,7 +41,7 @@ async fn can_update_state() {
     let state = conductor.get_state().await.unwrap();
     assert_eq!(
         state.inactive_apps.values().collect::<Vec<_>>()[0]
-            .cells()
+            .all_cells()
             .collect::<Vec<_>>()
             .as_slice(),
         &[&cell_id]

@@ -475,7 +475,7 @@ where
                 async move {
                     // Only create cells not already created
                     let cells_to_create = app
-                        .cells()
+                        .all_cells()
                         .filter(|cell_id| !self.cells.contains_key(cell_id))
                         .map(|cell_id| {
                             (
@@ -620,7 +620,7 @@ where
             .get(&installed_app_id)
             .expect("This app was just put here")
             .clone()
-            .cells()
+            .all_cells()
             .cloned()
             .collect())
     }
