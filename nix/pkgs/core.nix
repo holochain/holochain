@@ -13,8 +13,8 @@ rec {
     export RUST_BACKTRACE=1
 
     # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=4
-    export CARGO_BUILD_JOBS=4
+    export NUM_JOBS=8
+    export CARGO_BUILD_JOBS=8
 
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
