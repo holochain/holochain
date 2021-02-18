@@ -12,6 +12,10 @@ rec {
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
+    # limit parallel jobs to reduce memory consumption
+    export NUM_JOBS=4
+    export CARGO_BUILD_JOBS=4
+
     # ensure plain build works
     cargo build --no-default-features --manifest-path=crates/holochain/Cargo.toml
 
