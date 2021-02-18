@@ -87,6 +87,9 @@ pub enum ConductorApiError {
 
     #[error(transparent)]
     AppBundleError(#[from] AppBundleError),
+
+    #[error(transparent)]
+    JsonDumpError(#[from] serde_json::Error),
 }
 
 /// All the serialization errors that can occur

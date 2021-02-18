@@ -118,7 +118,7 @@ use structopt::StructOpt;
 /// and development purposes, make direct admin calls to running conductors,
 /// and more.
 #[derive(Debug, StructOpt)]
-#[structopt(setting = structopt::clap::AppSettings::InferSubcommands)
+#[structopt(setting = structopt::clap::AppSettings::InferSubcommands)]
 pub enum Opt {
     /// Work with hApp bundles
     App(hc_bundle::HcAppBundle),

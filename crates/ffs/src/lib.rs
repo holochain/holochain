@@ -37,8 +37,8 @@ macro_rules! impl_ffs {
             use super::*;
             $(
                 pub fn $name<P: Clone + AsRef<std::path::Path>>(path: P $(, $arg : $arg_ty)*) -> IoResult<$output> {
-                    let err_path = path.as_ref();
-                    let mapper = move |e| IoError::new(e, err_path.to_owned());
+                    let err_path = path.clone();
+                    let mapper = move |e| IoError::new(e, err_path.as_ref().to_owned());
                     return std::fs::$name(path $(, $arg)*).map_err(mapper);
                 }
             )*

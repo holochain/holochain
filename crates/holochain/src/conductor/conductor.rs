@@ -30,6 +30,7 @@ use super::manager::spawn_task_manager;
 use super::manager::ManagedTaskAdd;
 use super::manager::ManagedTaskHandle;
 use super::manager::TaskManagerRunHandle;
+use super::p2p_store;
 use super::p2p_store::all_agent_infos;
 use super::p2p_store::get_single_agent_info;
 use super::p2p_store::inject_agent_infos;
@@ -45,12 +46,14 @@ use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::InitialQueueTriggers;
+use crate::core::workflow::integrate_dht_ops_workflow;
 pub use builder::*;
 use fallible_iterator::FallibleIterator;
 use futures::future;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holo_hash::DnaHash;
+use holochain_conductor_api::JsonDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::KeystoreSender;
@@ -810,7 +813,20 @@ where
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.env();
         let source_chain = SourceChainBuf::new(arc.clone().into())?;
-        Ok(source_chain.dump_as_json().await?)
+
+        let peer_dump = p2p_store::dump_state(self.p2p_env.clone().into(), Some(cell_id.clone()))?;
+        let source_chain_dump = source_chain.dump_state().await?;
+        let integration_dump = integrate_dht_ops_workflow::dump_state(arc.clone().into())?;
+
+        let out = JsonDump {
+            peer_dump,
+            source_chain_dump,
+            integration_dump,
+        };
+        // Add summary
+        let summary = out.to_string();
+        let out = (out, summary);
+        Ok(serde_json::to_string_pretty(&out)?)
     }
 
     pub(super) fn p2p_env(&self) -> EnvironmentWrite {

@@ -57,6 +57,7 @@ use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
+use holochain_conductor_api::InstalledAppInfo;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
@@ -204,7 +205,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn get_app_info(
         &self,
         installed_app_id: &InstalledAppId,
-    ) -> ConductorResult<Option<InstalledApp>>;
+    ) -> ConductorResult<Option<InstalledAppInfo>>;
 
     /// Add signed agent info to the conductor
     async fn add_agent_infos(&self, agent_infos: Vec<AgentInfoSigned>) -> ConductorApiResult<()>;
@@ -580,15 +581,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn get_app_info(
         &self,
         installed_app_id: &InstalledAppId,
-    ) -> ConductorResult<Option<InstalledApp>> {
+    ) -> ConductorResult<Option<InstalledAppInfo>> {
         Ok(self
             .conductor
             .read()
             .await
             .get_state()
             .await?
-            .get_app_info(installed_app_id)
-            .cloned())
+            .get_app_info(installed_app_id))
     }
 
     async fn add_agent_infos(&self, agent_infos: Vec<AgentInfoSigned>) -> ConductorApiResult<()> {

@@ -473,12 +473,11 @@ mod test {
             vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
         )
         .unwrap();
-        let path_install_payload: InstallAppPayload = InstallAppPayload {
+        let path_install_payload = InstallAppPayload {
             dnas: vec![path_payload],
             installed_app_id: "test-by-path".to_string(),
             agent_key: agent_key2,
-        }
-        .into();
+        };
 
         let install_response = admin_api
             .handle_admin_request(AdminRequest::InstallApp(Box::new(path_install_payload)))
