@@ -73,6 +73,7 @@ async fn app_ids_are_unique() {
     let app = InstalledApp {
         installed_app_id: "id".to_string(),
         cell_data: vec![installed_cell],
+        active: false,
     };
 
     conductor.add_inactive_app_to_db(app.clone()).await.unwrap();
