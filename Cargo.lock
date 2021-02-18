@@ -1506,6 +1506,7 @@ dependencies = [
  "holo_hash",
  "holochain_p2p",
  "holochain_serialized_bytes",
+ "holochain_state",
  "holochain_types",
  "holochain_zome_types",
  "kitsune_p2p",

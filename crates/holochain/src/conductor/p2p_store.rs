@@ -3,6 +3,8 @@
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
+use holochain_conductor_api::AgentInfoDump;
+use holochain_conductor_api::P2pStateDump;
 use holochain_lmdb::buffer::KvStore;
 use holochain_lmdb::buffer::KvStoreT;
 use holochain_lmdb::db::GetDb;
@@ -16,6 +18,7 @@ use holochain_lmdb::key::BufKey;
 use holochain_lmdb::prelude::Readable;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
+use holochain_zome_types::CellId;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::sync::Arc;
@@ -317,6 +320,78 @@ pub fn put_agent_info_signed(
             &agent_info_signed,
         )
     })?)
+}
+
+/// Dump the agents currently in the peer store
+pub fn dump_state(env: EnvironmentRead, cell_id: Option<CellId>) -> DatabaseResult<P2pStateDump> {
+    use std::fmt::Write;
+    let cell_id = cell_id.map(|c| c.into_dna_and_agent()).map(|c| {
+        (
+            (c.0.clone(), holochain_p2p::space_holo_to_kit(c.0)),
+            (c.1.clone(), holochain_p2p::agent_holo_to_kit(c.1)),
+        )
+    });
+    let agent_infos = all_agent_infos(env)?;
+    let agent_infos =
+        agent_infos.into_iter().filter_map(
+            |a| match kitsune_p2p::agent_store::AgentInfo::try_from(&a) {
+                Ok(a) => match &cell_id {
+                    Some((s, _)) => {
+                        if s.1 == *a.as_space_ref() {
+                            Some(a)
+                        } else {
+                            None
+                        }
+                    }
+                    None => Some(a),
+                },
+                Err(e) => {
+                    tracing::error!(failed_to_deserialize_agent_info = ?e);
+                    None
+                }
+            },
+        );
+    let mut this_agent_info = None;
+    let mut peers = Vec::new();
+    for info in agent_infos {
+        let mut dump = String::new();
+
+        use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+        let duration = Duration::milliseconds(info.signed_at_ms() as i64);
+        let s = duration.num_seconds() as i64;
+        let n = duration.clone().to_std().unwrap().subsec_nanos();
+        let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
+        let exp = dt + Duration::milliseconds(info.expires_after_ms() as i64);
+        let now = Utc::now();
+
+        writeln!(dump, "signed at {}", dt).ok();
+        writeln!(
+            dump,
+            "expires at {} in {}mins",
+            exp,
+            (exp - now).num_minutes()
+        )
+        .ok();
+        writeln!(dump, "urls: {:?}", info.as_urls_ref()).ok();
+        let info = AgentInfoDump {
+            kitsune_agent: info.as_agent_ref().clone(),
+            kitsune_space: info.as_space_ref().clone(),
+            dump,
+        };
+        match &cell_id {
+            Some((s, a)) if info.kitsune_agent == a.1 && info.kitsune_space == s.1 => {
+                this_agent_info = Some(info);
+            }
+            None | Some(_) => peers.push(info),
+        }
+    }
+
+    Ok(P2pStateDump {
+        this_agent_info,
+        this_dna: cell_id.clone().map(|(s, _)| s),
+        this_agent: cell_id.clone().map(|(_, a)| a),
+        peers,
+    })
 }
 
 #[cfg(test)]
