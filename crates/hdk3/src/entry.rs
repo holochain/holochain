@@ -10,7 +10,7 @@ use crate::prelude::*;
 /// Usually you don't need to use this function directly; it is the most general way to create an
 /// entry and standardises the internals of higher level create functions.
 ///
-### See
+/// ### See
 /// [`create_entry`]
 /// [`create_cap_grant`]
 /// [`create_cap_claim`]
