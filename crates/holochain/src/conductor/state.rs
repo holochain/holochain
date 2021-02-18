@@ -52,13 +52,17 @@ impl ConductorState {
     /// Retrieve info about an installed App by its InstalledAppId
     #[allow(clippy::ptr_arg)]
     pub fn get_app_info(&self, installed_app_id: &InstalledAppId) -> Option<InstalledApp> {
-        self.active_apps
-            .get(installed_app_id)
-            .or_else(|| self.inactive_apps.get(installed_app_id))
-            .map(|cell_data| InstalledApp {
-                installed_app_id: installed_app_id.clone(),
-                cell_data: cell_data.clone(),
-            })
+        let mut active = true;
+        let mut maybe_cell_data = self.active_apps.get(installed_app_id);
+        if maybe_cell_data.is_none() {
+            active = false;
+            maybe_cell_data = self.inactive_apps.get(installed_app_id);
+        }
+        maybe_cell_data.map(|cell_data| InstalledApp {
+            installed_app_id: installed_app_id.clone(),
+            cell_data: cell_data.clone(),
+            active,
+        })
     }
 
     /// Returns the interface configuration with the given ID if present
