@@ -731,6 +731,8 @@ pub mod test {
             setup_admin_fake_cells(vec![(cell_id.clone(), None)], dna_store).await;
         let conductor_handle = activate(conductor_handle).await;
         let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
+        // Allow agents time to join
+        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
 
         // Get state
         let expected = conductor_handle.dump_cell_state(&cell_id).await.unwrap();
