@@ -171,6 +171,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let app = InstalledApp {
                     installed_app_id,
                     cell_data,
+                    active: false,
                 };
                 Ok(AdminResponse::AppInstalled(app))
             }
@@ -461,6 +462,7 @@ mod test {
         let expected_cell_ids = InstalledApp {
             installed_app_id: "test-by-path".to_string(),
             cell_data: vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
+            active: false,
         };
         let path_install_payload = InstallAppPayload {
             dnas: vec![path_payload],
