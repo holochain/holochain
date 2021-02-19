@@ -18,7 +18,7 @@ use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 use std::convert::TryFrom;
 
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::stream::StreamExt;
@@ -30,7 +30,7 @@ use url2::url2;
 /// Number of signals in buffer before applying
 /// back pressure.
 pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
-const MAX_CONNECTIONS: usize = 400;
+const MAX_CONNECTIONS: isize = 400;
 
 /// Create a WebsocketListener to be used in interfaces
 pub async fn spawn_websocket_listener(
@@ -63,7 +63,7 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
             handle.close_on(async move { stop_rx.recv().await.map(|_| true).unwrap_or(true) }),
         );
 
-        let num_connections = Arc::new(AtomicUsize::new(0));
+        let num_connections = Arc::new(AtomicIsize::new(0));
         futures::pin_mut!(listener);
         // establish a new connection to a client
         while let Some(connection) = listener.next().await {
@@ -141,7 +141,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
 async fn recv_incoming_admin_msgs<A: InterfaceApi>(
     api: A,
     mut rx_from_iface: WebsocketReceiver,
-    num_connections: Arc<AtomicUsize>,
+    num_connections: Arc<AtomicIsize>,
 ) {
     while let Some(msg) = rx_from_iface.next().await {
         match handle_incoming_message(msg, api.clone()).await {
@@ -151,18 +151,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
             Ok(()) => {}
         }
     }
-    // Do an atomic checked sub.
-    // This can still fail to decrement but won't overflow.
-    // This is ok because we really only need a rough idea if of the number of connections
-    // and failing to decrement should be rare.
-    let old_value = num_connections.load(Ordering::SeqCst);
-    if old_value > 0 {
-        let prev_value =
-            num_connections.compare_and_swap(old_value, old_value - 1, Ordering::SeqCst);
-        if prev_value != old_value {
-            warn!(msg = "Websocket didn't successfully decrement connections on close");
-        }
-    }
+    num_connections.fetch_sub(1, Ordering::SeqCst);
 }
 
 /// Polls for messages coming in from the external client while simultaneously
