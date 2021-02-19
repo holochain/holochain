@@ -660,7 +660,7 @@ where
     pub(super) async fn add_clone_cell_to_app(
         &mut self,
         installed_app_id: &InstalledAppId,
-        cell_nick: &CellNick,
+        slot_id: &SlotId,
         properties: YamlProperties,
     ) -> ConductorResult<CellId> {
         let (_, child_dna) = self
@@ -668,8 +668,8 @@ where
                 if let Some(app) = state.active_apps.get_mut(installed_app_id) {
                     let slot = app
                         .slots()
-                        .get(cell_nick)
-                        .ok_or_else(|| AppError::CellNickMissing(cell_nick.to_owned()))?;
+                        .get(slot_id)
+                        .ok_or_else(|| AppError::SlotIdMissing(slot_id.to_owned()))?;
                     let parent_dna_hash = slot.dna_hash();
                     let dna = self
                         .dna_store
@@ -687,9 +687,9 @@ where
         let (_, cell_id) = self
             .update_state_prime(|mut state| {
                 if let Some(app) = state.active_apps.get_mut(installed_app_id) {
-                    let agent_key = app.slot(cell_nick)?.agent_key().to_owned();
+                    let agent_key = app.slot(slot_id)?.agent_key().to_owned();
                     let cell_id = CellId::new(child_dna_hash, agent_key);
-                    app.add_clone(cell_nick, cell_id.clone())?;
+                    app.add_clone(slot_id, cell_id.clone())?;
                     Ok((state, cell_id))
                 } else {
                     Err(ConductorError::AppNotActive(installed_app_id.clone()))
