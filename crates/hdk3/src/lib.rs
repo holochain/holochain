@@ -1,6 +1,6 @@
 //! ## Holochain Development Kit 3.0 (HDK3)
 //!
-//! This is the third major iteration of the holochaind development kit.
+//! This is the third major iteration of the Holochain Development Kit.
 //!
 //! The HDK3 exists to make working with WASM in holochain much easier.
 //!
