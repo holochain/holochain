@@ -167,7 +167,7 @@ async fn cell_nicks_are_unique() {
     let result = InstalledApp::new_legacy("id", cells.into_iter());
     matches::assert_matches!(
         result,
-        Err(AppError::DuplicateCellNicks(_, nicks)) if nicks == vec!["1".to_string()]
+        Err(AppError::DuplicateSlotIds(_, nicks)) if nicks == vec!["1".to_string()]
     );
 }
 

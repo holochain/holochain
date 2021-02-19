@@ -2,7 +2,7 @@ use std::io::Write;
 use std::{io, path::PathBuf};
 
 use holochain_types::prelude::{
-    AppBundle, AppManifest, AppManifestCurrentBuilder, DnaBundle, DnaManifest,
+    AppBundle, AppManifest, AppManifestCurrentBuilder, AppSlotManifest, DnaBundle, DnaManifest,
 };
 
 fn readline(prompt: Option<&str>) -> io::Result<Option<String>> {
@@ -51,10 +51,11 @@ fn prompt_dna_init(root_dir: PathBuf) -> anyhow::Result<DnaBundle> {
 fn prompt_app_init(root_dir: PathBuf) -> anyhow::Result<AppBundle> {
     let name = prompt_required("name:")?;
     let description = prompt_optional("description:")?;
+    let slot = AppSlotManifest::sample("sample-slot".into());
     let manifest: AppManifest = AppManifestCurrentBuilder::default()
         .name(name)
         .description(description.unwrap_or_else(|| "".into()))
-        .slots(vec![])
+        .slots(vec![slot])
         .build()
         .unwrap()
         .into();

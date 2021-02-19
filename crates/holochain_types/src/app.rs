@@ -32,7 +32,11 @@ use self::error::{AppError, AppResult};
 pub type InstalledAppId = String;
 
 /// A friendly (nick)name used by UIs to refer to the Cells which make up the app
+#[deprecated = "Remove when InstallApp goes away; use SlotId instead"]
 pub type CellNick = String;
+
+/// Identifier for an AppSlot
+pub type SlotId = String;
 
 /// The source of the DNA to be installed, either as binary data, or from a path
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -69,9 +73,9 @@ pub struct CreateCloneCellPayload {
     pub agent_key: AgentPubKey,
     /// The App with which to associate the newly created Cell
     pub installed_app_id: InstalledAppId,
-    /// The CellNick under which to create this clone
+    /// The SlotId under which to create this clone
     /// (needed to track cloning permissions and `clone_count`)
-    pub cell_nick: CellNick,
+    pub slot_id: SlotId,
     /// Proof-of-membership, if required by this DNA
     pub membrane_proof: Option<MembraneProof>,
 }
@@ -246,7 +250,7 @@ pub type InstalledAppMap = automap::AutoHashMap<InstalledApp>;
 
 impl InstalledApp {
     /// Constructor
-    pub fn new<S: ToString, I: IntoIterator<Item = (CellNick, AppSlot)>>(
+    pub fn new<S: ToString, I: IntoIterator<Item = (SlotId, AppSlot)>>(
         installed_app_id: S,
         _agent_key: AgentPubKey,
         slots: I,
@@ -296,7 +300,7 @@ impl InstalledApp {
             .filter_map(|(nick, count)| if count > 1 { Some(nick) } else { None })
             .collect();
         if !duplicates.is_empty() {
-            return Err(AppError::DuplicateCellNicks(installed_app_id, duplicates));
+            return Err(AppError::DuplicateSlotIds(installed_app_id, duplicates));
         }
 
         let slots = installed_cells
@@ -324,14 +328,14 @@ impl InstalledApp {
     }
 
     /// Accessor
-    pub fn provisioned_cells(&self) -> impl Iterator<Item = (&CellNick, &CellId)> {
+    pub fn provisioned_cells(&self) -> impl Iterator<Item = (&SlotId, &CellId)> {
         self.slots
             .iter()
             .filter_map(|(nick, slot)| slot.provisioned_cell().map(|c| (nick, c)))
     }
 
     /// Accessor
-    pub fn into_provisioned_cells(self) -> impl Iterator<Item = (CellNick, CellId)> {
+    pub fn into_provisioned_cells(self) -> impl Iterator<Item = (SlotId, CellId)> {
         self.slots
             .into_iter()
             .filter_map(|(nick, slot)| slot.into_provisioned_cell().map(|c| (nick, c)))
@@ -350,20 +354,20 @@ impl InstalledApp {
     }
 
     /// Accessor for particular slot
-    pub fn slot(&self, cell_nick: &CellNick) -> AppResult<&AppSlot> {
+    pub fn slot(&self, slot_id: &SlotId) -> AppResult<&AppSlot> {
         self.slots
-            .get(cell_nick)
-            .ok_or_else(|| AppError::CellNickMissing(cell_nick.clone()))
+            .get(slot_id)
+            .ok_or_else(|| AppError::SlotIdMissing(slot_id.clone()))
     }
 
-    fn slot_mut(&mut self, cell_nick: &CellNick) -> AppResult<&mut AppSlot> {
+    fn slot_mut(&mut self, slot_id: &SlotId) -> AppResult<&mut AppSlot> {
         self.slots
-            .get_mut(cell_nick)
-            .ok_or_else(|| AppError::CellNickMissing(cell_nick.clone()))
+            .get_mut(slot_id)
+            .ok_or_else(|| AppError::SlotIdMissing(slot_id.clone()))
     }
 
     /// Accessor
-    pub fn slots(&self) -> &HashMap<CellNick, AppSlot> {
+    pub fn slots(&self) -> &HashMap<SlotId, AppSlot> {
         &self.slots
     }
 
@@ -373,8 +377,8 @@ impl InstalledApp {
     }
 
     /// Add a cloned cell
-    pub fn add_clone(&mut self, cell_nick: &CellNick, cell_id: CellId) -> AppResult<()> {
-        let slot = self.slot_mut(cell_nick)?;
+    pub fn add_clone(&mut self, slot_id: &SlotId, cell_id: CellId) -> AppResult<()> {
+        let slot = self.slot_mut(slot_id)?;
         assert_eq!(
             cell_id.agent_pubkey(),
             slot.agent_key(),
@@ -388,8 +392,8 @@ impl InstalledApp {
     }
 
     /// Remove a cloned cell
-    pub fn remove_clone(&mut self, cell_nick: &CellNick, cell_id: &CellId) -> AppResult<bool> {
-        let slot = self.slot_mut(cell_nick)?;
+    pub fn remove_clone(&mut self, slot_id: &SlotId, cell_id: &CellId) -> AppResult<bool> {
+        let slot = self.slot_mut(slot_id)?;
         Ok(slot.clones.remove(cell_id))
     }
 }
@@ -472,18 +476,18 @@ mod tests {
         let new_clone = || CellId::new(fixt!(DnaHash), agent.clone());
         let slot1 = AppSlot::new(base_cell_id, false, 3);
         let agent = fixt!(AgentPubKey);
-        let nick: CellNick = "nick".into();
-        let mut app = InstalledApp::new("app", agent.clone(), vec![(nick.clone(), slot1)]);
+        let slot_id: SlotId = "slot_id".into();
+        let mut app = InstalledApp::new("app", agent.clone(), vec![(slot_id.clone(), slot1)]);
 
         // Can add clones up to the limit
         let clones: Vec<_> = vec![new_clone(), new_clone(), new_clone()];
-        app.add_clone(&nick, clones[0].clone()).unwrap();
-        app.add_clone(&nick, clones[1].clone()).unwrap();
-        app.add_clone(&nick, clones[2].clone()).unwrap();
+        app.add_clone(&slot_id, clones[0].clone()).unwrap();
+        app.add_clone(&slot_id, clones[1].clone()).unwrap();
+        app.add_clone(&slot_id, clones[2].clone()).unwrap();
 
         // Adding a clone beyond the clone_limit is an error
         matches::assert_matches!(
-            app.add_clone(&nick, new_clone()),
+            app.add_clone(&slot_id, new_clone()),
             Err(AppError::CloneLimitExceeded(3, _))
         );
 
@@ -492,8 +496,8 @@ mod tests {
             maplit::hashset! { &clones[0], &clones[1], &clones[2] }
         );
 
-        assert_eq!(app.remove_clone(&nick, &clones[1]).unwrap(), true);
-        assert_eq!(app.remove_clone(&nick, &clones[1]).unwrap(), false);
+        assert_eq!(app.remove_clone(&slot_id, &clones[1]).unwrap(), true);
+        assert_eq!(app.remove_clone(&slot_id, &clones[1]).unwrap(), false);
 
         assert_eq!(
             app.cloned_cells().collect::<HashSet<_>>(),
@@ -502,7 +506,7 @@ mod tests {
 
         // Adding the same clone twice should probably be a panic, but if this
         // line is still here, I never got around to making it panic...
-        app.add_clone(&nick, clones[0].clone()).unwrap();
+        app.add_clone(&slot_id, clones[0].clone()).unwrap();
 
         assert_eq!(app.cloned_cells().count(), 2);
 

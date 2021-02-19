@@ -7,7 +7,7 @@ use super::{
     app_manifest_validated::{AppManifestValidated, AppSlotManifestValidated},
     error::{AppManifestError, AppManifestResult},
 };
-use crate::prelude::{CellNick, YamlProperties};
+use crate::prelude::{SlotId, YamlProperties};
 use holo_hash::{DnaHash, DnaHashB64};
 use std::collections::HashMap;
 
@@ -36,8 +36,8 @@ pub struct AppManifestV1 {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct AppSlotManifest {
-    /// The CellNick which will be given to the installed Cell for this Dna.
-    pub(super) nick: CellNick,
+    /// The SlotId which will be given to the installed Cell for this Dna.
+    pub(super) id: SlotId,
 
     /// Determines if, how, and when a Cell will be provisioned.
     pub(super) provisioning: Option<CellProvisioning>,
@@ -45,6 +45,17 @@ pub struct AppSlotManifest {
     /// Declares where to find the DNA, and options to modify it before
     /// inclusion in a Cell
     pub(super) dna: AppSlotDnaManifest,
+}
+
+impl AppSlotManifest {
+    /// Create a sample AppSlotManifest as a template to be followed
+    pub fn sample(id: SlotId) -> Self {
+        Self {
+            id,
+            provisioning: Some(CellProvisioning::default()),
+            dna: AppSlotDnaManifest::sample(),
+        }
+    }
 }
 
 /// The DNA portion of an app slot
@@ -75,6 +86,21 @@ pub struct AppSlotDnaManifest {
     /// Default: 0
     #[serde(default)]
     pub(super) clone_limit: u32,
+}
+
+impl AppSlotDnaManifest {
+    /// Create a sample AppSlotDnaManifest as a template to be followed
+    pub fn sample() -> Self {
+        Self {
+            location: Some(mr_bundle::Location::Bundled(
+                "./path/to/my/dnabundle.dna".into(),
+            )),
+            properties: None,
+            uuid: None,
+            version: None,
+            clone_limit: 0,
+        }
+    }
 }
 
 /// Allow the DNA version to be specified as a single hash, rather than a
@@ -167,7 +193,7 @@ impl AppManifestV1 {
             .into_iter()
             .map(
                 |AppSlotManifest {
-                     nick,
+                     id,
                      provisioning,
                      dna,
                  }| {
@@ -220,7 +246,7 @@ impl AppManifestV1 {
                             version: Self::require(version, "slots.dna.version")?,
                         },
                     };
-                    Ok((nick, validated))
+                    Ok((id, validated))
                 },
             )
             .collect::<Result<HashMap<_, _>, _>>()?;
@@ -264,7 +290,7 @@ pub mod tests {
         let version = DnaVersionSpec::from(hashes.clone()).into();
 
         let slots = vec![AppSlotManifest {
-            nick: "nick".into(),
+            id: "nick".into(),
             dna: AppSlotDnaManifest {
                 location,
                 properties: Some(YamlProperties::new(serde_yaml::to_value(props).unwrap())),
@@ -299,7 +325,7 @@ manifest_version: "1"
 name: "Test app"
 description: "Serialization roundtrip test"
 slots:
-  - nick: "nick"
+  - id: "nick"
     provisioning:
       strategy: "create"
       deferred: false
@@ -322,7 +348,7 @@ slots:
         // Check a handful of fields. Order matters in YAML, so to check the
         // entire structure would be too fragile for testing.
         let fields = &[
-            "slots[0].nick",
+            "slots[0].id",
             "slots[0].provisioning.deferred",
             "slots[0].dna.version[1]",
             "slots[0].dna.properties",

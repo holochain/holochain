@@ -435,7 +435,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             dna_hash,
             installed_app_id,
             agent_key,
-            cell_nick,
+            slot_id,
             membrane_proof,
         } = payload;
         {
@@ -448,7 +448,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             let mut conductor = self.conductor.write().await;
             let properties = properties.unwrap_or_else(|| ().into());
             let cell_id = conductor
-                .add_clone_cell_to_app(&installed_app_id, &cell_nick, properties)
+                .add_clone_cell_to_app(&installed_app_id, &slot_id, properties)
                 .await?;
             Ok(cell_id)
         }
