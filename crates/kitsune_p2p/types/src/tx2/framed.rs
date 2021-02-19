@@ -23,9 +23,14 @@ impl From<MsgId> for u64 {
 }
 
 impl MsgId {
-    /// Create a new Request-Type MsgId.
+    /// Create a new MsgId from a raw u64.
     pub fn new(v: u64) -> Self {
         Self(v)
+    }
+
+    /// Create a new notify-type MsgId.
+    pub fn new_notify() -> Self {
+        Self(0)
     }
 
     /// Get the inner raw value.
@@ -39,32 +44,47 @@ impl MsgId {
     }
 
     /// Get this Id as a request-type MsgId.
+    /// (will panic if `as_id() == 0`).
     pub fn as_req(&self) -> Self {
+        if self.as_id() == 0 {
+            panic!("MsgId::as_id() == 0 cannot be a request-type");
+        }
         Self(self.0 & R_FILT)
     }
 
     /// Get this Id as a response-type MsgId.
+    /// (will panic if `as_id() == 0`).
     pub fn as_res(&self) -> Self {
+        if self.as_id() == 0 {
+            panic!("MsgId::as_id() == 0 cannot be a response-type");
+        }
         Self(self.0 | R_MASK)
+    }
+
+    /// Is this MsgId a notify-type?
+    pub fn is_notify(&self) -> bool {
+        self.0 == 0
     }
 
     /// Is this MsgId a request-type?
     pub fn is_req(&self) -> bool {
-        self.0 & R_MASK == 0
+        self.0 != 0 && self.0 & R_MASK == 0
     }
 
     /// Is this MsgId a response-type?
     pub fn is_res(&self) -> bool {
-        self.0 & R_MASK > 0
+        self.0 != 0 && self.0 & R_MASK > 0
     }
 }
 
 impl std::fmt::Debug for MsgId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let is_notify = self.is_notify();
         let is_req = self.is_req();
         let is_res = self.is_res();
         let id = self.as_id();
         f.debug_struct("MsgId")
+            .field("is_notify", &is_notify)
             .field("is_req", &is_req)
             .field("is_res", &is_res)
             .field("id", &id)
@@ -72,14 +92,16 @@ impl std::fmt::Debug for MsgId {
     }
 }
 
+struct FramedReaderInner {
+    sub: Box<dyn futures::io::AsyncRead + 'static + Send + Unpin>,
+    local_buf: [u8; POOL_BUF_MAX_CAPACITY],
+}
+
 /// Efficiently read framed data from a sub AsyncRead instance.
 /// Note, this is intentionally not a Stream - as TryStreams are hard to work
 /// with, and we then would have no ability to pass individual timeout
 /// values to read operations.
-pub struct FramedReader {
-    sub: Box<dyn futures::io::AsyncRead + 'static + Send + Unpin>,
-    local_buf: [u8; POOL_BUF_MAX_CAPACITY],
-}
+pub struct FramedReader(Option<FramedReaderInner>);
 
 fn read_size(b: &[u8]) -> usize {
     let mut bytes = [0_u8; 4];
@@ -98,47 +120,67 @@ type RR = Vec<(MsgId, PoolBuf)>;
 impl FramedReader {
     /// Create a new FramedReader instance.
     pub fn new(sub: Box<dyn futures::io::AsyncRead + 'static + Send + Unpin>) -> Self {
-        Self {
+        Self(Some(FramedReaderInner {
             sub,
             local_buf: [0; POOL_BUF_MAX_CAPACITY],
-        }
+        }))
     }
 
     /// Read a frame of data from this FramedReader instance.
+    /// This returns a Vec in case the first read contains multiple small items.
     pub async fn read(&mut self, timeout: KitsuneTimeout) -> KitsuneResult<RR> {
-        timeout
-            .mix(async {
-                // TODO - starting with a naive impl here, see if it performs
+        let mut inner = match self.0.take() {
+            None => return Err(KitsuneError::Closed),
+            Some(inner) => inner,
+        };
 
+        let out = match timeout
+            .mix(async {
                 let mut read = 0;
 
                 while read < 4 + 8 {
-                    read += self
+                    read += inner
                         .sub
-                        .read(&mut self.local_buf[read..4 + 8])
+                        .read(&mut inner.local_buf[read..4 + 8])
                         .await
                         .map_err(KitsuneError::other)?;
                 }
 
-                let want_size = read_size(&self.local_buf[..4]) - 4 - 8;
-                let msg_id = read_msg_id(&self.local_buf[4..4 + 8]);
+                let want_size = read_size(&inner.local_buf[..4]) - 4 - 8;
+                let msg_id = read_msg_id(&inner.local_buf[4..4 + 8]);
 
                 let mut buf = BUF_POOL.acquire().await;
                 buf.reserve(want_size);
 
                 while buf.len() < want_size {
-                    let to_read = std::cmp::min(self.local_buf.len(), want_size - buf.len());
-                    read = self
+                    let to_read = std::cmp::min(inner.local_buf.len(), want_size - buf.len());
+                    read = match inner
                         .sub
-                        .read(&mut self.local_buf[..to_read])
+                        .read(&mut inner.local_buf[..to_read])
                         .await
-                        .map_err(KitsuneError::other)?;
-                    buf.extend_from_slice(&self.local_buf[..read]);
+                        .map_err(KitsuneError::other)
+                    {
+                        Err(e) => {
+                            BUF_POOL.release(buf).await;
+                            return Err(e);
+                        }
+                        Ok(read) => read,
+                    };
+                    buf.extend_from_slice(&inner.local_buf[..read]);
                 }
 
                 Ok(vec![(msg_id, buf)])
             })
             .await
+        {
+            Err(e) => {
+                return Err(e);
+            }
+            Ok(out) => out,
+        };
+
+        self.0 = Some(inner);
+        Ok(out)
     }
 }
 
@@ -223,39 +265,55 @@ mod tests {
     #[test]
     fn test_msgid() {
         let req = MsgId::new(1);
+        println!("{:?}", req);
 
         // make sure it starts out as a req
+        assert!(!req.is_notify());
         assert!(req.is_req());
         assert!(!req.is_res());
         assert_eq!(1, req.as_id());
 
         // make sure as_req doesn't toggle
         let req = req.as_req();
+        assert!(!req.is_notify());
         assert!(req.is_req());
         assert!(!req.is_res());
         assert_eq!(1, req.as_id());
 
         // make sure as_res works
         let res = req.as_res();
+        println!("{:?}", res);
+
+        assert!(!res.is_notify());
         assert!(res.is_res());
         assert!(!res.is_req());
         assert_eq!(1, res.as_id());
 
         // make sure as_res doesn't toggle
         let res = res.as_res();
+        assert!(!res.is_notify());
         assert!(res.is_res());
         assert!(!res.is_req());
         assert_eq!(1, res.as_id());
 
         // make sure as_req works
         let req = res.as_req();
+        assert!(!req.is_notify());
         assert!(req.is_req());
         assert!(!req.is_res());
         assert_eq!(1, req.as_id());
+
+        // make sure new_notify works
+        let not = MsgId::new_notify();
+        println!("{:?}", not);
+        assert!(not.is_notify());
+        assert!(!not.is_req());
+        assert!(!not.is_res());
+        assert_eq!(0, not.as_id());
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn play() {
+    async fn test_framed() {
         let (send, recv) = util::bound_async_mem_channel(4096).await;
         let mut send = FramedWriter::new(send);
         let mut recv = FramedReader::new(recv);

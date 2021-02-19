@@ -22,6 +22,7 @@ once_cell = "1.4"
 paste = "1.0.3"
 rmp-serde = "0.14"
 serde = { version = "1", features = [ "derive", "rc" ] }
+serde_bytes = "0.11"
 serde_json = { version = "1", features = [ "preserve_order" ] }
 sysinfo = "0.15.9"
 thiserror = "1.0.22"
@@ -38,4 +39,8 @@ harness = false
 
 [[bench]]
 name = "framed"
+harness = false
+
+[[bench]]
+name = "codec"
 harness = false

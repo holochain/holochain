@@ -13,7 +13,8 @@ pub(crate) const POOL_BUF_MAX_CAPACITY: usize = 4096;
 /// We avoid allocation by returning used buffers to a pool for later re-use.
 ///
 /// We avoid initialization by using `extend_from_slice()`.
-pub struct PoolBuf(Vec<u8>);
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct PoolBuf(#[serde(with = "serde_bytes")] Vec<u8>);
 
 impl PoolBuf {
     /// Create a new PoolBuf.
