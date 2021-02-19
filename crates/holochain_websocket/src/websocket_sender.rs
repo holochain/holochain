@@ -63,6 +63,15 @@ pub(crate) struct RegisterResponse {
     respond: tokio::sync::oneshot::Sender<Option<SerializedBytes>>,
 }
 
+#[derive(Debug)]
+/// If when the response future is finished (or dropped) the response
+/// hasn't arrived then on drop this will remove the stale request.
+pub(crate) struct StaleRequest(bool, TxToWebsocket, u64);
+pub(crate) type TxStaleRequest = tokio::sync::oneshot::Sender<u64>;
+
+/// Get the current state of the registered responses.
+pub(crate) type TxRequestsDebug = tokio::sync::oneshot::Sender<(Vec<u64>, u64)>;
+
 impl RegisterResponse {
     pub(crate) fn new(respond: tokio::sync::oneshot::Sender<Option<SerializedBytes>>) -> Self {
         Self { respond }
@@ -83,9 +92,12 @@ impl RegisterResponse {
 pub(crate) enum OutgoingMessage {
     Close,
     Signal(SerializedBytes),
-    Request(SerializedBytes, RegisterResponse),
-    Response(Option<SerializedBytes>, u32),
+    Request(SerializedBytes, RegisterResponse, TxStaleRequest),
+    Response(Option<SerializedBytes>, u64),
+    StaleRequest(u64),
     Pong(Vec<u8>),
+    #[allow(dead_code)]
+    Debug(TxRequestsDebug),
 }
 
 impl WebsocketSender {
@@ -103,10 +115,6 @@ impl WebsocketSender {
 
     #[tracing::instrument(skip(self))]
     /// Make a request to for the other side to respond to.
-    ///
-    /// Note:
-    /// There is no timeouts in this code. You either need to wrap
-    /// this future in a timeout or use [`WebsocketSender::request_timeout`].
     pub async fn request_timeout<I, O, E, E2>(
         &mut self,
         msg: I,
@@ -142,10 +150,12 @@ impl WebsocketSender {
         O: TryFrom<SerializedBytes, Error = E2>,
     {
         tracing::trace!("Sending");
+
         let (tx_resp, rx_resp) = tokio::sync::oneshot::channel();
+        let (tx_stale_resp, rx_stale_resp) = tokio::sync::oneshot::channel();
         let mut rx_resp = self.listener_shutdown.wrap(rx_resp.into_stream());
         let resp = RegisterResponse::new(tx_resp);
-        let msg = OutgoingMessage::Request(msg.try_into()?, resp);
+        let msg = OutgoingMessage::Request(msg.try_into()?, resp, tx_stale_resp);
 
         self.tx_to_websocket
             .send(msg)
@@ -153,14 +163,18 @@ impl WebsocketSender {
             .map_err(|_| WebsocketError::Shutdown)?;
 
         tracing::trace!("Sent");
+        let id = rx_stale_resp.await.map_err(|_| WebsocketError::Shutdown)?;
+        let stale_request_guard = StaleRequest::new(self.tx_to_websocket.clone(), id);
 
-        Ok(rx_resp
+        let resp: O = rx_resp
             .next()
             .await
             .ok_or(WebsocketError::Shutdown)?
             .map_err(|_| WebsocketError::FailedToRecvResp)?
             .ok_or(WebsocketError::FailedToRecvResp)?
-            .try_into()?)
+            .try_into()?;
+        stale_request_guard.response_received();
+        Ok(resp)
     }
 
     #[tracing::instrument(skip(self))]
@@ -183,5 +197,44 @@ impl WebsocketSender {
 
         tracing::trace!("Sent");
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn debug(&mut self) -> WebsocketResult<(Vec<u64>, u64)> {
+        let (tx_resp, rx_resp) = tokio::sync::oneshot::channel();
+        let msg = OutgoingMessage::Debug(tx_resp);
+        self.tx_to_websocket
+            .send(msg)
+            .await
+            .map_err(|_| WebsocketError::Shutdown)?;
+        Ok(rx_resp.await.map_err(|_| WebsocketError::Shutdown)?)
+    }
+}
+
+impl StaleRequest {
+    /// To remove responses we need the channel to the websocket
+    /// and the id of the request.
+    pub fn new(send_response: TxToWebsocket, id: u64) -> Self {
+        Self(true, send_response, id)
+    }
+    /// The response has been received so don't cancel on drop.
+    pub fn response_received(mut self) {
+        self.0 = false;
+    }
+}
+
+impl Drop for StaleRequest {
+    fn drop(&mut self) {
+        // If this response hasn't been received then remove the registered response.
+        if self.0 {
+            let mut tx = self.1.clone();
+            let id = self.2;
+            tokio::spawn(async move {
+                if let Err(e) = tx.send(OutgoingMessage::StaleRequest(id)).await {
+                    tracing::warn!("Failed to remove stale response on drop {:?}", e);
+                }
+                tracing::trace!("Removed stale response on drop");
+            });
+        }
     }
 }

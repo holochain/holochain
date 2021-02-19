@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::sync::Arc;
 
@@ -24,6 +24,8 @@ use crate::IncomingMessage;
 use crate::OutgoingMessage;
 use crate::RegisterResponse;
 use crate::Respond;
+use crate::TxRequestsDebug;
+use crate::TxStaleRequest;
 use crate::WebsocketConfig;
 use crate::WebsocketError;
 use crate::WebsocketReceiver;
@@ -39,20 +41,10 @@ pub struct Websocket(GhostActor<WebsocketInner>);
 
 #[derive(Debug)]
 struct ResponseTracker {
-    /// List of responses where Some is an registered response
-    /// while None is a free slot.
-    responses: Vec<Option<RegisterResponse>>,
-    /// Queue of free slots to avoid ever growing memory.
-    free_indices: VecDeque<usize>,
-}
-
-impl ResponseTracker {
-    fn new() -> Self {
-        Self {
-            responses: Vec::new(),
-            free_indices: VecDeque::new(),
-        }
-    }
+    /// Map of registered responses.
+    responses: HashMap<u64, RegisterResponse>,
+    /// The next key to use.
+    index: u64,
 }
 
 /// Inner GhostActor data.
@@ -233,13 +225,13 @@ impl Websocket {
         // This valve will not close is to_socket can successfully send a close message to from_socket.
         let (shutdown_to_socket, to_websocket) = Valved::new(to_websocket);
 
-        // Spawn the to external task.
+        // Spawn the "to" external task.
         tokio::task::spawn(
             self.clone()
                 .run_to_socket(to_socket, to_websocket, shutdown_from_socket)
                 .in_current_span(),
         );
-        // Spawn the from external task.
+        // Spawn the "from" external task.
         tokio::task::spawn(
             self.run_from_socket(
                 from_socket,
@@ -314,18 +306,25 @@ impl Websocket {
                     OutgoingMessage::Signal(msg) => WireMessage::Signal {
                         data: UnsafeBytes::from(msg).into(),
                     },
-                    OutgoingMessage::Request(msg, register_response) => {
-                        self.handle_outgoing_request(msg, register_response).await?
+                    OutgoingMessage::Request(msg, register_response, tx_stale_response) => {
+                        self.handle_outgoing_request(msg, register_response, tx_stale_response)
+                            .await?
                     }
                     OutgoingMessage::Response(msg, id) => WireMessage::Response {
                         id,
                         data: msg.map(|m| UnsafeBytes::from(m).into()),
                     },
+                    OutgoingMessage::StaleRequest(id) => {
+                        return self.handle_stale_request(id).await;
+                    }
                     OutgoingMessage::Pong(data) => {
                         // No need to deserialize, just send the data back
                         // and continue.
                         to_socket.send(tungstenite::Message::Pong(data)).await.ok();
                         return Task::cont();
+                    }
+                    OutgoingMessage::Debug(tx_requests_debug) => {
+                        return self.handle_requests_debug(tx_requests_debug).await;
                     }
                 };
                 let msg = Self::serialize_msg(msg)?;
@@ -514,7 +513,7 @@ impl Websocket {
     fn handle_incoming_request(
         send_response: &mut TxToWebsocket,
         msg: SerializedBytes,
-        id: u32,
+        id: u64,
     ) -> (SerializedBytes, Respond) {
         let resp = {
             // Get the sender to the "to socket" task so we can reply.
@@ -552,6 +551,7 @@ impl Websocket {
         &self,
         msg: SerializedBytes,
         register_response: RegisterResponse,
+        tx_stale_request: TxStaleRequest,
     ) -> Loop<WireMessage> {
         // If the actor has closed we can't register this response.
         if !self.0.is_active() {
@@ -572,12 +572,69 @@ impl Websocket {
                 return Task::exit();
             }
         };
+        // Send the id back to create the stale request guard.
+        if let Err(id) = tx_stale_request.send(id) {
+            // If we fail to send the id that means the requester
+            // has dropped so we should clean up the stale request.
+            match self.handle_stale_request(id).await {
+                Ok(_) => unreachable!("handle_stale_request always continues or exits the loop"),
+                Err(task) => return Err(task),
+            }
+        }
         let data = UnsafeBytes::from(msg).into();
         Ok(WireMessage::Request { data, id })
     }
 
+    /// Handle a request that has gone stale.
+    async fn handle_stale_request(&self, id: u64) -> Loop<()> {
+        // If the actor has closed we can't clean up this response.
+        if !self.0.is_active() {
+            tracing::error!("Actor is closed");
+            return Task::exit();
+        }
+        tracing::trace!(here = line!());
+        match self
+            .0
+            .invoke(move |state| GhostResult::Ok(state.responses.pop(id)))
+            .await
+        {
+            Ok(_) => Task::cont(),
+            Err(e) => {
+                // Failed to clean up request so something is
+                // wrong with the actor and we should shutdown.
+                tracing::error!(?e);
+                Task::exit()
+            }
+        }
+    }
+
+    /// Get the current state of the requests for debugging.
+    async fn handle_requests_debug(&self, tx_requests_debug: TxRequestsDebug) -> Loop<()> {
+        // If the actor has closed we can't clean up this response.
+        if !self.0.is_active() {
+            tracing::error!("Actor is closed");
+            return Task::exit();
+        }
+        match self
+            .0
+            .invoke(move |state| GhostResult::Ok(state.responses.debug()))
+            .await
+        {
+            Ok(state) => {
+                tx_requests_debug.send(state).ok();
+                Task::cont()
+            }
+            Err(e) => {
+                // Failed to get debug state, something is
+                // wrong with the actor and we should shutdown.
+                tracing::error!(?e);
+                Task::exit()
+            }
+        }
+    }
+
     /// Handle a response coming in from the network.
-    async fn handle_incoming_response(&self, msg: Option<SerializedBytes>, id: u32) -> Loop<()> {
+    async fn handle_incoming_response(&self, msg: Option<SerializedBytes>, id: u64) -> Loop<()> {
         // If the actor has closed we can't find the registered response.
         if !self.0.is_active() {
             tracing::error!("Actor is closed");
@@ -594,7 +651,7 @@ impl Websocket {
                 None => {
                     // We don't want to error here because a bad response
                     // shouldn't shutdown the connection.
-                    tracing::error!("Websocket: Received response for request that doesn't exist");
+                    tracing::warn!("Websocket: Received response for request that doesn't exist or has gone stale");
                     Ok(())
                 }
             });
@@ -665,47 +722,32 @@ impl Websocket {
 }
 
 impl ResponseTracker {
+    fn new() -> Self {
+        Self {
+            responses: HashMap::new(),
+            index: 0,
+        }
+    }
+
     /// Register an outgoing request with it's response.
-    fn register(&mut self, response: RegisterResponse) -> u32 {
-        // Find the next free slot or allocate one.
-        match self.free_indices.pop_front().map(|i| {
-            // Got a free index, now check it's valid.
-            self.responses.get_mut(i).and_then(|e| {
-                // It's valid, now check it's free.
-                if e.is_none() {
-                    Some((e, i as u32))
-                } else {
-                    None
-                }
-            })
-        }) {
-            // Index is free and empty so we can use it.
-            Some(Some((empty, i))) => {
-                *empty = Some(response);
-                i
-            }
-            // There are not free slots or the free slot was
-            // invalid so allocate a new one.
-            None | Some(None) => {
-                let i = self.responses.len();
-                self.responses.push(Some(response));
-                i as u32
-            }
-        }
+    fn register(&mut self, response: RegisterResponse) -> u64 {
+        // Get the index for this response and increment for the next response.
+        let index = self.index;
+        self.index += 1;
+
+        self.responses.insert(index, response);
+        index
     }
-    /// Retrieve the response at this id and leave and leave a free slot.
-    fn pop(&mut self, id: u32) -> Option<RegisterResponse> {
-        let index = id as usize;
-        let r = self.responses.get_mut(index).and_then(|slot| slot.take());
-        if r.is_some() {
-            // Got a new free slot, add it to the queue.
-            self.free_indices.push_back(index);
-        }
-        r
+
+    /// Retrieve the response at this id.
+    fn pop(&mut self, id: u64) -> Option<RegisterResponse> {
+        self.responses.remove(&id)
     }
-    // TODO: Maybe want to think about shrinking the memory here over time.
-    // If we get a burst of requests the `self.responses` vec will be that big
-    // for the rest of the application. Although might not be an issue.
+
+    /// Show outstanding responses.
+    fn debug(&self) -> (Vec<u64>, u64) {
+        (self.responses.keys().copied().collect(), self.index)
+    }
 }
 
 impl Drop for PairShutdown {
@@ -719,45 +761,54 @@ impl Drop for PairShutdown {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
+    use crate::connect;
+    use crate::WebsocketListener;
+    use url2::url2;
 
-    #[test]
-    fn test_register_response() {
-        let mut tracker = ResponseTracker::new();
-        for i in 0..10 {
-            let (respond, _rx) = tokio::sync::oneshot::channel();
-            let resp = RegisterResponse::new(respond);
-            assert_eq!(tracker.register(resp), i);
-        }
-        assert_eq!(tracker.responses.len(), 10);
+    #[tokio::test(threaded_scheduler)]
+    async fn test_register_response() {
+        observability::test_run().ok();
+        let (handle, mut listener) = WebsocketListener::bind_with_handle(
+            url2!("ws://127.0.0.1:0"),
+            Arc::new(WebsocketConfig::default()),
+        )
+        .await
+        .unwrap();
+        let binding = handle.local_addr().clone();
+        let sjh = tokio::task::spawn(async move {
+            let (_, _receiver) = listener
+                .next()
+                .instrument(tracing::debug_span!("next_server_connection"))
+                .await
+                .unwrap()
+                .unwrap();
 
-        assert!(tracker.pop(5).is_some());
-        assert_eq!(tracker.responses.len(), 10);
-        assert_eq!(tracker.free_indices.len(), 1);
-        assert!(tracker.responses.get(5).unwrap().is_none());
+            listener
+                .next()
+                .instrument(tracing::debug_span!("next_server_connection"))
+                .await;
+        });
+        let (mut sender, _) = connect(binding.clone(), Arc::new(WebsocketConfig::default()))
+            .instrument(tracing::debug_span!("client"))
+            .await
+            .unwrap();
 
-        assert!(tracker.pop(5).is_none());
-        assert_eq!(tracker.responses.len(), 10);
-        assert_eq!(tracker.free_indices.len(), 1);
+        let msg = SerializedBytes::from(UnsafeBytes::from(vec![0u8]));
+        sender
+            .request_timeout::<_, SerializedBytes, _, _>(msg, std::time::Duration::from_secs(1))
+            .await
+            .ok();
+        tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+        let state = sender.debug().await.unwrap();
+        assert_eq!(state, (vec![], 1));
 
-        assert!(tracker.pop(3).is_some());
-        assert_eq!(tracker.responses.len(), 10);
-        assert_eq!(tracker.free_indices.len(), 2);
-        assert!(tracker.responses.get(3).unwrap().is_none());
-
-        let (respond, _rx) = tokio::sync::oneshot::channel();
-        let resp = RegisterResponse::new(respond);
-        assert_eq!(tracker.register(resp), 5);
-
-        let (respond, _rx) = tokio::sync::oneshot::channel();
-        let resp = RegisterResponse::new(respond);
-        assert_eq!(tracker.register(resp), 3);
-
-        let (respond, _rx) = tokio::sync::oneshot::channel();
-        let resp = RegisterResponse::new(respond);
-        assert_eq!(tracker.register(resp), 10);
-
-        assert_eq!(tracker.free_indices.len(), 0);
-        assert_eq!(tracker.responses.len(), 11);
+        // - Connect and drop to close the server.
+        connect(binding, Arc::new(WebsocketConfig::default()))
+            .instrument(tracing::debug_span!("client"))
+            .await
+            .unwrap();
+        sjh.await.unwrap();
     }
 }

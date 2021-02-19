@@ -62,7 +62,7 @@ pub enum Respond {
 
 /// If a request is in the queue at shutdown this will send
 /// a cancellation response on drop.
-pub(crate) struct CancelResponse(bool, TxToWebsocket, u32);
+pub(crate) struct CancelResponse(bool, TxToWebsocket, u64);
 
 /// Shuts down the receiver on drop or
 /// if you call close.
@@ -168,7 +168,7 @@ impl Respond {
 impl CancelResponse {
     /// To cancel the response we need the channel to the websocket
     /// and the id of the request.
-    pub fn new(send_response: TxToWebsocket, id: u32) -> Self {
+    pub fn new(send_response: TxToWebsocket, id: u64) -> Self {
         Self(true, send_response, id)
     }
     /// The response has been sent so don't cancel on drop.

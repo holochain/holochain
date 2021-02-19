@@ -150,7 +150,7 @@ pub enum WireMessage {
     Request {
         /// The id of this request.
         /// Note ids are recycled once they are used.
-        id: u32,
+        id: u64,
         #[serde(with = "serde_bytes")]
         /// Actual bytes of the message serialized as [message pack](https://msgpack.org/).
         data: Vec<u8>,
@@ -158,7 +158,7 @@ pub enum WireMessage {
     /// The response to a request.
     Response {
         /// The id of the request that this response is for.
-        id: u32,
+        id: u64,
         #[serde(with = "serde_bytes")]
         /// Actual bytes of the message serialized as [message pack](https://msgpack.org/).
         data: Option<Vec<u8>>,
