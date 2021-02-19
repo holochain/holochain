@@ -68,8 +68,10 @@ pub fn create_link<T: Into<LinkTag>>(
 
 /// Delete a specific link creation element by its header.
 ///
-/// Links are always created and deleted in pairs.
-/// The delete is a "tombstone" for one pair of the create and the delete elements.
+/// Links are defined by a [OR-Set CRDT](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type#OR-Set_(Observed-Remove_Set))
+/// of "Creates" and "Deletes".
+/// The deletes form a "tombstone set", each of which can nullify one of the creates.
+/// A link only "exists" if it has one or more "creates" which have not been nullified by a "delete".
 ///
 /// For this reason the delete references the header of the create.
 /// Even more than that, both creates and deletes are _only_ headers, there is no separate entry

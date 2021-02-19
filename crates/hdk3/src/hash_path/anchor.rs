@@ -15,7 +15,7 @@ pub const ROOT: &str = "hdk3anchor";
 ///
 /// The second level is optional and the Strings use the standard [ `TryInto` ] for path [ `Component` ] internally.
 ///
-/// __Anchors are required to be included in an application [ `entry_defs` ]__ callback and so implement all the standard methods.
+/// __Anchors are required to be included in an application's [ `entry_defs` ]__ callback and so implement all the standard methods.
 /// Technically the [ `Anchor` ] entry definition is the [ `Path` ] definition.
 ///
 /// e.g. `entry_defs![Anchor::entry_def()]`
