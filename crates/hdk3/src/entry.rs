@@ -100,7 +100,7 @@ pub fn delete_entry(hash: HeaderHash) -> ExternResult<HeaderHash> {
 /// Anything that is annotated with #[hdk_entry( .. )] or entry_def!( .. ) implements this so is
 /// compatible automatically.
 ///
-/// [ `hash_entry` ] is "dumb" in that it doesn't check the entry is defined, committed, on the DHT or
+/// [ `hash_entry` ] is "dumb" in that it doesn't check that the entry is defined, committed, on the DHT or
 /// any other validation, it simply generates the hash for the serialized representation of
 /// something in the same way that the DHT would.
 ///
