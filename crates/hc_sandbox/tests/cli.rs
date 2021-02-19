@@ -2,7 +2,7 @@ use std::future::Future;
 use std::sync::Arc;
 
 // TODO: do the create tests first
-// TODO: run hc-admin then see if we can call the app websocket
+// TODO: run hc-sandbox then see if we can call the app websocket
 // TODO: Put holochain on the path
 // TODO:
 

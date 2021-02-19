@@ -82,7 +82,7 @@
 //! ```
 //! Output:
 //! ```shell
-//! hc-admin:
+//! hc-sandbox:
 //! Setups contained in `.hc`
 //! 0: /tmp/KOXgKVLBVvoxe8iKD4iSS
 //! 1: /tmp/m8VHwwt93Uh-nF-vr6nf6

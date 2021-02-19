@@ -35,7 +35,7 @@ This nix-shell flavor installs wrapper binaries for `holochain` and `dna-util` t
 ### Building with cargo if you already have rust installed:
 ```
 cargo install --path crates/holochain
-cargo install --path crates/dna_util
+cargo install --path crates/hc
 ```
 ## Usage
 
