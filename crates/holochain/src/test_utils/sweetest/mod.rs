@@ -10,7 +10,6 @@ mod sweet_app_bundle;
 mod sweet_cell;
 mod sweet_conductor;
 mod sweet_dna;
-// mod sweet_dna_bundle;
 mod sweet_network;
 mod sweet_zome;
 
@@ -20,7 +19,6 @@ pub use sweet_app_bundle::*;
 pub use sweet_cell::*;
 pub use sweet_conductor::*;
 pub use sweet_dna::*;
-// pub use sweet_dna_bundle::*;
 pub use sweet_network::*;
 pub use sweet_zome::*;
 
