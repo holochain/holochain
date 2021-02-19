@@ -120,11 +120,11 @@ rough advice, because anything we say today could be out of date tomorrow:
 
 ## Application Developer
 
-[Read the wasm API docs](./crates/hdk3/README.md)
+[Read the wasm API docs](./crates/hdk/README.md)
 
 Build the hdk docs:
 ```bash
-cargo doc --manifest-path=crates/hdk3/Cargo.toml --open
+cargo doc --manifest-path=crates/hdk/Cargo.toml --open
 ```
 
 ## Core Developer

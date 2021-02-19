@@ -13,7 +13,7 @@ use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
 use crate::core::workflow::integrate_dht_ops_workflow;
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
-use hdk3::prelude::ZomeName;
+use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
 use holochain_cascade::Cascade;

@@ -86,10 +86,6 @@ impl Element {
     }
 }
 
-/// Small struct to allow the return type of `query()` to be a vector of elements
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct ElementVec(pub Vec<Element>);
-
 /// Represents the different ways the entry_address reference within a Header
 /// can be intepreted
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]

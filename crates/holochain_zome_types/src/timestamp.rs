@@ -278,8 +278,6 @@ impl Timestamp {
     }
 
     /// Subtracts a chrono::Duration from a Timestamp
-    /// ```
-    /// ```
     pub fn checked_sub_signed(&self, rhs: &chrono::Duration) -> Option<Timestamp> {
         self.checked_add_signed(&-*rhs)
     }

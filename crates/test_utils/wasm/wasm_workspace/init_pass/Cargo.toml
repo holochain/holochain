@@ -10,4 +10,4 @@ crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
 serde = "1.0"
-hdk3 = { path = "../../../../hdk3" }
+hdk = { path = "../../../../hdk" }

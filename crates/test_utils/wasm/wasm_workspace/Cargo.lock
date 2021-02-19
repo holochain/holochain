@@ -140,10 +140,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 
 [[package]]
-name = "hdk3"
+name = "hdk"
 version = "0.0.1"
 dependencies = [
- "hdk3_derive",
+ "hdk_derive",
  "holo_hash",
  "holochain_wasmer_guest",
  "holochain_zome_types",
@@ -157,7 +157,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hdk3_derive"
+name = "hdk_derive"
 version = "0.0.1"
 dependencies = [
  "holochain_zome_types",
@@ -220,7 +220,7 @@ dependencies = [
 name = "holochain_test_wasm_common"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_serialized_bytes",
  "serde",
  "serde_bytes",
@@ -617,7 +617,7 @@ dependencies = [
 name = "test_wasm_agent_info"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -625,7 +625,7 @@ dependencies = [
 name = "test_wasm_anchor"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -634,7 +634,7 @@ dependencies = [
 name = "test_wasm_bench"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -642,7 +642,7 @@ dependencies = [
 name = "test_wasm_capability"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -650,7 +650,7 @@ dependencies = [
 name = "test_wasm_crd"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -659,7 +659,7 @@ dependencies = [
 name = "test_wasm_create_entry"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -668,7 +668,7 @@ dependencies = [
 name = "test_wasm_crud"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -677,7 +677,7 @@ dependencies = [
 name = "test_wasm_debug"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
  "tracing",
  "tracing-core",
@@ -688,7 +688,7 @@ dependencies = [
 name = "test_wasm_emit_signal"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -697,7 +697,7 @@ dependencies = [
 name = "test_wasm_entry_defs"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -705,7 +705,7 @@ dependencies = [
 name = "test_wasm_foo"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -714,7 +714,7 @@ dependencies = [
 name = "test_wasm_hash_entry"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -722,7 +722,7 @@ dependencies = [
 name = "test_wasm_hash_path"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -731,7 +731,7 @@ dependencies = [
 name = "test_wasm_hdk_extern"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -740,7 +740,7 @@ dependencies = [
 name = "test_wasm_init_fail"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -748,7 +748,7 @@ dependencies = [
 name = "test_wasm_init_pass"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -756,7 +756,7 @@ dependencies = [
 name = "test_wasm_link"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -765,7 +765,7 @@ dependencies = [
 name = "test_wasm_migrate_agent_fail"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -773,7 +773,7 @@ dependencies = [
 name = "test_wasm_migrate_agent_pass"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -781,7 +781,7 @@ dependencies = [
 name = "test_wasm_multiple_calls"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -790,7 +790,7 @@ dependencies = [
 name = "test_wasm_post_commit_fail"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -798,7 +798,7 @@ dependencies = [
 name = "test_wasm_post_commit_success"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -806,7 +806,7 @@ dependencies = [
 name = "test_wasm_query"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -815,7 +815,7 @@ dependencies = [
 name = "test_wasm_random_bytes"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -824,7 +824,7 @@ name = "test_wasm_ser_regression"
 version = "0.0.1"
 dependencies = [
  "derive_more",
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -832,7 +832,7 @@ dependencies = [
 name = "test_wasm_sign"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -840,7 +840,7 @@ dependencies = [
 name = "test_wasm_sys_time"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -848,7 +848,7 @@ dependencies = [
 name = "test_wasm_update_entry"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -857,7 +857,7 @@ dependencies = [
 name = "test_wasm_validate"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -865,7 +865,7 @@ dependencies = [
 name = "test_wasm_validate_invalid"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -873,7 +873,7 @@ dependencies = [
 name = "test_wasm_validate_link"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -881,7 +881,7 @@ dependencies = [
 name = "test_wasm_validate_link_add_invalid"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -889,7 +889,7 @@ dependencies = [
 name = "test_wasm_validate_link_add_valid"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -897,7 +897,7 @@ dependencies = [
 name = "test_wasm_validate_valid"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -905,7 +905,7 @@ dependencies = [
 name = "test_wasm_validation_package_fail"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -913,7 +913,7 @@ dependencies = [
 name = "test_wasm_validation_package_success"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -921,7 +921,7 @@ dependencies = [
 name = "test_wasm_whoami"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -930,7 +930,7 @@ dependencies = [
 name = "test_wasm_x_salsa20_poly1305"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -938,7 +938,7 @@ dependencies = [
 name = "test_wasm_zome_info"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
