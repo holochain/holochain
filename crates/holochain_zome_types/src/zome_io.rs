@@ -145,7 +145,7 @@ wasm_io_types! {
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
 
     // Query the source chain for data.
-    fn query (zt::query::ChainQueryFilter) -> zt::element::ElementVec;
+    fn query (zt::query::ChainQueryFilter) -> Vec<crate::Element>;
 
     // the length of random bytes to create
     fn random_bytes (u32) -> zt::bytes::Bytes;

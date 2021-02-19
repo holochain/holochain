@@ -19,11 +19,11 @@ pub fn get_agent_activity(
 
 /// Walks the source chain in reverse (latest to oldest) filtering by header and/or entry type
 ///
-/// Given a header and entry type, returns an [ `ElementVec` ]
+/// Given a header and entry type, returns an [ `Vec<Element>` ]
 ///
 /// @todo document this better with examples
 /// @todo do we want to return elements rather than hashes?
 /// @todo implement cap grant/claim usage in terms of query
-pub fn query(filter: ChainQueryFilter) -> ExternResult<ElementVec> {
-    host_call::<ChainQueryFilter, ElementVec>(__query, filter)
+pub fn query(filter: ChainQueryFilter) -> ExternResult<Vec<Element>> {
+    host_call::<ChainQueryFilter, Vec<Element>>(__query, filter)
 }
