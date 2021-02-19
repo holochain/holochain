@@ -41,7 +41,10 @@ pub async fn default_n(
     app_id: InstalledAppId,
 ) -> anyhow::Result<Vec<PathBuf>> {
     let num_sandboxes = create.num_sandboxes;
-    msg!("Creating {} conductor sandboxes with same settings", num_sandboxes);
+    msg!(
+        "Creating {} conductor sandboxes with same settings",
+        num_sandboxes
+    );
     let mut paths = Vec::with_capacity(num_sandboxes);
     for i in 0..num_sandboxes {
         let p = default_with_network(
