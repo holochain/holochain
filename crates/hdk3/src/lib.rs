@@ -422,7 +422,7 @@ pub mod ed25519;
 /// The holochain host has additional runtime context that the wasm may find useful and cannot produce for itself including:
 ///
 /// - The calling agent
-/// - The current bundle
+/// - The current app (bundle of DNAs)
 /// - The current DNA
 /// - The current Zome
 /// - The function call itself
