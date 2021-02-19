@@ -1,5 +1,8 @@
-//! Implements base-64 de/serialization for HoloHash
-// NB: this module has a lot of copy-and-paste from `ser.rs`
+//! Implements base-64 serialization for HoloHashes
+//!
+//! It's already the case that HoloHash can be deserialized from either a byte
+//! array or a base-64 string. This type just specifies how serialization should
+//! be done.
 
 use super::*;
 use crate::HoloHash;
@@ -7,9 +10,6 @@ use crate::{error::HoloHashResult, HashType};
 
 /// A wrapper around HoloHash to denote that deserialization should use
 /// base-64 strings rather than raw byte arrays
-//
-// TODO: make HoloHash and HoloHashB64 both deserialize identically (can take either string or seq),
-//       so that the only difference is how they serialize
 #[derive(
     Debug,
     Clone,
