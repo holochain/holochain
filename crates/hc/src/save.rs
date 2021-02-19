@@ -2,6 +2,7 @@
 //! This module gives basic helpers to save / load your setups
 //! in a `.hc` file.
 //! This is very much WIP and subject to change.
+use std::path::Path;
 use std::path::PathBuf;
 
 use crate::config;
@@ -44,6 +45,16 @@ pub fn clean(mut hc_dir: PathBuf, setups: Vec<usize>) -> anyhow::Result<()> {
         }
     }
     if setups_len == 0 || setups_len == to_remove_len {
+        for entry in std::fs::read_dir(&hc_dir)? {
+            let entry = entry?;
+            if entry.file_type()?.is_file() {
+                if let Some(s) = entry.file_name().to_str() {
+                    if s.starts_with(".hc_live_") {
+                        std::fs::remove_file(entry.path())?;
+                    }
+                }
+            }
+        }
         hc_dir.push(".hc");
         if hc_dir.exists() {
             std::fs::remove_file(hc_dir)?;
@@ -94,5 +105,69 @@ pub fn list(hc_dir: PathBuf, verbose: usize) -> anyhow::Result<()> {
         },
     )?;
     msg!("{}", out);
+    Ok(())
+}
+
+lazy_static::lazy_static! {
+    static ref FILE_LOCKS: tokio::sync::Mutex<Vec<usize>> = tokio::sync::Mutex::new(Vec::new());
+}
+
+/// Lock this setup as running live and advertise the port
+pub async fn lock_live(mut hc_dir: PathBuf, path: &Path, port: u16) -> anyhow::Result<()> {
+    use std::io::Write;
+    std::fs::create_dir_all(&hc_dir)?;
+    let paths = load(hc_dir.clone())?;
+    let index = match paths.into_iter().enumerate().find(|p| p.1 == path) {
+        Some((i, _)) => i,
+        None => return Ok(()),
+    };
+    hc_dir.push(format!(".hc_live_{}", index));
+    match std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(hc_dir)
+    {
+        Ok(mut file) => {
+            writeln!(file, "{}", port)?;
+            let mut lock = FILE_LOCKS.lock().await;
+            lock.push(index);
+        }
+        Err(e) => match e.kind() {
+            std::io::ErrorKind::AlreadyExists => {}
+            _ => return Err(e.into()),
+        },
+    }
+
+    Ok(())
+}
+
+/// For each registered setup, if it has a lockfile, return the port of the running conductor,
+/// otherwise return None.
+/// The resulting Vec has the same number of elements as lines in the `.hc` file
+pub fn load_ports(hc_dir: PathBuf) -> anyhow::Result<Vec<Option<u16>>> {
+    let mut ports = Vec::new();
+    let paths = load(hc_dir.clone())?;
+    for (i, _) in paths.into_iter().enumerate() {
+        let mut hc = hc_dir.clone();
+        hc.push(format!(".hc_live_{}", i));
+        if hc.exists() {
+            let live = std::fs::read_to_string(hc)?;
+            let p = live.lines().next().and_then(|l| l.parse::<u16>().ok());
+            ports.push(p)
+        }
+    }
+    Ok(ports)
+}
+
+/// Remove all lockfiles, releasing all locked ports
+pub async fn release_ports(hc_dir: PathBuf) -> anyhow::Result<()> {
+    let files = FILE_LOCKS.lock().await;
+    for file in files.iter() {
+        let mut hc = hc_dir.clone();
+        hc.push(format!(".hc_live_{}", file));
+        if hc.exists() {
+            std::fs::remove_file(hc)?;
+        }
+    }
     Ok(())
 }

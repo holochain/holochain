@@ -441,6 +441,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let app = InstalledApp {
             installed_app_id,
             cell_data,
+            active: false,
         };
 
         // Update the db

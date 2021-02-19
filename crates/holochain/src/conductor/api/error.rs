@@ -84,6 +84,9 @@ pub enum ConductorApiError {
 
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
+
+    #[error(transparent)]
+    JsonDumpError(#[from] serde_json::Error),
 }
 
 /// All the serialization errors that can occur
