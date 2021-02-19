@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
 use ::fixt::prelude::*;
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 use holochain::conductor::api::AppInterfaceApi;
 use holochain::conductor::api::AppRequest;

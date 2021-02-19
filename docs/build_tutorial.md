@@ -53,7 +53,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 Grab and install the binaries for `holochain` and `dna-util` from github, at the right version
 ```bash
 cargo install holochain --git https://github.com/holochain/holochain.git --branch develop
-cargo install dna_util --git https://github.com/holochain/holochain.git --branch develop
+cargo install hc --git https://github.com/holochain/holochain.git --branch develop
 ```
 
 Confirm that they are there by running `holochain -V` and `dna-util -V`, and that you see simple version number outputs.

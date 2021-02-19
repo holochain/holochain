@@ -34,7 +34,7 @@ tokio_safe_block_on = "0.1.2"
 [dev-dependencies]
 anyhow = "1.0.26"
 fixt = { version = "0.0.1", path = "../fixt" }
-hdk3 = { version = "0.0.1", path = "../hdk3" }
+hdk = { version = "0.0.1", path = "../hdk" }
 holochain_wasm_test_utils = { path = "../test_utils/wasm" }
 matches = "0.1.8"
 observability = "0.1.3"

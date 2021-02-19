@@ -10,7 +10,7 @@
 #![deny(missing_docs)]
 
 #[allow(missing_docs)]
-pub mod agent_info;
+pub mod agent_activity;
 pub mod bytes;
 #[allow(missing_docs)]
 pub mod call;
@@ -26,6 +26,8 @@ pub mod entry;
 pub mod entry_def;
 #[allow(missing_docs)]
 pub mod header;
+#[allow(missing_docs)]
+pub mod info;
 #[allow(missing_docs)]
 pub mod init;
 #[allow(missing_docs)]
@@ -46,13 +48,15 @@ pub mod trace;
 pub mod validate;
 #[allow(missing_docs)]
 pub mod validate_link;
+/// Tracking versions between the WASM host and guests and other interfaces.
+///
+/// Needed to ensure compatibility as code develops.
+pub mod version;
 pub mod warrant;
 #[allow(missing_docs)]
 pub mod x_salsa20_poly1305;
 #[allow(missing_docs)]
 pub mod zome;
-#[allow(missing_docs)]
-pub mod zome_info;
 #[allow(missing_docs)]
 pub mod zome_io;
 
@@ -179,7 +183,7 @@ macro_rules! secure_primitive {
         /// @todo maybe we want something like **HIDDEN** by default and putting the actual bytes
         ///       behind a feature flag?
         ///
-        /// @see https://docs.rs/subtle-encoding/0.5.1/subtle_encoding/
+        /// See https://docs.rs/subtle-encoding/0.5.1/subtle_encoding/
         impl std::fmt::Debug for $t {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 std::fmt::Debug::fmt(&self.0.to_vec(), f)

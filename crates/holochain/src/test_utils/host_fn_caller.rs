@@ -14,7 +14,7 @@ use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::CallZomeWorkspace;
 use crate::core::workflow::CallZomeWorkspaceLock;
-use hdk3::prelude::EntryError;
+use hdk::prelude::EntryError;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;

@@ -38,7 +38,7 @@ pub mod wasm_test {
     use crate::conductor::api::ZomeCall;
     use crate::conductor::interface::websocket::test_utils::setup_app;
     use crate::core::ribosome::ZomeCallResponse;
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;

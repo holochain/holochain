@@ -9,5 +9,5 @@ name = "test_wasm_sys_time"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-hdk3 = { path = "../../../../hdk3" }
+hdk = { path = "../../../../hdk" }
 serde = "1.0"

@@ -104,6 +104,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// Install a [Dna] in this Conductor
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
+    /// Install just the "code parts" (the wasm and entry defs) of a dna
+    async fn register_genotype(&self, dna: DnaFile) -> ConductorResult<()>;
+
     /// Get the list of hashes of installed Dnas in this Conductor
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
 
@@ -285,7 +288,18 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-        self.conductor.write().await.register_dna(dna).await
+        self.register_genotype(dna.clone()).await?;
+        self.conductor.write().await.register_phenotype(dna).await
+    }
+
+    async fn register_genotype(&self, dna: DnaFile) -> ConductorResult<()> {
+        let entry_defs = self.conductor.read().await.register_dna_wasm(dna).await?;
+        self.conductor
+            .write()
+            .await
+            .register_dna_entry_defs(entry_defs)
+            .await?;
+        Ok(())
     }
 
     async fn load_dnas(&self) -> ConductorResult<()> {
@@ -424,15 +438,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             cell_nick,
             membrane_proof,
         } = payload;
-        let mut conductor = self.conductor.write().await;
-        let cell_id = CellId::new(dna_hash, agent_key);
-        let cells = vec![(cell_id.clone(), membrane_proof)];
-        conductor.genesis_cells(cells, self.clone()).await?;
-        let properties = properties.unwrap_or_else(|| ().into());
-        let cell_id = conductor
-            .add_clone_cell_to_app(&installed_app_id, &cell_nick, properties)
-            .await?;
-        Ok(cell_id)
+        {
+            let conductor = self.conductor.read().await;
+            let cell_id = CellId::new(dna_hash, agent_key);
+            let cells = vec![(cell_id.clone(), membrane_proof)];
+            conductor.genesis_cells(cells, self.clone()).await?;
+        }
+        {
+            let mut conductor = self.conductor.write().await;
+            let properties = properties.unwrap_or_else(|| ().into());
+            let cell_id = conductor
+                .add_clone_cell_to_app(&installed_app_id, &cell_nick, properties)
+                .await?;
+            Ok(cell_id)
+        }
     }
 
     async fn destroy_clone_cell(self: Arc<Self>, _cell_id: CellId) -> ConductorResult<()> {

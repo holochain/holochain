@@ -3,7 +3,7 @@ use anyhow::Result;
 use assert_cmd::prelude::*;
 use futures::future;
 use futures::Future;
-use hdk3::prelude::RemoteSignal;
+use hdk::prelude::RemoteSignal;
 use holochain::test_utils::sweetest::SweetAgents;
 use holochain::test_utils::sweetest::SweetConductorBatch;
 use holochain::test_utils::sweetest::SweetDnaFile;

@@ -12,6 +12,7 @@ documentation = "https://github.com/holochain/holochain"
 backtrace = { version = "0.3", optional = true }
 cfg-if = "0.1"
 derive_more = "0.99"
+dunce = "1.0"
 tokio = { version = "0.2", features = ["fs"], optional = true}
 
 [features]

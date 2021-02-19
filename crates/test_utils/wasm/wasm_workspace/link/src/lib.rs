@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 entry_defs![Path::entry_def()];
 
@@ -18,23 +18,23 @@ fn target() -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 fn create_link(_: ()) -> ExternResult<HeaderHash> {
-    hdk3::prelude::create_link(base()?, target()?, ())
+    hdk::prelude::create_link(base()?, target()?, ())
 }
 
 #[hdk_extern]
 fn delete_link(input: HeaderHash) -> ExternResult<HeaderHash> {
-    hdk3::prelude::delete_link(input)
+    hdk::prelude::delete_link(input)
 }
 
 #[hdk_extern]
 fn get_links(_: ()) -> ExternResult<Links> {
-    hdk3::prelude::get_links(base()?, None)
+    hdk::prelude::get_links(base()?, None)
 }
 
 #[hdk_extern]
 fn delete_all_links(_: ()) -> ExternResult<()> {
-    for link in hdk3::prelude::get_links(base()?, None)?.into_inner() {
-        hdk3::prelude::delete_link(link.create_link_hash)?;
+    for link in hdk::prelude::get_links(base()?, None)?.into_inner() {
+        hdk::prelude::delete_link(link.create_link_hash)?;
     }
     Ok(())
 }
@@ -48,7 +48,7 @@ fn commit_existing_path(_: ()) -> ExternResult<()> {
     create_entry(&path)?;
     if let Some(parent) = path.parent() {
         parent.ensure()?;
-        hdk3::prelude::create_link(parent.hash()?, path.hash()?, LinkTag::try_from(&path)?)?;
+        hdk::prelude::create_link(parent.hash()?, path.hash()?, LinkTag::try_from(&path)?)?;
     }
     Ok(())
 }

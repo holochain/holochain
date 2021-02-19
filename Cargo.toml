@@ -3,8 +3,8 @@ members = [
   "crates/ffs",
   "crates/fixt",
   "crates/fixt/test",
-  "crates/hdk3",
-  "crates/hdk3_derive",
+  "crates/hdk",
+  "crates/hdk_derive",
   "crates/holo_hash",
   "crates/mr_bundle",
 

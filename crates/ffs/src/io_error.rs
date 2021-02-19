@@ -36,12 +36,6 @@ impl std::fmt::Display for IoError {
     }
 }
 
-// impl From<std::io::Error> for IoError {
-//     fn from(err: std::io::Error) -> Self {
-//         Self::new(err, None, backtrace::Backtrace::new())
-//     }
-// }
-
 impl IoError {
     pub fn into_inner(self) -> std::io::Error {
         self.original

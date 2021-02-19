@@ -1,6 +1,6 @@
 //! Common types
 
-pub use crate::agent_info::*;
+pub use crate::agent_activity::*;
 pub use crate::bytes::*;
 pub use crate::call::*;
 pub use crate::call_remote::*;
@@ -17,6 +17,7 @@ pub use crate::entry_def::*;
 pub use crate::header::conversions::*;
 pub use crate::header::*;
 pub use crate::header::*;
+pub use crate::info::*;
 pub use crate::init::*;
 pub use crate::link::*;
 pub use crate::metadata::*;
@@ -33,7 +34,6 @@ pub use crate::validate::*;
 pub use crate::validate_link::*;
 pub use crate::warrant::*;
 pub use crate::zome::*;
-pub use crate::zome_info::*;
 pub use crate::zome_io::ExternIO;
 pub use crate::zome_io::*;
 pub use crate::*;
