@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 /// A reference to a Zome in a Cell created by a SweetConductor installation function.
 /// Think of it as a partially applied SweetCell, with the ZomeName baked in.

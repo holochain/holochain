@@ -1,6 +1,6 @@
 #![cfg(feature = "test_utils")]
 
-use hdk3::prelude::*;
+use hdk::prelude::*;
 use holochain::{
     conductor::api::error::ConductorApiResult,
     test_utils::sweetest::{MaybeElement, SweetAgents, SweetConductor, SweetDnaFile},

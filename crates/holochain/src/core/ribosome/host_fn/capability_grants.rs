@@ -23,7 +23,7 @@ pub mod wasm_test {
         core::workflow::call_zome_workflow::CallZomeWorkspace, test_utils::sweetest::SweetDnaFile,
     };
     use ::fixt::prelude::*;
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
     use holochain_types::fixt::CapSecretFixturator;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;

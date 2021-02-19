@@ -238,7 +238,7 @@ pub trait Invocation: Clone {
     /// For example, if FnComponents was vec!["foo", "bar", "baz"] it would loop as "foo_bar_baz"
     /// then "foo_bar" then "foo". All of those three callbacks that are defined will be called
     /// _unless a definitive callback result is returned_.
-    /// @see CallbackResult::is_definitive() in zome_types.
+    /// See [ `CallbackResult::is_definitive` ] in zome_types.
     /// All of the individual callback results are then folded into a single overall result value
     /// as a From implementation on the invocation results structs (e.g. zome results vs. ribosome
     /// results).
