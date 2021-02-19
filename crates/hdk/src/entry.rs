@@ -42,8 +42,8 @@ pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
 
 /// Create an app entry.
 ///
-/// An app entry is anything that the app can define a type for that matches the entry defs and
-/// that can be serialized.
+/// Apps define app entries by registering entry def ids with the `entry_defs` callback and serialize the
+/// entry content when committing to the source chain.
 ///
 /// This function accepts any input that implements [ `TryInto<EntryWithDefId>` ].
 /// The default impls from the `#[hdk_entry( .. )]` and [ `entry_def!` ] macros include this.
