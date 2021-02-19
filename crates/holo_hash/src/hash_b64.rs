@@ -18,12 +18,14 @@ use crate::{error::HoloHashResult, HashType};
     Eq,
     PartialOrd,
     Ord,
+    serde::Deserialize,
     derive_more::Constructor,
     derive_more::Display,
     derive_more::From,
     derive_more::Into,
     derive_more::AsRef,
 )]
+#[serde(transparent)]
 pub struct HoloHashB64<T: HashType>(HoloHash<T>);
 
 impl<T: HashType> HoloHashB64<T> {
@@ -40,42 +42,6 @@ impl<T: HashType> serde::Serialize for HoloHashB64<T> {
         S: serde::Serializer,
     {
         serializer.serialize_str(&holo_hash_encode(self.0.get_raw_39()))
-    }
-}
-
-impl<'de, T: HashType> serde::Deserialize<'de> for HoloHashB64<T> {
-    fn deserialize<D>(deserializer: D) -> Result<HoloHashB64<T>, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_bytes(HoloHashB64Visitor(std::marker::PhantomData))
-    }
-}
-
-struct HoloHashB64Visitor<T: HashType>(std::marker::PhantomData<T>);
-
-impl<'de, T: HashType> serde::de::Visitor<'de> for HoloHashB64Visitor<T> {
-    type Value = HoloHashB64<T>;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("a HoloHash of primitive hash_type")
-    }
-
-    fn visit_str<E>(self, b64: &str) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        let h = holo_hash_decode_unchecked(b64)
-            .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))?;
-        if !h.len() == 39 {
-            Err(serde::de::Error::custom(
-                "HoloHash serialized representation must be exactly 39 bytes",
-            ))
-        } else {
-            let inner = HoloHash::from_raw_39(h.to_vec())
-                .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))?;
-            Ok(HoloHashB64(inner))
-        }
     }
 }
 
