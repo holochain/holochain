@@ -1,10 +1,14 @@
-use crate::tx2::*;
-use once_cell::sync::Lazy;
+use std::cell::RefCell;
 
-// TODO - expirement with this value for efficiency.
+// TODO - expirement with these values for efficiency.
+
+/// The max capacity of in-pool stored PoolBufs per thread.
+pub(crate) const POOL_MAX_CAPACITY: usize = 1024;
+
+/// Returned PoolBufs will be shrunk to this capacity when returned.
 pub(crate) const POOL_BUF_MAX_CAPACITY: usize = 4096;
 
-/// A shared buffer that should be returned to the SharedBufferPool after use.
+/// A buffer that will return to a pool after use.
 ///
 /// When working with network code, we try to avoid two slow things:
 /// - Allocation
@@ -13,41 +17,108 @@ pub(crate) const POOL_BUF_MAX_CAPACITY: usize = 4096;
 /// We avoid allocation by returning used buffers to a pool for later re-use.
 ///
 /// We avoid initialization by using `extend_from_slice()`.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct PoolBuf(#[serde(with = "serde_bytes")] Vec<u8>);
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PoolBuf(Option<Vec<u8>>);
+
+impl serde::Serialize for PoolBuf {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(self.0.as_ref().unwrap())
+    }
+}
+
+struct VisitBytes;
+
+impl<'de> serde::de::Visitor<'de> for VisitBytes {
+    type Value = PoolBuf;
+
+    fn expecting(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(fmt, "raw bytes")
+    }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        let mut out = PoolBuf::new();
+        out.extend_from_slice(v);
+        Ok(out)
+    }
+
+    fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(PoolBuf(Some(v)))
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for PoolBuf {
+    fn deserialize<D>(deserializer: D) -> Result<PoolBuf, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        // we might be tempted to deserialize_byte_buf here...
+        // but that may cause decoders to clone when there was no need.
+        deserializer.deserialize_bytes(VisitBytes)
+    }
+}
+
+thread_local! {
+    pub(crate) static BUF_POOL: RefCell<Vec<Vec<u8>>> = RefCell::new(Vec::with_capacity(POOL_MAX_CAPACITY));
+}
+
+impl Drop for PoolBuf {
+    fn drop(&mut self) {
+        if let Some(mut inner) = self.0.take() {
+            BUF_POOL.with(|p| {
+                let mut p = p.borrow_mut();
+                if p.len() < POOL_MAX_CAPACITY {
+                    if inner.capacity() > POOL_BUF_MAX_CAPACITY {
+                        inner.truncate(POOL_BUF_MAX_CAPACITY);
+                        inner.shrink_to_fit();
+                    }
+                    inner.clear();
+                    p.push(inner);
+                }
+            });
+        }
+    }
+}
 
 impl PoolBuf {
     /// Create a new PoolBuf.
     pub fn new() -> Self {
-        // I beleive Vec::new() actually starts with zero capacity,
-        // but make it explicit just in case.
-        Self(Vec::with_capacity(0))
-    }
-
-    /// Reset this PoolBuf for further usage.
-    /// (shrinking if it was grown too much).
-    pub fn reset(&mut self) {
-        if self.0.capacity() > POOL_BUF_MAX_CAPACITY {
-            self.0.truncate(POOL_BUF_MAX_CAPACITY);
-            self.0.shrink_to_fit();
-        }
-        self.0.clear();
+        let inner = BUF_POOL.with(|p| {
+            let mut p = p.borrow_mut();
+            if p.is_empty() {
+                // I beleive Vec::new() actually starts with zero capacity,
+                // but make it explicit just in case.
+                Vec::with_capacity(0)
+            } else {
+                p.remove(0)
+            }
+        });
+        Self(Some(inner))
     }
 
     /// Like `drain(..len)` but without the iterator trappings.
     pub fn truncate_front(&mut self, len: usize) {
+        let this = self.0.as_mut().unwrap();
         if len == 0 {
             return;
         }
 
-        if len >= self.0.len() {
-            self.0.clear();
+        if len >= this.len() {
+            this.clear();
             return;
         }
 
-        let r = len..self.0.len();
-        self.0.copy_within(r, 0);
-        self.0.truncate(self.0.len() - len);
+        let r = len..this.len();
+        this.copy_within(r, 0);
+        this.truncate(this.len() - len);
     }
 }
 
@@ -64,58 +135,24 @@ impl std::ops::Deref for PoolBuf {
     type Target = Vec<u8>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0.as_ref().unwrap()
     }
 }
 
 impl std::ops::DerefMut for PoolBuf {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        self.0.as_mut().unwrap()
     }
 }
 
 impl AsRef<[u8]> for PoolBuf {
     fn as_ref(&self) -> &[u8] {
-        &self.0
+        self.0.as_ref().unwrap()
     }
 }
 
 impl AsMut<Vec<u8>> for PoolBuf {
     fn as_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.0
-    }
-}
-
-/// A global static SharedBufferPool.
-pub static BUF_POOL: Lazy<SharedBufferPool> = Lazy::new(SharedBufferPool::new);
-
-/// A pool of shared buffers to avoid constant re-allocation.
-pub struct SharedBufferPool(ResourceBucket<PoolBuf>);
-
-impl Default for SharedBufferPool {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl SharedBufferPool {
-    /// Construct a new SharedBufferPool
-    /// ¿ but, maybe you want to use the global static `BUF_POOL` ?
-    pub fn new() -> Self {
-        Self(ResourceBucket::new(None))
-    }
-
-    /// Release a previously acquired buf to the pool.
-    pub fn release(
-        &self,
-        mut buf: PoolBuf,
-    ) -> impl std::future::Future<Output = ()> + 'static + Send {
-        buf.reset();
-        self.0.release(buf)
-    }
-
-    /// Acquire a buf from the pool.
-    pub fn acquire(&self) -> impl std::future::Future<Output = PoolBuf> + 'static + Send {
-        self.0.acquire_or_else(PoolBuf::new)
+        self.0.as_mut().unwrap()
     }
 }

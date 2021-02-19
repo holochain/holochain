@@ -149,7 +149,7 @@ impl FramedReader {
                 let want_size = read_size(&inner.local_buf[..4]) - 4 - 8;
                 let msg_id = read_msg_id(&inner.local_buf[4..4 + 8]);
 
-                let mut buf = BUF_POOL.acquire().await;
+                let mut buf = PoolBuf::new();
                 buf.reserve(want_size);
 
                 while buf.len() < want_size {
@@ -160,10 +160,7 @@ impl FramedReader {
                         .await
                         .map_err(KitsuneError::other)
                     {
-                        Err(e) => {
-                            BUF_POOL.release(buf).await;
-                            return Err(e);
-                        }
+                        Err(e) => return Err(e),
                         Ok(read) => read,
                     };
                     buf.extend_from_slice(&inner.local_buf[..read]);
@@ -221,13 +218,12 @@ impl FramedWriter {
                 let combine = (total as usize) < POOL_BUF_MAX_CAPACITY;
 
                 if combine {
-                    let mut buf = BUF_POOL.acquire().await;
+                    let mut buf = PoolBuf::new();
                     buf.reserve(total as usize);
                     buf.extend_from_slice(&total.to_le_bytes()[..]);
                     buf.extend_from_slice(&msg_id.inner().to_le_bytes()[..]);
                     buf.extend_from_slice(data);
                     let res = inner.sub.write_all(&buf).await.map_err(KitsuneError::other);
-                    BUF_POOL.release(buf).await;
                     res?;
                 } else {
                     let mut buf = [0_u8; 4 + 8];
@@ -314,7 +310,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_framed() {
-        let (send, recv) = util::bound_async_mem_channel(4096).await;
+        let (send, recv) = util::bound_async_mem_channel(4096);
         let mut send = FramedWriter::new(send);
         let mut recv = FramedReader::new(recv);
 

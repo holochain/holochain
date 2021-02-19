@@ -32,9 +32,7 @@ static NEXT_MESSAGE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64
 
 fn codec() {
     T.get_or_init(|| {
-        let (send, recv) = futures::executor::block_on(
-            RUNTIME.enter(|| async move { util::bound_async_mem_channel(4096).await }),
-        );
+        let (send, recv) = util::bound_async_mem_channel(4096);
         tokio::sync::Mutex::new(Some((
             CodecWriter::new(FramedWriter::new(send)),
             CodecReader::new(FramedReader::new(recv)),
@@ -46,7 +44,7 @@ fn codec() {
             let (mut send, mut recv) = T.get().unwrap().lock().await.take().unwrap();
 
             let wt = tokio::task::spawn(async move {
-                let mut buf = BUF_POOL.acquire().await;
+                let mut buf = PoolBuf::new();
                 buf.extend_from_slice(DATA);
                 let msg = Test::one(buf);
                 send.write_request(
@@ -56,11 +54,6 @@ fn codec() {
                 )
                 .await
                 .unwrap();
-
-                #[allow(irrefutable_let_patterns)]
-                if let Test::One(One { data }) = msg {
-                    BUF_POOL.release(data).await;
-                }
 
                 send
             });

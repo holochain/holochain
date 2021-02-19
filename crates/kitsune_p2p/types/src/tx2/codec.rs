@@ -2,9 +2,6 @@ use crate::codec::*;
 use crate::tx2::*;
 use crate::*;
 
-// NOTE - this is the termination point for PoolBuf usage...
-//        we need to be extra careful in here to return them.
-
 /// Result type returned from CodecReader::read
 #[derive(Debug)]
 pub enum CodecMessage<C: Codec> {
@@ -59,21 +56,11 @@ impl<C: Codec> CodecReader<C> {
         };
 
         let mut out = Vec::new();
-        let mut err = None;
         for (msg_id, data) in received {
-            if err.is_some() {
-                BUF_POOL.release(data).await;
-                continue;
-            }
             let (_, dec) = match C::decode_ref(&data) {
-                Err(e) => {
-                    err = Some(e);
-                    BUF_POOL.release(data).await;
-                    continue;
-                }
+                Err(e) => return Err(KitsuneError::other(e)),
                 Ok(dec) => dec,
             };
-            BUF_POOL.release(data).await;
             if msg_id.is_notify() {
                 out.push(CodecMessage::Notify(dec));
             } else if msg_id.is_req() {
@@ -81,10 +68,6 @@ impl<C: Codec> CodecReader<C> {
             } else {
                 out.push(CodecMessage::Response(msg_id.as_id(), dec));
             }
-        }
-
-        if let Some(e) = err {
-            return Err(KitsuneError::other(e));
         }
 
         self.0 = Some(inner);
@@ -121,7 +104,7 @@ impl<C: Codec> CodecWriter<C> {
             Some(inner) => inner,
         };
 
-        let mut buf = BUF_POOL.acquire().await;
+        let mut buf = PoolBuf::new();
 
         let (msg_id, c) = match msg {
             CodecMessageRef::Notify(c) => (MsgId::new_notify(), c),
@@ -130,16 +113,13 @@ impl<C: Codec> CodecWriter<C> {
         };
 
         if let Err(e) = c.encode(&mut *buf) {
-            BUF_POOL.release(buf).await;
             return Err(KitsuneError::other(e));
         }
 
         if let Err(e) = inner.sub.write(msg_id, &buf, timeout).await {
-            BUF_POOL.release(buf).await;
             return Err(e);
         }
 
-        BUF_POOL.release(buf).await;
         self.0 = Some(inner);
         Ok(())
     }
@@ -198,7 +178,7 @@ mod tests {
             }
         }
 
-        let (send, recv) = util::bound_async_mem_channel(4096).await;
+        let (send, recv) = util::bound_async_mem_channel(4096);
         let mut send = <CodecWriter<Test>>::new(FramedWriter::new(send));
         let mut recv = <CodecReader<Test>>::new(FramedReader::new(recv));
 

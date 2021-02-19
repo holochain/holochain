@@ -53,17 +53,17 @@ pub fn parse_latency_info(buf: &[u8]) -> Result<std::time::Duration, ()> {
 }
 
 /// Construct a bound async read/write memory channel
-pub async fn bound_async_mem_channel(
+pub fn bound_async_mem_channel(
     max_bytes: usize,
 ) -> (
     Box<dyn futures::io::AsyncWrite + 'static + Send + Unpin>,
     Box<dyn futures::io::AsyncRead + 'static + Send + Unpin>,
 ) {
-    let mut buf = BUF_POOL.acquire().await;
+    let mut buf = PoolBuf::new();
     buf.reserve(max_bytes);
 
     let inner = MemInner {
-        buf: Some(buf),
+        buf,
         max_bytes,
         closed: false,
         want_read_waker: None,
@@ -79,19 +79,11 @@ pub async fn bound_async_mem_channel(
 }
 
 struct MemInner {
-    buf: Option<PoolBuf>,
+    buf: PoolBuf,
     max_bytes: usize,
     closed: bool,
     want_read_waker: Option<std::task::Waker>,
     want_write_waker: Option<std::task::Waker>,
-}
-
-impl Drop for MemInner {
-    fn drop(&mut self) {
-        if let Some(buf) = self.buf.take() {
-            tokio::task::spawn(BUF_POOL.release(buf));
-        }
-    }
 }
 
 struct MemWrite(Option<futures::lock::BiLock<MemInner>>);
@@ -143,24 +135,20 @@ impl futures::io::AsyncWrite for MemWrite {
                         )));
                     }
 
-                    let mut loc_buf = lock.buf.take().unwrap();
-
                     let amount = std::cmp::min(
                         4096, //
                         std::cmp::min(
-                            buf.len(),                      //
-                            lock.max_bytes - loc_buf.len(), //
+                            buf.len(),                       //
+                            lock.max_bytes - lock.buf.len(), //
                         ),
                     );
 
                     if amount == 0 {
-                        lock.buf = Some(loc_buf);
                         lock.want_write_waker = Some(cx.waker().clone());
                         break 'res std::task::Poll::Pending;
                     }
 
-                    loc_buf.extend_from_slice(&buf[..amount]);
-                    lock.buf = Some(loc_buf);
+                    lock.buf.extend_from_slice(&buf[..amount]);
                     if let Some(waker) = lock.want_read_waker.take() {
                         waker.wake();
                     }
@@ -259,14 +247,11 @@ impl futures::io::AsyncRead for MemRead {
             match inner.poll_lock(cx) {
                 std::task::Poll::Pending => break 'res std::task::Poll::Pending,
                 std::task::Poll::Ready(mut lock) => {
-                    let mut loc_buf = lock.buf.take().unwrap();
-
-                    if loc_buf.is_empty() {
+                    if lock.buf.is_empty() {
                         if lock.closed {
                             closed = true;
                             break 'res std::task::Poll::Ready(Ok(0));
                         } else {
-                            lock.buf = Some(loc_buf);
                             lock.want_read_waker = Some(cx.waker().clone());
                             break 'res std::task::Poll::Pending;
                         }
@@ -275,14 +260,13 @@ impl futures::io::AsyncRead for MemRead {
                     let amount = std::cmp::min(
                         4096, //
                         std::cmp::min(
-                            buf.len(),     //
-                            loc_buf.len(), //
+                            buf.len(),      //
+                            lock.buf.len(), //
                         ),
                     );
 
-                    buf[..amount].copy_from_slice(&loc_buf[..amount]);
-                    loc_buf.truncate_front(amount);
-                    lock.buf = Some(loc_buf);
+                    buf[..amount].copy_from_slice(&lock.buf[..amount]);
+                    lock.buf.truncate_front(amount);
                     if let Some(waker) = lock.want_write_waker.take() {
                         waker.wake();
                     }
@@ -327,7 +311,7 @@ mod tests {
     }
 
     async fn _inner_test_async_bound_mem_channel(bind_size: usize, buf_size: usize) {
-        let (mut send, mut recv) = bound_async_mem_channel(bind_size).await;
+        let (mut send, mut recv) = bound_async_mem_channel(bind_size);
 
         let rt = tokio::task::spawn(async move {
             let mut read_buf = vec![0_u8; buf_size];

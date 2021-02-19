@@ -21,9 +21,7 @@ static T: OnceCell<tokio::sync::Mutex<Option<(FramedWriter, FramedReader)>>> = O
 
 fn framed() {
     T.get_or_init(|| {
-        let (send, recv) = futures::executor::block_on(
-            RUNTIME.enter(|| async move { util::bound_async_mem_channel(4096).await }),
-        );
+        let (send, recv) = util::bound_async_mem_channel(4096);
         tokio::sync::Mutex::new(Some((FramedWriter::new(send), FramedReader::new(recv))))
     });
 
