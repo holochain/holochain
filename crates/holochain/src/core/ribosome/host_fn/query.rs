@@ -28,7 +28,7 @@ pub mod slow_tests {
         core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator,
     };
     use ::fixt::prelude::*;
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
     use holochain_lmdb::test_utils::TestEnvironment;
     use query::ChainQueryFilter;
 

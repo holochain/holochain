@@ -1,5 +1,5 @@
 [package]
-name = "hdk3_derive"
+name = "hdk_derive"
 version = "0.0.1"
 description = "derive macros for third iteration of the holochain hdk"
 license = "Apache-2.0"

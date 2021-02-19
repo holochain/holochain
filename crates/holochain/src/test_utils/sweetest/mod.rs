@@ -20,7 +20,7 @@ pub use sweet_dna::*;
 pub use sweet_network::*;
 pub use sweet_zome::*;
 
-use hdk3::prelude::Element;
+use hdk::prelude::Element;
 use holochain_serialized_bytes::prelude::*;
 
 /// Necessary for parsing the output of a simple "get entry"

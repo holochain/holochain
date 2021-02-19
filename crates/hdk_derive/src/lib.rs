@@ -105,7 +105,7 @@ impl Parse for EntryDef {
 impl quote::ToTokens for CrdtType {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         tokens.append_all(quote::quote! {
-            hdk3::prelude::CrdtType
+            hdk::prelude::CrdtType
         });
     }
 }
@@ -115,7 +115,7 @@ impl quote::ToTokens for EntryDefId {
         match &self.0 {
             holochain_zome_types::entry_def::EntryDefId::App(s) => {
                 tokens.append_all(quote::quote! {
-                    hdk3::prelude::EntryDefId::App(String::from(#s))
+                    hdk::prelude::EntryDefId::App(String::from(#s))
                 });
             }
             _ => unreachable!(),
@@ -127,7 +127,7 @@ impl quote::ToTokens for RequiredValidations {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let u = <u8>::from(self.0);
         tokens.append_all(quote::quote! {
-            hdk3::prelude::RequiredValidations::from(#u)
+            hdk::prelude::RequiredValidations::from(#u)
         });
     }
 }
@@ -142,7 +142,7 @@ impl quote::ToTokens for EntryVisibility {
             proc_macro2::Span::call_site(),
         );
         tokens.append_all(quote::quote! {
-            hdk3::prelude::EntryVisibility::#variant
+            hdk::prelude::EntryVisibility::#variant
         });
     }
 }
@@ -159,7 +159,7 @@ impl quote::ToTokens for RequiredValidationType {
             proc_macro2::Span::call_site(),
         );
         tokens.append_all(quote::quote! {
-            hdk3::prelude::RequiredValidationType::#variant
+            hdk::prelude::RequiredValidationType::#variant
         });
     }
 }
@@ -173,7 +173,7 @@ impl quote::ToTokens for EntryDef {
         let required_validation_type = RequiredValidationType(self.0.required_validation_type);
 
         tokens.append_all(quote::quote! {
-            hdk3::prelude::EntryDef {
+            hdk::prelude::EntryDef {
                 id: #id,
                 visibility: #visibility,
                 crdt_type: #crdt_type,
@@ -196,9 +196,9 @@ pub fn hdk_entry(attrs: TokenStream, code: TokenStream) -> TokenStream {
     let entry_def = syn::parse_macro_input!(attrs as EntryDef);
 
     (quote::quote! {
-        #[derive(serde::Serialize, serde::Deserialize, hdk3::prelude::SerializedBytes, std::fmt::Debug)]
+        #[derive(serde::Serialize, serde::Deserialize, hdk::prelude::SerializedBytes, std::fmt::Debug)]
         #item
-        hdk3::prelude::entry_def!(#struct_ident #entry_def);
+        hdk::prelude::entry_def!(#struct_ident #entry_def);
     })
     .into()
 }

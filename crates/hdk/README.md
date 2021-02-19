@@ -1,4 +1,4 @@
-# Holochain Development Kit 3.0 (HDK3)
+# Holochain Development Kit 3.0 (HDK)
 
 This is the third major iteration of the holochain development kit.
 

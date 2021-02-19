@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 /// Create capability claims on the local source chain.
 ///
-/// Wraps the [ `create` ] HDK3 function with system type parameters set.
+/// Wraps the [ `create` ] HDK function with system type parameters set.
 /// This guards against sending application entry data or setting the wrong entry type.
 ///
 /// Capability claims are grant _secrets_ that have been received from someone else.
@@ -36,7 +36,7 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<HeaderHa
 
 /// Create a capability grant.
 ///
-/// Wraps the [ `create` ] HDK3 function with system type parameters set.
+/// Wraps the [ `create` ] HDK function with system type parameters set.
 /// This guards against sending application entry data or setting the wrong entry type.
 ///
 /// Capability grants are explicit entries in the local source chain that grant access to functions running in the current conductor.
@@ -127,7 +127,7 @@ pub fn create_cap_grant(cap_grant_entry: CapGrantEntry) -> ExternResult<HeaderHa
 
 /// Delete a capability grant.
 ///
-/// Wraps the [ `delete` ] HDK3 function with system type parameters set.
+/// Wraps the [ `delete` ] HDK function with system type parameters set.
 /// This guards against deleting application entries or setting the wrong entry type.
 ///
 /// Capability grants can be deleted like other entries.
@@ -145,7 +145,7 @@ pub fn delete_cap_grant(hash: HeaderHash) -> ExternResult<HeaderHash> {
 
 /// Generate secrets for capability grants.
 ///
-/// Wraps the [ `random_bytes` ] HDK3 function with appropriate parameters set.
+/// Wraps the [ `random_bytes` ] HDK function with appropriate parameters set.
 /// Generates 512 bits of cryptographic strength randomness to form the secret for a capability grant.
 ///
 /// It is strongly recommended to always use this function for generating capability grant secrets.
@@ -170,7 +170,7 @@ pub fn generate_cap_secret() -> ExternResult<CapSecret> {
 
 /// Update a capability secret.
 ///
-/// Wraps the [ `update` ] HDK3 function with system type parameters set.
+/// Wraps the [ `update` ] HDK function with system type parameters set.
 /// This guards against updating application entries or setting the wrong entry types.
 ///
 /// Capability grant updates work exactly as a delete+create of the old+new grant entries.

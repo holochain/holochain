@@ -1,7 +1,7 @@
 use fallible_iterator::FallibleIterator;
-use hdk3::prelude::Element;
-use hdk3::prelude::EntryType;
-use hdk3::prelude::ValidationPackage;
+use hdk::prelude::Element;
+use hdk::prelude::EntryType;
+use hdk::prelude::ValidationPackage;
 use holo_hash::HeaderHash;
 use holochain_lmdb::env::EnvironmentRead;
 use holochain_lmdb::fresh_reader_test;

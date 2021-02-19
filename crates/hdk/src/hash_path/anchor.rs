@@ -7,8 +7,8 @@ use holochain_wasmer_guest::*;
 ///
 /// Forms the entry point to all anchors so that agents can navigate down the tree from here.
 ///
-/// The string "hdk3anchor".
-pub const ROOT: &str = "hdk3anchor";
+/// The string "hdkanchor".
+pub const ROOT: &str = "hdkanchor";
 
 #[derive(PartialEq, SerializedBytes, serde::Serialize, serde::Deserialize, Debug, Clone)]
 /// An anchor can only be 1 or 2 levels deep as "type" and "text".
@@ -172,15 +172,15 @@ pub fn list_anchor_tags(anchor_type: String) -> ExternResult<Vec<String>> {
 #[cfg(test)]
 #[test]
 fn hash_path_root() {
-    assert_eq!(ROOT, "hdk3anchor");
+    assert_eq!(ROOT, "hdkanchor");
 }
 
 #[cfg(test)]
 #[test]
 fn hash_path_anchor_path() {
     for (atype, text, path_string) in vec![
-        ("foo", None, "hdk3anchor.foo"),
-        ("foo", Some("bar".to_string()), "hdk3anchor.foo.bar"),
+        ("foo", None, "hdkanchor.foo"),
+        ("foo", Some("bar".to_string()), "hdkanchor.foo.bar"),
     ] {
         assert_eq!(
             Path::from(path_string),

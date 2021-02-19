@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 entry_defs![Path::entry_def()];
 
@@ -10,7 +10,7 @@ fn path(s: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 fn query(args: QueryFilter) -> ExternResult<Vec<Element>> {
-    hdk3::prelude::query(args)
+    hdk::prelude::query(args)
 }
 
 #[hdk_extern]

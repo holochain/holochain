@@ -51,7 +51,7 @@ pub mod slow_tests {
     use crate::test_utils::wait_for_integration_10s;
     use crate::test_utils::WaitOps;
     use ::fixt::prelude::*;
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
     use holochain_test_wasm_common::*;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
@@ -289,7 +289,7 @@ pub mod slow_tests {
         .unwrap();
 
         let result = handle.call_zome(invocation).await.unwrap().unwrap();
-        let links: hdk3::prelude::Links = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+        let links: hdk::prelude::Links = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
             .decode()
             .unwrap();
         assert_eq!(links.into_inner().len(), 1);

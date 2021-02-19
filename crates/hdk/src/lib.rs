@@ -1,20 +1,20 @@
-//! ## Holochain Development Kit 3.0 (HDK3)
+//! ## Holochain Development Kit 3.0 (HDK)
 //!
 //! This is the third major iteration of the Holochain Development Kit.
 //!
-//! The HDK3 exists to make working with WASM in holochain much easier.
+//! The HDK exists to make working with WASM in holochain much easier.
 //!
 //! Hopefully you dont' notice the WASMness at all and it just feels like Rust 🦀
 //!
 //! Note: From the perspective of happ development in WASM the 'guest' is the WASM and the 'host' is the running holochain conductor.
 //! The host is _not_ the 'host operating system' in this context.
 //!
-//! ### HDK3 has layers 🧅
+//! ### HDK has layers 🧅
 //!
-//! HDK3 is designed in layers so that there is some kind of 80/20 rule.
+//! HDK is designed in layers so that there is some kind of 80/20 rule.
 //! The code is not strictly organised this way but you'll get a feel for it as you write your own happs.
 //!
-//! Roughly speaking, 80% of your apps can be production ready using just 20% of the HDK3 features and code.
+//! Roughly speaking, 80% of your apps can be production ready using just 20% of the HDK features and code.
 //! These are the 'high level' functions such as [ `crate::entry::create_entry` ] and macros like [ `#[hdk_extern]` ].
 //! Every holochain function is available with a typed and documented wrapper and there is a set of macros for exposing functions and defining entries.
 //!
@@ -30,9 +30,9 @@
 //! The lowest layer is the structs and serialization that define how the host and the guest communicate.
 //! You cannot change this but you can reimplement it in your language of choice (e.g. Haskell?) by referencing the Rust zome types and extern function signatures.
 //!
-//! ### HDK3 should be pinned 📌
+//! ### HDK should be pinned 📌
 //!
-//! The basic functionality of the HDK3 is to communicate with the holochain conductor using a specific typed interface.
+//! The basic functionality of the HDK is to communicate with the holochain conductor using a specific typed interface.
 //!
 //! If any of the following change relative to the conductor your wasm _will_ have bugs:
 //!
@@ -43,27 +43,27 @@
 //! - Callbacks the guest needs to provide to the host
 //!
 //! For this reason we have dedicated crates for serialization and memory handling that rarely change.
-//! HDK3 references these crates with `=x.y.z` syntax in Cargo.toml to be explicit about this.
+//! HDK references these crates with `=x.y.z` syntax in Cargo.toml to be explicit about this.
 //!
-//! HDK3 itself has a slower release cycle than the holochain conductor by design to make it easier to pin and track changes.
+//! HDK itself has a slower release cycle than the holochain conductor by design to make it easier to pin and track changes.
 //!
-//! You should pin your dependency on HDK3 using the `=x.y.z` syntax too!
+//! You should pin your dependency on HDK using the `=x.y.z` syntax too!
 //!
 //! You do _not_ need to pin _all_ your Rust dependencies, just those that take part in defining the host/guest interface.
 //!
-//! ### HDK3 has many simple example zomes 🍭
+//! ### HDK has many simple example zomes 🍭
 //!
-//! The HDK3 is used in all the wasms used to test holochain itself.
+//! The HDK is used in all the wasms used to test holochain itself.
 //! As they are used directly by tests in CI they are guaranteed to compile and work for at least the tests we define against them.
 //!
 //! At the time of writing there were about 40 example/test wasms that can be browsed [on github](https://github.com/holochain/holochain/tree/develop/crates/test_utils/wasm/wasm_workspace).
 //!
-//! Each example wasm is a minimal demonstration of specific HDK3 functionality, such as generating random data, creating entries or defining validation callbacks.
+//! Each example wasm is a minimal demonstration of specific HDK functionality, such as generating random data, creating entries or defining validation callbacks.
 //! Some of the examples are very contrived, none are intended as production grade happ examples, but do highlight key functionality.
 //!
-//! ### HDK3 code structure 🧱
+//! ### HDK code structure 🧱
 //!
-//! HDK3 implements several key features:
+//! HDK implements several key features:
 //!
 //! - Capabilities and function level access control: capability module
 //! - Application data and entry definitions for the source chain and DHT: entry module and `entry_defs` callback
@@ -80,14 +80,14 @@
 //!
 //! Generally these features are structured logically into modules but there are some affordances to the layering of abstractions.
 //!
-//! ### HDK3 is based on callbacks 👂
+//! ### HDK is based on callbacks 👂
 //!
 //! The only way to execute logic inside WASM is by having the host/conductor call a function that is marked as an 'extern' by the guest.
 //!
 //! Similarly, the only way for the guest to do anything other than process data and calculations is to call functions the host provides to the guest at runtime.
 //!
-//! The latter are all defined by the holochain conductor and implemented by HDK3 for you, but the former need to all be defined by your application.
-//! Any wasm that does _not_ use the HDK3 will need to define placeholders for and the interface to the host functions.
+//! The latter are all defined by the holochain conductor and implemented by HDK for you, but the former need to all be defined by your application.
+//! Any wasm that does _not_ use the HDK will need to define placeholders for and the interface to the host functions.
 //!
 //! All host functions can be called directly as:
 //!
@@ -96,7 +96,7 @@
 //! let _output: ExternResult<OutputType> = host_call::<InputType, OutputType>(__host_extern_name, input);
 //! ```
 //!
-//! And every host function defined by holochain has a convenience wrapper in HDK3 that does the type juggling for you.
+//! And every host function defined by holochain has a convenience wrapper in HDK that does the type juggling for you.
 //!
 //! To extend a Rust function so that it can be called by the host, add the `#[hdk_extern]` attribute.
 //!
@@ -178,7 +178,7 @@
 //!   - <entry_id> is the entry id defined by entry defs e.g. "comment"
 //!   - Only the originating zome is called
 //!
-//! ### HDK3 is atomic on the source chain ⚛
+//! ### HDK is atomic on the source chain ⚛
 //!
 //! All writes to the source chain are atomic within a single extern/callback call.
 //!
@@ -191,7 +191,7 @@
 //!
 //! Use a post commit hook and signals or remote calls if you need to notify other agents about completed commits.
 //!
-//! ### HDK3 is integrated with rust tracing for better debugging 🐛
+//! ### HDK is integrated with rust tracing for better debugging 🐛
 //!
 //! Every extern defined with the `#[hdk_extern]` attribute registers a [tracing subscriber](https://crates.io/crates/tracing-subscriber) that works in WASM.
 //!
@@ -203,7 +203,7 @@
 //!
 //! The most common internal errors, such as invalid deserialization between wasm and external processes, are traced as `error!` by default.
 //!
-//! ### HDK3 requires explicit error handling between the guest and host ⚠
+//! ### HDK requires explicit error handling between the guest and host ⚠
 //!
 //! All calls to functions provided by the host can fail to execute cleanly, at the least serialization could always fail.
 //!
@@ -335,7 +335,7 @@ pub mod hash_path;
 /// - Accept `serde::Serialize + std::fmt::Debug` input
 /// - Return `Result<O, WasmError>` (`ExternResult`) output where `O: serde::Serialize + std::fmt::Debug`
 ///
-/// This module only defines macros so check the HDK3 crate root to see more documentation.
+/// This module only defines macros so check the HDK crate root to see more documentation.
 ///
 /// A _new_ extern function is created with the same name as the function with the `#[hdk_extern]` attribute.
 /// The new extern is placed in a child module of the current scope.
@@ -345,7 +345,7 @@ pub mod hash_path;
 ///
 /// - Extern syntax for Rust
 /// - Receiving the serialized bytes from the host at a memory pointer specified by the guest
-/// - Setting the HDK3 wasm tracing subscriber as the global default
+/// - Setting the HDK wasm tracing subscriber as the global default
 /// - Deserializing the input from the host
 /// - Calling the function annotated with `#[hdk_extern]`
 /// - Serializing the result
@@ -460,7 +460,7 @@ pub mod link;
 /// @todo introduce a pubsub mechanism
 pub mod p2p;
 
-/// Integrates HDK3 with the Rust tracing crate.
+/// Integrates HDK with the Rust tracing crate.
 ///
 /// The functions and structs in this module do _not_ need to be used directly.
 /// The `#[hdk_extern]` attribute on functions exposed externally all set the `WasmSubscriber` as the global default.

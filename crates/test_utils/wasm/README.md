@@ -9,7 +9,7 @@ This crate contains:
 
 These Wasm crates _directly_ test the host/guest implementation of Holochain without going through an HDK or other convenience interface.
 
-We do this to make sure that it stays reasonably easy to interact with Holochain without using the `hdk3` and `holochain_wasmer_*` crates.
+We do this to make sure that it stays reasonably easy to interact with Holochain without using the `hdk` and `holochain_wasmer_*` crates.
 
 The tests that run this Wasm generally sit in the [`ribosome.rs` module in core][ribosome]. This is necessary because the Wasm crates depend on certain global functions that core defines and needs to inject.
 
