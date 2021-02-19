@@ -91,7 +91,7 @@ pub fn delete_entry(hash: HeaderHash) -> ExternResult<HeaderHash> {
 /// oldest live element.
 /// However there is no way to _generate_ a header hash directly from a header from inside wasm.
 /// [ `Element` ] values (entry+header pairs returned by [ `get` ] etc.) contain prehashed header structs
-/// called [ `HeaderHashed` ], which is alongside the "raw" [ `Header` ] value. Generally the pre-hashing is
+/// called [ `HeaderHashed` ], which is composed of a [ `HeaderHash` ] alongside the "raw" [ `Header` ] value. Generally the pre-hashing is
 /// more efficient than hashing headers ad-hoc as hashing always needs to be done at the database
 /// layer, so we want to re-use that as much as possible.
 /// The header hash can be extracted from the Element as `element.header_hashed().as_hash()`.
