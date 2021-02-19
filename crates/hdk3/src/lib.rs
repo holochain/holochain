@@ -263,7 +263,7 @@ pub mod capability;
 /// CRUD in holochain is represented as a graph/tree of entries referencing each other representing new states of a shared identity.
 /// Because the network is always subject to the possibility of partitions, there is no way to assert an objective truth about the 'current' or 'real' value that all participants will agree on.
 /// This is a key difference between holochain and blockchains.
-/// Where blockchains define a consensus algorithm that brings all participants as close as possible to a single value while holochain lets each paritipant discover their own truth.
+/// Where blockchains define a consensus algorithm that brings all participants as close as possible to a single value while holochain lets each participant discover their own truth.
 ///
 /// The practical implication of this is that agents fetch as much information as they can from the network then follow an algorithm to 'walk' or 'reduce' the revisions and discover 'current' for themselves.
 ///
