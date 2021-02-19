@@ -86,7 +86,7 @@ macro_rules! holochain_externs {
             __encrypt,
             __zome_info,
             __call_info,
-            __bundle_info,
+            __app_info,
             __random_bytes,
             __sys_time,
             __agent_info,

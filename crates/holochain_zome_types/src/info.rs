@@ -30,7 +30,7 @@ pub struct AgentInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct BundleInfo;
+pub struct AppInfo;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DnaInfo;

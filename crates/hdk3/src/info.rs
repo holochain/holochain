@@ -14,13 +14,13 @@ pub fn agent_info() -> ExternResult<AgentInfo> {
 }
 
 /// @todo Not implemented
-pub fn bundle_info() -> ExternResult<BundleInfo> {
-    host_call::<(), BundleInfo>(__bundle_info, ())
+pub fn app_info() -> ExternResult<AppInfo> {
+    host_call::<(), AppInfo>(__app_info, ())
 }
 
 /// @todo Not implemented
 pub fn dna_info() -> ExternResult<DnaInfo> {
-    host_call::<(), DnaInfo>(__bundle_info, ())
+    host_call::<(), DnaInfo>(__dna_info, ())
 }
 
 /// Get the zome information.

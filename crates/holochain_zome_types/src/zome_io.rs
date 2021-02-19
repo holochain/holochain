@@ -85,7 +85,7 @@ wasm_io_types! {
     fn agent_info (()) -> zt::info::AgentInfo;
 
     // @todo
-    fn bundle_info (()) -> zt::info::BundleInfo;
+    fn app_info (()) -> zt::info::AppInfo;
 
     // @todo
     fn dna_info (()) -> zt::info::DnaInfo;
