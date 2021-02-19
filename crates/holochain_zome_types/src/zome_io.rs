@@ -163,7 +163,7 @@ wasm_io_types! {
     fn sleep (core::time::Duration) -> ();
 
     // @todo
-    fn version (()) -> zt::version::Version;
+    fn version (()) -> zt::version::ZomeApiVersion;
 
     // Attempt to have the keystore sign some data
     // The pubkey in the input needs to be found in the keystore for this to work
