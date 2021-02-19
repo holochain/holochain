@@ -27,7 +27,7 @@ pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResu
     host_call::<UpdateInput, HeaderHash>(__update, UpdateInput::new(hash, entry_with_def_id))
 }
 
-/// General that can delete any entry type.
+/// General function that can delete any entry type.
 ///
 /// This is used under the hood by [ `delete_entry` ], [ `delete_cap_grant` ] and `delete_cap_claim`.
 /// @todo implement delete_cap_claim
