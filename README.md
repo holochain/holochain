@@ -36,7 +36,7 @@ This nix-shell flavor installs wrapper binaries for `holochain` and `dna-util` t
 
 Another way to install the `holochain` and `dna-util` binaries (if the previous didn't work) is by using rust
 
-[Install Rust](https://www.cloudbooklet.com/install-rust-on-ubuntu-18-04-lts/) 
+[Install Rust](https://www.rust-lang.org/tools/install) 
 
 Install holochain binaries:
 ```
