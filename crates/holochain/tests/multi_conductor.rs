@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 use holochain::conductor::config::ConductorConfig;
 use holochain::test_utils::host_fn_caller::Post;
 use holochain::test_utils::show_authored;

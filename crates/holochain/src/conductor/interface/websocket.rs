@@ -358,7 +358,6 @@ pub mod test {
     use holochain_lmdb::fresh_reader_test;
     use holochain_lmdb::test_utils::test_environments;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_state::source_chain::SourceChainBuf;
     use holochain_types::app::InstallAppDnaPayload;
     use holochain_types::app::InstallAppPayload;
     use holochain_types::app::InstalledCell;
@@ -629,6 +628,15 @@ pub mod test {
 
         assert_eq!(expected, cell_ids);
 
+        // Check that it is returned in get_app_info as active
+        let maybe_info = state.get_app_info(&"test app".to_string());
+        if let Some(info) = maybe_info {
+            assert_eq!(info.installed_app_id, "test app");
+            assert!(info.active);
+        } else {
+            assert!(false);
+        }
+
         // Now deactivate app
         let msg = AdminRequest::DeactivateApp {
             installed_app_id: "test app".to_string(),
@@ -664,6 +672,16 @@ pub mod test {
             .collect();
 
         assert_eq!(expected, cell_ids);
+
+        // Check that it is returned in get_app_info as not active
+        let maybe_info = state.get_app_info(&"test app".to_string());
+        if let Some(info) = maybe_info {
+            assert_eq!(info.installed_app_id, "test app");
+            assert!(!info.active);
+        } else {
+            assert!(false);
+        }
+
         conductor_handle.shutdown().await;
         shutdown.await.unwrap();
     }
@@ -713,15 +731,11 @@ pub mod test {
             setup_admin_fake_cells(vec![(cell_id.clone(), None)], dna_store).await;
         let conductor_handle = activate(conductor_handle).await;
         let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
-
-        // Set some state
-        let cell_env = conductor_handle.get_cell_env(&cell_id).await.unwrap();
+        // Allow agents time to join
+        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
 
         // Get state
-        let expected = {
-            let source_chain = SourceChainBuf::new(cell_env.clone().into()).unwrap();
-            source_chain.dump_as_json().await.unwrap()
-        };
+        let expected = conductor_handle.dump_cell_state(&cell_id).await.unwrap();
 
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::DumpState {
@@ -777,7 +791,10 @@ pub mod test {
             .collect::<Vec<_>>();
         let p2p_store = AgentKv::new(env.clone().into()).unwrap();
 
-        // - Check no data in the store to start
+        // - Give time for the agents to join the network.
+        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+
+        // - Check no extra data in the store to start
         let count = fresh_reader_test!(env, |r| p2p_store
             .as_store_ref()
             .iter(&r)

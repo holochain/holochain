@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 mod countree;
 
 entry_defs![countree::CounTree::entry_def()];

@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 #[hdk_extern]
 fn validate_agent(_: Element) -> ExternResult<ValidateCallbackResult> {

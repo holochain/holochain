@@ -1319,11 +1319,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 
 [[package]]
-name = "hdk3"
+name = "hdk"
 version = "0.0.1"
 dependencies = [
  "fixt",
- "hdk3_derive",
+ "hdk_derive",
  "holo_hash",
  "holochain_wasmer_guest",
  "holochain_zome_types",
@@ -1337,7 +1337,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hdk3_derive"
+name = "hdk_derive"
 version = "0.0.1"
 dependencies = [
  "holochain_zome_types",
@@ -1407,7 +1407,7 @@ dependencies = [
  "fixt",
  "futures",
  "ghost_actor",
- "hdk3",
+ "hdk",
  "holo_hash",
  "holochain_cascade",
  "holochain_conductor_api",
@@ -1473,8 +1473,8 @@ dependencies = [
  "fixt",
  "futures",
  "ghost_actor",
- "hdk3",
- "hdk3_derive",
+ "hdk",
+ "hdk_derive",
  "holo_hash",
  "holochain_lmdb",
  "holochain_p2p",
@@ -1500,6 +1500,7 @@ dependencies = [
  "holo_hash",
  "holochain_p2p",
  "holochain_serialized_bytes",
+ "holochain_state",
  "holochain_types",
  "holochain_zome_types",
  "kitsune_p2p",
@@ -1527,6 +1528,7 @@ dependencies = [
  "holochain_p2p",
  "holochain_types",
  "holochain_websocket",
+ "lazy_static",
  "matches",
  "nanoid",
  "observability",
@@ -1651,7 +1653,7 @@ dependencies = [
  "derive_more",
  "fallible-iterator",
  "fixt",
- "hdk3",
+ "hdk",
  "holo_hash",
  "holochain_keystore",
  "holochain_lmdb",
@@ -1678,7 +1680,7 @@ dependencies = [
 name = "holochain_test_wasm_common"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_serialized_bytes",
  "serde",
  "serde_bytes",

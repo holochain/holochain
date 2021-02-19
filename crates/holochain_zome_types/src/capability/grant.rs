@@ -16,7 +16,7 @@ use std::collections::HashSet;
 ///
 /// A `CapGrant` is valid if it matches the function, agent and secret for a given zome call.
 ///
-/// @see `.is_valid()`
+/// See `.is_valid()`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[allow(clippy::large_enum_variant)]
 pub enum CapGrant {
