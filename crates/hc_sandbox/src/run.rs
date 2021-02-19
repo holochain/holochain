@@ -10,7 +10,7 @@ use tokio::sync::oneshot;
 use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
 use crate::config::*;
-use crate::ports::random_admin_port_if_busy;
+use crate::ports::random_admin_port;
 use crate::ports::set_admin_port;
 use crate::CmdRunner;
 
@@ -71,7 +71,7 @@ pub async fn run_async(
         Some(port) => {
             set_admin_port(&mut config, port);
         }
-        None => random_admin_port_if_busy(&mut config),
+        None => random_admin_port(&mut config),
     }
     let config_path = write_config(sandbox_path.clone(), &config);
     let (tx_config, rx_config) = oneshot::channel();

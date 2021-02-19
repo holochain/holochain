@@ -1,9 +1,12 @@
 //! Definitions of StructOpt options for use in the CLI
 
 use crate::cmds::*;
+use holochain_types::prelude::InstalledAppId;
 use std::path::Path;
 use std::path::PathBuf;
 use structopt::StructOpt;
+
+const DEFAULT_APP_ID: &str = "test-app";
 
 #[derive(Debug, StructOpt)]
 /// Helper for generating, running, and interacting with Holochain Conductor "sandboxes".
@@ -34,13 +37,14 @@ pub enum HcSandboxSubcommand {
     /// A single app will be installed as part of this sandbox.
     /// See the help for the `<dnas>` argument below to learn how to define the app to be installed.
     Generate {
-        /// Number of conductor sandboxes to create.
-        #[structopt(short, long, default_value = "1")]
-        num_conductors: usize,
+        #[structopt(short, long, default_value = DEFAULT_APP_ID)]
+        /// ID for the installed app.
+        /// This is just a String to identify the app by.
+        app_id: InstalledAppId,
 
         /// (flattened)
         #[structopt(flatten)]
-        gen: Create,
+        create: Create,
 
         /// Automatically run the sandbox(es) that were created.
         /// This is effectively a combination of `hc generate` and `hc run`
@@ -74,6 +78,9 @@ pub enum HcSandboxSubcommand {
 
     /// Clean (completely remove) sandboxes that are listed in the `$(pwd)/.hc` file.
     Clean,
+
+    /// Create a fresh sandbox with no apps installed.
+    Create(Create),
 }
 
 /// Options for running a sandbox
@@ -95,12 +102,12 @@ impl HcSandbox {
     pub async fn run(self) -> anyhow::Result<()> {
         match self.command {
             HcSandboxSubcommand::Generate {
-                gen,
+                app_id,
+                create,
                 run,
-                num_conductors,
                 dnas,
             } => {
-                let paths = generate(&self.holochain_path, dnas, num_conductors, gen).await?;
+                let paths = generate(&self.holochain_path, dnas, create, app_id).await?;
                 for (port, path) in self
                     .force_admin_ports
                     .clone()
@@ -146,6 +153,28 @@ impl HcSandbox {
                 crate::save::list(std::env::current_dir()?, verbose)?
             }
             HcSandboxSubcommand::Clean => crate::save::clean(std::env::current_dir()?, Vec::new())?,
+            HcSandboxSubcommand::Create(Create {
+                num_sandboxes,
+                network,
+                root,
+                directories,
+            }) => {
+                let mut paths = Vec::with_capacity(num_sandboxes);
+                msg!(
+                    "Creating {} conductor sandboxes with same settings",
+                    num_sandboxes
+                );
+                for i in 0..num_sandboxes {
+                    let path = crate::generate::generate(
+                        network.clone().map(|n| n.into_inner().into()),
+                        root.clone(),
+                        directories.get(i).cloned(),
+                    )?;
+                    paths.push(path);
+                }
+                crate::save::save(std::env::current_dir()?, paths.clone())?;
+                msg!("Created {:?}", paths);
+            }
         }
 
         Ok(())
@@ -184,11 +213,11 @@ async fn run_n(
 async fn generate(
     holochain_path: &Path,
     dnas: Vec<PathBuf>,
-    num_conductors: usize,
     create: Create,
+    app_id: InstalledAppId,
 ) -> anyhow::Result<Vec<PathBuf>> {
     let dnas = crate::dna::parse_dnas(dnas)?;
-    let paths = crate::sandbox::default_n(holochain_path, num_conductors, create, dnas).await?;
+    let paths = crate::sandbox::default_n(holochain_path, create, dnas, app_id).await?;
     crate::save::save(std::env::current_dir()?, paths.clone())?;
     Ok(paths)
 }
