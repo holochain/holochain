@@ -1,9 +1,12 @@
 #![allow(clippy::never_loop)] // using for block breaking
 //! Utilities to help with developing / testing tx2.
 
+use crate::tx2::*;
 use futures::io::{Error, ErrorKind};
+use once_cell::sync::Lazy;
 
-const TAG: &[u8; 8] = &[0xff, 0xff, 0xff, 0xfe, 0xfe, 0xff, 0xff, 0xff];
+static LOC_EPOCH: Lazy<std::time::Instant> = Lazy::new(std::time::Instant::now);
+const LAT_TAG: &[u8; 8] = &[0xff, 0xff, 0xff, 0xfe, 0xfe, 0xff, 0xff, 0xff];
 
 /// Fill a buffer with data that is readable as latency information.
 /// Note, the minimum message size to get the timing data across is 16 bytes.
@@ -12,14 +15,13 @@ pub fn fill_with_latency_info(buf: &mut [u8]) {
         return;
     }
 
-    let now = std::time::SystemTime::now();
-    let now = now
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs_f64();
+    let epoch = *LOC_EPOCH;
+
+    let now = std::time::Instant::now();
+    let now = now.duration_since(epoch).as_secs_f64();
 
     let mut pat = [0_u8; 16];
-    pat[0..8].copy_from_slice(TAG);
+    pat[0..8].copy_from_slice(LAT_TAG);
     pat[8..16].copy_from_slice(&now.to_le_bytes());
 
     let mut offset = 0;
@@ -30,18 +32,20 @@ pub fn fill_with_latency_info(buf: &mut [u8]) {
     }
 }
 
-/// Return the timestamp microseconds encoded in a latency info buffer.
+/// Return the duration since the time encoded in a latency info buffer.
 /// Returns a unit error if we could not parse the buffer into time data.
-pub fn parse_latency_info(buf: &[u8]) -> Result<std::time::SystemTime, ()> {
+pub fn parse_latency_info(buf: &[u8]) -> Result<std::time::Duration, ()> {
     if buf.len() < 16 {
         return Err(());
     }
     for i in 0..buf.len() - 15 {
-        if &buf[i..i + 8] == TAG {
+        if &buf[i..i + 8] == LAT_TAG {
             let mut time = [0; 8];
             time.copy_from_slice(&buf[i + 8..i + 16]);
             let time = f64::from_le_bytes(time);
-            let time = std::time::UNIX_EPOCH + std::time::Duration::from_secs_f64(time);
+            let now = std::time::Instant::now();
+            let now = now.duration_since(*LOC_EPOCH).as_secs_f64();
+            let time = std::time::Duration::from_secs_f64(now - time);
             return Ok(time);
         }
     }
@@ -49,15 +53,18 @@ pub fn parse_latency_info(buf: &[u8]) -> Result<std::time::SystemTime, ()> {
 }
 
 /// Construct a bound async read/write memory channel
-pub fn bound_async_mem_channel(
+pub async fn bound_async_mem_channel(
     max_bytes: usize,
 ) -> (
     Box<dyn futures::io::AsyncWrite + 'static + Send + Unpin>,
     Box<dyn futures::io::AsyncRead + 'static + Send + Unpin>,
 ) {
+    let mut buf = BUF_POOL.acquire().await;
+    buf.reserve(max_bytes);
+
     let inner = MemInner {
-        buf: Vec::new(),
-        max: max_bytes,
+        buf: Some(buf),
+        max_bytes,
         closed: false,
         want_read_waker: None,
         want_write_waker: None,
@@ -72,11 +79,19 @@ pub fn bound_async_mem_channel(
 }
 
 struct MemInner {
-    buf: Vec<u8>,
-    max: usize,
+    buf: Option<PoolBuf>,
+    max_bytes: usize,
     closed: bool,
     want_read_waker: Option<std::task::Waker>,
     want_write_waker: Option<std::task::Waker>,
+}
+
+impl Drop for MemInner {
+    fn drop(&mut self) {
+        if let Some(buf) = self.buf.take() {
+            tokio::task::spawn(BUF_POOL.release(buf));
+        }
+    }
 }
 
 struct MemWrite(Option<futures::lock::BiLock<MemInner>>);
@@ -112,20 +127,24 @@ impl futures::io::AsyncWrite for MemWrite {
                         unreachable!();
                     }
 
+                    let mut loc_buf = lock.buf.take().unwrap();
+
                     let amount = std::cmp::min(
                         4096, //
                         std::cmp::min(
-                            buf.len(),                 //
-                            lock.max - lock.buf.len(), //
+                            buf.len(),                      //
+                            lock.max_bytes - loc_buf.len(), //
                         ),
                     );
 
                     if amount == 0 {
+                        lock.buf = Some(loc_buf);
                         lock.want_write_waker = Some(cx.waker().clone());
                         break 'res std::task::Poll::Pending;
                     }
 
-                    lock.buf.extend_from_slice(&buf[..amount]);
+                    loc_buf.extend_from_slice(&buf[..amount]);
+                    lock.buf = Some(loc_buf);
                     if let Some(waker) = lock.want_read_waker.take() {
                         waker.wake();
                     }
@@ -210,11 +229,14 @@ impl futures::io::AsyncRead for MemRead {
             match inner.poll_lock(cx) {
                 std::task::Poll::Pending => break 'res std::task::Poll::Pending,
                 std::task::Poll::Ready(mut lock) => {
-                    if lock.buf.is_empty() {
+                    let mut loc_buf = lock.buf.take().unwrap();
+
+                    if loc_buf.is_empty() {
                         if lock.closed {
                             closed = true;
                             break 'res std::task::Poll::Ready(Ok(0));
                         } else {
+                            lock.buf = Some(loc_buf);
                             lock.want_read_waker = Some(cx.waker().clone());
                             break 'res std::task::Poll::Pending;
                         }
@@ -223,13 +245,14 @@ impl futures::io::AsyncRead for MemRead {
                     let amount = std::cmp::min(
                         4096, //
                         std::cmp::min(
-                            buf.len(),      //
-                            lock.buf.len(), //
+                            buf.len(),     //
+                            loc_buf.len(), //
                         ),
                     );
 
-                    buf[..amount].copy_from_slice(&lock.buf[..amount]);
-                    lock.buf.drain(..amount);
+                    buf[..amount].copy_from_slice(&loc_buf[..amount]);
+                    loc_buf.truncate_front(amount);
+                    lock.buf = Some(loc_buf);
                     if let Some(waker) = lock.want_write_waker.take() {
                         waker.wake();
                     }
@@ -269,12 +292,12 @@ mod tests {
             let mut buf = vec![0; i];
             fill_with_latency_info(&mut buf);
             let val = parse_latency_info(&buf).unwrap();
-            assert!(val.elapsed().unwrap().as_micros() < 10_000);
+            assert!(val.as_micros() < 10_000);
         }
     }
 
     async fn _inner_test_async_bound_mem_channel(bind_size: usize, buf_size: usize) {
-        let (mut send, mut recv) = bound_async_mem_channel(bind_size);
+        let (mut send, mut recv) = bound_async_mem_channel(bind_size).await;
 
         let rt = tokio::task::spawn(async move {
             let mut read_buf = vec![0_u8; buf_size];
@@ -284,11 +307,7 @@ mod tests {
                 "mem_chan(bind-{},buf-{}) in: {} us",
                 bind_size,
                 buf_size,
-                parse_latency_info(&read_buf)
-                    .unwrap()
-                    .elapsed()
-                    .unwrap()
-                    .as_micros()
+                parse_latency_info(&read_buf).unwrap().as_micros()
             );
         });
 

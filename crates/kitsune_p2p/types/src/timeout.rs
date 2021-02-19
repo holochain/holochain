@@ -35,12 +35,16 @@ impl KitsuneTimeout {
     }
 
     /// Wrap a future with one that will timeout when this timeout expires.
-    pub fn mix<'a, R, F>(&'a self, f: F) -> impl std::future::Future<Output = KitsuneResult<R>> + 'a + Send
+    pub fn mix<'a, R, F>(
+        &'a self,
+        f: F,
+    ) -> impl std::future::Future<Output = KitsuneResult<R>> + 'a + Send
     where
         R: 'a,
         F: std::future::Future<Output = KitsuneResult<R>> + 'a + Send,
     {
-        let f: futures::future::BoxFuture<'a, KitsuneResult<R>> = futures::future::FutureExt::boxed(f);
+        let f: futures::future::BoxFuture<'a, KitsuneResult<R>> =
+            futures::future::FutureExt::boxed(f);
         let t_fut = tokio::time::delay_for(self.time_remaining());
         async move {
             match futures::future::select(f, t_fut).await {

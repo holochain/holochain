@@ -2,6 +2,9 @@
 
 pub mod util;
 
+mod pool;
+pub use pool::*;
+
 mod async_owned_resource_bucket;
 pub use async_owned_resource_bucket::*;
 

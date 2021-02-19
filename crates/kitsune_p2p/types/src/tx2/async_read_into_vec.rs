@@ -201,7 +201,7 @@ mod tests {
     use crate::*;
 
     async fn _inner_test(byte_count: usize) {
-        let (mut send, recv) = util::bound_async_mem_channel(4096);
+        let (mut send, recv) = util::bound_async_mem_channel(4096).await;
         let mut recv = AsyncReadIntoVecFilter::new(recv);
 
         let wt = tokio::task::spawn(async move {
@@ -223,11 +223,7 @@ mod tests {
         println!(
             "into_vec({}) in: {} us",
             byte_count,
-            util::parse_latency_info(&read)
-                .unwrap()
-                .elapsed()
-                .unwrap()
-                .as_micros()
+            util::parse_latency_info(&read).unwrap().as_micros()
         );
 
         wt.await.unwrap();

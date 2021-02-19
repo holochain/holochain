@@ -630,7 +630,7 @@ mod tests {
     }
 
     async fn _inner_test_async_framed(rcount: usize, byte_count: usize) {
-        let (send, recv) = bound_async_mem_channel(4096 * 10);
+        let (send, recv) = bound_async_mem_channel(4096 * 10).await;
 
         use std::sync::atomic;
         let count1 = Arc::new(atomic::AtomicUsize::new(0));
@@ -653,11 +653,7 @@ mod tests {
                 for (id, data) in frames.as_mut().unwrap().drain(..) {
                     assert_eq!(data.len(), byte_count);
                     let lat = parse_latency_info(&data).unwrap();
-                    println!(
-                        " - {} {} us",
-                        id.as_id(),
-                        lat.elapsed().unwrap().as_micros()
-                    );
+                    println!(" - {} {} us", id.as_id(), lat.as_micros());
                     count2.fetch_add(1, atomic::Ordering::SeqCst);
                 }
             }
