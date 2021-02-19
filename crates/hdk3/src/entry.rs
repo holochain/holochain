@@ -127,7 +127,7 @@ where
 /// Thin wrapper around update for app entries.
 /// The hash is the [ `HeaderHash` ] of the deleted element, the input is a [ `TryInto<EntryWithDefId>` ].
 ///
-/// Updates can reference Elements which contain Entry data -- namely, Creates and other Updates -- but 
+/// Updates can reference Elements which contain Entry data -- namely, Creates and other Updates -- but
 /// not Deletes or system Elements
 ///
 /// As updates can reference elements on other agent's source chains across unpredictable network
