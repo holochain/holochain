@@ -77,7 +77,7 @@ async fn can_add_clone_cell_to_app() {
     let app1 = InstalledApp::new_legacy("no clone", vec![installed_cell.clone()]).unwrap();
     let app2 = InstalledApp::new("yes clone", agent, vec![("nick".into(), slot.clone())]);
 
-    conductor.register_dna(dna).await.unwrap();
+    conductor.register_phenotype(dna).await.unwrap();
     conductor
         .update_state(|mut state| {
             state.active_apps.insert(app1.clone());

@@ -340,7 +340,10 @@ where
         Ok(port)
     }
 
-    pub(super) async fn register_dna(&mut self, dna: DnaFile) -> ConductorResult<()> {
+    pub(super) async fn register_dna_wasm(
+        &self,
+        dna: DnaFile,
+    ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
         let is_full_wasm_dna = dna
             .dna_def()
             .zomes
@@ -349,10 +352,21 @@ where
 
         // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
         if is_full_wasm_dna {
-            let entry_defs = self.put_wasm(dna.clone()).await?;
-            self.dna_store_mut().add_entry_defs(entry_defs);
+            Ok(self.put_wasm(dna.clone()).await?)
+        } else {
+            Ok(Vec::with_capacity(0))
         }
+    }
 
+    pub(super) async fn register_dna_entry_defs(
+        &mut self,
+        entry_defs: Vec<(EntryDefBufferKey, EntryDef)>,
+    ) -> ConductorResult<()> {
+        self.dna_store_mut().add_entry_defs(entry_defs);
+        Ok(())
+    }
+
+    pub(super) async fn register_phenotype(&mut self, dna: DnaFile) -> ConductorResult<()> {
         self.dna_store_mut().add_dna(dna);
         Ok(())
     }
@@ -669,7 +683,7 @@ where
             })
             .await?;
         let child_dna_hash = child_dna.dna_hash().to_owned();
-        self.register_dna(child_dna).await?;
+        self.register_phenotype(child_dna).await?;
         let (_, cell_id) = self
             .update_state_prime(|mut state| {
                 if let Some(app) = state.active_apps.get_mut(installed_app_id) {

@@ -104,6 +104,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// Install a [Dna] in this Conductor
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
+    /// Install just the "code parts" (the wasm and entry defs) of a dna
+    async fn register_genotype(&self, dna: DnaFile) -> ConductorResult<()>;
+
     /// Get the list of hashes of installed Dnas in this Conductor
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
 
@@ -285,7 +288,18 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-        self.conductor.write().await.register_dna(dna).await
+        self.register_genotype(dna.clone()).await?;
+        self.conductor.write().await.register_phenotype(dna).await
+    }
+
+    async fn register_genotype(&self, dna: DnaFile) -> ConductorResult<()> {
+        let entry_defs = self.conductor.read().await.register_dna_wasm(dna).await?;
+        self.conductor
+            .write()
+            .await
+            .register_dna_entry_defs(entry_defs)
+            .await?;
+        Ok(())
     }
 
     async fn load_dnas(&self) -> ConductorResult<()> {
