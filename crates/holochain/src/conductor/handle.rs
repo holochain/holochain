@@ -424,15 +424,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             cell_nick,
             membrane_proof,
         } = payload;
-        let mut conductor = self.conductor.write().await;
-        let cell_id = CellId::new(dna_hash, agent_key);
-        let cells = vec![(cell_id.clone(), membrane_proof)];
-        conductor.genesis_cells(cells, self.clone()).await?;
-        let properties = properties.unwrap_or_else(|| ().into());
-        let cell_id = conductor
-            .add_clone_cell_to_app(&installed_app_id, &cell_nick, properties)
-            .await?;
-        Ok(cell_id)
+        {
+            let conductor = self.conductor.read().await;
+            let cell_id = CellId::new(dna_hash, agent_key);
+            let cells = vec![(cell_id.clone(), membrane_proof)];
+            conductor.genesis_cells(cells, self.clone()).await?;
+        }
+        {
+            let mut conductor = self.conductor.write().await;
+            let properties = properties.unwrap_or_else(|| ().into());
+            let cell_id = conductor
+                .add_clone_cell_to_app(&installed_app_id, &cell_nick, properties)
+                .await?;
+            Ok(cell_id)
+        }
     }
 
     async fn destroy_clone_cell(self: Arc<Self>, _cell_id: CellId) -> ConductorResult<()> {
