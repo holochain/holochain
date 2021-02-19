@@ -89,7 +89,7 @@ impl AsMut<Vec<u8>> for PoolBuf {
 pub static BUF_POOL: Lazy<SharedBufferPool> = Lazy::new(SharedBufferPool::new);
 
 /// A pool of shared buffers to avoid constant re-allocation.
-pub struct SharedBufferPool(AsyncOwnedResourceBucket<PoolBuf>);
+pub struct SharedBufferPool(ResourceBucket<PoolBuf>);
 
 impl Default for SharedBufferPool {
     fn default() -> Self {
@@ -101,7 +101,7 @@ impl SharedBufferPool {
     /// Construct a new SharedBufferPool
     /// ¿ but, maybe you want to use the global static `BUF_POOL` ?
     pub fn new() -> Self {
-        Self(AsyncOwnedResourceBucket::new(None))
+        Self(ResourceBucket::new(None))
     }
 
     /// Release a previously acquired buf to the pool.

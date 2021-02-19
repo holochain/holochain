@@ -5,14 +5,8 @@ pub mod util;
 mod pool;
 pub use pool::*;
 
-mod async_owned_resource_bucket;
-pub use async_owned_resource_bucket::*;
+mod resource_bucket;
+pub use resource_bucket::*;
 
-mod async_read_into_vec;
-pub use async_read_into_vec::*;
-
-mod async_framed;
-pub use async_framed::*;
-
-mod play;
-pub use play::*;
+mod framed;
+pub use framed::*;

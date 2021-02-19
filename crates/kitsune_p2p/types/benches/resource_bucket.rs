@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use kitsune_p2p_types::tx2::AsyncOwnedResourceBucket;
+use kitsune_p2p_types::tx2::ResourceBucket;
 use once_cell::sync::Lazy;
 
 static RUNTIME: Lazy<tokio::runtime::Handle> = Lazy::new(|| {
@@ -15,10 +15,9 @@ static RUNTIME: Lazy<tokio::runtime::Handle> = Lazy::new(|| {
     handle
 });
 
-static BUCKET: Lazy<AsyncOwnedResourceBucket<&'static str>> =
-    Lazy::new(|| AsyncOwnedResourceBucket::new(None));
+static BUCKET: Lazy<ResourceBucket<&'static str>> = Lazy::new(|| ResourceBucket::new(None));
 
-fn async_bucket() {
+fn resource_bucket() {
     futures::executor::block_on(RUNTIME.enter(|| {
         tokio::task::spawn(async move {
             let mut all = Vec::new();
@@ -42,7 +41,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         BUCKET.release("1").await;
         BUCKET.release("2").await;
     });
-    c.bench_function("async_bucket", |b| b.iter(|| async_bucket()));
+    c.bench_function("resource_bucket", |b| b.iter(|| resource_bucket()));
 }
 
 criterion_group!(benches, criterion_benchmark);

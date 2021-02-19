@@ -96,6 +96,20 @@ impl Drop for MemInner {
 
 struct MemWrite(Option<futures::lock::BiLock<MemInner>>);
 
+impl Drop for MemWrite {
+    fn drop(&mut self) {
+        if let Some(inner) = self.0.take() {
+            tokio::task::spawn(async move {
+                let mut lock = inner.lock().await;
+                lock.closed = true;
+                if let Some(waker) = lock.want_read_waker.take() {
+                    waker.wake();
+                }
+            });
+        }
+    }
+}
+
 impl futures::io::AsyncWrite for MemWrite {
     fn poll_write(
         mut self: std::pin::Pin<&mut Self>,
@@ -122,9 +136,11 @@ impl futures::io::AsyncWrite for MemWrite {
                 std::task::Poll::Pending => break 'res std::task::Poll::Pending,
                 std::task::Poll::Ready(mut lock) => {
                     if lock.closed {
-                        // this should never happen, as we should not
-                        // restore the `Some(inner)` on close.
-                        unreachable!();
+                        // reader side closed, shutdown
+                        return std::task::Poll::Ready(Err(Error::new(
+                            ErrorKind::ConnectionAborted,
+                            "ReaderClosed",
+                        )));
                     }
 
                     let mut loc_buf = lock.buf.take().unwrap();
@@ -202,6 +218,20 @@ impl futures::io::AsyncWrite for MemWrite {
 }
 
 struct MemRead(Option<futures::lock::BiLock<MemInner>>);
+
+impl Drop for MemRead {
+    fn drop(&mut self) {
+        if let Some(inner) = self.0.take() {
+            tokio::task::spawn(async move {
+                let mut lock = inner.lock().await;
+                lock.closed = true;
+                if let Some(waker) = lock.want_write_waker.take() {
+                    waker.wake();
+                }
+            });
+        }
+    }
+}
 
 impl futures::io::AsyncRead for MemRead {
     fn poll_read(

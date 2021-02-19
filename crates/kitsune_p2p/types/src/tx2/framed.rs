@@ -3,7 +3,79 @@ use crate::*;
 use futures::io::AsyncReadExt;
 use futures::io::AsyncWriteExt;
 
+const R_MASK: u64 = 1 << 63;
+const R_FILT: u64 = !R_MASK;
+
+/// 64 bit MsgId - the top bit identifies if Request or Response.
+#[derive(Clone, Copy)]
+pub struct MsgId(u64);
+
+impl From<u64> for MsgId {
+    fn from(v: u64) -> Self {
+        Self(v)
+    }
+}
+
+impl From<MsgId> for u64 {
+    fn from(m: MsgId) -> Self {
+        m.0
+    }
+}
+
+impl MsgId {
+    /// Create a new Request-Type MsgId.
+    pub fn new(v: u64) -> Self {
+        Self(v)
+    }
+
+    /// Get the inner raw value.
+    pub fn inner(&self) -> u64 {
+        self.0
+    }
+
+    /// Get the ID-portion ignoring the req/res bit.
+    pub fn as_id(&self) -> u64 {
+        self.0 & R_FILT
+    }
+
+    /// Get this Id as a request-type MsgId.
+    pub fn as_req(&self) -> Self {
+        Self(self.0 & R_FILT)
+    }
+
+    /// Get this Id as a response-type MsgId.
+    pub fn as_res(&self) -> Self {
+        Self(self.0 | R_MASK)
+    }
+
+    /// Is this MsgId a request-type?
+    pub fn is_req(&self) -> bool {
+        self.0 & R_MASK == 0
+    }
+
+    /// Is this MsgId a response-type?
+    pub fn is_res(&self) -> bool {
+        self.0 & R_MASK > 0
+    }
+}
+
+impl std::fmt::Debug for MsgId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let is_req = self.is_req();
+        let is_res = self.is_res();
+        let id = self.as_id();
+        f.debug_struct("MsgId")
+            .field("is_req", &is_req)
+            .field("is_res", &is_res)
+            .field("id", &id)
+            .finish()
+    }
+}
+
 /// Efficiently read framed data from a sub AsyncRead instance.
+/// Note, this is intentionally not a Stream - as TryStreams are hard to work
+/// with, and we then would have no ability to pass individual timeout
+/// values to read operations.
 pub struct FramedReader {
     sub: Box<dyn futures::io::AsyncRead + 'static + Send + Unpin>,
     local_buf: [u8; POOL_BUF_MAX_CAPACITY],
@@ -70,25 +142,34 @@ impl FramedReader {
     }
 }
 
-/// Efficiently write framed data to a sub AsyncWrite instance.
-pub struct FramedWriter {
+struct FramedWriterInner {
     sub: Box<dyn futures::io::AsyncWrite + 'static + Send + Unpin>,
 }
+
+/// Efficiently write framed data to a sub AsyncWrite instance.
+pub struct FramedWriter(Option<FramedWriterInner>);
 
 impl FramedWriter {
     /// Create a new FramedWriter instance.
     pub fn new(sub: Box<dyn futures::io::AsyncWrite + 'static + Send + Unpin>) -> Self {
-        Self { sub }
+        Self(Some(FramedWriterInner { sub }))
     }
 
     /// Write a frame of data to this FramedWriter instance.
+    /// If timeout is exceeded, a timeout error is returned,
+    /// and the stream is closed.
     pub async fn write(
         &mut self,
         msg_id: MsgId,
         data: &[u8],
         timeout: KitsuneTimeout,
     ) -> KitsuneResult<()> {
-        timeout
+        let mut inner = match self.0.take() {
+            None => return Err(KitsuneError::Closed),
+            Some(inner) => inner,
+        };
+
+        if let Err(e) = timeout
             .mix(async {
                 let total: u32 = data.len() as u32 + 4 /* len */ + 8 /* msg_id */;
 
@@ -103,20 +184,20 @@ impl FramedWriter {
                     buf.extend_from_slice(&total.to_le_bytes()[..]);
                     buf.extend_from_slice(&msg_id.inner().to_le_bytes()[..]);
                     buf.extend_from_slice(data);
-                    self.sub
-                        .write_all(&buf)
-                        .await
-                        .map_err(KitsuneError::other)?;
+                    let res = inner.sub.write_all(&buf).await.map_err(KitsuneError::other);
                     BUF_POOL.release(buf).await;
+                    res?;
                 } else {
                     let mut buf = [0_u8; 4 + 8];
                     buf[..4].copy_from_slice(&total.to_le_bytes());
                     buf[4..].copy_from_slice(&msg_id.inner().to_le_bytes());
-                    self.sub
+                    inner
+                        .sub
                         .write_all(&buf)
                         .await
                         .map_err(KitsuneError::other)?;
-                    self.sub
+                    inner
+                        .sub
                         .write_all(&data)
                         .await
                         .map_err(KitsuneError::other)?;
@@ -125,12 +206,53 @@ impl FramedWriter {
                 Ok(())
             })
             .await
+        {
+            let _ = inner.sub.close().await;
+            return Err(e);
+        }
+
+        self.0 = Some(inner);
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_msgid() {
+        let req = MsgId::new(1);
+
+        // make sure it starts out as a req
+        assert!(req.is_req());
+        assert!(!req.is_res());
+        assert_eq!(1, req.as_id());
+
+        // make sure as_req doesn't toggle
+        let req = req.as_req();
+        assert!(req.is_req());
+        assert!(!req.is_res());
+        assert_eq!(1, req.as_id());
+
+        // make sure as_res works
+        let res = req.as_res();
+        assert!(res.is_res());
+        assert!(!res.is_req());
+        assert_eq!(1, res.as_id());
+
+        // make sure as_res doesn't toggle
+        let res = res.as_res();
+        assert!(res.is_res());
+        assert!(!res.is_req());
+        assert_eq!(1, res.as_id());
+
+        // make sure as_req works
+        let req = res.as_req();
+        assert!(req.is_req());
+        assert!(!req.is_res());
+        assert_eq!(1, req.as_id());
+    }
 
     #[tokio::test(threaded_scheduler)]
     async fn play() {

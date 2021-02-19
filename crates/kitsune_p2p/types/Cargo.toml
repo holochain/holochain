@@ -33,13 +33,9 @@ criterion = "0.3"
 tracing-subscriber = "0.2"
 
 [[bench]]
-name = "async_bucket"
+name = "resource_bucket"
 harness = false
 
 [[bench]]
-name = "async_read_into_vec"
-harness = false
-
-[[bench]]
-name = "async_framed"
+name = "framed"
 harness = false

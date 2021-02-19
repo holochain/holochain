@@ -12,11 +12,11 @@ struct Inner<T: 'static + Send> {
 
 /// Control efficient access to shared resource pool.
 #[derive(Clone)]
-pub struct AsyncOwnedResourceBucket<T: 'static + Send> {
+pub struct ResourceBucket<T: 'static + Send> {
     inner: Arc<tokio::sync::Mutex<Inner<T>>>,
 }
 
-impl<T: 'static + Send> AsyncOwnedResourceBucket<T> {
+impl<T: 'static + Send> ResourceBucket<T> {
     /// Create a new resource bucket.
     pub fn new(timeout_ms: Option<u64>) -> Self {
         Self {
@@ -158,7 +158,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_async_bucket_timeout() {
-        let bucket = <AsyncOwnedResourceBucket<&'static str>>::new(Some(10));
+        let bucket = <ResourceBucket<&'static str>>::new(Some(10));
         let j1 = tokio::task::spawn(bucket.acquire());
         let j2 = tokio::task::spawn(bucket.acquire());
         assert!(j1.await.unwrap().is_err());
@@ -167,7 +167,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_async_bucket() {
-        let bucket = <AsyncOwnedResourceBucket<&'static str>>::new(None);
+        let bucket = <ResourceBucket<&'static str>>::new(None);
         let j1 = tokio::task::spawn(bucket.acquire());
         let j2 = tokio::task::spawn(bucket.acquire());
         bucket.release("1").await;
@@ -179,7 +179,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_async_bucket_acquire_or_else() {
-        let bucket = <AsyncOwnedResourceBucket<&'static str>>::new(None);
+        let bucket = <ResourceBucket<&'static str>>::new(None);
         let j1 = tokio::task::spawn(bucket.acquire());
         let j2 = bucket.acquire_or_else(|| "2").await;
         bucket.release("1").await;
