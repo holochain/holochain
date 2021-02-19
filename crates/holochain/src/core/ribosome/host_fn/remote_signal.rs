@@ -58,7 +58,7 @@ mod tests {
     use crate::test_utils::sweetest::SweetDnaFile;
     use crate::test_utils::sweetest::{SweetAgents, SweetConductorBatch};
     use futures::future;
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
     use holochain_types::dna::zome::inline_zome::InlineZome;
     use holochain_zome_types::signal::AppSignal;
     use matches::assert_matches;

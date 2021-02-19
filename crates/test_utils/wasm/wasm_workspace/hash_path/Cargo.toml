@@ -9,6 +9,6 @@ name = "test_wasm_hash_path"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-hdk3 = { path = "../../../../hdk3" }
+hdk = { path = "../../../../hdk" }
 serde = "1.0.104"
 holochain_test_wasm_common = { version = "0.0.1", path = "../../../wasm_common" }

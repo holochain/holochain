@@ -81,13 +81,22 @@ wasm_io_types! {
     // These definitions can be copy-pasted into the ribosome's HostFnApi
     // when updated
 
-    fn agent_info (()) -> zt::agent_info::AgentInfo;
+    // Info about the calling agent.
+    fn agent_info (()) -> zt::info::AgentInfo;
+
+    // @todo
+    fn app_info (()) -> zt::info::AppInfo;
+
+    // @todo
+    fn dna_info (()) -> zt::info::DnaInfo;
+
+    // @todo
+    fn call_info (()) -> zt::info::CallInfo;
 
     // Header hash of the DeleteLink element.
     fn call_remote (zt::call_remote::CallRemote) -> zt::ZomeCallResponse;
 
     fn call (zt::call::Call) -> zt::ZomeCallResponse;
-
 
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();
@@ -120,10 +129,7 @@ wasm_io_types! {
     // Emit a Signal::App to subscribers on the interface
     fn emit_signal (zt::signal::AppSignal) -> ();
 
-    // @todo
-    fn entry_type_properties (()) -> ();
-
-    fn get_agent_activity (zt::agent_info::GetAgentActivityInput) -> zt::query::AgentActivity;
+    fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
     fn get_details (zt::entry::GetInput) -> Option<zt::metadata::Details>;
 
@@ -138,11 +144,8 @@ wasm_io_types! {
     // Hash an entry on the host.
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
 
-    // @todo
-    fn property (()) -> ();
-
     // Query the source chain for data.
-    fn query (zt::query::ChainQueryFilter) -> zt::element::ElementVec;
+    fn query (zt::query::ChainQueryFilter) -> Vec<crate::Element>;
 
     // the length of random bytes to create
     fn random_bytes (u32) -> zt::bytes::Bytes;
@@ -157,7 +160,10 @@ wasm_io_types! {
     fn schedule (core::time::Duration) -> ();
 
     // @todo
-    fn show_env (()) -> ();
+    fn sleep (core::time::Duration) -> ();
+
+    // @todo
+    fn version (()) -> zt::version::ZomeApiVersion;
 
     // Attempt to have the keystore sign some data
     // The pubkey in the input needs to be found in the keystore for this to work
@@ -192,7 +198,7 @@ wasm_io_types! {
     // The zome and agent info are constants specific to the current zome and chain.
     // All the information is provided by core so there is no input value.
     // These are constant for the lifetime of a zome call.
-    fn zome_info (()) -> zt::zome_info::ZomeInfo;
+    fn zome_info (()) -> zt::info::ZomeInfo;
 }
 
 /// Anything that can go wrong while calling a HostFnApi method

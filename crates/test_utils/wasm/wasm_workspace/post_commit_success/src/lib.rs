@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 #[hdk_extern]
 fn post_commit(_: HeaderHashes) -> ExternResult<PostCommitCallbackResult> {

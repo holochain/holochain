@@ -37,7 +37,7 @@ pub mod wasm_test {
     use crate::conductor::interface::websocket::test_utils::setup_app;
     use crate::conductor::{api::ZomeCall, dna_store::MockDnaStore};
     use crate::core::ribosome::ZomeCallResponse;
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
     use holochain_types::app::InstalledCell;
     use holochain_types::dna::DnaDef;
     use holochain_types::dna::DnaFile;

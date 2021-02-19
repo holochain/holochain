@@ -35,6 +35,7 @@ portpicker = "0.1.0"
 nanoid = "0.3"
 # unwrap_to = { version = "0.1.0", optional = false }
 observability = "0.1.3"
+lazy_static = "1.4.0"
 chrono = "0.4.6"
 walkdir = "2"
 

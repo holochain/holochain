@@ -48,9 +48,9 @@ pub fn call(
 pub mod wasm_test {
     use std::convert::TryFrom;
 
-    use hdk3::prelude::AgentInfo;
-    use hdk3::prelude::CellId;
-    use hdk3::prelude::WasmError;
+    use hdk::prelude::AgentInfo;
+    use hdk::prelude::CellId;
+    use hdk::prelude::WasmError;
     use holo_hash::HeaderHash;
     use holochain_serialized_bytes::SerializedBytes;
     use holochain_types::app::InstalledCell;

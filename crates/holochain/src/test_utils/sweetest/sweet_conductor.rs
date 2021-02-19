@@ -10,7 +10,7 @@ use crate::conductor::{
     Conductor, ConductorBuilder,
 };
 use futures::future;
-use hdk3::prelude::*;
+use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
 use holochain_lmdb::test_utils::{test_environments, TestEnvironments};
