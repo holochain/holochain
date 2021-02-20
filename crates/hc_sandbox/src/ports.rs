@@ -57,7 +57,7 @@ async fn websocket_client_by_port(
     .await?)
 }
 
-pub(crate) fn random_admin_port_if_busy(config: &mut ConductorConfig) {
+pub(crate) fn random_admin_port(config: &mut ConductorConfig) {
     match config.admin_interfaces.as_mut().and_then(|i| i.first_mut()) {
         Some(AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket { port },
@@ -65,14 +65,8 @@ pub(crate) fn random_admin_port_if_busy(config: &mut ConductorConfig) {
             if *port != 0 {
                 *port = 0;
             }
-            // if !is_free(dbg!(*port)) {
-            //     dbg!("not free");
-            //     *port = pick_unused_port().expect("No ports free");
-            // }
-            // dbg!(*port)
         }
         None => {
-            // let port = pick_unused_port().expect("No ports free");
             let port = 0;
             config.admin_interfaces = Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket { port },

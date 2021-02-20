@@ -7,6 +7,7 @@ use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
 
 use crate::config::create_config;
 use crate::config::write_config;
+use crate::ports::random_admin_port;
 
 /// Generate a new sandbox.
 /// This creates a directory and a [`ConductorConfig`]
@@ -22,6 +23,7 @@ pub fn generate(
     let dir = generate_directory(root, directory)?;
     let mut config = create_config(dir.clone());
     config.network = network;
+    random_admin_port(&mut config);
     let path = write_config(dir.clone(), &config);
     msg!("Config {:?}", config);
     msg!(

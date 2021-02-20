@@ -2,6 +2,8 @@
 use std::path::Path;
 use std::path::PathBuf;
 
+use holochain_types::prelude::InstalledAppId;
+
 use crate::calls::InstallApp;
 use crate::cmds::*;
 use crate::run::run_async;
@@ -15,13 +17,9 @@ pub async fn default_with_network(
     create: Create,
     directory: Option<PathBuf>,
     dnas: Vec<PathBuf>,
+    app_id: InstalledAppId,
 ) -> anyhow::Result<PathBuf> {
-    let Create {
-        network,
-        app_id,
-        root,
-        ..
-    } = create;
+    let Create { network, root, .. } = create;
     let path = crate::generate::generate(network.map(|n| n.into_inner().into()), root, directory)?;
     let conductor = run_async(holochain_path, path.clone(), None).await?;
     let mut cmd = CmdRunner::new(conductor.0).await;
@@ -38,18 +36,23 @@ pub async fn default_with_network(
 /// of this sandbox in their own directories.
 pub async fn default_n(
     holochain_path: &Path,
-    n: usize,
     create: Create,
     dnas: Vec<PathBuf>,
+    app_id: InstalledAppId,
 ) -> anyhow::Result<Vec<PathBuf>> {
-    msg!("Creating {} conductors with same settings", n);
-    let mut paths = Vec::with_capacity(n);
-    for i in 0..n {
+    let num_sandboxes = create.num_sandboxes;
+    msg!(
+        "Creating {} conductor sandboxes with same settings",
+        num_sandboxes
+    );
+    let mut paths = Vec::with_capacity(num_sandboxes);
+    for i in 0..num_sandboxes {
         let p = default_with_network(
             holochain_path,
             create.clone(),
             create.directories.get(i).cloned(),
             dnas.clone(),
+            app_id.clone(),
         )
         .await?;
         paths.push(p);

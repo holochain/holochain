@@ -2,11 +2,9 @@ use std::path::PathBuf;
 
 use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
 use holochain_p2p::kitsune_p2p::TransportConfig;
-use holochain_types::prelude::InstalledAppId;
 use structopt::StructOpt;
 use url2::Url2;
 
-const DEFAULT_APP_ID: &str = "test-app";
 #[derive(Debug, StructOpt, Clone)]
 // This creates a new holochain sandbox
 // which is a
@@ -14,13 +12,13 @@ const DEFAULT_APP_ID: &str = "test-app";
 // - databases
 // - keystore
 pub struct Create {
+    /// Number of conductor sandboxes to create.
+    #[structopt(short, long, default_value = "1")]
+    pub num_sandboxes: usize,
+
     #[structopt(subcommand)]
     /// Add an optional network config
     pub network: Option<NetworkCmd>,
-    #[structopt(short, long, default_value = DEFAULT_APP_ID)]
-    /// ID for the installed app.
-    /// This is just a String to identify the app by.
-    pub app_id: InstalledAppId,
     /// Set a root directory for conductor sandboxes to be placed into.
     /// Defaults to the system's temp directory.
     /// This directory must already exist.
@@ -215,8 +213,8 @@ impl From<Network> for KitsuneP2pConfig {
 impl Default for Create {
     fn default() -> Self {
         Self {
+            num_sandboxes: 1,
             network: None,
-            app_id: DEFAULT_APP_ID.to_string(),
             root: None,
             directories: Vec::with_capacity(0),
         }

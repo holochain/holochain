@@ -157,6 +157,8 @@ pub fn load_ports(hc_dir: PathBuf) -> anyhow::Result<Vec<Option<u16>>> {
             let live = std::fs::read_to_string(hc)?;
             let p = live.lines().next().and_then(|l| l.parse::<u16>().ok());
             ports.push(p)
+        } else {
+            ports.push(None);
         }
     }
     Ok(ports)
