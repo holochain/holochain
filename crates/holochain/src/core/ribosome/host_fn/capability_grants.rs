@@ -17,7 +17,6 @@ pub fn capability_grants(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::test_utils::sweetest::MaybeElement;
     use crate::{conductor::ConductorBuilder, test_utils::sweetest::SweetConductor};
     use crate::{
         core::workflow::call_zome_workflow::CallZomeWorkspace, test_utils::sweetest::SweetDnaFile,
@@ -169,11 +168,11 @@ pub mod wasm_test {
             .call(&bobbo, "roll_cap_grant", original_grant_hash)
             .await;
 
-        let output: MaybeElement = conductor
+        let output: Option<Element> = conductor
             .call(&bobbo, "get_entry", new_grant_header_hash.clone())
             .await;
 
-        let new_secret: CapSecret = match output.0 {
+        let new_secret: CapSecret = match output {
             Some(element) => match element.entry().to_grant_option() {
                 Some(zome_call_cap_grant) => match zome_call_cap_grant.access {
                     CapAccess::Transferable { secret, .. } => secret,
