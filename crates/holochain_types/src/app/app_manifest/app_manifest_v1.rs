@@ -24,7 +24,7 @@ pub struct AppManifestV1 {
     pub(super) name: String,
 
     /// Description of the app, just for context.
-    pub(super) description: String,
+    pub(super) description: Option<String>,
 
     /// The Cell manifests that make up this app.
     pub(super) slots: Vec<AppSlotManifest>,
@@ -302,7 +302,7 @@ pub mod tests {
         }];
         let manifest = AppManifest::V1(AppManifestV1 {
             name: "Test app".to_string(),
-            description: "Serialization roundtrip test".to_string(),
+            description: Some("Serialization roundtrip test".to_string()),
             slots,
         });
         (manifest, hashes)
