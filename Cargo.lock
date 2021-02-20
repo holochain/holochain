@@ -266,9 +266,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.6.0"
+version = "3.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "099e596ef14349721d9016f6b80dd3419ea1bf289ab9b44df8e4dfd3a005d5d9"
+checksum = "63396b8a4b9de3f4fdfb320ab6080762242f66a8ef174c49d8e19b674db4cdbe"
 
 [[package]]
 name = "byte-tools"
@@ -278,9 +278,9 @@ checksum = "e3b5ca7a04898ad4bcd41c90c5285445ff5b791899bb1b0abdd2a2aa791211d7"
 
 [[package]]
 name = "bytemuck"
-version = "1.5.0"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a4bad0c5981acc24bc09e532f35160f952e35422603f0563cd7a73c2c2e65a0"
+checksum = "bed57e2090563b83ba8f83366628ce535a7584c9afa4c9fc0612a03925c6df58"
 
 [[package]]
 name = "byteorder"
@@ -311,9 +311,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.66"
+version = "1.0.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c0496836a84f8d0495758516b8621a622beb77c0fed418570e50764093ced48"
+checksum = "e3c69b077ad434294d3ce9f1f6143a2a4b89a8a2d54ef813d85003a4fd1137fd"
 
 [[package]]
 name = "cfg-if"
@@ -1075,9 +1075,9 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 
 [[package]]
 name = "form_urlencoded"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ece68d15c92e84fa4f19d3780f1294e5ca82a78a6d515f1efaabcc144688be00"
+checksum = "5fc25a87fa4fd2094bffb06925852034d90a17f0d1e05197d4956d3555752191"
 dependencies = [
  "matches",
  "percent-encoding 2.1.0",
@@ -1529,6 +1529,7 @@ name = "holochain_cli_bundle"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "assert_cmd",
  "ffs",
  "holo_hash",
  "holochain",
@@ -1537,6 +1538,7 @@ dependencies = [
  "holochain_zome_types",
  "matches",
  "mr_bundle",
+ "predicates",
  "serde",
  "serde_bytes",
  "serde_yaml",
@@ -1637,7 +1639,7 @@ dependencies = [
  "parking_lot",
  "rand 0.7.3",
  "rkv",
- "rmp-serde 0.15.4",
+ "rmp-serde",
  "serde",
  "serde_derive",
  "shrinkwraprs",
@@ -1675,11 +1677,11 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes"
-version = "0.0.48"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=bump-serde#6a5f91fdb1336d1c3e8db6784eb81ff37ac841a1"
+version = "0.0.49"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=bump-serde#1244419117778edc230c927c6a59e2ea0566ebe8"
 dependencies = [
  "holochain_serialized_bytes_derive",
- "rmp-serde 0.14.4",
+ "rmp-serde",
  "serde",
  "serde-transcode",
  "serde_bytes",
@@ -1689,8 +1691,8 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes_derive"
-version = "0.0.48"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=bump-serde#6a5f91fdb1336d1c3e8db6784eb81ff37ac841a1"
+version = "0.0.49"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=bump-serde#1244419117778edc230c927c6a59e2ea0566ebe8"
 dependencies = [
  "quote",
  "syn",
@@ -1804,7 +1806,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.66"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=bump-serde#c72d925891e485acca2d27a5050e79590cc13e36"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=bump-serde#826ed31bf261f87fcd5256c37748d6a6457a33f6"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -1815,7 +1817,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_guest"
 version = "0.0.66"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=bump-serde#c72d925891e485acca2d27a5050e79590cc13e36"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=bump-serde#826ed31bf261f87fcd5256c37748d6a6457a33f6"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -1826,7 +1828,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_host"
 version = "0.0.66"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=bump-serde#c72d925891e485acca2d27a5050e79590cc13e36"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=bump-serde#826ed31bf261f87fcd5256c37748d6a6457a33f6"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -2027,9 +2029,9 @@ dependencies = [
 
 [[package]]
 name = "idna"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de910d521f7cc3135c4de8db1cb910e0b5ed1dc6f57c381cd07e8e661ce10094"
+checksum = "89829a5d69c23d348314a7ac337fe39173b61149a9864deabd260983aed48c21"
 dependencies = [
  "matches",
  "unicode-bidi",
@@ -2207,7 +2209,7 @@ dependencies = [
  "lair_keystore_api",
  "nanoid",
  "observability",
- "rmp-serde 0.15.4",
+ "rmp-serde",
  "rustls 0.19.0",
  "serde",
  "serde_bytes",
@@ -2246,7 +2248,7 @@ dependencies = [
  "observability",
  "once_cell",
  "paste 1.0.3",
- "rmp-serde 0.15.4",
+ "rmp-serde",
  "serde",
  "serde_json",
  "sysinfo",
@@ -2463,9 +2465,9 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.7.7"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e50ae3f04d169fcc9bde0b547d1c205219b7157e07ded9c5aff03e0637cb3ed7"
+checksum = "dc250d6848c90d719ea2ce34546fb5df7af1d3fd189d10bf7bad80bfcebecd95"
 dependencies = [
  "libc",
  "log",
@@ -2575,8 +2577,8 @@ dependencies = [
  "futures",
  "maplit",
  "matches",
- "reqwest 0.11.0",
- "rmp-serde 0.15.4",
+ "reqwest 0.11.1",
+ "rmp-serde",
  "serde",
  "serde_bytes",
  "serde_derive",
@@ -3587,7 +3589,7 @@ dependencies = [
  "serde_urlencoded",
  "tokio 0.2.25",
  "tokio-tls",
- "url 2.2.0",
+ "url 2.2.1",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -3596,9 +3598,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd281b1030aa675fb90aa994d07187645bb3c8fc756ca766e7c3070b439de9de"
+checksum = "0460542b551950620a3648c6aa23318ac6b3cd779114bd873209e6e8b5eb1c34"
 dependencies = [
  "base64 0.13.0",
  "bytes 1.0.1",
@@ -3621,7 +3623,7 @@ dependencies = [
  "serde_urlencoded",
  "tokio 1.2.0",
  "tokio-native-tls",
- "url 2.2.0",
+ "url 2.2.1",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -3667,7 +3669,7 @@ dependencies = [
  "ordered-float",
  "serde",
  "serde_derive",
- "url 2.2.0",
+ "url 2.2.1",
  "uuid 0.8.2",
 ]
 
@@ -3679,17 +3681,6 @@ checksum = "4f55e5fa1446c4d5dd1f5daeed2a4fe193071771a2636274d0d7a3b082aa7ad6"
 dependencies = [
  "byteorder",
  "num-traits",
-]
-
-[[package]]
-name = "rmp-serde"
-version = "0.14.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ce7d70c926fe472aed493b902010bccc17fa9f7284145cb8772fd22fdb052d8"
-dependencies = [
- "byteorder",
- "rmp",
- "serde",
 ]
 
 [[package]]
@@ -4292,18 +4283,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.23"
+version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76cc616c6abf8c8928e2fdcc0dbfab37175edd8fb49a4641066ad1364fdab146"
+checksum = "e0f4a65597094d4483ddaed134f409b2cb7c1beccf25201a9f73c719254fa98e"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.23"
+version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9be73a2caec27583d0046ef3796c3794f868a5bc813db689eed00c7631275cd1"
+checksum = "7765189610d8241a44529806d6fd1f2e0a08734313a35d5b3a556f92b381f3c0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4397,7 +4388,7 @@ dependencies = [
  "bytes 1.0.1",
  "libc",
  "memchr",
- "mio 0.7.7",
+ "mio 0.7.8",
  "pin-project-lite 0.2.4",
 ]
 
@@ -4514,9 +4505,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.12"
+version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43f080ea7e4107844ef4766459426fa2d5c1ada2e47edba05dc7fa99d9629f47"
+checksum = "a8a9bd1db7706f2373a190b0d067146caa39350c486f3d455b0e33b431f94c07"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4544,9 +4535,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-log"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e0f8c7178e13481ff6765bd169b33e8d554c5d2bbede5e32c356194be02b9b9"
+checksum = "a6923477a48e41c1951f1999ef8bb5a3023eb723ceadafe78ffb65dc366761e3"
 dependencies = [
  "lazy_static",
  "log",
@@ -4627,7 +4618,7 @@ dependencies = [
  "native-tls",
  "rand 0.7.3",
  "sha-1",
- "url 2.2.0",
+ "url 2.2.1",
  "utf-8",
 ]
 
@@ -4717,12 +4708,12 @@ dependencies = [
 
 [[package]]
 name = "url"
-version = "2.2.0"
+version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5909f2b0817350449ed73e8bcd81c8c3c8d9a7a5d8acba4b27db277f1868976e"
+checksum = "9ccd964113622c8e9322cfac19eb1004a07e636c545f325da085d5cdde6f1f8b"
 dependencies = [
  "form_urlencoded",
- "idna 0.2.1",
+ "idna 0.2.2",
  "matches",
  "percent-encoding 2.1.0",
  "serde",
@@ -4735,7 +4726,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c89cd13f1de9862d363308f5ffdadcd2b64b2a4a812fb296a80b7d3e80011b1e"
 dependencies = [
  "serde",
- "url 2.2.0",
+ "url 2.2.1",
 ]
 
 [[package]]

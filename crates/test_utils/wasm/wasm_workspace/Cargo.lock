@@ -111,7 +111,7 @@ dependencies = [
 name = "fixt"
 version = "0.0.1"
 dependencies = [
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.49",
  "lazy_static",
  "parking_lot",
  "paste",
@@ -184,7 +184,7 @@ dependencies = [
  "blake2b_simd",
  "derive_more",
  "fixt",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.49",
  "rand",
  "serde",
  "serde_bytes",
@@ -197,7 +197,22 @@ version = "0.0.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79ff6ebed11c8d4cbc9cb2ea1ee779100d623e819e4cb3bdca16481a775126da"
 dependencies = [
- "holochain_serialized_bytes_derive",
+ "holochain_serialized_bytes_derive 0.0.48",
+ "rmp-serde",
+ "serde",
+ "serde-transcode",
+ "serde_bytes",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "holochain_serialized_bytes"
+version = "0.0.49"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec1c2083f0f8c0b38450b586fed8343dfb4b82fbe5a1b04d43d8e364a70296c1"
+dependencies = [
+ "holochain_serialized_bytes_derive 0.0.49",
  "rmp-serde",
  "serde",
  "serde-transcode",
@@ -217,11 +232,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_serialized_bytes_derive"
+version = "0.0.49"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "492dd78dd4fae9fa835a5138e41ef089a139df98a823e0cb9a707ba5915aefb1"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "holochain_test_wasm_common"
 version = "0.0.1"
 dependencies = [
  "hdk",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.49",
  "serde",
  "serde_bytes",
 ]
@@ -232,7 +257,7 @@ version = "0.0.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4e10d2eeb178ad798f49473a9315a21f49384a287de0265af48d080112575df"
 dependencies = [
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.48",
  "serde",
  "serde_bytes",
  "thiserror",
@@ -244,7 +269,7 @@ version = "0.0.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff071b25faac0c38cf87c487b25a855a407954daea1ace87d61bd274266e9bcf"
 dependencies = [
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.48",
  "holochain_wasmer_common",
  "serde",
  "tracing",
@@ -257,7 +282,7 @@ dependencies = [
  "chrono",
  "fixt",
  "holo_hash",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.49",
  "paste",
  "rand",
  "serde",

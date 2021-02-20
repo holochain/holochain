@@ -162,13 +162,11 @@ where
     }
 
     /// An arbitrary and opaque encoding of the bundle data into a byte array
-    // NB: Ideally, Bundle could just implement serde Serialize/Deserialize,
-    // but the generic types cause problems
     pub fn encode(&self) -> MrBundleResult<Vec<u8>> {
         crate::encode(self)
     }
 
-    /// Decode bytes produced by `to_bytes`
+    /// Decode bytes produced by `encode`
     pub fn decode(bytes: &[u8]) -> MrBundleResult<Self> {
         crate::decode(bytes)
     }

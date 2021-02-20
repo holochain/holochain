@@ -36,6 +36,13 @@ impl DnaBundle {
         Ok(DnaFile::from_parts(dna_def, wasms))
     }
 
+    /// Construct from raw bytes
+    pub fn decode(bytes: &[u8]) -> DnaResult<Self> {
+        mr_bundle::Bundle::decode(bytes)
+            .map(Into::into)
+            .map_err(Into::into)
+    }
+
     async fn inner_maps(&self) -> DnaResult<(Zomes, WasmMap)> {
         let mut resources = self.resolve_all_cloned().await?;
         let intermediate: Vec<_> = match self.manifest() {

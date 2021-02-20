@@ -18,7 +18,7 @@ base64 = {version = "0.13", optional = true}
 blake2b_simd = {version = "0.5.10", optional = true}
 derive_more = { version = "0.99", optional = true }
 fixt = { version = "0.0.1", path = "../fixt", optional = true }
-holochain_serialized_bytes = {version = "=0.0.48", optional = true }
+holochain_serialized_bytes = {version = "=0.0.49", optional = true }
 rand = {version = "0.7", optional = true}
 tracing = { version = "0.1", optional = true}
 thiserror = "1.0.22"

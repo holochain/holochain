@@ -54,7 +54,7 @@ fn prompt_app_init(root_dir: PathBuf) -> anyhow::Result<AppBundle> {
     let slot = AppSlotManifest::sample("sample-slot".into());
     let manifest: AppManifest = AppManifestCurrentBuilder::default()
         .name(name)
-        .description(description.unwrap_or_else(|| "".into()))
+        .description(description)
         .slots(vec![slot])
         .build()
         .unwrap()
