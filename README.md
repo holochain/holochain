@@ -30,7 +30,7 @@ Assuming you have [installed the nix shell](https://nixos.wiki/wiki/Nix_Installa
 nix-shell --argstr flavor happDev
 ```
 
-This nix-shell flavor installs wrapper binaries for `holochain` and `dna-util` that will automatically compile and run the binaries.  This is very useful if you are tracking changes in the holochain repo because when you check out a new rev, running holochain will compile automatically to the version at that rev.
+This nix-shell flavor installs wrapper binaries for `holochain` and `hc` that will automatically compile and run the binaries.  This is very useful if you are tracking changes in the holochain repo because when you check out a new rev, running holochain will compile automatically to the version at that rev.
 
 ### Building with cargo if you already have rust installed:
 ```
