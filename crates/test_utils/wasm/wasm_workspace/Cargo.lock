@@ -193,8 +193,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes"
-version = "0.0.49"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=bump-serde#1244419117778edc230c927c6a59e2ea0566ebe8"
+version = "0.0.50"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e77d1f384e8c8908f12d12301d5fc7861779fa68e6f74078d8876ed6aedf7eab"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
@@ -207,8 +208,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes_derive"
-version = "0.0.49"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=bump-serde#1244419117778edc230c927c6a59e2ea0566ebe8"
+version = "0.0.50"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "085fe272d95591beeffe3e37c2996372c399baf33bc60ca88ae0906ce4d52207"
 dependencies = [
  "quote",
  "syn",
@@ -226,8 +228,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.66"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=bump-serde#826ed31bf261f87fcd5256c37748d6a6457a33f6"
+version = "0.0.67"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90cb4e0ce3995ed8fe5b7f1695b714bab5b7a343487fea8ae0ce14c38e225d24"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -237,8 +240,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.66"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=bump-serde#826ed31bf261f87fcd5256c37748d6a6457a33f6"
+version = "0.0.67"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9c2f16b3f80ee23107b1c20de51aae8fcd90948833fed830ddbd61b86f5c0b2"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -1098,8 +1102,3 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
-
-[[patch.unused]]
-name = "holochain_wasmer_host"
-version = "0.0.66"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=bump-serde#826ed31bf261f87fcd5256c37748d6a6457a33f6"
