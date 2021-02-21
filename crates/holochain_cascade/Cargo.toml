@@ -20,7 +20,7 @@ hdk_derive = { version = "0.0.1", path = "../hdk_derive" }
 holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
 holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }
 holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
-holochain_serialized_bytes = "=0.0.49"
+holochain_serialized_bytes = "=0.0.50"
 holochain_state = { version = "0.0.1", path = "../holochain_state" }
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
 holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }

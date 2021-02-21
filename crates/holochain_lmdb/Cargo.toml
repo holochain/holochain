@@ -20,7 +20,7 @@ fixt = { version = "0.0.1", path = "../fixt" }
 futures = "0.3.1"
 holo_hash = { path = "../holo_hash" }
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.49"
+holochain_serialized_bytes = "=0.0.50"
 holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
 lazy_static = "1.4.0"
 must_future = "0.1.1"
