@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 #[hdk_entry(id = "post", required_validations = 5)]
 struct Post(String);
@@ -18,7 +18,7 @@ fn msg() -> Msg {
 
 #[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<HeaderHash> {
-    hdk3::prelude::create_entry(&post())
+    hdk::prelude::create_entry(&post())
 }
 
 #[hdk_extern]
@@ -31,13 +31,13 @@ fn get_entry(_: ()) -> ExternResult<Option<Element>> {
 
 #[hdk_extern]
 fn update_entry(_: ()) -> ExternResult<HeaderHash> {
-    let header_hash = hdk3::prelude::create_entry(&post())?;
-    hdk3::prelude::update_entry(header_hash, &post())
+    let header_hash = hdk::prelude::create_entry(&post())?;
+    hdk::prelude::update_entry(header_hash, &post())
 }
 
 #[hdk_extern]
 /// Updates to a different entry, this will fail
 fn invalid_update_entry(_: ()) -> ExternResult<HeaderHash> {
-    let header_hash = hdk3::prelude::create_entry(&post())?;
-    hdk3::prelude::update_entry(header_hash, &msg())
+    let header_hash = hdk::prelude::create_entry(&post())?;
+    hdk::prelude::update_entry(header_hash, &msg())
 }

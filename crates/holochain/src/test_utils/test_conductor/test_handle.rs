@@ -5,7 +5,7 @@ use super::test_cell::TestCell;
 use crate::conductor::api::ZomeCall;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::ribosome::ZomeCallInvocation;
-use hdk3::prelude::*;
+use hdk::prelude::*;
 use holochain_types::prelude::*;
 use unwrap_to::unwrap_to;
 

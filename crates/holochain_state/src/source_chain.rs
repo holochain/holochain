@@ -319,7 +319,7 @@ impl BufferedStore for SourceChain {
 pub mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
     use holochain_lmdb::test_utils::test_cell_env;
     use holochain_types::test_utils::fake_dna_hash;
     use holochain_zome_types::capability::CapAccess;

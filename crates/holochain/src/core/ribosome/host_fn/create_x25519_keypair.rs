@@ -21,4 +21,4 @@ pub fn create_x25519_keypair(
     )
 }
 
-// @see x_25519_x_salsa20_poly1305_encrypt for testing encryption using created keypairs.
+// See x_25519_x_salsa20_poly1305_encrypt for testing encryption using created keypairs.

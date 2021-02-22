@@ -32,7 +32,7 @@ pub use rng::rng;
 /// their inner types by constructing an inner Fixturator directly with the outer index passed in.
 /// If we can always assume the inner fixturators can be efficiently constructed at any index this
 /// allows us to efficiently compose fixturators.
-/// @see newtype_fixturator! macro defined below for an example of this.
+/// See [ `newtype_fixturator!` ] macro defined below for an example of this.
 ///
 /// Fixturator implements Clone for convenience but note that this will clone the current index.
 ///
@@ -63,7 +63,7 @@ impl<Curve, Item> Fixturator<Item, Curve> {
     /// raw calls are a little verbose, e.g. `Fixturator::<u32, Predictable>::new(Predictable, 0)`
     /// the starting index is exposed to facilitate wrapper structs to delegate their indexes to
     /// internal Fixturators
-    /// @see newtype_fixturator! macro below for an example of this
+    /// See [ `newtype_fixturator!` ] macro below for an example of this
     pub fn new(curve: Curve, start: usize) -> Self {
         Fixturator::<Item, Curve> {
             curve,
@@ -79,7 +79,7 @@ impl<Curve, Item> Fixturator<Item, Curve> {
 // /// - empty_expected: vector of any length of empties that we predict from Empty
 // /// - predictable_expected: vector of any length (can wrap) that we predict from Predictable
 // /// - test_unpredictable (optional): whether to try and test the unpredictable case
-// /// @see the tests in modules in this crate
+// /// See the tests in modules in this crate
 #[macro_export]
 macro_rules! basic_test {
     ( $type:ty, $empty_expected:expr, $predictable_expected:expr ) => {
@@ -241,7 +241,7 @@ macro_rules! fixturator {
     // - FooVariant::random() for a random variant of Foo
     // - FooVariant::nth(n) for an indexed variant of Foo
     //
-    // @see the tests in this file for examples
+    // See the tests in this file for examples.
         (
             $type:tt;
             enum [ $( $variant:tt )* ];
@@ -396,7 +396,7 @@ macro_rules! fixturator {
     //
     // uses TT munching for multiple curves
     // used internally by this macro for all baseline curves
-    // @see https://danielkeep.github.io/tlborm/book/pat-incremental-tt-munchers.html
+    // See https://danielkeep.github.io/tlborm/book/pat-incremental-tt-munchers.html
     ( $type:ident; curve $curve:ident $e:expr; $($munch:tt)* ) => {
         curve!( $type, $curve, $e);
 
@@ -412,7 +412,7 @@ macro_rules! fixturator {
     // - FooFixturator::new(curve, index) to construct a FooFixturator with curve at index
     //
     // intended to be the TT munch endpoint for all patterns in this macro
-    // @see https://danielkeep.github.io/tlborm/book/pat-incremental-tt-munchers.html
+    // See https://danielkeep.github.io/tlborm/book/pat-incremental-tt-munchers.html
     ( $type:ident; $($munch:tt)* ) => {
         paste! {
             #[allow(missing_docs)]
@@ -641,7 +641,7 @@ macro_rules! newtype_fixturator {
 
 #[macro_export]
 /// a direct delegation of fixtures to the inner type for wasm io types
-/// @see zome types crate
+/// See zome types crate
 macro_rules! wasm_io_fixturator {
     ( $outer:ident<$inner:ty> ) => {
         fixturator!(
