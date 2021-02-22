@@ -20,7 +20,7 @@ fixt = { version = "0.0.1", path = "../fixt" }
 futures = "0.3.1"
 holo_hash = { path = "../holo_hash" }
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.48"
+holochain_serialized_bytes = "=0.0.50"
 holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
 lazy_static = "1.4.0"
 must_future = "0.1.1"
@@ -28,9 +28,9 @@ nanoid = "0.3.0"
 parking_lot = "0.10"
 rand = "0.7"
 rkv = "=0.10.4"
-rmp-serde = "0.14.3"
-serde = "1.0.104"
-serde_derive = "1.0.104"
+rmp-serde = "0.15"
+serde = "1.0"
+serde_derive = "1.0"
 shrinkwraprs = "0.3.0"
 tempdir = "0.3.7"
 thiserror = "1.0.22"

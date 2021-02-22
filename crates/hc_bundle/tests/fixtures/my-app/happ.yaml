@@ -1,0 +1,27 @@
+---
+manifest_version: "1"
+
+name: fixture-app
+description: it's an app
+
+slots:
+  - id: slot-1
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: dnas/dna1.dna
+      uuid: 0123456
+      properties: ~
+      clone_limit: 0
+  - id: slot-2
+    provisioning:
+      strategy: create
+      deferred: true
+    dna:
+      bundled: dnas/dna2.dna
+      uuid: ~
+      properties:
+        foo: 1111
+        bar: it could be anything
+      clone_limit: 10

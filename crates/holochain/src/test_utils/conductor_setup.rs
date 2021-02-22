@@ -98,12 +98,12 @@ impl ConductorTestData {
         let num_dnas = dna_files.len();
         let mut cells = Vec::with_capacity(num_dnas * num_agents);
         let mut cell_id_by_dna_file = Vec::with_capacity(num_dnas);
-        for dna_file in dna_files.iter() {
+        for (i, dna_file) in dna_files.iter().enumerate() {
             let mut cell_ids = Vec::with_capacity(num_agents);
-            for (i, agent_id) in agents.iter().enumerate() {
+            for (j, agent_id) in agents.iter().enumerate() {
                 let cell_id = CellId::new(dna_file.dna_hash().to_owned(), agent_id.clone());
                 cells.push((
-                    InstalledCell::new(cell_id.clone(), format!("agent-{}", i)),
+                    InstalledCell::new(cell_id.clone(), format!("agent-{}-{}", i, j)),
                     None,
                 ));
                 cell_ids.push(cell_id);

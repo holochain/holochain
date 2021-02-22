@@ -239,7 +239,7 @@ pub async fn install_app(
     conductor_handle: ConductorHandle,
 ) {
     for dna in dnas {
-        conductor_handle.install_dna(dna).await.unwrap();
+        conductor_handle.register_dna(dna).await.unwrap();
     }
     conductor_handle
         .clone()
@@ -619,4 +619,9 @@ where
         payload: ExternIO::encode(payload)?,
         provenance: cell_id.agent_pubkey().clone(),
     })
+}
+
+/// A fixture example dna for unit testing.
+pub fn fake_valid_dna_file(uuid: &str) -> DnaFile {
+    fake_dna_zomes(uuid, vec![(TestWasm::Foo.into(), TestWasm::Foo.into())])
 }

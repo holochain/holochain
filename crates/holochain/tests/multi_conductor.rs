@@ -2,10 +2,8 @@ use hdk::prelude::*;
 use holochain::conductor::config::ConductorConfig;
 use holochain::test_utils::host_fn_caller::Post;
 use holochain::test_utils::show_authored;
-use holochain::test_utils::sweetest::MaybeElement;
 use holochain::test_utils::sweetest::SweetNetwork;
 use holochain::test_utils::sweetest::{SweetConductorBatch, SweetDnaFile};
-
 use holochain::test_utils::wait_for_integration_10s;
 use holochain::test_utils::wait_for_integration_with_others_10s;
 use holochain::test_utils::WaitOps;
@@ -78,10 +76,8 @@ async fn multi_conductor() -> anyhow::Result<()> {
     .await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
-    let element: MaybeElement = conductors[1].call(&bobbo.zome("zome1"), "read", hash).await;
-    let element = element
-        .0
-        .expect("Element was None: bobbo couldn't `get` it");
+    let element: Option<Element> = conductors[1].call(&bobbo.zome("zome1"), "read", hash).await;
+    let element = element.expect("Element was None: bobbo couldn't `get` it");
 
     // Assert that the Element bobbo sees matches what alice committed
     assert_eq!(element.header().author(), alice.agent_pubkey());
@@ -129,12 +125,10 @@ async fn invalid_cell() -> anyhow::Result<()> {
         .await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
-    let element: MaybeElement = conductors[0]
+    let element: Option<Element> = conductors[0]
         .call(&alice.zome("zome1"), "read", hash.clone())
         .await;
-    let element = element
-        .0
-        .expect("Element was None: bobbo couldn't `get` it");
+    let element = element.expect("Element was None: bobbo couldn't `get` it");
 
     // Assert that the Element bobbo sees matches what alice committed
     assert_eq!(element.header().author(), alice.agent_pubkey());
@@ -143,7 +137,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
         ElementEntry::Present(Entry::app(Post("1".to_string()).try_into().unwrap()).unwrap())
     );
     conductors[1].startup().await;
-    let _: MaybeElement = conductors[1].call(&bobbo.zome("zome1"), "read", hash).await;
+    let _: Option<Element> = conductors[1].call(&bobbo.zome("zome1"), "read", hash).await;
 
     // Take both other conductors offline and commit a hash they don't have
     // then bring them back with the original offline.
@@ -155,15 +149,15 @@ async fn invalid_cell() -> anyhow::Result<()> {
         .await;
     conductors[1].shutdown().await;
     conductors[0].startup().await;
-    let r: MaybeElement = conductors[0]
+    let r: Option<Element> = conductors[0]
         .call(&alice.zome("zome1"), "read", hash.clone())
         .await;
-    assert!(r.0.is_none());
+    assert!(r.is_none());
     conductors[2].startup().await;
-    let r: MaybeElement = conductors[2]
+    let r: Option<Element> = conductors[2]
         .call(&carol.zome("zome1"), "read", hash.clone())
         .await;
-    assert!(r.0.is_none());
+    assert!(r.is_none());
     conductors[1].startup().await;
 
     let _: HeaderHash = conductors[0]
@@ -181,9 +175,9 @@ async fn invalid_cell() -> anyhow::Result<()> {
     show_authored(&envs);
     // wait_for_integration_10s(&carol_env, expected_count).await;
     wait_for_integration_with_others_10s(&alice_env, &envs, expected_count).await;
-    let r: MaybeElement = conductors[0]
+    let r: Option<Element> = conductors[0]
         .call(&alice.zome("zome1"), "read", hash.clone())
         .await;
-    assert!(r.0.is_some());
+    assert!(r.is_some());
     Ok(())
 }

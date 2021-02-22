@@ -214,9 +214,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
                 }
                 break;
             }
-            Err(e) => {
-                error!(error = &e as &dyn std::error::Error)
-            }
+            Err(e) => error!(error = &e as &dyn std::error::Error),
             Ok(()) => {}
         }
     }
@@ -289,11 +287,10 @@ where
 pub mod test_utils {
     use crate::conductor::api::RealAppInterfaceApi;
     use crate::conductor::conductor::ConductorBuilder;
-    use crate::conductor::dna_store::MockDnaStore;
     use crate::conductor::ConductorHandle;
     use holochain_lmdb::test_utils::test_environments;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::app::InstalledCell;
+    use holochain_types::prelude::*;
     use std::sync::Arc;
     use tempdir::TempDir;
 
@@ -343,7 +340,6 @@ pub mod test {
     use crate::conductor::api::AdminResponse;
     use crate::conductor::api::RealAdminInterfaceApi;
     use crate::conductor::conductor::ConductorBuilder;
-    use crate::conductor::dna_store::MockDnaStore;
     use crate::conductor::p2p_store::AgentKv;
     use crate::conductor::p2p_store::AgentKvKey;
     use crate::conductor::state::ConductorState;
@@ -358,14 +354,11 @@ pub mod test {
     use holochain_lmdb::fresh_reader_test;
     use holochain_lmdb::test_utils::test_environments;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::app::InstallAppDnaPayload;
-    use holochain_types::app::InstallAppPayload;
-    use holochain_types::app::InstalledCell;
-    use holochain_types::dna::DnaDef;
-    use holochain_types::dna::DnaFile;
+    use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_types::test_utils::fake_dna_zomes;
+    use holochain_types::{app::InstallAppDnaPayload, prelude::InstallAppPayload};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
     use holochain_zome_types::cell::CellId;
@@ -611,13 +604,12 @@ pub mod test {
         assert_eq!(r, None);
 
         // Check it is in active apps
-        let cell_ids: Vec<_> = state
+        let cell_ids: Vec<CellId> = state
             .active_apps
             .get("test app")
-            .cloned()
             .unwrap()
-            .into_iter()
-            .map(|c| c.into_id())
+            .all_cells()
+            .cloned()
             .collect();
 
         // Collect the expected result
@@ -662,13 +654,12 @@ pub mod test {
         assert_eq!(r, None);
 
         // Check it's added to inactive
-        let cell_ids: Vec<_> = state
+        let cell_ids: Vec<CellId> = state
             .inactive_apps
             .get("test app")
-            .cloned()
             .unwrap()
-            .into_iter()
-            .map(|c| c.into_id())
+            .all_cells()
+            .cloned()
             .collect();
 
         assert_eq!(expected, cell_ids);

@@ -6,6 +6,7 @@
 
 mod sweet_agents;
 mod sweet_app;
+mod sweet_app_bundle;
 mod sweet_cell;
 mod sweet_conductor;
 mod sweet_dna;
@@ -14,18 +15,9 @@ mod sweet_zome;
 
 pub use sweet_agents::*;
 pub use sweet_app::*;
+pub use sweet_app_bundle::*;
 pub use sweet_cell::*;
 pub use sweet_conductor::*;
 pub use sweet_dna::*;
 pub use sweet_network::*;
 pub use sweet_zome::*;
-
-use hdk::prelude::Element;
-use holochain_serialized_bytes::prelude::*;
-
-/// Necessary for parsing the output of a simple "get entry"
-// TODO: remove once host fns remove SerializedBytes constraint
-#[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes)]
-#[serde(transparent)]
-#[repr(transparent)]
-pub struct MaybeElement(pub Option<Element>);

@@ -15,6 +15,8 @@
 //! hard to automate piping from tests stderr.
 //!
 
+#![allow(deprecated)]
+
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holochain::conductor::api::AdminRequest;
@@ -26,7 +28,6 @@ use holochain::conductor::api::ZomeCall;
 use holochain::conductor::config::AdminInterfaceConfig;
 use holochain::conductor::config::ConductorConfig;
 use holochain::conductor::config::InterfaceDriver;
-use holochain::conductor::dna_store::MockDnaStore;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 
