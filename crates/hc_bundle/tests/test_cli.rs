@@ -16,18 +16,18 @@ fn read_dna(path: &Path) -> anyhow::Result<DnaBundle> {
 #[tokio::test]
 async fn roundtrip() {
     {
-        let mut cmd = Command::cargo_bin("hc").unwrap();
-        let cmd = cmd.args(&["dna", "pack", "tests/fixtures/my-app/dnas/dna1"]);
+        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let cmd = cmd.args(&["pack", "tests/fixtures/my-app/dnas/dna1"]);
         cmd.assert().success();
     }
     {
-        let mut cmd = Command::cargo_bin("hc").unwrap();
-        let cmd = cmd.args(&["dna", "pack", "tests/fixtures/my-app/dnas/dna2"]);
+        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let cmd = cmd.args(&["pack", "tests/fixtures/my-app/dnas/dna2"]);
         cmd.assert().success();
     }
     {
-        let mut cmd = Command::cargo_bin("hc").unwrap();
-        let cmd = cmd.args(&["app", "pack", "tests/fixtures/my-app/"]);
+        let mut cmd = Command::cargo_bin("hc-app").unwrap();
+        let cmd = cmd.args(&["pack", "tests/fixtures/my-app/"]);
         cmd.assert().success();
     }
 
