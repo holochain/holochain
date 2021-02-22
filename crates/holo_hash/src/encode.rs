@@ -31,6 +31,20 @@ impl<P: PrimitiveHashType> TryFrom<String> for HoloHash<P> {
     }
 }
 
+/// By default, disable string encoding and just display raw bytes
+#[cfg(not(feature = "string-encoding"))]
+impl<T: HashType> std::fmt::Display for HoloHash<T> {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_fmt(format_args!("0x"))?;
+        for byte in self.get_raw_39() {
+            f.write_fmt(format_args!("{:02x}", byte))?;
+        }
+        Ok(())
+    }
+}
+
+/// Include nice string encoding methods and From impls
+#[cfg(feature = "string-encoding")]
 impl<T: HashType> std::fmt::Display for HoloHash<T> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         write!(f, "{}", holo_hash_encode(self.get_raw_39()))
@@ -38,6 +52,7 @@ impl<T: HashType> std::fmt::Display for HoloHash<T> {
 }
 
 /// internal REPR for holo hash
+#[cfg(feature = "string-encoding")]
 pub fn holo_hash_encode(data: &[u8]) -> String {
     format!("u{}", base64::encode_config(data, base64::URL_SAFE_NO_PAD),)
 }

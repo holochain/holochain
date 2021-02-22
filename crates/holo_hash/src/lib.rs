@@ -16,12 +16,7 @@ pub use hash_b64::*;
 pub use hash_type::HashType;
 pub use hash_type::PrimitiveHashType;
 
-/// By default, disable string encoding and just display raw bytes
-#[cfg(not(feature = "string-encoding"))]
-pub mod encode_raw;
-
-/// Include nice string encoding methods and From impls
-#[cfg(feature = "string-encoding")]
+/// Encoding and decoding hashes.
 pub mod encode;
 
 #[cfg(feature = "string-encoding")]
