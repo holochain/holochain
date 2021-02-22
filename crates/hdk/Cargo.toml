@@ -1,10 +1,10 @@
 [package]
 name = "hdk"
-version = "0.0.1"
-description = "third iteration of the holochain hdk"
+version = "0.0.100-alpha.0"
+description = "The holochain hdk"
 license = "Apache-2.0"
-homepage = "https://github.com/holochain/holochain"
-documentation = "https://github.com/holochain/holochain"
+homepage = "https://github.com/holochain/holochain/crates/hdk"
+documentation = "https://docs.rs/hdk/"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "hdk" ]
 categories = [ "cryptography" ]
@@ -15,7 +15,7 @@ crate-type = [ "cdylib", "rlib" ]
 path = "src/lib.rs"
 
 [dependencies]
-hdk_derive = { version = "0.0.1", path = "../hdk_derive" }
+hdk_derive = { version = "0.0.100", path = "../hdk_derive" }
 holo_hash = { path = "../holo_hash" }
 holochain_wasmer_guest = "=0.0.67"
 holochain_zome_types = { path = "../holochain_zome_types" }
