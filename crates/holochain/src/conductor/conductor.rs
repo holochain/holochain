@@ -13,11 +13,9 @@ use super::api::RealAppInterfaceApi;
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
 use super::dna_store::DnaDefBuf;
-use super::dna_store::DnaStore;
 use super::dna_store::RealDnaStore;
 use super::entry_def_store::get_entry_defs;
 use super::entry_def_store::EntryDefBuf;
-use super::entry_def_store::EntryDefBufferKey;
 use super::error::ConductorError;
 use super::error::CreateAppError;
 use super::handle::ConductorHandleImpl;
@@ -45,7 +43,6 @@ use super::{api::CellConductorApiT, interface::AppInterfaceRuntime};
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::cell::Cell;
 use crate::conductor::config::ConductorConfig;
-use crate::conductor::dna_store::MockDnaStore;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::InitialQueueTriggers;
@@ -343,6 +340,37 @@ where
         Ok(port)
     }
 
+    pub(super) async fn register_dna_wasm(
+        &self,
+        dna: DnaFile,
+    ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
+        let is_full_wasm_dna = dna
+            .dna_def()
+            .zomes
+            .iter()
+            .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
+
+        // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
+        if is_full_wasm_dna {
+            Ok(self.put_wasm(dna.clone()).await?)
+        } else {
+            Ok(Vec::with_capacity(0))
+        }
+    }
+
+    pub(super) async fn register_dna_entry_defs(
+        &mut self,
+        entry_defs: Vec<(EntryDefBufferKey, EntryDef)>,
+    ) -> ConductorResult<()> {
+        self.dna_store_mut().add_entry_defs(entry_defs);
+        Ok(())
+    }
+
+    pub(super) async fn register_phenotype(&mut self, dna: DnaFile) -> ConductorResult<()> {
+        self.dna_store_mut().add_dna(dna);
+        Ok(())
+    }
+
     /// Start all app interfaces currently in state.
     /// This should only be run at conductor initialization.
     #[allow(irrefutable_let_patterns)]
@@ -451,8 +479,7 @@ where
 
         // Closure for creating all cells in an app
         let tasks = active_apps.into_iter().map(
-            move |(installed_app_id, cells): (InstalledAppId, Vec<InstalledCell>)| {
-                let cell_ids = cells.into_iter().map(|c| c.into_id());
+            move |(installed_app_id, app): (InstalledAppId, InstalledApp)| {
                 // Clone data for async block
                 let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
                 let conductor_handle = conductor_handle.clone();
@@ -461,7 +488,8 @@ where
                 // Task that creates the cells
                 async move {
                     // Only create cells not already created
-                    let cells_to_create = cell_ids
+                    let cells_to_create = app
+                        .all_cells()
                         .filter(|cell_id| !self.cells.contains_key(cell_id))
                         .map(|cell_id| {
                             (
@@ -477,7 +505,6 @@ where
                     // Create each cell
                     let cells_tasks = cells_to_create.map(
                         |(cell_id, dir, keystore, conductor_handle)| async move {
-                            tracing::info!(?cell_id, "CREATE CELL");
                             let holochain_p2p_cell = self.holochain_p2p.to_cell(
                                 cell_id.dna_hash().clone(),
                                 cell_id.agent_pubkey().clone(),
@@ -501,7 +528,7 @@ where
                     );
 
                     // Join all the cell create tasks for this app
-                    // and seperate any errors
+                    // and separate any errors
                     let (success, errors): (Vec<_>, Vec<_>) =
                         futures::future::join_all(cells_tasks)
                             .await
@@ -553,13 +580,12 @@ where
         trace!(?app);
         self.update_state(move |mut state| {
             debug!(?app);
-            let is_active = state.active_apps.contains_key(&app.installed_app_id);
-            let is_inactive = state
-                .inactive_apps
-                .insert(app.installed_app_id.clone(), app.cell_data)
-                .is_some();
+            let is_active = state.active_apps.contains_key(app.installed_app_id());
+            let is_inactive = state.inactive_apps.insert(app.clone()).is_some();
             if is_active || is_inactive {
-                Err(ConductorError::AppAlreadyInstalled(app.installed_app_id))
+                Err(ConductorError::AppAlreadyInstalled(
+                    app.installed_app_id().clone(),
+                ))
             } else {
                 Ok(state)
             }
@@ -574,11 +600,11 @@ where
         installed_app_id: InstalledAppId,
     ) -> ConductorResult<()> {
         self.update_state(move |mut state| {
-            let cell_data = state
+            let app = state
                 .inactive_apps
                 .remove(&installed_app_id)
                 .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
-            state.active_apps.insert(installed_app_id, cell_data);
+            state.active_apps.insert(app);
             Ok(state)
         })
         .await?;
@@ -594,11 +620,11 @@ where
             .update_state({
                 let installed_app_id = installed_app_id.clone();
                 move |mut state| {
-                    let cell_ids = state
+                    let app = state
                         .active_apps
                         .remove(&installed_app_id)
                         .ok_or_else(|| ConductorError::AppNotActive(installed_app_id.clone()))?;
-                    state.inactive_apps.insert(installed_app_id, cell_ids);
+                    state.inactive_apps.insert(app);
                     Ok(state)
                 }
             })
@@ -608,8 +634,8 @@ where
             .get(&installed_app_id)
             .expect("This app was just put here")
             .clone()
-            .into_iter()
-            .map(|c| c.into_id())
+            .all_cells()
+            .cloned()
             .collect())
     }
 
@@ -628,6 +654,49 @@ where
 
             trigger.initialize_workflows();
         }
+    }
+
+    /// Associate a Cell with an existing App
+    pub(super) async fn add_clone_cell_to_app(
+        &mut self,
+        installed_app_id: &InstalledAppId,
+        slot_id: &SlotId,
+        properties: YamlProperties,
+    ) -> ConductorResult<CellId> {
+        let (_, child_dna) = self
+            .update_state_prime(|mut state| {
+                if let Some(app) = state.active_apps.get_mut(installed_app_id) {
+                    let slot = app
+                        .slots()
+                        .get(slot_id)
+                        .ok_or_else(|| AppError::SlotIdMissing(slot_id.to_owned()))?;
+                    let parent_dna_hash = slot.dna_hash();
+                    let dna = self
+                        .dna_store
+                        .get(parent_dna_hash)
+                        .ok_or_else(|| DnaError::DnaMissing(parent_dna_hash.to_owned()))?
+                        .modify_phenotype(random_uuid(), properties)?;
+                    Ok((state, dna))
+                } else {
+                    Err(ConductorError::AppNotActive(installed_app_id.clone()))
+                }
+            })
+            .await?;
+        let child_dna_hash = child_dna.dna_hash().to_owned();
+        self.register_phenotype(child_dna).await?;
+        let (_, cell_id) = self
+            .update_state_prime(|mut state| {
+                if let Some(app) = state.active_apps.get_mut(installed_app_id) {
+                    let agent_key = app.slot(slot_id)?.agent_key().to_owned();
+                    let cell_id = CellId::new(child_dna_hash, agent_key);
+                    app.add_clone(slot_id, cell_id.clone())?;
+                    Ok((state, cell_id))
+                } else {
+                    Err(ConductorError::AppNotActive(installed_app_id.clone()))
+                }
+            })
+            .await?;
+        Ok(cell_id)
     }
 
     pub(super) async fn load_wasms_into_dna_files(
@@ -855,19 +924,31 @@ where
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
     }
 
+    /// Update the internal state with a pure function mapping old state to new
     async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
     where
         F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
     {
+        let (state, _) = self.update_state_prime(|s| Ok((f(s)?, ()))).await?;
+        Ok(state)
+    }
+
+    /// Update the internal state with a pure function mapping old state to new,
+    /// which may also produce an output value which will be the output of
+    /// this function
+    async fn update_state_prime<F: Send, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
+    where
+        F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)>,
+    {
         self.check_running()?;
         let guard = self.env.guard();
-        let new_state = guard.with_commit(|txn| {
+        let output = guard.with_commit(|txn| {
             let state: ConductorState = self.state_db.get(txn, &UnitDbKey)?.unwrap_or_default();
-            let new_state = f(state)?;
+            let (new_state, output) = f(state)?;
             self.state_db.put(txn, &UnitDbKey, &new_state)?;
-            Result::<_, ConductorError>::Ok(new_state)
+            Result::<_, ConductorError>::Ok((new_state, output))
         })?;
-        Ok(new_state)
+        Ok(output)
     }
 
     fn add_admin_port(&mut self, port: u16) {
@@ -1038,7 +1119,7 @@ mod builder {
                 holochain_p2p,
             });
 
-            handle.add_dnas().await?;
+            handle.load_dnas().await?;
 
             tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
 

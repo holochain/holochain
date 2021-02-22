@@ -15,7 +15,6 @@ use kitsune_p2p::agent_store::AgentInfoSigned;
 ///
 /// [`AdminResponse`]: enum.AdminResponse.html
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[cfg_attr(test, derive(Clone))]
 #[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AdminRequest {
     /// Set up and register one or more new Admin interfaces
@@ -35,9 +34,22 @@ pub enum AdminRequest {
     /// Will be responded to with an [`AdminResponse::DnaRegistered`]
     /// or an [`AdminResponse::Error`]
     ///
-    /// [`InstallDnaPayload`]: ../../../holochain_types/app/struct.InstallDnaPayload.html
+    /// [`RegisterDnaPayload`]: ../../../holochain_types/app/struct.RegisterDnaPayload.html
     /// [`AdminResponse::DnaRegistered`]: enum.AdminResponse.html#variant.DnaRegistered
     RegisterDna(Box<RegisterDnaPayload>),
+
+    /// "Clone" a DNA (in the biological sense), thus creating a new Cell.
+    ///
+    /// Using the provided, already-registered DNA, create a new DNA with a unique
+    /// UUID and the specified properties, create a new Cell from this cloned DNA,
+    /// and add the Cell to the specified App.
+    ///
+    /// Will be responded to with an [`AdminResponse::DnaCloned`]
+    /// or an [`AdminResponse::Error`]
+    ///
+    /// [`CreateCloneCellPayload`]: ../../../holochain_types/app/struct.CreateCloneCellPayload.html
+    /// [`AdminResponse::DnaCloned`]: enum.AdminResponse.html#variant.DnaCloned
+    CreateCloneCell(Box<CreateCloneCellPayload>),
 
     /// Install an app from a list of `Dna` paths.
     /// Triggers genesis to be run on all `Cell`s and to be stored.
@@ -57,6 +69,27 @@ pub enum AdminRequest {
     /// [`AdminResponse::AppInstalled`]: enum.AdminResponse.html#variant.AppInstalled
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     InstallApp(Box<InstallAppPayload>),
+
+    /// Install an app using an [`AppBundle`].
+    ///
+    /// Triggers genesis to be run on all `Cell`s and to be stored.
+    /// An `App` is intended for use by
+    /// one and only one Agent and for that reason it takes an `AgentPubKey` and
+    /// installs all the Dnas with that `AgentPubKey` forming new `Cell`s.
+    /// See [`InstallAppBundlePayload`] for full details on the configuration.
+    ///
+    /// Note that the new `App` will not be "activated" automatically after installation
+    /// and can be activated by calling [`AdminRequest::ActivateApp`].
+    ///
+    /// Will be responded to with an [`AdminResponse::AppInstalled`]
+    /// or an [`AdminResponse::Error`]
+    ///
+    /// [`InstallAppBundlePayload`]: ../../../holochain_types/app/struct.InstallAppBundlePayload.html
+    /// [`AdminRequest::ActivateApp`]: enum.AdminRequest.html#variant.ActivateApp
+    /// [`AdminResponse::AppInstalled`]: enum.AdminResponse.html#variant.AppInstalled
+    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    InstallAppBundle(Box<InstallAppBundlePayload>),
+
     /// List the hashes of all installed `Dna`s.
     /// Takes no arguments.
     ///
@@ -200,6 +233,7 @@ pub enum AdminResponse {
     /// [`AdminRequest`]: enum.AdminRequest.html
     /// [`ExternalApiWireError`]: error/enum.ExternalApiWireError.html
     Error(ExternalApiWireError),
+
     /// The successful response to an [`AdminRequest::RegisterDna`]
     ///
     /// [`AdminRequest::RegisterDna`]: enum.AdminRequest.html#variant.RegisterDna
@@ -216,36 +250,62 @@ pub enum AdminResponse {
     /// [`CellNick`]: ../../../holochain_types/app/type.CellNick.html
     /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
     AppInstalled(InstalledApp),
+
+    /// The successful response to an [`AdminRequest::InstallAppBundle`].
+    ///
+    /// The resulting [`InstalledApp`] contains the App id,
+    /// the [`CellNick`]s and, most usefully, the new [`CellId`]s
+    /// of the newly installed `Dna`s. See the [`InstalledApp`] docs for details.
+    ///
+    /// [`AdminRequest::InstallApp`]: enum.AdminRequest.html#variant.InstallApp
+    /// [`InstalledApp`]: ../../../holochain_types/app/struct.InstalledApp.html
+    /// [`CellNick`]: ../../../holochain_types/app/type.CellNick.html
+    /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
+    AppBundleInstalled(InstalledApp),
+
+    /// The successful response to an [`AdminRequest::CreateCloneCell`].
+    ///
+    /// The response contains the [`CellId`] of the newly created clone.
+    ///
+    /// [`AdminRequest::CreateCloneCell`]: enum.AdminRequest.html#variant.CreateCloneCell
+    /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
+    CloneCellCreated(CellId),
+
     /// The succesful response to an [`AdminRequest::AddAdminInterfaces`].
     ///
     /// It means the `AdminInterface`s have successfully been added
     ///
     /// [`AdminRequest::AddAdminInterfaces`]: enum.AdminRequest.html#variant.AddAdminInterfaces
     AdminInterfacesAdded,
+
     /// The succesful response to an [`AdminRequest::GenerateAgentPubKey`].
     ///
     /// Contains a new `AgentPubKey` generated by the Keystore
     ///
     /// [`AdminRequest::GenerateAgentPubKey`]: enum.AdminRequest.html#variant.GenerateAgentPubKey
     AgentPubKeyGenerated(AgentPubKey),
+
     /// The successful response to an [`AdminRequest::ListDnas`].
     ///
     /// Contains a list of the hashes of all installed `Dna`s
     ///
     /// [`AdminRequest::ListDnas`]: enum.AdminRequest.html#variant.ListDnas
     DnasListed(Vec<DnaHash>),
+
     /// The succesful response to an [`AdminRequest::ListCellIds`].
     ///
     /// Contains a list of all the `Cell` ids in the conductor
     ///
     /// [`AdminRequest::ListCellIds`]: enum.AdminRequest.html#variant.ListCellIds
     CellIdsListed(Vec<CellId>),
+
     /// The succesful response to an [`AdminRequest::ListActiveApps`].
     ///
     /// Contains a list of all the active `App` ids in the conductor
     ///
     /// [`AdminRequest::ListActiveApps`]: enum.AdminRequest.html#variant.ListActiveApps
     ActiveAppsListed(Vec<InstalledAppId>),
+
     /// The succesful response to an [`AdminRequest::AttachAppInterface`].
     ///
     /// `AppInterfaceApi` successfully attached.
@@ -257,18 +317,21 @@ pub enum AdminResponse {
         /// Networking port of the new `AppInterfaceApi`
         port: u16,
     },
+
     /// The succesful response to an [`AdminRequest::ActivateApp`].
     ///
     /// It means the `App` was activated successfully
     ///
     /// [`AdminRequest::ActivateApp`]: enum.AdminRequest.html#variant.ActivateApp
     AppActivated,
+
     /// The succesful response to an [`AdminRequest::DeactivateApp`].
     ///
     /// It means the `App` was deactivated successfully.
     ///
     /// [`AdminRequest::DeactivateApp`]: enum.AdminRequest.html#variant.DeactivateApp
     AppDeactivated,
+
     /// The succesful response to an [`AdminRequest::DumpState`].
     ///
     /// The result contains a string of serialized JSON data which can be deserialized to access the
@@ -276,12 +339,14 @@ pub enum AdminResponse {
     ///
     /// [`AdminRequest::DumpState`]: enum.AdminRequest.html#variant.DumpState
     StateDumped(String),
+
     /// The succesful response to an [`AdminRequest::AddAgentInfo`].
     ///
     /// This means the agent info was successfully added to the peer store.
     ///
     /// [`AdminRequest::AddAgentInfo`]: enum.AdminRequest.html#variant.AddAgentInfo
     AgentInfoAdded,
+
     /// The succesful response to an [`AdminRequest::RequestAgentInfo`].
     ///
     /// This is all the agent info that was found for the request.

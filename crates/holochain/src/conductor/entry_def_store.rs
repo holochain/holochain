@@ -23,15 +23,6 @@ use std::convert::TryInto;
 
 pub mod error;
 
-/// Key for the [EntryDef] buffer
-#[derive(
-    Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize, SerializedBytes,
-)]
-pub struct EntryDefBufferKey {
-    zome: ZomeDef,
-    entry_def_position: EntryDefIndex,
-}
-
 /// This is where entry defs live
 pub struct EntryDefBuf(KvBufFresh<EntryDefStoreKey, EntryDef>);
 
@@ -69,16 +60,6 @@ impl From<EntryDefStoreKey> for EntryDefBufferKey {
     fn from(a: EntryDefStoreKey) -> Self {
         a.0.try_into()
             .expect("Database corruption when retrieving EntryDefBufferKeys")
-    }
-}
-
-impl EntryDefBufferKey {
-    /// Create a new key
-    pub fn new(zome: ZomeDef, entry_def_position: EntryDefIndex) -> Self {
-        Self {
-            zome,
-            entry_def_position,
-        }
     }
 }
 
@@ -172,7 +153,7 @@ pub(crate) fn get_entry_defs(
 
     // Get the zomes hashes
     let zomes = dna
-        .dna
+        .dna()
         .zomes
         .iter()
         .cloned()
@@ -270,7 +251,7 @@ mod tests {
             entry_def_position: 1.into(),
         };
 
-        handle.install_dna(dna).await.unwrap();
+        handle.register_dna(dna).await.unwrap();
         // Check entry defs are here
         assert_eq!(
             handle.get_entry_def(&post_def_key).await,

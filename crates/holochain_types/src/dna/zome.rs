@@ -144,7 +144,17 @@ impl ZomeDef {
 
 /// A zome defined by Wasm bytecode
 #[derive(
-    Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, SerializedBytes,
+    Serialize,
+    Deserialize,
+    Hash,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    SerializedBytes,
+    derive_more::Constructor,
 )]
 pub struct WasmZome {
     /// The WasmHash representing the WASM byte code for this zome.
