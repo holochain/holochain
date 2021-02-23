@@ -157,7 +157,7 @@ fn conductors_local_boot_gossip(
     new_conductors: usize,
 ) {
     let mut network = KitsuneP2pConfig::default();
-    network.bootstrap_service = Some(url2::url2!("http://127.0.0.1:8787"));
+    network.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
         bind_to: None,
         override_host: None,
