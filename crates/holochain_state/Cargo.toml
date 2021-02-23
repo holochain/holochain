@@ -15,11 +15,11 @@ derive_more = "0.99.3"
 holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }
 holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
 fallible-iterator = "0.2.0"
-serde = { version = "1.0.104", features = [ "derive" ] }
+serde = { version = "1.0", features = [ "derive" ] }
 tracing = "=0.1.21"
 tracing-futures = "0.2.4"
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.48"
+holochain_serialized_bytes = "=0.0.50"
 holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
 holochain_wasm_test_utils = { path = "../test_utils/wasm", optional = true }

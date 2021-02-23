@@ -1,7 +1,9 @@
 //! All the components you need to build a Holochain Conductor
 
-// #![deny(missing_docs)]
+// Toggle this to see what needs to be eventually refactored (as warnings).
 #![allow(deprecated)]
+// We have a lot of usages of type aliases to `&String`, which clippy objects to.
+#![allow(clippy::ptr_arg)]
 
 pub mod conductor;
 #[allow(missing_docs)]

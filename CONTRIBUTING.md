@@ -11,7 +11,7 @@ We are committed to foster a vibrant thriving community, including growing a cul
 ## Coordination
 
 * For support be sure to explore our [Developer Resources and Documentation](https://developer.holochain.org)
-* Please chat with us on our [online forums](https://forum.holochain.org) 
+* Please chat with us on our [online forums](https://forum.holochain.org)
 
 ## Test Driven Development
 We use **test driven development**. When you add a new function or feature, be sure to add both unit tests and integration tests to shows that it works.  Pull requests without tests will most-likely not be accepted!
@@ -141,4 +141,4 @@ Holochain is licensed under the Cryptographic Autonomy License [![License: CAL v
 
 Other components, applications, and libraries we build are typically shared under the [Apache License v2](http://www.apache.org/licenses/LICENSE-2.0) as a simple, lighweight, and flexible way to share code.
 
-Copyright (C) 2017 - 2020, Holochain Foundation
+Copyright (C) 2017 - 2021, Holochain Foundation

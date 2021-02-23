@@ -69,7 +69,7 @@ pub enum AppResponse {
     ///
     /// [`InstalledApp`]: ../../../holochain_types/app/struct.InstalledApp.html
     /// [`AppRequest::AppInfo`]: enum.AppRequest.html#variant.AppInfo
-    AppInfo(Option<InstalledApp>),
+    AppInfo(Option<InstalledAppInfo>),
 
     /// The successful response to an [`AppRequest::ZomeCall`].
     ///
@@ -116,4 +116,30 @@ pub enum CryptoRequest {
     Sign(String),
     Decrypt(String),
     Encrypt(String),
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+/// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
+pub struct InstalledAppInfo {
+    /// The unique identifier for an installed app in this conductor
+    pub installed_app_id: InstalledAppId,
+    /// Info about the Cells installed in this app
+    pub cell_data: Vec<InstalledCell>,
+    /// Is this app currently active?
+    pub active: bool,
+}
+
+impl InstalledAppInfo {
+    pub fn from_installed_app(app: &InstalledApp, active: bool) -> Self {
+        let installed_app_id = app.installed_app_id().clone();
+        let cell_data = app
+            .provisioned_cells()
+            .map(|(nick, id)| InstalledCell::new(id.clone(), nick.clone()))
+            .collect();
+        Self {
+            installed_app_id,
+            cell_data,
+            active,
+        }
+    }
 }

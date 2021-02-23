@@ -31,7 +31,7 @@ impl TestConductorHandle {
     ) -> SetupOutput {
         for dna_file in dna_files {
             self.0
-                .install_dna(dna_file.clone())
+                .register_dna(dna_file.clone())
                 .await
                 .expect("Could not install DNA")
         }
