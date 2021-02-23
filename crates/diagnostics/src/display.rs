@@ -19,7 +19,7 @@ pub fn human_size(size: usize) -> String {
 
 fn dump_iter<'i>(
     name: &str,
-    it: impl Iterator<Item = Result<(&'i [u8], Option<rkv::Value<'i>>), rkv::StoreError>>,
+    it: impl Iterator<Item = Result<(&'i [u8], Option<rkv::Value<'i>>), StoreError>>,
 ) -> DatabaseResult<()> {
     let items = it
         .map(|kv| {
@@ -37,7 +37,7 @@ fn dump_iter<'i>(
 #[allow(dead_code)]
 fn dump_iter_multi<'i>(
     name: &str,
-    it: impl Iterator<Item = Result<(&'i [u8], rkv::Value<'i>), rkv::StoreError>>,
+    it: impl Iterator<Item = Result<(&'i [u8], rkv::Value<'i>), StoreError>>,
 ) -> DatabaseResult<()> {
     let items = it
         .map(|kv| {
@@ -52,11 +52,11 @@ fn dump_iter_multi<'i>(
     Ok(())
 }
 
-pub fn dump_kv(reader: &Reader, name: &str, db: rkv::SingleStore) -> DatabaseResult<()> {
+pub fn dump_kv(reader: &Reader, name: &str, db: SingleStore) -> DatabaseResult<()> {
     dump_iter(name, db.iter_start(reader)?)
 }
 
-pub fn dump_kvi(reader: &Reader, name: &str, db: rkv::IntegerStore<IntKey>) -> DatabaseResult<()> {
+pub fn dump_kvi(reader: &Reader, name: &str, db: rkv::IntegerStore) -> DatabaseResult<()> {
     dump_iter(name, db.iter_start(reader)?)
 }
 

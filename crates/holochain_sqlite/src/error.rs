@@ -4,6 +4,7 @@
 #![allow(missing_docs)]
 
 use crate::db::DbName;
+use crate::prelude::*;
 use failure::Fail;
 use holochain_serialized_bytes::SerializedBytesError;
 use std::path::PathBuf;
@@ -42,6 +43,9 @@ pub enum DatabaseError {
     // },
     #[error("Error interacting with the underlying LMDB store: {0}")]
     LmdbStoreError(#[from] failure::Compat<rkv::StoreError>),
+
+    #[error(transparent)]
+    ShimStoreError(#[from] StoreError),
 
     // TODO: the following is necessary for actual backtraces, and would be ideal,
     // but requires the unstable "backtrace" feature, so we are doing without for now.

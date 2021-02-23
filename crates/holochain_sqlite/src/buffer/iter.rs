@@ -3,7 +3,6 @@ use crate::error::DatabaseError;
 use crate::prelude::*;
 use fallible_iterator::DoubleEndedFallibleIterator;
 use fallible_iterator::FallibleIterator;
-use rkv::StoreError;
 use std::collections::BTreeMap;
 use tracing::*;
 
@@ -351,7 +350,8 @@ where
     type Item = IterItem<'env, V>;
 
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        let r = Self::next_inner(self.iter.next());
+        let n = self.iter.next().map(|o| o.map_err(StoreError::from));
+        let r = Self::next_inner(n);
         if let Ok(Some((k, _))) = r {
             self.key = Some(k);
             match self.key_back {
@@ -368,7 +368,8 @@ where
     V: BufVal,
 {
     fn next_back(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        let r = Self::next_inner(self.rev.next());
+        let n = self.rev.next().map(|o| o.map_err(StoreError::from));
+        let r = Self::next_inner(n);
         if let Ok(Some((k_back, _))) = r {
             self.key_back = Some(k_back);
             match self.key {

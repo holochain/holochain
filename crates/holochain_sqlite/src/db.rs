@@ -1,12 +1,12 @@
 //! Functionality for safely accessing LMDB database references.
 
-use crate::{env::EnvironmentKind, exports::IntegerStore};
+use crate::{env::EnvironmentKind, exports::IntegerStore, prelude::Readable};
 use crate::{
     error::DatabaseResult,
     exports::{MultiStore, SingleStore},
 };
+use crate::{prelude::Writer, rkv::Rkv};
 use derive_more::Display;
-use rkv::Rkv;
 /// Enumeration of all databases needed by Holochain
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Display)]
 pub enum TableName {
@@ -73,7 +73,7 @@ pub(super) fn initialize_databases(_rkv: &Rkv, _kind: &EnvironmentKind) -> Datab
 #[deprecated = "sqlite: placeholder"]
 pub trait GetDb {
     /// Placeholder
-    fn get_db(&self, _table_name: TableName) -> DatabaseResult<SingleStore> {
+    fn get_db(&self, _table_name: TableName) -> DatabaseResult<Table> {
         todo!("rewrite to return a Databasae")
     }
 
@@ -85,5 +85,38 @@ pub trait GetDb {
     /// Placeholder
     fn get_db_m(&self, _table_name: TableName) -> DatabaseResult<MultiStore> {
         todo!("rewrite to return a Databasae")
+    }
+}
+
+/// A reference to a SQLite table.
+/// This patten only exists as part of the naive LMDB refactor.
+#[deprecated = "lmdb: naive"]
+pub struct Table {}
+
+impl Table {
+    pub fn get<R: Readable>(&self, reader: &R, k: &[u8]) -> StoreResult<rkv::Value> {
+        todo!()
+    }
+
+    pub fn put(&self, writer: &mut Writer, k: &[u8], v: &rkv::Value) -> StoreResult<()> {
+        todo!()
+    }
+
+    pub fn delete(&self, writer: &mut Writer, k: &[u8]) -> StoreResult<()> {
+        todo!()
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum StoreError {
+    #[error("Error interacting with the underlying LMDB store: {0}")]
+    LmdbStoreError(#[from] failure::Compat<rkv::StoreError>),
+}
+
+pub type StoreResult<T> = Result<T, StoreError>;
+
+impl From<rkv::StoreError> for StoreError {
+    fn from(e: rkv::StoreError) -> StoreError {
+        StoreError::LmdbStoreError(e.compat())
     }
 }

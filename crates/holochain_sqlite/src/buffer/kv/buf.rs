@@ -13,8 +13,6 @@ use crate::error::DatabaseResult;
 use crate::fresh_reader;
 use crate::prelude::*;
 use fallible_iterator::FallibleIterator;
-use rkv::IntegerStore;
-use rkv::SingleStore;
 use std::collections::BTreeMap;
 
 #[cfg(test)]
@@ -55,7 +53,7 @@ where
 {
     /// Constructor
     // FIXME: why does this conflict with the other `new` when it's called just "new"?
-    pub fn new_int(db: IntegerStore<IntKey>) -> Self {
+    pub fn new_int(db: IntegerStore) -> Self {
         Self {
             store: KvIntStore::new(db),
             scratch: BTreeMap::new(),
@@ -292,7 +290,7 @@ where
     V: BufVal,
 {
     /// Create a new Fresh
-    pub fn new(env: EnvironmentRead, db: IntegerStore<IntKey>) -> Self {
+    pub fn new(env: EnvironmentRead, db: IntegerStore) -> Self {
         Self {
             env,
             inner: Used::new_int(db),
@@ -348,7 +346,10 @@ where
                     self.store.db().put(writer, k, &encoded)?;
                 }
                 Delete => match self.store.db().delete(writer, k) {
-                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => {}
+                    r @ Err(StoreError::LmdbStoreError(e)) => match e.into_inner() {
+                        rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => (),
+                        _ => r?,
+                    },
                     r => r?,
                 },
             }

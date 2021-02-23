@@ -3,6 +3,7 @@
 use crate::db::{initialize_databases, GetDb, TableName};
 use crate::error::DatabaseError;
 use crate::error::DatabaseResult;
+use crate::rkv::Rkv;
 use crate::transaction::Reader;
 use crate::transaction::Writer;
 use derive_more::Into;
@@ -12,7 +13,6 @@ use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use parking_lot::RwLockReadGuard;
 use rkv::EnvironmentFlags;
-use rkv::Rkv;
 use shrinkwraprs::Shrinkwrap;
 use std::collections::hash_map;
 use std::collections::HashMap;

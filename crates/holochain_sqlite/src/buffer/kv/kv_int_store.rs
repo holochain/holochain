@@ -4,23 +4,20 @@ use crate::error::DatabaseError;
 use crate::error::DatabaseResult;
 use crate::prelude::*;
 use fallible_iterator::FallibleIterator;
-use rkv::IntegerStore;
 
-pub type KvIntStore<V> = KvIntStoreGeneric<IntKey, V>;
+type K = IntKey;
 
 /// Wrapper around an rkv IntegerStore which provides strongly typed values
-pub struct KvIntStoreGeneric<K, V>
+pub struct KvIntStore<V>
 where
-    K: BufIntKey,
     V: BufVal,
 {
-    db: IntegerStore<K>,
-    __phantom: std::marker::PhantomData<(K, V)>,
+    db: IntegerStore,
+    __phantom: std::marker::PhantomData<V>,
 }
 
-impl<K, V> KvStoreT<K, V> for KvIntStoreGeneric<K, V>
+impl<V> KvStoreT<K, V> for KvIntStore<V>
 where
-    K: BufIntKey,
     V: BufVal,
 {
     /// Fetch data from DB as raw byte slice
@@ -48,7 +45,7 @@ where
     fn put(&self, writer: &mut Writer, k: &K, v: &V) -> DatabaseResult<()> {
         let buf = holochain_serialized_bytes::encode(v)?;
         let encoded = rkv::Value::Blob(&buf);
-        self.db.put(writer, *k, &encoded)?;
+        self.db.put(writer, *&encoded)?;
         Ok(())
     }
 
@@ -86,13 +83,12 @@ where
     }
 }
 
-impl<K, V> KvIntStoreGeneric<K, V>
+impl<V> KvIntStore<V>
 where
-    K: BufIntKey,
     V: BufVal,
 {
     /// Create a new KvIntBufFresh
-    pub fn new(db: IntegerStore<K>) -> Self {
+    pub fn new(db: IntegerStore) -> Self {
         Self {
             db,
             __phantom: std::marker::PhantomData,
@@ -100,7 +96,7 @@ where
     }
 
     /// Accessor for raw Rkv DB
-    pub fn db(&self) -> IntegerStore<K> {
+    pub fn db(&self) -> IntegerStore {
         self.db
     }
 

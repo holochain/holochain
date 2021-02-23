@@ -35,7 +35,7 @@ where
     P: PrefixType,
 {
     /// Create a new CasBufUsedAsync
-    pub fn new(db: rkv::SingleStore) -> Self {
+    pub fn new(db: SingleStore) -> Self {
         Self(KvBufUsed::new(db))
     }
 
@@ -148,7 +148,7 @@ where
     P: PrefixType,
 {
     /// Create a new CasBufFreshAsync
-    pub fn new(env: EnvironmentRead, db: rkv::SingleStore) -> Self {
+    pub fn new(env: EnvironmentRead, db: SingleStore) -> Self {
         Self {
             env,
             inner: CasBufUsedAsync::new(db),

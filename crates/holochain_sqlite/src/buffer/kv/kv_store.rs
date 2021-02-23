@@ -5,7 +5,7 @@ use crate::error::DatabaseError;
 use crate::error::DatabaseResult;
 use crate::prelude::*;
 use fallible_iterator::FallibleIterator;
-use rkv::SingleStore;
+use SingleStore;
 
 /// Wrapper around an rkv SingleStore which provides strongly typed values
 pub struct KvStore<K, V>
