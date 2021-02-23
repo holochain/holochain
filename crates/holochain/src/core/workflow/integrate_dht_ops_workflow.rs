@@ -19,10 +19,10 @@ use holochain_cascade::{error::CascadeError, integrate_single_metadata};
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_sqlite::buffer::BufferedStore;
 use holochain_sqlite::buffer::KvBufFresh;
-use holochain_sqlite::db::INTEGRATED_DHT_OPS;
-use holochain_sqlite::db::INTEGRATION_LIMBO;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
+use holochain_sqlite::prelude::*;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
@@ -498,10 +498,10 @@ impl Workspace for IntegrateDhtOpsWorkspace {
 impl IntegrateDhtOpsWorkspace {
     /// Constructor
     pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let db = env.get_db(&*INTEGRATED_DHT_OPS)?;
+        let db = env.get_db(TableName::IntegratedDhtOps)?;
         let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
 
-        let db = env.get_db(&*INTEGRATION_LIMBO)?;
+        let db = env.get_db(TableName::IntegrationLimbo)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
         let validation_limbo = ValidationLimboStore::new(env.clone())?;

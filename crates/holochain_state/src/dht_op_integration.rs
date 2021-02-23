@@ -5,13 +5,13 @@ use holo_hash::*;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::buffer::KvBufFresh;
-use holochain_sqlite::db::INTEGRATED_DHT_OPS;
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::BufferedStore;
 use holochain_sqlite::prelude::EnvironmentRead;
 use holochain_sqlite::prelude::GetDb;
 use holochain_sqlite::prelude::Readable;
+use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::validate::ValidationStatus;
 
@@ -105,7 +105,7 @@ pub struct IntegrationLimboValue {
 impl IntegratedDhtOpsBuf {
     /// Create a new buffer for the IntegratedDhtOpsStore
     pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let db = env.get_db(&*INTEGRATED_DHT_OPS).unwrap();
+        let db = env.get_db(TableName::IntegratedDhtOps).unwrap();
         Ok(Self {
             store: IntegratedDhtOpsStore::new(env, db),
         })

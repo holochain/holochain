@@ -1295,10 +1295,10 @@ mod slow_tests {
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
     use holo_hash::EntryHash;
-    use holochain_sqlite::db::GetDb;
-    use holochain_sqlite::db::INTEGRATED_DHT_OPS;
-    use holochain_sqlite::env::ReadManager;
     use holochain_serialized_bytes::SerializedBytes;
+    use holochain_sqlite::prelude::*;
+    use holochain_sqlite::prelude::*;
+    use holochain_sqlite::env::ReadManager;
     use holochain_state::prelude::*;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
@@ -1399,7 +1399,7 @@ mod slow_tests {
             // Check the ops are not empty
             let env_ref = call_data.env.guard();
             let reader = env_ref.reader().unwrap();
-            let db = call_data.env.get_db(&*INTEGRATED_DHT_OPS).unwrap();
+            let db = call_data.env.get_db(TableName::IntegratedDhtOps).unwrap();
             let ops_db = IntegratedDhtOpsStore::new(call_data.env.clone().into(), db);
             let ops = ops_db.iter(&reader).unwrap().collect::<Vec<_>>().unwrap();
             debug!(?ops);

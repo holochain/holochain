@@ -5,14 +5,14 @@ use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_keystore::KeystoreSender;
+use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::buffer::BufferedStore;
 use holochain_sqlite::buffer::KvvBufUsed;
-use holochain_sqlite::db::GetDb;
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::Readable;
 use holochain_sqlite::prelude::Writer;
-use holochain_serialized_bytes::prelude::*;
+use holochain_sqlite::prelude::*;
 use holochain_zome_types::signature::Signature;
 
 /// The result of a DhtOp Validation.
@@ -92,7 +92,7 @@ impl ValidationReceiptsBuf {
     /// Constructor given read-only transaction and db ref.
     pub fn new(dbs: &impl GetDb) -> DatabaseResult<ValidationReceiptsBuf> {
         Ok(Self(KvvBufUsed::new_opts(
-            dbs.get_db(&*holochain_sqlite::db::VALIDATION_RECEIPTS)?,
+            dbs.get_db_m(TableName::ValidationReceipts)?,
             true, // set to no_dup_data mode
         )))
     }

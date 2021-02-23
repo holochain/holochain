@@ -1,6 +1,6 @@
 //! Functions dealing with obtaining and referencing singleton LMDB environments
 
-use crate::db::initialize_databases;
+use crate::db::{initialize_databases, GetDb, TableName};
 use crate::error::DatabaseError;
 use crate::error::DatabaseResult;
 use crate::transaction::Reader;
@@ -120,6 +120,9 @@ impl EnvironmentRead {
         &self.path
     }
 }
+
+impl GetDb for EnvironmentRead {}
+impl GetDb for EnvironmentWrite {}
 
 /// The canonical representation of a (singleton) LMDB environment.
 /// The wrapper contains methods for managing transactions

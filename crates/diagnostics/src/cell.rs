@@ -32,7 +32,7 @@ pub async fn dump_cell_state(
     );
     println!();
 
-    kvi!("chain sequence", CHAIN_SEQUENCE);
+    kvi!("chain sequence", TableName::ChainSequence);
     kv!(
         "element vault - public entries",
         ELEMENT_VAULT_PUBLIC_ENTRIES
@@ -45,10 +45,10 @@ pub async fn dump_cell_state(
     kv!("metadata vault - links", META_VAULT_LINKS);
     kv!("metadata vault - misc", META_VAULT_MISC);
 
-    kv!("element cache - entries", ELEMENT_CACHE_ENTRIES);
-    kv!("element cache - headers", ELEMENT_CACHE_HEADERS);
-    kv!("metadata cache - links", CACHE_LINKS_META);
-    kv!("metadata cache - status", CACHE_STATUS_META);
+    kv!("element cache - entries", TableName::ElementCacheEntries);
+    kv!("element cache - headers", TableName::ElementCacheHeaders);
+    kv!("metadata cache - links", TableName::MetaCacheLinks);
+    kv!("metadata cache - status", TableName::MetaCacheStatus);
 
     kv!("integration queue", INTEGRATION_LIMBO);
     kv!("integrated dht ops", INTEGRATED_DHT_OPS);

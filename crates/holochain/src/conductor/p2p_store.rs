@@ -5,9 +5,10 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_conductor_api::AgentInfoDump;
 use holochain_conductor_api::P2pStateDump;
+use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
+use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_sqlite::buffer::KvStore;
 use holochain_sqlite::buffer::KvStoreT;
-use holochain_sqlite::db::GetDb;
 use holochain_sqlite::env::EnvironmentRead;
 use holochain_sqlite::env::EnvironmentWrite;
 use holochain_sqlite::env::WriteManager;
@@ -16,8 +17,7 @@ use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::key::BufKey;
 use holochain_sqlite::prelude::Readable;
-use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
-use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
+use holochain_sqlite::prelude::*;
 use holochain_zome_types::CellId;
 use std::convert::TryFrom;
 use std::convert::TryInto;
@@ -133,7 +133,7 @@ impl AsRef<KvStore<AgentKvKey, AgentInfoSigned>> for AgentKv {
 impl AgentKv {
     /// Constructor.
     pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let db = env.get_db(&*holochain_sqlite::db::AGENT)?;
+        let db = env.get_db(TableName::Agent)?;
         Ok(Self(KvStore::new(db)))
     }
 

@@ -17,14 +17,14 @@ use crate::core::queue_consumer::OneshotWriter;
 use crate::core::queue_consumer::WorkComplete;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use holochain_sqlite::buffer::BufferedStore;
-use holochain_sqlite::buffer::KvBufFresh;
-use holochain_sqlite::db::AUTHORED_DHT_OPS;
-use holochain_sqlite::fresh_reader;
-use holochain_sqlite::prelude::*;
-use holochain_sqlite::transaction::Writer;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_sqlite::buffer::BufferedStore;
+use holochain_sqlite::buffer::KvBufFresh;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
+use holochain_sqlite::prelude::*;
+use holochain_sqlite::transaction::Writer;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use std::collections::HashMap;
@@ -145,7 +145,7 @@ impl Workspace for PublishDhtOpsWorkspace {
 
 impl PublishDhtOpsWorkspace {
     pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let db = env.get_db(&*AUTHORED_DHT_OPS)?;
+        let db = env.get_db(TableName::AuthoredDhtOps)?;
         let authored_dht_ops = KvBufFresh::new(env.clone(), db);
         // Note that this must always be false as we don't want private entries being published
         let elements = ElementBuf::authored(env, false)?;

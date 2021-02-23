@@ -13,11 +13,11 @@ use holo_hash::HeaderHash;
 use holochain_sqlite::buffer::BufferedStore;
 use holochain_sqlite::buffer::KvIntBufFresh;
 use holochain_sqlite::buffer::KvIntStore;
-use holochain_sqlite::db::GetDb;
-use holochain_sqlite::db::CHAIN_SEQUENCE;
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
+use holochain_sqlite::prelude::*;
 use holochain_sqlite::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -45,7 +45,7 @@ pub struct ChainSequenceBuf {
 impl ChainSequenceBuf {
     /// Create a new instance
     pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let buf: Store = KvIntBufFresh::new(env.clone(), env.get_db(&*CHAIN_SEQUENCE)?);
+        let buf: Store = KvIntBufFresh::new(env.clone(), env.get_db_i(TableName::ChainSequence)?);
         let (next_index, tx_seq, current_head) =
             fresh_reader!(env, |r| { Self::head_info(buf.store(), &r) })?;
         let persisted_head = current_head.clone();
@@ -179,7 +179,7 @@ impl BufferedStore for ChainSequenceBuf {
 
         // Writing a chain move
         let env = self.buf.env().clone();
-        let db = env.get_db(&*CHAIN_SEQUENCE)?;
+        let db = env.get_db_i(TableName::ChainSequence)?;
         let (_, _, persisted_head) = ChainSequenceBuf::head_info(&KvIntStore::new(db), writer)?;
         let persisted_head_moved = self.persisted_head != persisted_head;
         if persisted_head_moved && self.chain_moved_in_this_transaction() {

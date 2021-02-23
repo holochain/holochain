@@ -3,11 +3,11 @@ use crate::core::queue_consumer::OneshotWriter;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use holochain_sqlite::buffer::KvBufFresh;
-use holochain_sqlite::db::AUTHORED_DHT_OPS;
 use holochain_sqlite::prelude::BufferedStore;
 use holochain_sqlite::prelude::EnvironmentRead;
 use holochain_sqlite::prelude::GetDb;
 use holochain_sqlite::prelude::Writer;
+use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::dht_op::DhtOpHashed;
 use tracing::*;
@@ -64,7 +64,7 @@ pub struct ProduceDhtOpsWorkspace {
 
 impl ProduceDhtOpsWorkspace {
     pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let authored_dht_ops = env.get_db(&*AUTHORED_DHT_OPS)?;
+        let authored_dht_ops = env.get_db(TableName::AuthoredDhtOps)?;
         Ok(Self {
             source_chain: SourceChain::public_only(env.clone())?,
             authored_dht_ops: KvBufFresh::new(env, authored_dht_ops),

@@ -14,12 +14,6 @@ use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 use holochain_sqlite::buffer::CasBufFreshSync;
-use holochain_sqlite::db::GetDb;
-use holochain_sqlite::db::ELEMENT_CACHE_ENTRIES;
-use holochain_sqlite::db::ELEMENT_CACHE_HEADERS;
-use holochain_sqlite::db::ELEMENT_VAULT_HEADERS;
-use holochain_sqlite::db::ELEMENT_VAULT_PRIVATE_ENTRIES;
-use holochain_sqlite::db::ELEMENT_VAULT_PUBLIC_ENTRIES;
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::exports::SingleStore;
@@ -55,8 +49,8 @@ impl ElementBuf<IntegratedPrefix> {
     /// Create a ElementBuf using the Cache databases.
     /// There is no cache for private entries, so private entries are disallowed
     pub fn cache(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let entries = env.get_db(&*ELEMENT_CACHE_ENTRIES)?;
-        let headers = env.get_db(&*ELEMENT_CACHE_HEADERS)?;
+        let entries = env.get_db(TableName::ElementCacheEntries)?;
+        let headers = env.get_db(TableName::ElementCacheHeaders)?;
         ElementBuf::new(env, entries, None, headers)
     }
 }
@@ -109,10 +103,10 @@ where
 
     /// Construct a element buf using the vault databases
     fn new_vault(env: EnvironmentRead, allow_private: bool) -> DatabaseResult<Self> {
-        let headers = env.get_db(&*ELEMENT_VAULT_HEADERS)?;
-        let entries = env.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?;
+        let headers = env.get_db(TableName::ElementVaultHeaders)?;
+        let entries = env.get_db(TableName::ElementVaultPublicEntries)?;
         let private_entries = if allow_private {
-            Some(env.get_db(&*ELEMENT_VAULT_PRIVATE_ENTRIES)?)
+            Some(env.get_db(TableName::ElementVaultPrivateEntries)?)
         } else {
             None
         };

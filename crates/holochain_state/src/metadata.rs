@@ -10,19 +10,19 @@ use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
+use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::buffer::KvBufUsed;
 use holochain_sqlite::buffer::KvvBufUsed;
-use holochain_sqlite::db::CACHE_LINKS_META;
-use holochain_sqlite::db::CACHE_STATUS_META;
-use holochain_sqlite::db::CACHE_SYSTEM_META;
-use holochain_sqlite::db::META_VAULT_LINKS;
-use holochain_sqlite::db::META_VAULT_MISC;
-use holochain_sqlite::db::META_VAULT_SYS;
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
-use holochain_serialized_bytes::prelude::*;
+use holochain_sqlite::prelude::*;
+use holochain_sqlite::prelude::*;
+use holochain_sqlite::prelude::*;
+use holochain_sqlite::prelude::*;
+use holochain_sqlite::prelude::*;
+use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::HeaderHashed;
 use std::collections::HashSet;
@@ -378,9 +378,9 @@ impl MetadataBuf<IntegratedPrefix> {
 
     /// Create a [MetadataBuf] with the cache databases
     pub fn cache(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let system_meta = env.get_db(&*CACHE_SYSTEM_META)?;
-        let links_meta = env.get_db(&*CACHE_LINKS_META)?;
-        let misc_meta = env.get_db(&*CACHE_STATUS_META)?;
+        let system_meta = env.get_db_m(TableName::MetaCacheSys)?;
+        let links_meta = env.get_db(TableName::MetaCacheLinks)?;
+        let misc_meta = env.get_db(TableName::MetaCacheStatus)?;
         Self::new(env, system_meta, links_meta, misc_meta)
     }
 }
@@ -431,9 +431,9 @@ where
     }
 
     fn new_vault(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let system_meta = env.get_db(&*META_VAULT_SYS)?;
-        let links_meta = env.get_db(&*META_VAULT_LINKS)?;
-        let misc_meta = env.get_db(&*META_VAULT_MISC)?;
+        let system_meta = env.get_db_m(TableName::MetaVaultSys)?;
+        let links_meta = env.get_db(TableName::MetaVaultLinks)?;
+        let misc_meta = env.get_db(TableName::MetaVaultMisc)?;
         Self::new(env, system_meta, links_meta, misc_meta)
     }
 

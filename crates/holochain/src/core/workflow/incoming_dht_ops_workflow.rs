@@ -10,8 +10,6 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::integrate_single_metadata;
 use holochain_sqlite::buffer::BufferedStore;
 use holochain_sqlite::buffer::KvBufFresh;
-use holochain_sqlite::db::INTEGRATED_DHT_OPS;
-use holochain_sqlite::db::INTEGRATION_LIMBO;
 use holochain_sqlite::env::EnvironmentWrite;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::EnvironmentRead;
@@ -19,6 +17,8 @@ use holochain_sqlite::prelude::GetDb;
 use holochain_sqlite::prelude::IntegratedPrefix;
 use holochain_sqlite::prelude::PendingPrefix;
 use holochain_sqlite::prelude::Writer;
+use holochain_sqlite::prelude::*;
+use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::query::HighestObserved;
@@ -93,10 +93,10 @@ impl Workspace for IncomingDhtOpsWorkspace {
 
 impl IncomingDhtOpsWorkspace {
     pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let db = env.get_db(&*INTEGRATED_DHT_OPS)?;
+        let db = env.get_db(TableName::IntegratedDhtOps)?;
         let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
 
-        let db = env.get_db(&*INTEGRATION_LIMBO)?;
+        let db = env.get_db(TableName::IntegrationLimbo)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
         let validation_limbo = ValidationLimboStore::new(env.clone())?;

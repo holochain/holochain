@@ -46,9 +46,9 @@ pub mod tests {
     use crate::workspace::WorkspaceResult;
     use holochain_sqlite::buffer::BufferedStore;
     use holochain_sqlite::buffer::KvBufFresh;
-    use holochain_sqlite::db::GetDb;
-    use holochain_sqlite::db::ELEMENT_VAULT_HEADERS;
-    use holochain_sqlite::db::ELEMENT_VAULT_PUBLIC_ENTRIES;
+    use holochain_sqlite::prelude::*;
+    use holochain_sqlite::prelude::*;
+    use holochain_sqlite::prelude::*;
     use holochain_sqlite::prelude::*;
     use holochain_sqlite::test_utils::test_cell_env;
     use holochain_sqlite::test_utils::DbString;
@@ -63,8 +63,11 @@ pub mod tests {
     impl TestWorkspace {
         pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
             Ok(Self {
-                one: KvBufFresh::new(env.clone(), env.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?),
-                two: KvBufFresh::new(env.clone(), env.get_db(&*ELEMENT_VAULT_HEADERS)?),
+                one: KvBufFresh::new(
+                    env.clone(),
+                    env.get_db(TableName::ElementVaultPublicEntries)?,
+                ),
+                two: KvBufFresh::new(env.clone(), env.get_db(TableName::ElementVaultHeaders)?),
             })
         }
     }

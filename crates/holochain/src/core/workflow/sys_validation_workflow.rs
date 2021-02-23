@@ -15,13 +15,13 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::DbPair;
 use holochain_cascade::DbPairMut;
-use holochain_sqlite::buffer::BufferedStore;
-use holochain_sqlite::buffer::KvBufFresh;
-use holochain_sqlite::db::INTEGRATION_LIMBO;
-use holochain_sqlite::fresh_reader;
-use holochain_sqlite::prelude::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_sqlite::buffer::BufferedStore;
+use holochain_sqlite::buffer::KvBufFresh;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
+use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::Entry;
@@ -723,7 +723,7 @@ impl<'a> SysValidationWorkspace {
 
 impl SysValidationWorkspace {
     pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let db = env.get_db(&*INTEGRATION_LIMBO)?;
+        let db = env.get_db(TableName::IntegrationLimbo)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
         let validation_limbo = ValidationLimboStore::new(env.clone())?;

@@ -1,7 +1,10 @@
 //! Functionality for safely accessing LMDB database references.
 
-use crate::env::EnvironmentKind;
-use crate::error::DatabaseResult;
+use crate::{env::EnvironmentKind, exports::IntegerStore};
+use crate::{
+    error::DatabaseResult,
+    exports::{MultiStore, SingleStore},
+};
 use derive_more::Display;
 use rkv::Rkv;
 /// Enumeration of all databases needed by Holochain
@@ -61,7 +64,26 @@ pub type DbName = TableName;
 
 /// Get access to the singleton database manager ([GetDb]),
 /// in order to access individual LMDB databases
-pub(super) fn initialize_databases(rkv: &Rkv, kind: &EnvironmentKind) -> DatabaseResult<()> {
+pub(super) fn initialize_databases(_rkv: &Rkv, _kind: &EnvironmentKind) -> DatabaseResult<()> {
     todo!("create database and schema if not exists");
     Ok(())
+}
+
+/// TODO
+#[deprecated = "sqlite: placeholder"]
+pub trait GetDb {
+    /// Placeholder
+    fn get_db(&self, _table_name: TableName) -> DatabaseResult<SingleStore> {
+        todo!("rewrite to return a Databasae")
+    }
+
+    /// Placeholder
+    fn get_db_i(&self, _table_name: TableName) -> DatabaseResult<IntegerStore> {
+        todo!("rewrite to return a Databasae")
+    }
+
+    /// Placeholder
+    fn get_db_m(&self, _table_name: TableName) -> DatabaseResult<MultiStore> {
+        todo!("rewrite to return a Databasae")
+    }
 }

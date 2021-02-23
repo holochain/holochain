@@ -47,11 +47,8 @@ mod tests {
 
         // all the stuff needed to have a WasmBuf
         let env = holochain_sqlite::test_utils::test_wasm_env();
-        let mut wasm_buf = WasmBuf::new(
-            env.env().into(),
-            env.get_db(&*holochain_sqlite::db::WASM).unwrap(),
-        )
-        .unwrap();
+        let mut wasm_buf =
+            WasmBuf::new(env.env().into(), env.get_db(TableName::Wasm).unwrap()).unwrap();
 
         // a wasm
         let wasm =

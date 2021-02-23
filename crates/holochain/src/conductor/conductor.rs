@@ -61,12 +61,12 @@ use holochain_keystore::KeystoreSenderExt;
 use holochain_sqlite::buffer::BufferedStore;
 use holochain_sqlite::buffer::KvStore;
 use holochain_sqlite::buffer::KvStoreT;
-use holochain_sqlite::db;
 use holochain_sqlite::env::EnvironmentKind;
 use holochain_sqlite::env::EnvironmentWrite;
 use holochain_sqlite::env::ReadManager;
 use holochain_sqlite::exports::SingleStore;
 use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
 use holochain_sqlite::prelude::*;
 use holochain_state::source_chain::SourceChainBuf;
 use holochain_state::wasm::WasmBuf;
@@ -706,9 +706,9 @@ where
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
         let environ = &self.wasm_env;
-        let wasm = environ.get_db(&*holochain_sqlite::db::WASM)?;
-        let dna_def_db = environ.get_db(&*holochain_sqlite::db::DNA_DEF)?;
-        let entry_def_db = environ.get_db(&*holochain_sqlite::db::ENTRY_DEF)?;
+        let wasm = environ.get_db(TableName::Wasm)?;
+        let dna_def_db = environ.get_db(TableName::DnaDef)?;
+        let entry_def_db = environ.get_db(TableName::EntryDef)?;
 
         let wasm_buf = Arc::new(WasmBuf::new(environ.clone().into(), wasm)?);
         let dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
@@ -777,9 +777,9 @@ where
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
         let environ = self.wasm_env.clone();
-        let wasm = environ.get_db(&*holochain_sqlite::db::WASM)?;
-        let dna_def_db = environ.get_db(&*holochain_sqlite::db::DNA_DEF)?;
-        let entry_def_db = environ.get_db(&*holochain_sqlite::db::ENTRY_DEF)?;
+        let wasm = environ.get_db(TableName::Wasm)?;
+        let dna_def_db = environ.get_db(TableName::DnaDef)?;
+        let entry_def_db = environ.get_db(TableName::EntryDef)?;
 
         let zome_defs = get_entry_defs(dna.clone())?;
 
@@ -895,7 +895,7 @@ where
         root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
     ) -> ConductorResult<Self> {
-        let db: SingleStore = env.get_db(&db::CONDUCTOR_STATE)?;
+        let db: SingleStore = env.get_db(TableName::ConductorState)?;
         let (task_tx, task_manager_run_handle) = spawn_task_manager();
         let task_manager_run_handle = Some(task_manager_run_handle);
         let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);
@@ -1182,7 +1182,7 @@ mod builder {
         /// Build a Conductor with a test environment
         #[cfg(any(test, feature = "test_utils"))]
         pub async fn test(self, envs: &TestEnvironments) -> ConductorResult<ConductorHandle> {
-            let keystore = envs.conductor().keystore();
+            let keystore = envs.conductor().keystore().clone();
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
                     .await?;

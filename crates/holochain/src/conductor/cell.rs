@@ -38,7 +38,7 @@ use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
-use holochain_sqlite::db::GetDb;
+use holochain_sqlite::prelude::*;
 use holochain_sqlite::env::EnvironmentRead;
 use holochain_sqlite::env::EnvironmentWrite;
 use holochain_sqlite::env::ReadManager;
