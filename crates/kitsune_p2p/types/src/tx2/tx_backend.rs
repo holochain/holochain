@@ -2,52 +2,76 @@
 
 use crate::*;
 
-use futures::{future::BoxFuture, stream::BoxStream};
+use futures::future::BoxFuture;
 
-/// incoming data channel
-pub type InboundChannel = Box<dyn futures::io::AsyncRead + 'static + Send + Unpin>;
+///
+pub type InChan = Box<dyn futures::io::AsyncRead + 'static + Send + Unpin>;
 
-/// a future that resolves to an incoming data channel
-pub type InboundChannelFut = BoxFuture<'static, KitsuneResult<InboundChannel>>;
+///
+pub type InChanFut = BoxFuture<'static, KitsuneResult<InChan>>;
 
-/// stream of incoming data channels
-pub type InboundChannelStream = BoxStream<'static, KitsuneResult<InboundChannelFut>>;
+///
+pub type InChanFutFut<'a> = BoxFuture<'a, KitsuneResult<InChanFut>>;
 
-/// outbound data channel
-pub type OutboundChannel = Box<dyn futures::io::AsyncWrite + 'static + Send + Unpin>;
-
-/// a future that resolves to an outbound channel
-pub type OutboundChannelFut = BoxFuture<'static, KitsuneResult<OutboundChannel>>;
-
-/// represents a connection that can make outgoing channels
-pub trait ConnectionBackend: 'static + Send + Unpin {
-    /// create a new outgoing channel on this connection
-    fn new_outbound(&self, timeout: KitsuneTimeout) -> OutboundChannelFut;
+///
+pub trait InChanRecvAdapt: 'static + Send + Unpin {
+    ///
+    fn next(&mut self) -> InChanFutFut<'_>;
 }
 
-/// two halves of a logical connection (outgoing channels + incoming channels)
-pub type ConnectionBackendPair = (Arc<dyn ConnectionBackend>, InboundChannelStream);
+///
+pub type OutChan = Box<dyn futures::io::AsyncWrite + 'static + Send + Unpin>;
 
-/// a future that resolves to a logical connection
-pub type ConnectionBackendPairFut = BoxFuture<'static, KitsuneResult<ConnectionBackendPair>>;
+///
+pub type OutChanFut = BoxFuture<'static, KitsuneResult<OutChan>>;
 
-/// represents an endpoint that can make outgoing connections
-pub trait EndpointBackend: 'static + Send + Unpin {
-    /// create a new outgoing connection from this endpoint
-    fn connect(&self, url: String, timeout: KitsuneTimeout) -> ConnectionBackendPairFut;
+///
+pub trait ConAdapt: 'static + Send + Sync + Unpin {
+    ///
+    fn remote_addr(&self) -> KitsuneResult<String>;
+
+    ///
+    fn out_chan(&self, timeout: KitsuneTimeout) -> OutChanFut;
+
+    ///
+    fn close(&self) -> BoxFuture<'static, ()>;
 }
 
-/// a stream of incoming logical connection futures
-pub type ConnectionStream = BoxStream<'static, KitsuneResult<ConnectionBackendPairFut>>;
+///
+pub type Con = (Arc<dyn ConAdapt>, Box<dyn InChanRecvAdapt>);
 
-/// two halves of a logical endpoint (outgoing connections + incoming connections)
-pub type EndpointBackendPair = (Arc<dyn EndpointBackend>, ConnectionStream);
+///
+pub type ConFut = BoxFuture<'static, KitsuneResult<Con>>;
 
-/// a futures that resolves to a logical endpoint
-pub type EndpointBackendPairFut = BoxFuture<'static, KitsuneResult<EndpointBackendPair>>;
+///
+pub type ConFutFut<'a> = BoxFuture<'a, KitsuneResult<ConFut>>;
 
-/// a factory that can establish endpoints
-pub trait BindingBackend: 'static + Send + Unpin {
-    /// establish a new endpoint on this system
-    fn bind(&self, url: String, timeout: KitsuneTimeout) -> EndpointBackendPairFut;
+///
+pub trait ConRecvAdapt: 'static + Send + Unpin {
+    ///
+    fn next(&mut self) -> ConFutFut<'_>;
+}
+
+///
+pub trait EndpointAdapt: 'static + Send + Sync + Unpin {
+    ///
+    fn local_addr(&self) -> KitsuneResult<String>;
+
+    ///
+    fn connect(&self, url: String, timeout: KitsuneTimeout) -> ConFut;
+
+    ///
+    fn close(&self) -> BoxFuture<'static, ()>;
+}
+
+///
+pub type Endpoint = (Arc<dyn EndpointAdapt>, Box<dyn ConRecvAdapt>);
+
+///
+pub type EndpointFut = BoxFuture<'static, KitsuneResult<Endpoint>>;
+
+///
+pub trait BackendAdapt: 'static + Send + Sync + Unpin {
+    ///
+    fn bind(&self, url: String, timeout: KitsuneTimeout) -> EndpointFut;
 }
