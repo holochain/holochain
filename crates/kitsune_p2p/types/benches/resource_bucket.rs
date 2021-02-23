@@ -21,12 +21,12 @@ fn resource_bucket() {
     futures::executor::block_on(RUNTIME.enter(|| {
         tokio::task::spawn(async move {
             let mut all = Vec::new();
-            for _ in 0..100 {
+            for _ in 0..50 {
                 all.push(tokio::task::spawn(async move {
-                    for _ in 0..100 {
+                    for _ in 0..50 {
                         let res = BUCKET.acquire().await.unwrap();
                         assert!(res == "1" || res == "2");
-                        BUCKET.release(black_box(res)).await;
+                        BUCKET.release(black_box(res));
                     }
                 }));
             }
@@ -38,8 +38,8 @@ fn resource_bucket() {
 
 fn criterion_benchmark(c: &mut Criterion) {
     futures::executor::block_on(async move {
-        BUCKET.release("1").await;
-        BUCKET.release("2").await;
+        BUCKET.release("1");
+        BUCKET.release("2");
     });
     c.bench_function("resource_bucket", |b| b.iter(|| resource_bucket()));
 }
