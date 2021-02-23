@@ -1,13 +1,17 @@
 #![allow(clippy::new_ret_no_self)]
 
-use crate::tx2::*;
 use crate::tx2::tx_backend::*;
+use crate::tx2::util::Active;
+use crate::tx2::*;
 use crate::*;
-use futures::{future::{BoxFuture, FutureExt}, stream::StreamExt};
-use parking_lot::Mutex;
-use std::sync::atomic;
+use futures::{
+    future::{BoxFuture, FutureExt},
+    stream::StreamExt,
+};
 use once_cell::sync::Lazy;
+use parking_lot::Mutex;
 use std::collections::HashMap;
+use std::sync::atomic;
 
 static NEXT_MEM_ID: atomic::AtomicU64 = atomic::AtomicU64::new(1);
 
@@ -16,70 +20,26 @@ type ChanRecv = tokio::sync::mpsc::Receiver<InChan>;
 type ConSend = tokio::sync::mpsc::Sender<Con>;
 type ConRecv = tokio::sync::mpsc::Receiver<Con>;
 
-#[derive(Debug, Clone)]
-struct Active([Option<Arc<atomic::AtomicBool>>; 4]);
+static MEM_ENDPOINTS: Lazy<Mutex<HashMap<u64, (ConSend, Active)>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
-impl Active {
-    pub fn new() -> Self {
-        Self([
-            Some(Arc::new(atomic::AtomicBool::new(true))),
-            None,
-            None,
-            None,
-        ])
-    }
-
-    pub fn mix(&self, oth: &Self) -> Self {
-        let mut inner = self.0.clone();
-        'top: for o in oth.0.iter() {
-            if let Some(o) = o {
-                for i in 0..4 {
-                    if inner[i].is_none() {
-                        inner[i] = Some(o.clone());
-                        continue 'top;
-                    }
-                }
-                panic!("No remaining Active slots");
-            }
-        }
-        Self(inner)
-    }
-
-    pub fn kill(&self) {
-        for a in self.0.iter() {
-            if let Some(a) = a {
-                a.store(false, atomic::Ordering::SeqCst);
-            }
-        }
-    }
-
-    pub fn is_active(&self) -> bool {
-        for a in self.0.iter() {
-            if let Some(a) = a {
-                if !a.load(atomic::Ordering::SeqCst) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
+struct MemInChanRecvAdapt {
+    recv: ChanRecv,
+    active: Active,
 }
-
-static MEM_ENDPOINTS: Lazy<Mutex<HashMap<u64, (ConSend, Active)>>> = Lazy::new(|| {
-    Mutex::new(HashMap::new())
-});
-
-struct MemInChanRecvAdapt(ChanRecv);
 
 impl InChanRecvAdapt for MemInChanRecvAdapt {
     fn next(&mut self) -> InChanFutFut {
-        let fut = self.0.next();
+        let fut = self.recv.next();
+        let fut = self
+            .active
+            .fut(async move { fut.await.ok_or(KitsuneError::Closed) });
+        let active = &self.active;
         async move {
-            let chan = fut.await.ok_or_else(|| KitsuneError::Closed)?;
-            Ok(async move {
-                Ok(chan)
-            }.boxed())
-        }.boxed()
+            let chan = fut.await?;
+            Ok(active.fut(async move { Ok(chan) }).boxed())
+        }
+        .boxed()
     }
 }
 
@@ -114,7 +74,8 @@ impl ConAdapt for MemConAdapt {
                 return Err("failed to create out channel".into());
             }
             Ok(send)
-        }.boxed()
+        }
+        .boxed()
     }
 
     fn close(&self) -> BoxFuture<'static, ()> {
@@ -123,17 +84,23 @@ impl ConAdapt for MemConAdapt {
     }
 }
 
-struct MemConRecvAdapt(ConRecv);
+struct MemConRecvAdapt {
+    recv: ConRecv,
+    active: Active,
+}
 
 impl ConRecvAdapt for MemConRecvAdapt {
     fn next(&mut self) -> ConFutFut {
-        let fut = self.0.next();
+        let fut = self.recv.next();
+        let fut = self
+            .active
+            .fut(async move { fut.await.ok_or(KitsuneError::Closed) });
+        let active = &self.active;
         async move {
-            let con = fut.await.ok_or_else(|| KitsuneError::Closed)?;
-            Ok(async move {
-                Ok(con)
-            }.boxed())
-        }.boxed()
+            let con = fut.await?;
+            Ok(active.fut(async move { Ok(con) }).boxed())
+        }
+        .boxed()
     }
 }
 
@@ -199,19 +166,29 @@ impl EndpointAdapt for MemEndpointAdapt {
 
             let con_active = Active::new();
             let mix_ep_active = this_ep_active.mix(&oth_ep_active);
-            let _mix_active = con_active.mix(&mix_ep_active);
+            let mix_active = con_active.mix(&mix_ep_active);
 
             let (send, oth_recv) = tokio::sync::mpsc::channel(1);
             let (oth_send, recv) = tokio::sync::mpsc::channel(1);
 
-            let oth_con = MemConAdapt::new(format!("{}/{}", this_url, con_id), oth_send, con_active.clone());
+            let oth_con = MemConAdapt::new(
+                format!("{}/{}", this_url, con_id),
+                oth_send,
+                con_active.clone(),
+            );
             let oth_con: Arc<dyn ConAdapt> = Arc::new(oth_con);
 
             let con = MemConAdapt::new(format!("{}/{}", url, con_id), send, con_active);
             let con: Arc<dyn ConAdapt> = Arc::new(con);
 
-            let oth_chan_recv: Box<dyn InChanRecvAdapt> = Box::new(MemInChanRecvAdapt(oth_recv));
-            let chan_recv: Box<dyn InChanRecvAdapt> = Box::new(MemInChanRecvAdapt(recv));
+            let oth_chan_recv: Box<dyn InChanRecvAdapt> = Box::new(MemInChanRecvAdapt {
+                recv: oth_recv,
+                active: mix_active.clone(),
+            });
+            let chan_recv: Box<dyn InChanRecvAdapt> = Box::new(MemInChanRecvAdapt {
+                recv,
+                active: mix_active,
+            });
 
             if sender.send((oth_con, oth_chan_recv)).await.is_err() {
                 MEM_ENDPOINTS.lock().remove(&id);
@@ -219,7 +196,8 @@ impl EndpointAdapt for MemEndpointAdapt {
             }
 
             Ok((con, chan_recv))
-        }.boxed()
+        }
+        .boxed()
     }
 
     fn close(&self) -> BoxFuture<'static, ()> {
@@ -234,6 +212,12 @@ impl EndpointAdapt for MemEndpointAdapt {
 /// Memory-based test endpoint adapter for kitsune tx2.
 pub struct MemBackendAdapt;
 
+impl Default for MemBackendAdapt {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemBackendAdapt {
     /// Construct a new test memory-based kitsune tx2 endpoint adapter.
     pub fn new() -> Self {
@@ -247,33 +231,57 @@ impl BackendAdapt for MemBackendAdapt {
             let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
             let (c_send, c_recv) = tokio::sync::mpsc::channel(1);
             let (ep, ep_active) = MemEndpointAdapt::new(id);
-            MEM_ENDPOINTS.lock().insert(id, (c_send, ep_active));
+            MEM_ENDPOINTS.lock().insert(id, (c_send, ep_active.clone()));
             let ep: Arc<dyn EndpointAdapt> = Arc::new(ep);
-            let rc: Box<dyn ConRecvAdapt> = Box::new(MemConRecvAdapt(c_recv));
+            let rc: Box<dyn ConRecvAdapt> = Box::new(MemConRecvAdapt {
+                recv: c_recv,
+                active: ep_active,
+            });
             Ok((ep, rc))
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::io::{AsyncReadExt, AsyncWriteExt};
 
     #[tokio::test(threaded_scheduler)]
     async fn test_tx2_mem_backend() {
         let back = MemBackendAdapt::new();
 
-        let (ep1, _con_recv1) = back.bind("".to_string(), KitsuneTimeout::from_millis(1000 * 30)).await.unwrap();
-        let (ep2, mut con_recv2) = back.bind("".to_string(), KitsuneTimeout::from_millis(1000 * 30)).await.unwrap();
+        let (ep1, _con_recv1) = back
+            .bind("".to_string(), KitsuneTimeout::from_millis(1000 * 30))
+            .await
+            .unwrap();
+        let (ep2, mut con_recv2) = back
+            .bind("".to_string(), KitsuneTimeout::from_millis(1000 * 30))
+            .await
+            .unwrap();
 
         let rt = tokio::task::spawn(async move {
             let mut all = Vec::new();
             while let Ok(fut) = con_recv2.next().await {
-                if let Ok((_con2, mut chan_recv2)) = fut.await {
+                println!("in-con-1");
+                if let Ok((con2, mut chan_recv2)) = fut.await {
+                    println!("in-con-2");
+
+                    let mut out_chan = con2
+                        .out_chan(KitsuneTimeout::from_millis(1000 * 30))
+                        .await
+                        .unwrap();
                     all.push(tokio::task::spawn(async move {
+                        println!("in-chan-1");
                         while let Ok(fut) = chan_recv2.next().await {
-                            if let Ok(_in_chan) = fut.await {
-                                println!("GOT IN CHAN!");
+                            println!("in-chan-2");
+                            if let Ok(mut in_chan) = fut.await {
+                                let mut bob = [0_u8; 5];
+                                in_chan.read_exact(&mut bob).await.unwrap();
+                                println!("GOT IN CHAN!: {}", String::from_utf8_lossy(&bob[..]));
+                                assert_eq!(b"hello", &bob[..]);
+                                out_chan.write_all(b"world").await.unwrap();
                             }
                         }
                     }));
@@ -286,10 +294,23 @@ mod tests {
         let addr2 = ep2.local_addr().unwrap();
         println!("addr2 = {}", addr2);
 
-        let (con1, _chan_recv1) = ep1.connect(addr2, KitsuneTimeout::from_millis(1000 * 30)).await.unwrap();
+        let (con1, mut chan_recv1) = ep1
+            .connect(addr2, KitsuneTimeout::from_millis(1000 * 30))
+            .await
+            .unwrap();
         println!("con to = {}", con1.remote_addr().unwrap());
 
-        let _out_chan = con1.out_chan(KitsuneTimeout::from_millis(1000 * 30)).await.unwrap();
+        let mut out_chan = con1
+            .out_chan(KitsuneTimeout::from_millis(1000 * 30))
+            .await
+            .unwrap();
+        out_chan.write_all(b"hello").await.unwrap();
+
+        let mut in_chan = chan_recv1.next().await.unwrap().await.unwrap();
+        let mut bob = [0_u8; 5];
+        in_chan.read_exact(&mut bob).await.unwrap();
+        println!("GOT RESPONSE: {}", String::from_utf8_lossy(&bob[..]));
+        assert_eq!(b"world", &bob[..]);
 
         ep1.close().await;
         ep2.close().await;

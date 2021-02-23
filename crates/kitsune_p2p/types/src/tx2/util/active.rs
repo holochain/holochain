@@ -1,7 +1,7 @@
 use crate::*;
 use futures::future::FutureExt;
-use std::sync::Arc;
 use std::sync::atomic;
+use std::sync::Arc;
 
 struct ActiveInner {
     act: Arc<atomic::AtomicBool>,
@@ -33,17 +33,19 @@ impl ActiveInner {
 }
 
 /// Active tracking helper for related items.
+#[derive(Clone)]
 pub struct Active([Option<Arc<ActiveInner>>; 4]);
+
+impl Default for Active {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl Active {
     /// Create a new active tracker set to "active".
     pub fn new() -> Self {
-        Self([
-            Some(Arc::new(ActiveInner::new())),
-            None,
-            None,
-            None,
-        ])
+        Self([Some(Arc::new(ActiveInner::new())), None, None, None])
     }
 
     /// Mix two active trackers to gether.
@@ -52,9 +54,9 @@ impl Active {
         let mut inner = self.0.clone();
         'top: for o in oth.0.iter() {
             if let Some(o) = o {
-                for i in 0..4 {
-                    if inner[i].is_none() {
-                        inner[i] = Some(o.clone());
+                for i in inner.iter_mut() {
+                    if i.is_none() {
+                        *i = Some(o.clone());
                         continue 'top;
                     }
                 }
@@ -89,10 +91,13 @@ impl Active {
     /// Mutate a future such that if any of the sub-trackers
     /// within this active tracker instance become inactive
     /// before the future resolve, resolve with a Err::Closed result.
-    pub fn fut<'a, 'b, R, F>(&'a self, f: F) -> impl std::future::Future<Output = KitsuneResult<R>> + 'b + Send
+    pub fn fut<'a, 'b, R, F>(
+        &'a self,
+        f: F,
+    ) -> impl std::future::Future<Output = KitsuneResult<R>> + 'b + Send
     where
         R: 'static + Send,
-        F: std::future::Future<Output = KitsuneResult<R>> + 'b + Send
+        F: std::future::Future<Output = KitsuneResult<R>> + 'b + Send,
     {
         let mut act_list = Vec::new();
         let mut recv_list = Vec::new();
@@ -103,9 +108,7 @@ impl Active {
             }
         }
         async move {
-            let w_fut = futures::future::select_all(
-                recv_list.iter_mut().map(|r| r.recv().boxed())
-            );
+            let w_fut = futures::future::select_all(recv_list.iter_mut().map(|r| r.recv().boxed()));
 
             // make sure to check this *after* we've registered the
             // watch receive futures.
