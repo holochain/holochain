@@ -1,24 +1,17 @@
 //! Functions dealing with obtaining and referencing singleton LMDB environments
 
-use crate::db::{initialize_databases, GetDb, TableName};
-use crate::error::DatabaseError;
-use crate::error::DatabaseResult;
-use crate::rkv::Rkv;
-use crate::transaction::Reader;
-use crate::transaction::Writer;
+use crate::prelude::*;
 use derive_more::Into;
 use holochain_keystore::KeystoreSender;
 use holochain_zome_types::cell::CellId;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
-use parking_lot::RwLockReadGuard;
 use rkv::EnvironmentFlags;
 use shrinkwraprs::Shrinkwrap;
 use std::collections::hash_map;
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024; // 100MB
 const MAX_DBS: u32 = 32;
@@ -48,23 +41,6 @@ lazy_static! {
 
         RwLock::new(HashMap::new())
     };
-}
-
-fn rkv_builder(
-    initial_map_size: Option<usize>,
-    flags: Option<EnvironmentFlags>,
-) -> impl (Fn(&Path) -> Result<Rkv, rkv::StoreError>) {
-    move |path: &Path| {
-        todo!("this becomes database construction")
-        // let mut env_builder = Rkv::environment_builder();
-        // env_builder
-        //     // max size of memory map, can be changed later
-        //     .set_map_size(initial_map_size.unwrap_or(DEFAULT_INITIAL_MAP_SIZE))
-        //     // max number of DBs in this environment
-        //     .set_max_dbs(MAX_DBS)
-        //     .set_flags(flags.unwrap_or_else(default_flags) | required_flags());
-        // Rkv::from_env(path, env_builder)
-    }
 }
 
 /// A read-only version of [EnvironmentWrite].
@@ -101,6 +77,54 @@ impl EnvironmentRead {
     pub fn path(&self) -> &PathBuf {
         &self.path
     }
+
+    /// SHIM
+    pub fn open_single<'s, T>(
+        &self,
+        name: T,
+        opts: rkv::StoreOptions,
+    ) -> Result<SingleStore, StoreError>
+    where
+        T: Into<Option<&'s str>>,
+    {
+        todo!("this is a shim")
+    }
+
+    /// SHIM
+    pub fn open_integer<'s, T>(
+        &self,
+        name: T,
+        mut opts: rkv::StoreOptions,
+    ) -> Result<IntegerStore, StoreError>
+    where
+        T: Into<Option<&'s str>>,
+    {
+        todo!("this is a shim")
+    }
+
+    /// SHIM
+    pub fn open_multi<'s, T>(
+        &self,
+        name: T,
+        mut opts: rkv::StoreOptions,
+    ) -> Result<MultiStore, StoreError>
+    where
+        T: Into<Option<&'s str>>,
+    {
+        todo!("this is a shim")
+    }
+
+    // /// SHIM
+    // pub fn open_multi_integer<'s, T, K: PrimitiveInt>(
+    //     &self,
+    //     name: T,
+    //     mut opts: StoreOptions,
+    // ) -> Result<MultiIntegerStore<K>, StoreError>
+    // where
+    //     T: Into<Option<&'s str>>,
+    // {
+    //     todo!("this is a shim")
+    // }
 }
 
 impl GetDb for EnvironmentRead {}
@@ -152,9 +176,10 @@ impl EnvironmentWrite {
     }
 
     #[deprecated = "remove this identity function"]
-    pub fn guard(&self) -> &Self {
+    pub fn guard(&self) -> Self {
         self.clone()
     }
+
     /// Remove the db and directory
     pub async fn remove(self) -> DatabaseResult<()> {
         todo!();
@@ -218,6 +243,22 @@ pub trait WriteManager<'e> {
 }
 
 impl<'e> ReadManager<'e> for EnvironmentRead {
+    fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
+        todo!("probably no longer makes sense")
+        // let reader = Reader::from(self.rkv.read()?);
+        // Ok(reader)
+    }
+
+    fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(Reader) -> Result<R, E>,
+    {
+        f(self.reader()?)
+    }
+}
+
+impl<'e> ReadManager<'e> for EnvironmentWrite {
     fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
         todo!("probably no longer makes sense")
         // let reader = Reader::from(self.rkv.read()?);

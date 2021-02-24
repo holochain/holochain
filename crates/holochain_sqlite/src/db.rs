@@ -1,11 +1,13 @@
 //! Functionality for safely accessing LMDB database references.
 
+use std::path::Path;
+
+use crate::prelude::Writer;
 use crate::{env::EnvironmentKind, exports::IntegerStore, prelude::Readable};
 use crate::{
     error::DatabaseResult,
     exports::{MultiStore, SingleStore},
 };
-use crate::{prelude::Writer, rkv::Rkv};
 use derive_more::Display;
 /// Enumeration of all databases needed by Holochain
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Display)]
@@ -64,7 +66,7 @@ pub type DbName = TableName;
 
 /// Get access to the singleton database manager ([GetDb]),
 /// in order to access individual LMDB databases
-pub(super) fn initialize_databases(_rkv: &Rkv, _kind: &EnvironmentKind) -> DatabaseResult<()> {
+pub(super) fn initialize_databases(_path: &Path, _kind: &EnvironmentKind) -> DatabaseResult<()> {
     todo!("create database and schema if not exists");
     Ok(())
 }

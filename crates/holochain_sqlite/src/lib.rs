@@ -61,8 +61,5 @@ pub mod key;
 pub mod prelude;
 pub mod transaction;
 
-#[deprecated = "lmdb: naive"]
-pub mod rkv;
-
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils;
