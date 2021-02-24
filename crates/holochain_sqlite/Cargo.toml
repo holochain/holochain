@@ -39,6 +39,17 @@ tokio_safe_block_on = "0.1.2"
 tracing = "0.1.18"
 tracing-futures = "0.2"
 
+rusqlite = { version = "0.24.1", features = [
+  "blob",        # better integration with blob types (Read, Write, etc)
+  "chrono",      # integration with chrono crate
+  "functions",   # rust scalar / agg / window functions
+  "hooks",       # sqlite notification callbacks
+  "serde_json",  # integration with serde_json crate
+  "sqlcipher",   # enable at-rest encryption
+  "url",         # integration with url crate
+  "uuid",        # integration with uuid crate
+] }
+
 [dev-dependencies]
 observability = { version = "0.1.3" }
 

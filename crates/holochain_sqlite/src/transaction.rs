@@ -9,10 +9,9 @@ use crate::{db::Table, error::DatabaseError};
 use chrono::offset::Local;
 use chrono::DateTime;
 use derive_more::From;
-use rkv::Database;
-use rkv::RoCursor;
 use rkv::StoreError;
 use rkv::Value;
+use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
 
 #[deprecated = "no need for read/write distinction with SQLite"]
@@ -46,7 +45,7 @@ impl Drop for ReaderSpanInfo {
 
 /// Wrapper around `rkv::Reader`, so it can be marked as threadsafe
 #[derive(Shrinkwrap)]
-pub struct Reader<'env>(#[shrinkwrap(main_field)] rkv::Reader<'env>, ReaderSpanInfo);
+pub struct Reader<'env>(#[shrinkwrap(main_field)] Transaction<'env>, ReaderSpanInfo);
 
 /// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
 /// and we can mark them as such
@@ -64,8 +63,8 @@ impl<'env> Readable for Reader<'env> {
     }
 }
 
-impl<'env> From<rkv::Reader<'env>> for Reader<'env> {
-    fn from(r: rkv::Reader<'env>) -> Self {
+impl<'env> From<Transaction<'env>> for Reader<'env> {
+    fn from(r: Transaction<'env>) -> Self {
         Self(r, ReaderSpanInfo::new())
     }
 }
@@ -74,7 +73,7 @@ impl<'env> From<rkv::Reader<'env>> for Reader<'env> {
 /// rather than the rkv-specific values
 #[derive(From, Shrinkwrap)]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct Writer<'env>(rkv::Writer<'env>);
+pub struct Writer<'env>(Transaction<'env>);
 
 impl<'env> Readable for Writer<'env> {
     fn get<K: AsRef<[u8]>>(&self, db: Table, k: &K) -> Result<Option<Value>, StoreError> {
@@ -86,6 +85,6 @@ impl<'env> Writer<'env> {
     /// This override exists solely to raise the Error from the rkv::StoreError,
     /// which does not implement std::error::Error, into a DatabaseError, which does.
     pub fn commit(self) -> Result<(), DatabaseError> {
-        self.0.commit().map_err(DatabaseError::from)
+        todo!("sqlite")
     }
 }
