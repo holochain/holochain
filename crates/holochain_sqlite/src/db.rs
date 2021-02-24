@@ -78,12 +78,12 @@ pub trait GetDb {
     }
 
     /// Placeholder
-    fn get_db_i(&self, _table_name: TableName) -> DatabaseResult<IntegerStore> {
+    fn get_db_i(&self, _table_name: TableName) -> DatabaseResult<Table> {
         todo!("rewrite to return a Databasae")
     }
 
     /// Placeholder
-    fn get_db_m(&self, _table_name: TableName) -> DatabaseResult<MultiStore> {
+    fn get_db_m(&self, _table_name: TableName) -> DatabaseResult<Table> {
         todo!("rewrite to return a Databasae")
     }
 }

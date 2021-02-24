@@ -5,7 +5,7 @@
 //! - We can upgrade some error types from rkv::StoreError, which does not implement
 //!     std::error::Error, into error types that do
 
-use crate::error::DatabaseError;
+use crate::{db::Table, error::DatabaseError};
 use chrono::offset::Local;
 use chrono::DateTime;
 use derive_more::From;
@@ -15,11 +15,10 @@ use rkv::StoreError;
 use rkv::Value;
 use shrinkwraprs::Shrinkwrap;
 
-/// Just a trait alias for rkv::Readable
-/// It's important because it lets us use either a Reader or a Writer
-/// for read-only operations
-pub trait Readable: rkv::Readable {}
-impl<T: rkv::Readable> Readable for T {}
+#[deprecated = "no need for read/write distinction with SQLite"]
+pub trait Readable {
+    fn get<K: AsRef<[u8]>>(&self, db: Table, k: &K) -> Result<Option<Value>, StoreError>;
+}
 
 struct ReaderSpanInfo {
     // Using a chrono timestamp here because we need duration operations
@@ -59,13 +58,9 @@ unsafe impl<'env> Send for Reader<'env> {}
 #[cfg(feature = "lmdb_no_tls")]
 unsafe impl<'env> Sync for Reader<'env> {}
 
-impl<'env> rkv::Readable for Reader<'env> {
-    fn get<K: AsRef<[u8]>>(&self, db: Database, k: &K) -> Result<Option<Value>, StoreError> {
-        self.0.get(db, k)
-    }
-
-    fn open_ro_cursor(&self, db: Database) -> Result<RoCursor, StoreError> {
-        self.0.open_ro_cursor(db)
+impl<'env> Readable for Reader<'env> {
+    fn get<K: AsRef<[u8]>>(&self, db: Table, k: &K) -> Result<Option<Value>, StoreError> {
+        todo!("do get on the table with sqlite")
     }
 }
 
@@ -81,13 +76,9 @@ impl<'env> From<rkv::Reader<'env>> for Reader<'env> {
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
 pub struct Writer<'env>(rkv::Writer<'env>);
 
-impl<'env> rkv::Readable for Writer<'env> {
-    fn get<K: AsRef<[u8]>>(&self, db: Database, k: &K) -> Result<Option<Value>, StoreError> {
-        self.0.get(db, k)
-    }
-
-    fn open_ro_cursor(&self, db: Database) -> Result<RoCursor, StoreError> {
-        self.0.open_ro_cursor(db)
+impl<'env> Readable for Writer<'env> {
+    fn get<K: AsRef<[u8]>>(&self, db: Table, k: &K) -> Result<Option<Value>, StoreError> {
+        todo!("do get on the table with sqlite")
     }
 }
 
