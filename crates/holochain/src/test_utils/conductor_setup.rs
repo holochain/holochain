@@ -12,12 +12,12 @@ use crate::core::ribosome::real_ribosome::RealRibosome;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
-use holochain_sqlite::env::EnvironmentWrite;
-use holochain_sqlite::test_utils::test_environments;
-use holochain_sqlite::test_utils::TestEnvironments;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_sqlite::db::DbWrite;
+use holochain_sqlite::test_utils::test_environments;
+use holochain_sqlite::test_utils::TestDbs;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -29,7 +29,7 @@ use tempdir::TempDir;
 /// A "factory" for HostFnCaller, which will produce them when given a ZomeName
 pub struct CellHostFnCaller {
     pub cell_id: CellId,
-    pub env: EnvironmentWrite,
+    pub env: DbWrite,
     pub ribosome: RealRibosome,
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
@@ -89,7 +89,7 @@ pub struct ConductorTestData {
 
 impl ConductorTestData {
     pub async fn new(
-        envs: TestEnvironments,
+        envs: TestDbs,
         dna_files: Vec<DnaFile>,
         agents: Vec<AgentPubKey>,
         network_config: KitsuneP2pConfig,

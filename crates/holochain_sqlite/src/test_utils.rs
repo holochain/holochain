@@ -1,7 +1,7 @@
 //! Helpers for unit tests
 
-use crate::env::EnvironmentKind;
-use crate::env::EnvironmentWrite;
+use crate::db::DbKind;
+use crate::db::DbWrite;
 use crate::prelude::BufKey;
 use holochain_keystore::KeystoreSender;
 use holochain_zome_types::test_utils::fake_cell_id;
@@ -9,25 +9,25 @@ use shrinkwraprs::Shrinkwrap;
 use std::sync::Arc;
 use tempdir::TempDir;
 
-/// Create a [TestEnvironment] of [EnvironmentKind::Cell], backed by a temp directory.
-pub fn test_cell_env() -> TestEnvironment {
+/// Create a [TestDb] of [DbKind::Cell], backed by a temp directory.
+pub fn test_cell_env() -> TestDb {
     let cell_id = fake_cell_id(1);
-    test_env(EnvironmentKind::Cell(cell_id))
+    test_env(DbKind::Cell(cell_id))
 }
 
-/// Create a [TestEnvironment] of [EnvironmentKind::Conductor], backed by a temp directory.
-pub fn test_conductor_env() -> TestEnvironment {
-    test_env(EnvironmentKind::Conductor)
+/// Create a [TestDb] of [DbKind::Conductor], backed by a temp directory.
+pub fn test_conductor_env() -> TestDb {
+    test_env(DbKind::Conductor)
 }
 
-/// Create a [TestEnvironment] of [EnvironmentKind::Wasm], backed by a temp directory.
-pub fn test_wasm_env() -> TestEnvironment {
-    test_env(EnvironmentKind::Wasm)
+/// Create a [TestDb] of [DbKind::Wasm], backed by a temp directory.
+pub fn test_wasm_env() -> TestDb {
+    test_env(DbKind::Wasm)
 }
 
-/// Create a [TestEnvironment] of [EnvironmentKind::P2p], backed by a temp directory.
-pub fn test_p2p_env() -> TestEnvironment {
-    test_env(EnvironmentKind::P2p)
+/// Create a [TestDb] of [DbKind::P2p], backed by a temp directory.
+pub fn test_p2p_env() -> TestDb {
+    test_env(DbKind::P2p)
 }
 
 /// Generate a test keystore pre-populated with a couple test keypairs.
@@ -57,34 +57,34 @@ pub fn test_keystore() -> holochain_keystore::KeystoreSender {
     .unwrap()
 }
 
-fn test_env(kind: EnvironmentKind) -> TestEnvironment {
+fn test_env(kind: DbKind) -> TestDb {
     let tmpdir = Arc::new(TempDir::new("holochain-test-environments").unwrap());
-    TestEnvironment {
-        env: EnvironmentWrite::new(tmpdir.path(), kind, test_keystore())
+    TestDb {
+        env: DbWrite::new(tmpdir.path(), kind, test_keystore())
             .expect("Couldn't create test LMDB environment"),
         tmpdir,
     }
 }
 
 /// Create a fresh set of test environments with a new TempDir
-pub fn test_environments() -> TestEnvironments {
+pub fn test_environments() -> TestDbs {
     let tempdir = TempDir::new("holochain-test-environments").unwrap();
-    TestEnvironments::new(tempdir)
+    TestDbs::new(tempdir)
 }
 
 /// A test lmdb environment with test directory
 #[derive(Clone, Shrinkwrap)]
-pub struct TestEnvironment {
+pub struct TestDb {
     #[shrinkwrap(main_field)]
     /// lmdb environment
-    env: EnvironmentWrite,
+    env: DbWrite,
     /// temp directory for this environment
     tmpdir: Arc<TempDir>,
 }
 
-impl TestEnvironment {
+impl TestDb {
     /// Accessor
-    pub fn env(&self) -> EnvironmentWrite {
+    pub fn env(&self) -> DbWrite {
         self.env.clone()
     }
 
@@ -96,13 +96,13 @@ impl TestEnvironment {
 
 #[derive(Clone)]
 /// A container for all three non-cell environments
-pub struct TestEnvironments {
+pub struct TestDbs {
     /// A test conductor environment
-    conductor: EnvironmentWrite,
+    conductor: DbWrite,
     /// A test wasm environment
-    wasm: EnvironmentWrite,
+    wasm: DbWrite,
     /// A test p2p environment
-    p2p: EnvironmentWrite,
+    p2p: DbWrite,
     /// The shared root temp dir for these environments
     tempdir: Arc<TempDir>,
     /// A keystore sender shared by all environments
@@ -110,15 +110,14 @@ pub struct TestEnvironments {
 }
 
 #[allow(missing_docs)]
-impl TestEnvironments {
+impl TestDbs {
     /// Create all three non-cell environments at once
     pub fn new(tempdir: TempDir) -> Self {
-        use EnvironmentKind::*;
+        use DbKind::*;
         let keystore = test_keystore();
-        let conductor =
-            EnvironmentWrite::new(&tempdir.path(), Conductor, keystore.clone()).unwrap();
-        let wasm = EnvironmentWrite::new(&tempdir.path(), Wasm, keystore.clone()).unwrap();
-        let p2p = EnvironmentWrite::new(&tempdir.path(), P2p, keystore.clone()).unwrap();
+        let conductor = DbWrite::new(&tempdir.path(), Conductor, keystore.clone()).unwrap();
+        let wasm = DbWrite::new(&tempdir.path(), Wasm, keystore.clone()).unwrap();
+        let p2p = DbWrite::new(&tempdir.path(), P2p, keystore.clone()).unwrap();
         Self {
             conductor,
             wasm,
@@ -128,15 +127,15 @@ impl TestEnvironments {
         }
     }
 
-    pub fn conductor(&self) -> EnvironmentWrite {
+    pub fn conductor(&self) -> DbWrite {
         self.conductor.clone()
     }
 
-    pub fn wasm(&self) -> EnvironmentWrite {
+    pub fn wasm(&self) -> DbWrite {
         self.wasm.clone()
     }
 
-    pub fn p2p(&self) -> EnvironmentWrite {
+    pub fn p2p(&self) -> DbWrite {
         self.p2p.clone()
     }
 

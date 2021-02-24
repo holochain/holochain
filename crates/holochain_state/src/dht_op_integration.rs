@@ -8,8 +8,8 @@ use holochain_sqlite::buffer::KvBufFresh;
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::BufferedStore;
-use holochain_sqlite::prelude::EnvironmentRead;
-use holochain_sqlite::prelude::GetDb;
+use holochain_sqlite::prelude::DbRead;
+use holochain_sqlite::prelude::GetTable;
 use holochain_sqlite::prelude::Readable;
 use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
@@ -104,8 +104,8 @@ pub struct IntegrationLimboValue {
 
 impl IntegratedDhtOpsBuf {
     /// Create a new buffer for the IntegratedDhtOpsStore
-    pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let db = env.get_db(TableName::IntegratedDhtOps).unwrap();
+    pub fn new(env: DbRead) -> DatabaseResult<Self> {
+        let db = env.get_table(TableName::IntegratedDhtOps).unwrap();
         Ok(Self {
             store: IntegratedDhtOpsStore::new(env, db),
         })
@@ -166,8 +166,8 @@ mod tests {
     use holo_hash::fixt::DhtOpHashFixturator;
     use holo_hash::fixt::HeaderHashFixturator;
     use holochain_sqlite::buffer::BufferedStore;
-    use holochain_sqlite::env::ReadManager;
-    use holochain_sqlite::env::WriteManager;
+    use holochain_sqlite::db::ReadManager;
+    use holochain_sqlite::db::WriteManager;
     use holochain_sqlite::test_utils::test_cell_env;
     use pretty_assertions::assert_eq;
 

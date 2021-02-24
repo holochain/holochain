@@ -15,9 +15,9 @@ use crate::here;
 use crate::test_utils::test_network;
 use ::fixt::prelude::*;
 
-use holochain_sqlite::env::EnvironmentWrite;
-use holochain_sqlite::env::ReadManager;
-use holochain_sqlite::env::WriteManager;
+use holochain_sqlite::db::DbWrite;
+use holochain_sqlite::db::ReadManager;
+use holochain_sqlite::db::WriteManager;
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::test_utils::test_cell_env;
 use holochain_state::metadata::ChainItemKey;
@@ -184,7 +184,7 @@ enum Db {
 impl Db {
     /// Checks that the database is in a state
     #[instrument(skip(expects, env))]
-    async fn check(expects: Vec<Self>, env: EnvironmentWrite, here: String) {
+    async fn check(expects: Vec<Self>, env: DbWrite, here: String) {
         let env_ref = env.guard();
         let reader = env_ref.reader().unwrap();
         let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
@@ -454,7 +454,7 @@ impl Db {
 
     // Sets the database to a certain state
     #[instrument(skip(pre_state, env))]
-    async fn set<'env>(pre_state: Vec<Self>, env: EnvironmentWrite) {
+    async fn set<'env>(pre_state: Vec<Self>, env: DbWrite) {
         let env_ref = env.guard();
         let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
         for state in pre_state {
@@ -527,7 +527,7 @@ impl Db {
     }
 }
 
-async fn call_workflow<'env>(env: EnvironmentWrite) {
+async fn call_workflow<'env>(env: DbWrite) {
     let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
     let (mut qt, _rx) = TriggerSender::new();
     integrate_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
@@ -536,7 +536,7 @@ async fn call_workflow<'env>(env: EnvironmentWrite) {
 }
 
 // Need to clear the data from the previous test
-fn clear_dbs(env: EnvironmentWrite) {
+fn clear_dbs(env: DbWrite) {
     let env_ref = env.guard();
     let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
     env_ref
@@ -836,7 +836,7 @@ async fn test_ops_state() {
 }
 
 /// Call the produce dht ops workflow
-async fn produce_dht_ops<'env>(env: EnvironmentWrite) {
+async fn produce_dht_ops<'env>(env: DbWrite) {
     let (mut qt, _rx) = TriggerSender::new();
     let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
     produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
@@ -845,7 +845,7 @@ async fn produce_dht_ops<'env>(env: EnvironmentWrite) {
 }
 
 /// Run genesis on the source chain
-async fn genesis<'env>(env: EnvironmentWrite) {
+async fn genesis<'env>(env: DbWrite) {
     let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     fake_genesis(&mut workspace.source_chain).await.unwrap();
     {
@@ -857,7 +857,7 @@ async fn genesis<'env>(env: EnvironmentWrite) {
 
 async fn commit_entry<'env>(
     pre_state: Vec<Db>,
-    env: EnvironmentWrite,
+    env: DbWrite,
     zome_name: ZomeName,
 ) -> (EntryHash, HeaderHash) {
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
@@ -936,7 +936,7 @@ async fn commit_entry<'env>(
     (entry_hash, output)
 }
 
-async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry> {
+async fn get_entry(env: DbWrite, entry_hash: EntryHash) -> Option<Entry> {
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
@@ -960,7 +960,7 @@ async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry
 }
 
 async fn create_link(
-    env: EnvironmentWrite,
+    env: DbWrite,
     base_address: EntryHash,
     target_address: EntryHash,
     zome_name: ZomeName,
@@ -1014,7 +1014,7 @@ async fn create_link(
 }
 
 async fn get_links(
-    env: EnvironmentWrite,
+    env: DbWrite,
     base_address: EntryHash,
     zome_name: ZomeName,
     link_tag: LinkTag,
@@ -1296,9 +1296,9 @@ mod slow_tests {
     use fallible_iterator::FallibleIterator;
     use holo_hash::EntryHash;
     use holochain_serialized_bytes::SerializedBytes;
+    use holochain_sqlite::db::ReadManager;
     use holochain_sqlite::prelude::*;
     use holochain_sqlite::prelude::*;
-    use holochain_sqlite::env::ReadManager;
     use holochain_state::prelude::*;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
@@ -1399,7 +1399,10 @@ mod slow_tests {
             // Check the ops are not empty
             let env_ref = call_data.env.guard();
             let reader = env_ref.reader().unwrap();
-            let db = call_data.env.get_db(TableName::IntegratedDhtOps).unwrap();
+            let db = call_data
+                .env
+                .get_table(TableName::IntegratedDhtOps)
+                .unwrap();
             let ops_db = IntegratedDhtOpsStore::new(call_data.env.clone().into(), db);
             let ops = ops_db.iter(&reader).unwrap().collect::<Vec<_>>().unwrap();
             debug!(?ops);

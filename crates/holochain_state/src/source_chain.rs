@@ -37,11 +37,11 @@ impl SourceChain {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
 
-    pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn new(env: DbRead) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::new(env)?.into())
     }
 
-    pub fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn public_only(env: DbRead) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::public_only(env)?.into())
     }
 

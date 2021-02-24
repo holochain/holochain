@@ -1,8 +1,8 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
 
 pub fn query(
     _ribosome: Arc<impl RibosomeT>,
@@ -16,7 +16,8 @@ pub fn query(
             .write()
             .await
             .source_chain
-            .query(&input).map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+            .query(&input)
+            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
         Ok(elements)
     })
 }
@@ -24,18 +25,16 @@ pub fn query(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::{
-        core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator,
-    };
+    use crate::{core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator};
     use ::fixt::prelude::*;
     use hdk::prelude::*;
-    use holochain_sqlite::test_utils::TestEnvironment;
+    use holochain_sqlite::test_utils::TestDb;
     use query::ChainQueryFilter;
 
     use holochain_wasm_test_utils::TestWasm;
 
     // TODO: use this setup function to DRY up a lot of duplicated code
-    async fn setup() -> (TestEnvironment, ZomeCallHostAccess) {
+    async fn setup() -> (TestDb, ZomeCallHostAccess) {
         let test_env = holochain_sqlite::test_utils::test_cell_env();
         let env = test_env.env();
 
@@ -47,8 +46,7 @@ pub mod slow_tests {
             .await
             .unwrap();
 
-        let workspace_lock =
-            crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
         (test_env, host_access)
@@ -58,18 +56,10 @@ pub mod slow_tests {
     async fn query_smoke_test() {
         let (_test_env, host_access) = setup().await;
 
-        let _hash_a: EntryHash = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Query,
-            "add_path",
-            "a".to_string()
-        );
-        let _hash_b: EntryHash = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Query,
-            "add_path",
-            "b".to_string()
-        );
+        let _hash_a: EntryHash =
+            crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "a".to_string());
+        let _hash_b: EntryHash =
+            crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "b".to_string());
 
         let elements: Vec<Element> = crate::call_test_ribosome!(
             host_access,

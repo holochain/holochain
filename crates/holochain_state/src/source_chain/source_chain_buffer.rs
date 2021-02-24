@@ -17,7 +17,7 @@ pub struct SourceChainBuf {
     sequence: ChainSequenceBuf,
     keystore: KeystoreSender,
 
-    env: EnvironmentRead,
+    env: DbRead,
 }
 
 // TODO fix this.  We shouldn't really have nil values but this would
@@ -37,7 +37,7 @@ pub struct SourceChainJsonElement {
 }
 
 impl SourceChainBuf {
-    pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn new(env: DbRead) -> DatabaseResult<Self> {
         Ok(Self {
             elements: ElementBuf::authored(env.clone(), true)?,
             sequence: ChainSequenceBuf::new(env.clone())?,
@@ -46,7 +46,7 @@ impl SourceChainBuf {
         })
     }
 
-    pub fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn public_only(env: DbRead) -> DatabaseResult<Self> {
         Ok(Self {
             elements: ElementBuf::authored(env.clone(), false)?,
             sequence: ChainSequenceBuf::new(env.clone())?,
@@ -55,7 +55,7 @@ impl SourceChainBuf {
         })
     }
 
-    pub fn env(&self) -> &EnvironmentRead {
+    pub fn env(&self) -> &DbRead {
         &self.env
     }
 

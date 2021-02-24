@@ -5,9 +5,9 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_sqlite::env::EnvironmentRead;
-use holochain_sqlite::env::EnvironmentWrite;
-use holochain_sqlite::env::ReadManager;
+use holochain_sqlite::db::DbRead;
+use holochain_sqlite::db::DbWrite;
+use holochain_sqlite::db::ReadManager;
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::PrefixType;
@@ -25,7 +25,7 @@ use tracing::*;
 
 #[instrument(skip(state_env))]
 pub fn handle_get_entry(
-    state_env: EnvironmentWrite,
+    state_env: DbWrite,
     hash: EntryHash,
     options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<GetElementResponse> {
@@ -173,10 +173,7 @@ pub fn handle_get_entry(
 }
 
 #[tracing::instrument(skip(env))]
-pub fn handle_get_element(
-    env: EnvironmentWrite,
-    hash: HeaderHash,
-) -> CascadeResult<GetElementResponse> {
+pub fn handle_get_element(env: DbWrite, hash: HeaderHash) -> CascadeResult<GetElementResponse> {
     // Get the vaults
     let env_ref = env.guard();
     let reader = env_ref.reader()?;
@@ -248,7 +245,7 @@ pub fn handle_get_element(
 
 #[instrument(skip(env))]
 pub fn handle_get_agent_activity(
-    env: EnvironmentRead,
+    env: DbRead,
     agent: AgentPubKey,
     query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
@@ -344,7 +341,7 @@ fn check_headers<P: PrefixType, R: Readable>(
 
 #[instrument(skip(env, _options))]
 pub fn handle_get_links(
-    env: EnvironmentRead,
+    env: DbRead,
     link_key: WireLinkMetaKey,
     _options: holochain_p2p::event::GetLinksOptions,
 ) -> CascadeResult<GetLinksResponse> {

@@ -5,7 +5,7 @@ use super::*;
 use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_dht_ops_workflow;
 use crate::core::workflow::integrate_dht_ops_workflow::IntegrateDhtOpsWorkspace;
-use holochain_sqlite::env::EnvironmentWrite;
+use holochain_sqlite::db::DbWrite;
 
 use tokio::task::JoinHandle;
 use tracing::*;
@@ -13,7 +13,7 @@ use tracing::*;
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
 #[instrument(skip(env, stop, trigger_sys))]
 pub fn spawn_integrate_dht_ops_consumer(
-    env: EnvironmentWrite,
+    env: DbWrite,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_sys: sync::oneshot::Receiver<TriggerSender>,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {

@@ -126,7 +126,7 @@ mock! {
         fn has_rejected_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool>;
         fn has_registered_store_entry(&self, entry_hash: &EntryHash, header_hash: &HeaderHash) -> DatabaseResult<bool>;
         fn has_any_registered_store_entry(&self, hash: &EntryHash) -> DatabaseResult<bool>;
-        fn env(&self) -> &EnvironmentRead;
+        fn env(&self) -> &DbRead;
     }
 }
 
@@ -454,7 +454,7 @@ impl MetadataBufT for MockMetadataBuf {
         self.has_any_registered_store_entry(hash)
     }
 
-    fn env(&self) -> &EnvironmentRead {
+    fn env(&self) -> &DbRead {
         self.env()
     }
 }

@@ -44,8 +44,9 @@ pub struct ChainSequenceBuf {
 
 impl ChainSequenceBuf {
     /// Create a new instance
-    pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let buf: Store = KvIntBufFresh::new(env.clone(), env.get_db_i(TableName::ChainSequence)?);
+    pub fn new(env: DbRead) -> DatabaseResult<Self> {
+        let buf: Store =
+            KvIntBufFresh::new(env.clone(), env.get_table_i(TableName::ChainSequence)?);
         let (next_index, tx_seq, current_head) =
             fresh_reader!(env, |r| { Self::head_info(buf.store(), &r) })?;
         let persisted_head = current_head.clone();
@@ -179,7 +180,7 @@ impl BufferedStore for ChainSequenceBuf {
 
         // Writing a chain move
         let env = self.buf.env().clone();
-        let db = env.get_db_i(TableName::ChainSequence)?;
+        let db = env.get_table_i(TableName::ChainSequence)?;
         let (_, _, persisted_head) = ChainSequenceBuf::head_info(&KvIntStore::new(db), writer)?;
         let persisted_head_moved = self.persisted_head != persisted_head;
         if persisted_head_moved && self.chain_moved_in_this_transaction() {
@@ -200,8 +201,8 @@ pub mod tests {
     use super::SourceChainError;
     use crate::source_chain::SourceChainResult;
     use holo_hash::HeaderHash;
-    use holochain_sqlite::env::ReadManager;
-    use holochain_sqlite::env::WriteManager;
+    use holochain_sqlite::db::ReadManager;
+    use holochain_sqlite::db::WriteManager;
     use holochain_sqlite::error::DatabaseResult;
     use holochain_sqlite::prelude::*;
     use holochain_sqlite::test_utils::test_cell_env;

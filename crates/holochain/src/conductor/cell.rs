@@ -38,12 +38,12 @@ use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
-use holochain_sqlite::prelude::*;
-use holochain_sqlite::env::EnvironmentRead;
-use holochain_sqlite::env::EnvironmentWrite;
-use holochain_sqlite::env::ReadManager;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_sqlite::db::DbRead;
+use holochain_sqlite::db::DbWrite;
+use holochain_sqlite::db::ReadManager;
+use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use observability::OpenSpanExt;
@@ -99,7 +99,7 @@ where
 {
     id: CellId,
     conductor_api: Api,
-    env: EnvironmentWrite,
+    env: DbWrite,
     holochain_p2p_cell: P2pCell,
     queue_triggers: QueueTriggers,
 }
@@ -116,7 +116,7 @@ impl Cell {
     pub async fn create(
         id: CellId,
         conductor_handle: ConductorHandle,
-        env: EnvironmentWrite,
+        env: DbWrite,
         holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
@@ -164,7 +164,7 @@ impl Cell {
     pub async fn genesis(
         id: CellId,
         conductor_handle: ConductorHandle,
-        cell_env: EnvironmentWrite,
+        cell_env: DbWrite,
         membrane_proof: Option<SerializedBytes>,
     ) -> CellResult<()> {
         // get the dna
@@ -446,7 +446,7 @@ impl Cell {
         &self,
         header_hash: HeaderHash,
     ) -> CellResult<ValidationPackageResponse> {
-        let env: EnvironmentRead = self.env.clone().into();
+        let env: DbRead = self.env.clone().into();
 
         // Get the header
         let databases = ValidationPackageDb::create(env.clone())?;
@@ -772,7 +772,7 @@ impl Cell {
 
     /// Accessor for the LMDB environment backing this Cell
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
-    pub(crate) fn env(&self) -> &EnvironmentWrite {
+    pub(crate) fn env(&self) -> &DbWrite {
         &self.env
     }
 

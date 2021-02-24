@@ -3,8 +3,8 @@
 // missing_docs allowed here since the errors already have self-descriptive strings
 #![allow(missing_docs)]
 
-use crate::db::DbName;
 use crate::prelude::*;
+use crate::table::DbName;
 use failure::Fail;
 use holochain_serialized_bytes::SerializedBytesError;
 use std::path::PathBuf;

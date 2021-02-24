@@ -144,8 +144,8 @@ impl Workspace for PublishDhtOpsWorkspace {
 }
 
 impl PublishDhtOpsWorkspace {
-    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let db = env.get_db(TableName::AuthoredDhtOps)?;
+    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+        let db = env.get_table(TableName::AuthoredDhtOps)?;
         let authored_dht_ops = KvBufFresh::new(env.clone(), db);
         // Note that this must always be false as we don't want private entries being published
         let elements = ElementBuf::authored(env, false)?;
@@ -196,7 +196,7 @@ mod tests {
 
     /// publish ops setup
     async fn setup<'env>(
-        env: EnvironmentWrite,
+        env: DbWrite,
         num_agents: u32,
         num_hash: u32,
         panic_on_publish: bool,
@@ -316,7 +316,7 @@ mod tests {
     }
 
     /// Call the workflow
-    async fn call_workflow(env: EnvironmentWrite, mut cell_network: HolochainP2pCell) {
+    async fn call_workflow(env: DbWrite, mut cell_network: HolochainP2pCell) {
         let workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
         publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)
             .await

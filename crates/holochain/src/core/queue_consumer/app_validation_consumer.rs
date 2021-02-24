@@ -4,7 +4,7 @@ use super::*;
 use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::app_validation_workflow::app_validation_workflow;
 use crate::core::workflow::app_validation_workflow::AppValidationWorkspace;
-use holochain_sqlite::env::EnvironmentWrite;
+use holochain_sqlite::db::DbWrite;
 
 use tokio::task::JoinHandle;
 use tracing::*;
@@ -12,7 +12,7 @@ use tracing::*;
 /// Spawn the QueueConsumer for AppValidation workflow
 #[instrument(skip(env, stop, trigger_integration, conductor_api, network))]
 pub fn spawn_app_validation_consumer(
-    env: EnvironmentWrite,
+    env: DbWrite,
     mut stop: sync::broadcast::Receiver<()>,
     mut trigger_integration: TriggerSender,
     conductor_api: impl CellConductorApiT + 'static,

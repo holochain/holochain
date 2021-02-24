@@ -354,7 +354,7 @@ where
     fn has_any_registered_store_entry(&self, hash: &EntryHash) -> DatabaseResult<bool>;
 
     /// Get the environment for creating readers
-    fn env(&self) -> &EnvironmentRead;
+    fn env(&self) -> &DbRead;
 }
 
 /// Updates and answers queries for the links and system meta databases
@@ -365,22 +365,22 @@ where
     system_meta: KvvBufUsed<PrefixBytesKey<P>, SysMetaVal>,
     links_meta: KvBufUsed<PrefixBytesKey<P>, LinkMetaVal>,
     misc_meta: KvBufUsed<PrefixBytesKey<P>, MiscMetaValue>,
-    env: EnvironmentRead,
+    env: DbRead,
 }
 
 impl MetadataBuf<IntegratedPrefix> {
     /// Create a [MetadataBuf] with the vault databases using the IntegratedPrefix.
     /// The data in the type will be separate from the other prefixes even though the
     /// database is shared.
-    pub fn vault(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn vault(env: DbRead) -> DatabaseResult<Self> {
         Self::new_vault(env)
     }
 
     /// Create a [MetadataBuf] with the cache databases
-    pub fn cache(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let system_meta = env.get_db_m(TableName::MetaCacheSys)?;
-        let links_meta = env.get_db(TableName::MetaCacheLinks)?;
-        let misc_meta = env.get_db(TableName::MetaCacheStatus)?;
+    pub fn cache(env: DbRead) -> DatabaseResult<Self> {
+        let system_meta = env.get_table_m(TableName::MetaCacheSys)?;
+        let links_meta = env.get_table(TableName::MetaCacheLinks)?;
+        let misc_meta = env.get_table(TableName::MetaCacheStatus)?;
         Self::new(env, system_meta, links_meta, misc_meta)
     }
 }
@@ -389,7 +389,7 @@ impl MetadataBuf<PendingPrefix> {
     /// Create a [MetadataBuf] with the vault databases using the PendingPrefix.
     /// The data in the type will be separate from the other prefixes even though the
     /// database is shared.
-    pub fn pending(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn pending(env: DbRead) -> DatabaseResult<Self> {
         Self::new_vault(env)
     }
 }
@@ -398,7 +398,7 @@ impl MetadataBuf<RejectedPrefix> {
     /// Create a [MetadataBuf] with the vault databases using the RejectedPrefix.
     /// The data in the type will be separate from the other prefixes even though the
     /// database is shared.
-    pub fn rejected(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn rejected(env: DbRead) -> DatabaseResult<Self> {
         Self::new_vault(env)
     }
 }
@@ -407,7 +407,7 @@ impl MetadataBuf<AuthoredPrefix> {
     /// Create a [MetadataBuf] with the vault databases using the AuthoredPrefix.
     /// The data in the type will be separate from the other prefixes even though the
     /// database is shared.
-    pub fn authored(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn authored(env: DbRead) -> DatabaseResult<Self> {
         Self::new_vault(env)
     }
 }
@@ -417,7 +417,7 @@ where
     P: PrefixType,
 {
     pub(crate) fn new(
-        env: EnvironmentRead,
+        env: DbRead,
         system_meta: MultiStore,
         links_meta: SingleStore,
         misc_meta: SingleStore,
@@ -430,10 +430,10 @@ where
         })
     }
 
-    fn new_vault(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let system_meta = env.get_db_m(TableName::MetaVaultSys)?;
-        let links_meta = env.get_db(TableName::MetaVaultLinks)?;
-        let misc_meta = env.get_db(TableName::MetaVaultMisc)?;
+    fn new_vault(env: DbRead) -> DatabaseResult<Self> {
+        let system_meta = env.get_table_m(TableName::MetaVaultSys)?;
+        let links_meta = env.get_table(TableName::MetaVaultLinks)?;
+        let misc_meta = env.get_table(TableName::MetaVaultMisc)?;
         Self::new(env, system_meta, links_meta, misc_meta)
     }
 
@@ -1249,7 +1249,7 @@ where
             .is_some()))
     }
 
-    fn env(&self) -> &EnvironmentRead {
+    fn env(&self) -> &DbRead {
         &self.env
     }
 }

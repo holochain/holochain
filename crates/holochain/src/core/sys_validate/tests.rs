@@ -6,9 +6,9 @@ use ::fixt::prelude::*;
 use error::SysValidationError;
 
 use holochain_keystore::AgentPubKeyExt;
-use holochain_sqlite::env::EnvironmentRead;
-use holochain_sqlite::test_utils::test_cell_env;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_sqlite::db::DbRead;
+use holochain_sqlite::test_utils::test_cell_env;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
 use matches::assert_matches;
@@ -56,7 +56,7 @@ async fn check_previous_header() {
 
 #[tokio::test(threaded_scheduler)]
 async fn check_valid_if_dna_test() {
-    let env: EnvironmentRead = test_cell_env().env().into();
+    let env: DbRead = test_cell_env().env().into();
     // Test data
     let activity_return = vec![fixt!(HeaderHash)];
 

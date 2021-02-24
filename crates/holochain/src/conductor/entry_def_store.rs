@@ -11,12 +11,12 @@ use error::EntryDefStoreError;
 use error::EntryDefStoreResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
+use holochain_serialized_bytes::prelude::*;
+use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::buffer::KvBufFresh;
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::*;
-use holochain_serialized_bytes::prelude::*;
-use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -65,7 +65,7 @@ impl From<EntryDefStoreKey> for EntryDefBufferKey {
 
 impl EntryDefBuf {
     /// Create a new buffer
-    pub fn new(env: EnvironmentRead, entry_def_store: SingleStore) -> DatabaseResult<Self> {
+    pub fn new(env: DbRead, entry_def_store: SingleStore) -> DatabaseResult<Self> {
         Ok(Self(KvBufFresh::new(env, entry_def_store)))
     }
 

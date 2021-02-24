@@ -9,9 +9,9 @@ use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_sqlite::buffer::KvStore;
 use holochain_sqlite::buffer::KvStoreT;
-use holochain_sqlite::env::EnvironmentRead;
-use holochain_sqlite::env::EnvironmentWrite;
-use holochain_sqlite::env::WriteManager;
+use holochain_sqlite::db::DbRead;
+use holochain_sqlite::db::DbWrite;
+use holochain_sqlite::db::WriteManager;
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::fresh_reader;
@@ -132,8 +132,8 @@ impl AsRef<KvStore<AgentKvKey, AgentInfoSigned>> for AgentKv {
 
 impl AgentKv {
     /// Constructor.
-    pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let db = env.get_db(TableName::Agent)?;
+    pub fn new(env: DbRead) -> DatabaseResult<Self> {
+        let db = env.get_table(TableName::Agent)?;
         Ok(Self(KvStore::new(db)))
     }
 
@@ -169,7 +169,7 @@ impl AgentKv {
 
 /// Inject multiple agent info entries into the peer store
 pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
-    env: EnvironmentWrite,
+    env: DbWrite,
     iter: I,
 ) -> DatabaseResult<()> {
     let p2p_store = AgentKv::new(env.clone().into())?;
@@ -187,7 +187,7 @@ pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
 }
 
 /// Helper function to get all the peer data from this conductor
-pub fn all_agent_infos(env: EnvironmentRead) -> DatabaseResult<Vec<AgentInfoSigned>> {
+pub fn all_agent_infos(env: DbRead) -> DatabaseResult<Vec<AgentInfoSigned>> {
     let p2p_store = AgentKv::new(env.clone())?;
     fresh_reader!(env, |r| {
         p2p_store.iter(&r)?.map(|(_, v)| Ok(v)).collect()
@@ -196,7 +196,7 @@ pub fn all_agent_infos(env: EnvironmentRead) -> DatabaseResult<Vec<AgentInfoSign
 
 /// Helper function to get a single agent info
 pub fn get_single_agent_info(
-    env: EnvironmentRead,
+    env: DbRead,
     space: DnaHash,
     agent: AgentPubKey,
 ) -> DatabaseResult<Option<AgentInfoSigned>> {
@@ -206,7 +206,7 @@ pub fn get_single_agent_info(
 
 /// Interconnect every provided pair of conductors via their peer store lmdb environments
 #[cfg(any(test, feature = "test_utils"))]
-pub fn exchange_peer_info(envs: Vec<EnvironmentWrite>) {
+pub fn exchange_peer_info(envs: Vec<DbWrite>) {
     for (i, a) in envs.iter().enumerate() {
         for (j, b) in envs.iter().enumerate() {
             if i == j {
@@ -220,7 +220,7 @@ pub fn exchange_peer_info(envs: Vec<EnvironmentWrite>) {
 
 /// Get agent info for a single agent
 pub fn get_agent_info_signed(
-    environ: EnvironmentWrite,
+    environ: DbWrite,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
 ) -> ConductorResult<Option<AgentInfoSigned>> {
@@ -256,7 +256,7 @@ pub fn get_agent_info_signed(
 
 /// Get agent info for a single space
 pub fn query_agent_info_signed(
-    environ: EnvironmentWrite,
+    environ: DbWrite,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
 ) -> ConductorResult<Vec<AgentInfoSigned>> {
     let p2p_kv = AgentKv::new(environ.clone().into())?;
@@ -308,7 +308,7 @@ pub fn query_agent_info_signed(
 
 /// Put single agent info into store
 pub fn put_agent_info_signed(
-    environ: EnvironmentWrite,
+    environ: DbWrite,
     agent_info_signed: kitsune_p2p::agent_store::AgentInfoSigned,
 ) -> ConductorResult<()> {
     let p2p_kv = AgentKv::new(environ.clone().into())?;
@@ -323,7 +323,7 @@ pub fn put_agent_info_signed(
 }
 
 /// Dump the agents currently in the peer store
-pub fn dump_state(env: EnvironmentRead, cell_id: Option<CellId>) -> DatabaseResult<P2pStateDump> {
+pub fn dump_state(env: DbRead, cell_id: Option<CellId>) -> DatabaseResult<P2pStateDump> {
     use std::fmt::Write;
     let cell_id = cell_id.map(|c| c.into_dna_and_agent()).map(|c| {
         (
@@ -399,8 +399,8 @@ mod tests {
     use super::*;
     use ::fixt::prelude::*;
     use holochain_sqlite::buffer::KvStoreT;
-    use holochain_sqlite::env::ReadManager;
-    use holochain_sqlite::env::WriteManager;
+    use holochain_sqlite::db::ReadManager;
+    use holochain_sqlite::db::WriteManager;
     use holochain_sqlite::fresh_reader_test;
     use holochain_sqlite::test_utils::test_p2p_env;
     use kitsune_p2p::fixt::AgentInfoFixturator;

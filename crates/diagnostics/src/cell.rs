@@ -1,9 +1,9 @@
 use crate::display::{dump_kv, dump_kvi};
-use holochain_sqlite::{db, env::EnvironmentWrite, prelude::*};
+use holochain_sqlite::{db, env::DbWrite, prelude::*};
 use holochain_types::{app::CellNick, cell::CellId};
 
 pub async fn dump_cell_state(
-    env: EnvironmentWrite,
+    env: DbWrite,
     _cell_id: CellId,
     cell_nick: &CellNick,
 ) -> anyhow::Result<()> {
@@ -13,14 +13,14 @@ pub async fn dump_cell_state(
 
     macro_rules! kv {
         ($name: expr, $db: ident) => {
-            let db = env.get_db(&$db)?;
+            let db = env.get_table(&$db)?;
             dump_kv(&r, $name, db)?;
         };
     }
 
     macro_rules! kvi {
         ($name: expr, $db: ident) => {
-            let db = env.get_db(&$db)?;
+            let db = env.get_table(&$db)?;
             dump_kvi(&r, $name, db)?;
         };
     }

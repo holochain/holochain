@@ -1,8 +1,8 @@
 use call_zome_workflow::CallZomeWorkspaceLock;
-use holochain_sqlite::env::EnvironmentRead;
+use holochain_p2p::HolochainP2pCell;
+use holochain_sqlite::db::DbRead;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::*;
-use holochain_p2p::HolochainP2pCell;
 use holochain_types::dna::DnaFile;
 use holochain_zome_types::HeaderHashed;
 
@@ -28,7 +28,7 @@ pub(super) struct ValidationPackageDb {
 }
 
 impl ValidationPackageDb {
-    pub(super) fn create(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub(super) fn create(env: DbRead) -> DatabaseResult<Self> {
         Ok(Self {
             element_integrated: ElementBuf::vault(env.clone(), false)?,
             element_rejected: ElementBuf::rejected(env.clone())?,
@@ -50,7 +50,7 @@ impl ValidationPackageDb {
 #[instrument(skip(header_hashed, env, ribosome, conductor_api, network))]
 pub(super) async fn get_as_author(
     header_hashed: HeaderHashed,
-    env: EnvironmentRead,
+    env: DbRead,
     ribosome: &impl RibosomeT,
     conductor_api: &impl CellConductorApiT,
     network: &HolochainP2pCell,
@@ -164,7 +164,7 @@ pub(super) async fn get_as_author(
 
 pub(super) async fn get_as_authority(
     header: HeaderHashed,
-    env: EnvironmentRead,
+    env: DbRead,
     dna_file: &DnaFile,
     conductor_api: &impl CellConductorApiT,
 ) -> CellResult<ValidationPackageResponse> {

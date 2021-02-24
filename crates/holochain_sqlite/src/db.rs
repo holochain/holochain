@@ -1,191 +1,285 @@
-//! Functionality for safely accessing LMDB database references.
+//! Functions dealing with obtaining and referencing singleton LMDB environments
 
+use crate::prelude::*;
+use derive_more::Into;
+use holochain_keystore::KeystoreSender;
+use holochain_zome_types::cell::CellId;
+use lazy_static::lazy_static;
+use parking_lot::RwLock;
+use rkv::EnvironmentFlags;
+use shrinkwraprs::Shrinkwrap;
+use std::collections::hash_map;
+use std::collections::HashMap;
 use std::path::Path;
+use std::path::PathBuf;
 
-use crate::prelude::Writer;
-use crate::{env::EnvironmentKind, exports::IntegerStore, prelude::Readable};
-use crate::{
-    error::DatabaseResult,
-    exports::{MultiStore, SingleStore},
-};
-use derive_more::Display;
-/// Enumeration of all databases needed by Holochain
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Display)]
-pub enum TableName {
-    /// Vault database: KV store of chain entries, keyed by address
-    ElementVaultPublicEntries,
-    /// Vault database: KV store of chain entries, keyed by address
-    ElementVaultPrivateEntries,
-    /// Vault database: KV store of chain headers, keyed by address
-    ElementVaultHeaders,
-    /// Vault database: KVV store of chain metadata, storing relationships
-    MetaVaultSys,
-    /// Vault database: Kv store of links
-    MetaVaultLinks,
-    /// Vault database: Kv store of entry dht status
-    MetaVaultMisc,
-    /// int KV store storing the sequence of committed headers,
-    /// most notably allowing access to the chain head
-    ChainSequence,
-    /// Cache database: KV store of chain entries, keyed by address
-    ElementCacheEntries,
-    /// Cache database: KV store of chain headers, keyed by address
-    ElementCacheHeaders,
-    /// Cache database: KVV store of chain metadata, storing relationships
-    MetaCacheSys,
-    /// Cache database: Kv store of links
-    MetaCacheLinks,
-    /// Vault database: Kv store of entry dht status
-    MetaCacheStatus,
-    /// database which stores a single key-value pair, encoding the
-    /// mutable state for the entire Conductor
-    ConductorState,
-    /// database that stores wasm bytecode
-    Wasm,
-    /// database to store the [DnaDef]
-    DnaDef,
-    /// database to store the [EntryDef] Kvv store
-    EntryDef,
-    /// Authored [DhtOp]s KV store
-    AuthoredDhtOps,
-    /// Integrated [DhtOp]s KV store
-    IntegratedDhtOps,
-    /// Integration Queue of [DhtOp]s KV store where key is [DhtOpHash]
-    IntegrationLimbo,
-    /// Place for [DhtOp]s waiting to be validated to hang out. KV store where key is a [DhtOpHash]
-    ValidationLimbo,
-    /// KVV store to accumulate validation receipts for a published EntryHash
-    ValidationReceipts,
-    /// Single store for all known agents on the network
-    Agent,
+const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024; // 100MB
+const MAX_DBS: u32 = 32;
+
+lazy_static! {
+    static ref ENVIRONMENTS: RwLock<HashMap<PathBuf, DbWrite>> = {
+        // This is just a convenient place that we know gets initialized
+        // both in the final binary holochain && in all relevant tests
+        //
+        // Holochain (and most binaries) are left in invalid states
+        // if a thread panic!s - switch to failing fast in that case.
+        //
+        // We tried putting `panic = "abort"` in the Cargo.toml,
+        // but somehow that breaks the wasmer / test_utils integration.
+
+        let orig_handler = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |panic_info| {
+            // print the panic message
+            eprintln!("FATAL PANIC {:#?}", panic_info);
+            // invoke the original handler
+            orig_handler(panic_info);
+            // // Abort the process
+            // // TODO - we need a better solution than this, but if there is
+            // // no better solution, we can uncomment the following line:
+            // std::process::abort();
+        }));
+
+        RwLock::new(HashMap::new())
+    };
 }
 
-#[deprecated = "alias, remove"]
-/// remove
-pub type DbName = TableName;
-
-/// Get access to the singleton database manager ([GetDb]),
-/// in order to access individual LMDB databases
-pub(super) fn initialize_databases(_path: &Path, _kind: &EnvironmentKind) -> DatabaseResult<()> {
-    todo!("create database and schema if not exists");
-    Ok(())
+/// A read-only version of [DbWrite].
+/// This environment can only generate read-only transactions, never read-write.
+#[derive(Clone)]
+pub struct DbRead {
+    kind: DbKind,
+    path: PathBuf,
+    keystore: KeystoreSender,
 }
 
-/// TODO
-#[deprecated = "sqlite: placeholder"]
-pub trait GetDb {
-    /// Placeholder
-    fn get_db(&self, _table_name: TableName) -> DatabaseResult<Table> {
-        todo!("rewrite to return a Databasae")
+impl DbRead {
+    #[deprecated = "remove this identity function"]
+    pub fn guard(&self) -> Self {
+        self.clone()
     }
 
-    /// Placeholder
-    fn get_db_i(&self, _table_name: TableName) -> DatabaseResult<Table> {
-        todo!("rewrite to return a Databasae")
+    #[deprecated = "remove this identity function"]
+    pub fn inner(&self) -> Self {
+        self.clone()
     }
 
-    /// Placeholder
-    fn get_db_m(&self, _table_name: TableName) -> DatabaseResult<Table> {
-        todo!("rewrite to return a Databasae")
+    /// Accessor for the [DbKind] of the DbWrite
+    pub fn kind(&self) -> &DbKind {
+        &self.kind
     }
-}
 
-/// A reference to a SQLite table.
-/// This patten only exists as part of the naive LMDB refactor.
-#[deprecated = "lmdb: naive"]
-#[derive(Clone, Debug)]
-pub struct Table {}
+    /// Request access to this conductor's keystore
+    pub fn keystore(&self) -> &KeystoreSender {
+        &self.keystore
+    }
 
-impl Table {
-    pub fn get<R: Readable, K: AsRef<[u8]>>(
+    /// The environment's path
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+
+    /// SHIM
+    pub fn open_single<'s, T>(
         &self,
-        reader: &R,
-        k: K,
-    ) -> StoreResult<Option<rkv::Value>> {
-        todo!()
+        name: T,
+        opts: rkv::StoreOptions,
+    ) -> Result<SingleStore, StoreError>
+    where
+        T: Into<Option<&'s str>>,
+    {
+        todo!("this is a shim")
     }
 
-    /// This handles the fact that getting from an rkv::MultiStore returns
-    /// multiple results
-    #[deprecated = "unneeded in the context of SQL"]
-    pub fn get_m<R: Readable, K: AsRef<[u8]>>(
+    /// SHIM
+    pub fn open_integer<'s, T>(
         &self,
-        reader: &R,
-        k: K,
-    ) -> StoreResult<impl Iterator<Item = StoreResult<(K, Option<rkv::Value>)>>> {
-        todo!();
-        Ok(std::iter::empty())
+        name: T,
+        mut opts: rkv::StoreOptions,
+    ) -> Result<IntegerStore, StoreError>
+    where
+        T: Into<Option<&'s str>>,
+    {
+        todo!("this is a shim")
     }
 
-    pub fn put<K: AsRef<[u8]>>(
+    /// SHIM
+    pub fn open_multi<'s, T>(
         &self,
-        writer: &mut Writer,
-        k: K,
-        v: &rkv::Value,
-    ) -> StoreResult<()> {
-        todo!()
+        name: T,
+        mut opts: rkv::StoreOptions,
+    ) -> Result<MultiStore, StoreError>
+    where
+        T: Into<Option<&'s str>>,
+    {
+        todo!("this is a shim")
     }
 
-    #[deprecated = "unneeded in the context of SQL"]
-    pub fn put_with_flags<K: AsRef<[u8]>>(
-        &self,
-        writer: &mut Writer,
-        k: K,
-        v: &rkv::Value,
-        flags: rkv::WriteFlags,
-    ) -> StoreResult<()> {
-        todo!()
-    }
-
-    pub fn delete<K: AsRef<[u8]>>(&self, writer: &mut Writer, k: K) -> StoreResult<()> {
-        todo!()
-    }
-
-    pub fn delete_all<K: AsRef<[u8]>>(&self, writer: &mut Writer, k: K) -> StoreResult<()> {
-        todo!()
-    }
-
-    /// This handles the fact that deleting from an rkv::MultiStore requires
-    /// passing the value to delete (deleting a particular kv pair)
-    #[deprecated = "unneeded in the context of SQL"]
-    pub fn delete_m<K: AsRef<[u8]>>(
-        &self,
-        writer: &mut Writer,
-        k: K,
-        v: &rkv::Value,
-    ) -> StoreResult<()> {
-        todo!()
-    }
-
-    #[cfg(feature = "test_utils")]
-    pub fn clear(&mut self, writer: &mut Writer) -> StoreResult<()> {
-        todo!()
-    }
+    // /// SHIM
+    // pub fn open_multi_integer<'s, T, K: PrimitiveInt>(
+    //     &self,
+    //     name: T,
+    //     mut opts: StoreOptions,
+    // ) -> Result<MultiIntegerStore<K>, StoreError>
+    // where
+    //     T: Into<Option<&'s str>>,
+    // {
+    //     todo!("this is a shim")
+    // }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum StoreError {
-    #[error("Error interacting with the underlying LMDB store: {0}")]
-    LmdbStoreError(#[from] failure::Compat<rkv::StoreError>),
-}
+impl GetTable for DbRead {}
+impl GetTable for DbWrite {}
 
-pub type StoreResult<T> = Result<T, StoreError>;
+/// The canonical representation of a (singleton) LMDB environment.
+/// The wrapper contains methods for managing transactions
+/// and database connections,
+#[derive(Clone, Shrinkwrap, Into, derive_more::From)]
+pub struct DbWrite(DbRead);
 
-impl From<rkv::StoreError> for StoreError {
-    fn from(e: rkv::StoreError) -> StoreError {
-        use failure::Fail;
-        StoreError::LmdbStoreError(e.compat())
-    }
-}
-
-impl StoreError {
-    pub fn ok_if_not_found(self) -> StoreResult<()> {
-        match self {
-            StoreError::LmdbStoreError(err) => match err.into_inner() {
-                rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => Ok(()),
-                err => Err(err.into()),
-            },
-            err => Err(err),
+impl DbWrite {
+    /// Create an environment,
+    pub fn new(
+        path_prefix: &Path,
+        kind: DbKind,
+        keystore: KeystoreSender,
+    ) -> DatabaseResult<DbWrite> {
+        let mut map = ENVIRONMENTS.write();
+        let path = path_prefix.join(kind.path());
+        if !path.is_dir() {
+            std::fs::create_dir(path.clone())
+                .map_err(|_e| DatabaseError::EnvironmentMissing(path.clone()))?;
         }
+        let env: DbWrite = match map.entry(path.clone()) {
+            hash_map::Entry::Occupied(e) => e.get().clone(),
+            hash_map::Entry::Vacant(e) => e
+                .insert({
+                    tracing::debug!("Initializing databases for path {:?}", path);
+                    initialize_databases(&path, &kind)?;
+                    DbWrite(DbRead {
+                        kind,
+                        keystore,
+                        path,
+                    })
+                })
+                .clone(),
+        };
+        Ok(env)
+    }
+
+    /// Create a Cell environment (slight shorthand)
+    pub fn new_cell(
+        path_prefix: &Path,
+        cell_id: CellId,
+        keystore: KeystoreSender,
+    ) -> DatabaseResult<Self> {
+        Self::new(path_prefix, DbKind::Cell(cell_id), keystore)
+    }
+
+    #[deprecated = "remove this identity function"]
+    pub fn guard(&self) -> Self {
+        self.clone()
+    }
+
+    /// Remove the db and directory
+    pub async fn remove(self) -> DatabaseResult<()> {
+        todo!();
+
+        // let mut map = ENVIRONMENTS.write();
+        // map.remove(&self.0.path);
+
+        // remove the directory
+        std::fs::remove_dir_all(&self.0.path)?;
+        Ok(())
+    }
+}
+
+/// The various types of LMDB environment, used to specify the list of databases to initialize
+#[derive(Clone)]
+pub enum DbKind {
+    /// Specifies the environment used by each Cell
+    Cell(CellId),
+    /// Specifies the environment used by a Conductor
+    Conductor,
+    /// Specifies the environment used to save wasm
+    Wasm,
+    /// State of the p2p network
+    P2p,
+}
+
+impl DbKind {
+    /// Constuct a partial Path based on the kind
+    fn path(&self) -> PathBuf {
+        match self {
+            DbKind::Cell(cell_id) => PathBuf::from(cell_id.to_string()),
+            DbKind::Conductor => PathBuf::from("conductor"),
+            DbKind::Wasm => PathBuf::from("wasm"),
+            DbKind::P2p => PathBuf::from("p2p"),
+        }
+    }
+}
+
+/// Implementors are able to create a new read-only LMDB transaction
+pub trait ReadManager<'e> {
+    /// Create a new read-only LMDB transaction
+    fn reader(&'e self) -> DatabaseResult<Reader<'e>>;
+
+    /// Run a closure, passing in a new read-only transaction
+    fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(Reader) -> Result<R, E>;
+}
+
+/// Implementors are able to create a new read-write LMDB transaction
+pub trait WriteManager<'e> {
+    /// Run a closure, passing in a mutable reference to a read-write
+    /// transaction, and commit the transaction after the closure has run.
+    /// If there is a LMDB error, recover from it and re-run the closure.
+    // FIXME: B-01566: implement write failure detection
+    fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(&mut Writer) -> Result<R, E>;
+}
+
+impl<'e> ReadManager<'e> for DbRead {
+    fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
+        todo!("probably no longer makes sense")
+        // let reader = Reader::from(self.rkv.read()?);
+        // Ok(reader)
+    }
+
+    fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(Reader) -> Result<R, E>,
+    {
+        f(self.reader()?)
+    }
+}
+
+impl<'e> ReadManager<'e> for DbWrite {
+    fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
+        todo!("probably no longer makes sense")
+        // let reader = Reader::from(self.rkv.read()?);
+        // Ok(reader)
+    }
+
+    fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(Reader) -> Result<R, E>,
+    {
+        f(self.reader()?)
+    }
+}
+
+impl<'e> WriteManager<'e> for DbWrite {
+    fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(&mut Writer) -> Result<R, E>,
+    {
+        todo!("probably no longer makes sense")
     }
 }

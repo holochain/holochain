@@ -52,22 +52,22 @@ pub trait BufferedStore: Sized {
 }
 
 #[macro_export]
-/// Macro to generate a fresh reader from an EnvironmentRead with less boilerplate
+/// Macro to generate a fresh reader from an DbRead with less boilerplate
 macro_rules! fresh_reader {
     ($env: expr, $f: expr) => {{
         let g = $env.guard();
-        let r = $crate::env::ReadManager::reader(&g)?;
+        let r = $crate::db::ReadManager::reader(&g)?;
         $f(r)
     }};
 }
 
 #[macro_export]
-/// Macro to generate a fresh reader from an EnvironmentRead with less boilerplate
+/// Macro to generate a fresh reader from an DbRead with less boilerplate
 /// Use this in tests, where everything gets unwrapped anyway
 macro_rules! fresh_reader_test {
     ($env: expr, $f: expr) => {{
         let g = $env.guard();
-        let r = $crate::env::ReadManager::reader(&g).unwrap();
+        let r = $crate::db::ReadManager::reader(&g).unwrap();
         $f(r)
     }};
 }

@@ -4,8 +4,8 @@ use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use holochain_sqlite::buffer::KvBufFresh;
 use holochain_sqlite::prelude::BufferedStore;
-use holochain_sqlite::prelude::EnvironmentRead;
-use holochain_sqlite::prelude::GetDb;
+use holochain_sqlite::prelude::DbRead;
+use holochain_sqlite::prelude::GetTable;
 use holochain_sqlite::prelude::Writer;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
@@ -63,8 +63,8 @@ pub struct ProduceDhtOpsWorkspace {
 }
 
 impl ProduceDhtOpsWorkspace {
-    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let authored_dht_ops = env.get_db(TableName::AuthoredDhtOps)?;
+    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+        let authored_dht_ops = env.get_table(TableName::AuthoredDhtOps)?;
         Ok(Self {
             source_chain: SourceChain::public_only(env.clone())?,
             authored_dht_ops: KvBufFresh::new(env, authored_dht_ops),
@@ -90,8 +90,8 @@ mod tests {
     use fallible_iterator::FallibleIterator;
     use holo_hash::*;
 
-    use holochain_sqlite::env::ReadManager;
-    use holochain_sqlite::env::WriteManager;
+    use holochain_sqlite::db::ReadManager;
+    use holochain_sqlite::db::WriteManager;
     use holochain_sqlite::test_utils::test_cell_env;
     use holochain_types::dht_op::produce_ops_from_element;
     use holochain_types::dht_op::DhtOp;

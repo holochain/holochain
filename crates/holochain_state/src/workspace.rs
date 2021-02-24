@@ -61,13 +61,13 @@ pub mod tests {
     }
 
     impl TestWorkspace {
-        pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
+        pub fn new(env: DbRead) -> WorkspaceResult<Self> {
             Ok(Self {
                 one: KvBufFresh::new(
                     env.clone(),
-                    env.get_db(TableName::ElementVaultPublicEntries)?,
+                    env.get_table(TableName::ElementVaultPublicEntries)?,
                 ),
-                two: KvBufFresh::new(env.clone(), env.get_db(TableName::ElementVaultHeaders)?),
+                two: KvBufFresh::new(env.clone(), env.get_table(TableName::ElementVaultHeaders)?),
             })
         }
     }

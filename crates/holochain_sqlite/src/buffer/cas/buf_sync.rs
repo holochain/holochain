@@ -3,7 +3,7 @@
 
 use crate::buffer::BufferedStore;
 use crate::buffer::KvBufUsed;
-use crate::env::EnvironmentRead;
+use crate::db::DbRead;
 use crate::error::DatabaseError;
 use crate::error::DatabaseResult;
 use crate::fatal_db_hash_integrity_check;
@@ -129,7 +129,7 @@ where
     C::HashType: PrimitiveHashType + HashTypeSync + Send + Sync,
     P: PrefixType,
 {
-    env: EnvironmentRead,
+    env: DbRead,
     #[shrinkwrap(main_field)]
     inner: CasBufUsedSync<C, P>,
 }
@@ -142,14 +142,14 @@ where
     P: PrefixType,
 {
     /// Create a new CasBufFreshSync
-    pub fn new(env: EnvironmentRead, db: SingleStore) -> Self {
+    pub fn new(env: DbRead, db: SingleStore) -> Self {
         Self {
             env,
             inner: CasBufUsedSync::new(db),
         }
     }
 
-    pub fn env(&self) -> &EnvironmentRead {
+    pub fn env(&self) -> &DbRead {
         &self.env
     }
 

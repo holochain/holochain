@@ -4,7 +4,7 @@ use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::exports::SingleStore;
 use holochain_sqlite::prelude::BufferedStore;
-use holochain_sqlite::prelude::EnvironmentRead;
+use holochain_sqlite::prelude::DbRead;
 use holochain_sqlite::transaction::Writer;
 use holochain_types::prelude::*;
 
@@ -12,7 +12,7 @@ use holochain_types::prelude::*;
 pub struct WasmBuf(CasBufFreshAsync<DnaWasm>);
 
 impl WasmBuf {
-    pub fn new(env: EnvironmentRead, wasm_store: SingleStore) -> DatabaseResult<Self> {
+    pub fn new(env: DbRead, wasm_store: SingleStore) -> DatabaseResult<Self> {
         Ok(Self(CasBufFreshAsync::new(env, wasm_store)))
     }
 
@@ -48,7 +48,7 @@ mod tests {
         // all the stuff needed to have a WasmBuf
         let env = holochain_sqlite::test_utils::test_wasm_env();
         let mut wasm_buf =
-            WasmBuf::new(env.env().into(), env.get_db(TableName::Wasm).unwrap()).unwrap();
+            WasmBuf::new(env.env().into(), env.get_table(TableName::Wasm).unwrap()).unwrap();
 
         // a wasm
         let wasm =

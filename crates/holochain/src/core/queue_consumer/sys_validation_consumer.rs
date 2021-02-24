@@ -4,14 +4,14 @@ use super::*;
 use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::sys_validation_workflow::sys_validation_workflow;
 use crate::core::workflow::sys_validation_workflow::SysValidationWorkspace;
-use holochain_sqlite::env::EnvironmentWrite;
+use holochain_sqlite::db::DbWrite;
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for SysValidation workflow
 #[instrument(skip(env, stop, trigger_app_validation, network, conductor_api))]
 pub fn spawn_sys_validation_consumer(
-    env: EnvironmentWrite,
+    env: DbWrite,
     mut stop: sync::broadcast::Receiver<()>,
     mut trigger_app_validation: TriggerSender,
     network: HolochainP2pCell,

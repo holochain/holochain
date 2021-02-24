@@ -7,7 +7,7 @@ use crate::buffer::iter::SingleIterKeyMatch;
 use crate::buffer::kv::generic::KvStoreT;
 use crate::buffer::kv::KvStore;
 use crate::buffer::BufferedStore;
-use crate::env::EnvironmentRead;
+use crate::db::DbRead;
 use crate::error::DatabaseError;
 use crate::error::DatabaseResult;
 use crate::fresh_reader;
@@ -266,7 +266,7 @@ where
     V: BufVal,
     Store: KvStoreT<K, V>,
 {
-    env: EnvironmentRead,
+    env: DbRead,
     #[shrinkwrap(main_field)]
     inner: Used<K, V, Store>,
 }
@@ -277,7 +277,7 @@ where
     V: BufVal,
 {
     /// Create a new Fresh
-    pub fn new(env: EnvironmentRead, db: SingleStore) -> Self {
+    pub fn new(env: DbRead, db: SingleStore) -> Self {
         Self {
             env,
             inner: Used::new(db),
@@ -290,7 +290,7 @@ where
     V: BufVal,
 {
     /// Create a new Fresh
-    pub fn new(env: EnvironmentRead, db: IntegerStore) -> Self {
+    pub fn new(env: DbRead, db: IntegerStore) -> Self {
         Self {
             env,
             inner: Used::new_int(db),
@@ -304,7 +304,7 @@ where
     V: BufVal,
     Store: KvStoreT<K, V>,
 {
-    pub fn env(&self) -> &EnvironmentRead {
+    pub fn env(&self) -> &DbRead {
         &self.env
     }
 

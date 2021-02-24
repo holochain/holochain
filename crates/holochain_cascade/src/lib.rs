@@ -13,15 +13,15 @@ use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
-use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::fresh_reader;
-use holochain_sqlite::prelude::*;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetMetaOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use std::collections::BTreeMap;
@@ -132,7 +132,7 @@ pub struct Cascade<
     pending_data: Option<DbPair<'a, MetaPending, PendingPrefix>>,
     rejected_data: Option<DbPair<'a, MetaRejected, RejectedPrefix>>,
     cache_data: Option<DbPairMut<'a, MetaCache>>,
-    env: Option<EnvironmentRead>,
+    env: Option<DbRead>,
     network: Option<Network>,
 }
 
@@ -167,7 +167,7 @@ where
     // avoid refactoring
     #[allow(clippy::complexity)]
     pub fn new(
-        env: EnvironmentRead,
+        env: DbRead,
         element_authored: &'a ElementBuf<AuthoredPrefix>,
         meta_authored: &'a MetaAuthored,
         element_integrated: &'a ElementBuf,
@@ -788,7 +788,7 @@ where
         headers: &BTreeSet<TimedHeaderHash>,
         cache_data: &DbPairMut<'a, MetaCache>,
         authored_data: &DbPair<'a, MetaAuthored, AuthoredPrefix>,
-        env: &EnvironmentRead,
+        env: &DbRead,
     ) -> CascadeResult<EntryDhtStatus> {
         fresh_reader!(env, |r| {
             for thh in headers {
@@ -1051,7 +1051,7 @@ where
         entry_hash: &EntryHash,
         authored_data: &DbPair<MA, AuthoredPrefix>,
         cache_data: &DbPair<MC, AnyPrefix>,
-        env: &EnvironmentRead,
+        env: &DbRead,
     ) -> CascadeResult<Search> {
         fresh_reader!(env, |r| {
             let oldest_live_header = authored_data
@@ -1670,7 +1670,7 @@ where
         agent: AgentPubKey,
         range: &Option<std::ops::Range<u32>>,
         cache_data: &DbPairMut<'a, MetaCache>,
-        env: &EnvironmentRead,
+        env: &DbRead,
     ) -> CascadeResult<Vec<(u32, HeaderHash)>> {
         match range {
             Some(range) => {
@@ -2172,7 +2172,7 @@ pub fn get_header<P: PrefixType>(
 #[cfg(test)]
 /// Helper function for easily setting up cascades during tests
 pub fn test_dbs_and_mocks(
-    env: EnvironmentRead,
+    env: DbRead,
 ) -> (
     ElementBuf,
     holochain_state::metadata::MockMetadataBuf,

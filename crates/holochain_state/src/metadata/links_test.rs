@@ -2,7 +2,7 @@ use super::*;
 use crate::here;
 use ::fixt::prelude::*;
 use holochain_sqlite::buffer::BufferedStore;
-use holochain_sqlite::env::EnvironmentWrite;
+use holochain_sqlite::db::DbWrite;
 use holochain_sqlite::fresh_reader_test;
 use holochain_sqlite::test_utils::test_cell_env;
 
@@ -16,10 +16,10 @@ struct TestData {
     zome_id: ZomeId,
     tag: LinkTag,
     expected_link: LinkMetaVal,
-    env: EnvironmentWrite,
+    env: DbWrite,
 }
 
-async fn fixtures(env: EnvironmentWrite, n: usize) -> Vec<TestData> {
+async fn fixtures(env: DbWrite, n: usize) -> Vec<TestData> {
     let mut tag_fix = BytesFixturator::new(Predictable);
     let mut zome_id = ZomeIdFixturator::new(Predictable);
     let mut data = Vec::new();

@@ -90,9 +90,9 @@ pub struct ValidationReceiptsBuf(KvvBufUsed<DhtOpHash, SignedValidationReceipt>)
 
 impl ValidationReceiptsBuf {
     /// Constructor given read-only transaction and db ref.
-    pub fn new(dbs: &impl GetDb) -> DatabaseResult<ValidationReceiptsBuf> {
+    pub fn new(dbs: &impl GetTable) -> DatabaseResult<ValidationReceiptsBuf> {
         Ok(Self(KvvBufUsed::new_opts(
-            dbs.get_db_m(TableName::ValidationReceipts)?,
+            dbs.get_table_m(TableName::ValidationReceipts)?,
             true, // set to no_dup_data mode
         )))
     }
@@ -153,7 +153,7 @@ impl BufferedStore for ValidationReceiptsBuf {
 mod tests {
     use super::*;
     use holochain_keystore::KeystoreSenderExt;
-    use holochain_sqlite::env::ReadManager;
+    use holochain_sqlite::db::ReadManager;
     use holochain_sqlite::prelude::*;
     use holochain_types::test_utils::fake_dht_op_hash;
 

@@ -698,7 +698,7 @@ pub struct SysValidationWorkspace {
     /// Cached data
     pub element_cache: ElementBuf,
     pub meta_cache: MetadataBuf,
-    pub env: EnvironmentRead,
+    pub env: DbRead,
 }
 
 impl<'a> SysValidationWorkspace {
@@ -722,8 +722,8 @@ impl<'a> SysValidationWorkspace {
 }
 
 impl SysValidationWorkspace {
-    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let db = env.get_db(TableName::IntegrationLimbo)?;
+    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+        let db = env.get_table(TableName::IntegrationLimbo)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
         let validation_limbo = ValidationLimboStore::new(env.clone())?;

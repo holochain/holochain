@@ -8,10 +8,10 @@ use crate::conductor::api::CellConductorApiT;
 use crate::conductor::entry_def_store::get_entry_def;
 use fallible_iterator::FallibleIterator;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_sqlite::env::EnvironmentWrite;
+use holochain_p2p::HolochainP2pCell;
+use holochain_sqlite::db::DbWrite;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::fresh_reader;
-use holochain_p2p::HolochainP2pCell;
 use holochain_state::metadata::ChainItemKey;
 use holochain_state::metadata::MetadataBufT;
 use holochain_types::prelude::*;
@@ -443,7 +443,7 @@ where
 /// to be holding it.
 #[derive(derive_more::Constructor)]
 pub struct IncomingDhtOpSender {
-    env: EnvironmentWrite,
+    env: DbWrite,
     sys_validation_trigger: TriggerSender,
 }
 

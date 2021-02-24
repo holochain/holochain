@@ -1,6 +1,6 @@
 //! A few imports from `rkv`, to avoid consumers needing to import `rkv` explicitly
 
-use crate::{db::Table, prelude::IntKey};
+use crate::{prelude::IntKey, table::Table};
 
 /// Simple type alias for re-exporting
 pub type SingleStore = Table;

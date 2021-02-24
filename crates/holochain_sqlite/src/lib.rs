@@ -53,12 +53,12 @@
 
 pub mod buffer;
 pub mod db;
-pub mod env;
 pub mod error;
 pub mod exports;
 pub mod fatal;
 pub mod key;
 pub mod prelude;
+pub mod table;
 pub mod transaction;
 
 #[cfg(any(test, feature = "test_utils"))]

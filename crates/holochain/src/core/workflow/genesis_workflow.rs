@@ -85,7 +85,7 @@ pub struct GenesisWorkspace {
 
 impl GenesisWorkspace {
     /// Constructor
-    pub async fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
+    pub async fn new(env: DbRead) -> WorkspaceResult<Self> {
         Ok(Self {
             source_chain: SourceChainBuf::new(env)?,
         })

@@ -918,10 +918,10 @@ pub struct AppValidationWorkspace {
 }
 
 impl AppValidationWorkspace {
-    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let db = env.get_db(TableName::IntegratedDhtOps)?;
+    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+        let db = env.get_table(TableName::IntegratedDhtOps)?;
         let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
-        let db = env.get_db(TableName::IntegrationLimbo)?;
+        let db = env.get_table(TableName::IntegrationLimbo)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
         let validation_limbo = ValidationLimboStore::new(env.clone())?;

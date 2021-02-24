@@ -16,8 +16,8 @@ use holochain_cascade::Cascade;
 use holochain_cascade::DbPair;
 use holochain_cascade::DbPairMut;
 use holochain_keystore::KeystoreSender;
-use holochain_sqlite::prelude::*;
 use holochain_p2p::HolochainP2pCell;
+use holochain_sqlite::prelude::*;
 use holochain_state::element_buf::ElementBuf;
 use holochain_state::metadata::MetadataBuf;
 use holochain_state::metadata::MetadataBufT;
@@ -272,7 +272,7 @@ pub struct CallZomeWorkspace {
 }
 
 impl<'a> CallZomeWorkspace {
-    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
+    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
         let source_chain = SourceChain::new(env.clone())?;
         let meta_authored = MetadataBuf::authored(env.clone())?;
         let element_integrated = ElementBuf::vault(env.clone(), true)?;
@@ -320,7 +320,7 @@ impl<'a> CallZomeWorkspace {
             .with_integrated(integrated_data)
     }
 
-    pub fn env(&self) -> &EnvironmentRead {
+    pub fn env(&self) -> &DbRead {
         self.meta_authored.env()
     }
 }
@@ -346,9 +346,9 @@ pub mod tests {
     use crate::fixt::*;
     use ::fixt::prelude::*;
 
-    use holochain_sqlite::env::ReadManager;
-    use holochain_sqlite::test_utils::test_cell_env;
     use holochain_p2p::HolochainP2pCellFixturator;
+    use holochain_sqlite::db::ReadManager;
+    use holochain_sqlite::test_utils::test_cell_env;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::cell::CellId;

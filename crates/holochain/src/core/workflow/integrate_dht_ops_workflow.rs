@@ -497,11 +497,11 @@ impl Workspace for IntegrateDhtOpsWorkspace {
 
 impl IntegrateDhtOpsWorkspace {
     /// Constructor
-    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let db = env.get_db(TableName::IntegratedDhtOps)?;
+    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+        let db = env.get_table(TableName::IntegratedDhtOps)?;
         let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
 
-        let db = env.get_db(TableName::IntegrationLimbo)?;
+        let db = env.get_table(TableName::IntegrationLimbo)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
         let validation_limbo = ValidationLimboStore::new(env.clone())?;
@@ -577,7 +577,7 @@ impl IntegrateDhtOpsWorkspace {
     }
 }
 
-pub fn dump_state(env: EnvironmentRead) -> WorkspaceResult<IntegrationStateDump> {
+pub fn dump_state(env: DbRead) -> WorkspaceResult<IntegrationStateDump> {
     let workspace = IncomingDhtOpsWorkspace::new(env.clone())?;
     let (validation_limbo, integration_limbo, integrated) = fresh_reader!(env, |r| {
         let v = workspace.validation_limbo.iter(&r)?.count()?;

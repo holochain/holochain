@@ -20,10 +20,6 @@ use holochain_cascade::Cascade;
 use holochain_cascade::DbPair;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
-use holochain_sqlite::env::EnvironmentWrite;
-use holochain_sqlite::fresh_reader_test;
-use holochain_sqlite::test_utils::test_environments;
-use holochain_sqlite::test_utils::TestEnvironments;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::spawn_holochain_p2p;
@@ -32,6 +28,10 @@ use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
+use holochain_sqlite::db::DbWrite;
+use holochain_sqlite::fresh_reader_test;
+use holochain_sqlite::test_utils::test_environments;
+use holochain_sqlite::test_utils::TestDbs;
 use holochain_state::metadata::MetadataBuf;
 use holochain_state::{element_buf::ElementBuf, prelude::SourceChain};
 use holochain_types::prelude::*;
@@ -281,7 +281,7 @@ pub async fn setup_app_with_network(
 
 /// Setup an app with full configurability
 pub async fn setup_app_inner(
-    envs: TestEnvironments,
+    envs: TestDbs,
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: Option<KitsuneP2pConfig>,
@@ -374,11 +374,7 @@ pub async fn consistency(all_cells: &[&SweetCell], num_attempts: usize, delay: D
 }
 
 /// Wait for all cell envs to reach consistency
-pub async fn consistency_envs(
-    all_cell_envs: &[&EnvironmentWrite],
-    num_attempts: usize,
-    delay: Duration,
-) {
+pub async fn consistency_envs(all_cell_envs: &[&DbWrite], num_attempts: usize, delay: Duration) {
     let mut expected_count = 0;
     let query = ChainQueryFilter::new().include_entries(true);
     for &env in all_cell_envs.iter() {
@@ -395,7 +391,7 @@ pub async fn consistency_envs(
 
 /// Same as wait_for_integration but with a default wait time of 10 seconds
 #[tracing::instrument(skip(env))]
-pub async fn wait_for_integration_10s(env: &EnvironmentWrite, expected_count: usize) {
+pub async fn wait_for_integration_10s(env: &DbWrite, expected_count: usize) {
     const NUM_ATTEMPTS: usize = 100;
     const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
     wait_for_integration(env, expected_count, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
@@ -405,7 +401,7 @@ pub async fn wait_for_integration_10s(env: &EnvironmentWrite, expected_count: us
 /// have been integrated or wait for num_attempts * delay
 #[tracing::instrument(skip(env))]
 pub async fn wait_for_integration(
-    env: &EnvironmentWrite,
+    env: &DbWrite,
     expected_count: usize,
     num_attempts: usize,
     delay: Duration,
@@ -424,8 +420,8 @@ pub async fn wait_for_integration(
 
 /// Same as wait for integration but can print other states at the same time
 pub async fn wait_for_integration_with_others_10s(
-    env: &EnvironmentWrite,
-    others: &[&EnvironmentWrite],
+    env: &DbWrite,
+    others: &[&DbWrite],
     expected_count: usize,
 ) {
     const NUM_ATTEMPTS: usize = 100;
@@ -437,8 +433,8 @@ pub async fn wait_for_integration_with_others_10s(
 #[tracing::instrument(skip(env, others))]
 /// Same as wait for integration but can print other states at the same time
 pub async fn wait_for_integration_with_others(
-    env: &EnvironmentWrite,
-    others: &[&EnvironmentWrite],
+    env: &DbWrite,
+    others: &[&DbWrite],
     expected_count: usize,
     num_attempts: usize,
     delay: Duration,
@@ -471,7 +467,7 @@ pub async fn wait_for_integration_with_others(
 
 #[tracing::instrument(skip(envs))]
 /// Show authored data for each cell environment
-pub fn show_authored(envs: &[&EnvironmentWrite]) {
+pub fn show_authored(envs: &[&DbWrite]) {
     for (i, &env) in envs.iter().enumerate() {
         let chain = SourceChain::new(env.clone().into()).unwrap();
         let mut items = chain.iter_back().collect::<Vec<_>>().unwrap();
@@ -488,7 +484,7 @@ pub fn show_authored(envs: &[&EnvironmentWrite]) {
     }
 }
 
-async fn get_counts(envs: &[&EnvironmentWrite]) -> IntegrationStateDumps {
+async fn get_counts(envs: &[&DbWrite]) -> IntegrationStateDumps {
     let mut output = Vec::new();
     for env in envs {
         let env = *env;
@@ -497,11 +493,11 @@ async fn get_counts(envs: &[&EnvironmentWrite]) -> IntegrationStateDumps {
     IntegrationStateDumps(output)
 }
 
-async fn count_integration(env: &EnvironmentWrite) -> IntegrationStateDump {
+async fn count_integration(env: &DbWrite) -> IntegrationStateDump {
     integrate_dht_ops_workflow::dump_state(env.clone().into()).unwrap()
 }
 
-async fn display_integration(env: &EnvironmentWrite) -> usize {
+async fn display_integration(env: &DbWrite) -> usize {
     let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
 
     let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
