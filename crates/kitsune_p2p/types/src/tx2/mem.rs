@@ -1,7 +1,8 @@
 #![allow(clippy::new_ret_no_self)]
+#![allow(clippy::never_loop)]
 
 use crate::tx2::tx_backend::*;
-use crate::tx2::util::Active;
+use crate::tx2::util::{Active, TxUrl};
 use crate::tx2::*;
 use crate::*;
 use futures::{
@@ -44,7 +45,7 @@ impl InChanRecvAdapt for MemInChanRecvAdapt {
 }
 
 struct MemConAdaptInner {
-    remote_addr: String,
+    remote_addr: TxUrl,
     chan_send: ChanSend,
     con_active: Active,
 }
@@ -52,7 +53,7 @@ struct MemConAdaptInner {
 struct MemConAdapt(Arc<MemConAdaptInner>);
 
 impl MemConAdapt {
-    fn new(remote_addr: String, chan_send: ChanSend, con_active: Active) -> Self {
+    fn new(remote_addr: TxUrl, chan_send: ChanSend, con_active: Active) -> Self {
         Self(Arc::new(MemConAdaptInner {
             remote_addr,
             chan_send,
@@ -62,7 +63,7 @@ impl MemConAdapt {
 }
 
 impl ConAdapt for MemConAdapt {
-    fn remote_addr(&self) -> KitsuneResult<String> {
+    fn remote_addr(&self) -> KitsuneResult<TxUrl> {
         Ok(self.0.remote_addr.clone())
     }
 
@@ -106,7 +107,7 @@ impl ConRecvAdapt for MemConRecvAdapt {
 
 struct MemEndpointAdaptInner {
     id: u64,
-    url: String,
+    url: TxUrl,
     ep_active: Active,
 }
 
@@ -125,7 +126,7 @@ impl MemEndpointAdapt {
         (
             Self(Arc::new(Mutex::new(MemEndpointAdaptInner {
                 id,
-                url,
+                url: url.into(),
                 ep_active: ep_active.clone(),
             }))),
             ep_active,
@@ -134,7 +135,7 @@ impl MemEndpointAdapt {
 }
 
 impl EndpointAdapt for MemEndpointAdapt {
-    fn local_addr(&self) -> KitsuneResult<String> {
+    fn local_addr(&self) -> KitsuneResult<TxUrl> {
         let inner = self.0.lock();
         if !inner.ep_active.is_active() {
             return Err(KitsuneError::Closed);
@@ -142,7 +143,7 @@ impl EndpointAdapt for MemEndpointAdapt {
         Ok(inner.url.clone())
     }
 
-    fn connect(&self, url: String, _timeout: KitsuneTimeout) -> ConFut {
+    fn connect(&self, url: TxUrl, _timeout: KitsuneTimeout) -> ConFut {
         let (this_url, this_ep_active) = {
             let inner = self.0.lock();
             if !inner.ep_active.is_active() {
@@ -152,12 +153,19 @@ impl EndpointAdapt for MemEndpointAdapt {
         };
         async move {
             let con_id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
-            if !url.starts_with("kitsune-mem://") {
-                return Err(format!("invalid url: {}", url).into());
-            }
-            let id: u64 = match String::from_utf8_lossy(&url.as_bytes()[14..]).parse() {
-                Err(_) => return Err(format!("invalid url: {}", url).into()),
+            let id: Result<u64, ()> = 'top: loop {
+                if url.scheme() == "kitsune-mem" {
+                    if let Some(id) = url.host_str() {
+                        if let Ok(id) = id.parse::<u64>() {
+                            break 'top Ok(id);
+                        }
+                    }
+                }
+                break 'top Err(());
+            };
+            let id = match id {
                 Ok(id) => id,
+                Err(_) => return Err(format!("invalid url: {}", url).into()),
             };
             let (mut sender, oth_ep_active) = match MEM_ENDPOINTS.lock().get(&id) {
                 None => return Err(format!("remote not found: {}", url).into()),
@@ -172,13 +180,13 @@ impl EndpointAdapt for MemEndpointAdapt {
             let (oth_send, recv) = tokio::sync::mpsc::channel(1);
 
             let oth_con = MemConAdapt::new(
-                format!("{}/{}", this_url, con_id),
+                format!("{}/{}", this_url, con_id).into(),
                 oth_send,
                 con_active.clone(),
             );
             let oth_con: Arc<dyn ConAdapt> = Arc::new(oth_con);
 
-            let con = MemConAdapt::new(format!("{}/{}", url, con_id), send, con_active);
+            let con = MemConAdapt::new(format!("{}/{}", url, con_id).into(), send, con_active);
             let con: Arc<dyn ConAdapt> = Arc::new(con);
 
             let oth_chan_recv: Box<dyn InChanRecvAdapt> = Box::new(MemInChanRecvAdapt {
@@ -212,21 +220,8 @@ impl EndpointAdapt for MemEndpointAdapt {
 /// Memory-based test endpoint adapter for kitsune tx2.
 pub struct MemBackendAdapt;
 
-impl Default for MemBackendAdapt {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl MemBackendAdapt {
-    /// Construct a new test memory-based kitsune tx2 endpoint adapter.
-    pub fn new() -> Self {
-        Self
-    }
-}
-
 impl BackendAdapt for MemBackendAdapt {
-    fn bind(&self, _url: String, _timeout: KitsuneTimeout) -> EndpointFut {
+    fn bind(_url: TxUrl, _timeout: KitsuneTimeout) -> EndpointFut {
         async move {
             let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
             let (c_send, c_recv) = tokio::sync::mpsc::channel(1);
@@ -250,16 +245,14 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_tx2_mem_backend() {
-        let back = MemBackendAdapt::new();
-
-        let (ep1, _con_recv1) = back
-            .bind("".to_string(), KitsuneTimeout::from_millis(1000 * 30))
-            .await
-            .unwrap();
-        let (ep2, mut con_recv2) = back
-            .bind("".to_string(), KitsuneTimeout::from_millis(1000 * 30))
-            .await
-            .unwrap();
+        let (ep1, _con_recv1) =
+            MemBackendAdapt::bind("none:".into(), KitsuneTimeout::from_millis(1000 * 30))
+                .await
+                .unwrap();
+        let (ep2, mut con_recv2) =
+            MemBackendAdapt::bind("none:".into(), KitsuneTimeout::from_millis(1000 * 30))
+                .await
+                .unwrap();
 
         let rt = tokio::task::spawn(async move {
             let mut all = Vec::new();

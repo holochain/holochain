@@ -8,6 +8,9 @@ use once_cell::sync::Lazy;
 mod active;
 pub use active::*;
 
+mod tx_url;
+pub use tx_url::*;
+
 static LOC_EPOCH: Lazy<std::time::Instant> = Lazy::new(std::time::Instant::now);
 const LAT_TAG: &[u8; 8] = &[0xff, 0xff, 0xff, 0xfe, 0xfe, 0xff, 0xff, 0xff];
 

@@ -28,6 +28,7 @@ serde_json = { version = "1", features = [ "preserve_order" ] }
 sysinfo = "0.15.9"
 thiserror = "1.0.22"
 tokio = { version = "0.2", features = [ "full" ] }
+url = "2"
 url2 = "0.0.6"
 
 [dev-dependencies]
