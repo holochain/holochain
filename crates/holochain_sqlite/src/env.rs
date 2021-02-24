@@ -50,24 +50,6 @@ lazy_static! {
     };
 }
 
-fn default_flags() -> EnvironmentFlags {
-    // The flags WRITE_MAP and MAP_ASYNC make writes waaaaay faster by async writing to disk rather than blocking
-    // There is some loss of data integrity guarantees that comes with this.
-    EnvironmentFlags::WRITE_MAP | EnvironmentFlags::MAP_ASYNC
-}
-
-#[cfg(feature = "lmdb_no_tls")]
-fn required_flags() -> EnvironmentFlags {
-    // NO_TLS associates read slots with the transaction object instead of the thread, which is crucial for us
-    // so we can have multiple read transactions per thread (since futures can run on any thread)
-    EnvironmentFlags::NO_TLS
-}
-
-#[cfg(not(feature = "lmdb_no_tls"))]
-fn required_flags() -> EnvironmentFlags {
-    EnvironmentFlags::default()
-}
-
 fn rkv_builder(
     initial_map_size: Option<usize>,
     flags: Option<EnvironmentFlags>,
@@ -89,21 +71,20 @@ fn rkv_builder(
 /// This environment can only generate read-only transactions, never read-write.
 #[derive(Clone)]
 pub struct EnvironmentRead {
-    arc: Arc<RwLock<Rkv>>,
     kind: EnvironmentKind,
     path: PathBuf,
     keystore: KeystoreSender,
 }
 
 impl EnvironmentRead {
-    /// Get a read-only lock on the EnvironmentWrite. The most typical use case is
-    /// to get a lock in order to create a read-only transaction. The lock guard
-    /// must outlive the transaction, so it has to be returned here and managed
-    /// explicitly.
-    pub fn guard(&self) -> EnvironmentReadRef<'_> {
-        EnvironmentReadRef {
-            rkv: self.arc.read(),
-        }
+    #[deprecated = "remove this identity function"]
+    pub fn guard(&self) -> Self {
+        self.clone()
+    }
+
+    #[deprecated = "remove this identity function"]
+    pub fn inner(&self) -> Self {
+        self.clone()
     }
 
     /// Accessor for the [EnvironmentKind] of the EnvironmentWrite
@@ -148,11 +129,9 @@ impl EnvironmentWrite {
             hash_map::Entry::Occupied(e) => e.get().clone(),
             hash_map::Entry::Vacant(e) => e
                 .insert({
-                    let rkv = rkv_builder(None, None)(&path)?;
                     tracing::debug!("Initializing databases for path {:?}", path);
-                    initialize_databases(&rkv, &kind)?;
+                    initialize_databases(&path, &kind)?;
                     EnvironmentWrite(EnvironmentRead {
-                        arc: Arc::new(RwLock::new(rkv)),
                         kind,
                         keystore,
                         path,
@@ -172,17 +151,17 @@ impl EnvironmentWrite {
         Self::new(path_prefix, EnvironmentKind::Cell(cell_id), keystore)
     }
 
-    /// Get a read-only lock guard on the environment.
-    /// This reference can create read-write transactions.
-    pub fn guard(&self) -> EnvironmentWriteRef<'_> {
-        EnvironmentWriteRef(self.0.guard())
+    #[deprecated = "remove this identity function"]
+    pub fn guard(&self) -> &Self {
+        self.clone()
     }
-
     /// Remove the db and directory
     pub async fn remove(self) -> DatabaseResult<()> {
-        let mut map = ENVIRONMENTS.write();
-        map.remove(&self.0.path);
-        // TODO remove this db from the DB_MAP_MAP?
+        todo!();
+
+        // let mut map = ENVIRONMENTS.write();
+        // map.remove(&self.0.path);
+
         // remove the directory
         std::fs::remove_dir_all(&self.0.path)?;
         Ok(())
@@ -213,19 +192,6 @@ impl EnvironmentKind {
         }
     }
 }
-/// A reference to a read-only EnvironmentRead.
-/// This has the distinction of being unable to create a read-write transaction,
-/// because unlike [EnvironmentWriteRef], this does not implement WriteManager
-pub struct EnvironmentReadRef<'e> {
-    rkv: RwLockReadGuard<'e, Rkv>,
-}
-
-impl<'e> EnvironmentReadRef<'e> {
-    /// Access the wrapped Rkv
-    pub fn rkv(&self) -> &Rkv {
-        &self.rkv
-    }
-}
 
 /// Implementors are able to create a new read-only LMDB transaction
 pub trait ReadManager<'e> {
@@ -251,7 +217,7 @@ pub trait WriteManager<'e> {
         F: FnOnce(&mut Writer) -> Result<R, E>;
 }
 
-impl<'e> ReadManager<'e> for EnvironmentReadRef<'e> {
+impl<'e> ReadManager<'e> for EnvironmentRead {
     fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
         todo!("probably no longer makes sense")
         // let reader = Reader::from(self.rkv.read()?);
@@ -267,61 +233,12 @@ impl<'e> ReadManager<'e> for EnvironmentReadRef<'e> {
     }
 }
 
-impl<'e> WriteManager<'e> for EnvironmentWriteRef<'e> {
-    fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError>,
-        F: FnOnce(&mut Writer) -> Result<R, E>,
-    {
-        todo!("probably no longer makes sense")
-        // let mut writer = Writer::from(self.rkv.write().map_err(Into::into)?);
-        // let result = f(&mut writer)?;
-        // writer.commit().map_err(Into::into)?;
-        // Ok(result)
-    }
-}
-
 impl<'e> WriteManager<'e> for EnvironmentWrite {
     fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: FnOnce(&mut Writer) -> Result<R, E>,
     {
-        EnvironmentWriteRef::with_commit(&self.guard(), f)
-    }
-}
-
-impl<'e> EnvironmentWriteRef<'e> {
-    /// Access the underlying Rkv lock guard
-    #[cfg(test)]
-    pub(crate) fn inner(&'e self) -> &Rkv {
-        &self.rkv
-    }
-
-    /// Get a raw read-write transaction for this environment.
-    /// It is preferable to use WriterManager::with_commit for database writes,
-    /// which can properly recover from and manage write failures
-    pub fn writer_unmanaged(&'e self) -> DatabaseResult<Writer<'e>> {
         todo!("probably no longer makes sense")
-        // let writer = Writer::from(self.rkv.write()?);
-        // Ok(writer)
-    }
-}
-
-/// A reference to a EnvironmentWrite
-#[derive(Shrinkwrap, Into)]
-pub struct EnvironmentWriteRef<'e>(EnvironmentReadRef<'e>);
-
-impl<'e> ReadManager<'e> for EnvironmentWriteRef<'e> {
-    fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
-        self.0.reader()
-    }
-
-    fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError>,
-        F: FnOnce(Reader) -> Result<R, E>,
-    {
-        self.0.with_reader(f)
     }
 }
