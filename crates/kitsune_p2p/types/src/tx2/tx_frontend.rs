@@ -7,8 +7,16 @@ use crate::*;
 /// A factory that allows binding endpoints
 pub struct TxEndpointFramedFactory<B>(std::marker::PhantomData<B>)
 where
+    B: BackendAdapt;
+
+impl<B> Default for TxEndpointFramedFactory<B>
+where
     B: BackendAdapt,
-;
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl<B> TxEndpointFramedFactory<B>
 where
@@ -59,9 +67,6 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_tx_endpoint_framed() {
         let factory = <TxEndpointFramedFactory<MemBackendAdapt>>::new();
-        let _ = factory.bind(
-            "none:",
-            KitsuneTimeout::from_millis(1000 * 30),
-        );
+        let _ = factory.bind("none:", KitsuneTimeout::from_millis(1000 * 30));
     }
 }
