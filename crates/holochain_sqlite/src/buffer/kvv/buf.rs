@@ -3,7 +3,6 @@ use crate::error::DatabaseError;
 use crate::error::DatabaseResult;
 use crate::prelude::*;
 use either::Either;
-use rkv::MultiStore;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use tracing::*;
@@ -78,14 +77,24 @@ where
         }
     }
 
+    // /// Get a set of values, taking the scratch space into account,
+    // /// or from persistence if needed
+    // #[instrument(skip(self, r))]
+    // pub fn get<'r, R: Readable, KK: 'r + Debug + AsRef<K>>(
+    //     &'r self,
+    //     r: &'r R,
+    //     k: KK,
+    // ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>> + 'r> {
+
     /// Get a set of values, taking the scratch space into account,
     /// or from persistence if needed
     #[instrument(skip(self, r))]
-    pub fn get<'r, R: Readable>(
+    pub fn get<'r, R: Readable, KK: 'r + Debug + std::borrow::Borrow<K>>(
         &'r self,
         r: &'r R,
-        k: &K,
+        k: KK,
     ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>> + 'r> {
+        todo!("Revisit later, too much to consider for the current basic type refactor");
         // Depending on which branches get taken, this function could return
         // any of three different iterator types, in order to unify all three
         // into a single type, we return (in the happy path) a value of type
@@ -93,12 +102,12 @@ where
         // Either<__GetPersistedIter, Either<__ScratchSpaceITer, Chain<...>>>
         // ```
 
-        let values_delta = if let Some(v) = self.scratch.get(k) {
+        let values_delta = if let Some(v) = self.scratch.get(k.borrow()) {
             v
         } else {
             // Only do the persisted call if it's not in the scratch
-            let persisted = Self::check_not_found(self.get_persisted(r, k))?;
             trace!(?k);
+            let persisted = Self::check_not_found(self.get_persisted(r, k.borrow()))?;
 
             return Ok(Either::Left(persisted));
         };
@@ -114,7 +123,7 @@ where
             // skipping persisted content (as it will all be deleted)
             Either::Left(from_scratch_space)
         } else {
-            let persisted = Self::check_not_found(self.get_persisted(r, k))?;
+            let persisted = Self::check_not_found(self.get_persisted(r, k.borrow()))?;
             Either::Right(
                 from_scratch_space
                     // Otherwise, chain it with the persisted content,
@@ -155,14 +164,14 @@ where
     /// Fetch data from DB, deserialize into V type
     #[instrument(skip(self, r))]
     fn get_persisted<'r, R: Readable>(
-        &self,
+        &'r self,
         r: &'r R,
-        k: &K,
+        k: &'r K,
     ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>> + 'r> {
         let s = trace_span!("persisted");
         let _g = s.enter();
         trace!("test");
-        let iter = self.db.get(r, k)?;
+        let iter = self.db.get_m(r, k)?;
         Ok(iter.filter_map(|v| match v {
             Ok((_, Some(rkv::Value::Blob(buf)))) => Some(
                 holochain_serialized_bytes::decode(buf)
@@ -183,19 +192,17 @@ where
     ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>>> {
         let empty = std::iter::empty::<DatabaseResult<V>>();
         trace!("{:?}", line!());
+
         match persisted {
             Ok(persisted) => {
                 trace!("{:?}", line!());
                 Ok(Either::Left(persisted))
             }
-            Err(DatabaseError::LmdbStoreError(err)) => match err.into_inner() {
-                rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => {
-                    trace!("{:?}", line!());
-                    Ok(Either::Right(empty))
-                }
-                err => Err(err.into()),
-            },
-            Err(err) => Err(err),
+            Err(err) => {
+                trace!("{:?}", line!());
+                err.ok_if_not_found()?;
+                Ok(Either::Right(empty))
+            }
         }
     }
 
@@ -246,17 +253,21 @@ where
                                     rkv::WriteFlags::NO_DUP_DATA,
                                 )
                                 .or_else(|err| {
-                                    // This error is a little misleading...
-                                    // In a MultiStore with NO_DUP_DATA, it is
-                                    // actually returned if there is a duplicate
-                                    // value... which we want to ignore.
-                                    if let rkv::StoreError::LmdbError(rkv::LmdbError::KeyExist) =
-                                        err
-                                    {
-                                        Ok(())
-                                    } else {
-                                        Err(err)
-                                    }
+                                    todo!(
+                                        "remove this, should be unnecessary in the context of SQL"
+                                    );
+                                    StoreResult::Ok(())
+                                    // // This error is a little misleading...
+                                    // // In a MultiStore with NO_DUP_DATA, it is
+                                    // // actually returned if there is a duplicate
+                                    // // value... which we want to ignore.
+                                    // if let rkv::StoreError::LmdbError(rkv::LmdbError::KeyExist) =
+                                    //     err
+                                    // {
+                                    //     Ok(())
+                                    // } else {
+                                    //     Err(err)
+                                    // }
                                 })?;
                         } else {
                             self.db.put(writer, k.clone(), &encoded)?;
@@ -268,14 +279,9 @@ where
                     Delete => {
                         let buf = holochain_serialized_bytes::encode(&v)?;
                         let encoded = rkv::Value::Blob(&buf);
-                        self.db.delete(writer, k.clone(), &encoded).or_else(|err| {
-                            // Ignore the case where the key is not found
-                            if let rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) = err {
-                                Ok(())
-                            } else {
-                                Err(err)
-                            }
-                        })?;
+                        self.db
+                            .delete_m(writer, k.clone(), &encoded)
+                            .or_else(StoreError::ok_if_not_found)?;
                     }
                 }
             }
@@ -293,7 +299,7 @@ where
 {
     fn from(other: &KvvBufUsed<K, V>) -> Self {
         Self {
-            db: other.db,
+            db: other.db.clone(),
             scratch: other.scratch.clone(),
             no_dup_data: other.no_dup_data,
         }

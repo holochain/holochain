@@ -49,7 +49,7 @@
 //!
 //! See [this hackmd](https://holo.hackmd.io/@holochain/SkuVLpqEL) for a diagram explaining the relationships between these building blocks and the higher abstractions
 
-#![deny(missing_docs)]
+#![allow(missing_docs)]
 
 pub mod buffer;
 pub mod db;

@@ -963,7 +963,7 @@ where
         Ok(Box::new(
             fallible_iterator::convert(
                 self.system_meta
-                    .get(r, &SysMetaKey::from(entry_hash).into())?,
+                    .get(r, PrefixBytesKey::from(SysMetaKey::from(entry_hash)))?,
             )
             .filter_map(|h| {
                 Ok(match h {
@@ -983,7 +983,7 @@ where
         Ok(Box::new(
             fallible_iterator::convert(
                 self.system_meta
-                    .get(r, &SysMetaKey::from(entry_hash).into())?,
+                    .get(r, PrefixBytesKey::from(SysMetaKey::from(entry_hash)))?,
             )
             .filter_map(|h| {
                 Ok(match h {
@@ -1004,7 +1004,7 @@ where
         Ok(Box::new(
             fallible_iterator::convert(
                 self.system_meta
-                    .get(r, &SysMetaKey::from(entry_hash).into())?,
+                    .get(r, PrefixBytesKey::from(SysMetaKey::from(entry_hash)))?,
             )
             .filter_map(|h| {
                 Ok(match h {
@@ -1022,12 +1022,13 @@ where
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(r, &hash.into())?).filter_map(|h| {
-                Ok(match h {
-                    SysMetaVal::Update(h) => Some(h),
-                    _ => None,
-                })
-            }),
+            fallible_iterator::convert(self.system_meta.get(r, PrefixBytesKey::from(hash))?)
+                .filter_map(|h| {
+                    Ok(match h {
+                        SysMetaVal::Update(h) => Some(h),
+                        _ => None,
+                    })
+                }),
         ))
     }
 
@@ -1040,7 +1041,7 @@ where
         Ok(Box::new(
             fallible_iterator::convert(
                 self.system_meta
-                    .get(r, &SysMetaKey::from(new_entry_header).into())?,
+                    .get(r, PrefixBytesKey::from(SysMetaKey::from(new_entry_header)))?,
             )
             .filter_map(|h| {
                 Ok(match h {
@@ -1060,7 +1061,7 @@ where
         Ok(Box::new(
             fallible_iterator::convert(
                 self.system_meta
-                    .get(r, &SysMetaKey::from(entry_hash).into())?,
+                    .get(r, PrefixBytesKey::from(SysMetaKey::from(entry_hash)))?,
             )
             .filter_map(|h| {
                 Ok(match h {
@@ -1122,7 +1123,7 @@ where
         Ok(Box::new(
             fallible_iterator::convert(
                 self.system_meta
-                    .get(r, &SysMetaKey::from(hash.clone()).into())?,
+                    .get(r, PrefixBytesKey::from(SysMetaKey::from(hash.clone())))?,
             )
             .filter_map(|h| {
                 Ok(match h {
@@ -1169,7 +1170,7 @@ where
     ) -> DatabaseResult<DisputedStatus> {
         Ok(fallible_iterator::convert(
             self.system_meta
-                .get(r, &SysMetaKey::from(hash.clone()).into())?,
+                .get(r, PrefixBytesKey::from(SysMetaKey::from(hash.clone())))?,
         )
         .filter_map(|h| {
             Ok(match h {
@@ -1198,7 +1199,7 @@ where
         Ok(Box::new(
             fallible_iterator::convert(
                 self.system_meta
-                    .get(r, &SysMetaKey::from(link_add).into())?,
+                    .get(r, PrefixBytesKey::from(SysMetaKey::from(link_add)))?,
             )
             .filter_map(|h| {
                 Ok(match h {

@@ -93,6 +93,18 @@ impl PartialEq for DatabaseError {
     }
 }
 
+impl DatabaseError {
+    pub fn ok_if_not_found(self) -> DatabaseResult<()> {
+        match self {
+            DatabaseError::LmdbStoreError(err) => match err.into_inner() {
+                rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => Ok(()),
+                err => Err(err.into()),
+            },
+            err => Err(err),
+        }
+    }
+}
+
 pub type DatabaseResult<T> = Result<T, DatabaseError>;
 
 // Note: these are necessary since rkv Errors do not have std::Error impls,

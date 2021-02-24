@@ -5,7 +5,7 @@ use crate::prelude::*;
 pub trait KvStoreT<K, V> {
     /// Fetch data from DB as raw byte slice
     fn get_bytes<'env, R: Readable>(
-        &self,
+        &'env self,
         reader: &'env R,
         k: &K,
     ) -> DatabaseResult<Option<&'env [u8]>>;

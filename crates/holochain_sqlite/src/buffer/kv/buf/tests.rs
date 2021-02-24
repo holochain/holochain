@@ -57,7 +57,7 @@ async fn kv_iterators() -> DatabaseResult<()> {
     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
     {
-        let mut buf = Store::new(db);
+        let mut buf = Store::new(db.clone());
 
         buf.put("a".into(), V(1)).unwrap();
         buf.put("b".into(), V(2)).unwrap();
@@ -69,7 +69,7 @@ async fn kv_iterators() -> DatabaseResult<()> {
     }
 
     env.with_reader(|reader| {
-        let buf = Store::new(db);
+        let buf = Store::new(db.clone());
 
         let forward: Vec<_> = buf
             .store()
@@ -103,7 +103,7 @@ async fn kv_empty_iterators() -> DatabaseResult<()> {
         .unwrap();
 
     env.with_reader(|reader| {
-        let buf = Store::new(db);
+        let buf = Store::new(db.clone());
 
         let forward: Vec<_> = buf.store().iter(&reader).unwrap().collect().unwrap();
         let reverse: Vec<_> = buf.store().iter(&reader).unwrap().rev().collect().unwrap();
@@ -125,8 +125,8 @@ async fn kv_store_sanity_check() -> DatabaseResult<()> {
 
     let testval = TestVal { name: "Joe".into() };
 
-    let mut kv1: KvBufUsed<DbString, TestVal> = KvBufUsed::new(db1);
-    let mut kv2: KvBufUsed<DbString, DbString> = KvBufUsed::new(db2);
+    let mut kv1: KvBufUsed<DbString, TestVal> = KvBufUsed::new(db1.clone());
+    let mut kv2: KvBufUsed<DbString, DbString> = KvBufUsed::new(db2.clone());
 
     env.with_commit(|txn| {
         kv1.put("hi".into(), testval.clone()).unwrap();
@@ -143,8 +143,8 @@ async fn kv_store_sanity_check() -> DatabaseResult<()> {
 
     env.with_reader(|reader| {
         // Now open some fresh Readers to see that our data was persisted
-        let kv1b: KvBufUsed<DbString, TestVal> = KvBufUsed::new(db1);
-        let kv2b: KvBufUsed<DbString, DbString> = KvBufUsed::new(db2);
+        let kv1b: KvBufUsed<DbString, TestVal> = KvBufUsed::new(db1.clone());
+        let kv2b: KvBufUsed<DbString, DbString> = KvBufUsed::new(db2.clone());
         // Check that the underlying store contains no changes yet
         assert_eq!(kv1b.store().get(&reader, &"hi".into())?, Some(testval));
         assert_eq!(
@@ -163,7 +163,7 @@ async fn kv_indicate_value_overwritten() -> DatabaseResult<()> {
     let env = arc.guard();
     let db = env.inner().open_single("kv", StoreOptions::create())?;
     env.with_reader(|reader| {
-        let mut buf = Store::new(db);
+        let mut buf = Store::new(db.clone());
 
         buf.put("a".into(), V(1)).unwrap();
         assert_eq!(Some(V(1)), buf.get(&reader, &"a".into())?);
@@ -183,7 +183,7 @@ async fn kv_deleted_persisted() -> DatabaseResult<()> {
     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
     env.with_reader(|reader| {
-        let mut buf = Store::new(db);
+        let mut buf = Store::new(db.clone());
 
         buf.put("a".into(), V(1)).unwrap();
         buf.put("b".into(), V(2)).unwrap();
@@ -193,7 +193,7 @@ async fn kv_deleted_persisted() -> DatabaseResult<()> {
         env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
     })?;
     env.with_reader(|reader| {
-        let mut buf: KvBufUsed<DbString, V> = KvBufUsed::new(db);
+        let mut buf: KvBufUsed<DbString, V> = KvBufUsed::new(db.clone());
 
         buf.delete("b".into()).unwrap();
         assert!(!buf.contains(&reader, &"b".into())?);
@@ -201,7 +201,7 @@ async fn kv_deleted_persisted() -> DatabaseResult<()> {
         env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
     })?;
     env.with_reader(|reader| {
-        let buf: KvBufUsed<DbString, _> = KvBufUsed::new(db);
+        let buf: KvBufUsed<DbString, _> = KvBufUsed::new(db.clone());
 
         let forward = buf
             .store()
@@ -225,7 +225,7 @@ async fn kv_deleted_buffer() -> DatabaseResult<()> {
     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
     {
-        let mut buf = Store::new(db);
+        let mut buf = Store::new(db.clone());
 
         buf.put("a".into(), V(5)).unwrap();
         buf.put("b".into(), V(4)).unwrap();
@@ -247,7 +247,7 @@ async fn kv_deleted_buffer() -> DatabaseResult<()> {
         env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
     env.with_reader(|reader| {
-        let buf: KvBufUsed<DbString, _> = KvBufUsed::new(db);
+        let buf: KvBufUsed<DbString, _> = KvBufUsed::new(db.clone());
 
         let forward: Vec<_> = buf.store().iter(&reader).unwrap().collect().unwrap();
         assert_eq!(forward, vec![(&b"a"[..], V(5)), (&b"c"[..], V(9))]);
@@ -264,7 +264,7 @@ async fn kv_get_buffer() -> DatabaseResult<()> {
     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
     env.with_reader(|reader| {
-        let mut buf = Store::new(db);
+        let mut buf = Store::new(db.clone());
 
         buf.put("a".into(), V(5)).unwrap();
         buf.put("b".into(), V(4)).unwrap();
@@ -285,7 +285,7 @@ async fn kv_get_persisted() -> DatabaseResult<()> {
     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
     {
-        let mut buf = Store::new(db);
+        let mut buf = Store::new(db.clone());
 
         buf.put("a".into(), V(1)).unwrap();
         buf.put("b".into(), V(2)).unwrap();
@@ -295,7 +295,7 @@ async fn kv_get_persisted() -> DatabaseResult<()> {
     }
 
     env.with_reader(|reader| {
-        let buf = Store::new(db);
+        let buf = Store::new(db.clone());
 
         let n = buf.get(&reader, &"b".into())?;
         assert_eq!(n, Some(V(2)));
@@ -313,7 +313,7 @@ async fn kv_get_del_buffer() -> DatabaseResult<()> {
     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
     env.with_reader(|reader| {
-        let mut buf = Store::new(db);
+        let mut buf = Store::new(db.clone());
 
         buf.put("a".into(), V(5)).unwrap();
         buf.put("b".into(), V(4)).unwrap();
@@ -335,7 +335,7 @@ async fn kv_get_del_persisted() -> DatabaseResult<()> {
     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
     {
-        let mut buf = Store::new(db);
+        let mut buf = Store::new(db.clone());
 
         buf.put("a".into(), V(1)).unwrap();
         buf.put("b".into(), V(2)).unwrap();
@@ -345,7 +345,7 @@ async fn kv_get_del_persisted() -> DatabaseResult<()> {
     }
 
     env.with_reader(|reader| {
-        let mut buf: KvBufUsed<DbString, V> = KvBufUsed::new(db);
+        let mut buf: KvBufUsed<DbString, V> = KvBufUsed::new(db.clone());
 
         buf.delete("b".into()).unwrap();
         let n = buf.get(&reader, &"b".into())?;
@@ -355,7 +355,7 @@ async fn kv_get_del_persisted() -> DatabaseResult<()> {
     })?;
 
     env.with_reader(|reader| {
-        let buf: KvBufUsed<DbString, V> = KvBufUsed::new(db);
+        let buf: KvBufUsed<DbString, V> = KvBufUsed::new(db.clone());
 
         let n = buf.get(&reader, &"b".into())?;
         assert_eq!(n, None);

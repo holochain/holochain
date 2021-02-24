@@ -345,13 +345,11 @@ where
                     let encoded = rkv::Value::Blob(&buf);
                     self.store.db().put(writer, k, &encoded)?;
                 }
-                Delete => match self.store.db().delete(writer, k) {
-                    r @ Err(StoreError::LmdbStoreError(e)) => match e.into_inner() {
-                        rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => (),
-                        _ => r?,
-                    },
-                    r => r?,
-                },
+                Delete => self
+                    .store
+                    .db()
+                    .delete(writer, k)
+                    .or_else(StoreError::ok_if_not_found)?,
             }
         }
 
@@ -383,18 +381,15 @@ where
                     let encoded = rkv::Value::Blob(&buf);
                     self.store.db().put(
                         writer,
-                        IntKey::from_key_bytes_or_friendly_panic(k),
+                        IntKey::from_key_bytes_or_friendly_panic(k).as_ref(),
                         &encoded,
                     )?;
                 }
-                Delete => match self
+                Delete => self
                     .store
                     .db()
-                    .delete(writer, IntKey::from_key_bytes_or_friendly_panic(k))
-                {
-                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => {}
-                    r => r?,
-                },
+                    .delete(writer, IntKey::from_key_bytes_or_friendly_panic(k).as_ref())
+                    .or_else(StoreError::ok_if_not_found)?,
             }
         }
 

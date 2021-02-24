@@ -11,6 +11,7 @@ use chrono::DateTime;
 use derive_more::From;
 use rkv::Database;
 use rkv::RoCursor;
+use rkv::StoreError;
 use rkv::Value;
 use shrinkwraprs::Shrinkwrap;
 

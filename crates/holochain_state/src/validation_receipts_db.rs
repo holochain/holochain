@@ -101,7 +101,7 @@ impl ValidationReceiptsBuf {
     pub fn list_receipts<'r, R: Readable>(
         &'r self,
         r: &'r R,
-        dht_op_hash: &DhtOpHash,
+        dht_op_hash: &'r DhtOpHash,
     ) -> DatabaseResult<
         impl fallible_iterator::FallibleIterator<
                 Item = SignedValidationReceipt,

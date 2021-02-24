@@ -73,14 +73,15 @@ fn rkv_builder(
     flags: Option<EnvironmentFlags>,
 ) -> impl (Fn(&Path) -> Result<Rkv, rkv::StoreError>) {
     move |path: &Path| {
-        let mut env_builder = Rkv::environment_builder();
-        env_builder
-            // max size of memory map, can be changed later
-            .set_map_size(initial_map_size.unwrap_or(DEFAULT_INITIAL_MAP_SIZE))
-            // max number of DBs in this environment
-            .set_max_dbs(MAX_DBS)
-            .set_flags(flags.unwrap_or_else(default_flags) | required_flags());
-        Rkv::from_env(path, env_builder)
+        todo!("this becomes database construction")
+        // let mut env_builder = Rkv::environment_builder();
+        // env_builder
+        //     // max size of memory map, can be changed later
+        //     .set_map_size(initial_map_size.unwrap_or(DEFAULT_INITIAL_MAP_SIZE))
+        //     // max number of DBs in this environment
+        //     .set_max_dbs(MAX_DBS)
+        //     .set_flags(flags.unwrap_or_else(default_flags) | required_flags());
+        // Rkv::from_env(path, env_builder)
     }
 }
 
@@ -252,8 +253,9 @@ pub trait WriteManager<'e> {
 
 impl<'e> ReadManager<'e> for EnvironmentReadRef<'e> {
     fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
-        let reader = Reader::from(self.rkv.read()?);
-        Ok(reader)
+        todo!("probably no longer makes sense")
+        // let reader = Reader::from(self.rkv.read()?);
+        // Ok(reader)
     }
 
     fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
@@ -271,10 +273,11 @@ impl<'e> WriteManager<'e> for EnvironmentWriteRef<'e> {
         E: From<DatabaseError>,
         F: FnOnce(&mut Writer) -> Result<R, E>,
     {
-        let mut writer = Writer::from(self.rkv.write().map_err(Into::into)?);
-        let result = f(&mut writer)?;
-        writer.commit().map_err(Into::into)?;
-        Ok(result)
+        todo!("probably no longer makes sense")
+        // let mut writer = Writer::from(self.rkv.write().map_err(Into::into)?);
+        // let result = f(&mut writer)?;
+        // writer.commit().map_err(Into::into)?;
+        // Ok(result)
     }
 }
 
@@ -299,8 +302,9 @@ impl<'e> EnvironmentWriteRef<'e> {
     /// It is preferable to use WriterManager::with_commit for database writes,
     /// which can properly recover from and manage write failures
     pub fn writer_unmanaged(&'e self) -> DatabaseResult<Writer<'e>> {
-        let writer = Writer::from(self.rkv.write()?);
-        Ok(writer)
+        todo!("probably no longer makes sense")
+        // let writer = Writer::from(self.rkv.write()?);
+        // Ok(writer)
     }
 }
 

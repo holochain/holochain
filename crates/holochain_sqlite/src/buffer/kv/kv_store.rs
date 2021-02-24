@@ -24,7 +24,7 @@ where
 {
     /// Fetch data from DB as raw byte slice
     fn get_bytes<'env, R: Readable>(
-        &self,
+        &'env self,
         reader: &'env R,
         k: &K,
     ) -> DatabaseResult<Option<&'env [u8]>> {
@@ -60,10 +60,11 @@ where
 
     /// Iterate over the underlying persisted data
     fn iter<'env, R: Readable>(&self, reader: &'env R) -> DatabaseResult<SingleIterRaw<'env, V>> {
-        Ok(SingleIterRaw::new(
-            self.db.iter_start(reader)?,
-            self.db.iter_end(reader)?,
-        ))
+        todo!("lmdb iter")
+        // Ok(SingleIterRaw::new(
+        //     self.db.iter_start(reader)?,
+        //     self.db.iter_end(reader)?,
+        // ))
     }
 
     /// Iterate from a key onwards
@@ -73,10 +74,11 @@ where
         k: K,
     ) -> DatabaseResult<SingleIterRaw<'env, V>> {
         check_empty_key(&k)?;
-        Ok(SingleIterRaw::new(
-            self.db.iter_from(reader, k)?,
-            self.db.iter_end(reader)?,
-        ))
+        todo!("lmdb iter")
+        // Ok(SingleIterRaw::new(
+        //     self.db.iter_from(reader, k)?,
+        //     self.db.iter_end(reader)?,
+        // ))
     }
 
     /// Iterate over the underlying persisted data in reverse
@@ -84,7 +86,8 @@ where
         &self,
         reader: &'env R,
     ) -> DatabaseResult<fallible_iterator::Rev<SingleIterRaw<'env, V>>> {
-        Ok(SingleIterRaw::new(self.db.iter_start(reader)?, self.db.iter_end(reader)?).rev())
+        todo!("lmdb iter")
+        // Ok(SingleIterRaw::new(self.db.iter_start(reader)?, self.db.iter_end(reader)?).rev())
     }
 }
 
@@ -103,7 +106,7 @@ where
 
     /// Accessor for raw Rkv DB
     pub fn db(&self) -> SingleStore {
-        self.db
+        self.db.clone()
     }
 
     // TODO: This should be cfg test but can't because it's in a different crate

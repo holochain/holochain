@@ -91,18 +91,72 @@ pub trait GetDb {
 /// A reference to a SQLite table.
 /// This patten only exists as part of the naive LMDB refactor.
 #[deprecated = "lmdb: naive"]
+#[derive(Clone, Debug)]
 pub struct Table {}
 
 impl Table {
-    pub fn get<R: Readable>(&self, reader: &R, k: &[u8]) -> StoreResult<rkv::Value> {
+    pub fn get<R: Readable, K: AsRef<[u8]>>(
+        &self,
+        reader: &R,
+        k: K,
+    ) -> StoreResult<Option<rkv::Value>> {
         todo!()
     }
 
-    pub fn put(&self, writer: &mut Writer, k: &[u8], v: &rkv::Value) -> StoreResult<()> {
+    /// This handles the fact that getting from an rkv::MultiStore returns
+    /// multiple results
+    #[deprecated = "unneeded in the context of SQL"]
+    pub fn get_m<R: Readable, K: AsRef<[u8]>>(
+        &self,
+        reader: &R,
+        k: K,
+    ) -> StoreResult<impl Iterator<Item = StoreResult<(K, Option<rkv::Value>)>>> {
+        todo!();
+        Ok(std::iter::empty())
+    }
+
+    pub fn put<K: AsRef<[u8]>>(
+        &self,
+        writer: &mut Writer,
+        k: K,
+        v: &rkv::Value,
+    ) -> StoreResult<()> {
         todo!()
     }
 
-    pub fn delete(&self, writer: &mut Writer, k: &[u8]) -> StoreResult<()> {
+    #[deprecated = "unneeded in the context of SQL"]
+    pub fn put_with_flags<K: AsRef<[u8]>>(
+        &self,
+        writer: &mut Writer,
+        k: K,
+        v: &rkv::Value,
+        flags: rkv::WriteFlags,
+    ) -> StoreResult<()> {
+        todo!()
+    }
+
+    pub fn delete<K: AsRef<[u8]>>(&self, writer: &mut Writer, k: K) -> StoreResult<()> {
+        todo!()
+    }
+
+    pub fn delete_all<K: AsRef<[u8]>>(&self, writer: &mut Writer, k: K) -> StoreResult<()> {
+        todo!()
+    }
+
+    /// This handles the fact that deleting from an rkv::MultiStore requires
+    /// passing the value to delete (deleting a particular kv pair)
+    #[deprecated = "unneeded in the context of SQL"]
+    pub fn delete_m<K: AsRef<[u8]>>(
+        &self,
+        writer: &mut Writer,
+        k: K,
+        v: &rkv::Value,
+    ) -> StoreResult<()> {
+        todo!()
+    }
+
+    #[cfg(feature = "test_utils")]
+    pub fn clear(&mut self, writer: &mut Writer) -> StoreResult<()> {
         todo!()
     }
 }
@@ -117,6 +171,19 @@ pub type StoreResult<T> = Result<T, StoreError>;
 
 impl From<rkv::StoreError> for StoreError {
     fn from(e: rkv::StoreError) -> StoreError {
+        use failure::Fail;
         StoreError::LmdbStoreError(e.compat())
+    }
+}
+
+impl StoreError {
+    pub fn ok_if_not_found(self) -> StoreResult<()> {
+        match self {
+            StoreError::LmdbStoreError(err) => match err.into_inner() {
+                rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => Ok(()),
+                err => Err(err.into()),
+            },
+            err => Err(err),
+        }
     }
 }

@@ -1,4 +1,4 @@
-use rkv::{MultiIntegerStore, PrimitiveInt, StoreError, StoreOptions};
+use rkv::{PrimitiveInt, StoreError, StoreOptions};
 
 use crate::exports::*;
 
@@ -38,15 +38,15 @@ impl Rkv {
         todo!("this is a shim")
     }
 
-    /// SHIM
-    pub fn open_multi_integer<'s, T, K: PrimitiveInt>(
-        &self,
-        name: T,
-        mut opts: StoreOptions,
-    ) -> Result<MultiIntegerStore<K>, StoreError>
-    where
-        T: Into<Option<&'s str>>,
-    {
-        todo!("this is a shim")
-    }
+    // /// SHIM
+    // pub fn open_multi_integer<'s, T, K: PrimitiveInt>(
+    //     &self,
+    //     name: T,
+    //     mut opts: StoreOptions,
+    // ) -> Result<MultiIntegerStore<K>, StoreError>
+    // where
+    //     T: Into<Option<&'s str>>,
+    // {
+    //     todo!("this is a shim")
+    // }
 }

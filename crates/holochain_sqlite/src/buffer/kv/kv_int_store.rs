@@ -22,11 +22,11 @@ where
 {
     /// Fetch data from DB as raw byte slice
     fn get_bytes<'env, R: Readable>(
-        &self,
+        &'env self,
         reader: &'env R,
         k: &K,
     ) -> DatabaseResult<Option<&'env [u8]>> {
-        match self.db.get(reader, *k)? {
+        match self.db.get(reader, (*k).as_ref())? {
             Some(rkv::Value::Blob(buf)) => Ok(Some(buf)),
             None => Ok(None),
             Some(_) => Err(DatabaseError::InvalidValue),
@@ -45,21 +45,22 @@ where
     fn put(&self, writer: &mut Writer, k: &K, v: &V) -> DatabaseResult<()> {
         let buf = holochain_serialized_bytes::encode(v)?;
         let encoded = rkv::Value::Blob(&buf);
-        self.db.put(writer, *&encoded)?;
+        self.db.put(writer, k.as_ref(), &encoded)?;
         Ok(())
     }
 
     /// Delete value from DB
     fn delete(&self, writer: &mut Writer, k: &K) -> DatabaseResult<()> {
-        Ok(self.db.delete(writer, *k)?)
+        Ok(self.db.delete(writer, k.as_ref())?)
     }
 
     /// Iterate over the underlying persisted data
     fn iter<'env, R: Readable>(&self, reader: &'env R) -> DatabaseResult<SingleIterRaw<'env, V>> {
-        Ok(SingleIterRaw::new(
-            self.db.iter_start(reader)?,
-            self.db.iter_end(reader)?,
-        ))
+        todo!("lmdb")
+        // Ok(SingleIterRaw::new(
+        //     self.db.iter_start(reader)?,
+        //     self.db.iter_end(reader)?,
+        // ))
     }
 
     /// Iterate from a key onwards
@@ -68,10 +69,11 @@ where
         reader: &'env R,
         k: K,
     ) -> DatabaseResult<SingleIterRaw<'env, V>> {
-        Ok(SingleIterRaw::new(
-            self.db.iter_from(reader, k)?,
-            self.db.iter_end(reader)?,
-        ))
+        todo!("lmdb")
+        // Ok(SingleIterRaw::new(
+        //     self.db.iter_from(reader, k)?,
+        //     self.db.iter_end(reader)?,
+        // ))
     }
 
     /// Iterate over the underlying persisted data in reverse
@@ -79,7 +81,8 @@ where
         &self,
         reader: &'env R,
     ) -> DatabaseResult<fallible_iterator::Rev<SingleIterRaw<'env, V>>> {
-        Ok(SingleIterRaw::new(self.db.iter_start(reader)?, self.db.iter_end(reader)?).rev())
+        todo!("lmdb")
+        // Ok(SingleIterRaw::new(self.db.iter_start(reader)?, self.db.iter_end(reader)?).rev())
     }
 }
 
@@ -97,7 +100,7 @@ where
 
     /// Accessor for raw Rkv DB
     pub fn db(&self) -> IntegerStore {
-        self.db
+        self.db.clone()
     }
 
     // TODO: This should be cfg test but can't because it's in a different crate
