@@ -58,6 +58,7 @@ pub struct RegisterDnaPayload {
     /// Properties to override when installing this Dna
     pub properties: Option<YamlProperties>,
     /// Where to find the DNA
+    #[serde(flatten)]
     pub source: DnaSource,
 }
 
@@ -104,6 +105,7 @@ pub struct InstallAppPayload {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct InstallAppBundlePayload {
     /// The unique identifier for an installed app in this conductor.
+    #[serde(flatten)]
     pub source: AppBundleSource,
 
     /// The agent to use when creating Cells for this App.
@@ -121,7 +123,6 @@ pub struct InstallAppBundlePayload {
 /// The possible locations of an AppBundle
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[serde(untagged)]
 pub enum AppBundleSource {
     /// The actual serialized bytes of a bundle
     Bundle(AppBundle),
