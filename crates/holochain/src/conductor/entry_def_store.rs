@@ -65,7 +65,7 @@ impl From<EntryDefStoreKey> for EntryDefBufferKey {
 
 impl EntryDefBuf {
     /// Create a new buffer
-    pub fn new(env: DbRead, entry_def_store: SingleStore) -> DatabaseResult<Self> {
+    pub fn new(env: DbRead, entry_def_store: SingleTable) -> DatabaseResult<Self> {
         Ok(Self(KvBufFresh::new(env, entry_def_store)))
     }
 

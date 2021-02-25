@@ -5,15 +5,15 @@ use crate::error::DatabaseError;
 use crate::error::DatabaseResult;
 use crate::prelude::*;
 use fallible_iterator::FallibleIterator;
-use SingleStore;
+use SingleTable;
 
-/// Wrapper around an rkv SingleStore which provides strongly typed values
+/// Wrapper around an rkv SingleTable which provides strongly typed values
 pub struct KvStore<K, V>
 where
     K: BufKey,
     V: BufVal,
 {
-    db: SingleStore,
+    db: SingleTable,
     __phantom: std::marker::PhantomData<(K, V)>,
 }
 
@@ -97,7 +97,7 @@ where
     V: BufVal,
 {
     /// Create a new KvStore
-    pub fn new(db: SingleStore) -> Self {
+    pub fn new(db: SingleTable) -> Self {
         Self {
             db,
             __phantom: std::marker::PhantomData,
@@ -105,7 +105,7 @@ where
     }
 
     /// Accessor for raw Rkv DB
-    pub fn db(&self) -> SingleStore {
+    pub fn db(&self) -> SingleTable {
         self.db.clone()
     }
 

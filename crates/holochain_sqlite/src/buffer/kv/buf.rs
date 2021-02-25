@@ -53,7 +53,7 @@ where
 {
     /// Constructor
     // FIXME: why does this conflict with the other `new` when it's called just "new"?
-    pub fn new_int(db: IntegerStore) -> Self {
+    pub fn new_int(db: IntegerTable) -> Self {
         Self {
             store: KvIntStore::new(db),
             scratch: BTreeMap::new(),
@@ -75,7 +75,7 @@ where
     V: BufVal,
 {
     /// Constructor
-    pub fn new(db: SingleStore) -> Self {
+    pub fn new(db: SingleTable) -> Self {
         Self {
             store: KvStore::new(db),
             scratch: BTreeMap::new(),
@@ -277,7 +277,7 @@ where
     V: BufVal,
 {
     /// Create a new Fresh
-    pub fn new(env: DbRead, db: SingleStore) -> Self {
+    pub fn new(env: DbRead, db: SingleTable) -> Self {
         Self {
             env,
             inner: Used::new(db),
@@ -290,7 +290,7 @@ where
     V: BufVal,
 {
     /// Create a new Fresh
-    pub fn new(env: DbRead, db: IntegerStore) -> Self {
+    pub fn new(env: DbRead, db: IntegerTable) -> Self {
         Self {
             env,
             inner: Used::new_int(db),

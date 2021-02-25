@@ -34,15 +34,15 @@
 //!
 //! The rkv crate provides a few abstractions for working with LMDB stores. The ones we use are:
 //!
-//! - SingleStore: a key-value store with arbitrary key and one value per key
-//! - IntegerStore: a key-value store with integer key and one value per key
-//! - MultiStore: a key-value store with arbitrary key and multiple values per key
+//! - SingleTable: a key-value store with arbitrary key and one value per key
+//! - IntegerTable: a key-value store with integer key and one value per key
+//! - MultiTable: a key-value store with arbitrary key and multiple values per key
 //!
 //! On top of these abstractions, the `crate` crate provides three buffered store abstractions to wrap each of the rkv store types, as well as a simple CAS abstraction:
 //!
-//! - [KvBuffer]: a SingleStore with a scratch space
-//! - [KvIntBuffer]: an IntegerStore with a scratch space
-//! - [KvvBuffer]: a MultiStore with a scratch space
+//! - [KvBuffer]: a SingleTable with a scratch space
+//! - [KvIntBuffer]: an IntegerTable with a scratch space
+//! - [KvvBuffer]: a MultiTable with a scratch space
 //! - [CasBuffer]: a [KvBuffer] which enforces that keys must be the "address" of the values (content)
 //!
 //! The `holochain` crate composes these building blocks together to build more purpose-specific BufferedStore implementations

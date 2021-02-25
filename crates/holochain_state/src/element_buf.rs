@@ -16,7 +16,7 @@ use holo_hash::HeaderHash;
 use holochain_sqlite::buffer::CasBufFreshSync;
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::exports::SingleStore;
+use holochain_sqlite::exports::SingleTable;
 use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use tracing::*;
@@ -85,9 +85,9 @@ where
 {
     fn new(
         env: DbRead,
-        public_entries_store: SingleStore,
-        private_entries_store: Option<SingleStore>,
-        headers_store: SingleStore,
+        public_entries_store: SingleTable,
+        private_entries_store: Option<SingleTable>,
+        headers_store: SingleTable,
     ) -> DatabaseResult<Self> {
         let private_entries = if let Some(store) = private_entries_store {
             Some(CasBufFreshSync::new(env.clone(), store))

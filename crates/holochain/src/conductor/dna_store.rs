@@ -3,7 +3,7 @@ use holochain_sqlite::buffer::CasBufFreshSync;
 use holochain_sqlite::db::DbRead;
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::exports::SingleStore;
+use holochain_sqlite::exports::SingleTable;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
@@ -62,7 +62,7 @@ impl RealDnaStore {
 }
 
 impl DnaDefBuf {
-    pub fn new(env: DbRead, dna_def_store: SingleStore) -> DatabaseResult<Self> {
+    pub fn new(env: DbRead, dna_def_store: SingleTable) -> DatabaseResult<Self> {
         Ok(Self {
             dna_defs: CasBufFreshSync::new(env, dna_def_store),
         })

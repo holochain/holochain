@@ -418,9 +418,9 @@ where
 {
     pub(crate) fn new(
         env: DbRead,
-        system_meta: MultiStore,
-        links_meta: SingleStore,
-        misc_meta: SingleStore,
+        system_meta: MultiTable,
+        links_meta: SingleTable,
+        misc_meta: SingleTable,
     ) -> DatabaseResult<Self> {
         Ok(Self {
             system_meta: KvvBufUsed::new(system_meta),

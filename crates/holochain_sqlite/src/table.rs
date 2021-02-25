@@ -3,10 +3,10 @@
 use std::path::Path;
 
 use crate::prelude::Writer;
-use crate::{db::DbKind, exports::IntegerStore, prelude::Readable};
+use crate::{db::DbKind, exports::IntegerTable, prelude::Readable};
 use crate::{
     error::DatabaseResult,
-    exports::{MultiStore, SingleStore},
+    exports::{MultiTable, SingleTable},
 };
 use derive_more::Display;
 /// Enumeration of all databases needed by Holochain
@@ -105,7 +105,7 @@ impl Table {
         todo!()
     }
 
-    /// This handles the fact that getting from an rkv::MultiStore returns
+    /// This handles the fact that getting from an rkv::MultiTable returns
     /// multiple results
     #[deprecated = "unneeded in the context of SQL"]
     pub fn get_m<R: Readable, K: AsRef<[u8]>>(
@@ -145,7 +145,7 @@ impl Table {
         todo!()
     }
 
-    /// This handles the fact that deleting from an rkv::MultiStore requires
+    /// This handles the fact that deleting from an rkv::MultiTable requires
     /// passing the value to delete (deleting a particular kv pair)
     #[deprecated = "unneeded in the context of SQL"]
     pub fn delete_m<K: AsRef<[u8]>>(

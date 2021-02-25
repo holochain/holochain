@@ -52,16 +52,16 @@ fn dump_iter_multi<'i>(
     Ok(())
 }
 
-pub fn dump_kv(reader: &Reader, name: &str, db: SingleStore) -> DatabaseResult<()> {
+pub fn dump_kv(reader: &Reader, name: &str, db: SingleTable) -> DatabaseResult<()> {
     dump_iter(name, db.iter_start(reader)?)
 }
 
-pub fn dump_kvi(reader: &Reader, name: &str, db: rkv::IntegerStore) -> DatabaseResult<()> {
+pub fn dump_kvi(reader: &Reader, name: &str, db: rkv::IntegerTable) -> DatabaseResult<()> {
     dump_iter(name, db.iter_start(reader)?)
 }
 
 // TODO:
-// pub fn dump_kvv(reader: &Reader, name: &str, db: rkv::MultiStore) -> DatabaseResult<()> {
+// pub fn dump_kvv(reader: &Reader, name: &str, db: rkv::MultiTable) -> DatabaseResult<()> {
 //     dump_iter_multi(name, db.iter_start(reader)?)
 // }
 

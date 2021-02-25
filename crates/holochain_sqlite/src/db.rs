@@ -83,7 +83,7 @@ impl DbRead {
         &self,
         name: T,
         opts: rkv::StoreOptions,
-    ) -> Result<SingleStore, StoreError>
+    ) -> Result<SingleTable, StoreError>
     where
         T: Into<Option<&'s str>>,
     {
@@ -95,7 +95,7 @@ impl DbRead {
         &self,
         name: T,
         mut opts: rkv::StoreOptions,
-    ) -> Result<IntegerStore, StoreError>
+    ) -> Result<IntegerTable, StoreError>
     where
         T: Into<Option<&'s str>>,
     {
@@ -107,7 +107,7 @@ impl DbRead {
         &self,
         name: T,
         mut opts: rkv::StoreOptions,
-    ) -> Result<MultiStore, StoreError>
+    ) -> Result<MultiTable, StoreError>
     where
         T: Into<Option<&'s str>>,
     {

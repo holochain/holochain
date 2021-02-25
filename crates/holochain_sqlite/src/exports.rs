@@ -3,10 +3,10 @@
 use crate::{prelude::IntKey, table::Table};
 
 /// Simple type alias for re-exporting
-pub type SingleStore = Table;
+pub type SingleTable = Table;
 /// Simple type alias for re-exporting
-pub type IntegerStore = Table;
+pub type IntegerTable = Table;
 /// Simple type alias for re-exporting
-pub type MultiStore = Table;
+pub type MultiTable = Table;
 
 pub use fallible_iterator::FallibleIterator;

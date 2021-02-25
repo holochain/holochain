@@ -64,7 +64,7 @@ use holochain_sqlite::buffer::KvStoreT;
 use holochain_sqlite::db::DbKind;
 use holochain_sqlite::db::DbWrite;
 use holochain_sqlite::db::ReadManager;
-use holochain_sqlite::exports::SingleStore;
+use holochain_sqlite::exports::SingleTable;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::prelude::*;
@@ -887,7 +887,7 @@ where
         root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
     ) -> ConductorResult<Self> {
-        let db: SingleStore = env.get_table(TableName::ConductorState)?;
+        let db: SingleTable = env.get_table(TableName::ConductorState)?;
         let (task_tx, task_manager_run_handle) = spawn_task_manager();
         let task_manager_run_handle = Some(task_manager_run_handle);
         let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);

@@ -52,7 +52,7 @@ where
     K: BufKey,
     V: BufMultiVal,
 {
-    db: MultiStore,
+    db: MultiTable,
     scratch: BTreeMap<K, ValuesDelta<V>>,
     no_dup_data: bool,
 }
@@ -63,13 +63,13 @@ where
     V: BufMultiVal + Debug,
 {
     /// Create a new KvvBufUsed
-    pub fn new(db: MultiStore) -> Self {
+    pub fn new(db: MultiTable) -> Self {
         Self::new_opts(db, false)
     }
 
     /// Create a new KvvBufUsed
     /// also allow switching to no_dup_data mode.
-    pub fn new_opts(db: MultiStore, no_dup_data: bool) -> Self {
+    pub fn new_opts(db: MultiTable, no_dup_data: bool) -> Self {
         Self {
             db,
             scratch: BTreeMap::new(),
@@ -258,7 +258,7 @@ where
                                     );
                                     StoreResult::Ok(())
                                     // // This error is a little misleading...
-                                    // // In a MultiStore with NO_DUP_DATA, it is
+                                    // // In a MultiTable with NO_DUP_DATA, it is
                                     // // actually returned if there is a duplicate
                                     // // value... which we want to ignore.
                                     // if let rkv::StoreError::LmdbError(rkv::LmdbError::KeyExist) =

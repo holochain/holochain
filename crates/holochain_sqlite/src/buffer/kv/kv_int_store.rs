@@ -7,12 +7,12 @@ use fallible_iterator::FallibleIterator;
 
 type K = IntKey;
 
-/// Wrapper around an rkv IntegerStore which provides strongly typed values
+/// Wrapper around an rkv IntegerTable which provides strongly typed values
 pub struct KvIntStore<V>
 where
     V: BufVal,
 {
-    db: IntegerStore,
+    db: IntegerTable,
     __phantom: std::marker::PhantomData<V>,
 }
 
@@ -91,7 +91,7 @@ where
     V: BufVal,
 {
     /// Create a new KvIntBufFresh
-    pub fn new(db: IntegerStore) -> Self {
+    pub fn new(db: IntegerTable) -> Self {
         Self {
             db,
             __phantom: std::marker::PhantomData,
@@ -99,7 +99,7 @@ where
     }
 
     /// Accessor for raw Rkv DB
-    pub fn db(&self) -> IntegerStore {
+    pub fn db(&self) -> IntegerTable {
         self.db.clone()
     }
 

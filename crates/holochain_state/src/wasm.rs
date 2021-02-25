@@ -2,7 +2,7 @@ use holo_hash::WasmHash;
 use holochain_sqlite::buffer::CasBufFreshAsync;
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::exports::SingleStore;
+use holochain_sqlite::exports::SingleTable;
 use holochain_sqlite::prelude::BufferedStore;
 use holochain_sqlite::prelude::DbRead;
 use holochain_sqlite::transaction::Writer;
@@ -12,7 +12,7 @@ use holochain_types::prelude::*;
 pub struct WasmBuf(CasBufFreshAsync<DnaWasm>);
 
 impl WasmBuf {
-    pub fn new(env: DbRead, wasm_store: SingleStore) -> DatabaseResult<Self> {
+    pub fn new(env: DbRead, wasm_store: SingleTable) -> DatabaseResult<Self> {
         Ok(Self(CasBufFreshAsync::new(env, wasm_store)))
     }
 
