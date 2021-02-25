@@ -3,7 +3,7 @@
 use holochain_serialized_bytes::prelude::*;
 
 /// Maps directly to the tracing Levels but here to define the interface.
-/// @see https://docs.rs/tracing-core/0.1.17/tracing_core/struct.Level.html
+/// See https://docs.rs/tracing-core/0.1.17/tracing_core/struct.Level.html
 #[derive(PartialEq, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum Level {
     /// Error.

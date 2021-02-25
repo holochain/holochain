@@ -9,5 +9,5 @@ name = "test_wasm_x_salsa20_poly1305"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-hdk3 = { path = "../../../../hdk3" }
-serde = "=1.0.104"
+hdk = { path = "../../../../hdk" }
+serde = "1.0"

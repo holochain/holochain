@@ -879,7 +879,7 @@ async fn commit_entry<'env>(
     let zome = Zome::new(zome_name.clone().into(), fixt!(ZomeDef));
     dna_def.zomes.clear();
     dna_def.zomes.push(zome.clone().into());
-    let dna_def = DnaDefHashed::from_content(dna_def).await;
+    let dna_def = DnaDefHashed::from_content_sync(dna_def);
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
@@ -975,7 +975,7 @@ async fn create_link(
     let zome = Zome::new(zome_name.clone().into(), fixt!(ZomeDef));
     dna_def.zomes.clear();
     dna_def.zomes.push(zome.clone().into());
-    let dna_def = DnaDefHashed::from_content(dna_def).await;
+    let dna_def = DnaDefHashed::from_content_sync(dna_def);
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
@@ -1028,7 +1028,7 @@ async fn get_links(
     let zome = Zome::new(zome_name.clone().into(), fixt!(ZomeDef));
     dna_def.zomes.clear();
     dna_def.zomes.push(zome.clone().into());
-    let dna_def = DnaDefHashed::from_content(dna_def).await;
+    let dna_def = DnaDefHashed::from_content_sync(dna_def);
 
     let test_network = test_network(Some(dna_def.as_hash().clone()), None).await;
 

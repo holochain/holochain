@@ -72,5 +72,14 @@ let rsp: TestMessage = send.request(msg).await.unwrap();
 assert_eq!("echo: test", &rsp.0,);
 ```
 
+## Contribute
+Holochain is an open source project.  We welcome all sorts of participation and are actively working on increasing surface area to accept it.  Please see our [contributing guidelines](/CONTRIBUTING.md) for our general practices and protocols on participating in the community, as well as specific expectations around things like code formatting, testing practices, continuous integration, etc.
+
+* Connect with us on our [forum](https://forum.holochain.org)
+
+## License
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+
+Copyright (C) 2019 - 2021, Holochain Foundation
 
 License: Apache-2.0

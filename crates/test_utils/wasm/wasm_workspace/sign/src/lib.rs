@@ -1,8 +1,8 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 #[hdk_extern]
 fn sign(sign_input: Sign) -> ExternResult<Signature> {
-    Ok(hdk3::prelude::sign_raw(sign_input.key, sign_input.data)?)
+    Ok(hdk::prelude::sign_raw(sign_input.key, sign_input.data)?)
 }
 
 #[hdk_extern]
@@ -14,7 +14,7 @@ fn verify_signature_raw(
         signature,
         data,
     } = verify_signature_input;
-    hdk3::prelude::verify_signature_raw(
+    hdk::prelude::verify_signature_raw(
         key, signature, data,
     )
 }
@@ -35,7 +35,7 @@ fn verify_signature(
         bar: 100,
     };
 
-    let signature = match hdk3::prelude::sign(agent_pub_key.clone(), some_struct.clone()) {
+    let signature = match hdk::prelude::sign(agent_pub_key.clone(), some_struct.clone()) {
         Ok(v) => v,
         Err(error) => {
             tracing::error!(?agent_pub_key, ?some_struct, ?error);
@@ -45,7 +45,7 @@ fn verify_signature(
 
     tracing::debug!(?signature);
 
-    let verify = match hdk3::prelude::verify_signature(agent_pub_key.clone(), signature.clone(), some_struct.clone()) {
+    let verify = match hdk::prelude::verify_signature(agent_pub_key.clone(), signature.clone(), some_struct.clone()) {
         Ok(v) => v,
         Err(error) => {
             tracing::error!(?agent_pub_key, ?some_struct, ?signature, ?error);
@@ -60,7 +60,7 @@ fn verify_signature(
         bar: 100,
     };
 
-    let not_verify = match hdk3::prelude::verify_signature(agent_pub_key.clone(), signature.clone(), bad_struct.clone()) {
+    let not_verify = match hdk::prelude::verify_signature(agent_pub_key.clone(), signature.clone(), bad_struct.clone()) {
         Ok(v) => v,
         Err(error) => {
             tracing::error!(?agent_pub_key, ?bad_struct, ?signature, ?error);

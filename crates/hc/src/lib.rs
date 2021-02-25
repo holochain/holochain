@@ -20,7 +20,7 @@
 //! #### Building
 //! From github:
 //! ```shell
-//! cargo install holochain_hc --git https://github.com/holochain/holochain
+//! cargo install holochain_cli --git https://github.com/holochain/holochain
 //! ```
 //! From the holochain repo:
 //! ```shell
@@ -39,7 +39,7 @@
 //! # or shorter
 //! hc r -h
 //! ```
-//!  In a folder with where your `my-dna.dna.gz` is you can generate and run
+//!  In a folder with where your `my-dna.dna` is you can generate and run
 //!  a new setup with:
 //! ```shell
 //! hc r
@@ -54,16 +54,16 @@
 //! hc g
 //! ```
 //! For example this will generate 5 setups with app ids set to `my-app`
-//! using the `elemental-chat.dna.gz` from the current directory with a quic
+//! using the `elemental-chat.dna` from the current directory with a quic
 //! network setup to localhost.
 //! _You don't need to specify dnas when they are in the directory._
 //! ```shell
-//!  hc gen -a "my-app" -n 5 ./elemental-chat.dna.gz network quic
+//!  hc gen -a "my-app" -n 5 ./elemental-chat.dna network quic
 //! ```
 //! You can also generate and run in the same command:
 //! (Notice the number of conductors and dna path must come before the gen sub-command).
 //! ```shell
-//!  hc r -n 5 ./elemental-chat.dna.gz gen -a "my-app" network quic
+//!  hc r -n 5 ./elemental-chat.dna gen -a "my-app" network quic
 //! ```
 //! #### Call
 //! Allows calling the [`AdminRequest`] api.
@@ -82,7 +82,7 @@
 //! ```
 //! Output:
 //! ```shell
-//! hc-admin:
+//! hc-sandbox:
 //! Setups contained in `.hc`
 //! 0: /tmp/KOXgKVLBVvoxe8iKD4iSS
 //! 1: /tmp/m8VHwwt93Uh-nF-vr6nf6
@@ -108,107 +108,34 @@
 //! ```
 //! and the examples.
 
-use std::path::Path;
-use std::path::PathBuf;
+use holochain_cli_bundle as hc_bundle;
+use holochain_cli_sandbox as hc_sandbox;
+use structopt::StructOpt;
 
-use holochain_conductor_api::{AdminRequest, AdminResponse};
-use holochain_websocket::WebsocketResult;
-use holochain_websocket::WebsocketSender;
-use ports::get_admin_api;
-
-pub use ports::force_admin_port;
-
-/// Print a msg with `hc-admin: ` pre-pended
-/// and ansi colors.
-macro_rules! msg {
-    ($($arg:tt)*) => ({
-        use ansi_term::Color::*;
-        print!("{} ", Blue.bold().paint("hc-admin:"));
-        println!($($arg)*);
-    })
+/// Holochain CLI
+///
+/// Work with DNA and hApp bundle files, set up sandbox environments for testing
+/// and development purposes, make direct admin calls to running conductors,
+/// and more.
+#[derive(Debug, StructOpt)]
+#[structopt(setting = structopt::clap::AppSettings::InferSubcommands)]
+pub enum Opt {
+    /// Work with hApp bundles
+    App(hc_bundle::HcAppBundle),
+    /// Work with DNA bundles
+    Dna(hc_bundle::HcDnaBundle),
+    /// Work with sandboxed environments for testing and development
+    Sandbox(hc_sandbox::HcSandbox),
 }
 
-pub mod calls;
-#[doc(hidden)]
-pub mod cmds;
-pub mod config;
-pub mod dna;
-pub mod generate;
-pub mod run;
-pub mod save;
-pub mod setups;
-
-mod ports;
-
-/// An active connection to a running conductor.
-pub struct CmdRunner {
-    client: WebsocketSender,
-}
-
-impl CmdRunner {
-    const HOLOCHAIN_PATH: &'static str = "holochain";
-    /// Create a new connection for calling admin interface commands.
-    /// Panics if admin port fails to connect.
-    pub async fn new(port: u16) -> Self {
-        Self::try_new(port)
-            .await
-            .expect("Failed to create CmdRunner because admin port failed to connect")
-    }
-
-    /// Create a new connection for calling admin interface commands.
-    pub async fn try_new(port: u16) -> WebsocketResult<Self> {
-        let client = get_admin_api(port).await?;
-        Ok(Self { client })
-    }
-
-    /// Create a command runner from a setup path.
-    /// This expects holochain to be on the path.
-    pub async fn from_setup(setup_path: PathBuf) -> anyhow::Result<(Self, tokio::process::Child)> {
-        Self::from_setup_with_bin_path(&Path::new(Self::HOLOCHAIN_PATH), setup_path).await
-    }
-
-    /// Create a command runner from a setup path and
-    /// set the path to the holochain binary.
-    pub async fn from_setup_with_bin_path(
-        holochain_bin_path: &Path,
-        setup_path: PathBuf,
-    ) -> anyhow::Result<(Self, tokio::process::Child)> {
-        let conductor = run::run_async(holochain_bin_path, setup_path, None).await?;
-        let cmd = CmdRunner::try_new(conductor.0).await?;
-        Ok((cmd, conductor.1))
-    }
-
-    /// Make an Admin request to this conductor.
-    pub async fn command(&mut self, cmd: AdminRequest) -> anyhow::Result<AdminResponse> {
-        let response: Result<AdminResponse, _> = self.client.request(cmd).await;
-        Ok(response?)
-    }
-}
-
-#[macro_export]
-/// Expect that an enum matches a variant and panic if it doesn't.
-macro_rules! expect_variant {
-    ($var:expr => $variant:path, $error_msg:expr) => {
-        match $var {
-            $variant(v) => v,
-            _ => panic!(format!("{}: Expected {} but got {:?}", $error_msg, stringify!($variant), $var)),
+impl Opt {
+    /// Run this command
+    pub async fn run(self) -> anyhow::Result<()> {
+        match self {
+            Self::App(cmd) => cmd.run().await?,
+            Self::Dna(cmd) => cmd.run().await?,
+            Self::Sandbox(cmd) => cmd.run().await?,
         }
-    };
-    ($var:expr => $variant:path) => {
-        expect_variant!($var => $variant, "")
-    };
-}
-
-#[macro_export]
-/// Expect that an enum matches a variant and return an error if it doesn't.
-macro_rules! expect_match {
-    ($var:expr => $variant:path, $error_msg:expr) => {
-        match $var {
-            $variant(v) => v,
-            _ => anyhow::bail!("{}: Expected {} but got {:?}", $error_msg, stringify!($variant), $var),
-        }
-    };
-    ($var:expr => $variant:path) => {
-        expect_variant!($var => $variant, "")
-    };
+        Ok(())
+    }
 }

@@ -114,7 +114,7 @@ impl Task {
 
     /// Exit immediately with emptying channels.
     fn exit_now<T>() -> Loop<T> {
-        Err(Task::Exit)
+        Err(Task::ExitNow)
     }
 }
 

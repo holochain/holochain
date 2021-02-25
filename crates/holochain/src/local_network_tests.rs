@@ -1,8 +1,8 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use hdk3::prelude::CellId;
-use hdk3::prelude::WasmError;
+use hdk::prelude::CellId;
+use hdk::prelude::WasmError;
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
 use holochain_keystore::AgentPubKeyExt;

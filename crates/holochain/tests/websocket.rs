@@ -3,7 +3,7 @@ use anyhow::Result;
 use assert_cmd::prelude::*;
 use futures::future;
 use futures::Future;
-use hdk3::prelude::RemoteSignal;
+use hdk::prelude::RemoteSignal;
 use holochain::test_utils::sweetest::SweetAgents;
 use holochain::test_utils::sweetest::SweetConductorBatch;
 use holochain::test_utils::sweetest::SweetDnaFile;
@@ -151,11 +151,15 @@ async fn call_admin() {
     let original_dna_hash = dna.dna_hash().clone();
 
     // Make properties
-    let properties: holochain_types::dna::JsonProperties = serde_json::json!({
-        "test": "example",
-        "how_many": 42,
-    })
-    .into();
+    let properties = holochain_types::dna::YamlProperties::new(
+        serde_yaml::from_str(
+            r#"
+test: "example"
+how_many: 42
+    "#,
+        )
+        .unwrap(),
+    );
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
