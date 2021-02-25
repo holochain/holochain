@@ -1,0 +1,26 @@
+[package]
+name = "kitsune_mdns"
+version = "0.0.1"
+description = "p2p / mdns discovery framework"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://github.com/holochain/holochain"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "p2p", "mdns", "networking" ]
+categories = [ "network-programming" ]
+edition = "2018"
+
+[dependencies]
+log = "0.4"
+libmdns = "=0.6.0"
+mdns = "=3.0.0"
+futures-util = "0.3.1"
+futures-core = "0.3.1"
+async-stream = "0.2.0"
+regex = "1.4"
+base64 = "0.13"
+err-derive = "0.2.1"
+
+[dev-dependencies]
+env_logger =  { version = "0.8", default-features = false, features = ["termcolor","humantime","atty"] }
+
