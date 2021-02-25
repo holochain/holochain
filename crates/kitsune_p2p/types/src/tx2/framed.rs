@@ -226,9 +226,9 @@ impl FramedWriter {
                     let res = inner.sub.write_all(&buf).await.map_err(KitsuneError::other);
                     res?;
                 } else {
-                    let mut buf = [0_u8; 4 + 8];
-                    buf[..4].copy_from_slice(&total.to_le_bytes());
-                    buf[4..].copy_from_slice(&msg_id.inner().to_le_bytes());
+                    let mut buf = Vec::with_capacity(4 + 8);
+                    buf.extend_from_slice(&total.to_le_bytes());
+                    buf.extend_from_slice(&msg_id.inner().to_le_bytes());
                     inner
                         .sub
                         .write_all(&buf)

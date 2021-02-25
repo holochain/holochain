@@ -220,8 +220,16 @@ impl EndpointAdapt for MemEndpointAdapt {
 /// Memory-based test endpoint adapter for kitsune tx2.
 pub struct MemBackendAdapt;
 
+impl MemBackendAdapt {
+    /// Construct a new memory-based test endpoint adapter for kitsune tx2.
+    pub fn new() -> BackendFactory {
+        let out: BackendFactory = Arc::new(Self);
+        out
+    }
+}
+
 impl BackendAdapt for MemBackendAdapt {
-    fn bind(_url: TxUrl, _timeout: KitsuneTimeout) -> EndpointFut {
+    fn bind(&self, _url: TxUrl, _timeout: KitsuneTimeout) -> EndpointFut {
         async move {
             let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
             let (c_send, c_recv) = tokio::sync::mpsc::channel(1);
@@ -245,12 +253,13 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_tx2_mem_backend() {
+        let back = MemBackendAdapt::new();
         let (ep1, _con_recv1) =
-            MemBackendAdapt::bind("none:".into(), KitsuneTimeout::from_millis(1000 * 30))
+            back.bind("none:".into(), KitsuneTimeout::from_millis(1000 * 30))
                 .await
                 .unwrap();
         let (ep2, mut con_recv2) =
-            MemBackendAdapt::bind("none:".into(), KitsuneTimeout::from_millis(1000 * 30))
+            back.bind("none:".into(), KitsuneTimeout::from_millis(1000 * 30))
                 .await
                 .unwrap();
 

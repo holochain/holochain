@@ -78,5 +78,8 @@ pub type EndpointFut = BoxFuture<'static, KitsuneResult<Endpoint>>;
 /// Tx backend adapter represents the ability to bind local endpoints.
 pub trait BackendAdapt: 'static + Send + Sync + Unpin {
     /// Bind a local endpoint, given a url spec.
-    fn bind(url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut;
+    fn bind(&self, url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut;
 }
+
+/// Tx backend endpoint binding factory type.
+pub type BackendFactory = Arc<dyn BackendAdapt>;
