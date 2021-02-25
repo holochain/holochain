@@ -81,9 +81,6 @@ async fn run() -> anyhow::Result<()> {
 }
 
 #[tokio::main(threaded_scheduler)]
-async fn main() {
-    if let Err(err) = run().await {
-        eprintln!("holochain-analyzer: {}", err);
-        std::process::exit(1);
-    }
+async fn main() -> anyhow::Result<()> {
+    run().await
 }

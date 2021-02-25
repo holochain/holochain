@@ -105,9 +105,14 @@ where
 }
 
 impl Cell {
-    /// Constructor for a Cell. The SourceChain will be created, and genesis
-    /// will be run if necessary. A Cell will not be created if the SourceChain
-    /// is not ready to be used.
+    /// Constructor for a Cell, which ensure the Cell is fully initialized
+    /// before returning.
+    ///
+    /// If it hasn't happened already, a SourceChain will be created, and
+    /// genesis will be run. If these have already happened, those steps are
+    /// skipped.
+    ///
+    /// No Cell will be created if the SourceChain is not ready to be used.
     pub async fn create(
         id: CellId,
         conductor_handle: ConductorHandle,
@@ -166,7 +171,7 @@ impl Cell {
         let dna_file = conductor_handle
             .get_dna(id.dna_hash())
             .await
-            .ok_or(CellError::DnaMissing)?;
+            .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
 
         let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
 
@@ -717,7 +722,7 @@ impl Cell {
         let dna_file = conductor_api
             .get_dna(id.dna_hash())
             .await
-            .ok_or(CellError::DnaMissing)?;
+            .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
         let dna_def = dna_file.dna_def().clone();
 
         // Get the ribosome
@@ -761,7 +766,7 @@ impl Cell {
     pub(crate) async fn get_ribosome(&self) -> CellResult<RealRibosome> {
         match self.conductor_api.get_dna(self.dna_hash()).await {
             Some(dna) => Ok(RealRibosome::new(dna)),
-            None => Err(CellError::DnaMissing),
+            None => Err(DnaError::DnaMissing(self.dna_hash().to_owned()).into()),
         }
     }
 

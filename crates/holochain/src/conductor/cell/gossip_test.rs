@@ -4,7 +4,7 @@ use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::new_zome_call;
 use crate::test_utils::wait_for_integration;
 use fallible_iterator::FallibleIterator;
-use hdk3::prelude::*;
+use hdk::prelude::*;
 use holochain_lmdb::buffer::KvStoreT;
 use holochain_lmdb::fresh_reader_test;
 use holochain_test_wasm_common::AnchorInput;

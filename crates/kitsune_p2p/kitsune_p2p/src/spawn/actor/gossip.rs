@@ -5,7 +5,6 @@ use crate::types::actor::KitsuneP2pResult;
 use crate::types::gossip::*;
 use crate::*;
 use ghost_actor::dependencies::tracing;
-use ghost_actor::dependencies::tracing_futures;
 use ghost_actor::GhostError;
 use kitsune_p2p_types::dht_arc::DhtArc;
 use std::collections::HashMap;

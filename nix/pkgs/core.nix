@@ -65,8 +65,8 @@ rec {
     command -v holochain
     echo
 
-    echo "dna-util binary installation"
-    command -v dna-util
+    echo "hc binary installation"
+    command -v hc
     echo
   '';
 

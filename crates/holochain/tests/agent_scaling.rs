@@ -1,6 +1,6 @@
 #![cfg(feature = "test_utils")]
 
-use hdk3::prelude::Links;
+use hdk::prelude::Links;
 use holochain::test_utils::consistency_10s;
 use holochain::test_utils::sweetest::SweetAgents;
 use holochain::test_utils::sweetest::SweetConductor;

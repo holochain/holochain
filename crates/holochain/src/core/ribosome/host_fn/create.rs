@@ -116,7 +116,7 @@ pub mod wasm_test {
     use crate::test_utils::setup_app;
     use crate::{conductor::api::ZomeCall, core::ribosome::error::RibosomeError};
     use ::fixt::prelude::*;
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
     use holo_hash::AnyDhtHash;
     use holo_hash::EntryHash;
     use holochain_state::source_chain::ChainInvalidReason;

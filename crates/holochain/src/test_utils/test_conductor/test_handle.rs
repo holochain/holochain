@@ -5,7 +5,7 @@ use super::test_cell::TestCell;
 use crate::conductor::api::ZomeCall;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::ribosome::ZomeCallInvocation;
-use hdk3::prelude::*;
+use hdk::prelude::*;
 use holochain_types::prelude::*;
 use unwrap_to::unwrap_to;
 
@@ -31,7 +31,7 @@ impl TestConductorHandle {
     ) -> SetupOutput {
         for dna_file in dna_files {
             self.0
-                .install_dna(dna_file.clone())
+                .register_dna(dna_file.clone())
                 .await
                 .expect("Could not install DNA")
         }
