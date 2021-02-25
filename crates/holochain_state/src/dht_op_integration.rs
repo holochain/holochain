@@ -175,7 +175,7 @@ mod tests {
     async fn test_query() {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let env_ref = env.guard();
+        let mut env_ref = env.guard();
 
         // Create some integration values
         let mut expected = Vec::new();

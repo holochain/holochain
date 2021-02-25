@@ -337,7 +337,7 @@ mod tests {
                 .unwrap();
             headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
-            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+            arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
         {
@@ -393,7 +393,7 @@ mod tests {
                 .unwrap();
             headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
-            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+            arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
         {
@@ -449,7 +449,7 @@ mod tests {
                 .unwrap();
             headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
-            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+            arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
         {
@@ -495,7 +495,7 @@ mod tests {
                 .unwrap();
             headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
-            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+            arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
         {

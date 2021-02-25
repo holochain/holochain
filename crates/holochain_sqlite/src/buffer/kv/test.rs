@@ -18,11 +18,11 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 
     let testval = DbString::from("Joe");
 
-    env.with_reader::<DatabaseError, _, _>(|reader| {
+    arc.guard().with_reader::<DatabaseError, _, _>(|reader| {
         let mut kv1: KvBufUsed<DbString, DbString> = KvBufUsed::new(db1)?;
         let mut kv2: KvBufUsed<DbString, DbString> = KvBufUsed::new(db2)?;
 
-        env.with_commit(|writer| {
+        arc.guard().with_commit(|writer| {
             kv1.put("hi".into(), testval.clone()).unwrap();
             kv2.put("salutations".into(), "folks".into()).unwrap();
             // Check that the underlying store contains no changes yet
@@ -44,7 +44,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
         // Ensure that mid-transaction, there has still been no persistence,
         // just for kicks
 
-        env.with_commit(|writer| {
+        arc.guard().with_commit(|writer| {
             let kv1a: KvBufUsed<DbString, DbString> = KvBufUsed::new(db1)?;
             assert_eq!(kv1a.store().get(&reader, &"hi".into())?, None);
             kv2.flush_to_txn(writer)
@@ -53,7 +53,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
         Ok(())
     })?;
 
-    env.with_reader(|reader| {
+    arc.guard().with_reader(|reader| {
         // Now open some fresh Readers to see that our data was persisted
         let kv1b: KvBufUsed<DbString, DbString> = KvBufUsed::new(db1)?;
         let kv2b: KvBufUsed<DbString, DbString> = KvBufUsed::new(db2)?;
@@ -103,7 +103,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 //     let mut env = arc.guard();
 //     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
-//     env.with_reader::<DatabaseError, _, _>(|reader| {
+//     arc.guard().with_reader::<DatabaseError, _, _>(|reader| {
 //         let mut buf: TestBuf = KvBufUsed::new)?;
 
 //         buf.put("a", V(1)).unwrap();
@@ -112,11 +112,11 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 //         buf.put("d", V(4)).unwrap();
 //         buf.put("e", V(5)).unwrap();
 
-//         env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
+//         arc.guard().with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
 //         Ok(())
 //     })?;
 
-//     env.with_reader(|reader| {
+//     arc.guard().with_reader(|reader| {
 //         let buf: TestBuf = KvBufUsed::new)?;
 
 //         let forward: Vec<_> = buf.iter_raw()?.map(|(_, v)| Ok(v)).collect().unwrap();
@@ -142,7 +142,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 //         .open_single("kv", StoreOptions::create())
 //         .unwrap();
 
-//     env.with_reader(|reader| {
+//     arc.guard().with_reader(|reader| {
 //         let buf: TestBuf = KvBufUsed::new( db();
 
 //         let forward: Vec<_> = buf.iter_raw().unwrap().collect().unwrap();

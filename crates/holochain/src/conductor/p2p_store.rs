@@ -227,7 +227,7 @@ pub fn get_agent_info_signed(
     let p2p_kv = AgentKv::new(environ.clone().into())?;
     let env = environ.guard();
 
-    env.with_commit(|writer| {
+    arc.guard().with_commit(|writer| {
         let res = p2p_kv
             .as_store_ref()
             .get(writer, &(&*kitsune_space, &*kitsune_agent).into())?;
@@ -263,7 +263,7 @@ pub fn query_agent_info_signed(
     let env = environ.guard();
 
     let mut out = Vec::new();
-    env.with_commit(|writer| {
+    arc.guard().with_commit(|writer| {
         let mut expired = Vec::new();
 
         {
@@ -313,7 +313,7 @@ pub fn put_agent_info_signed(
 ) -> ConductorResult<()> {
     let p2p_kv = AgentKv::new(environ.clone().into())?;
     let env = environ.guard();
-    Ok(env.with_commit(|writer| {
+    Ok(arc.guard().with_commit(|writer| {
         p2p_kv.as_store_ref().put(
             writer,
             &(&agent_info_signed).try_into()?,
@@ -433,14 +433,15 @@ mod tests {
         let agent_info_signed = fixt!(AgentInfoSigned);
 
         let env = environ.guard();
-        env.with_commit(|writer| {
-            store_buf.as_store_ref().put(
-                writer,
-                &(&agent_info_signed).try_into().unwrap(),
-                &agent_info_signed,
-            )
-        })
-        .unwrap();
+        arc.guard()
+            .with_commit(|writer| {
+                store_buf.as_store_ref().put(
+                    writer,
+                    &(&agent_info_signed).try_into().unwrap(),
+                    &agent_info_signed,
+                )
+            })
+            .unwrap();
 
         let ret = &store_buf
             .as_store_ref()

@@ -276,7 +276,6 @@ pub mod tests {
     async fn chain_sequence_functionality() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let mut env = arc.guard();
 
         {
             let mut buf = ChainSequenceBuf::new(arc.clone().into())?;
@@ -311,10 +310,11 @@ pub mod tests {
                 ])
                 .into(),
             )?;
-            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
+            arc.guard()
+                .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
         }
-
-        let reader = env.reader()?;
+        let mut g = arc.guard();
+        let reader = g.reader()?;
         {
             let buf = ChainSequenceBuf::new(arc.clone().into())?;
             assert_eq!(
@@ -359,10 +359,11 @@ pub mod tests {
                 ])
                 .into(),
             )?;
-            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
+            arc.guard()
+                .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
         }
-
-        let reader = env.reader()?;
+        let mut g = arc.guard();
+        let reader = g.reader()?;
         {
             let buf = ChainSequenceBuf::new(arc.clone().into())?;
             assert_eq!(
@@ -427,8 +428,8 @@ pub mod tests {
             tx1.send(()).unwrap();
             rx2.await.unwrap();
 
-            let env = arc1.guard();
-            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+            arc1.guard()
+                .with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         });
 
         // Attempt to move the chain concurrently -- this one succeeds
@@ -457,8 +458,8 @@ pub mod tests {
                 .into(),
             )?;
 
-            let env = arc2.guard();
-            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
+            arc2.guard()
+                .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             tx2.send(()).unwrap();
             Result::<_, SourceChainError>::Ok(())
         });
@@ -524,8 +525,8 @@ pub mod tests {
             tx1.send(()).unwrap();
             rx2.await.unwrap();
 
-            let env = arc1.guard();
-            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+            arc1.guard()
+                .with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         });
 
         // Add a header to the chain -- there is no collision, so this succeeds
@@ -540,8 +541,8 @@ pub mod tests {
                 .into(),
             )?;
 
-            let env = arc2.guard();
-            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
+            arc2.guard()
+                .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             tx2.send(()).unwrap();
             Result::<_, SourceChainError>::Ok(())
         });

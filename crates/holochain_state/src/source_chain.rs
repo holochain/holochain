@@ -498,7 +498,7 @@ pub mod tests {
     //         store
     //             .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
     //             .await?;
-    //         env.with_commit(|writer| store.flush_to_txn(writer))?;
+    //         arc.guard().with_commit(|writer| store.flush_to_txn(writer))?;
     //     }
     //
     //     {
@@ -514,7 +514,7 @@ pub mod tests {
     // //     Some(claim.clone())
     // // );
     //
-    //         env.with_commit(|writer| chain.flush_to_txn(writer))?;
+    //         arc.guard().with_commit(|writer| chain.flush_to_txn(writer))?;
     //     }
     //
     //     {
