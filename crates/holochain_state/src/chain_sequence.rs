@@ -276,7 +276,7 @@ pub mod tests {
     async fn chain_sequence_functionality() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
+        let mut env = arc.guard();
 
         {
             let mut buf = ChainSequenceBuf::new(arc.clone().into())?;

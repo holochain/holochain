@@ -12,7 +12,7 @@ use rkv::StoreOptions;
 async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard();
+    let mut env = arc.guard();
     let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
     let db2 = env.inner().open_single("kv1", StoreOptions::create())?;
 
@@ -100,7 +100,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 // async fn kv_iterators() -> DatabaseResult<()> {
 //     let test_env = test_cell_env();
 //     let arc = test_env.env();
-//     let env = arc.guard();
+//     let mut env = arc.guard();
 //     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
 //     env.with_reader::<DatabaseError, _, _>(|reader| {
@@ -136,7 +136,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 // async fn kv_empty_iterators() -> DatabaseResult<()> {
 //     let test_env = test_cell_env();
 //     let arc = test_env.env();
-//     let env = arc.guard();
+//     let mut env = arc.guard();
 //     let db = env
 //         .inner()
 //         .open_single("kv", StoreOptions::create())

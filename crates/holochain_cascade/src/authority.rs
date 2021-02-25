@@ -175,7 +175,7 @@ pub fn handle_get_entry(
 #[tracing::instrument(skip(env))]
 pub fn handle_get_element(env: DbWrite, hash: HeaderHash) -> CascadeResult<GetElementResponse> {
     // Get the vaults
-    let env_ref = env.guard();
+    let mut env_ref = env.guard();
     let reader = env_ref.reader()?;
     let element_vault = ElementBuf::vault(env.clone().into(), false)?;
     let meta_vault = MetadataBuf::vault(env.clone().into())?;
@@ -346,7 +346,7 @@ pub fn handle_get_links(
     _options: holochain_p2p::event::GetLinksOptions,
 ) -> CascadeResult<GetLinksResponse> {
     // Get the vaults
-    let env_ref = env.guard();
+    let mut env_ref = env.guard();
     let reader = env_ref.reader()?;
     let element_vault = ElementBuf::vault(env.clone(), false)?;
     let meta_vault = MetadataBuf::vault(env.clone())?;

@@ -365,7 +365,7 @@ mod tests {
         let keystore = spawn_test_keystore().await?;
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
+        let mut env = arc.guard();
 
         let agent_key = AgentPubKey::new_from_pure_entropy(&keystore).await?;
         let (header_pub, entry_pub) =
@@ -412,7 +412,7 @@ mod tests {
         let keystore = spawn_test_keystore().await?;
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
+        let mut env = arc.guard();
 
         let agent_key = AgentPubKey::new_from_pure_entropy(&keystore).await?;
         let (header_pub, entry_pub) =

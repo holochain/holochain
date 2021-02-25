@@ -9,10 +9,10 @@ use parking_lot::RwLock;
 use rkv::EnvironmentFlags;
 use rusqlite::Connection;
 use shrinkwraprs::Shrinkwrap;
-use std::collections::hash_map;
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
+use std::{collections::hash_map, marker::PhantomData};
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024; // 100MB
 const MAX_DBS: u32 = 32;
@@ -55,8 +55,8 @@ pub struct DbRead {
 
 impl DbRead {
     #[deprecated = "remove this identity function"]
-    pub fn guard(&self) -> Self {
-        self.clone()
+    pub fn guard(&self) -> Conn<'_> {
+        self.connection_naive().expect("TODO: Can't fail")
     }
 
     #[deprecated = "remove this identity function"]
@@ -80,61 +80,13 @@ impl DbRead {
     }
 
     #[deprecated = "TODO: use `connection`"]
-    fn connection_naive(&self) -> DatabaseResult<Connection> {
-        Ok(Connection::open(&self.path)?)
+    fn connection_naive(&self) -> DatabaseResult<Conn> {
+        Ok(Conn::new(Connection::open(&self.path)?))
     }
 
-    fn connection(&self) -> DatabaseResult<Connection> {
+    fn connection(&self) -> DatabaseResult<Conn> {
         todo!("use thread-local")
     }
-
-    /// SHIM
-    pub fn open_single<'s, T>(
-        &self,
-        name: T,
-        opts: rkv::StoreOptions,
-    ) -> Result<SingleTable, StoreError>
-    where
-        T: Into<Option<&'s str>>,
-    {
-        todo!("this is a shim")
-    }
-
-    /// SHIM
-    pub fn open_integer<'s, T>(
-        &self,
-        name: T,
-        mut opts: rkv::StoreOptions,
-    ) -> Result<IntegerTable, StoreError>
-    where
-        T: Into<Option<&'s str>>,
-    {
-        todo!("this is a shim")
-    }
-
-    /// SHIM
-    pub fn open_multi<'s, T>(
-        &self,
-        name: T,
-        mut opts: rkv::StoreOptions,
-    ) -> Result<MultiTable, StoreError>
-    where
-        T: Into<Option<&'s str>>,
-    {
-        todo!("this is a shim")
-    }
-
-    // /// SHIM
-    // pub fn open_multi_integer<'s, T, K: PrimitiveInt>(
-    //     &self,
-    //     name: T,
-    //     mut opts: StoreOptions,
-    // ) -> Result<MultiIntegerStore<K>, StoreError>
-    // where
-    //     T: Into<Option<&'s str>>,
-    // {
-    //     todo!("this is a shim")
-    // }
 }
 
 impl GetTable for DbRead {}
@@ -186,8 +138,8 @@ impl DbWrite {
     }
 
     #[deprecated = "remove this identity function"]
-    pub fn guard(&self) -> Self {
-        self.clone()
+    pub fn guard(&self) -> Conn {
+        self.0.guard()
     }
 
     /// Remove the db and directory
@@ -200,6 +152,71 @@ impl DbWrite {
         // remove the directory
         std::fs::remove_dir_all(&self.0.path)?;
         Ok(())
+    }
+}
+
+/// Wrapper around Connection with a phantom lifetime.
+/// Needed to allow borrowing transactions in the same fashion as our LMDB
+/// lifetime model
+#[derive(Shrinkwrap)]
+pub struct Conn<'e> {
+    #[shrinkwrap(main_field)]
+    conn: Connection,
+    lt: PhantomData<&'e ()>,
+}
+
+impl<'e> Conn<'e> {
+    pub fn new(conn: Connection) -> Self {
+        Self {
+            conn,
+            lt: PhantomData,
+        }
+    }
+
+    #[deprecated = "Shim for `Rkv`, just because we have methods that call these"]
+    pub fn inner(&self) -> ConnInner {
+        ConnInner
+    }
+}
+
+#[deprecated = "Shim for `Rkv`, just because we have methods that call these"]
+pub struct ConnInner;
+
+impl ConnInner {
+    /// SHIM
+    pub fn open_single<'s, T>(
+        &self,
+        name: T,
+        opts: rkv::StoreOptions,
+    ) -> Result<SingleTable, StoreError>
+    where
+        T: Into<Option<&'s str>>,
+    {
+        todo!("this is a shim")
+    }
+
+    /// SHIM
+    pub fn open_integer<'s, T>(
+        &self,
+        name: T,
+        mut opts: rkv::StoreOptions,
+    ) -> Result<IntegerTable, StoreError>
+    where
+        T: Into<Option<&'s str>>,
+    {
+        todo!("this is a shim")
+    }
+
+    /// SHIM
+    pub fn open_multi<'s, T>(
+        &self,
+        name: T,
+        mut opts: rkv::StoreOptions,
+    ) -> Result<MultiTable, StoreError>
+    where
+        T: Into<Option<&'s str>>,
+    {
+        todo!("this is a shim")
     }
 }
 
@@ -231,13 +248,14 @@ impl DbKind {
 /// Implementors are able to create a new read-only LMDB transaction
 pub trait ReadManager<'e> {
     /// Create a new read-only LMDB transaction
-    fn reader(&'e self) -> DatabaseResult<Reader<'e>>;
+    // NB: this has to be mutable now because SQLite has only read-write txns
+    fn reader(&'e mut self) -> DatabaseResult<Reader<'e>>;
 
     /// Run a closure, passing in a new read-only transaction
-    fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    fn with_reader<E, R, F: Send>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
-        F: FnOnce(Reader) -> Result<R, E>;
+        F: 'e + FnOnce(Reader) -> Result<R, E>;
 }
 
 /// Implementors are able to create a new read-write LMDB transaction
@@ -246,57 +264,76 @@ pub trait WriteManager<'e> {
     /// transaction, and commit the transaction after the closure has run.
     /// If there is a LMDB error, recover from it and re-run the closure.
     // FIXME: B-01566: implement write failure detection
-    fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    fn with_commit<E, R, F: Send>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
-        F: FnOnce(&mut Writer) -> Result<R, E>;
+        F: 'e + FnOnce(&mut Writer) -> Result<R, E>;
+
+    /// Get a raw read-write transaction for this environment.
+    /// It is preferable to use WriterManager::with_commit for database writes,
+    /// which can properly recover from and manage write failures
+    fn writer_unmanaged(&'e mut self) -> DatabaseResult<Writer<'e>>;
 }
 
-impl<'e> ReadManager<'e> for DbRead {
-    fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
-        let mut conn = self.connection_naive()?;
-        let txn = conn.transaction()?;
+impl<'e> ReadManager<'e> for Conn<'e> {
+    fn reader(&'e mut self) -> DatabaseResult<Reader<'e>> {
+        let txn = self.conn.transaction()?;
         let reader = Reader::from(txn);
         Ok(reader)
     }
 
-    fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    fn with_reader<E, R, F: Send>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
-        F: FnOnce(Reader) -> Result<R, E>,
+        F: 'e + FnOnce(Reader) -> Result<R, E>,
     {
         f(self.reader()?)
     }
 }
 
-impl<'e> ReadManager<'e> for DbWrite {
-    fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
-        let mut conn = self.connection_naive()?;
-        let txn = conn.transaction()?;
-        let reader = Reader::from(txn);
-        Ok(reader)
-    }
+// impl<'e> ReadManager<'e> for DbWrite {
+//     fn reader(&'e mut self) -> DatabaseResult<Reader<'e>> {
+//         let mut conn = self.connection_naive()?;
+//         let txn = conn.transaction()?;
+//         let reader = Reader::from(txn);
+//         Ok(reader)
+//     }
 
-    fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
+//     fn with_reader<E, R, F: Send>(&'e mut self, f: F) -> Result<R, E>
+//     where
+//         E: From<DatabaseError>,
+//         F: 'e + FnOnce(Reader) -> Result<R, E>,
+//     {
+//         f(self.reader()?)
+//     }
+// }
+
+impl<'e> WriteManager<'e> for Conn<'e> {
+    fn with_commit<E, R, F: Send>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
-        F: FnOnce(Reader) -> Result<R, E>,
+        F: 'e + FnOnce(&mut Writer) -> Result<R, E>,
     {
-        f(self.reader()?)
-    }
-}
-
-impl<'e> WriteManager<'e> for DbWrite {
-    fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError>,
-        F: FnOnce(&mut Writer) -> Result<R, E>,
-    {
-        let mut conn = self.connection_naive()?;
-        let txn = conn.transaction().map_err(DatabaseError::from)?;
+        let txn = self.conn.transaction().map_err(DatabaseError::from)?;
         let mut writer = Writer::from(txn);
         let result = f(&mut writer)?;
         writer.commit()?;
         Ok(result)
     }
+
+    fn writer_unmanaged(&'e mut self) -> DatabaseResult<Writer<'e>> {
+        let txn = self.conn.transaction()?;
+        let writer = Writer::from(txn);
+        Ok(writer)
+    }
 }
+
+// impl<'e> WriteManager<'e> for DbWrite {
+//     fn with_commit<E, R, F: Send>(&'e self, f: F) -> Result<R, E>
+//     where
+//         E: From<DatabaseError>,
+//         F: 'e + FnOnce(&mut Writer) -> Result<R, E>,
+//     {
+//         Conn::with_commit(&self.connection()?, f)
+//     }
+// }
