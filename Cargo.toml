@@ -1,3 +1,9 @@
+[package]
+name = "toplevel"
+version = "0.0.0"
+
+[lib]
+
 [workspace]
 members = [
   "crates/ffs",
