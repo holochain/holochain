@@ -1,21 +1,21 @@
-///! Use libmdns crate for broadcasting
-///! Une mdns crate for discovery
+///! Crate for discovering Holochain peers over MDNS
+///! Works by broadcasting a service named `HC_SERVICE_NAME`
+///! and adding base64 encoded data in a TXT record
+///!
+///! Uses libmdns crate for broadcasting
+///! Uses mdns crate for discovery
 
-use futures_util::{pin_mut, stream::StreamExt, self, future::ready};
+use futures_util::{stream::StreamExt, self};
 use std::thread;
 use std::time::Duration;
-use regex::Regex;
 use std::sync::mpsc::{self, TryRecvError, Sender};
-use mdns::{discover::Discovery, RecordKind};
+use mdns::RecordKind;
 use futures_core::Stream;
 use err_derive::Error;
 
 const HC_SERVICE_NAME: &str       = "_holochain._udp";
 const BROADCAST_INTERVAL_SEC: u64 = 8;
 const QUERY_INTERVAL_SEC: u64     = 5;
-const BASE64_REGEX:& str          = "[^-A-Za-z0-9+/=]|=[^=]|={3,}";
-
-
 
 #[derive(Debug, Error)]
 pub enum MdnsError {
@@ -30,17 +30,15 @@ pub fn mdns_kill_thread(tx: Sender<()>) {
    tx.send(()).ok();
 }
 
-
 /// Create a thread that will broadcast the holochain service over mdns
 /// Returns Sender for sending thread termination command
-pub fn mdns_create_broadcast_thread(name: &str, buffer: &[u8]) -> Sender<()> {
+pub fn mdns_create_broadcast_thread(buffer: &[u8]) -> Sender<()> {
    // Create Terminate command channel
    let (tx, rx) = mpsc::channel();
    // Change buffer to base64 string
    let b64 =format!("u{}", base64::encode_config(buffer, base64::URL_SAFE_NO_PAD));
-   // Format into a TXT attribute
-   let txt = format!("\"{}={}\"", name, b64);
-   println!("TXT = {} ({})", txt, txt.len());
+   println!("base64 length is {}", b64.len());
+
    // Create thread
    let _handle = thread::spawn(move || {
       // debug
@@ -69,13 +67,16 @@ pub fn mdns_create_broadcast_thread(name: &str, buffer: &[u8]) -> Sender<()> {
    tx
 }
 
-
+///
 pub struct MdnsResponse {
+   /// IP address that responded to the mdns query
    pub addr: std::net::IpAddr,
+   /// Data contained in the TXT record
    pub buffer: Vec<u8>,
 }
 
-/// Gets an iterator over all responses for the holochain service
+/// Queries the network for the holochain service
+/// Returns an iterator over all responses received
 pub fn mdns_listen() -> impl Stream<Item = Result<MdnsResponse, MdnsError>> {
    let service_name = format!("{}.local", HC_SERVICE_NAME);
    let query = mdns::discover::all(service_name, Duration::from_secs(QUERY_INTERVAL_SEC))
@@ -86,7 +87,7 @@ pub fn mdns_listen() -> impl Stream<Item = Result<MdnsResponse, MdnsError>> {
    let mdns_stream = response_stream
       // Filtering out Empty responses
       .filter(move |res| {
-         ready(match res {
+         futures_util::future::ready(match res {
             Ok(response) => !response.is_empty() && !response.ip_addr().is_none(),
             Err(_) => true, // Keep errors
          })
@@ -116,73 +117,4 @@ pub fn mdns_listen() -> impl Stream<Item = Result<MdnsResponse, MdnsError>> {
       });
    // Done
    mdns_stream
-}
-
-// -- Deprecated -- //
-
-type MdnsCallback = fn(addr: std::net::IpAddr, /*name: &str,*/ buffer: &[u8]);
-
-///
-///
-pub async fn mdns_create_discovery_thread(callback: MdnsCallback) /*-> Sender<()>*/ {
-   // Create Terminate command channel
-   //let (tx, rx) = mpsc::channel();
-
-   // Create thread
-   println!("Launching discovery thread...");
-
-   //let _ = thread::spawn(move || async move {
-
-      println!("Entered mdns discovery thread...");
-      let service_name = format!("{}.local", HC_SERVICE_NAME);
-      let query = mdns::discover::all(service_name, Duration::from_secs(QUERY_INTERVAL_SEC))
-         .expect("mdns discover failed");
-      let stream = query.listen();
-      pin_mut!(stream);
-      //let re = Regex::new(r"(?P<name>.*)=(?P<base64>.*)").unwrap();
-
-      //loop {
-         // match rx.try_recv() {
-         //    Ok(_) | Err(TryRecvError::Disconnected) => {
-         //       println!("Terminating.");
-         //       break;
-         //    }
-         //    Err(TryRecvError::Empty) => {}
-         // }
-
-         while let Some(Ok(response)) = stream.next().await {
-            //println!("Found response {:?}", response);
-            // Must have IP address
-            let maybe_addr = response.ip_addr();
-            if maybe_addr.is_none() {
-               println!("Device does not advertise address");
-               continue;
-            }
-            // Must have TXT field with base64 attribute
-            for answer in response.answers.clone() {
-               if let RecordKind::TXT(txts) = answer.kind {
-                  for txt in txts {
-                     println!("Response TXT = {:?}", txt);
-
-                     let buffer = match base64::decode_config(&txt[1..], base64::URL_SAFE_NO_PAD) {
-                        Err(_) => panic!("Err(HoloHashError::BadBase64)"),
-                        Ok(s) => s,
-                     };
-
-                     // let caps = re.captures(txt).expect("Regex capture failed");
-                     // let maybe_name = caps.get(1);
-                     // let maybe_b64 = caps.get(2);
-                     // if maybe_name.is_none() || maybe_b64.is_none() {
-                     //    continue;
-                     // }
-                     callback(maybe_addr.unwrap(), &buffer /*maybe_name.unwrap(), maybe_b64.unwrap()*/);
-                  }
-               }
-            }
-         }
-      //}
-      println!("EXITING discovery thread.");
-   //});
-   // Done
-   //tx
 }
