@@ -71,6 +71,9 @@ pub enum DatabaseError {
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 
+    #[error(transparent)]
+    SqlLiteError(#[from] rusqlite::Error),
+
     #[error("Failue to remove directory")]
     DirectoryError(#[from] std::io::Error),
 

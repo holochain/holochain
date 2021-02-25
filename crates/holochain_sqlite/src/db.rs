@@ -7,6 +7,7 @@ use holochain_zome_types::cell::CellId;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use rkv::EnvironmentFlags;
+use rusqlite::Connection;
 use shrinkwraprs::Shrinkwrap;
 use std::collections::hash_map;
 use std::collections::HashMap;
@@ -76,6 +77,15 @@ impl DbRead {
     /// The environment's path
     pub fn path(&self) -> &PathBuf {
         &self.path
+    }
+
+    #[deprecated = "TODO: use `connection`"]
+    fn connection_naive(&self) -> DatabaseResult<Connection> {
+        Ok(Connection::open(&self.path)?)
+    }
+
+    fn connection(&self) -> DatabaseResult<Connection> {
+        todo!("use thread-local")
     }
 
     /// SHIM
@@ -244,9 +254,10 @@ pub trait WriteManager<'e> {
 
 impl<'e> ReadManager<'e> for DbRead {
     fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
-        todo!("probably no longer makes sense")
-        // let reader = Reader::from(self.rkv.read()?);
-        // Ok(reader)
+        let mut conn = self.connection_naive()?;
+        let txn = conn.transaction()?;
+        let reader = Reader::from(txn);
+        Ok(reader)
     }
 
     fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
@@ -260,9 +271,10 @@ impl<'e> ReadManager<'e> for DbRead {
 
 impl<'e> ReadManager<'e> for DbWrite {
     fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
-        todo!("probably no longer makes sense")
-        // let reader = Reader::from(self.rkv.read()?);
-        // Ok(reader)
+        let mut conn = self.connection_naive()?;
+        let txn = conn.transaction()?;
+        let reader = Reader::from(txn);
+        Ok(reader)
     }
 
     fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
@@ -280,6 +292,11 @@ impl<'e> WriteManager<'e> for DbWrite {
         E: From<DatabaseError>,
         F: FnOnce(&mut Writer) -> Result<R, E>,
     {
-        todo!("probably no longer makes sense")
+        let mut conn = self.connection_naive()?;
+        let txn = conn.transaction().map_err(DatabaseError::from)?;
+        let mut writer = Writer::from(txn);
+        let result = f(&mut writer)?;
+        writer.commit()?;
+        Ok(result)
     }
 }
