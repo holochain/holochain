@@ -3,7 +3,7 @@ use crate::holochain::conductor::{state::ConductorState, ConductorStateDb};
 use holochain_sqlite::{db::CONDUCTOR_STATE, env::DbWrite, prelude::*};
 
 pub async fn dump_conductor_state(env: DbWrite) -> anyhow::Result<ConductorState> {
-    let g = env.guard();
+    let mut g = env.guard();
     let r = g.reader()?;
     let db = ConductorStateDb::new(env.get_table(&CONDUCTOR_STATE)?);
     let bytes = db.get_bytes(&r, &().into())?.unwrap();

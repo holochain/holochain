@@ -3,7 +3,7 @@ use holochain_sqlite::{db, env::DbWrite, prelude::*};
 
 pub async fn dump_wasm_state(env: DbWrite) -> anyhow::Result<()> {
     use db::*;
-    let g = env.guard();
+    let mut g = env.guard();
     let r = g.reader()?;
 
     dump_kv(&r, "wasm", env.get_table(&WASM)?)?;

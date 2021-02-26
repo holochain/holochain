@@ -10,9 +10,9 @@ use holo_hash::AnyDhtHash;
 use holo_hash::DhtOpHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
+use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::fresh_reader_test;
 use holochain_sqlite::prelude::ReadManager;
-use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::element_buf::ElementBuf;
 use holochain_state::validation_db::ValidationLimboStatus;
 use holochain_types::prelude::*;
@@ -261,13 +261,13 @@ async fn run_test(
             delay_per_attempt.clone(),
         )
         .await;
-        let env_ref = alice_env.guard();
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should still contain bobs link pending because the target was missing
         assert_eq!(
             {
-                let r = env_ref.reader().unwrap();
+                let mut guard = alice_env.guard();
+                let r = guard.reader().unwrap();
                 workspace
                     .validation_limbo
                     .iter(&r)
@@ -290,7 +290,8 @@ async fn run_test(
         );
         assert_eq!(
             {
-                let r = env_ref.reader().unwrap();
+                let mut guard = alice_env.guard();
+                let r = guard.reader().unwrap();
                 workspace
                     .integrated_dht_ops
                     .iter(&r)

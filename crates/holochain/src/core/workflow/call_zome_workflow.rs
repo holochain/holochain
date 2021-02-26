@@ -391,8 +391,8 @@ pub mod tests {
     async fn private_zome_call() {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let env_ref = env.guard();
-        let reader = env_ref.reader().unwrap();
+        let mut g = env.guard();
+        let reader = g.reader().unwrap();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let ribosome = MockRibosomeT::new();
         // FIXME: CAP: Set this function to private

@@ -175,7 +175,6 @@ mod tests {
     async fn test_query() {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let mut env_ref = env.guard();
 
         // Create some integration values
         let mut expected = Vec::new();
@@ -206,14 +205,15 @@ mod tests {
                 buf.put(dht_hash.next().unwrap(), value.clone()).unwrap();
                 expected.push(value.clone());
             }
-            env_ref
+            env.guard()
                 .with_commit(|writer| buf.flush_to_txn(writer))
                 .unwrap();
         }
 
         // Check queries
         {
-            let reader = env_ref.reader().unwrap();
+            let mut g = env.guard();
+            let reader = g.reader().unwrap();
             let buf = IntegratedDhtOpsBuf::new(env.clone().into()).unwrap();
             // No filter
             let mut r = buf

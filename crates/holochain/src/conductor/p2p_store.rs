@@ -173,8 +173,7 @@ pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
     iter: I,
 ) -> DatabaseResult<()> {
     let p2p_store = AgentKv::new(env.clone().into())?;
-    let env_ref = env.guard();
-    Ok(env_ref.with_commit(|writer| {
+    Ok(env.guard().with_commit(|writer| {
         for agent_info_signed in iter {
             p2p_store.as_store_ref().put(
                 writer,
@@ -225,9 +224,8 @@ pub fn get_agent_info_signed(
     kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
 ) -> ConductorResult<Option<AgentInfoSigned>> {
     let p2p_kv = AgentKv::new(environ.clone().into())?;
-    let env = environ.guard();
 
-    arc.guard().with_commit(|writer| {
+    environ.guard().with_commit(|writer| {
         let res = p2p_kv
             .as_store_ref()
             .get(writer, &(&*kitsune_space, &*kitsune_agent).into())?;
@@ -260,10 +258,9 @@ pub fn query_agent_info_signed(
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
 ) -> ConductorResult<Vec<AgentInfoSigned>> {
     let p2p_kv = AgentKv::new(environ.clone().into())?;
-    let env = environ.guard();
 
     let mut out = Vec::new();
-    arc.guard().with_commit(|writer| {
+    environ.guard().with_commit(|writer| {
         let mut expired = Vec::new();
 
         {
@@ -312,8 +309,7 @@ pub fn put_agent_info_signed(
     agent_info_signed: kitsune_p2p::agent_store::AgentInfoSigned,
 ) -> ConductorResult<()> {
     let p2p_kv = AgentKv::new(environ.clone().into())?;
-    let env = environ.guard();
-    Ok(arc.guard().with_commit(|writer| {
+    Ok(environ.guard().with_commit(|writer| {
         p2p_kv.as_store_ref().put(
             writer,
             &(&agent_info_signed).try_into()?,
@@ -432,8 +428,8 @@ mod tests {
 
         let agent_info_signed = fixt!(AgentInfoSigned);
 
-        let env = environ.guard();
-        arc.guard()
+        environ
+            .guard()
             .with_commit(|writer| {
                 store_buf.as_store_ref().put(
                     writer,
@@ -442,11 +438,12 @@ mod tests {
                 )
             })
             .unwrap();
+        let mut g = environ.guard();
 
         let ret = &store_buf
             .as_store_ref()
             .get(
-                &env.reader().unwrap(),
+                &g.reader().unwrap(),
                 &(&agent_info_signed).try_into().unwrap(),
             )
             .unwrap();

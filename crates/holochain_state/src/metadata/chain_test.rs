@@ -36,7 +36,7 @@ async fn check_different_seq_num_on_separate_queries() {
         .register_activity(&h2.into(), ValidationStatus::Valid)
         .unwrap();
 
-    let g = meta_buf.env().guard();
+    let mut g = meta_buf.env().guard();
     let reader = g.reader().unwrap();
 
     let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 1);
@@ -75,7 +75,7 @@ async fn check_equal_seq_num_on_same_query() {
         .register_activity(&h2, ValidationStatus::Valid)
         .unwrap();
 
-    let g = meta_buf.env().guard();
+    let mut g = meta_buf.env().guard();
     let reader = g.reader().unwrap();
 
     let k = ChainItemKey::new(&h1, ValidationStatus::Valid);
@@ -115,7 +115,7 @@ async fn chain_item_keys_ser() {
         .register_activity(&h, ValidationStatus::Valid)
         .unwrap();
 
-    let g = meta_buf.env().guard();
+    let mut g = meta_buf.env().guard();
     let reader = g.reader().unwrap();
 
     let k = ChainItemKey::new(&h, ValidationStatus::Valid);
@@ -150,7 +150,7 @@ async fn check_large_seq_queries() {
         .register_activity(&h2.into(), ValidationStatus::Valid)
         .unwrap();
 
-    let g = meta_buf.env().guard();
+    let mut g = meta_buf.env().guard();
     let reader = g.reader().unwrap();
 
     let k = ChainItemKey::Agent(agent_pubkey.clone());

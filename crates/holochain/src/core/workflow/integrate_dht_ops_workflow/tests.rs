@@ -185,8 +185,8 @@ impl Db {
     /// Checks that the database is in a state
     #[instrument(skip(expects, env))]
     async fn check(expects: Vec<Self>, env: DbWrite, here: String) {
-        let env_ref = env.guard();
-        let reader = env_ref.reader().unwrap();
+        let mut g = env.guard();
+        let reader = g.reader().unwrap();
         let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
         for expect in expects {
             match expect {
@@ -455,7 +455,6 @@ impl Db {
     // Sets the database to a certain state
     #[instrument(skip(pre_state, env))]
     async fn set<'env>(pre_state: Vec<Self>, env: DbWrite) {
-        let env_ref = env.guard();
         let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
         for state in pre_state {
             match state {
@@ -518,7 +517,7 @@ impl Db {
             }
         }
         // Commit workspace
-        env_ref
+        env.guard()
             .with_commit::<WorkspaceError, _, _>(|writer| {
                 workspace.flush_to_txn(writer)?;
                 Ok(())
@@ -537,9 +536,8 @@ async fn call_workflow<'env>(env: DbWrite) {
 
 // Need to clear the data from the previous test
 fn clear_dbs(env: DbWrite) {
-    let env_ref = env.guard();
     let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
-    env_ref
+    env.guard()
         .with_commit::<DatabaseError, _, _>(|writer| {
             workspace.integration_limbo.clear_all(writer)?;
             workspace.integrated_dht_ops.clear_all(writer)?;
@@ -1116,7 +1114,7 @@ async fn test_metadata_from_wasm_api() {
     // TODO: create the expect from the result of the commit and link entries
     // Db::check(
     //     expect,
-    //     &env_ref,
+    //     &env.guard(),
     //     &dbs,
     //     format!("{}: {}", "metadata from wasm", here!("")),
     // )
@@ -1182,7 +1180,6 @@ async fn test_wasm_api_without_integration_delete() {
     observability::test_run().ok();
     let test_env = holochain_sqlite::test_utils::test_cell_env();
     let env = test_env.env();
-    let env_ref = env.guard();
     clear_dbs(env.clone());
 
     // Generate fixture data
@@ -1210,7 +1207,8 @@ async fn test_wasm_api_without_integration_delete() {
     call_workflow(env.clone()).await;
 
     {
-        let reader = env_ref.reader().unwrap();
+        let mut g = env.guard();
+        let reader = g.reader().unwrap();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let entry_header = workspace
             .meta_authored
@@ -1224,7 +1222,7 @@ async fn test_wasm_api_without_integration_delete() {
             deletes_entry_address: base_address.clone(),
         };
         workspace.source_chain.put(delete, None).await.unwrap();
-        env_ref
+        env.guard()
             .with_commit(|writer| workspace.flush_to_txn(writer))
             .unwrap();
     }
@@ -1397,8 +1395,8 @@ mod slow_tests {
             wait_for_integration(&call_data.env, 14 + 9, 100, Duration::from_millis(100)).await;
 
             // Check the ops are not empty
-            let env_ref = call_data.env.guard();
-            let reader = env_ref.reader().unwrap();
+            let mut guard = call_data.env.guard();
+            let reader = guard.reader().unwrap();
             let db = call_data
                 .env
                 .get_table(TableName::IntegratedDhtOps)

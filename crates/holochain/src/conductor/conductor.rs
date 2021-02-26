@@ -793,15 +793,20 @@ where
             dna_def_buf.put(dna.dna_def().clone()).await?;
         }
         {
-            let env = environ.guard();
             // write the wasm db
-            arc.guard().with_commit(|writer| wasm_buf.flush_to_txn(writer))?;
+            environ
+                .guard()
+                .with_commit(|writer| wasm_buf.flush_to_txn(writer))?;
 
             // write the dna_def db
-            arc.guard().with_commit(|writer| dna_def_buf.flush_to_txn(writer))?;
+            environ
+                .guard()
+                .with_commit(|writer| dna_def_buf.flush_to_txn(writer))?;
 
             // write the entry_def db
-            arc.guard().with_commit(|writer| entry_def_buf.flush_to_txn(writer))?;
+            environ
+                .guard()
+                .with_commit(|writer| entry_def_buf.flush_to_txn(writer))?;
         }
         Ok(zome_defs)
     }
@@ -911,7 +916,7 @@ where
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        let guard = self.env.guard();
+        let mut guard = self.env.guard();
         let reader = guard.reader()?;
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
     }
@@ -933,7 +938,7 @@ where
         F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)>,
     {
         self.check_running()?;
-        let guard = self.env.guard();
+        let mut guard = self.env.guard();
         let output = guard.with_commit(|txn| {
             let state: ConductorState = self.state_db.get(txn, &UnitDbKey)?.unwrap_or_default();
             let (new_state, output) = f(state)?;

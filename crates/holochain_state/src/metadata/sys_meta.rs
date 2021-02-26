@@ -310,7 +310,6 @@ mod tests {
     async fn add_entry_get_headers() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let mut env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut expected: Vec<TimedHeaderHash> = Vec::new();
@@ -323,6 +322,7 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
+            let mut env = arc.guard();
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for create in entry_creates {
@@ -337,10 +337,12 @@ mod tests {
                 .unwrap();
             headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
-            arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+            arc.guard()
+                .with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
         {
+            let mut env = arc.guard();
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
@@ -357,7 +359,6 @@ mod tests {
     async fn add_entry_get_updates() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let mut env = arc.guard();
         let mut fx = TestFixtures::new();
         let original_entry_hash = fx.entry_hash();
         let original_header_hash = test_create(original_entry_hash.clone(), &mut fx)
@@ -381,6 +382,7 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
+            let mut env = arc.guard();
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for update in entry_updates {
@@ -393,10 +395,12 @@ mod tests {
                 .unwrap();
             headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
-            arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+            arc.guard()
+                .with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
         {
+            let mut env = arc.guard();
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
@@ -413,7 +417,6 @@ mod tests {
     async fn add_entry_get_updates_header() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let mut env = arc.guard();
         let mut fx = TestFixtures::new();
         let original_entry_hash = fx.entry_hash();
         let original_header_hash = test_create(original_entry_hash.clone(), &mut fx)
@@ -437,6 +440,7 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
+            let mut env = arc.guard();
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for update in entry_updates {
@@ -449,10 +453,12 @@ mod tests {
                 .unwrap();
             headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
-            arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+            arc.guard()
+                .with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
         {
+            let mut env = arc.guard();
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
@@ -469,7 +475,6 @@ mod tests {
     async fn add_entry_get_deletes() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let mut env = arc.guard();
         let mut fx = TestFixtures::new();
         let header_hash = fx.header_hash();
         let entry_hash = fx.entry_hash();
@@ -483,6 +488,7 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
+            let mut env = arc.guard();
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for delete in entry_deletes {
@@ -495,10 +501,12 @@ mod tests {
                 .unwrap();
             headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
-            arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+            arc.guard()
+                .with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
         {
+            let mut env = arc.guard();
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf

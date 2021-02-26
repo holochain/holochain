@@ -149,7 +149,6 @@ mod tests {
         observability::test_run().ok();
         let test_env = test_cell_env();
         let env = test_env.env();
-        let env_ref = env.guard();
 
         // Setup the database and expected data
         let expected_hashes: HashSet<_> = {
@@ -193,7 +192,7 @@ mod tests {
                 );
             }
 
-            env_ref
+            env.guard()
                 .with_commit(|writer| source_chain.flush_to_txn(writer))
                 .unwrap();
 
@@ -211,14 +210,15 @@ mod tests {
                 .await
                 .unwrap();
             assert_matches!(complete, WorkComplete::Complete);
-            env_ref
+            env.guard()
                 .with_commit(|writer| workspace.flush_to_txn(writer))
                 .unwrap();
         }
 
         // Pull out the results and check them
         let last_count = {
-            let reader = env_ref.reader().unwrap();
+            let mut g = env.guard();
+            let reader = g.reader().unwrap();
             let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
 
             // Get the authored ops
@@ -258,7 +258,7 @@ mod tests {
                 .await
                 .unwrap();
             assert_matches!(complete, WorkComplete::Complete);
-            env_ref
+            env.guard()
                 .with_commit(|writer| workspace.flush_to_txn(writer))
                 .unwrap();
         }
@@ -266,8 +266,8 @@ mod tests {
         // Check the lengths are unchanged
         {
             let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
-            let env_ref = env.guard();
-            let reader = env_ref.reader().unwrap();
+            let mut g = env.guard();
+            let reader = g.reader().unwrap();
             let authored_count = workspace
                 .authored_dht_ops
                 .iter(&reader)

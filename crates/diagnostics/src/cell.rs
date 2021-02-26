@@ -8,7 +8,7 @@ pub async fn dump_cell_state(
     cell_nick: &CellNick,
 ) -> anyhow::Result<()> {
     use db::*;
-    let g = env.guard();
+    let mut g = env.guard();
     let r = g.reader()?;
 
     macro_rules! kv {

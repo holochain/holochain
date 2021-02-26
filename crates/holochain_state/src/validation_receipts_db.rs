@@ -186,7 +186,6 @@ mod tests {
         let vr1 = fake_vr(&test_op_hash, &keystore).await;
         let vr2 = fake_vr(&test_op_hash, &keystore).await;
 
-        let env_ref = env.guard();
         {
             let mut vr_buf1 = ValidationReceiptsBuf::new(&env)?;
             let mut vr_buf2 = ValidationReceiptsBuf::new(&env)?;
@@ -196,14 +195,17 @@ mod tests {
 
             vr_buf1.add_if_unique(vr2.clone())?;
 
-            env_ref.with_commit(|writer| vr_buf1.flush_to_txn(writer))?;
+            env.guard()
+                .with_commit(|writer| vr_buf1.flush_to_txn(writer))?;
 
             vr_buf2.add_if_unique(vr1.clone())?;
 
-            env_ref.with_commit(|writer| vr_buf2.flush_to_txn(writer))?;
+            env.guard()
+                .with_commit(|writer| vr_buf2.flush_to_txn(writer))?;
         }
 
-        let reader = env_ref.reader()?;
+        let mut g = env.guard();
+        let reader = g.reader()?;
         let vr_buf = ValidationReceiptsBuf::new(&env)?;
 
         assert_eq!(2, vr_buf.count_valid(&reader, &test_op_hash)?);

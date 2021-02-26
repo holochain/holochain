@@ -196,7 +196,7 @@ impl HostFnCaller {
         // Write
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        arc.guard()
+        env.guard()
             .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
@@ -217,7 +217,7 @@ impl HostFnCaller {
         // Write
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        arc.guard()
+        env.guard()
             .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
@@ -240,7 +240,7 @@ impl HostFnCaller {
         // Write
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        arc.guard()
+        env.guard()
             .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
@@ -276,7 +276,7 @@ impl HostFnCaller {
         // Write
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        arc.guard()
+        env.guard()
             .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
@@ -291,7 +291,7 @@ impl HostFnCaller {
         // Write
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        arc.guard()
+        env.guard()
             .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
@@ -311,7 +311,7 @@ impl HostFnCaller {
         // Write
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        arc.guard()
+        env.guard()
             .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
@@ -353,7 +353,7 @@ impl HostFnCaller {
         // Write
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        arc.guard()
+        env.guard()
             .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
         unwrap_to!(output => ZomeCallResponse::Ok).to_owned()

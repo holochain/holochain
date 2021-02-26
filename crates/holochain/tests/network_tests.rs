@@ -103,7 +103,6 @@ async fn get_meta_updates_meta_cache() {
     // Database setup
     let test_env = test_cell_env();
     let env = test_env.env();
-    let env_ref = env.guard();
 
     // Setup other metadata store with fixtures attached
     // to known entry hash
@@ -139,7 +138,8 @@ async fn get_meta_updates_meta_cache() {
     assert_eq!(returned.headers.len(), 1);
     assert_eq!(returned.headers.into_iter().next().unwrap(), expected.1);
     let result = {
-        let reader = env_ref.reader().unwrap();
+        let mut g = env.guard();
+let reader = g.reader().unwrap();
 
         // Check the cache has been updated
         workspace

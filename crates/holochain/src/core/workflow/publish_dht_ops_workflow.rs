@@ -206,7 +206,6 @@ mod tests {
         JoinHandle<()>,
         tokio::sync::oneshot::Receiver<()>,
     ) {
-        let env_ref = env.guard();
         // Create data fixts for op
         let mut sig_fixt = SignatureFixturator::new(Unpredictable);
         let mut link_add_fixt = CreateLinkFixturator::new(Unpredictable);
@@ -244,7 +243,7 @@ mod tests {
                 workspace.elements.put(signed_header, None).unwrap();
             }
             // Manually commit because this workspace doesn't commit to all dbs
-            env_ref
+            env.guard()
                 .with_commit::<DatabaseError, _, _>(|writer| {
                     workspace.authored_dht_ops.flush_to_txn(writer)?;
                     workspace.elements.flush_to_txn(writer)?;
@@ -356,9 +355,9 @@ mod tests {
             };
 
             let check = async move {
-                let env_ref = env.guard();
                 recv_task.await.unwrap();
-                let reader = env_ref.reader().unwrap();
+                let mut g = env.guard();
+                let reader = g.reader().unwrap();
                 let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
                 for i in workspace.authored().iter(&reader).unwrap().iterator() {
                     // Check that each item now has a publish time
@@ -391,7 +390,6 @@ mod tests {
             // Create test env
             let test_env = test_cell_env();
             let env = test_env.env();
-            let env_ref = env.guard();
 
             // Setup
             let (_network, cell_network, recv_task, _) =
@@ -399,7 +397,8 @@ mod tests {
 
             // Update the authored to have > R counts
             {
-                let reader = env_ref.reader().unwrap();
+                let mut g = env.guard();
+                let reader = g.reader().unwrap();
                 let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
 
                 // Update authored to R
@@ -419,7 +418,7 @@ mod tests {
                 }
 
                 // Manually commit because this workspace doesn't commit to all dbs
-                env_ref
+                env.guard()
                     .with_commit::<DatabaseError, _, _>(|writer| {
                         workspace.authored_dht_ops.flush_to_txn(writer)?;
                         Ok(())
@@ -470,7 +469,6 @@ mod tests {
                 // Create test env
                 let test_env = test_cell_env();
                 let env = test_env.env();
-                let env_ref = env.guard();
 
                 // Setup data
                 let original_entry = fixt!(Entry);
@@ -489,7 +487,7 @@ mod tests {
                 {
                     let mut source_chain = SourceChain::new(env.clone().into()).unwrap();
                     fake_genesis(&mut source_chain).await.unwrap();
-                    env_ref
+                    env.guard()
                         .with_commit::<SourceChainError, _, _>(|writer| {
                             source_chain.flush_to_txn(writer)?;
                             Ok(())
@@ -506,7 +504,7 @@ mod tests {
                 }
                 {
                     let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
-                    env_ref
+                    env.guard()
                         .with_commit::<SourceChainError, _, _>(|writer| {
                             workspace.authored_dht_ops.clear_all(writer)?;
                             Ok(())
@@ -553,7 +551,7 @@ mod tests {
                         .unwrap()
                         .clone();
 
-                    env_ref
+                    env.guard()
                         .with_commit::<SourceChainError, _, _>(|writer| {
                             source_chain.flush_to_txn(writer)?;
                             Ok(())
