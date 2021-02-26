@@ -6,12 +6,13 @@
 ///! Uses mdns crate for discovery
 
 use futures_util::{stream::StreamExt, self};
-use std::thread;
 use std::time::Duration;
-use std::sync::mpsc::{self, TryRecvError, Sender};
 use mdns::RecordKind;
 use futures_core::Stream;
 use err_derive::Error;
+
+use std::sync::atomic::{AtomicBool, Ordering};
+
 
 const HC_SERVICE_TYPE: &str       = "_holochain._udp";
 const BROADCAST_INTERVAL_SEC: u64 = 8;
@@ -27,29 +28,30 @@ pub enum MdnsError {
 }
 
 /// Stop thread created by `mdns_create_broadcast_thread()`
-pub fn mdns_kill_thread(tx: Sender<()>) {
-   tx.send(()).ok();
+pub fn mdns_kill_thread(can_run: ::std::sync::Arc<AtomicBool>) {
+   can_run.store(false, Ordering::Relaxed);
 }
+
 
 /// Create a thread that will broadcast a holochain service over mdns
 /// Returns Sender for sending thread termination command
-pub fn mdns_create_broadcast_thread(service_name: String, buffer: &[u8]) -> Sender<()> {
+pub fn mdns_create_broadcast_thread(service_name: String, buffer: &[u8]) -> ::std::sync::Arc<AtomicBool> {
    assert!(service_name.len() < 63); // constraint in libmdns
-   // Create Terminate command channel
-   let (tx, rx) = mpsc::channel();
+   // Create Termination command variable
+   let can_run  = ::std::sync::Arc::new(AtomicBool::new(true));
+   let can_run_clone = can_run.clone();
    // Change buffer to base64 string
    let mut b64 = format!("u{}", base64::encode_config(buffer, base64::URL_SAFE_NO_PAD));
-   // println!("Broadcasting service '{}' over mdns ({})", service_name, b64.len());
-   // Split buffer to fix TXT max size
-   let mut substrs = Vec::new();
-   while b64.len() > MAX_TXT_SIZE {
-      let start: String = b64.drain(..MAX_TXT_SIZE).collect();
-      substrs.push(start);
-   };
-   substrs.push(b64);
-   //println!("substrs = {:?}", substrs);
+   println!("Broadcasting service '{}' over mdns ({})", service_name, b64.len());
    // Create thread
-   let _handle = thread::spawn(move || {
+   let _handle = tokio::task::spawn(async move {
+      // Split buffer to fix TXT max size
+      let mut substrs = Vec::new();
+      while b64.len() > MAX_TXT_SIZE {
+         let start: String = b64.drain(..MAX_TXT_SIZE).collect();
+         substrs.push(start);
+      };
+      substrs.push(b64);
       let txts: Vec<_> = substrs.iter().map(AsRef::as_ref).collect();
       println!("Entering mdns broadcasting thread...");
       // Create mdns responder
@@ -60,20 +62,17 @@ pub fn mdns_create_broadcast_thread(service_name: String, buffer: &[u8]) -> Send
          0,
          &txts,
       );
-      // Loop forever unless termination command recieved
+      // Loop forever unless termination command received
       loop {
-         ::std::thread::sleep(::std::time::Duration::from_secs(BROADCAST_INTERVAL_SEC));
-         match rx.try_recv() {
-            Ok(_) | Err(TryRecvError::Disconnected) => {
-               println!("Terminating.");
-               break;
-            }
-            Err(TryRecvError::Empty) => {}
+         tokio::time::delay_for(::std::time::Duration::from_secs(BROADCAST_INTERVAL_SEC)).await;
+         if !can_run_clone.load(Ordering::Relaxed) {
+            println!("Terminating.");
+            break;
          }
       }
    });
    // Done
-   tx
+   can_run
 }
 
 ///

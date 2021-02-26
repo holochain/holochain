@@ -18,7 +18,4 @@ futures-core = "0.3.1"
 async-stream = "0.2.0"
 base64 = "0.13"
 err-derive = "0.2.1"
-
-[dev-dependencies]
-env_logger =  { version = "0.8", default-features = false, features = ["termcolor","humantime","atty"] }
-
+tokio = { version = "0.2.11", features = [ "full" ] }
