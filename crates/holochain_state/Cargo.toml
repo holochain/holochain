@@ -2,7 +2,7 @@
 name = "holochain_state"
 version = "0.0.1"
 description = "TODO minimize deps"
-license = "CAL-1.0"
+license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://github.com/holochain/holochain"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
@@ -34,7 +34,7 @@ tokio_safe_block_on = "0.1.2"
 [dev-dependencies]
 anyhow = "1.0.26"
 fixt = { version = "0.0.1", path = "../fixt" }
-hdk = { version = "0.0.1", path = "../hdk" }
+hdk = { version = "0.0.99", path = "../hdk" }
 holochain_wasm_test_utils = { path = "../test_utils/wasm" }
 matches = "0.1.8"
 observability = "0.1.3"

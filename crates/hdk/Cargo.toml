@@ -1,10 +1,10 @@
 [package]
 name = "hdk"
-version = "0.0.1"
-description = "third iteration of the holochain hdk"
-license = "Apache-2.0"
-homepage = "https://github.com/holochain/holochain"
-documentation = "https://github.com/holochain/holochain"
+version = "0.0.99"
+description = "The Holochain HDK"
+license-file = "LICENSE_CAL-1.0"
+homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdk"
+documentation = "https://docs.rs/hdk/"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "hdk" ]
 categories = [ "cryptography" ]

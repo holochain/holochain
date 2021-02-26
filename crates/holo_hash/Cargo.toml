@@ -6,7 +6,7 @@ keywords = [ "holochain", "holo", "hash", "blake", "blake2b" ]
 categories = [ "cryptography" ]
 edition = "2018"
 description = "hashing helpers supporting dht sharding"
-license = "CAL-1.0"
+license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://github.com/holochain/holochain"
 
@@ -28,7 +28,7 @@ serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 
 [features]
 
-default = ["serialized-bytes"]
+default = ["serialized-bytes", "fixturators"]
 full = ["fixturators", "hashing", "string-encoding"]
 
 fixturators = ["fixt", "rand", "serialized-bytes", "string-encoding"]
