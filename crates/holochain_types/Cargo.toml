@@ -14,8 +14,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.26"
 async-trait = "0.1"
-# automap = { path = "../../../automap", features = ["serde"] }
-automap = { git = "https://github.com/maackle/automap-rs.git", branch = "main", features = ["serde"] }
+automap = { version = "0.1", features = ["serde"] }
 backtrace = "0.3.27"
 base64 = "0.13"
 cfg-if = "0.1"
