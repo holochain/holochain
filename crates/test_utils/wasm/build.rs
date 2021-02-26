@@ -86,7 +86,7 @@ fn main() {
         );
     }*/
 }
-
+/*
 /// Return the list of local path dependencies specified in the Cargo.toml
 fn parse_cargo_toml_local_dependency_paths() -> Vec<String> {
     let cargo_toml: toml::Value = std::fs::read_to_string("Cargo.toml")
@@ -137,3 +137,4 @@ fn toml_table(value: toml::Value) -> toml::value::Table {
         panic!("Expected TOML table, got: {:?}", value)
     }
 }
+*/
