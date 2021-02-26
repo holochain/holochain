@@ -18,18 +18,6 @@ commands:
       command: ./docker/push.sh << parameters.box >> $CIRCLE_BRANCH
 
 jobs:
-  build-binary-packages:
-    docker:
-     - image: nixos/nix
-    environment:
-     NIXPKGS_ALLOW_UNFREE: 1
-    steps:
-      - checkout
-      - run:
-         name: Build the Nix packages
-         no_output_timeout: 45m
-         command: nix build --verbose -f default.nix pkgs.applications
-
   merge-test:
     docker:
      - image: holochain/holochain:circle.build.develop
@@ -90,11 +78,6 @@ workflows:
  version: 2.1
  tests:
   jobs:
-   - build-binary-packages:
-      filters:
-       branches:
-        only:
-          - /.*release.*/
    - merge-test
    # - merge-test-mac
 

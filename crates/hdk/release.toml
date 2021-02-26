@@ -1,0 +1,11 @@
+[[pre-release-replacements]]
+file = "Cargo.toml"
+search = "/develop/"
+replace = "/{{crate_name}}-v{{version}}/"
+prerelease = true
+
+[[post-release-replacements]]
+file = "Cargo.toml"
+search = "/{{crate_name}}-v{{version}}/"
+replace = "/develop/"
+prerelease = true
