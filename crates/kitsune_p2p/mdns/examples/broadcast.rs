@@ -11,8 +11,9 @@ async fn main() {
       buffer.push((i % 255) as u8);
    }
    /// Launch thread
+   let service_type = "bobby".to_owned();
    let service_name = (0..62).map(|_| "X").collect::<String>();
-   let tx = mdns_create_broadcast_thread(service_name, &buffer);
+   let tx = mdns_create_broadcast_thread(service_type, service_name, &buffer);
    /// Kill thread after a minute
    tokio::time::delay_for(::std::time::Duration::from_secs(60)).await;
    mdns_kill_thread(tx);
