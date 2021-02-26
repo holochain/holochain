@@ -13,7 +13,7 @@ use mdns::RecordKind;
 use futures_core::Stream;
 use err_derive::Error;
 
-const HC_SERVICE_NAME: &str       = "_holochain._udp";
+const HC_SERVICE_TYPE: &str       = "_holochain._udp";
 const BROADCAST_INTERVAL_SEC: u64 = 8;
 const QUERY_INTERVAL_SEC: u64     = 5;
 const MAX_TXT_SIZE: usize         = 192;
@@ -34,11 +34,12 @@ pub fn mdns_kill_thread(tx: Sender<()>) {
 /// Create a thread that will broadcast a holochain service over mdns
 /// Returns Sender for sending thread termination command
 pub fn mdns_create_broadcast_thread(service_name: String, buffer: &[u8]) -> Sender<()> {
+   assert!(service_name.len() < 63); // constraint in libmdns
    // Create Terminate command channel
    let (tx, rx) = mpsc::channel();
    // Change buffer to base64 string
-   let mut b64 =format!("u{}", base64::encode_config(buffer, base64::URL_SAFE_NO_PAD));
-   println!("b64 length is {}", b64.len());
+   let mut b64 = format!("u{}", base64::encode_config(buffer, base64::URL_SAFE_NO_PAD));
+   // println!("Broadcasting service '{}' over mdns ({})", service_name, b64.len());
    // Split buffer to fix TXT max size
    let mut substrs = Vec::new();
    while b64.len() > MAX_TXT_SIZE {
@@ -54,7 +55,7 @@ pub fn mdns_create_broadcast_thread(service_name: String, buffer: &[u8]) -> Send
       // Create mdns responder
       let responder = libmdns::Responder::new().unwrap();
       let _svc = responder.register(
-         HC_SERVICE_NAME.to_owned(),
+         HC_SERVICE_TYPE.to_owned(),
          service_name,
          0,
          &txts,
@@ -89,7 +90,7 @@ pub struct MdnsResponse {
 /// Queries the network for the holochain service
 /// Returns an iterator over all responses received
 pub fn mdns_listen() -> impl Stream<Item = Result<MdnsResponse, MdnsError>> {
-   let service_name = format!("{}.local", HC_SERVICE_NAME);
+   let service_name = format!("{}.local", HC_SERVICE_TYPE);
    let query = mdns::discover::all(service_name, Duration::from_secs(QUERY_INTERVAL_SEC))
    .expect("mdns Discover failed");
    // Get Mdns Response stream
