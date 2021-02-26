@@ -1,12 +1,13 @@
 //! Types and Traits for writing tx2 backends.
 
 use crate::tx2::util::TxUrl;
+use crate::tx2::*;
 use crate::*;
 
 use futures::future::BoxFuture;
 
 /// Tx backend read stream type.
-pub type InChan = Box<dyn futures::io::AsyncRead + 'static + Send + Unpin>;
+pub type InChan = Box<dyn AsFramedReader>;
 
 /// Tx backend future resolves to InChan instance.
 pub type InChanFut = BoxFuture<'static, KitsuneResult<InChan>>;
@@ -22,7 +23,7 @@ pub trait InChanRecvAdapt: 'static + Send + Unpin {
 }
 
 /// Tx backend write stream type.
-pub type OutChan = Box<dyn futures::io::AsyncWrite + 'static + Send + Unpin>;
+pub type OutChan = Box<dyn AsFramedWriter>;
 
 /// Tx backend future resolves to OutChan type.
 pub type OutChanFut = BoxFuture<'static, KitsuneResult<OutChan>>;

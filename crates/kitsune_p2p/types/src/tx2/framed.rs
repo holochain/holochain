@@ -1,5 +1,6 @@
 use crate::tx2::*;
 use crate::*;
+use futures::future::{BoxFuture, FutureExt};
 use futures::io::AsyncReadExt;
 use futures::io::AsyncWriteExt;
 
@@ -92,15 +93,19 @@ impl std::fmt::Debug for MsgId {
     }
 }
 
+/// Efficiently read framed data.
+pub trait AsFramedReader: 'static + Send + Unpin {
+    /// Read a frame of data from this AsFramedReader instance.
+    /// This returns a Vec in case the first read contains multiple small items.
+    fn read(&mut self, timeout: KitsuneTimeout) -> BoxFuture<'_, KitsuneResult<RR>>;
+}
+
 struct FramedReaderInner {
     sub: Box<dyn futures::io::AsyncRead + 'static + Send + Unpin>,
     local_buf: [u8; POOL_BUF_MAX_CAPACITY],
 }
 
 /// Efficiently read framed data from a sub AsyncRead instance.
-/// Note, this is intentionally not a Stream - as TryStreams are hard to work
-/// with, and we then would have no ability to pass individual timeout
-/// values to read operations.
 pub struct FramedReader(Option<FramedReaderInner>);
 
 fn read_size(b: &[u8]) -> usize {
@@ -125,60 +130,75 @@ impl FramedReader {
             local_buf: [0; POOL_BUF_MAX_CAPACITY],
         }))
     }
+}
 
-    /// Read a frame of data from this FramedReader instance.
-    /// This returns a Vec in case the first read contains multiple small items.
-    pub async fn read(&mut self, timeout: KitsuneTimeout) -> KitsuneResult<RR> {
-        let mut inner = match self.0.take() {
-            None => return Err(KitsuneError::Closed),
-            Some(inner) => inner,
-        };
+impl AsFramedReader for FramedReader {
+    fn read(&mut self, timeout: KitsuneTimeout) -> BoxFuture<'_, KitsuneResult<RR>> {
+        async move {
+            let mut inner = match self.0.take() {
+                None => return Err(KitsuneError::Closed),
+                Some(inner) => inner,
+            };
 
-        let out = match timeout
-            .mix(async {
-                let mut read = 0;
+            let out = match timeout
+                .mix(async {
+                    let mut read = 0;
 
-                while read < 4 + 8 {
-                    read += inner
-                        .sub
-                        .read(&mut inner.local_buf[read..4 + 8])
-                        .await
-                        .map_err(KitsuneError::other)?;
+                    while read < 4 + 8 {
+                        read += inner
+                            .sub
+                            .read(&mut inner.local_buf[read..4 + 8])
+                            .await
+                            .map_err(KitsuneError::other)?;
+                    }
+
+                    let want_size = read_size(&inner.local_buf[..4]) - 4 - 8;
+                    let msg_id = read_msg_id(&inner.local_buf[4..4 + 8]);
+
+                    let mut buf = PoolBuf::new();
+                    buf.reserve(want_size);
+
+                    while buf.len() < want_size {
+                        let to_read = std::cmp::min(inner.local_buf.len(), want_size - buf.len());
+                        read = match inner
+                            .sub
+                            .read(&mut inner.local_buf[..to_read])
+                            .await
+                            .map_err(KitsuneError::other)
+                        {
+                            Err(e) => return Err(e),
+                            Ok(read) => read,
+                        };
+                        buf.extend_from_slice(&inner.local_buf[..read]);
+                    }
+
+                    Ok(vec![(msg_id, buf)])
+                })
+                .await
+            {
+                Err(e) => {
+                    return Err(e);
                 }
+                Ok(out) => out,
+            };
 
-                let want_size = read_size(&inner.local_buf[..4]) - 4 - 8;
-                let msg_id = read_msg_id(&inner.local_buf[4..4 + 8]);
-
-                let mut buf = PoolBuf::new();
-                buf.reserve(want_size);
-
-                while buf.len() < want_size {
-                    let to_read = std::cmp::min(inner.local_buf.len(), want_size - buf.len());
-                    read = match inner
-                        .sub
-                        .read(&mut inner.local_buf[..to_read])
-                        .await
-                        .map_err(KitsuneError::other)
-                    {
-                        Err(e) => return Err(e),
-                        Ok(read) => read,
-                    };
-                    buf.extend_from_slice(&inner.local_buf[..read]);
-                }
-
-                Ok(vec![(msg_id, buf)])
-            })
-            .await
-        {
-            Err(e) => {
-                return Err(e);
-            }
-            Ok(out) => out,
-        };
-
-        self.0 = Some(inner);
-        Ok(out)
+            self.0 = Some(inner);
+            Ok(out)
+        }.boxed()
     }
+}
+
+/// Efficiently write framed data.
+pub trait AsFramedWriter: 'static + Send + Unpin {
+    /// Write a frame of data to this FramedWriter instance.
+    /// If timeout is exceeded, a timeout error is returned,
+    /// and the stream is closed.
+    fn write(
+        &mut self,
+        msg_id: MsgId,
+        data: PoolBuf,
+        timeout: KitsuneTimeout,
+    ) -> BoxFuture<'_, KitsuneResult<()>>;
 }
 
 struct FramedWriterInner {
@@ -193,64 +213,45 @@ impl FramedWriter {
     pub fn new(sub: Box<dyn futures::io::AsyncWrite + 'static + Send + Unpin>) -> Self {
         Self(Some(FramedWriterInner { sub }))
     }
+}
 
+impl AsFramedWriter for FramedWriter {
     /// Write a frame of data to this FramedWriter instance.
     /// If timeout is exceeded, a timeout error is returned,
     /// and the stream is closed.
-    pub async fn write(
+    fn write(
         &mut self,
         msg_id: MsgId,
-        data: &[u8],
+        mut data: PoolBuf,
         timeout: KitsuneTimeout,
-    ) -> KitsuneResult<()> {
-        let mut inner = match self.0.take() {
-            None => return Err(KitsuneError::Closed),
-            Some(inner) => inner,
-        };
+    ) -> BoxFuture<'_, KitsuneResult<()>> {
+        async move {
+            let mut inner = match self.0.take() {
+                None => return Err(KitsuneError::Closed),
+                Some(inner) => inner,
+            };
 
-        if let Err(e) = timeout
-            .mix(async {
-                let total: u32 = data.len() as u32 + 4 /* len */ + 8 /* msg_id */;
+            if let Err(e) = timeout
+                .mix(async {
+                    let total = data.len() as u32 + 4 /* len */ + 8 /* msg_id */;
 
-                // if the size of data to be written is small,
-                // it'll be more efficient to combine it into one buffer first
-                // TODO - use a different value than POOL_BUF_MAX_CAPACITY?
-                let combine = (total as usize) < POOL_BUF_MAX_CAPACITY;
+                    data.reserve_front(4 + 8);
+                    data.prepend_from_slice(&msg_id.inner().to_le_bytes()[..]);
+                    data.prepend_from_slice(&total.to_le_bytes()[..]);
 
-                if combine {
-                    let mut buf = PoolBuf::new();
-                    buf.reserve(total as usize);
-                    buf.extend_from_slice(&total.to_le_bytes()[..]);
-                    buf.extend_from_slice(&msg_id.inner().to_le_bytes()[..]);
-                    buf.extend_from_slice(data);
-                    let res = inner.sub.write_all(&buf).await.map_err(KitsuneError::other);
-                    res?;
-                } else {
-                    let mut buf = Vec::with_capacity(4 + 8);
-                    buf.extend_from_slice(&total.to_le_bytes());
-                    buf.extend_from_slice(&msg_id.inner().to_le_bytes());
-                    inner
-                        .sub
-                        .write_all(&buf)
-                        .await
-                        .map_err(KitsuneError::other)?;
-                    inner
-                        .sub
-                        .write_all(&data)
-                        .await
-                        .map_err(KitsuneError::other)?;
-                }
+                    inner.sub.write_all(&data).await.map_err(KitsuneError::other)?;
 
-                Ok(())
-            })
-            .await
-        {
-            let _ = inner.sub.close().await;
-            return Err(e);
-        }
+                    Ok(())
+                })
+                .await
+            {
+                let _ = inner.sub.close().await;
+                return Err(e);
+            }
 
-        self.0 = Some(inner);
-        Ok(())
+            self.0 = Some(inner);
+            Ok(())
+        }.boxed()
     }
 }
 
@@ -315,16 +316,20 @@ mod tests {
         let mut recv = FramedReader::new(recv);
 
         let wt = tokio::task::spawn(async move {
+            let mut buf = PoolBuf::new();
+            buf.extend_from_slice(&[0xd0; 512]);
             send.write(
                 1.into(),
-                &[0xd0; 512],
+                buf,
                 KitsuneTimeout::from_millis(1000 * 30),
             )
             .await
             .unwrap();
+            let mut buf = PoolBuf::new();
+            buf.extend_from_slice(&[0xd1; 8000]);
             send.write(
                 2.into(),
-                &[0xd1; 8000],
+                buf,
                 KitsuneTimeout::from_millis(1000 * 30),
             )
             .await

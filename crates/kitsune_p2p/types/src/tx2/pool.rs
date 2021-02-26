@@ -8,6 +8,10 @@ pub(crate) const POOL_MAX_CAPACITY: usize = 1024;
 /// Returned PoolBufs will be shrunk to this capacity when returned.
 pub(crate) const POOL_BUF_MAX_CAPACITY: usize = 4096;
 
+/// PoolBufs will be allocated/reset with this byte count BEFORE
+/// the readable buffer to make prepending frame info more efficient.
+pub(crate) const POOL_BUF_PRE_WRITE_SPACE: usize = 128;
+
 /// A buffer that will return to a pool after use.
 ///
 /// When working with network code, we try to avoid two slow things:
@@ -18,14 +22,24 @@ pub(crate) const POOL_BUF_MAX_CAPACITY: usize = 4096;
 ///
 /// We avoid initialization by using `extend_from_slice()`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PoolBuf(Option<Vec<u8>>);
+pub struct PoolBuf(Option<(usize, Vec<u8>)>);
+
+impl std::io::Write for PoolBuf {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        std::io::Write::write(&mut self.0.as_mut().unwrap().1, buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        std::io::Write::flush(&mut self.0.as_mut().unwrap().1)
+    }
+}
 
 impl serde::Serialize for PoolBuf {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        serializer.serialize_bytes(self.0.as_ref().unwrap())
+        serializer.serialize_bytes(self.as_ref())
     }
 }
 
@@ -46,13 +60,6 @@ impl<'de> serde::de::Visitor<'de> for VisitBytes {
         out.extend_from_slice(v);
         Ok(out)
     }
-
-    fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        Ok(PoolBuf(Some(v)))
-    }
 }
 
 impl<'de> serde::Deserialize<'de> for PoolBuf {
@@ -72,20 +79,24 @@ thread_local! {
 
 impl Drop for PoolBuf {
     fn drop(&mut self) {
-        if let Some(mut inner) = self.0.take() {
+        if let Some((_, mut inner)) = self.0.take() {
             BUF_POOL.with(|p| {
                 let mut p = p.borrow_mut();
                 if p.len() < POOL_MAX_CAPACITY {
-                    if inner.capacity() > POOL_BUF_MAX_CAPACITY {
-                        inner.truncate(POOL_BUF_MAX_CAPACITY);
-                        inner.shrink_to_fit();
-                    }
-                    inner.clear();
+                    reset(&mut inner, true);
                     p.push(inner);
                 }
             });
         }
     }
+}
+
+fn reset(v: &mut Vec<u8>, do_truncate: bool) {
+    if do_truncate && v.capacity() > POOL_BUF_MAX_CAPACITY {
+        v.truncate(POOL_BUF_MAX_CAPACITY);
+        v.shrink_to_fit();
+    }
+    v.resize(POOL_BUF_PRE_WRITE_SPACE, 0);
 }
 
 impl PoolBuf {
@@ -94,31 +105,89 @@ impl PoolBuf {
         let inner = BUF_POOL.with(|p| {
             let mut p = p.borrow_mut();
             if p.is_empty() {
-                // I beleive Vec::new() actually starts with zero capacity,
-                // but make it explicit just in case.
-                Vec::with_capacity(0)
+                let mut i = Vec::with_capacity(POOL_BUF_PRE_WRITE_SPACE);
+                i.resize(POOL_BUF_PRE_WRITE_SPACE, 0);
+                i
             } else {
                 p.remove(0)
             }
         });
-        Self(Some(inner))
+        Self(Some((POOL_BUF_PRE_WRITE_SPACE, inner)))
+    }
+
+    /// Reset this buffer
+    pub fn clear(&mut self) {
+        reset(&mut self.0.as_mut().unwrap().1, false);
     }
 
     /// Like `drain(..len)` but without the iterator trappings.
     pub fn truncate_front(&mut self, len: usize) {
-        let this = self.0.as_mut().unwrap();
         if len == 0 {
             return;
         }
 
-        if len >= this.len() {
-            this.clear();
+        let inner = self.0.as_mut().unwrap();
+
+        let start = inner.0;
+        let data_len = inner.1.len() - start;
+
+        if len >= data_len {
+            reset(&mut inner.1, false);
+            inner.0 = POOL_BUF_PRE_WRITE_SPACE;
             return;
         }
 
-        let r = len..this.len();
-        this.copy_within(r, 0);
-        this.truncate(this.len() - len);
+        let r = len + start..inner.1.len();
+        inner.1.copy_within(r, start);
+        inner.1.truncate(inner.1.len() - len);
+    }
+
+    /// Reserve desired capacity. Prefer doing this once at the beginning
+    /// of an operation to avoid the time cost of allocation.
+    pub fn reserve(&mut self, want_size: usize) {
+        let inner = self.0.as_mut().unwrap();
+        inner.1.reserve(want_size + inner.0);
+    }
+
+    /// Extend this buffer with data from src.
+    pub fn extend_from_slice(&mut self, src: &[u8]) {
+        let inner = self.0.as_mut().unwrap();
+        inner.1.extend_from_slice(src);
+    }
+
+    /// Ensure we have enough front space to prepend the given byte count.
+    /// If not, shift all data over to the right, making more prepend space.
+    pub fn reserve_front(&mut self, mut len: usize) {
+        let inner = self.0.as_mut().unwrap();
+
+        if len < inner.0 {
+            // we already have enough space, return early
+            return;
+        }
+
+        // we don't have enough space - allocate a little extra
+        len += POOL_BUF_PRE_WRITE_SPACE;
+
+        let prev_len = inner.1.len();
+        let new_len = prev_len + len;
+
+        inner.1.reserve(new_len);
+
+        // any way to work around this unsafe without needlessly
+        // initializing this data we're going to overwrite?
+        unsafe { inner.1.set_len(new_len); }
+
+        inner.1.copy_within(inner.0..prev_len, inner.0 + len);
+        inner.0 += len;
+    }
+
+    /// Efficiently copy data *before* the current data.
+    pub fn prepend_from_slice(&mut self, src: &[u8]) {
+        self.reserve_front(src.len());
+
+        let inner = self.0.as_mut().unwrap();
+        inner.1[inner.0 - src.len()..inner.0].copy_from_slice(src);
+        inner.0 -= src.len();
     }
 }
 
@@ -129,30 +198,42 @@ impl Default for PoolBuf {
 }
 
 impl std::ops::Deref for PoolBuf {
-    // really, we'd like `Target = [u8]`,
-    // but we want access to Vec methods in `deref_mut()`.
-    // At least we can differentiate `AsRef<[u8]>` and `AsMut<Vec<u8>>`.
-    type Target = Vec<u8>;
+    type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        self.0.as_ref().unwrap()
-    }
-}
-
-impl std::ops::DerefMut for PoolBuf {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.as_mut().unwrap()
+        self.as_ref()
     }
 }
 
 impl AsRef<[u8]> for PoolBuf {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_ref().unwrap()
+        let inner = self.0.as_ref().unwrap();
+        &inner.1[inner.0..]
     }
 }
 
-impl AsMut<Vec<u8>> for PoolBuf {
-    fn as_mut(&mut self) -> &mut Vec<u8> {
-        self.0.as_mut().unwrap()
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pool_buf_prepend() {
+        let mut b = PoolBuf::new();
+        b.extend_from_slice(b"World!");
+        b.prepend_from_slice(b"Hello ");
+        assert_eq!("Hello World!", String::from_utf8_lossy(&b));
+    }
+
+    #[test]
+    fn pool_buf_prepend_large() {
+        const D: [u8; 512] = [0xdb; 512];
+        let mut b = PoolBuf::new();
+        b.extend_from_slice(b"apple");
+        b.prepend_from_slice(&D[..]);
+        b.prepend_from_slice(b"banana");
+        assert_eq!(b"banana", &b[0..6]);
+        assert_eq!(b"apple", &b[518..523]);
+        assert_eq!(&D[..], &b[6..518]);
+        assert_eq!(523, b.len());
     }
 }

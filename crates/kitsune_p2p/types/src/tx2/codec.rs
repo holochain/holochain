@@ -112,11 +112,11 @@ impl<C: Codec> CodecWriter<C> {
             CodecMessageRef::Response(id, c) => (MsgId::new(*id).as_res(), c),
         };
 
-        if let Err(e) = c.encode(&mut *buf) {
+        if let Err(e) = c.encode(&mut buf) {
             return Err(KitsuneError::other(e));
         }
 
-        if let Err(e) = inner.sub.write(msg_id, &buf, timeout).await {
+        if let Err(e) = inner.sub.write(msg_id, buf, timeout).await {
             return Err(e);
         }
 

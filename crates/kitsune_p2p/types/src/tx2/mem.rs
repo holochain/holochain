@@ -50,15 +50,15 @@ struct MemConAdaptInner {
     con_active: Active,
 }
 
-struct MemConAdapt(Arc<MemConAdaptInner>);
+struct MemConAdapt(MemConAdaptInner);
 
 impl MemConAdapt {
     fn new(remote_addr: TxUrl, chan_send: ChanSend, con_active: Active) -> Self {
-        Self(Arc::new(MemConAdaptInner {
+        Self(MemConAdaptInner {
             remote_addr,
             chan_send,
             con_active,
-        }))
+        })
     }
 }
 
@@ -71,6 +71,8 @@ impl ConAdapt for MemConAdapt {
         let mut sender = self.0.chan_send.clone();
         async move {
             let (send, recv) = util::bound_async_mem_channel(4096);
+            let send: OutChan = Box::new(FramedWriter::new(send));
+            let recv: InChan = Box::new(FramedReader::new(recv));
             if sender.send(recv).await.is_err() {
                 return Err("failed to create out channel".into());
             }
@@ -117,18 +119,18 @@ impl Drop for MemEndpointAdaptInner {
     }
 }
 
-struct MemEndpointAdapt(Arc<Mutex<MemEndpointAdaptInner>>);
+struct MemEndpointAdapt(Mutex<MemEndpointAdaptInner>);
 
 impl MemEndpointAdapt {
     pub fn new(id: u64) -> (Self, Active) {
         let url = format!("kitsune-mem://{}", id);
         let ep_active = Active::new();
         (
-            Self(Arc::new(Mutex::new(MemEndpointAdaptInner {
+            Self(Mutex::new(MemEndpointAdaptInner {
                 id,
                 url: url.into(),
                 ep_active: ep_active.clone(),
-            }))),
+            })),
             ep_active,
         )
     }
@@ -249,17 +251,18 @@ impl BackendAdapt for MemBackendAdapt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::io::{AsyncReadExt, AsyncWriteExt};
 
     #[tokio::test(threaded_scheduler)]
     async fn test_tx2_mem_backend() {
+        let t = KitsuneTimeout::from_millis(5000);
+
         let back = MemBackendAdapt::new();
         let (ep1, _con_recv1) =
-            back.bind("none:".into(), KitsuneTimeout::from_millis(1000 * 30))
+            back.bind("none:".into(), t)
                 .await
                 .unwrap();
         let (ep2, mut con_recv2) =
-            back.bind("none:".into(), KitsuneTimeout::from_millis(1000 * 30))
+            back.bind("none:".into(), t)
                 .await
                 .unwrap();
 
@@ -271,7 +274,7 @@ mod tests {
                     println!("in-con-2");
 
                     let mut out_chan = con2
-                        .out_chan(KitsuneTimeout::from_millis(1000 * 30))
+                        .out_chan(t)
                         .await
                         .unwrap();
                     all.push(tokio::task::spawn(async move {
@@ -279,11 +282,12 @@ mod tests {
                         while let Ok(fut) = chan_recv2.next().await {
                             println!("in-chan-2");
                             if let Ok(mut in_chan) = fut.await {
-                                let mut bob = [0_u8; 5];
-                                in_chan.read_exact(&mut bob).await.unwrap();
-                                println!("GOT IN CHAN!: {}", String::from_utf8_lossy(&bob[..]));
-                                assert_eq!(b"hello", &bob[..]);
-                                out_chan.write_all(b"world").await.unwrap();
+                                let (_, mut buf) = in_chan.read(t).await.unwrap().remove(0);
+                                println!("GOT IN CHAN!: {}", String::from_utf8_lossy(&buf[..]));
+                                assert_eq!(b"hello", &buf[..]);
+                                buf.clear();
+                                buf.extend_from_slice(b"world");
+                                out_chan.write(0.into(), buf, t).await.unwrap();
                             }
                         }
                     }));
@@ -297,22 +301,23 @@ mod tests {
         println!("addr2 = {}", addr2);
 
         let (con1, mut chan_recv1) = ep1
-            .connect(addr2, KitsuneTimeout::from_millis(1000 * 30))
+            .connect(addr2, t)
             .await
             .unwrap();
         println!("con to = {}", con1.remote_addr().unwrap());
 
         let mut out_chan = con1
-            .out_chan(KitsuneTimeout::from_millis(1000 * 30))
+            .out_chan(t)
             .await
             .unwrap();
-        out_chan.write_all(b"hello").await.unwrap();
+        let mut buf = PoolBuf::new();
+        buf.extend_from_slice(b"hello");
+        out_chan.write(0.into(), buf, t).await.unwrap();
 
         let mut in_chan = chan_recv1.next().await.unwrap().await.unwrap();
-        let mut bob = [0_u8; 5];
-        in_chan.read_exact(&mut bob).await.unwrap();
-        println!("GOT RESPONSE: {}", String::from_utf8_lossy(&bob[..]));
-        assert_eq!(b"world", &bob[..]);
+        let (_, buf) = in_chan.read(t).await.unwrap().remove(0);
+        println!("GOT RESPONSE: {}", String::from_utf8_lossy(&buf[..]));
+        assert_eq!(b"world", &buf[..]);
 
         ep1.close().await;
         ep2.close().await;

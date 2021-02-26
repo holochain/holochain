@@ -36,7 +36,7 @@ impl<E: 'static + Send> std::hash::Hash for ActorHandle<E> {
     }
 }
 
-impl<E: 'static + Send + std::fmt::Debug> ActorHandle<E> {
+impl<E: 'static + Send> ActorHandle<E> {
     /// Cause the actor to emit an event.
     pub fn emit(&self, e: E) {
         self.0.lock().events.push(e);
@@ -70,12 +70,12 @@ impl<E: 'static + Send + std::fmt::Debug> ActorHandle<E> {
         }
     }
 
-    /// Check if this task actor was closed.
+    /// Check if this actor was closed.
     pub fn is_closed(&self) -> bool {
         self.0.lock().is_closed
     }
 
-    /// Close this task actor.
+    /// Close this actor.
     pub fn close(&self) {
         let mut inner = self.0.lock();
         inner.is_closed = true;
@@ -110,7 +110,7 @@ impl<E: 'static + Send> Actor<E> {
     }
 }
 
-impl<E: 'static + Send + std::fmt::Debug> futures::stream::Stream for Actor<E> {
+impl<E: 'static + Send> futures::stream::Stream for Actor<E> {
     type Item = Vec<E>;
 
     fn poll_next(

@@ -29,8 +29,11 @@ fn framed() {
         tokio::task::spawn(async move {
             let (mut send, mut recv) = T.get().unwrap().lock().await.take().unwrap();
 
+            let mut buf = PoolBuf::new();
+            buf.extend_from_slice(DATA);
+
             let wt = tokio::task::spawn(async move {
-                send.write(1.into(), DATA, KitsuneTimeout::from_millis(1000 * 30))
+                send.write(1.into(), buf, KitsuneTimeout::from_millis(1000 * 30))
                     .await
                     .unwrap();
                 send
