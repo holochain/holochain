@@ -10,11 +10,12 @@ use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
 use holochain_keystore::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::dna::DnaBundle;
 use holochain_types::prelude::*;
+use mr_bundle::Bundle;
 
 use holochain_zome_types::cell::CellId;
 
-use std::path::PathBuf;
 use tracing::*;
 
 pub use holochain_conductor_api::*;
@@ -74,7 +75,8 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             }
             RegisterDna(payload) => {
                 trace!(register_dna_payload = ?payload);
-                let mut dna = match payload.source {
+                // uuid and properties from the register call will override any in the bundle
+                let (mut dna, maybe_uuid, maybe_properties) = match payload.source {
                     DnaSource::Hash(ref hash) => {
                         if payload.properties.is_none() && payload.uuid.is_none() {
                             return Err(ConductorApiError::DnaReadError(
@@ -82,22 +84,28 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                                     .to_string(),
                             ));
                         }
-                        self.conductor_handle.get_dna(hash).await.ok_or_else(|| {
+                        let dna = self.conductor_handle.get_dna(hash).await.ok_or_else(|| {
                             ConductorApiError::DnaReadError(format!(
                                 "Unable to create derived Dna: {} not registered",
                                 hash
                             ))
-                        })?
+                        })?;
+                        (dna, payload.uuid.clone(), payload.properties.clone())
                     }
-                    DnaSource::Path(path) => read_parse_dna(path, None).await?, // properties handled below
-                    DnaSource::DnaFile(dna) => dna,
+                    DnaSource::Path(ref path) => {
+                        let bundle = Bundle::read_from_file(path).await?;
+                        bundle_to_tuple(payload.clone(), bundle.into()).await?
+                    }
+                    DnaSource::Bundle(ref bundle) => {
+                        bundle_to_tuple(payload.clone(), bundle.clone()).await?
+                    }
                 };
-                if let Some(props) = payload.properties {
+                if let Some(props) = maybe_properties {
                     let properties =
                         SerializedBytes::try_from(props).map_err(SerializationError::from)?;
                     dna = dna.with_properties(properties).await?;
                 }
-                if let Some(uuid) = payload.uuid {
+                if let Some(uuid) = maybe_uuid {
                     dna = dna.with_uuid(uuid).await?;
                 }
                 let hash = dna.dna_hash().clone();
@@ -126,37 +134,21 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 // Install Dnas
                 let tasks = dnas.into_iter().map(|dna_payload| async {
                     let InstallAppDnaPayload {
-                        path: maybe_path,
-                        hash: maybe_hash,
-                        properties,
+                        hash,
                         membrane_proof,
                         nick,
                     } = dna_payload;
-                    if maybe_path.is_none() && maybe_hash.is_none() {
-                        return Err(ConductorApiError::DnaReadError("Neither path nor hash specified in payload".to_string()))
-                    };
-                    if maybe_path.is_some() && maybe_hash.is_some() {
-                        return Err(ConductorApiError::DnaReadError("Both path and hash specified in payload, pick just one".to_string()))
+
+                    // confirm that hash has been installed
+                    let dna_list = self.conductor_handle.list_dnas().await?;
+                    if !dna_list.contains(&hash) {
+                        return Err(ConductorApiError::DnaReadError(format!(
+                            "Given dna has not been registered: {}",
+                            hash
+                        )));
                     }
-                    // TODO: this if let will be removed after deprecation period
-                    if let Some(path) = maybe_path {
-                        tracing::warn!("specifying dna by path with register side-effect is deprecated, please use RegisterDna and install by hash");
-                        let dna = read_parse_dna(path, properties).await?;
-                        let hash = dna.dna_hash().clone();
-                        let cell_id = CellId::from((hash.clone(), agent_key.clone()));
-                        self.conductor_handle.register_dna(dna).await?;
-                        ConductorApiResult::Ok((InstalledCell::new(cell_id, nick), membrane_proof))
-                    } else if let Some(hash) = maybe_hash {
-                        // confirm that hash has been installed
-                        let dna_list = self.conductor_handle.list_dnas().await?;
-                        if !dna_list.contains(&hash) {
-                            return Err(ConductorApiError::DnaReadError(format!("Given dna has not been registered: {}", hash)));
-                        }
-                        let cell_id = CellId::from((hash.clone(), agent_key.clone()));
-                        ConductorApiResult::Ok((InstalledCell::new(cell_id, nick), membrane_proof))
-                    } else {
-                        unreachable!()
-                    }
+                    let cell_id = CellId::from((hash.clone(), agent_key.clone()));
+                    ConductorApiResult::Ok((InstalledCell::new(cell_id, nick), membrane_proof))
                 });
 
                 // Join all the install tasks
@@ -263,6 +255,24 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
     }
 }
 
+async fn bundle_to_tuple(
+    payload: Box<RegisterDnaPayload>,
+    bundle: DnaBundle,
+) -> ConductorApiResult<(DnaFile, Option<Uuid>, Option<YamlProperties>)> {
+    let dna = bundle.clone().into_dna_file().await?;
+    let properties = if payload.properties.is_some() {
+        payload.properties.clone()
+    } else {
+        bundle.manifest().properties()
+    };
+    let uuid = if payload.uuid.is_some() {
+        payload.uuid.clone()
+    } else {
+        bundle.manifest().uuid()
+    };
+    Ok((dna, uuid, properties))
+}
+/*
 /// Reads the [Dna] from disk and parses to [SerializedBytes]
 async fn read_parse_dna(
     dna_path: PathBuf,
@@ -278,6 +288,7 @@ async fn read_parse_dna(
     }
     Ok(dna)
 }
+ */
 
 #[async_trait::async_trait]
 impl InterfaceApi for RealAdminInterfaceApi {
@@ -311,7 +322,6 @@ mod test {
     use holochain_lmdb::test_utils::test_environments;
     use holochain_types::app::InstallAppDnaPayload;
     use holochain_types::test_utils::fake_agent_pubkey_1;
-    use holochain_types::test_utils::fake_dna_file;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_types::test_utils::write_fake_dna_file;
     use holochain_wasm_test_utils::TestWasm;
@@ -447,7 +457,7 @@ mod test {
         let agent_key1 = fake_agent_pubkey_1();
 
         // attempt install with a hash before the DNA has been registered
-        let dna_hash = dna.dna_hash();
+        let dna_hash = dna.dna_hash().clone();
         let hash_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
         let hash_install_payload = InstallAppPayload {
             dnas: vec![hash_payload],
@@ -464,9 +474,22 @@ mod test {
             AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == format!("Given dna has not been registered: {}", dna_hash)
         );
 
-        // now install it using the path which should add the dna to the database
+        // now register a DNA
+        let path_payload = RegisterDnaPayload {
+            uuid: None,
+            properties: None,
+            source: DnaSource::Path(dna_path),
+        };
+        let path0_install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload.clone())))
+            .await;
+        assert_matches!(
+            path0_install_response,
+            AdminResponse::DnaRegistered(h) if h == dna_hash
+        );
+
         let agent_key2 = fake_agent_pubkey_2();
-        let path_payload = InstallAppDnaPayload::path_only(dna_path, "".to_string());
+        let path_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
         let cell_id2 = CellId::new(dna_hash.clone(), agent_key2.clone());
         let expected_cell_ids = InstalledApp::new_legacy(
             "test-by-path".to_string(),
@@ -527,24 +550,24 @@ mod test {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn dna_read_parses() -> Result<()> {
-        let uuid = Uuid::new_v4();
-        let dna = fake_dna_file(&uuid.to_string());
-        let (dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await?;
-        let json: serde_yaml::Value = serde_yaml::from_str(
-            r#"
-test: "example"
-how_many": 42
-        "#,
-        )
-        .unwrap();
-        let properties = Some(YamlProperties::new(json.clone()));
-        let result = read_parse_dna(dna_path, properties).await?;
-        let properties = YamlProperties::new(json);
-        let mut dna = dna.dna_def().clone();
-        dna.properties = properties.try_into().unwrap();
-        assert_eq!(&dna, result.dna_def());
-        Ok(())
-    }
+    /*    #[tokio::test(threaded_scheduler)]
+        async fn dna_read_parses() -> Result<()> {
+            let uuid = Uuid::new_v4();
+            let dna = fake_dna_file(&uuid.to_string());
+            let (dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await?;
+            let json: serde_yaml::Value = serde_yaml::from_str(
+                r#"
+    test: "example"
+    how_many": 42
+            "#,
+            )
+            .unwrap();
+            let properties = Some(YamlProperties::new(json.clone()));
+            let result = read_parse_dna(dna_path, properties).await?;
+            let properties = YamlProperties::new(json);
+            let mut dna = dna.dna_def().clone();
+            dna.properties = properties.try_into().unwrap();
+            assert_eq!(&dna, result.dna_def());
+            Ok(())
+        }*/
 }

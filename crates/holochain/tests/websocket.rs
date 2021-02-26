@@ -163,23 +163,17 @@ how_many: 42
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let dna_payload = InstallAppDnaPayload {
-        path: Some(fake_dna_path),
-        hash: None,
-        nick: "nick".into(),
-        properties: Some(properties.clone()),
-        membrane_proof: None,
-    };
-    let agent_key = fake_agent_pubkey_1();
-    let payload = InstallAppPayload {
-        dnas: vec![dna_payload],
-        installed_app_id: "test".to_string(),
-        agent_key,
-    };
-    let request = AdminRequest::InstallApp(Box::new(payload));
-    let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 3000).await;
-    assert_matches!(response, AdminResponse::AppInstalled(_));
+
+    let orig_dna_hash = dna.dna_hash().clone();
+    let _dna_hash = register_and_install_dna(
+        &mut holochain,
+        &mut client,
+        orig_dna_hash,
+        fake_dna_path,
+        Some(properties.clone()),
+        "nick".into(),
+    )
+    .await;
 
     // List Dnas
     let request = AdminRequest::ListDnas;
@@ -297,6 +291,47 @@ pub async fn retry_admin_interface(
     }
 }
 
+async fn register_and_install_dna(
+    mut holochain: &mut Child,
+    client: &mut WebsocketSender,
+    orig_dna_hash: DnaHash,
+    dna_path: PathBuf,
+    properties: Option<YamlProperties>,
+    nick: String,
+) -> DnaHash {
+    let register_payload = RegisterDnaPayload {
+        uuid: None,
+        properties,
+        source: DnaSource::Path(dna_path),
+    };
+    let request = AdminRequest::RegisterDna(Box::new(register_payload));
+    let response = client.request(request);
+    let response = check_timeout(&mut holochain, response, 3000).await;
+    assert_matches!(response, AdminResponse::DnaRegistered(_));
+    let dna_hash = if let AdminResponse::DnaRegistered(h) = response {
+        h.clone()
+    } else {
+        orig_dna_hash
+    };
+
+    let dna_payload = InstallAppDnaPayload {
+        hash: dna_hash.clone(),
+        nick,
+        membrane_proof: None,
+    };
+    let agent_key = fake_agent_pubkey_1();
+    let payload = InstallAppPayload {
+        dnas: vec![dna_payload],
+        installed_app_id: "test".to_string(),
+        agent_key,
+    };
+    let request = AdminRequest::InstallApp(Box::new(payload));
+    let response = client.request(request);
+    let response = check_timeout(&mut holochain, response, 3000).await;
+    assert_matches!(response, AdminResponse::AppInstalled(_));
+    dna_hash
+}
+
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "slow_tests")]
 async fn call_zome() {
@@ -328,17 +363,15 @@ async fn call_zome() {
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
-    let agent_key = fake_agent_pubkey_1();
-    let payload = InstallAppPayload {
-        dnas: vec![dna_payload],
-        installed_app_id: "test".to_string(),
-        agent_key,
-    };
-    let request = AdminRequest::InstallApp(Box::new(payload));
-    let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 3000).await;
-    assert_matches!(response, AdminResponse::AppInstalled(_));
+    let _dna_hash = register_and_install_dna(
+        &mut holochain,
+        &mut client,
+        original_dna_hash.clone(),
+        fake_dna_path,
+        None,
+        "".into(),
+    )
+    .await;
 
     // List Dnas
     let request = AdminRequest::ListDnas;
@@ -473,22 +506,21 @@ async fn emit_signals() {
         &uuid.to_string(),
         vec![(TestWasm::EmitSignal.into(), TestWasm::EmitSignal.into())],
     );
-    let dna_hash = dna.dna_hash().clone();
-
+    let orig_dna_hash = dna.dna_hash().clone();
+    let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
     // Install Dna
-    let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
     let agent_key = fake_agent_pubkey_1();
+
+    let dna_hash = register_and_install_dna(
+        &mut holochain,
+        &mut admin_tx,
+        orig_dna_hash,
+        fake_dna_path,
+        None,
+        "".into(),
+    )
+    .await;
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
-    let payload = InstallAppPayload {
-        dnas: vec![dna_payload],
-        installed_app_id: "test".to_string(),
-        agent_key: agent_key.clone(),
-    };
-    let request = AdminRequest::InstallApp(Box::new(payload));
-    let response = admin_tx.request(request);
-    let response = check_timeout(&mut holochain, response, 3000).await;
-    assert_matches!(response, AdminResponse::AppInstalled(_));
 
     // Activate cells
     let request = AdminRequest::ActivateApp {
@@ -560,16 +592,15 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
         vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
     );
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
-    let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
-    let agent_key = fake_agent_pubkey_1();
-    let payload = InstallAppPayload {
-        dnas: vec![dna_payload],
-        installed_app_id: "test".to_string(),
-        agent_key,
+    let register_payload = RegisterDnaPayload {
+        uuid: None,
+        properties: None,
+        source: DnaSource::Path(fake_dna_path),
     };
-    let request = AdminRequest::InstallApp(Box::new(payload));
-    let response = client.request(request).await;
-    assert_matches!(response, Ok(AdminResponse::AppInstalled(_)));
+    let request = AdminRequest::RegisterDna(Box::new(register_payload));
+    let response = client.request(request).await.unwrap();
+    assert_matches!(response, AdminResponse::DnaRegistered(_));
+
     conductor_handle.shutdown().await;
 
     Ok(())
@@ -624,14 +655,12 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
         vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
     );
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
-    let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
-    let agent_key = fake_agent_pubkey_1();
-    let payload = InstallAppPayload {
-        dnas: vec![dna_payload],
-        installed_app_id: "test".to_string(),
-        agent_key,
+    let register_payload = RegisterDnaPayload {
+        uuid: None,
+        properties: None,
+        source: DnaSource::Path(fake_dna_path),
     };
-    let request = AdminRequest::InstallApp(Box::new(payload));
+    let request = AdminRequest::RegisterDna(Box::new(register_payload));
 
     // send a request after the conductor has shutdown
     let response: Result<Result<AdminResponse, _>, tokio::time::Elapsed> =

@@ -7,6 +7,7 @@ use mr_bundle::Location;
 
 /// A bundle of Wasm zomes, respresented as a file.
 #[derive(
+    Clone,
     Debug,
     PartialEq,
     Eq,
