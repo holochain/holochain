@@ -16,7 +16,7 @@ use err_derive::Error;
 const HC_SERVICE_NAME: &str       = "_holochain._udp";
 const BROADCAST_INTERVAL_SEC: u64 = 8;
 const QUERY_INTERVAL_SEC: u64     = 5;
-const MAX_TXT_SIZE: usize         = 10;
+const MAX_TXT_SIZE: usize         = 192;
 
 #[derive(Debug, Error)]
 pub enum MdnsError {
@@ -31,21 +31,18 @@ pub fn mdns_kill_thread(tx: Sender<()>) {
    tx.send(()).ok();
 }
 
-/// Create a thread that will broadcast the holochain service over mdns
+/// Create a thread that will broadcast a holochain service over mdns
 /// Returns Sender for sending thread termination command
-pub fn mdns_create_broadcast_thread(buffer: &[u8]) -> Sender<()> {
+pub fn mdns_create_broadcast_thread(service_name: String, buffer: &[u8]) -> Sender<()> {
    // Create Terminate command channel
    let (tx, rx) = mpsc::channel();
    // Change buffer to base64 string
    let mut b64 =format!("u{}", base64::encode_config(buffer, base64::URL_SAFE_NO_PAD));
    println!("b64 length is {}", b64.len());
-   println!("b64: {}", b64);
    // Split buffer to fix TXT max size
    let mut substrs = Vec::new();
    while b64.len() > MAX_TXT_SIZE {
       let start: String = b64.drain(..MAX_TXT_SIZE).collect();
-      println!("start = {} ({})", start, start.len());
-      println!("b64 = {} ({})", b64, b64.len());
       substrs.push(start);
    };
    substrs.push(b64);
@@ -53,14 +50,12 @@ pub fn mdns_create_broadcast_thread(buffer: &[u8]) -> Sender<()> {
    // Create thread
    let _handle = thread::spawn(move || {
       let txts: Vec<_> = substrs.iter().map(AsRef::as_ref).collect();
-      // debug
       println!("Entering mdns broadcasting thread...");
-      println!("txts = {:?}", txts);
       // Create mdns responder
       let responder = libmdns::Responder::new().unwrap();
       let _svc = responder.register(
          HC_SERVICE_NAME.to_owned(),
-         "holonode".to_owned(),
+         service_name,
          0,
          &txts,
       );
@@ -81,7 +76,10 @@ pub fn mdns_create_broadcast_thread(buffer: &[u8]) -> Sender<()> {
 }
 
 ///
+#[derive(Debug, Clone)]
 pub struct MdnsResponse {
+   /// Service name used
+   pub service_name: String,
    /// IP address that responded to the mdns query
    pub addr: std::net::IpAddr,
    /// Data contained in the TXT record
@@ -110,27 +108,40 @@ pub fn mdns_listen() -> impl Stream<Item = Result<MdnsResponse, MdnsError>> {
             return Err(MdnsError::Mdns(e));
          }
          let response = maybe_response.unwrap();
+         // NOTE: if response.ip_addr() is not te right address,
+         // we should give all A/AAA records found in the answers instead
          let addr = response.ip_addr().unwrap(); // should have already been filtered out
          let mut buffer = Vec::new();
+         let mut service_name = String::new();
          println!("Response Answer count = {}", response.answers.len());
-         println!("Response Answers:  {:?}", response.answers);
+         //println!("Response Answers:  {:?}", response.answers);
          for answer in response.answers {
-            if let RecordKind::TXT(txts) = answer.kind {
-               println!("TXT count = {}", txts.len());
-               let mut b64 = String::new();
-               for txt in txts {
-                  //println!("Response TXT = {:?}", txt);
-                  b64.push_str(&txt);
-               }
-               buffer = match base64::decode_config(&b64[1..], base64::URL_SAFE_NO_PAD) {
-                  Err(e) => return Err(MdnsError::Base64(e)),
-                  Ok(s) => s,
-               };
-               // Expecting only one valid response
-               return Ok(MdnsResponse {addr, buffer });
+            match  answer.kind {
+               RecordKind::TXT(txts) => {
+                  println!("TXT count = {}", txts.len());
+                  let mut b64 = String::new();
+                  for txt in txts {
+                     //println!("Response TXT = {:?}", txt);
+                     b64.push_str(&txt);
+                  }
+                  buffer = match base64::decode_config(&b64[1..], base64::URL_SAFE_NO_PAD) {
+                     Err(e) => return Err(MdnsError::Base64(e)),
+                     Ok(s) => s,
+                  };
+               },
+               // Retrieve service name stored in PTR record
+               RecordKind::PTR(ptr) => {
+                  //println!("PTR = {}", ptr);
+                  service_name = ptr.split('.')
+                     .into_iter()
+                     .next()
+                     .expect("Found service without a name")
+                     .to_string();
+               },
+               _ => {},
             }
          }
-         Ok(MdnsResponse {addr, buffer })
+         Ok(MdnsResponse {addr, buffer, service_name })
       });
    // Done
    mdns_stream
