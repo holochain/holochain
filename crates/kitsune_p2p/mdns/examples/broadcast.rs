@@ -1,7 +1,7 @@
 use kitsune_mdns::*;
 
 #[tokio::main(threaded_scheduler)]
-pub fn main() {
+async fn main() {
    println!("Starting broadcast");
    /// Create buffer
    // let buffer = [0, 1, 2];
