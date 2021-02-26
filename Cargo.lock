@@ -1343,7 +1343,7 @@ checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 
 [[package]]
 name = "hdk"
-version = "0.0.1"
+version = "0.0.99"
 dependencies = [
  "fixt",
  "hdk_derive",
