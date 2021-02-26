@@ -1010,7 +1010,7 @@ dependencies = [
 
 [[package]]
 name = "fixt"
-version = "0.0.1"
+version = "0.0.2-alpha.1"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -1338,7 +1338,7 @@ checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 
 [[package]]
 name = "hdk"
-version = "0.0.99"
+version = "0.0.100-alpha.1"
 dependencies = [
  "fixt",
  "hdk_derive",
@@ -1356,7 +1356,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.1"
+version = "0.0.2-alpha.1"
 dependencies = [
  "holochain_zome_types",
  "paste 1.0.3",
@@ -1391,7 +1391,7 @@ checksum = "644f9158b2f133fd50f5fb3242878846d9eb792e445c893805ff0e3824006e35"
 
 [[package]]
 name = "holo_hash"
-version = "0.0.1"
+version = "0.0.2-alpha.1"
 dependencies = [
  "base64 0.13.0",
  "blake2b_simd",
@@ -1867,7 +1867,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.1"
+version = "0.0.2-alpha.1"
 dependencies = [
  "chrono",
  "fixt",
