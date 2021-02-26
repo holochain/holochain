@@ -16,13 +16,18 @@ use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::fresh_reader;
 use holochain_lmdb::key::BufKey;
 use holochain_lmdb::prelude::Readable;
+use holochain_p2p::dht_arc::DhtArc;
+use holochain_p2p::dht_arc::DhtArcBucket;
+use holochain_p2p::dht_arc::PeerDensity;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_zome_types::CellId;
+use kitsune_p2p::KitsuneBinType;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::sync::Arc;
 
+use super::error::ConductorError;
 use super::error::ConductorResult;
 
 const AGENT_KEY_LEN: usize = 64;
@@ -84,7 +89,6 @@ impl From<(DnaHash, AgentPubKey)> for AgentKvKey {
 
 impl From<(&kitsune_p2p::KitsuneSpace, &kitsune_p2p::KitsuneAgent)> for AgentKvKey {
     fn from(o: (&kitsune_p2p::KitsuneSpace, &kitsune_p2p::KitsuneAgent)) -> Self {
-        use kitsune_p2p::KitsuneBinType;
         let mut bytes = [0; AGENT_KEY_LEN];
         bytes[..AGENT_KEY_COMPONENT_LEN].copy_from_slice(&o.0.get_bytes());
         bytes[AGENT_KEY_COMPONENT_LEN..].copy_from_slice(&o.1.get_bytes());
@@ -304,6 +308,40 @@ pub fn query_agent_info_signed(
     })?;
 
     Ok(out)
+}
+
+/// Get the peer density an agent is currently seeing within
+/// a given [`DhtArc`A.]
+pub fn query_peer_density(
+    env: EnvironmentWrite,
+    kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+    dht_arc: DhtArc,
+) -> ConductorResult<PeerDensity> {
+    let p2p_store = AgentKv::new(env.clone().into())?;
+    let arcs = fresh_reader!(env, |r| {
+        p2p_store
+            .iter(&r)?
+            .map(|(_, v)| Ok(v))
+            .map_err(ConductorError::from)
+            .filter_map(|v| {
+                if dht_arc.contains(v.as_agent_ref().get_loc()) {
+                    let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
+                    if info.as_space_ref() == kitsune_space.as_ref() {
+                        Ok(Some(info.dht_arc()?))
+                    } else {
+                        Ok(None)
+                    }
+                } else {
+                    Ok(None)
+                }
+            })
+            .collect()
+    })?;
+
+    // contains is already checked in the iterator
+    let bucket = DhtArcBucket::new_unchecked(dht_arc, arcs);
+
+    Ok(bucket.density())
 }
 
 /// Put single agent info into store

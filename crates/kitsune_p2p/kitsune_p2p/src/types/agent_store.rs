@@ -6,6 +6,8 @@ use crate::types::KitsuneAgent;
 use crate::types::KitsuneP2pError;
 use crate::types::KitsuneSignature;
 use crate::types::KitsuneSpace;
+use crate::KitsuneBinType;
+use kitsune_p2p_types::dht_arc::DhtArc;
 use url2::Url2;
 
 /// A list of Urls.
@@ -154,6 +156,13 @@ impl AgentInfo {
     /// Decode the meta info.
     pub fn meta_info(&self) -> Result<AgentMetaInfo, KitsuneP2pError> {
         Ok(self.meta_info[..].try_into()?)
+    }
+
+    /// Get the [DhtArc] for this agent info
+    pub fn dht_arc(&self) -> Result<DhtArc, KitsuneP2pError> {
+        let half_len = self.meta_info()?.dht_storage_arc_half_length;
+        let center = self.agent.get_loc();
+        Ok(DhtArc::new(center, half_len))
     }
 }
 

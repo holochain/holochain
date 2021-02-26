@@ -5,8 +5,12 @@ use derive_more::Into;
 use std::num::Wrapping;
 use std::ops::Bound;
 use std::ops::RangeBounds;
+
 #[cfg(test)]
 use std::ops::RangeInclusive;
+
+#[cfg(test)]
+mod tests;
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, From, Into)]
 /// Type for representing a location that can wrap around
@@ -19,6 +23,84 @@ pub struct DhtLocation(pub Wrapping<u32>);
 /// 1 is added for rounding
 /// 1 more is added to represent the middle point of an odd length array
 pub const MAX_HALF_LENGTH: u32 = (u32::MAX / 2) + 1 + 1;
+
+/// Maximum number of values that a u32 can represent.
+const U32_LEN: u64 = u32::MAX as u64 + 1;
+
+/// Number of copies of a given hash available at any given time.
+const REDUNDANCY_TARGET: usize = 20;
+
+/// Default assumed up time for nodes.
+const DEFAULT_UPTIME: f64 = 0.5;
+
+/// The minimum number of peers before sharding can begin.
+/// This factors in the expected uptime to reach the redundancy target.
+pub const MIN_PEERS: usize = (REDUNDANCY_TARGET as f64 / DEFAULT_UPTIME) as usize;
+
+/// The amount "change in arc" is scaled to prevent rapid changes.
+/// This also represents the maximum coverage change in a single update
+/// as a difference of 1.0 would scale to 0.2.
+const DELTA_SCALE: f64 = 0.2;
+
+/// The minimal "change in arc" before we stop scaling.
+/// This prevents never reaching the target arc coverage.
+const DELTA_THRESHOLD: f64 = 0.01;
+
+/// Due to estimation noise we don't want a very small difference
+/// between observed coverage and estimated coverage to
+/// amplify when scaled to by the estimated total peers.
+/// This threshold must be reached before an estimated coverage gap
+/// is calculated.
+const NOISE_THRESHOLD: f64 = 0.01;
+
+/// The ideal coverage if all peers were holding the same sized
+/// arcs and our estimated total peers is close.
+fn coverage_target(est_total_peers: usize) -> f64 {
+    if est_total_peers <= REDUNDANCY_TARGET {
+        1.0
+    } else {
+        REDUNDANCY_TARGET as f64 / est_total_peers as f64
+    }
+}
+
+/// The convergence algorithm that moves an arc towards
+/// our estimation of what it should be.
+///
+/// Note the rate of convergence is dependant of the rate
+/// that [`DhtArc::update_length`] is called.
+fn converge(current: f64, density: PeerDensity) -> f64 {
+    // Get the estimated coverage gap based on our observed peer density.
+    let est_gap = density.est_gap();
+    let target;
+    // 1. If we haven't observed  at least our redundancy target number
+    // of peers (adjusted for expected uptime) then we know that the data
+    // in our arc is under replicated and we should start aiming for full coverage.
+    if density.expected_count() <= REDUNDANCY_TARGET {
+        target = 1.0;
+    // 2. If our estimated gap in coverage is greater then zero
+    // we should aim for that (up to our maximum of 1.0).
+    } else if est_gap > 0.0 {
+        target = est_gap.min(1.0);
+    // 3. Finally if we estimate an over redundancy then we
+    // should aim for the ideal coverage for the number of peers
+    // we estimate are on the network.
+    } else {
+        // This is more stable then trying to aim for a negative gap
+        // in coverage because given an over redundant network nodes
+        // will tend towards the ideal coverage instead of bouncing
+        // up and down as gap estimations change.
+        target = coverage_target(density.est_total_peers());
+    }
+    // The change in arc we'd need to make to get to the target.
+    let delta = target - current;
+    // If this is below our threshold then apply that delta.
+    if delta.abs() < DELTA_THRESHOLD {
+        current + delta
+    // Other wise scale the delta to avoid rapid change.
+    } else {
+        current + (delta * DELTA_SCALE)
+    }
+}
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 /// Represents how much of a dht arc is held
@@ -45,6 +127,26 @@ pub struct DhtArc {
     pub half_length: u32,
 }
 
+#[derive(Debug, Clone, Copy)]
+/// The average density of peers at a location in the u32 space.
+pub struct PeerDensity {
+    /// The arc that filtered the bucket that generated this density.
+    filter: DhtArc,
+    /// The average coverage of peers in the bucket.
+    average_coverage: f64,
+    /// The number of peers in the bucket.
+    count: usize,
+}
+
+/// A list of arcs that are
+/// contained within the buckets arc.
+pub struct DhtArcBucket {
+    /// The arc used to filter this bucket.
+    filter: DhtArc,
+    /// The arcs in this bucket.
+    arcs: Vec<DhtArc>,
+}
+
 impl DhtArc {
     /// Create an Arc from a hash location plus a length on either side
     /// half length is (0..(u32::Max / 2 + 1))
@@ -54,6 +156,14 @@ impl DhtArc {
             center_loc: center_loc.into(),
             half_length,
         }
+    }
+
+    /// Update the half length based on a density reading.
+    /// This will converge on a new target instead of jumping directly
+    /// to the new target and is designed to be called at a given rate
+    /// with more recent peer density readings.
+    pub fn update_length(&mut self, density: PeerDensity) {
+        self.half_length = (MAX_HALF_LENGTH as f64 * converge(self.coverage(), density)) as u32;
     }
 
     /// Check if a location is contained in this arc
@@ -81,7 +191,9 @@ impl DhtArc {
                 start: Bound::Included(self.center_loc.into()),
                 end: Bound::Included(self.center_loc.into()),
             }
-        } else if self.half_length == MAX_HALF_LENGTH {
+        // In order to make sure the arc covers the full range we need some overlap at the
+        // end to account for division rounding.
+        } else if self.half_length == MAX_HALF_LENGTH || self.half_length == MAX_HALF_LENGTH - 1 {
             ArcRange {
                 start: Bound::Included(
                     (self.center_loc.0 - DhtLocation::from(MAX_HALF_LENGTH - 1).0).0,
@@ -100,6 +212,66 @@ impl DhtArc {
                 ),
             }
         }
+    }
+
+    /// The absolute length that this arc will hold.
+    pub fn absolute_length(&self) -> u64 {
+        self.range().len()
+    }
+
+    /// The percentage of the full circle that is covered
+    /// by this arc.
+    pub fn coverage(&self) -> f64 {
+        self.absolute_length() as f64 / U32_LEN as f64
+    }
+}
+
+impl PeerDensity {
+    /// Create a new peer density reading from the:
+    /// - The filter used to create the bucket.
+    /// - Average coverage of all peers in the bucket.
+    /// - Count of peers in the bucket.
+    pub fn new(filter: DhtArc, average_coverage: f64, count: usize) -> Self {
+        Self {
+            filter,
+            average_coverage,
+            count,
+        }
+    }
+
+    /// The expected number of peers for this arc over time.
+    pub fn expected_count(&self) -> usize {
+        (self.count as f64 * DEFAULT_UPTIME) as usize
+    }
+
+    /// Estimate the gap in coverage that needs to be filled.
+    /// If the gap is negative that means we are over covered.
+    pub fn est_gap(&self) -> f64 {
+        let est_total_peers = self.est_total_peers();
+        let ideal_target = coverage_target(est_total_peers);
+        let gap = ideal_target - self.average_coverage;
+        if gap < NOISE_THRESHOLD {
+            0.0
+        } else {
+            gap * est_total_peers as f64
+        }
+    }
+
+    /// Estimate total peers.
+    pub fn est_total_peers(&self) -> usize {
+        let coverage = self.filter.coverage();
+        if coverage > 0.0 {
+            (1.0 / coverage * self.expected_count() as f64) as usize
+        } else {
+            // If we had no coverage when we collected these
+            // peers then we can't make a good guess at the total.
+            0
+        }
+    }
+
+    /// Estimated total redundant coverage.
+    pub fn est_total_redundancy(&self) -> usize {
+        (self.est_total_peers() as f64 * self.average_coverage) as usize
     }
 }
 
@@ -140,6 +312,21 @@ impl ArcRange {
         matches!((self.start_bound(), self.end_bound()), (Bound::Excluded(a), Bound::Excluded(b)) if a == b)
     }
 
+    /// Length of this range. Remember this range can be a wrapping range.
+    /// Must be u64 because the length of possible values in a u32 is u32::MAX + 1.
+    pub fn len(&self) -> u64 {
+        match (self.start_bound(), self.end_bound()) {
+            // Range has wrapped around.
+            (Bound::Included(start), Bound::Included(end)) if end < start => {
+                U32_LEN - *start as u64 + *end as u64 + 1
+            }
+            (Bound::Included(start), Bound::Included(end)) if start == end => 1,
+            (Bound::Included(start), Bound::Included(end)) => (end - start) as u64 + 1,
+            (Bound::Excluded(_), Bound::Excluded(_)) => 0,
+            _ => unreachable!("Ranges are either completely inclusive or completely exclusive"),
+        }
+    }
+
     #[cfg(test)]
     fn into_inc(self: ArcRange) -> RangeInclusive<usize> {
         match self {
@@ -172,147 +359,119 @@ impl RangeBounds<u32> for ArcRange {
             Bound::Unbounded => unreachable!("No unbounded ranges for arcs"),
         }
     }
+
+    fn contains<U>(&self, _item: &U) -> bool
+    where
+        u32: PartialOrd<U>,
+        U: ?Sized + PartialOrd<u32>,
+    {
+        unreachable!("Contains doesn't make sense for this type of range due to redundant holding near the bounds. Use DhtArc::contains")
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // TODO: This is a really good place for prop testing
-
-    #[test]
-    fn test_arc_dist() {
-        // start at 5 go all the way around the arc anti-clockwise until
-        // you reach 5. You will have traveled 5 less then the entire arc plus one
-        // for the reserved zero value
-        assert_eq!(shortest_arc_distance(10, 5), 5);
-        assert_eq!(shortest_arc_distance(5, 10), 5);
-        assert_eq!(
-            shortest_arc_distance(Wrapping(u32::MAX) + Wrapping(5), u32::MAX),
-            5
-        );
-        assert_eq!(shortest_arc_distance(0, u32::MAX), 1);
-        assert_eq!(
-            shortest_arc_distance(0, MAX_HALF_LENGTH),
-            MAX_HALF_LENGTH - 2
-        );
+impl DhtArcBucket {
+    /// Select only the arcs that fit into the bucket.
+    pub fn new<I: IntoIterator<Item = DhtArc>>(filter: DhtArc, arcs: I) -> Self {
+        let arcs = arcs
+            .into_iter()
+            .filter(|a| filter.contains(a.center_loc))
+            .collect();
+        Self { filter, arcs }
     }
 
-    #[test]
-    fn test_dht_arc() {
-        assert!(!DhtArc::new(0, 0).contains(0));
-
-        assert!(DhtArc::new(0, 1).contains(0));
-
-        assert!(!DhtArc::new(0, 1).contains(1));
-        assert!(!DhtArc::new(1, 0).contains(0));
-        assert!(!DhtArc::new(1, 0).contains(1));
-
-        assert!(DhtArc::new(1, 1).contains(1));
-        assert!(DhtArc::new(0, 2).contains(0));
-        assert!(DhtArc::new(0, 2).contains(1));
-        assert!(DhtArc::new(0, 2).contains(u32::MAX));
-
-        assert!(!DhtArc::new(0, 2).contains(2));
-        assert!(!DhtArc::new(0, 2).contains(3));
-        assert!(!DhtArc::new(0, 2).contains(u32::MAX - 1));
-        assert!(!DhtArc::new(0, 2).contains(u32::MAX - 2));
-
-        assert!(DhtArc::new(0, 3).contains(2));
-        assert!(DhtArc::new(0, 3).contains(u32::MAX - 1));
-        assert!(DhtArc::new(0, MAX_HALF_LENGTH).contains(u32::MAX / 2));
-        assert!(DhtArc::new(0, MAX_HALF_LENGTH).contains(u32::MAX));
-        assert!(DhtArc::new(0, MAX_HALF_LENGTH).contains(0));
-        assert!(DhtArc::new(0, MAX_HALF_LENGTH).contains(MAX_HALF_LENGTH));
+    /// Same as new but doesn't check if arcs fit into the bucket.
+    pub fn new_unchecked(bucket: DhtArc, arcs: Vec<DhtArc>) -> Self {
+        Self {
+            filter: bucket,
+            arcs,
+        }
     }
 
-    #[test]
-    fn test_arc_start_end() {
-        use std::ops::Bound::*;
+    /// Get the density of this bucket.
+    pub fn density(&self) -> PeerDensity {
+        self.arcs
+            .iter()
+            .fold(PeerDensity::new(self.filter, 0.0, 0), |mut d, arc| {
+                d.average_coverage =
+                    (d.average_coverage * d.count as f64 + arc.coverage()) / (d.count as f64 + 1.0);
+                d.count += 1;
+                d
+            })
+    }
+}
 
-        let quarter = (u32::MAX as f64 / 4.0).round() as u32;
-        let half = (u32::MAX as f64 / 2.0).round() as u32;
+impl std::fmt::Display for DhtArcBucket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for a in &self.arcs {
+            writeln!(f, "{}", a)?;
+        }
+        writeln!(f, "{} <- Bucket arc", self.filter)
+    }
+}
 
-        // Checks that the range is contained and the outside of the range isn't contained
-        let check_bounds = |mid, hl, start, end| {
-            let out_l = (Wrapping(start) - Wrapping(1u32)).0;
-            let out_r = (Wrapping(end) + Wrapping(1u32)).0;
-            let opp = (Wrapping(mid) + Wrapping(half)).0;
+impl std::fmt::Display for DhtArc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut out = ["_"; 100];
+        let half_cov = (self.coverage() * 50.0) as isize;
+        let center = self.center_loc.0 .0 as f64 / U32_LEN as f64;
+        let center = (center * 100.0) as isize;
+        for mut i in (center - half_cov)..(center + half_cov) {
+            if i >= 100 {
+                i -= 100;
+            }
+            if i < 0 {
+                i += 100;
+            }
+            out[i as usize] = "#";
+        }
+        out[center as usize] = "|";
+        let out: String = out.iter().map(|a| a.chars()).flatten().collect();
+        writeln!(f, "[{}]", out)
+    }
+}
 
-            assert!(!DhtArc::new(mid, hl).contains(out_l));
-            assert!(DhtArc::new(mid, hl).contains(start));
-            assert!(DhtArc::new(mid, hl).contains(mid));
-            assert!(DhtArc::new(mid, hl).contains(end));
-            assert!(!DhtArc::new(mid, hl).contains(out_r));
-            assert!(!DhtArc::new(mid, hl + 1).contains(opp));
+/// Check a set of peers for a gap in coverage.
+pub fn check_for_gaps(peers: Vec<DhtArc>) -> bool {
+    let left = |arc: &DhtArc| match arc.range().start_bound() {
+        Bound::Included(arm) => *arm,
+        _ => unreachable!(),
+    };
+    let mut peers: Vec<_> = peers
+        .into_iter()
+        .filter(|a| match a.range().start_bound() {
+            Bound::Included(_) => true,
+            _ => false,
+        })
+        .collect();
+    if peers.is_empty() {
+        return true;
+    }
+    peers.sort_unstable_by_key(|p| left(p));
+    if peers[0].coverage() == 1.0 {
+        return false;
+    }
+    // Translate the peers to zero to make wrapping checks easy.
+    let translate = left(&peers[0]);
+    // Safe to cast because of the coverage check
+    let mut max = peers[0].range().len() as u32;
+
+    for peer in peers {
+        if peer.coverage() == 1.0 {
+            return false;
+        }
+        let l = left(&peer) - translate;
+        if l > max {
+            return true;
+        }
+        max = match l.checked_add(peer.range().len() as u32) {
+            Some(m) => m,
+            None => {
+                // We reached the end and we know 0 is covered
+                // so there is no gap.
+                return false;
+            }
         };
-
-        // Checks that everything is contained because this is a full range
-        let check_bounds_full = |mid, hl, start, end| {
-            let out_l = (Wrapping(start) - Wrapping(1u32)).0;
-            let out_r = (Wrapping(end) + Wrapping(1u32)).0;
-            let opp = (Wrapping(mid) + Wrapping(half)).0;
-
-            assert!(DhtArc::new(mid, hl).contains(out_l));
-            assert!(DhtArc::new(mid, hl).contains(start));
-            assert!(DhtArc::new(mid, hl).contains(mid));
-            assert!(DhtArc::new(mid, hl).contains(end));
-            assert!(DhtArc::new(mid, hl).contains(out_r));
-            assert!(DhtArc::new(mid, hl + 1).contains(opp));
-        };
-
-        assert!(DhtArc::new(0, 0).range().is_empty());
-        assert_eq!(DhtArc::new(0, 1).range().into_inc(), 0..=0);
-        assert_eq!(DhtArc::new(1, 2).range().into_inc(), 0..=2);
-        assert_eq!(
-            DhtArc::new(quarter, quarter + 1).range().into_inc(),
-            0..=(half as usize)
-        );
-        check_bounds(quarter, quarter + 1, 0, half);
-
-        assert_eq!(
-            DhtArc::new(half, quarter + 1).range().into_inc(),
-            (quarter as usize)..=((quarter * 3) as usize)
-        );
-        check_bounds(half, quarter + 1, quarter, quarter * 3);
-
-        assert_eq!(
-            DhtArc::new(half, MAX_HALF_LENGTH).range().into_inc(),
-            0..=(u32::MAX as usize)
-        );
-        check_bounds_full(half, MAX_HALF_LENGTH, 0, u32::MAX);
-
-        assert_eq!(
-            DhtArc::new(half, MAX_HALF_LENGTH - 2).range().into_inc(),
-            2..=((u32::MAX - 1) as usize)
-        );
-        check_bounds(half, MAX_HALF_LENGTH - 2, 2, u32::MAX - 1);
-
-        assert_eq!(
-            DhtArc::new(0, 2).range(),
-            ArcRange {
-                start: Included(u32::MAX),
-                end: Included(1)
-            }
-        );
-        check_bounds(0, 2, u32::MAX, 1);
-
-        assert_eq!(
-            DhtArc::new(u32::MAX, 2).range(),
-            ArcRange {
-                start: Included(u32::MAX - 1),
-                end: Included(0)
-            }
-        );
-        check_bounds(u32::MAX, 2, u32::MAX - 1, 0);
-
-        assert_eq!(
-            DhtArc::new(0, MAX_HALF_LENGTH).range(),
-            ArcRange {
-                start: Included(half),
-                end: Included(half - 1)
-            }
-        );
-        check_bounds_full(0, MAX_HALF_LENGTH, half, half - 1);
     }
+    // Didn't reach the end
+    true
 }

@@ -446,7 +446,10 @@ impl SpaceInternalHandler for Space {
                     urls.clone(),
                     crate::spawn::actor::bootstrap::now_once(None).await?,
                     expires_after,
-                );
+                )
+                .with_meta_info(crate::types::agent_store::AgentMetaInfo {
+                    dht_storage_arc_half_length: 0,
+                })?;
                 let mut data = Vec::new();
                 kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info)?;
                 let sign_req = SignNetworkDataEvt {
