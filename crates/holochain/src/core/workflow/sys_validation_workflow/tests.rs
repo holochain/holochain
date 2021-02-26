@@ -5,7 +5,7 @@ use crate::test_utils::setup_app;
 use crate::test_utils::wait_for_integration;
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
-use hdk3::prelude::LinkTag;
+use hdk::prelude::LinkTag;
 use holo_hash::AnyDhtHash;
 use holo_hash::DhtOpHash;
 use holo_hash::EntryHash;

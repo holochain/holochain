@@ -1,0 +1,10 @@
+---
+manifest_version: "1"
+name: a dna
+uuid: 00000000-0000-0000-0000-000000000000
+properties: ~
+zomes:
+  - name: zome1
+    bundled: ./zomes/zome1.wasm
+  - name: zome2
+    bundled: ./zomes/zome2.wasm

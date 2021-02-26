@@ -59,6 +59,23 @@ impl<'de, T: HashType> serde::de::Visitor<'de> for HoloHashVisitor<T> {
 
         self.visit_bytes(&vec)
     }
+
+    #[cfg(feature = "string-encoding")]
+    fn visit_str<E>(self, b64: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        let h = crate::holo_hash_decode_unchecked(b64)
+            .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))?;
+        if !h.len() == 39 {
+            Err(serde::de::Error::custom(
+                "HoloHash serialized representation must be exactly 39 bytes",
+            ))
+        } else {
+            HoloHash::from_raw_39(h.to_vec())
+                .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))
+        }
+    }
 }
 
 impl<T: HashType> std::convert::TryFrom<&HoloHash<T>> for SerializedBytes {

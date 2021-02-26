@@ -1,8 +1,8 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use hdk3::prelude::CellId;
-use hdk3::prelude::WasmError;
+use hdk::prelude::CellId;
+use hdk::prelude::WasmError;
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
 use holochain_keystore::AgentPubKeyExt;
@@ -125,7 +125,7 @@ fn conductors_local_gossip(num_committers: usize, num_conductors: usize, new_con
 #[ignore = "Don't want network tests running on ci"]
 fn conductors_boot_gossip(num_committers: usize, num_conductors: usize, new_conductors: usize) {
     let mut network = KitsuneP2pConfig::default();
-    network.bootstrap_service = Some(url2::url2!("https://bootstrap.holo.host"));
+    network.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
         bind_to: None,
         override_host: None,
@@ -157,7 +157,7 @@ fn conductors_local_boot_gossip(
     new_conductors: usize,
 ) {
     let mut network = KitsuneP2pConfig::default();
-    network.bootstrap_service = Some(url2::url2!("http://127.0.0.1:8787"));
+    network.bootstrap_service = Some(url2::url2!("http://localhost:8787"));
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
         bind_to: None,
         override_host: None,
@@ -241,7 +241,7 @@ fn conductors_remote_boot_gossip(
         override_port: None,
         override_host: None,
     };
-    network.bootstrap_service = Some(url2::url2!("https://bootstrap.holo.host/"));
+    network.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host/"));
     let proxy_config = holochain_p2p::kitsune_p2p::ProxyConfig::RemoteProxyClient{
         proxy_url: url2::url2!("kitsune-proxy://CIW6PxKxsPPlcuvUCbMcKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/proxy.holochain.org/p/5778/--"),
     };

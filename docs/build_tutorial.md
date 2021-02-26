@@ -4,9 +4,9 @@
 
 ## Steps
 
-### 0. Build `holochain` and `dna-util`
+### 0. Build `holochain` and `hc`
 
-You'll need two binaries on your PATH to develop DNAs: the actual Holochain (`holochain`) conductor binary, and the dna-util library which assists with assembling Wasms into a DNA file.
+You'll need two binaries on your PATH to develop DNAs: the actual Holochain (`holochain`) conductor binary, and the hc library which assists with assembling Wasms into a DNA file.
 
 There are two ways you can approach that, via a [nix-shell](https://nixos.org/manual/nix/stable/#ch-installing-binary) which handles the majority for you, or via direct Rust installation to your computer. Instructions for both follow.
 
@@ -36,12 +36,12 @@ Launch a nix-shell, based on holochain/holochain's nix-shell configuration
 nix-shell
 ```
 
-Install the `holochain` and `dna-util` binaries using the built-in installer
+Install the `holochain` and `hc` binaries using the built-in installer
 ```bash
 hc-install
 ```
 
-Confirm that they are there by running `holochain -V` and `dna-util -V`, and that you see simple version number outputs.
+Confirm that they are there by running `holochain -V` and `hc -V`, and that you see simple version number outputs.
 
 #### native rust
 
@@ -50,13 +50,13 @@ Install Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-Grab and install the binaries for `holochain` and `dna-util` from github, at the right version
+Grab and install the binaries for `holochain` and `hc` from github, at the right version
 ```bash
 cargo install holochain --git https://github.com/holochain/holochain.git --branch develop
-cargo install dna_util --git https://github.com/holochain/holochain.git --branch develop
+cargo install hc --git https://github.com/holochain/holochain.git --branch develop
 ```
 
-Confirm that they are there by running `holochain -V` and `dna-util -V`, and that you see simple version number outputs.
+Confirm that they are there by running `holochain -V` and `hc -V`, and that you see simple version number outputs.
 
 ### 1. Write your Zomes
 
@@ -77,15 +77,15 @@ and they will be available in `target/wasm32-unknown-unknown/release/`
 *Note: Soon, this process will be easier in that it will not require a `.dna.workdir`*
 
 1. Create a `demo.dna.workdir` directory (replace "demo" with whatever you want)
-2. Create a `demo.dna.workdir/dna.json` file which references the `*.wasm` files you built in the previous step. See the [dna.json](dna.json) file in this repo for an example.
-  - Note: this is a bit hacky right now. Normally when using a dna.workdir, you would include the Wasms alongside the `dna.json` in the same directory. However, it is easier for the purposes of this tutorial to let the `dna.json` reference Wasms in a different directory. The workdir construct becomes more useful when you need to go back and forth between an already-built DNA and its constituent Wasms.
-3. Run the following command to assemble your Wasms into a DNA file per your dna.json:
+2. Create a `demo.dna.workdir/dna.yaml` file which references the `*.wasm` files you built in the previous step. See the [dna.yaml](dna.yaml) file in this repo for an example.
+  - Note: this is a bit hacky right now. Normally when using a dna.workdir, you would include the Wasms alongside the `dna.yaml` in the same directory. However, it is easier for the purposes of this tutorial to let the `dna.yaml` reference Wasms in a different directory. The workdir construct becomes more useful when you need to go back and forth between an already-built DNA and its constituent Wasms.
+3. Run the following command to assemble your Wasms into a DNA file per your dna.yaml:
 
 ```bash
-dna-util -c demo.dna.workdir
+hc -c demo.dna.workdir
 ```
 
-This will produce a `demo.dna.gz` file as a sibling of the `demo.dna.workdir` directory.
+This will produce a `demo.dna` file as a sibling of the `demo.dna.workdir` directory.
 
 ### 4. Use the Conductor's admin interface to install your DNA
 

@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 #[hdk_entry(
     id = "post",
@@ -38,12 +38,12 @@ fn priv_msg() -> PrivMsg {
 
 #[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<HeaderHash> {
-    Ok(hdk3::prelude::create_entry(&post())?)
+    Ok(hdk::prelude::create_entry(&post())?)
 }
 
 #[hdk_extern]
 fn create_post(post: crate::Post) -> ExternResult<HeaderHash> {
-    hdk3::prelude::create_entry(&post)
+    hdk::prelude::create_entry(&post)
 }
 
 #[hdk_extern]
@@ -64,12 +64,12 @@ fn get_post(hash: HeaderHash) -> ExternResult<Option<Element>> {
 
 #[hdk_extern]
 fn create_msg(_: ()) -> ExternResult<HeaderHash> {
-    hdk3::prelude::create_entry(&msg())
+    hdk::prelude::create_entry(&msg())
 }
 
 #[hdk_extern]
 fn create_priv_msg(_: ()) -> ExternResult<HeaderHash> {
-    hdk3::prelude::create_entry(&priv_msg())
+    hdk::prelude::create_entry(&priv_msg())
 }
 
 #[hdk_extern]
@@ -118,7 +118,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 #[hdk_extern]
 fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
     // Create an entry directly via. the hdk.
-    hdk3::prelude::create_entry(&post())?;
+    hdk::prelude::create_entry(&post())?;
     // Create an entry via a `call`.
     let zome_call_response: ZomeCallResponse = call(
         None,

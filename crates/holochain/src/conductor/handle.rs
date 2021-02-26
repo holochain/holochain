@@ -44,8 +44,6 @@
 use super::api::error::ConductorApiResult;
 use super::api::ZomeCall;
 use super::config::AdminInterfaceConfig;
-use super::dna_store::DnaStore;
-use super::entry_def_store::EntryDefBufferKey;
 use super::error::ConductorResult;
 use super::error::CreateAppError;
 use super::interface::SignalBroadcaster;
@@ -59,6 +57,7 @@ use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
+use holochain_conductor_api::InstalledAppInfo;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
@@ -90,7 +89,6 @@ pub trait ConductorHandleT: Send + Sync {
     /// around having a circular reference in the types.
     ///
     /// Never use a ConductorHandle for different Conductor here!
-    #[allow(clippy::ptr_arg)]
     async fn add_admin_interfaces(
         self: Arc<Self>,
         configs: Vec<AdminInterfaceConfig>,
@@ -104,7 +102,10 @@ pub trait ConductorHandleT: Send + Sync {
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16>;
 
     /// Install a [Dna] in this Conductor
-    async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()>;
+    async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
+
+    /// Install just the "code parts" (the wasm and entry defs) of a dna
+    async fn register_genotype(&self, dna: DnaFile) -> ConductorResult<()>;
 
     /// Get the list of hashes of installed Dnas in this Conductor
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
@@ -116,7 +117,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
     /// Add the [DnaFile]s from the wasm and dna_def databases into memory
-    async fn add_dnas(&self) -> ConductorResult<()>;
+    async fn load_dnas(&self) -> ConductorResult<()>;
 
     /// Dispatch a network event to the correct cell.
     async fn dispatch_holochain_p2p_event(
@@ -157,25 +158,37 @@ pub trait ConductorHandleT: Send + Sync {
     /// Request access to this conductor's networking handle
     fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef;
 
+    /// Create a new Cell in an existing App based on an existing DNA
+    async fn create_clone_cell(
+        self: Arc<Self>,
+        payload: CreateCloneCellPayload,
+    ) -> ConductorResult<CellId>;
+
+    /// Destroy a cloned Cell
+    async fn destroy_clone_cell(self: Arc<Self>, cell_id: CellId) -> ConductorResult<()>;
+
     /// Install Cells into ConductorState based on installation info, and run
     /// genesis on all new source chains
-    #[allow(clippy::ptr_arg)]
     async fn install_app(
         self: Arc<Self>,
         installed_app_id: InstalledAppId,
         cell_data_with_proofs: Vec<(InstalledCell, Option<MembraneProof>)>,
     ) -> ConductorResult<()>;
 
+    /// Install DNAs and set up Cells as specified by an AppBundle
+    async fn install_app_bundle(
+        self: Arc<Self>,
+        payload: InstallAppBundlePayload,
+    ) -> ConductorResult<InstalledApp>;
+
     /// Setup the cells from the database
     /// Only creates any cells that are not already created
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>>;
 
     /// Activate an app
-    #[allow(clippy::ptr_arg)]
     async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()>;
 
     /// Deactivate an app
-    #[allow(clippy::ptr_arg)]
     async fn deactivate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()>;
 
     /// List Cell Ids
@@ -185,7 +198,6 @@ pub trait ConductorHandleT: Send + Sync {
     async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
 
     /// Dump the cells state
-    #[allow(clippy::ptr_arg)]
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
     /// Access the broadcast Sender which will send a Signal across every
@@ -193,11 +205,10 @@ pub trait ConductorHandleT: Send + Sync {
     async fn signal_broadcaster(&self) -> SignalBroadcaster;
 
     /// Get info about an installed App, whether active or inactive
-    #[allow(clippy::ptr_arg)]
     async fn get_app_info(
         &self,
         installed_app_id: &InstalledAppId,
-    ) -> ConductorResult<Option<InstalledApp>>;
+    ) -> ConductorResult<Option<InstalledAppInfo>>;
 
     /// Add signed agent info to the conductor
     async fn add_agent_infos(&self, agent_infos: Vec<AgentInfoSigned>) -> ConductorApiResult<()>;
@@ -276,27 +287,22 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         lock.add_app_interface_via_handle(port, self.clone()).await
     }
 
-    async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-        let is_full_wasm_dna = dna
-            .dna_def()
-            .zomes
-            .iter()
-            .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
+    async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
+        self.register_genotype(dna.clone()).await?;
+        self.conductor.write().await.register_phenotype(dna).await
+    }
 
-        let mut lock = self.conductor.write().await;
-
-        // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
-        if is_full_wasm_dna {
-            let entry_defs = lock.put_wasm(dna.clone()).await?;
-            lock.dna_store_mut().add_entry_defs(entry_defs);
-        }
-
-        lock.dna_store_mut().add_dna(dna);
-
+    async fn register_genotype(&self, dna: DnaFile) -> ConductorResult<()> {
+        let entry_defs = self.conductor.read().await.register_dna_wasm(dna).await?;
+        self.conductor
+            .write()
+            .await
+            .register_dna_entry_defs(entry_defs)
+            .await?;
         Ok(())
     }
 
-    async fn add_dnas(&self) -> ConductorResult<()> {
+    async fn load_dnas(&self) -> ConductorResult<()> {
         let (dnas, entry_defs) = self
             .conductor
             .read()
@@ -420,6 +426,38 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self.holochain_p2p
     }
 
+    async fn create_clone_cell(
+        self: Arc<Self>,
+        payload: CreateCloneCellPayload,
+    ) -> ConductorResult<CellId> {
+        let CreateCloneCellPayload {
+            properties,
+            dna_hash,
+            installed_app_id,
+            agent_key,
+            slot_id,
+            membrane_proof,
+        } = payload;
+        {
+            let conductor = self.conductor.read().await;
+            let cell_id = CellId::new(dna_hash, agent_key);
+            let cells = vec![(cell_id.clone(), membrane_proof)];
+            conductor.genesis_cells(cells, self.clone()).await?;
+        }
+        {
+            let mut conductor = self.conductor.write().await;
+            let properties = properties.unwrap_or_else(|| ().into());
+            let cell_id = conductor
+                .add_clone_cell_to_app(&installed_app_id, &slot_id, properties)
+                .await?;
+            Ok(cell_id)
+        }
+    }
+
+    async fn destroy_clone_cell(self: Arc<Self>, _cell_id: CellId) -> ConductorResult<()> {
+        todo!()
+    }
+
     async fn install_app(
         self: Arc<Self>,
         installed_app_id: InstalledAppId,
@@ -437,12 +475,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             )
             .await?;
 
-        let cell_data = cell_data.into_iter().map(|(c, _)| c).collect();
-        let app = InstalledApp {
-            installed_app_id,
-            cell_data,
-            active: false,
-        };
+        let cell_data = cell_data.into_iter().map(|(c, _)| c);
+        let app = InstalledApp::new_legacy(installed_app_id, cell_data)?;
 
         // Update the db
         self.conductor
@@ -450,6 +484,50 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
             .add_inactive_app_to_db(app)
             .await
+    }
+
+    async fn install_app_bundle(
+        self: Arc<Self>,
+        payload: InstallAppBundlePayload,
+    ) -> ConductorResult<InstalledApp> {
+        let InstallAppBundlePayload {
+            source,
+            agent_key,
+            installed_app_id,
+            membrane_proofs,
+        } = payload;
+
+        let bundle = source.resolve().await?;
+
+        let installed_app_id =
+            installed_app_id.unwrap_or_else(|| bundle.manifest().app_name().to_owned());
+        let ops = bundle
+            .resolve_cells(agent_key.clone(), DnaGamut::placeholder(), membrane_proofs)
+            .await?;
+
+        let cells_to_create = ops.cells_to_create();
+
+        for (dna, _) in ops.dnas_to_register {
+            self.clone().register_dna(dna).await?;
+        }
+
+        self.conductor
+            .read()
+            .await
+            .genesis_cells(cells_to_create, self.clone())
+            .await?;
+
+        let slots = ops.slots;
+        let app = InstalledApp::new(installed_app_id, agent_key, slots);
+
+        // Update the db
+        self.conductor
+            .write()
+            .await
+            .add_inactive_app_to_db(app.clone())
+            .await?;
+
+        Ok(app)
     }
 
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>> {
@@ -483,6 +561,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
             .activate_app_in_db(installed_app_id)
             .await
+        // MD: Should we be doing `Conductor::add_cells()` here? (see below comment)
     }
 
     async fn deactivate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()> {
@@ -521,7 +600,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn get_app_info(
         &self,
         installed_app_id: &InstalledAppId,
-    ) -> ConductorResult<Option<InstalledApp>> {
+    ) -> ConductorResult<Option<InstalledAppInfo>> {
         Ok(self
             .conductor
             .read()

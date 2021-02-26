@@ -1,8 +1,8 @@
 //! Structs which allow the Conductor's state to be persisted across
 //! startups and shutdowns
 
-use holochain_conductor_api::config::InterfaceDriver;
 use holochain_conductor_api::signal_subscription::SignalSubscription;
+use holochain_conductor_api::{config::InterfaceDriver, InstalledAppInfo};
 use holochain_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -18,10 +18,10 @@ use std::collections::HashMap;
 pub struct ConductorState {
     /// Apps that are ready to be activated
     #[serde(default)]
-    pub inactive_apps: HashMap<InstalledAppId, Vec<InstalledCell>>,
+    pub inactive_apps: InstalledAppMap,
     /// Apps that are active and will be loaded
     #[serde(default)]
-    pub active_apps: HashMap<InstalledAppId, Vec<InstalledCell>>,
+    pub active_apps: InstalledAppMap,
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
     pub app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
@@ -51,18 +51,15 @@ impl From<&str> for AppInterfaceId {
 impl ConductorState {
     /// Retrieve info about an installed App by its InstalledAppId
     #[allow(clippy::ptr_arg)]
-    pub fn get_app_info(&self, installed_app_id: &InstalledAppId) -> Option<InstalledApp> {
-        let mut active = true;
-        let mut maybe_cell_data = self.active_apps.get(installed_app_id);
-        if maybe_cell_data.is_none() {
-            active = false;
-            maybe_cell_data = self.inactive_apps.get(installed_app_id);
-        }
-        maybe_cell_data.map(|cell_data| InstalledApp {
-            installed_app_id: installed_app_id.clone(),
-            cell_data: cell_data.clone(),
-            active,
-        })
+    pub fn get_app_info(&self, installed_app_id: &InstalledAppId) -> Option<InstalledAppInfo> {
+        self.active_apps
+            .get(installed_app_id)
+            .map(|app| InstalledAppInfo::from_installed_app(app, true))
+            .or_else(|| {
+                self.inactive_apps
+                    .get(installed_app_id)
+                    .map(|app| InstalledAppInfo::from_installed_app(app, false))
+            })
     }
 
     /// Returns the interface configuration with the given ID if present

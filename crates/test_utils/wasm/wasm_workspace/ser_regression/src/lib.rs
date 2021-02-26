@@ -1,5 +1,5 @@
 use derive_more::*;
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
 struct CreateMessageInput {

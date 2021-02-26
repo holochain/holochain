@@ -9,6 +9,7 @@ pub use std::convert::TryFrom;
 pub use std::convert::TryInto;
 
 pub use crate::activity::*;
+pub use crate::app::error::*;
 pub use crate::app::*;
 pub use crate::autonomic::*;
 pub use crate::chain::*;

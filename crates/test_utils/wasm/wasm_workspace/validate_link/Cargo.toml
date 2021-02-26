@@ -9,5 +9,5 @@ name = "test_wasm_validate_link"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-serde = "=1.0.104"
-hdk3 = { path = "../../../../hdk3" }
+serde = "1.0"
+hdk = { path = "../../../../hdk" }
