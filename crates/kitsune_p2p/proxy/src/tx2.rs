@@ -8,6 +8,7 @@ use std::sync::Arc;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
 use parking_lot::Mutex;
+use tokio::sync::{Semaphore, OwnedSemaphorePermit};
 
 struct ProxyConRecvAdapt {
     actor: Actor<ConFut>,
@@ -43,6 +44,7 @@ struct ProxyEndpointInner {
     actor: ActorHandle<ConFut>,
     sub_ep: Arc<dyn EndpointAdapt>,
     digest: crate::CertDigest,
+    max_connections: Arc<Semaphore>,
 }
 
 struct ProxyEndpointAdapt(Mutex<Option<ProxyEndpointInner>>);
@@ -52,11 +54,13 @@ impl ProxyEndpointAdapt {
         actor: ActorHandle<ConFut>,
         sub_ep: Arc<dyn EndpointAdapt>,
         digest: crate::CertDigest,
-    ) -> Arc<dyn EndpointAdapt> {
+        max_connections: Arc<Semaphore>,
+    ) -> Arc<Self> {
         Arc::new(Self(Mutex::new(Some(ProxyEndpointInner {
             actor,
             sub_ep,
             digest,
+            max_connections,
         }))))
     }
 }
@@ -82,7 +86,7 @@ impl EndpointAdapt for ProxyEndpointAdapt {
     }
 
     fn connect(&self, url: TxUrl, timeout: KitsuneTimeout) -> ConFut {
-        let fut = {
+        let (ep, max_connections) = {
             let mut lock = self.0.lock();
             if lock.is_none() {
                 return async move { Err(KitsuneError::Closed) }.boxed();
@@ -92,11 +96,12 @@ impl EndpointAdapt for ProxyEndpointAdapt {
                 return async move { Err(KitsuneError::Closed) }.boxed();
             }
             let inner = lock.as_ref().unwrap();
-            let base_url = ProxyUrl::from(url.as_str()).into_base().as_str().into();
-            inner.sub_ep.connect(base_url, timeout)
+            (inner.sub_ep.clone(), inner.max_connections.clone())
         };
         async move {
-            let (con, _in_chan_recv) = fut.await?;
+            let _permit = max_connections.acquire_owned().await;
+            let base_url = ProxyUrl::from(url.as_str()).into_base().as_str().into();
+            let (con, _in_chan_recv) = ep.connect(base_url, timeout).await?;
             println!("got remote con addr: {}", con.remote_addr().unwrap());
             unimplemented!()
         }
@@ -118,6 +123,7 @@ impl EndpointAdapt for ProxyEndpointAdapt {
 pub struct ProxyBackendAdapt {
     tls_config: TlsConfig,
     sub_transport_factory: BackendFactory,
+    max_connections: Arc<Semaphore>,
 }
 
 impl ProxyBackendAdapt {
@@ -125,21 +131,57 @@ impl ProxyBackendAdapt {
     pub fn new(
         tls_config: TlsConfig,
         sub_transport_factory: BackendFactory,
+        max_connections: usize,
     ) -> BackendFactory {
         let out: BackendFactory = Arc::new(Self {
             tls_config,
             sub_transport_factory,
+            max_connections: Arc::new(Semaphore::new(max_connections)),
         });
         out
     }
+}
+
+async fn in_con_logic(
+    _ep: Arc<ProxyEndpointAdapt>,
+    sub_con_recv: Box<dyn ConRecvAdapt>,
+    max_connections: Arc<Semaphore>,
+) {
+    type P = (OwnedSemaphorePermit, Arc<dyn ConAdapt>, Box<dyn InChanRecvAdapt>);
+    type RP = BoxFuture<'static, KitsuneResult<P>>;
+    type SP = futures::stream::BoxStream<'static, RP>;
+    let sub_con_recv: SP = futures::stream::unfold(sub_con_recv, move |mut sub_con_recv| {
+        let max_connections = max_connections.clone();
+        async move {
+            let permit = max_connections.acquire_owned().await;
+            match sub_con_recv.next().await {
+                Err(_) => None,
+                Ok(fut) => Some((async move {
+                    let (con, chan_recv) = fut.await?;
+                    Ok((permit, con, chan_recv))
+                }.boxed(), sub_con_recv)),
+            }
+        }
+    }).boxed();
+    sub_con_recv.for_each_concurrent(None, move |fut| async move {
+        let (_permit, con, _chan_recv) = match fut.await {
+            // TODO - FIXME
+            Err(e) => panic!("{:?}", e),
+            Ok(r) => r,
+        };
+        println!("RECV CON: rem: {}", con.remote_addr().unwrap());
+        unimplemented!()
+    }).await;
+    println!("CON RECV LOOP END");
 }
 
 impl BackendAdapt for ProxyBackendAdapt {
     fn bind(&self, url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut {
         let digest = self.tls_config.cert_digest.clone();
         let fut = self.sub_transport_factory.bind(url, timeout);
+        let max_connections = self.max_connections.clone();
         async move {
-            let (ep, mut con_recv) = fut.await?;
+            let (ep, sub_con_recv) = fut.await?;
 
             let actor_recv = Actor::new(32);
 
@@ -147,26 +189,18 @@ impl BackendAdapt for ProxyBackendAdapt {
                 actor_recv.handle().clone(),
                 ep,
                 digest,
+                max_connections.clone(),
             );
 
-            let ep2 = ep.clone();
-            actor_recv.handle().capture_logic(async move {
-                let _ep2 = ep2;
-                loop {
-                    match con_recv.next().await {
-                        // TODO - FIXME
-                        Err(e) => panic!("{:?}", e),
-                        Ok(_con_fut) => {
-                            println!("GOT CON_FUT");
-                            unimplemented!()
-                        }
-                    }
-                }
-            }).await;
+            let dyn_ep: Arc<dyn EndpointAdapt> = ep.clone();
+
+            actor_recv.handle().capture_logic(
+                in_con_logic(ep, sub_con_recv, max_connections),
+            ).await;
 
             let con_recv = ProxyConRecvAdapt::new(actor_recv);
 
-            Ok((ep, con_recv))
+            Ok((dyn_ep, con_recv))
         }
         .boxed()
     }
@@ -183,13 +217,15 @@ mod tests {
 
         let back = ProxyBackendAdapt::new(
             TlsConfig::new_ephemeral().await.unwrap(),
-            MemBackendAdapt::new()
+            MemBackendAdapt::new(),
+            32,
         );
         let (ep1, _con_recv1) = back.bind("none:".into(), t).await.unwrap();
 
         let back = ProxyBackendAdapt::new(
             TlsConfig::new_ephemeral().await.unwrap(),
-            MemBackendAdapt::new()
+            MemBackendAdapt::new(),
+            32,
         );
         let (ep2, mut con_recv2) = back.bind("none:".into(), t).await.unwrap();
 

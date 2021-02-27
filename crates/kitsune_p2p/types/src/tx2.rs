@@ -9,13 +9,15 @@ pub use framed::*;
 mod mem;
 pub use mem::*;
 
-mod pool;
-pub use pool::*;
+mod pool_buf;
+pub use pool_buf::*;
 
 mod resource_bucket;
 pub use resource_bucket::*;
 
 pub mod tx_backend;
+
+pub mod tx_pool;
 
 pub mod tx_frontend;
 
