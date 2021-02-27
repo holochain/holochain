@@ -1,8 +1,8 @@
 [package]
 name = "holochain_zome_types"
-version = "0.0.1"
+version = "0.0.2-alpha.1"
 description = "Holochain zome types"
-license = "CAL-1.0"
+license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://github.com/holochain/holochain"
 readme = "README.md"
@@ -12,10 +12,11 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+chrono = "0.4.6"
 holo_hash = { path = "../holo_hash" }
-holochain_serialized_bytes = "=0.0.48"
+holochain_serialized_bytes = "=0.0.50"
 paste = "=1.0.3"
-serde = { version = "1.0.104", features = [ "derive" ] }
+serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 subtle = "2"
 thiserror = "1.0.22"

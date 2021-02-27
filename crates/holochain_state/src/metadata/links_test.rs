@@ -75,7 +75,7 @@ async fn fixtures(env: EnvironmentWrite, n: usize) -> Vec<TestData> {
 impl TestData {
     /// Create the same test data with a new timestamp
     async fn with_same_keys(mut td: Self) -> Self {
-        td.link_add.timestamp = Timestamp::now().into();
+        td.link_add.timestamp = timestamp::now().into();
         let link_add_hash =
             HeaderHashed::from_content_sync(Header::CreateLink(td.link_add.clone())).into_hash();
         td.link_remove.link_add_address = link_add_hash.clone();

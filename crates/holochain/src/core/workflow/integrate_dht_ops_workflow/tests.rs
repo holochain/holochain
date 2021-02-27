@@ -195,7 +195,7 @@ impl Db {
                     let value = IntegratedDhtOpsValue {
                         validation_status: ValidationStatus::Valid,
                         op: op.to_light(),
-                        when_integrated: Timestamp::now().into(),
+                        when_integrated: timestamp::now().into(),
                     };
                     let mut r = workspace
                         .integrated_dht_ops
@@ -826,6 +826,7 @@ async fn test_ops_state() {
 
     for t in tests.iter() {
         clear_dbs(env.clone());
+        println!("test_ops_state on function {:?}", t);
         let td = TestData::new().await;
         let (pre_state, expect, name) = t(td);
         Db::set(pre_state, env.clone()).await;
@@ -878,7 +879,7 @@ async fn commit_entry<'env>(
     let zome = Zome::new(zome_name.clone().into(), fixt!(ZomeDef));
     dna_def.zomes.clear();
     dna_def.zomes.push(zome.clone().into());
-    let dna_def = DnaDefHashed::from_content(dna_def).await;
+    let dna_def = DnaDefHashed::from_content_sync(dna_def);
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
@@ -974,7 +975,7 @@ async fn create_link(
     let zome = Zome::new(zome_name.clone().into(), fixt!(ZomeDef));
     dna_def.zomes.clear();
     dna_def.zomes.push(zome.clone().into());
-    let dna_def = DnaDefHashed::from_content(dna_def).await;
+    let dna_def = DnaDefHashed::from_content_sync(dna_def);
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
@@ -1027,7 +1028,7 @@ async fn get_links(
     let zome = Zome::new(zome_name.clone().into(), fixt!(ZomeDef));
     dna_def.zomes.clear();
     dna_def.zomes.push(zome.clone().into());
-    let dna_def = DnaDefHashed::from_content(dna_def).await;
+    let dna_def = DnaDefHashed::from_content_sync(dna_def);
 
     let test_network = test_network(Some(dna_def.as_hash().clone()), None).await;
 

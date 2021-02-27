@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
-use crate::conductor::entry_def_store::EntryDefBufferKey;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::workflow::call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;

@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 pub struct AnchorInput(pub String, pub String);

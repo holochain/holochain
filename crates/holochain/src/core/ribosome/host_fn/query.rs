@@ -1,14 +1,14 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 pub fn query(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: ChainQueryFilter,
-) -> RibosomeResult<ElementVec> {
+) -> Result<Vec<Element>, WasmError> {
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let elements: Vec<Element> = call_context
             .host_access
@@ -16,8 +16,8 @@ pub fn query(
             .write()
             .await
             .source_chain
-            .query(&input)?;
-        Ok(ElementVec(elements))
+            .query(&input).map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+        Ok(elements)
     })
 }
 
@@ -28,7 +28,7 @@ pub mod slow_tests {
         core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator,
     };
     use ::fixt::prelude::*;
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
     use holochain_lmdb::test_utils::TestEnvironment;
     use query::ChainQueryFilter;
 
@@ -71,13 +71,13 @@ pub mod slow_tests {
             "b".to_string()
         );
 
-        let elements: ElementVec = crate::call_test_ribosome!(
+        let elements: Vec<Element> = crate::call_test_ribosome!(
             host_access,
             TestWasm::Query,
             "query",
             ChainQueryFilter::default()
         );
 
-        assert_eq!(elements.0.len(), 5);
+        assert_eq!(elements.len(), 5);
     }
 }

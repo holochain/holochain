@@ -1,15 +1,15 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 pub fn hash_entry(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     input: Entry,
-) -> RibosomeResult<EntryHash> {
+) -> Result<EntryHash, WasmError> {
     let entry_hash = holochain_types::entry::EntryHashed::from_content_sync(input).into_hash();
 
     Ok(entry_hash)
@@ -100,7 +100,7 @@ pub mod wasm_test {
         let output: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::HashPath, "hash", input);
 
-        let expected_path = hdk3::hash_path::path::Path::from("foo.bar");
+        let expected_path = hdk::hash_path::path::Path::from("foo.bar");
 
         let expected_hash = holochain_types::entry::EntryHashed::from_content_sync(
             Entry::app((&expected_path).try_into().unwrap()).unwrap(),

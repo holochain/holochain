@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 enum TemperatureUnit {
@@ -22,17 +22,17 @@ fn twenty_three_degrees_entry_hash(_: ()) -> ExternResult<EntryHash> {
     let header_hash: HeaderHash = create_entry(&temp)?;
     let element: Element = get(header_hash, GetOptions::content())?.unwrap();
     match element.entry() {
-        ElementEntry::Present(entry) => hdk3::prelude::hash_entry(entry.clone()),
+        ElementEntry::Present(entry) => hdk::prelude::hash_entry(entry.clone()),
         _ => unreachable!(),
     }
 }
 
 #[hdk_extern]
 fn twenty_three_degrees_hash(_: ()) -> ExternResult<EntryHash> {
-    hdk3::prelude::hash_entry(&temperature())
+    hdk::prelude::hash_entry(&temperature())
 }
 
 #[hdk_extern]
 fn hash_entry(entry: Entry) -> ExternResult<EntryHash> {
-    hdk3::prelude::hash_entry(entry)
+    hdk::prelude::hash_entry(entry)
 }

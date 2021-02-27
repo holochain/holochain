@@ -1,19 +1,21 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use ring::rand::SecureRandom;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 /// return n crypto secure random bytes from the standard holochain crypto lib
 pub fn random_bytes(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     input: u32,
-) -> RibosomeResult<Bytes> {
+) -> Result<Bytes, WasmError> {
     let system_random = ring::rand::SystemRandom::new();
     let mut bytes = vec![0; input as _];
-    system_random.fill(&mut bytes)?;
+    system_random.fill(&mut bytes).map_err(|ring_unspecified_error|
+        WasmError::Host(ring_unspecified_error.to_string())
+    )?;
 
     Ok(Bytes::from(bytes))
 }
@@ -64,7 +66,7 @@ pub mod wasm_test {
         const LEN: u32 = 5;
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        let output: hdk3::prelude::Bytes = crate::call_test_ribosome!(
+        let output: hdk::prelude::Bytes = crate::call_test_ribosome!(
             host_access,
             TestWasm::RandomBytes,
             "random_bytes",

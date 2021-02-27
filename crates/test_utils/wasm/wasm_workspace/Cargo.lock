@@ -29,9 +29,9 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
 name = "base64"
-version = "0.12.3"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3441f0f7b02788e948e47f457ca01f1d7e6d92c693bc132c22b087d3141c03ff"
+checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
 name = "bitflags"
@@ -52,9 +52,9 @@ dependencies = [
 
 [[package]]
 name = "byteorder"
-version = "1.3.4"
+version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
+checksum = "ae44d1a3d5a19df61dd0c8beb138458ac2a53a7ac09eba97d55592540004306b"
 
 [[package]]
 name = "cfg-if"
@@ -124,11 +124,11 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.1.15"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc587bc0ec293155d5bfa6b9891ec18a1e330c234f896ea47fbada4cadbe47e6"
+checksum = "8fc3cb4d91f53b50155bdcfd23f6a4c39ae1969c2ae85982b135750cccaf5fce"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "libc",
  "wasi 0.9.0+wasi-snapshot-preview1",
 ]
@@ -140,10 +140,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 
 [[package]]
-name = "hdk3"
+name = "hdk"
 version = "0.0.1"
 dependencies = [
- "hdk3_derive",
+ "hdk_derive",
  "holo_hash",
  "holochain_wasmer_guest",
  "holochain_zome_types",
@@ -157,7 +157,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hdk3_derive"
+name = "hdk_derive"
 version = "0.0.1"
 dependencies = [
  "holochain_zome_types",
@@ -182,18 +182,20 @@ version = "0.0.1"
 dependencies = [
  "base64",
  "blake2b_simd",
+ "derive_more",
  "fixt",
  "holochain_serialized_bytes",
  "rand",
  "serde",
  "serde_bytes",
+ "thiserror",
 ]
 
 [[package]]
 name = "holochain_serialized_bytes"
-version = "0.0.48"
+version = "0.0.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79ff6ebed11c8d4cbc9cb2ea1ee779100d623e819e4cb3bdca16481a775126da"
+checksum = "e77d1f384e8c8908f12d12301d5fc7861779fa68e6f74078d8876ed6aedf7eab"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
@@ -206,9 +208,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes_derive"
-version = "0.0.48"
+version = "0.0.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dbd32f37d69ab4772ec726b8d8349b6f0752f3757deac724a5791149c34ec1e"
+checksum = "085fe272d95591beeffe3e37c2996372c399baf33bc60ca88ae0906ce4d52207"
 dependencies = [
  "quote",
  "syn",
@@ -218,7 +220,7 @@ dependencies = [
 name = "holochain_test_wasm_common"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_serialized_bytes",
  "serde",
  "serde_bytes",
@@ -226,9 +228,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.65"
+version = "0.0.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59eea153743289f73ccdbca3d3281c163d858084084096d55e44b1602af1d2c6"
+checksum = "90cb4e0ce3995ed8fe5b7f1695b714bab5b7a343487fea8ae0ce14c38e225d24"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -238,19 +240,21 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.65"
+version = "0.0.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f371c69b6c335e70136266655afea31824260e2cad82d1142afde3e869c2b754"
+checksum = "a9c2f16b3f80ee23107b1c20de51aae8fcd90948833fed830ddbd61b86f5c0b2"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "serde",
+ "tracing",
 ]
 
 [[package]]
 name = "holochain_zome_types"
 version = "0.0.1"
 dependencies = [
+ "chrono",
  "fixt",
  "holo_hash",
  "holochain_serialized_bytes",
@@ -276,9 +280,9 @@ dependencies = [
 
 [[package]]
 name = "itoa"
-version = "0.4.6"
+version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc6f3ad7b9d11a0c00842ff8de1b60ee58661048eb8049ed33c73594f359d7e6"
+checksum = "dd25036021b0de88a0aff6b850051563c6516d0bf53f8638938edbb9de732736"
 
 [[package]]
 name = "lazy_static"
@@ -288,9 +292,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.81"
+version = "0.2.86"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1482821306169ec4d07f6aca392a4681f66c75c9918aa49641a2595db64053cb"
+checksum = "b7282d924be3275cec7f6756ff4121987bc6481325397dde6ba3e7802b1a8b1c"
 
 [[package]]
 name = "lock_api"
@@ -397,9 +401,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.8"
+version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "991431c3519a3f36861882da93630ce66b52918dcf1b8e2fd66b397fc96f28df"
+checksum = "c3d0b9745dc2debf507c8422de05d7226cc1f0644216dfdfead988f9b1ab32a7"
 dependencies = [
  "proc-macro2",
 ]
@@ -478,9 +482,9 @@ checksum = "b5eb417147ba9860a96cfe72a0b93bf88fee1744b5636ec99ab20c1aa9376581"
 
 [[package]]
 name = "rmp"
-version = "0.8.9"
+version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f10b46df14cf1ee1ac7baa4d2fbc2c52c0622a4b82fa8740e37bc452ac0184f"
+checksum = "4f55e5fa1446c4d5dd1f5daeed2a4fe193071771a2636274d0d7a3b082aa7ad6"
 dependencies = [
  "byteorder",
  "num-traits",
@@ -488,9 +492,9 @@ dependencies = [
 
 [[package]]
 name = "rmp-serde"
-version = "0.14.4"
+version = "0.15.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ce7d70c926fe472aed493b902010bccc17fa9f7284145cb8772fd22fdb052d8"
+checksum = "839395ef53057db96b84c9238ab29e1a13f2e5c8ec9f66bef853ab4197303924"
 dependencies = [
  "byteorder",
  "rmp",
@@ -511,9 +515,9 @@ checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
 name = "serde"
-version = "1.0.104"
+version = "1.0.123"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "414115f25f818d7dfccec8ee535d76949ae78584fc4f79a6f45a904bf8ab4449"
+checksum = "92d5161132722baa40d802cc70b15262b98258453e85e5d1d365c757c73869ae"
 dependencies = [
  "serde_derive",
 ]
@@ -538,9 +542,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.104"
+version = "1.0.123"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "128f9e303a5a29922045a830221b8f78ec74a5f544944f3d5984f8ec3895ef64"
+checksum = "9391c295d64fc0abb2c556bad848f33cb8296276b1ad2677d1ae1ace4f258f31"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -549,9 +553,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.60"
+version = "1.0.62"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1500e84d27fe482ed1dc791a56eddc2f230046a040fa908c08bda1d9fb615779"
+checksum = "ea1c6153794552ea7cf7cf63b1231a25de00ec90db326ba6264440fa08e31486"
 dependencies = [
  "indexmap",
  "itoa",
@@ -570,9 +574,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.5.1"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae524f056d7d770e174287294f562e95044c68e88dec909a00d2094805db9d75"
+checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
 
 [[package]]
 name = "strum"
@@ -600,9 +604,9 @@ checksum = "1e81da0851ada1f3e9d4312c704aa4f8806f0f9d69faaf8df2f3464b4a9437c2"
 
 [[package]]
 name = "syn"
-version = "1.0.55"
+version = "1.0.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a571a711dddd09019ccc628e1b17fe87c59b09d513c06c026877aa708334f37a"
+checksum = "c700597eca8a5a762beb35753ef6b94df201c81cca676604f547495a0d7f0081"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -613,7 +617,7 @@ dependencies = [
 name = "test_wasm_agent_info"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -621,7 +625,7 @@ dependencies = [
 name = "test_wasm_anchor"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -630,7 +634,7 @@ dependencies = [
 name = "test_wasm_bench"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -638,7 +642,7 @@ dependencies = [
 name = "test_wasm_capability"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -646,7 +650,7 @@ dependencies = [
 name = "test_wasm_crd"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -655,7 +659,7 @@ dependencies = [
 name = "test_wasm_create_entry"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -664,7 +668,7 @@ dependencies = [
 name = "test_wasm_crud"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -673,7 +677,7 @@ dependencies = [
 name = "test_wasm_debug"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
  "tracing",
  "tracing-core",
@@ -684,7 +688,7 @@ dependencies = [
 name = "test_wasm_emit_signal"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -693,7 +697,7 @@ dependencies = [
 name = "test_wasm_entry_defs"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -701,7 +705,7 @@ dependencies = [
 name = "test_wasm_foo"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -710,7 +714,7 @@ dependencies = [
 name = "test_wasm_hash_entry"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -718,7 +722,7 @@ dependencies = [
 name = "test_wasm_hash_path"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -727,7 +731,7 @@ dependencies = [
 name = "test_wasm_hdk_extern"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -736,7 +740,7 @@ dependencies = [
 name = "test_wasm_init_fail"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -744,7 +748,7 @@ dependencies = [
 name = "test_wasm_init_pass"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -752,7 +756,7 @@ dependencies = [
 name = "test_wasm_link"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -761,7 +765,7 @@ dependencies = [
 name = "test_wasm_migrate_agent_fail"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -769,7 +773,7 @@ dependencies = [
 name = "test_wasm_migrate_agent_pass"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -777,7 +781,7 @@ dependencies = [
 name = "test_wasm_multiple_calls"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -786,7 +790,7 @@ dependencies = [
 name = "test_wasm_post_commit_fail"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -794,7 +798,7 @@ dependencies = [
 name = "test_wasm_post_commit_success"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -802,7 +806,7 @@ dependencies = [
 name = "test_wasm_query"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -811,7 +815,7 @@ dependencies = [
 name = "test_wasm_random_bytes"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -820,7 +824,7 @@ name = "test_wasm_ser_regression"
 version = "0.0.1"
 dependencies = [
  "derive_more",
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -828,7 +832,7 @@ dependencies = [
 name = "test_wasm_sign"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -836,7 +840,7 @@ dependencies = [
 name = "test_wasm_sys_time"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -844,7 +848,7 @@ dependencies = [
 name = "test_wasm_update_entry"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -853,7 +857,7 @@ dependencies = [
 name = "test_wasm_validate"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -861,7 +865,7 @@ dependencies = [
 name = "test_wasm_validate_invalid"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -869,7 +873,7 @@ dependencies = [
 name = "test_wasm_validate_link"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -877,7 +881,7 @@ dependencies = [
 name = "test_wasm_validate_link_add_invalid"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -885,7 +889,7 @@ dependencies = [
 name = "test_wasm_validate_link_add_valid"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -893,7 +897,7 @@ dependencies = [
 name = "test_wasm_validate_valid"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -901,7 +905,7 @@ dependencies = [
 name = "test_wasm_validation_package_fail"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -909,7 +913,7 @@ dependencies = [
 name = "test_wasm_validation_package_success"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -917,7 +921,7 @@ dependencies = [
 name = "test_wasm_whoami"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -926,7 +930,7 @@ dependencies = [
 name = "test_wasm_x_salsa20_poly1305"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
@@ -934,24 +938,24 @@ dependencies = [
 name = "test_wasm_zome_info"
 version = "0.0.1"
 dependencies = [
- "hdk3",
+ "hdk",
  "serde",
 ]
 
 [[package]]
 name = "thiserror"
-version = "1.0.22"
+version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e9ae34b84616eedaaf1e9dd6026dbe00dcafa92aa0c8077cb69df1fcfe5e53e"
+checksum = "e0f4a65597094d4483ddaed134f409b2cb7c1beccf25201a9f73c719254fa98e"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.22"
+version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ba20f23e85b10754cd195504aebf6a27e2e6cbe28c17778a0c930724628dd56"
+checksum = "7765189610d8241a44529806d6fd1f2e0a08734313a35d5b3a556f92b381f3c0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -960,9 +964,9 @@ dependencies = [
 
 [[package]]
 name = "thread_local"
-version = "1.1.2"
+version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8208a331e1cb318dd5bd76951d2b8fc48ca38a69f5f4e4af1b6a9f8c6236915"
+checksum = "8018d24e04c95ac8790716a5987d0fec4f8b27249ffa0f7d33f1369bdfb88cbd"
 dependencies = [
  "once_cell",
 ]
@@ -980,9 +984,9 @@ dependencies = [
 
 [[package]]
 name = "tracing"
-version = "0.1.22"
+version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f47026cdc4080c07e49b37087de021820269d996f581aac150ef9e5583eefe3"
+checksum = "f77d3842f76ca899ff2dbcf231c5c65813dea431301d6eb686279c15c4464f12"
 dependencies = [
  "cfg-if 1.0.0",
  "pin-project-lite",
@@ -992,9 +996,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.11"
+version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80e0ccfc3378da0cce270c946b676a376943f5cd16aeba64568e7939806f4ada"
+checksum = "a8a9bd1db7706f2373a190b0d067146caa39350c486f3d455b0e33b431f94c07"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1012,9 +1016,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-log"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e0f8c7178e13481ff6765bd169b33e8d554c5d2bbede5e32c356194be02b9b9"
+checksum = "a6923477a48e41c1951f1999ef8bb5a3023eb723ceadafe78ffb65dc366761e3"
 dependencies = [
  "lazy_static",
  "log",
@@ -1033,9 +1037,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.2.15"
+version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1fa8f0c8f4c594e4fc9debc1990deab13238077271ba84dd853d54902ee3401"
+checksum = "8ab8966ac3ca27126141f7999361cc97dd6fb4b71da04c02044fa9045d98bb96"
 dependencies = [
  "ansi_term",
  "chrono",

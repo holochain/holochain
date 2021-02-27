@@ -147,7 +147,7 @@ impl IncomingDhtOpsWorkspace {
             status: ValidationLimboStatus::Pending,
             op: op_light,
             basis,
-            time_added: Timestamp::now(),
+            time_added: timestamp::now(),
             last_try: None,
             num_tries: 0,
             from_agent,

@@ -12,15 +12,15 @@ rec {
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # ensure plain build works
-    cargo build --no-default-features --manifest-path=crates/holochain/Cargo.toml
+    # limit parallel jobs to reduce memory consumption
+    export NUM_JOBS=8
+    export CARGO_BUILD_JOBS=8
 
     # alas, we cannot specify --features in the virtual workspace
-    cargo test warm_wasm_tests --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms
     # run the specific slow tests in the holochain crate
-    cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests -- --nocapture
+    cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture
     # run all the remaining cargo tests
-    cargo test -- --nocapture
+    cargo test --workspace --exclude holochain -- --nocapture
   '';
 
   hcMergeTest = let
@@ -65,8 +65,8 @@ rec {
     command -v holochain
     echo
 
-    echo "dna-util binary installation"
-    command -v dna-util
+    echo "hc binary installation"
+    command -v hc
     echo
   '';
 

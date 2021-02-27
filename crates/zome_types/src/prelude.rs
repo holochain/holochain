@@ -9,7 +9,7 @@ pub use crate::{
     cell::*,
     crdt::CrdtType,
     trace_msg,
-    element::{Element, ElementVec},
+    element::*,
     entry::*,
     entry_def::*,
     header::*,
@@ -21,6 +21,7 @@ pub use crate::{
     query::{ActivityRequest, AgentActivity, ChainQueryFilter, ChainQueryFilter as QueryFilter},
     signal::{AppSignal, RemoteSignal},
     signature::{Sign, Signature, VerifySignature},
+    timestamp::*,
     validate::{
         RequiredValidationType, ValidateCallbackResult, ValidateData, ValidationPackage,
         ValidationPackageCallbackResult,

@@ -62,7 +62,7 @@ pub struct Link {
     /// The [Entry] being linked to
     pub target: holo_hash::EntryHash,
     /// When the link was added
-    pub timestamp: std::time::SystemTime,
+    pub timestamp: crate::Timestamp,
     /// A tag used to find this link
     pub tag: LinkTag,
     /// The hash of this link's create header

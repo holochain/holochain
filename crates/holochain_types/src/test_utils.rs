@@ -3,11 +3,11 @@
 use crate::dna::zome::WasmZome;
 use crate::dna::DnaDef;
 use crate::dna::DnaFile;
-use crate::dna::JsonProperties;
+use crate::dna::YamlProperties;
 use crate::element::SignedHeaderHashedExt;
 use crate::fixt::*;
 use crate::prelude::*;
-use crate::Timestamp;
+use crate::timestamp;
 use crate::{dna::wasm::DnaWasm, EntryHashed};
 use std::path::PathBuf;
 
@@ -32,7 +32,7 @@ pub fn fake_dna_file(uuid: &str) -> DnaFile {
 pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     let mut dna = DnaDef {
         name: "test".to_string(),
-        properties: JsonProperties::new(serde_json::json!({"p": "hi"}))
+        properties: YamlProperties::new(serde_yaml::from_str("p: hi").unwrap())
             .try_into()
             .unwrap(),
         uuid: uuid.to_string(),
@@ -55,7 +55,7 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
 pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
     let tmp_dir = tempdir::TempDir::new("fake_dna")?;
     let mut path: PathBuf = tmp_dir.path().into();
-    path.push("test-dna.dna.gz");
+    path.push("test-dna.dna");
     tokio::fs::write(path.clone(), dna.to_file_content().await?).await?;
     Ok((path, tmp_dir))
 }
@@ -93,7 +93,7 @@ pub async fn fake_unique_element(
     let app_entry_type = AppEntryTypeFixturator::new(visibility).next().unwrap();
     let header_1 = Header::Create(Create {
         author: agent_key,
-        timestamp: Timestamp::now().into(),
+        timestamp: timestamp::now(),
         header_seq: 0,
         prev_header: fake_header_hash(1),
 

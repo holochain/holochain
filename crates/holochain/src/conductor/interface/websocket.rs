@@ -214,9 +214,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
                 }
                 break;
             }
-            Err(e) => {
-                error!(error = &e as &dyn std::error::Error)
-            }
+            Err(e) => error!(error = &e as &dyn std::error::Error),
             Ok(()) => {}
         }
     }
@@ -289,11 +287,10 @@ where
 pub mod test_utils {
     use crate::conductor::api::RealAppInterfaceApi;
     use crate::conductor::conductor::ConductorBuilder;
-    use crate::conductor::dna_store::MockDnaStore;
     use crate::conductor::ConductorHandle;
     use holochain_lmdb::test_utils::test_environments;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::app::InstalledCell;
+    use holochain_types::prelude::*;
     use std::sync::Arc;
     use tempdir::TempDir;
 
@@ -343,7 +340,6 @@ pub mod test {
     use crate::conductor::api::AdminResponse;
     use crate::conductor::api::RealAdminInterfaceApi;
     use crate::conductor::conductor::ConductorBuilder;
-    use crate::conductor::dna_store::MockDnaStore;
     use crate::conductor::p2p_store::AgentKv;
     use crate::conductor::p2p_store::AgentKvKey;
     use crate::conductor::state::ConductorState;
@@ -358,15 +354,11 @@ pub mod test {
     use holochain_lmdb::fresh_reader_test;
     use holochain_lmdb::test_utils::test_environments;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_state::source_chain::SourceChainBuf;
-    use holochain_types::app::InstallAppDnaPayload;
-    use holochain_types::app::InstallAppPayload;
-    use holochain_types::app::InstalledCell;
-    use holochain_types::dna::DnaDef;
-    use holochain_types::dna::DnaFile;
+    use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_types::test_utils::fake_dna_zomes;
+    use holochain_types::{app::InstallAppDnaPayload, prelude::InstallAppPayload};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
     use holochain_zome_types::cell::CellId;
@@ -612,13 +604,12 @@ pub mod test {
         assert_eq!(r, None);
 
         // Check it is in active apps
-        let cell_ids: Vec<_> = state
+        let cell_ids: Vec<CellId> = state
             .active_apps
             .get("test app")
-            .cloned()
             .unwrap()
-            .into_iter()
-            .map(|c| c.into_id())
+            .all_cells()
+            .cloned()
             .collect();
 
         // Collect the expected result
@@ -628,6 +619,15 @@ pub mod test {
             .collect::<Vec<_>>();
 
         assert_eq!(expected, cell_ids);
+
+        // Check that it is returned in get_app_info as active
+        let maybe_info = state.get_app_info(&"test app".to_string());
+        if let Some(info) = maybe_info {
+            assert_eq!(info.installed_app_id, "test app");
+            assert!(info.active);
+        } else {
+            assert!(false);
+        }
 
         // Now deactivate app
         let msg = AdminRequest::DeactivateApp {
@@ -654,16 +654,25 @@ pub mod test {
         assert_eq!(r, None);
 
         // Check it's added to inactive
-        let cell_ids: Vec<_> = state
+        let cell_ids: Vec<CellId> = state
             .inactive_apps
             .get("test app")
-            .cloned()
             .unwrap()
-            .into_iter()
-            .map(|c| c.into_id())
+            .all_cells()
+            .cloned()
             .collect();
 
         assert_eq!(expected, cell_ids);
+
+        // Check that it is returned in get_app_info as not active
+        let maybe_info = state.get_app_info(&"test app".to_string());
+        if let Some(info) = maybe_info {
+            assert_eq!(info.installed_app_id, "test app");
+            assert!(!info.active);
+        } else {
+            assert!(false);
+        }
+
         conductor_handle.shutdown().await;
         shutdown.await.unwrap();
     }
@@ -713,15 +722,11 @@ pub mod test {
             setup_admin_fake_cells(vec![(cell_id.clone(), None)], dna_store).await;
         let conductor_handle = activate(conductor_handle).await;
         let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
-
-        // Set some state
-        let cell_env = conductor_handle.get_cell_env(&cell_id).await.unwrap();
+        // Allow agents time to join
+        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
 
         // Get state
-        let expected = {
-            let source_chain = SourceChainBuf::new(cell_env.clone().into()).unwrap();
-            source_chain.dump_as_json().await.unwrap()
-        };
+        let expected = conductor_handle.dump_cell_state(&cell_id).await.unwrap();
 
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::DumpState {
@@ -777,7 +782,10 @@ pub mod test {
             .collect::<Vec<_>>();
         let p2p_store = AgentKv::new(env.clone().into()).unwrap();
 
-        // - Check no data in the store to start
+        // - Give time for the agents to join the network.
+        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+
+        // - Check no extra data in the store to start
         let count = fresh_reader_test!(env, |r| p2p_store
             .as_store_ref()
             .iter(&r)

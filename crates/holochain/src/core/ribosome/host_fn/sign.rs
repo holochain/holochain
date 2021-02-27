@@ -1,15 +1,15 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 pub fn sign(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: Sign,
-) -> RibosomeResult<Signature> {
+) -> Result<Signature, WasmError> {
     Ok(
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             call_context
@@ -17,7 +17,7 @@ pub fn sign(
                 .keystore()
                 .sign(input)
                 .await
-        })?,
+        }).map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))?,
     )
 }
 
@@ -27,9 +27,9 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
-    use hdk3::prelude::test_utils::fake_agent_pubkey_1;
-    use hdk3::prelude::test_utils::fake_agent_pubkey_2;
-    use hdk3::prelude::*;
+    use hdk::prelude::test_utils::fake_agent_pubkey_1;
+    use hdk::prelude::test_utils::fake_agent_pubkey_2;
+    use hdk::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_sign_test() {

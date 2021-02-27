@@ -1,15 +1,15 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: GetInput,
-) -> RibosomeResult<Option<Element>> {
+) -> Result<Option<Element>, WasmError> {
     let GetInput{ any_dht_hash, get_options } = input;
 
     // Get the network from the context
@@ -24,11 +24,12 @@ pub fn get<'a>(
             .await
             .cascade(network)
             .dht_get(any_dht_hash, get_options)
-            .await?;
+            .await
+            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
 
         Ok(maybe_element)
     })
 }
 
 // we are relying on the create tests to show the commit/get round trip
-// @see commit_entry.rs
+// See commit_entry.rs

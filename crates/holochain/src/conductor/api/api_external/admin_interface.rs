@@ -103,9 +103,17 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let hash = dna.dna_hash().clone();
                 let dna_list = self.conductor_handle.list_dnas().await?;
                 if !dna_list.contains(&hash) {
-                    self.conductor_handle.install_dna(dna).await?;
+                    self.conductor_handle.register_dna(dna).await?;
                 }
                 Ok(AdminResponse::DnaRegistered(hash))
+            }
+            CreateCloneCell(payload) => {
+                let cell_id = payload.cell_id();
+                self.conductor_handle
+                    .clone()
+                    .create_clone_cell(*payload)
+                    .await?;
+                Ok(AdminResponse::CloneCellCreated(cell_id))
             }
             InstallApp(payload) => {
                 trace!(?payload.dnas);
@@ -130,13 +138,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     if maybe_path.is_some() && maybe_hash.is_some() {
                         return Err(ConductorApiError::DnaReadError("Both path and hash specified in payload, pick just one".to_string()))
                     }
+                    // TODO: this if let will be removed after deprecation period
                     if let Some(path) = maybe_path {
-                        // TODO: this if let will be removed after deprecation period
                         tracing::warn!("specifying dna by path with register side-effect is deprecated, please use RegisterDna and install by hash");
                         let dna = read_parse_dna(path, properties).await?;
                         let hash = dna.dna_hash().clone();
                         let cell_id = CellId::from((hash.clone(), agent_key.clone()));
-                        self.conductor_handle.install_dna(dna).await?;
+                        self.conductor_handle.register_dna(dna).await?;
                         ConductorApiResult::Ok((InstalledCell::new(cell_id, nick), membrane_proof))
                     } else if let Some(hash) = maybe_hash {
                         // confirm that hash has been installed
@@ -164,15 +172,19 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .install_app(installed_app_id.clone(), cell_ids_with_proofs.clone())
                     .await?;
 
-                let cell_data = cell_ids_with_proofs
+                let installed_cells = cell_ids_with_proofs
                     .into_iter()
-                    .map(|(cell_data, _)| cell_data)
-                    .collect();
-                let app = InstalledApp {
-                    installed_app_id,
-                    cell_data,
-                };
+                    .map(|(cell_data, _)| cell_data);
+                let app = InstalledApp::new_legacy(installed_app_id, installed_cells)?;
                 Ok(AdminResponse::AppInstalled(app))
+            }
+            InstallAppBundle(payload) => {
+                let app = self
+                    .conductor_handle
+                    .clone()
+                    .install_app_bundle(*payload)
+                    .await?;
+                Ok(AdminResponse::AppBundleInstalled(app))
             }
             ListDnas => {
                 let dna_list = self.conductor_handle.list_dnas().await?;
@@ -254,7 +266,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
 /// Reads the [Dna] from disk and parses to [SerializedBytes]
 async fn read_parse_dna(
     dna_path: PathBuf,
-    properties: Option<JsonProperties>,
+    properties: Option<YamlProperties>,
 ) -> ConductorApiResult<DnaFile> {
     let dna_content = tokio::fs::read(dna_path)
         .await
@@ -364,10 +376,8 @@ mod test {
         );
 
         // with a property should install and produce a different hash
-        let json = serde_json::json!({
-            "some prop": "foo",
-        });
-        hash_payload.properties = Some(JsonProperties::new(json.clone()));
+        let json: serde_yaml::Value = serde_yaml::from_str("some prop: \"foo\"").unwrap();
+        hash_payload.properties = Some(YamlProperties::new(json.clone()));
         let install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload.clone())))
             .await;
@@ -458,10 +468,11 @@ mod test {
         let agent_key2 = fake_agent_pubkey_2();
         let path_payload = InstallAppDnaPayload::path_only(dna_path, "".to_string());
         let cell_id2 = CellId::new(dna_hash.clone(), agent_key2.clone());
-        let expected_cell_ids = InstalledApp {
-            installed_app_id: "test-by-path".to_string(),
-            cell_data: vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
-        };
+        let expected_cell_ids = InstalledApp::new_legacy(
+            "test-by-path".to_string(),
+            vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
+        )
+        .unwrap();
         let path_install_payload = InstallAppPayload {
             dnas: vec![path_payload],
             installed_app_id: "test-by-path".to_string(),
@@ -521,13 +532,16 @@ mod test {
         let uuid = Uuid::new_v4();
         let dna = fake_dna_file(&uuid.to_string());
         let (dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await?;
-        let json = serde_json::json!({
-            "test": "example",
-            "how_many": 42,
-        });
-        let properties = Some(JsonProperties::new(json.clone()));
+        let json: serde_yaml::Value = serde_yaml::from_str(
+            r#"
+test: "example"
+how_many": 42
+        "#,
+        )
+        .unwrap();
+        let properties = Some(YamlProperties::new(json.clone()));
         let result = read_parse_dna(dna_path, properties).await?;
-        let properties = JsonProperties::new(json);
+        let properties = YamlProperties::new(json);
         let mut dna = dna.dna_def().clone();
         dna.properties = properties.try_into().unwrap();
         assert_eq!(&dna, result.dna_def());

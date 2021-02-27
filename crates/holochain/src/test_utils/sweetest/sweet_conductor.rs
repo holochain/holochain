@@ -3,17 +3,17 @@
 
 use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetZome};
 use crate::conductor::{
-    api::ZomeCall, config::ConductorConfig, dna_store::DnaStore, handle::ConductorHandle,
+    api::{error::ConductorApiResult, ZomeCall},
+    config::ConductorConfig,
+    handle::ConductorHandle,
     Conductor, ConductorBuilder,
 };
 use futures::future;
-use hdk3::prelude::*;
+use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
 use holochain_lmdb::test_utils::{test_environments, TestEnvironments};
-use holochain_types::{app::InstalledCell, signal::Signal};
-
-use holochain_types::dna::DnaFile;
+use holochain_types::prelude::*;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::sync::Arc;
 use unwrap_to::unwrap_to;
@@ -90,7 +90,9 @@ impl SweetConductorBatch {
         dna_files: &[DnaFile],
     ) -> SweetAppBatch {
         if agents.len() != self.0.len() {
-            panic!("setup_app_for_zipped_agents must take as many Agents as there are Conductors in this batch.")
+            panic!(
+                "setup_app_for_zipped_agents must take as many Agents as there are Conductors in this batch."
+            )
         }
 
         let apps = self
@@ -142,7 +144,7 @@ fn standard_config() -> ConductorConfig {
 
 impl SweetConductor {
     /// Create a SweetConductor from an already-built ConductorHandle and environments
-    ///
+    ///DnaStore
     /// The conductor will be supplied with a single test AppInterface named
     /// "sweet-interface" so that signals may be emitted
     pub async fn new(
@@ -214,7 +216,7 @@ impl SweetConductor {
     /// installing many apps with the same dna
     async fn setup_app_part_1(&mut self, dna_files: &[DnaFile]) {
         for dna_file in dna_files {
-            self.install_dna(dna_file.clone())
+            self.register_dna(dna_file.clone())
                 .await
                 .expect("Could not install DNA");
             self.dnas.push(dna_file.clone());
@@ -391,7 +393,7 @@ impl SweetConductor {
             // MD: this feels wrong, why should we have to reinstall DNAs on restart?
 
             for dna_file in self.dnas.iter() {
-                self.install_dna(dna_file.clone())
+                self.register_dna(dna_file.clone())
                     .await
                     .expect("Could not install DNA");
             }
@@ -426,7 +428,22 @@ impl SweetConductorHandle {
         I: serde::Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        self.call_from(zome.cell_id().agent_pubkey(), None, zome, fn_name, payload)
+        self.call_fallible(zome, fn_name, payload).await.unwrap()
+    }
+
+    /// Like `call`, but without the unwrap
+    pub async fn call_fallible<I, O, F>(
+        &self,
+        zome: &SweetZome,
+        fn_name: F,
+        payload: I,
+    ) -> ConductorApiResult<O>
+    where
+        FunctionName: From<F>,
+        I: serde::Serialize + std::fmt::Debug,
+        O: serde::de::DeserializeOwned + std::fmt::Debug,
+    {
+        self.call_from_fallible(zome.cell_id().agent_pubkey(), None, zome, fn_name, payload)
             .await
     }
 
@@ -445,6 +462,25 @@ impl SweetConductorHandle {
         I: Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
+        self.call_from_fallible(provenance, cap, zome, fn_name, payload)
+            .await
+            .unwrap()
+    }
+
+    /// Like `call_from`, but without the unwrap
+    pub async fn call_from_fallible<I, O, F>(
+        &self,
+        provenance: &AgentPubKey,
+        cap: Option<CapSecret>,
+        zome: &SweetZome,
+        fn_name: F,
+        payload: I,
+    ) -> ConductorApiResult<O>
+    where
+        FunctionName: From<F>,
+        I: Serialize + std::fmt::Debug,
+        O: serde::de::DeserializeOwned + std::fmt::Debug,
+    {
         let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
         let call = ZomeCall {
             cell_id: zome.cell_id().clone(),
@@ -454,10 +490,11 @@ impl SweetConductorHandle {
             provenance: provenance.clone(),
             payload,
         };
-        let response = self.0.call_zome(call).await.unwrap().unwrap();
-        unwrap_to!(response => ZomeCallResponse::Ok)
-            .decode()
-            .expect("Couldn't deserialize zome call output")
+        self.0.call_zome(call).await.map(|r| {
+            unwrap_to!(r.unwrap() => ZomeCallResponse::Ok)
+                .decode()
+                .expect("Couldn't deserialize zome call output")
+        })
     }
 
     // /// Get a stream of all Signals emitted since the time of this function call.

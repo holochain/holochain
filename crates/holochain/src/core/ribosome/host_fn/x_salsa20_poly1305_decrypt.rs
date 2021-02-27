@@ -1,16 +1,16 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use std::sync::Arc;
 use xsalsa20poly1305::aead::{generic_array::GenericArray, Aead, NewAead};
 use xsalsa20poly1305::XSalsa20Poly1305;
 use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::WasmError;
 
 pub fn x_salsa20_poly1305_decrypt(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     input: XSalsa20Poly1305Decrypt,
-) -> RibosomeResult<Option<XSalsa20Poly1305Data>> {
+) -> Result<Option<XSalsa20Poly1305Data>, WasmError> {
     // @todo use a libsodium wrapper instead of an ad-hoc rust implementation.
     // Note that the we're mapping any decrypting error to None here.
     // @todo this decrypt should be in lair and key refs should be refs to keys in lair

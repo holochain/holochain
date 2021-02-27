@@ -24,7 +24,7 @@ let
     '';
   in {
     holochain = mkHolochainBinaryScript "holochain";
-    dnaUtil = mkHolochainBinaryScript "dna_util";
+    hc = mkHolochainBinaryScript "hc";
   };
 
   all = {

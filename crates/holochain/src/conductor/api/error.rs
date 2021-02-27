@@ -8,19 +8,15 @@ use crate::core::ribosome::error::RibosomeError;
 use crate::core::workflow::error::WorkflowError;
 use holo_hash::DnaHash;
 use holochain_lmdb::error::DatabaseError;
-
 use holochain_state::source_chain::SourceChainError;
 use holochain_state::workspace::WorkspaceError;
+use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
 
 /// Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 #[derive(Error, Debug)]
 pub enum ConductorApiError {
-    /// Cell was referenced, but is missing from the conductor.
-    #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
-    CellMissing(CellId),
-
     /// The Dna for this Cell is not installed in the conductor.
     #[error("The Dna for this Cell is not installed in the conductor! DnaHash: {0}")]
     DnaMissing(DnaHash),
@@ -78,12 +74,22 @@ pub enum ConductorApiError {
     #[error(transparent)]
     CellError(#[from] CellError),
 
+    /// App error
+    #[error(transparent)]
+    AppError(#[from] AppError),
+
     /// Error in the Interface
     #[error("An error occurred in the interface: {0:?}")]
     InterfaceError(#[from] InterfaceError),
 
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
+
+    #[error(transparent)]
+    AppBundleError(#[from] AppBundleError),
+
+    #[error(transparent)]
+    JsonDumpError(#[from] serde_json::Error),
 }
 
 /// All the serialization errors that can occur

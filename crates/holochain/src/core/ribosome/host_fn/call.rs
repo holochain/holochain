@@ -1,14 +1,15 @@
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCall;
-use crate::core::ribosome::{error::RibosomeResult, CallContext};
+use crate::core::ribosome::CallContext;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use holochain_wasmer_host::prelude::WasmError;
 
 pub fn call(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     call: Call,
-) -> RibosomeResult<ZomeCallResponse> {
+) -> Result<ZomeCallResponse, WasmError> {
 
     // Get the conductor handle
     let host_access = call_context.host_access();
@@ -38,15 +39,17 @@ pub fn call(
             .call_zome(invocation, workspace)
             .await
             .map_err(Box::new)
-    })??)
+    })
+    .map_err(|conductor_api_error| WasmError::Host(conductor_api_error.to_string()))?
+    .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?)
 }
 
 #[cfg(test)]
 pub mod wasm_test {
     use std::convert::TryFrom;
 
-    use hdk3::prelude::AgentInfo;
-    use hdk3::prelude::CellId;
+    use hdk::prelude::AgentInfo;
+    use hdk::prelude::CellId;
     use holo_hash::HeaderHash;
     use holochain_serialized_bytes::SerializedBytes;
     use holochain_types::app::InstalledCell;

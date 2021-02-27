@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 #[hdk_entry(id = "post")]
 struct Val(u32);
@@ -16,7 +16,7 @@ fn create_entry_multiple(n: u32) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-fn get_entry_multiple(n: u32) -> ExternResult<hdk3::prelude::Bytes> {
+fn get_entry_multiple(n: u32) -> ExternResult<hdk::prelude::Bytes> {
     let mut bytes = vec![];
     'test_loop: for i in 0..n {
         match get(hash_entry(&Val(i))?, GetOptions::content())? {

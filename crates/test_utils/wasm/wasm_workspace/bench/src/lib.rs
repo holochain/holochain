@@ -1,6 +1,6 @@
 //! externs to help bench the wasm ribosome
 
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 /// round trip bytes back to the host
 /// useful to see what the basic throughput of our wasm implementation is

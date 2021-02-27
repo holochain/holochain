@@ -1,0 +1,4 @@
+sign-commit = true
+sign-tag = true
+consolidate-commits = true
+pre-release-commit-message="Multi-crate release performed on {{date}}"

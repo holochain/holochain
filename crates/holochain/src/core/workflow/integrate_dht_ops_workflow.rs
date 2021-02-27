@@ -1,5 +1,6 @@
 //! The workflow and queue consumer for DhtOp integration
 
+use super::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
 use super::*;
 use crate::core::queue_consumer::OneshotWriter;
 use crate::core::queue_consumer::TriggerSender;
@@ -15,6 +16,7 @@ use holochain_cascade::error::CascadeResult;
 use holochain_cascade::Cascade;
 use holochain_cascade::DbPair;
 use holochain_cascade::{error::CascadeError, integrate_single_metadata};
+use holochain_conductor_api::IntegrationStateDump;
 use holochain_lmdb::buffer::BufferedStore;
 use holochain_lmdb::buffer::KvBufFresh;
 use holochain_lmdb::db::INTEGRATED_DHT_OPS;
@@ -175,7 +177,7 @@ async fn integrate_single_dht_op(
                 let integrated = IntegratedDhtOpsValue {
                     validation_status: iv.validation_status,
                     op: iv.op,
-                    when_integrated: Timestamp::now(),
+                    when_integrated: timestamp::now(),
                 };
                 Ok(Outcome::Integrated(integrated))
             }
@@ -197,7 +199,7 @@ fn integrate_data_and_meta<P: PrefixType>(
     let integrated = IntegratedDhtOpsValue {
         validation_status: iv.validation_status,
         op: iv.op,
-        when_integrated: Timestamp::now(),
+        when_integrated: timestamp::now(),
     };
     debug!("integrating");
     Ok(Outcome::Integrated(integrated))
@@ -213,7 +215,7 @@ fn integrate_data<P: PrefixType>(
     let integrated = IntegratedDhtOpsValue {
         validation_status: iv.validation_status,
         op: iv.op,
-        when_integrated: Timestamp::now(),
+        when_integrated: timestamp::now(),
     };
     debug!("integrating");
     Ok(Outcome::Integrated(integrated))
@@ -573,4 +575,20 @@ impl IntegrateDhtOpsWorkspace {
         }
         Ok(())
     }
+}
+
+pub fn dump_state(env: EnvironmentRead) -> WorkspaceResult<IntegrationStateDump> {
+    let workspace = IncomingDhtOpsWorkspace::new(env.clone())?;
+    let (validation_limbo, integration_limbo, integrated) = fresh_reader!(env, |r| {
+        let v = workspace.validation_limbo.iter(&r)?.count()?;
+        let il = workspace.integration_limbo.iter(&r)?.count()?;
+        let i = workspace.integrated_dht_ops.iter(&r)?.count()?;
+        DatabaseResult::Ok((v, il, i))
+    })?;
+
+    Ok(IntegrationStateDump {
+        validation_limbo,
+        integration_limbo,
+        integrated,
+    })
 }
