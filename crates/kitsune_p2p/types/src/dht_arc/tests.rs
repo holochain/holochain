@@ -296,9 +296,9 @@ fn test_converge() {
 
 #[test]
 fn test_multiple() {
-    let min_online_peers = MIN_PEERS;
     let converge = |peers: &mut Vec<DhtArc>| {
-        for _ in 0..10000 {
+        let mut mature = false;
+        for i in 0..40 {
             for i in 0..peers.len() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
@@ -311,20 +311,40 @@ fn test_multiple() {
             }
             // let bucket = DhtArcBucket::new(peers[0], peers.clone());
             // println!("{}\n{:?}", bucket, bucket.density().est_gap());
-            for arc in peers.iter() {
-                if arc.coverage() > 0.6 {
-                    dbg!(arc.coverage());
+            // for arc in peers.iter() {
+            //     if arc.coverage() > 0.6 {
+            //         dbg!(arc.coverage());
+            //     }
+            // }
+            let bucket = DhtArcBucket::new(DhtArc::new(0, MAX_HALF_LENGTH), peers.clone());
+            let r = bucket.density().est_total_redundancy();
+            if mature {
+                println!("{}{:?}", r, bucket.density());
+                assert!(r >= 20);
+            // println!("{}\n{}", bucket, r);
+            } else {
+                println!("Immature {}@{}", r, i);
+                // println!("{}\n{}", bucket, r);
+                if r >= 20 {
+                    mature = true;
                 }
             }
             // std::thread::sleep(std::time::Duration::from_millis(200));
         }
     };
 
-    let mut peers = even_dist_peers(min_online_peers * 4, &[20]);
+    let mut peers = even_dist_peers(MIN_STABLE_PEERS, &[20]);
     converge(&mut peers);
     // - Converge to half coverage
     for arc in peers {
-        assert_eq!((arc.coverage() * 10.0).round() / 10.0, 0.5);
+        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.55);
+    }
+
+    let mut peers = even_dist_peers(MIN_STABLE_PEERS, &[MAX_HALF_LENGTH]);
+    converge(&mut peers);
+    // - Converge to half coverage
+    for arc in peers {
+        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.55);
     }
 
     // let mut peers = even_dist_peers(min_online_peers * 4, &[MAX_HALF_LENGTH / 10]);
@@ -446,4 +466,18 @@ fn even_dist_peers(num: usize, half_lens: &[u32]) -> Vec<DhtArc> {
             DhtArc::new(dist as u32, *half_len)
         })
         .collect()
+}
+
+#[test]
+fn test_target() {
+    let filter = DhtArc::new(0, (MAX_HALF_LENGTH as f64 * 0.5) as u32);
+    let peers = even_dist_peers(
+        dbg!((MIN_STABLE_PEERS / 4 + 20) * 2),
+        &[(MAX_HALF_LENGTH as f64 * 0.5) as u32],
+    );
+    let bucket = DhtArcBucket::new(filter, peers);
+    let density = bucket.density();
+    dbg!(&density);
+    dbg!(density.est_total_redundancy());
+    dbg!(target(density));
 }

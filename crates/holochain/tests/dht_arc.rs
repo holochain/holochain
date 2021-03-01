@@ -65,7 +65,7 @@ async fn test_arc_keys() {
     let min_peers = 40;
 
     let converge = |peers: &mut Vec<DhtArc>| {
-        for _ in 0..40 {
+        for _ in 0..10000 {
             // dbg!(i);
             for i in 0..peers.len() {
                 // dbg!(i);
@@ -78,7 +78,7 @@ async fn test_arc_keys() {
                 // println!("{}\n{:?}", bucket, bucket.density().est_gap());
                 // println!("{}", bucket.density().est_gap());
             }
-            let bucket = DhtArcBucket::new(peers[0], peers.clone());
+            let bucket = DhtArcBucket::new(DhtArc::new(0, MAX_HALF_LENGTH), peers.clone());
             println!("{}\n{:?}", bucket, bucket.density().est_gap());
             std::thread::sleep(std::time::Duration::from_millis(200));
         }
@@ -184,9 +184,10 @@ async fn test_arc_redundancy() {
 
             let r = bucket.density().est_total_redundancy();
             if mature {
+                println!("{}", r);
                 assert!(r >= 20);
             } else {
-                println!("{}\n{}", bucket, r);
+                // println!("{}\n{}", bucket, r);
                 if r >= 20 {
                     mature = true;
                 }

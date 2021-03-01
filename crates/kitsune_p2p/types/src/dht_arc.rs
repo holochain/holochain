@@ -30,12 +30,18 @@ const U32_LEN: u64 = u32::MAX as u64 + 1;
 /// Number of copies of a given hash available at any given time.
 const REDUNDANCY_TARGET: usize = 20;
 
+/// When distribution starts to become good.
+const STABLE_TARGET: usize = REDUNDANCY_TARGET + 20;
+
 /// Default assumed up time for nodes.
 const DEFAULT_UPTIME: f64 = 0.5;
 
 /// The minimum number of peers before sharding can begin.
 /// This factors in the expected uptime to reach the redundancy target.
 pub const MIN_PEERS: usize = (REDUNDANCY_TARGET as f64 / DEFAULT_UPTIME) as usize;
+
+/// Minimum number of peers before the network is considered stable
+pub const MIN_STABLE_PEERS: usize = (STABLE_TARGET as f64 / DEFAULT_UPTIME) as usize;
 
 /// The amount "change in arc" is scaled to prevent rapid changes.
 /// This also represents the maximum coverage change in a single update
@@ -53,6 +59,28 @@ const DELTA_THRESHOLD: f64 = 0.01;
 /// is calculated.
 const NOISE_THRESHOLD: f64 = 0.01;
 
+/// Margin of error for floating point comparisons
+const ERROR_MARGIN: f64 = 0.00001;
+
+// TODO: Use the [`f64::clamp`] when we switch to rustc 1.50
+fn clamp(min: f64, max: f64, mut x: f64) -> f64 {
+    if x < min {
+        x = min;
+    }
+    if x > max {
+        x = max;
+    }
+    x
+}
+
+/// Hermite interpolation that is common in computer graphics.
+/// This makes a nice smooth transition between two points.
+fn smooth_step(start: f64, end: f64, x: f64) -> f64 {
+    let t = (x - start) / (end - start);
+    let t = clamp(0.0, 1.0, t);
+    t * t * (3.0 - 2.0 * t)
+}
+
 /// The ideal coverage if all peers were holding the same sized
 /// arcs and our estimated total peers is close.
 fn coverage_target(est_total_peers: usize) -> f64 {
@@ -63,34 +91,46 @@ fn coverage_target(est_total_peers: usize) -> f64 {
     }
 }
 
+/// Calculate the target arc length given a peer density.
+fn target(density: PeerDensity) -> f64 {
+    // Get the estimated coverage gap based on our observed peer density.
+    let est_gap = density.est_gap();
+    // If we haven't observed  at least our redundancy target number
+    // of peers (adjusted for expected uptime) then we know that the data
+    // in our arc is under replicated and we should start aiming for full coverage.
+    if density.expected_count() < REDUNDANCY_TARGET {
+        1.0
+    } else {
+        // Get the estimated gap. We don't care about negative gaps
+        // or gaps we can't fill (> 1.0)
+        let est_gap = clamp(0.0, 1.0, est_gap);
+        // Get the ideal coverage target for the size of that we estimate
+        // the network to be.
+        let ideal_target = coverage_target(density.est_total_peers());
+        // Take whichever is larger. We prefer nodes to target the ideal
+        // coverage but if there is a larger gap then it needs to be filled.
+        let mut target = est_gap.max(ideal_target);
+
+        // If the network is small then we add a little padding to account for
+        // poor distribution of peers.
+        let small_network_padding = 1.0
+            - smooth_step(
+                REDUNDANCY_TARGET as f64,
+                STABLE_TARGET as f64,
+                density.est_total_peers() as f64,
+            );
+        target += small_network_padding;
+        clamp(0.0, 1.0, target)
+    }
+}
+
 /// The convergence algorithm that moves an arc towards
-/// our estimation of what it should be.
+/// our estimated target.
 ///
 /// Note the rate of convergence is dependant of the rate
 /// that [`DhtArc::update_length`] is called.
 fn converge(current: f64, density: PeerDensity) -> f64 {
-    // Get the estimated coverage gap based on our observed peer density.
-    let est_gap = density.est_gap();
-    let target;
-    // 1. If we haven't observed  at least our redundancy target number
-    // of peers (adjusted for expected uptime) then we know that the data
-    // in our arc is under replicated and we should start aiming for full coverage.
-    if density.expected_count() <= REDUNDANCY_TARGET {
-        target = 1.0;
-    // 2. If our estimated gap in coverage is greater then zero
-    // we should aim for that (up to our maximum of 1.0).
-    } else if est_gap > 0.0 {
-        target = est_gap.min(1.0);
-    // 3. Finally if we estimate an over redundancy then we
-    // should aim for the ideal coverage for the number of peers
-    // we estimate are on the network.
-    } else {
-        // This is more stable then trying to aim for a negative gap
-        // in coverage because given an over redundant network nodes
-        // will tend towards the ideal coverage instead of bouncing
-        // up and down as gap estimations change.
-        target = coverage_target(density.est_total_peers());
-    }
+    let target = target(density);
     // The change in arc we'd need to make to get to the target.
     let delta = target - current;
     // If this is below our threshold then apply that delta.
@@ -250,7 +290,10 @@ impl PeerDensity {
         let est_total_peers = self.est_total_peers();
         let ideal_target = coverage_target(est_total_peers);
         let gap = ideal_target - self.average_coverage;
-        if gap < NOISE_THRESHOLD {
+        // We want to check the ratio between the gap and the target
+        // because small targets will have small gaps.
+        let gap_ratio = gap.abs() / ideal_target;
+        if gap_ratio < NOISE_THRESHOLD {
             0.0
         } else {
             gap * est_total_peers as f64
@@ -438,16 +481,13 @@ pub fn check_for_gaps(peers: Vec<DhtArc>) -> bool {
     };
     let mut peers: Vec<_> = peers
         .into_iter()
-        .filter(|a| match a.range().start_bound() {
-            Bound::Included(_) => true,
-            _ => false,
-        })
+        .filter(|a| matches!(a.range().start_bound(), Bound::Included(_)))
         .collect();
     if peers.is_empty() {
         return true;
     }
     peers.sort_unstable_by_key(|p| left(p));
-    if peers[0].coverage() == 1.0 {
+    if (peers[0].coverage() - 1.0).abs() < ERROR_MARGIN {
         return false;
     }
     // Translate the peers to zero to make wrapping checks easy.
@@ -456,7 +496,7 @@ pub fn check_for_gaps(peers: Vec<DhtArc>) -> bool {
     let mut max = peers[0].range().len() as u32;
 
     for peer in peers {
-        if peer.coverage() == 1.0 {
+        if (peer.coverage() - 1.0).abs() < ERROR_MARGIN {
             return false;
         }
         let l = left(&peer) - translate;
