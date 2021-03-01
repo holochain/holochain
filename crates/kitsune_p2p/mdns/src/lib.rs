@@ -96,6 +96,7 @@ pub struct MdnsResponse {
 
 /// Queries the network for the holochain service
 /// Returns an iterator over all responses received
+#[allow(clippy::let_and_return)]
 pub fn mdns_listen(service_type: String) -> impl Stream<Item = Result<MdnsResponse, MdnsError>> {
     //let service_name = format!("{}.local", HC_SERVICE_TYPE);
     let svc_type = format!("_{}{}.local", service_type, HC_SERVICE_PROTOCOL);
@@ -109,7 +110,7 @@ pub fn mdns_listen(service_type: String) -> impl Stream<Item = Result<MdnsRespon
         // Filtering out Empty responses
         .filter(move |res| {
             match res {
-                Ok(response) => !response.is_empty() && !response.ip_addr().is_none(),
+                Ok(response) => !response.is_empty() && response.ip_addr().is_some(),
                 Err(_) => true, // Keep errors
             }
         })
