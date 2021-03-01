@@ -23,7 +23,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024; // 100MB
+const DEFAULT_INITIAL_MAP_SIZE: usize = 1024 * 1024 * 1024; // 1GB
 const MAX_DBS: u32 = 32;
 
 lazy_static! {
