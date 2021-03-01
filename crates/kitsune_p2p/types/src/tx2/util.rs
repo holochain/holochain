@@ -14,6 +14,9 @@ pub use actor::*;
 mod tx_url;
 pub use tx_url::*;
 
+mod share;
+pub use share::*;
+
 static LOC_EPOCH: Lazy<std::time::Instant> = Lazy::new(std::time::Instant::now);
 const LAT_TAG: &[u8; 8] = &[0xff, 0xff, 0xff, 0xfe, 0xfe, 0xff, 0xff, 0xff];
 

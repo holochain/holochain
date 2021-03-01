@@ -1,13 +1,14 @@
 #![allow(clippy::new_ret_no_self)]
 //! Types, traits, and an implementation for applying pooling to a tx backend.
 
+/*
 use crate::tx2::tx_backend::*;
 use crate::tx2::util::*;
 use crate::tx2::*;
 use crate::*;
 
 use futures::future::{BoxFuture, FutureExt};
-use futures::stream::StreamExt;
+use futures::stream::{Stream, StreamExt};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use std::collections::HashMap;
@@ -22,9 +23,7 @@ pub enum TxPoolEvent {
 }
 
 ///
-pub trait TxPoolEventRecv: 'static + Send + Unpin {
-    ///
-    fn next(&mut self) -> BoxFuture<'_, KitsuneResult<TxPoolEvent>>;
+pub trait TxPoolEventRecv: 'static + Send + Unpin + Stream<Item = TxPoolEvent> {
 }
 
 ///
@@ -117,7 +116,13 @@ impl EvtRecvWrap {
     }
 }
 
-impl TxPoolEventRecv for EvtRecvWrap {
+impl Stream for EvtRecvWrap {
+    type Item = TxPoolEvent;
+
+
+}
+
+impl TxPoolEventRecv for EvtRecvWrap {}
     fn next(&mut self) -> BoxFuture<'_, KitsuneResult<TxPoolEvent>> {
         async move {
             if self.pending.is_empty() {
@@ -346,3 +351,4 @@ mod tests {
         rt.await.unwrap();
     }
 }
+*/

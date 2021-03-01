@@ -3,6 +3,7 @@
 use crate::tx2::tx_backend::*;
 use crate::tx2::util::TxUrl;
 use crate::*;
+use futures::stream::StreamExt;
 
 /// Struct representing a bound local endpoint for connections.
 /// This layer adds connection / channel management and framing.
@@ -28,8 +29,8 @@ impl TxEndpointFramed {
         let (_ep, con_recv) = ep_pair;
         let con_recv = futures::stream::unfold(con_recv, |mut con_recv| async move {
             let item = match con_recv.next().await {
-                Ok(item) => item,
-                Err(_) => return None,
+                Some(item) => item,
+                None => return None,
             };
             Some((item, con_recv))
         });

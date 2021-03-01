@@ -4,7 +4,7 @@ use crate::tx2::util::TxUrl;
 use crate::tx2::*;
 use crate::*;
 
-use futures::future::BoxFuture;
+use futures::{future::BoxFuture, stream::Stream};
 
 /// Tx backend read stream type.
 pub type InChan = Box<dyn AsFramedReader>;
@@ -12,15 +12,9 @@ pub type InChan = Box<dyn AsFramedReader>;
 /// Tx backend future resolves to InChan instance.
 pub type InChanFut = BoxFuture<'static, KitsuneResult<InChan>>;
 
-/// Tx backend future future resolves to InChan instance.
-pub type InChanFutFut<'a> = BoxFuture<'a, KitsuneResult<InChanFut>>;
-
 /// Tx backend adapter for incoming InChan instances.
-/// This is NOT a futures::Stream to simplify backend implementations.
-pub trait InChanRecvAdapt: 'static + Send + Unpin {
-    /// Get the next future future that will resolve to an InChan instance.
-    fn next(&mut self) -> InChanFutFut<'_>;
-}
+#[must_use = "streams do nothing unless polled"]
+pub trait InChanRecvAdapt: 'static + Send + Unpin + Stream<Item = InChanFut> {}
 
 /// Tx backend write stream type.
 pub type OutChan = Box<dyn AsFramedWriter>;
@@ -47,15 +41,9 @@ pub type Con = (Arc<dyn ConAdapt>, Box<dyn InChanRecvAdapt>);
 /// Tx backend future resolves to a Con instance.
 pub type ConFut = BoxFuture<'static, KitsuneResult<Con>>;
 
-/// Tx backend future future resolves to a Con instance.
-pub type ConFutFut<'a> = BoxFuture<'a, KitsuneResult<ConFut>>;
-
 /// Tx backend adapter for incoming Con instances.
-/// This is NOT a futures::Stream to simplify backend implementations.
-pub trait ConRecvAdapt: 'static + Send + Unpin {
-    /// Get the next future future that will resolve to a Con instance.
-    fn next(&mut self) -> ConFutFut<'_>;
-}
+#[must_use = "streams do nothing unless polled"]
+pub trait ConRecvAdapt: 'static + Send + Unpin + Stream<Item = ConFut> {}
 
 /// Tx backend adapter represents a bound local endpoint.
 pub trait EndpointAdapt: 'static + Send + Sync + Unpin {

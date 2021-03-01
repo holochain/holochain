@@ -1,11 +1,11 @@
+use crate::tx2::util::Share;
+use crate::*;
 use futures::future::BoxFuture;
-use parking_lot::Mutex;
-use std::sync::Arc;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
+#[allow(dead_code)]
 struct ActorInner<E: 'static + Send> {
     events: Vec<E>,
-    is_closed: bool,
     waker: Option<std::task::Waker>,
     limit: Arc<Semaphore>,
     logic: Vec<(OwnedSemaphorePermit, BoxFuture<'static, ()>)>,
@@ -14,7 +14,7 @@ struct ActorInner<E: 'static + Send> {
 /// Handle to an actor instance.
 /// A clone of an ActorHandle is `Eq` to its origin.
 /// A clone of an ActorHandle will `Hash` the same as its origin.
-pub struct ActorHandle<E: 'static + Send>(Arc<Mutex<ActorInner<E>>>);
+pub struct ActorHandle<E: 'static + Send>(Share<ActorInner<E>>);
 
 impl<E: 'static + Send> Clone for ActorHandle<E> {
     fn clone(&self) -> Self {
@@ -24,7 +24,7 @@ impl<E: 'static + Send> Clone for ActorHandle<E> {
 
 impl<E: 'static + Send> PartialEq for ActorHandle<E> {
     fn eq(&self, oth: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &oth.0)
+        self.0.eq(&oth.0)
     }
 }
 
@@ -32,14 +32,18 @@ impl<E: 'static + Send> Eq for ActorHandle<E> {}
 
 impl<E: 'static + Send> std::hash::Hash for ActorHandle<E> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        Arc::as_ptr(&self.0).hash(state);
+        self.0.hash(state);
     }
 }
 
 impl<E: 'static + Send> ActorHandle<E> {
     /// Cause the actor to emit an event.
-    pub fn emit(&self, e: E) {
-        self.0.lock().events.push(e);
+    pub fn emit(&self, e: E) -> KitsuneResult<()> {
+        self.0.share_mut(move |i, _| {
+            i.events.push(e);
+            Ok(())
+        })?;
+        Ok(())
     }
 
     /// Capture new logic into the actor.
@@ -49,39 +53,42 @@ impl<E: 'static + Send> ActorHandle<E> {
     /// Be careful calling `capture_logic()` from within previously captured
     /// logic. While there may be reason to do this, it can lead to
     /// deadlock when approaching the capture_bound.
-    pub fn capture_logic<L>(&self, l: L) -> impl std::future::Future<Output = ()> + 'static + Send
+    pub fn capture_logic<L>(
+        &self,
+        l: L,
+    ) -> impl std::future::Future<Output = KitsuneResult<()>> + 'static + Send
     where
         L: std::future::Future<Output = ()> + 'static + Send,
     {
+        let l = futures::future::FutureExt::boxed(l);
         let inner = self.0.clone();
         async move {
-            let permit = {
-                let limit = { inner.lock().limit.clone() };
-                limit.acquire_owned()
+            let limit = inner.share_mut(|i, _| Ok(i.limit.clone()))?;
+            let permit = limit.acquire_owned().await;
+            let waker = inner.share_mut(move |i, _| {
+                i.logic.push((permit, l));
+                Ok(i.waker.take())
+            })?;
+            if let Some(waker) = waker {
+                waker.wake();
             }
-            .await;
-
-            let mut inner = inner.lock();
-            inner
-                .logic
-                .push((permit, futures::future::FutureExt::boxed(l)));
-            if let Some(w) = inner.waker.take() {
-                w.wake();
-            }
+            Ok(())
         }
     }
 
     /// Check if this actor was closed.
     pub fn is_closed(&self) -> bool {
-        self.0.lock().is_closed
+        self.0.is_closed()
     }
 
     /// Close this actor.
     pub fn close(&self) {
-        let mut inner = self.0.lock();
-        inner.is_closed = true;
-        if let Some(w) = inner.waker.take() {
-            w.wake();
+        let maybe_waker = self.0.share_mut(|i, c| {
+            *c = true;
+            Ok(i.waker.take())
+        });
+        if let Ok(Some(waker)) = maybe_waker {
+            waker.wake();
         }
     }
 }
@@ -96,13 +103,12 @@ pub struct Actor<E: 'static + Send>(ActorHandle<E>);
 impl<E: 'static + Send> Actor<E> {
     /// Create a new task actor instance.
     pub fn new(capture_bound: usize) -> Self {
-        Self(ActorHandle(Arc::new(Mutex::new(ActorInner {
+        Self(ActorHandle(Share::new(ActorInner {
             events: Vec::new(),
-            is_closed: false,
             waker: None,
             limit: Arc::new(Semaphore::new(capture_bound)),
             logic: Vec::with_capacity(capture_bound),
-        }))))
+        })))
     }
 
     /// A handle to this actor. You can clone this.
@@ -112,23 +118,41 @@ impl<E: 'static + Send> Actor<E> {
 }
 
 impl<E: 'static + Send> futures::stream::Stream for Actor<E> {
-    type Item = Vec<E>;
+    type Item = E;
 
     fn poll_next(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
+        enum X<E: 'static + Send> {
+            T(E),
+            L(Vec<(OwnedSemaphorePermit, BoxFuture<'static, ()>)>),
+        }
+
+        // either pull one event to emit,
+        // or the task list for processing.
+        let x = match self.0 .0.share_mut(|i, _| {
+            if i.events.is_empty() {
+                Ok(X::L(std::mem::replace(&mut i.logic, Vec::new())))
+            } else {
+                Ok(X::T(i.events.remove(0)))
+            }
+        }) {
+            Err(_) => return std::task::Poll::Ready(None),
+            Ok(x) => x,
+        };
+
+        // if we got an event, return it.
+        let task_list = match x {
+            X::T(e) => return std::task::Poll::Ready(Some(e)),
+            X::L(l) => l,
+        };
+
         // tasks marked as pending - we'll need to re-queue them
         let mut pending_tasks = Vec::new();
 
         // do a single logic loop - if any of this logic injects more logic
         // the waker will be woken and we'll just be polled again.
-        let mut task_list = Vec::new();
-        {
-            let mut inner = self.0 .0.lock();
-            task_list.append(&mut inner.logic);
-        }
-
         // make sure the lock is released while we execute the extracted logic:
         for (permit, mut task) in task_list {
             let mut keep = false;
@@ -149,34 +173,35 @@ impl<E: 'static + Send> futures::stream::Stream for Actor<E> {
         // - check for events
         // - if any logic was added in the mean time, trigger waker
         // - restore any logic that is still pending
-        let mut events = Vec::new();
-        let is_closed;
-        {
-            let mut inner = self.0 .0.lock();
-            is_closed = inner.is_closed;
-
-            events.append(&mut inner.events);
-
-            if !is_closed && (events.is_empty() || !pending_tasks.is_empty()) {
-                if events.is_empty() && !inner.logic.is_empty() {
-                    // logic was added since we pulled it out
-                    // we need to explicitly wake for running again.
-                    cx.waker().wake_by_ref();
-                } else {
-                    inner.waker = Some(cx.waker().clone());
-                }
-                inner.logic.append(&mut pending_tasks);
-            }
-        }
-
-        if events.is_empty() {
-            if is_closed {
-                std::task::Poll::Ready(None)
+        let waker = cx.waker().clone();
+        let (is_closed, event) = match self.0 .0.share_mut(move |i, _| {
+            if i.events.is_empty() && !i.logic.is_empty() {
+                // logic was added since we pulled it out
+                // we need to explicitly wake for running again.
+                waker.wake_by_ref();
             } else {
-                std::task::Poll::Pending
+                i.waker = Some(waker);
             }
-        } else {
-            std::task::Poll::Ready(Some(events))
+            i.logic.append(&mut pending_tasks);
+            if i.events.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(i.events.remove(0)))
+            }
+        }) {
+            Err(_) => (true, None),
+            Ok(e) => (false, e),
+        };
+
+        match event {
+            None => {
+                if is_closed {
+                    std::task::Poll::Ready(None)
+                } else {
+                    std::task::Poll::Pending
+                }
+            }
+            Some(event) => std::task::Poll::Ready(Some(event)),
         }
     }
 }
@@ -187,33 +212,32 @@ mod tests {
     use std::sync::atomic;
 
     #[tokio::test(threaded_scheduler)]
-    async fn test_agg() {
-        let mut agg = <Actor<&'static str>>::new(32);
-        let h = agg.handle().clone();
-        let a = agg.handle().clone();
+    async fn test_util_actor() {
+        let mut actor = <Actor<&'static str>>::new(32);
+        let h = actor.handle().clone();
+        let a = actor.handle().clone();
 
         let count = Arc::new(atomic::AtomicUsize::new(0));
 
         let count2 = count.clone();
         let rt = tokio::task::spawn(async move {
-            while let Some(res) = futures::stream::StreamExt::next(&mut agg).await {
-                for _ in res {
-                    count2.fetch_add(1, atomic::Ordering::SeqCst);
-                }
+            while let Some(_res) = futures::stream::StreamExt::next(&mut actor).await {
+                count2.fetch_add(1, atomic::Ordering::SeqCst);
             }
         });
 
         tokio::task::spawn(async move {
-            a.emit("a1");
+            a.emit("a1").unwrap();
             let b = a.clone();
             a.capture_logic(async move {
-                b.emit("b1");
+                b.emit("b1").unwrap();
                 tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
-                b.emit("b2");
+                b.emit("b2").unwrap();
             })
-            .await;
+            .await
+            .unwrap();
             tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
-            a.emit("a2");
+            a.emit("a2").unwrap();
         });
 
         tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
