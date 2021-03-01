@@ -20,10 +20,10 @@ derive_more = "0.99.3"
 directories = "2.0.2"
 either = "1.5.0"
 fallible-iterator = "0.2.0"
-fixt = { version = "0.0.1", path = "../fixt" }
+fixt = { version = "^0.0.2-alpha.1", path = "../fixt" }
 futures = "0.3.1"
 ghost_actor = "0.3.0-alpha.1"
-holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
+holo_hash = { version = "^0.0.2-alpha.1", path = "../holo_hash", features = ["full"] }
 holochain_cascade = { version = "0.0.1", path = "../holochain_cascade" }
 holochain_conductor_api = { version = "0.0.1", path = "../holochain_conductor_api" }
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
@@ -35,7 +35,7 @@ holochain_types = { version = "0.0.1", path = "../holochain_types" }
 holochain_wasm_test_utils = { version = "0.0.1", path = "../test_utils/wasm" }
 holochain_wasmer_host = "=0.0.67"
 holochain_websocket = { version = "0.0.1", path = "../holochain_websocket" }
-holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
+holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
 human-panic = "1.0.3"
 lazy_static = "1.4.0"
 mockall = "0.8"

@@ -1,10 +1,8 @@
-//! ## Holochain Development Kit 3.0 (HDK)
-//!
-//! This is the third major iteration of the Holochain Development Kit.
+//! ## Holochain Development Kit (HDK)
 //!
 //! The HDK exists to make working with WASM in holochain much easier.
 //!
-//! Hopefully you dont' notice the WASMness at all and it just feels like Rust 🦀
+//! Hopefully you don't notice the WASMness at all and it just feels like Rust 🦀
 //!
 //! Note: From the perspective of happ development in WASM the 'guest' is the WASM and the 'host' is the running holochain conductor.
 //! The host is _not_ the 'host operating system' in this context.
