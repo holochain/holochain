@@ -16,12 +16,12 @@ derive_more = "0.99.3"
 either = "1.5.0"
 fallible-iterator = "0.2.0"
 failure = "0.1.6"
-fixt = { version = "0.0.1", path = "../fixt" }
+fixt = { version = "^0.0.2-alpha.1", path = "../fixt" }
 futures = "0.3.1"
 holo_hash = { path = "../holo_hash" }
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.50"
-holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }
+holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
 lazy_static = "1.4.0"
 must_future = "0.1.1"
 nanoid = "0.3.0"

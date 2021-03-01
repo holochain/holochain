@@ -184,7 +184,8 @@ impl AsFramedReader for FramedReader {
 
             self.0 = Some(inner);
             Ok(out)
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
@@ -239,7 +240,11 @@ impl AsFramedWriter for FramedWriter {
                     data.prepend_from_slice(&msg_id.inner().to_le_bytes()[..]);
                     data.prepend_from_slice(&total.to_le_bytes()[..]);
 
-                    inner.sub.write_all(&data).await.map_err(KitsuneError::other)?;
+                    inner
+                        .sub
+                        .write_all(&data)
+                        .await
+                        .map_err(KitsuneError::other)?;
 
                     Ok(())
                 })
@@ -251,7 +256,8 @@ impl AsFramedWriter for FramedWriter {
 
             self.0 = Some(inner);
             Ok(())
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
@@ -318,22 +324,14 @@ mod tests {
         let wt = tokio::task::spawn(async move {
             let mut buf = PoolBuf::new();
             buf.extend_from_slice(&[0xd0; 512]);
-            send.write(
-                1.into(),
-                buf,
-                KitsuneTimeout::from_millis(1000 * 30),
-            )
-            .await
-            .unwrap();
+            send.write(1.into(), buf, KitsuneTimeout::from_millis(1000 * 30))
+                .await
+                .unwrap();
             let mut buf = PoolBuf::new();
             buf.extend_from_slice(&[0xd1; 8000]);
-            send.write(
-                2.into(),
-                buf,
-                KitsuneTimeout::from_millis(1000 * 30),
-            )
-            .await
-            .unwrap();
+            send.write(2.into(), buf, KitsuneTimeout::from_millis(1000 * 30))
+                .await
+                .unwrap();
         });
 
         for _ in 0..2 {

@@ -1,7 +1,7 @@
 use futures::future::BoxFuture;
 use parking_lot::Mutex;
 use std::sync::Arc;
-use tokio::sync::{Semaphore, OwnedSemaphorePermit};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 struct ActorInner<E: 'static + Send> {
     events: Vec<E>,
@@ -56,14 +56,15 @@ impl<E: 'static + Send> ActorHandle<E> {
         let inner = self.0.clone();
         async move {
             let permit = {
-                let limit = {
-                    inner.lock().limit.clone()
-                };
+                let limit = { inner.lock().limit.clone() };
                 limit.acquire_owned()
-            }.await;
+            }
+            .await;
 
             let mut inner = inner.lock();
-            inner.logic.push((permit, futures::future::FutureExt::boxed(l)));
+            inner
+                .logic
+                .push((permit, futures::future::FutureExt::boxed(l)));
             if let Some(w) = inner.waker.take() {
                 w.wake();
             }
@@ -209,7 +210,8 @@ mod tests {
                 b.emit("b1");
                 tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
                 b.emit("b2");
-            }).await;
+            })
+            .await;
             tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
             a.emit("a2");
         });

@@ -1,13 +1,14 @@
+#![allow(clippy::new_ret_no_self)]
 //! Types, traits, and an implementation for applying pooling to a tx backend.
 
-use crate::tx2::util::*;
 use crate::tx2::tx_backend::*;
+use crate::tx2::util::*;
 use crate::tx2::*;
 use crate::*;
 
-use tokio::sync::{Semaphore, OwnedSemaphorePermit};
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use std::collections::HashMap;
 
@@ -127,7 +128,8 @@ impl TxPoolEventRecv for EvtRecvWrap {
                 self.pending.append(&mut items);
             }
             Ok(self.pending.remove(0))
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
@@ -144,9 +146,7 @@ struct PoolWrapInner {
 }
 
 impl PoolWrapInner {
-    pub fn new(
-        ep: Arc<dyn EndpointAdapt>,
-    ) -> Self {
+    pub fn new(ep: Arc<dyn EndpointAdapt>) -> Self {
         Self {
             ep,
             cons: HashMap::new(),
@@ -157,36 +157,39 @@ impl PoolWrapInner {
 struct PoolWrap(Share<PoolWrapInner>);
 
 impl PoolWrap {
-    pub fn new(
-        ep: Arc<dyn EndpointAdapt>,
-    ) -> Arc<dyn TxPoolAdapt> {
-        Arc::new(Self(Share::new(PoolWrapInner::new(
-            ep,
-        ))))
+    pub fn new(ep: Arc<dyn EndpointAdapt>) -> Arc<dyn TxPoolAdapt> {
+        Arc::new(Self(Share::new(PoolWrapInner::new(ep))))
     }
 
     fn get_con(&self, url: TxUrl, timeout: KitsuneTimeout) -> KitsuneResult<ConRefFut> {
         let inner = self.0.clone();
         self.0.share_mut(move |i, _| {
             let ep = i.ep.clone();
-            Ok(i.cons.entry(url.clone()).or_insert_with(|| {
-                let fut = ep.connect(url.clone(), timeout);
-                async move {
-                    let (_con, _in_chan_recv) = match fut.await {
-                        Err(e) => {
-                            inner.share_mut(move |i, _| {
-                                i.cons.remove(&url);
-                                Ok(())
-                            }).unwrap();
-                            return Arc::new(Err(e));
-                        }
-                        Ok(c) => c,
-                    };
-                    Arc::new(Ok(ConRef {
-                        last_msg: std::time::Instant::now(),
-                    }))
-                }.boxed().shared()
-            }).clone())
+            Ok(i.cons
+                .entry(url.clone())
+                .or_insert_with(|| {
+                    let fut = ep.connect(url.clone(), timeout);
+                    async move {
+                        let (_con, _in_chan_recv) = match fut.await {
+                            Err(e) => {
+                                inner
+                                    .share_mut(move |i, _| {
+                                        i.cons.remove(&url);
+                                        Ok(())
+                                    })
+                                    .unwrap();
+                                return Arc::new(Err(e));
+                            }
+                            Ok(c) => c,
+                        };
+                        Arc::new(Ok(ConRef {
+                            last_msg: std::time::Instant::now(),
+                        }))
+                    }
+                    .boxed()
+                    .shared()
+                })
+                .clone())
         })
     }
 }
@@ -218,7 +221,7 @@ impl TxPoolAdapt for PoolWrap {
             *c = true;
             Ok(i.ep.close())
         }) {
-            Err(_) => async move { }.boxed(),
+            Err(_) => async move {}.boxed(),
             Ok(fut) => fut,
         }
     }
@@ -232,10 +235,7 @@ pub struct TxPoolFactoryWrapper {
 
 impl TxPoolFactoryWrapper {
     /// Wrap a basic BackendFactory into a TxPoolFactory.
-    pub fn new(
-        sub_factory: BackendFactory,
-        max_connections: usize,
-    ) -> TxPoolFactory {
+    pub fn new(sub_factory: BackendFactory, max_connections: usize) -> TxPoolFactory {
         let out: TxPoolFactory = Arc::new(Self {
             sub_factory,
             max_connections: Arc::new(Semaphore::new(max_connections)),
@@ -244,11 +244,12 @@ impl TxPoolFactoryWrapper {
     }
 }
 
-async fn recv_con_logic(
-    con_recv: Box<dyn ConRecvAdapt>,
-    max_connections: Arc<Semaphore>,
-) {
-    type P = (OwnedSemaphorePermit, Arc<dyn ConAdapt>, Box<dyn InChanRecvAdapt>);
+async fn recv_con_logic(con_recv: Box<dyn ConRecvAdapt>, max_connections: Arc<Semaphore>) {
+    type P = (
+        OwnedSemaphorePermit,
+        Arc<dyn ConAdapt>,
+        Box<dyn InChanRecvAdapt>,
+    );
     type RP = BoxFuture<'static, KitsuneResult<P>>;
     type SP = futures::stream::BoxStream<'static, RP>;
     let con_recv: SP = futures::stream::unfold(con_recv, move |mut con_recv| {
@@ -257,22 +258,29 @@ async fn recv_con_logic(
             let permit = max_connections.acquire_owned().await;
             match con_recv.next().await {
                 Err(_) => None,
-                Ok(fut) => Some((async move {
-                    let (con, chan_recv) = fut.await?;
-                    Ok((permit, con, chan_recv))
-                }.boxed(), con_recv)),
+                Ok(fut) => Some((
+                    async move {
+                        let (con, chan_recv) = fut.await?;
+                        Ok((permit, con, chan_recv))
+                    }
+                    .boxed(),
+                    con_recv,
+                )),
             }
         }
-    }).boxed();
-    con_recv.for_each_concurrent(None, move |fut| async move {
-        let (_permit, con, _chan_recv) = match fut.await {
-            // TODO - FIXME
-            Err(e) => panic!("{:?}", e),
-            Ok(r) => r,
-        };
-        println!("RECV CON: rem: {}", con.remote_addr().unwrap());
-        unimplemented!()
-    }).await;
+    })
+    .boxed();
+    con_recv
+        .for_each_concurrent(None, move |fut| async move {
+            let (_permit, con, _chan_recv) = match fut.await {
+                // TODO - FIXME
+                Err(e) => panic!("{:?}", e),
+                Ok(r) => r,
+            };
+            println!("RECV CON: rem: {}", con.remote_addr().unwrap());
+            unimplemented!()
+        })
+        .await;
     println!("CON RECV LOOP END");
 }
 
@@ -286,12 +294,16 @@ impl TxPoolBackendAdapt for TxPoolFactoryWrapper {
             let actor = Actor::new(32);
             let pool = PoolWrap::new(ep);
 
-            actor.handle().capture_logic(recv_con_logic(con_recv, max_connections.clone())).await;
+            actor
+                .handle()
+                .capture_logic(recv_con_logic(con_recv, max_connections.clone()))
+                .await;
 
             let recv = EvtRecvWrap::new(actor);
 
             Ok((pool, recv))
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
@@ -303,10 +315,7 @@ mod tests {
     async fn test_tx_pool() {
         let t = KitsuneTimeout::from_millis(5000);
 
-        let pfact = TxPoolFactoryWrapper::new(
-            MemBackendAdapt::new(),
-            32,
-        );
+        let pfact = TxPoolFactoryWrapper::new(MemBackendAdapt::new(), 32);
 
         let (p1, _recv1) = pfact.bind("none:".into(), t).await.unwrap();
         let (p2, mut recv2) = pfact.bind("none:".into(), t).await.unwrap();

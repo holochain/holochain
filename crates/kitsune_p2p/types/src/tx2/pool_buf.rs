@@ -105,9 +105,7 @@ impl PoolBuf {
         let inner = BUF_POOL.with(|p| {
             let mut p = p.borrow_mut();
             if p.is_empty() {
-                let mut i = Vec::with_capacity(POOL_BUF_PRE_WRITE_SPACE);
-                i.resize(POOL_BUF_PRE_WRITE_SPACE, 0);
-                i
+                vec![0; POOL_BUF_PRE_WRITE_SPACE]
             } else {
                 p.remove(0)
             }
@@ -175,7 +173,9 @@ impl PoolBuf {
 
         // any way to work around this unsafe without needlessly
         // initializing this data we're going to overwrite?
-        unsafe { inner.1.set_len(new_len); }
+        unsafe {
+            inner.1.set_len(new_len);
+        }
 
         inner.1.copy_within(inner.0..prev_len, inner.0 + len);
         inner.0 += len;

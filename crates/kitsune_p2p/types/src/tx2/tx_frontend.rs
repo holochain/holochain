@@ -11,7 +11,11 @@ pub struct TxEndpointFramed {}
 
 impl TxEndpointFramed {
     /// Construct a new instance from given factory / bind info.
-    pub async fn bind<U>(factory: BackendFactory, url: U, timeout: KitsuneTimeout) -> KitsuneResult<TxEndpointFramed>
+    pub async fn bind<U>(
+        factory: BackendFactory,
+        url: U,
+        timeout: KitsuneTimeout,
+    ) -> KitsuneResult<TxEndpointFramed>
     where
         U: Into<TxUrl>,
     {
@@ -46,6 +50,7 @@ mod tests {
             MemBackendAdapt::new(),
             "none:",
             KitsuneTimeout::from_millis(1000 * 30),
-        ).await;
+        )
+        .await;
     }
 }

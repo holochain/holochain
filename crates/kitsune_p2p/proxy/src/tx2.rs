@@ -1,14 +1,15 @@
+#![allow(clippy::new_ret_no_self)]
 //! Next-gen performance kitsune transport proxy
 
-use crate::{TlsConfig, ProxyUrl};
-use kitsune_p2p_types::*;
-use kitsune_p2p_types::tx2::tx_backend::*;
-use kitsune_p2p_types::tx2::util::*;
-use std::sync::Arc;
+use crate::{ProxyUrl, TlsConfig};
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
+use kitsune_p2p_types::tx2::tx_backend::*;
+use kitsune_p2p_types::tx2::util::*;
+use kitsune_p2p_types::*;
 use parking_lot::Mutex;
-use tokio::sync::{Semaphore, OwnedSemaphorePermit};
+use std::sync::Arc;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 struct ProxyConRecvAdapt {
     actor: Actor<ConFut>,
@@ -36,7 +37,8 @@ impl ConRecvAdapt for ProxyConRecvAdapt {
             };
             self.pending.append(&mut items);
             Ok(self.pending.remove(0))
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
@@ -81,7 +83,10 @@ impl EndpointAdapt for ProxyEndpointAdapt {
         };
 
         let local_addr = ep.local_addr()?;
-        let proxy_addr: TxUrl = ProxyUrl::new(local_addr.as_str(), digest).map_err(KitsuneError::other)?.as_str().into();
+        let proxy_addr: TxUrl = ProxyUrl::new(local_addr.as_str(), digest)
+            .map_err(KitsuneError::other)?
+            .as_str()
+            .into();
         Ok(proxy_addr)
     }
 
@@ -111,7 +116,7 @@ impl EndpointAdapt for ProxyEndpointAdapt {
     fn close(&self) -> BoxFuture<'static, ()> {
         let mut lock = self.0.lock();
         if lock.is_none() {
-            return async move { }.boxed();
+            return async move {}.boxed();
         }
         let fut = lock.as_ref().unwrap().sub_ep.close();
         *lock = None;
@@ -147,7 +152,11 @@ async fn in_con_logic(
     sub_con_recv: Box<dyn ConRecvAdapt>,
     max_connections: Arc<Semaphore>,
 ) {
-    type P = (OwnedSemaphorePermit, Arc<dyn ConAdapt>, Box<dyn InChanRecvAdapt>);
+    type P = (
+        OwnedSemaphorePermit,
+        Arc<dyn ConAdapt>,
+        Box<dyn InChanRecvAdapt>,
+    );
     type RP = BoxFuture<'static, KitsuneResult<P>>;
     type SP = futures::stream::BoxStream<'static, RP>;
     let sub_con_recv: SP = futures::stream::unfold(sub_con_recv, move |mut sub_con_recv| {
@@ -156,22 +165,29 @@ async fn in_con_logic(
             let permit = max_connections.acquire_owned().await;
             match sub_con_recv.next().await {
                 Err(_) => None,
-                Ok(fut) => Some((async move {
-                    let (con, chan_recv) = fut.await?;
-                    Ok((permit, con, chan_recv))
-                }.boxed(), sub_con_recv)),
+                Ok(fut) => Some((
+                    async move {
+                        let (con, chan_recv) = fut.await?;
+                        Ok((permit, con, chan_recv))
+                    }
+                    .boxed(),
+                    sub_con_recv,
+                )),
             }
         }
-    }).boxed();
-    sub_con_recv.for_each_concurrent(None, move |fut| async move {
-        let (_permit, con, _chan_recv) = match fut.await {
-            // TODO - FIXME
-            Err(e) => panic!("{:?}", e),
-            Ok(r) => r,
-        };
-        println!("RECV CON: rem: {}", con.remote_addr().unwrap());
-        unimplemented!()
-    }).await;
+    })
+    .boxed();
+    sub_con_recv
+        .for_each_concurrent(None, move |fut| async move {
+            let (_permit, con, _chan_recv) = match fut.await {
+                // TODO - FIXME
+                Err(e) => panic!("{:?}", e),
+                Ok(r) => r,
+            };
+            println!("RECV CON: rem: {}", con.remote_addr().unwrap());
+            unimplemented!()
+        })
+        .await;
     println!("CON RECV LOOP END");
 }
 
@@ -194,9 +210,10 @@ impl BackendAdapt for ProxyBackendAdapt {
 
             let dyn_ep: Arc<dyn EndpointAdapt> = ep.clone();
 
-            actor_recv.handle().capture_logic(
-                in_con_logic(ep, sub_con_recv, max_connections),
-            ).await;
+            actor_recv
+                .handle()
+                .capture_logic(in_con_logic(ep, sub_con_recv, max_connections))
+                .await;
 
             let con_recv = ProxyConRecvAdapt::new(actor_recv);
 

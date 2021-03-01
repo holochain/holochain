@@ -257,14 +257,8 @@ mod tests {
         let t = KitsuneTimeout::from_millis(5000);
 
         let back = MemBackendAdapt::new();
-        let (ep1, _con_recv1) =
-            back.bind("none:".into(), t)
-                .await
-                .unwrap();
-        let (ep2, mut con_recv2) =
-            back.bind("none:".into(), t)
-                .await
-                .unwrap();
+        let (ep1, _con_recv1) = back.bind("none:".into(), t).await.unwrap();
+        let (ep2, mut con_recv2) = back.bind("none:".into(), t).await.unwrap();
 
         let rt = tokio::task::spawn(async move {
             let mut all = Vec::new();
@@ -273,10 +267,7 @@ mod tests {
                 if let Ok((con2, mut chan_recv2)) = fut.await {
                     println!("in-con-2");
 
-                    let mut out_chan = con2
-                        .out_chan(t)
-                        .await
-                        .unwrap();
+                    let mut out_chan = con2.out_chan(t).await.unwrap();
                     all.push(tokio::task::spawn(async move {
                         println!("in-chan-1");
                         while let Ok(fut) = chan_recv2.next().await {
@@ -300,16 +291,10 @@ mod tests {
         let addr2 = ep2.local_addr().unwrap();
         println!("addr2 = {}", addr2);
 
-        let (con1, mut chan_recv1) = ep1
-            .connect(addr2, t)
-            .await
-            .unwrap();
+        let (con1, mut chan_recv1) = ep1.connect(addr2, t).await.unwrap();
         println!("con to = {}", con1.remote_addr().unwrap());
 
-        let mut out_chan = con1
-            .out_chan(t)
-            .await
-            .unwrap();
+        let mut out_chan = con1.out_chan(t).await.unwrap();
         let mut buf = PoolBuf::new();
         buf.extend_from_slice(b"hello");
         out_chan.write(0.into(), buf, t).await.unwrap();
