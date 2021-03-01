@@ -128,9 +128,7 @@ impl Cell {
         if has_genesis {
             tokio::spawn({
                 let mut network = holochain_p2p_cell.clone();
-                async move {
-                    network.join().await
-                }
+                async move { network.join().await }
             });
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 &env,

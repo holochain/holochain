@@ -2,8 +2,8 @@
 //use std::process::Stdio;
 
 fn main() {
-    return;
-/*    let should_build = std::env::var_os("CARGO_FEATURE_BUILD").is_some();
+    // return;
+    /*    let should_build = std::env::var_os("CARGO_FEATURE_BUILD").is_some();
     let only_check = std::env::var_os("CARGO_FEATURE_ONLY_CHECK").is_some();
 
     if !(should_build || only_check) {
