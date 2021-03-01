@@ -94,8 +94,8 @@ pub struct MdnsResponse {
     pub buffer: Vec<u8>,
 }
 
-/// Queries the network for the holochain service
-/// Returns an iterator over all responses received
+/// Queries the network for the holochain service.
+/// Returns an iterator over all responses received.
 #[allow(clippy::let_and_return)]
 pub fn mdns_listen(service_type: String) -> impl Stream<Item = Result<MdnsResponse, MdnsError>> {
     //let service_name = format!("{}.local", HC_SERVICE_TYPE);
