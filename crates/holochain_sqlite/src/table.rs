@@ -1,7 +1,5 @@
 //! Functionality for safely accessing LMDB database references.
 
-use std::path::Path;
-
 use crate::prelude::Writer;
 use crate::{db::DbKind, exports::IntegerTable, prelude::Readable};
 use crate::{
@@ -9,6 +7,9 @@ use crate::{
     exports::{MultiTable, SingleTable},
 };
 use derive_more::Display;
+use rusqlite::*;
+use std::path::Path;
+
 /// Enumeration of all databases needed by Holochain
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Display)]
 pub enum TableName {
@@ -60,14 +61,62 @@ pub enum TableName {
     Agent,
 }
 
-#[deprecated = "alias, remove"]
-/// remove
-pub type DbName = TableName;
+fn initialize_table(conn: &mut Connection, name: TableName) -> DatabaseResult<()> {
+    let table_name = format!("{}", name);
+    let index_name = format!("{}_idx", table_name);
 
-/// Get access to the singleton database manager ([GetTable]),
-/// in order to access individual LMDB databases
-pub(super) fn initialize_databases(_path: &Path, _kind: &DbKind) -> DatabaseResult<()> {
-    todo!("create database and schema if not exists");
+    // create table
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS ?1 (
+            key       BLOB PRIMARY KEY,
+            val       BLOB NOT NULL
+        );",
+        &[table_name.clone()],
+    )?;
+
+    // create index
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS ?1 ON ?2 ( key );",
+        &[index_name, table_name],
+    )?;
+    Ok(())
+}
+
+pub(super) fn initialize_database(conn: &mut Connection, kind: &DbKind) -> DatabaseResult<()> {
+    match kind {
+        DbKind::Cell(_) => {
+            initialize_table(conn, TableName::ElementVaultPublicEntries)?;
+            initialize_table(conn, TableName::ElementVaultPrivateEntries)?;
+            initialize_table(conn, TableName::ElementVaultHeaders)?;
+            initialize_table(conn, TableName::MetaVaultSys)?;
+            initialize_table(conn, TableName::MetaVaultLinks)?;
+            initialize_table(conn, TableName::MetaVaultMisc)?;
+            initialize_table(conn, TableName::ChainSequence)?;
+            initialize_table(conn, TableName::ElementCacheEntries)?;
+            initialize_table(conn, TableName::ElementCacheHeaders)?;
+            initialize_table(conn, TableName::MetaCacheSys)?;
+            initialize_table(conn, TableName::MetaCacheLinks)?;
+            initialize_table(conn, TableName::MetaCacheStatus)?;
+            initialize_table(conn, TableName::AuthoredDhtOps)?;
+            initialize_table(conn, TableName::IntegratedDhtOps)?;
+            initialize_table(conn, TableName::IntegrationLimbo)?;
+            initialize_table(conn, TableName::ValidationLimbo)?;
+            initialize_table(conn, TableName::ValidationReceipts)?;
+        }
+        DbKind::Conductor => {
+            initialize_table(conn, TableName::ConductorState)?;
+        }
+        DbKind::Wasm => {
+            initialize_table(conn, TableName::Wasm)?;
+            initialize_table(conn, TableName::DnaDef)?;
+            initialize_table(conn, TableName::EntryDef)?;
+        }
+        DbKind::P2p => {
+            initialize_table(conn, TableName::Agent)?;
+            // @todo health metrics for the space
+            // register_db(env, um, &*HEALTH)?;
+        }
+    }
     Ok(())
 }
 

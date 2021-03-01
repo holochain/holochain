@@ -6,8 +6,7 @@ use holochain_keystore::KeystoreSender;
 use holochain_zome_types::cell::CellId;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
-use rkv::EnvironmentFlags;
-use rusqlite::Connection;
+use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
 use std::collections::HashMap;
 use std::path::Path;
@@ -81,7 +80,7 @@ impl DbRead {
 
     #[deprecated = "TODO: use `connection`"]
     fn connection_naive(&self) -> DatabaseResult<Conn> {
-        Ok(Conn::new(Connection::open(&self.path)?))
+        Ok(Conn::new(&self.path, &self.kind)?)
     }
 
     fn connection(&self) -> DatabaseResult<Conn> {
@@ -111,12 +110,13 @@ impl DbWrite {
             std::fs::create_dir(path.clone())
                 .map_err(|_e| DatabaseError::EnvironmentMissing(path.clone()))?;
         }
+        let mut conn = Conn::new(&path, &kind)?.into_raw();
         let env: DbWrite = match map.entry(path.clone()) {
             hash_map::Entry::Occupied(e) => e.get().clone(),
             hash_map::Entry::Vacant(e) => e
                 .insert({
                     tracing::debug!("Initializing databases for path {:?}", path);
-                    initialize_databases(&path, &kind)?;
+                    initialize_database(&mut conn, &kind)?;
                     DbWrite(DbRead {
                         kind,
                         keystore,
@@ -166,17 +166,50 @@ pub struct Conn<'e> {
 }
 
 impl<'e> Conn<'e> {
-    pub fn new(conn: Connection) -> Self {
-        Self {
+    /// Create a new connection with decryption key set
+    pub fn new(path: &Path, kind: &DbKind) -> DatabaseResult<Self> {
+        let mut filename = kind.path();
+        filename.set_extension("sqlite3");
+        let path = path.join(filename);
+        let conn = Connection::open(path)?;
+
+        let key = get_encryption_key_shim();
+        let mut cmd = *br#"PRAGMA key = "x'0000000000000000000000000000000000000000000000000000000000000000'";"#;
+        {
+            use std::io::Write;
+            let mut c = std::io::Cursor::new(&mut cmd[16..80]);
+            for b in &key {
+                write!(c, "{:02X}", b)
+                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+            }
+        }
+        conn.execute(std::str::from_utf8(&cmd).unwrap(), NO_PARAMS)?;
+
+        // set to faster write-ahead-log mode
+        conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
+
+        Ok(Self {
             conn,
             lt: PhantomData,
-        }
+        })
+    }
+
+    pub fn into_raw(self) -> Connection {
+        self.conn
     }
 
     #[deprecated = "Shim for `Rkv`, just because we have methods that call these"]
     pub fn inner(&self) -> ConnInner {
         ConnInner
     }
+}
+
+/// Simulate getting an encryption key from Lair.
+fn get_encryption_key_shim() -> [u8; 32] {
+    [
+        26, 111, 7, 31, 52, 204, 156, 103, 203, 171, 156, 89, 98, 51, 158, 143, 57, 134, 93, 56,
+        199, 225, 53, 141, 39, 77, 145, 130, 136, 108, 96, 201,
+    ]
 }
 
 #[deprecated = "Shim for `Rkv`, just because we have methods that call these"]

@@ -4,7 +4,7 @@
 #![allow(missing_docs)]
 
 use crate::prelude::*;
-use crate::table::DbName;
+use crate::table::TableName;
 use failure::Fail;
 use holochain_serialized_bytes::SerializedBytesError;
 use std::path::PathBuf;
@@ -13,10 +13,10 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum DatabaseError {
     #[error("A store which was expected not to be empty turned out to be empty: {0}")]
-    EmptyStore(DbName),
+    EmptyStore(TableName),
 
     #[error("An LMDB store was not created/initialized: {0}, path: {1}")]
-    StoreNotInitialized(DbName, PathBuf),
+    StoreNotInitialized(TableName, PathBuf),
 
     #[error("An LMDB environment's database map was initialized more than once: {0}")]
     EnvironmentDoubleInitialized(PathBuf),
