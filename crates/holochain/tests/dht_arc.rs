@@ -223,3 +223,23 @@ async fn test_arc_redundancy() {
         }
     }
 }
+
+#[tokio::test(threaded_scheduler)]
+async fn test_join_leave() {
+    let conductor = SweetConductor::from_config(Default::default()).await;
+    let keystore = conductor.keystore();
+
+    let num_peers = 10;
+
+    let coverages = vec![MAX_HALF_LENGTH];
+    let converge = |peers: &mut Vec<DhtArc>| {
+        for i in 0..peers.len() {
+            let p = peers.clone();
+            let arc = peers.get_mut(i).unwrap();
+            let bucket = DhtArcBucket::new(*arc, p.clone());
+            let density = bucket.density();
+            arc.update_length(density);
+        }
+    };
+    let mut peers = get_peers(num_peers, &coverages, keystore.clone()).await;
+}
