@@ -32,7 +32,7 @@ const U32_LEN: u64 = u32::MAX as u64 + 1;
 const REDUNDANCY_TARGET: usize = 20;
 
 /// When distribution starts to become good.
-const STABLE_TARGET: usize = REDUNDANCY_TARGET + 20;
+const STABLE_TARGET: usize = REDUNDANCY_TARGET + 40;
 
 /// Default assumed up time for nodes.
 const DEFAULT_UPTIME: f64 = 0.5;
@@ -114,6 +114,8 @@ fn target(density: PeerDensity) -> f64 {
 
         // If the network is small then we add a little padding to account for
         // poor distribution of peers.
+        // TODO: We can probably scale this padding down a bit as it is probably
+        // more then we really need.
         let small_network_padding = 1.0
             - smooth_step(
                 REDUNDANCY_TARGET as f64,
@@ -475,6 +477,7 @@ impl std::fmt::Display for DhtArc {
 }
 
 /// Check a set of peers for a gap in coverage.
+/// Note this function is only used for verification in tests at this time.
 pub fn check_for_gaps(peers: Vec<DhtArc>) -> bool {
     let left = |arc: &DhtArc| match arc.range().start_bound() {
         Bound::Included(arm) => *arm,
@@ -519,6 +522,7 @@ pub fn check_for_gaps(peers: Vec<DhtArc>) -> bool {
 
 /// Check a set of peers the actual redundancy across all peers.
 /// This can tell if there is bad distribution.
+/// Note this function is only used for verification in tests at this time.
 pub fn check_redundancy(peers: Vec<DhtArc>) -> usize {
     #[derive(Clone, Copy, Debug)]
     enum Side {

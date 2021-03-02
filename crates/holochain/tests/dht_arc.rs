@@ -2,7 +2,9 @@ use holochain::test_utils::sweetest::SweetAgents;
 use holochain::test_utils::sweetest::SweetConductor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::dht_arc::check_for_gaps;
+use holochain_p2p::dht_arc::check_redundancy;
 use holochain_p2p::dht_arc::MAX_HALF_LENGTH;
+use holochain_p2p::dht_arc::MIN_PEERS;
 use holochain_p2p::dht_arc::MIN_STABLE_PEERS;
 use kitsune_p2p::dht_arc::DhtArc;
 use kitsune_p2p::dht_arc::DhtArcBucket;
@@ -167,7 +169,6 @@ async fn test_arc_gaps() {
 async fn test_arc_redundancy() {
     let conductor = SweetConductor::from_config(Default::default()).await;
     let keystore = conductor.keystore();
-    let min_peers = 40;
     let converge = |peers: &mut Vec<DhtArc>| {
         let mut mature = false;
         for _ in 0..40 {
@@ -183,13 +184,18 @@ async fn test_arc_redundancy() {
             }
             let bucket = DhtArcBucket::new(DhtArc::new(0, MAX_HALF_LENGTH), peers.clone());
 
-            let r = bucket.density().est_total_redundancy();
+            let r = check_redundancy(peers.clone());
             if mature {
                 println!("{}", r);
-                assert!(r >= 20);
+                assert!(r >= MIN_PEERS);
             } else {
-                // println!("{}\n{}", bucket, r);
-                if r >= 20 {
+                // println!(
+                //     "{}\nR: {}, est R: {}",
+                //     bucket,
+                //     r,
+                //     bucket.density().est_total_redundancy()
+                // );
+                if r >= MIN_PEERS {
                     mature = true;
                 }
             }
@@ -198,13 +204,15 @@ async fn test_arc_redundancy() {
     };
     let test = |x: f64, scale, n, k| async move {
         let mut peers = get_peers(
-            (min_peers as f64 * x) as usize,
+            (MIN_PEERS as f64 * x) as usize,
             &[(MAX_HALF_LENGTH as f64 * scale) as u32 + n],
             k,
         )
         .await;
         converge(&mut peers);
     };
+    test(2.0, 0.0, 20, keystore.clone()).await;
+    test(4.0, 0.0, 20, keystore.clone()).await;
     for &peer_factor in [1.0, 1.1, 1.5, 2.0, 4.0].iter() {
         for &(scale, n) in [
             (0.0, 20),
@@ -218,7 +226,14 @@ async fn test_arc_redundancy() {
         .iter()
         {
             for i in 0..10 {
-                println!("Test: {} peers {}", i, peer_factor * min_peers as f64);
+                println!(
+                    "Test: {} pf {} peers {} scale {} n {}",
+                    i,
+                    peer_factor,
+                    peer_factor * MIN_PEERS as f64,
+                    scale,
+                    n
+                );
                 test(peer_factor, scale, n, keystore.clone()).await;
             }
         }
@@ -251,15 +266,14 @@ async fn test_join_leave() {
             *o = n;
         }
         converge(&mut peers);
-        let bucket = DhtArcBucket::new(DhtArc::new(0, MAX_HALF_LENGTH), peers.clone());
+        let r = check_redundancy(peers.clone());
 
-        let r = bucket.density().est_total_redundancy();
         if mature {
             println!("{}", r);
-            assert!(r >= 20);
+            assert!(r >= MIN_PEERS);
         } else {
             // println!("{}\n{}", bucket, r);
-            if r >= 20 {
+            if r >= MIN_PEERS {
                 mature = true;
             }
         }
