@@ -3,6 +3,7 @@ use holochain::test_utils::sweetest::SweetConductor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::dht_arc::check_for_gaps;
 use holochain_p2p::dht_arc::MAX_HALF_LENGTH;
+use holochain_p2p::dht_arc::MIN_STABLE_PEERS;
 use kitsune_p2p::dht_arc::DhtArc;
 use kitsune_p2p::dht_arc::DhtArcBucket;
 use kitsune_p2p::*;
@@ -229,7 +230,7 @@ async fn test_join_leave() {
     let conductor = SweetConductor::from_config(Default::default()).await;
     let keystore = conductor.keystore();
 
-    let num_peers = 10;
+    let num_peers = MIN_STABLE_PEERS;
 
     let coverages = vec![MAX_HALF_LENGTH];
     let converge = |peers: &mut Vec<DhtArc>| {
@@ -242,4 +243,26 @@ async fn test_join_leave() {
         }
     };
     let mut peers = get_peers(num_peers, &coverages, keystore.clone()).await;
+    let delta_peers = num_peers * 0;
+    let mut mature = false;
+    for _ in 0..40 {
+        let new_peers = get_peers(delta_peers, &coverages, keystore.clone()).await;
+        for (o, n) in peers[..delta_peers].iter_mut().zip(new_peers.into_iter()) {
+            *o = n;
+        }
+        converge(&mut peers);
+        let bucket = DhtArcBucket::new(DhtArc::new(0, MAX_HALF_LENGTH), peers.clone());
+
+        let r = bucket.density().est_total_redundancy();
+        if mature {
+            println!("{}", r);
+            assert!(r >= 20);
+        } else {
+            // println!("{}\n{}", bucket, r);
+            if r >= 20 {
+                mature = true;
+            }
+        }
+    }
+    assert!(mature);
 }

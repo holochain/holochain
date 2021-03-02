@@ -61,7 +61,7 @@ fn test_arc_start_end() {
         let out_r = (Wrapping(end) + Wrapping(1u32)).0;
         let opp = (Wrapping(mid) + Wrapping(half)).0;
 
-        assert!(!DhtArc::new(mid, hl).contains(dbg!(out_l)));
+        assert!(!DhtArc::new(mid, hl).contains(out_l));
         assert!(DhtArc::new(mid, hl).contains(start));
         assert!(DhtArc::new(mid, hl).contains(mid));
         assert!(DhtArc::new(mid, hl).contains(end));
@@ -215,22 +215,19 @@ fn test_peer_density() {
     };
 
     let converge = |arc: &mut DhtArc, peers: &Vec<DhtArc>| {
-        let bucket = DhtArcBucket::new(*arc, peers.clone());
-        println!("{}\n{:?}", bucket, bucket.density());
         for _ in 0..40 {
             let bucket = DhtArcBucket::new(*arc, peers.clone());
             let density = bucket.density();
             arc.update_length(density);
         }
-        let bucket = DhtArcBucket::new(*arc, peers.clone());
-        println!("{}\n{:?}", bucket, bucket.density().est_gap());
     };
 
     assert_eq!(arc(0.0, 0, MAX_HALF_LENGTH), 1.0);
     for i in 0..(MIN_PEERS - 1) {
         assert_eq!(arc(1.0, i, MAX_HALF_LENGTH), 1.0);
     }
-    assert_eq!(arc(1.0, MIN_PEERS * 4, MAX_HALF_LENGTH), 0.9);
+    assert_eq!(arc(1.0, MIN_PEERS, MAX_HALF_LENGTH), 1.0);
+    assert_eq!(arc(1.0, MIN_STABLE_PEERS, MAX_HALF_LENGTH), 0.9);
 
     // - Start with half coverage and minimum density
     let mut arc = DhtArc::new(0, MAX_HALF_LENGTH / 2);
@@ -241,23 +238,23 @@ fn test_peer_density() {
 
     // - Start with full coverage and over density
     let mut arc = DhtArc::new(0, MAX_HALF_LENGTH);
-    let peers = even_dist_peers(MIN_PEERS * 4, &[MAX_HALF_LENGTH]);
+    let peers = even_dist_peers(MIN_PEERS * 2, &[MAX_HALF_LENGTH]);
     converge(&mut arc, &peers);
     // - Converge to half coverage
     assert_eq!((arc.coverage() * 10.0).round() / 10.0, 0.5);
 
-    // - Start with full coverage and even but lower density
+    // - Start with full coverage and low density
     let mut arc = DhtArc::new(u32::MAX / 2, MAX_HALF_LENGTH);
-    let peers = even_dist_peers(MIN_PEERS * 8, &[MAX_HALF_LENGTH / 4]);
+    let peers = even_dist_peers(MIN_STABLE_PEERS * 2, &[20]);
     converge(&mut arc, &peers);
-    // - Converge to a quarter coverage
-    assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.25);
+    // - Converge to a full coverage
+    assert_eq!((arc.coverage() * 100.0).round() / 100.0, 1.0);
 
     // - Start with no coverage and under density
     let mut arc = DhtArc::new(u32::MAX / 2, 0);
     let peers = even_dist_peers(MIN_PEERS * 8, &[MAX_HALF_LENGTH / 10]);
     converge(&mut arc, &peers);
-    // - Converge to a quarter coverage
+    // - Converge to a full coverage
     assert_eq!((arc.coverage() * 100.0).round() / 100.0, 1.0);
 }
 
@@ -298,79 +295,61 @@ fn test_converge() {
 fn test_multiple() {
     let converge = |peers: &mut Vec<DhtArc>| {
         let mut mature = false;
-        for i in 0..40 {
+        for _ in 0..40 {
             for i in 0..peers.len() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
                 let bucket = DhtArcBucket::new(*arc, p.clone());
                 let density = bucket.density();
                 arc.update_length(density);
-                // let bucket = DhtArcBucket::new(*arc, p.clone());
-                // println!("{}\n{:?}", bucket, bucket.density().est_gap());
-                // println!("{}", bucket.density().est_gap());
             }
-            // let bucket = DhtArcBucket::new(peers[0], peers.clone());
-            // println!("{}\n{:?}", bucket, bucket.density().est_gap());
-            // for arc in peers.iter() {
-            //     if arc.coverage() > 0.6 {
-            //         dbg!(arc.coverage());
-            //     }
-            // }
-            let bucket = DhtArcBucket::new(DhtArc::new(0, MAX_HALF_LENGTH), peers.clone());
-            let r = bucket.density().est_total_redundancy();
+            let r = check_redundancy(peers.clone());
             if mature {
-                println!("{}{:?}", r, bucket.density());
-                assert!(r >= 20);
-            // println!("{}\n{}", bucket, r);
+                assert!(r >= MIN_PEERS);
             } else {
-                println!("Immature {}@{}", r, i);
-                // println!("{}\n{}", bucket, r);
-                if r >= 20 {
+                if r >= MIN_PEERS {
                     mature = true;
                 }
             }
-            // std::thread::sleep(std::time::Duration::from_millis(200));
         }
+        assert!(mature)
     };
 
     let mut peers = even_dist_peers(MIN_STABLE_PEERS, &[20]);
     converge(&mut peers);
-    // - Converge to half coverage
     for arc in peers {
         assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.55);
     }
 
     let mut peers = even_dist_peers(MIN_STABLE_PEERS, &[MAX_HALF_LENGTH]);
     converge(&mut peers);
-    // - Converge to half coverage
     for arc in peers {
         assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.55);
     }
 
-    // let mut peers = even_dist_peers(min_online_peers * 4, &[MAX_HALF_LENGTH / 10]);
-    // converge(&mut peers);
-    // // - Converge to quarter coverage
-    // for arc in peers {
-    //     assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.25);
-    // }
-    // let mut peers = even_dist_peers(min_online_peers * 2, &[20]);
-    // converge(&mut peers);
-    // // - Converge to half coverage
-    // for arc in peers {
-    //     assert_eq!((arc.coverage() * 10.0).round() / 10.0, 0.5);
-    // }
-    // let mut peers = even_dist_peers(min_online_peers * 2, &[MAX_HALF_LENGTH / 10]);
-    // converge(&mut peers);
-    // // - Converge to half coverage
-    // for arc in peers {
-    //     assert_eq!((arc.coverage() * 10.0).round() / 10.0, 0.5);
-    // }
-    // let mut peers = even_dist_peers(min_online_peers * 20, &[MAX_HALF_LENGTH / 4]);
-    // converge(&mut peers);
-    // // - Converge to half coverage
-    // for arc in peers {
-    //     assert_eq!((arc.coverage() * 1000.0).round() / 1000.0, 0.05);
-    // }
+    let mut peers = even_dist_peers(MIN_STABLE_PEERS * 4, &[20]);
+    converge(&mut peers);
+    for arc in peers {
+        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.13);
+    }
+
+    let mut peers = even_dist_peers(MIN_STABLE_PEERS * 4, &[MAX_HALF_LENGTH]);
+    converge(&mut peers);
+    for arc in peers {
+        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.13);
+    }
+
+    let mut peers = even_dist_peers(MIN_PEERS, &[20]);
+    converge(&mut peers);
+    for arc in peers {
+        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 1.0);
+    }
+
+    let mut peers = even_dist_peers(MIN_PEERS, &[MAX_HALF_LENGTH]);
+    converge(&mut peers);
+    for arc in peers {
+        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 1.0);
+    }
 }
 
 #[test]
@@ -415,8 +394,79 @@ fn test_check_for_gaps() {
 }
 
 #[test]
+fn test_check_redundancy() {
+    // Gaps
+    assert_eq!(check_redundancy(vec![DhtArc::new(0, 1)]), 0);
+    assert_eq!(check_redundancy(vec![DhtArc::new(0, 0)]), 0);
+    assert_eq!(
+        check_redundancy(vec![DhtArc::new(0, MAX_HALF_LENGTH - 2)]),
+        0
+    );
+    assert_eq!(
+        check_redundancy(vec![
+            DhtArc::new(0, MAX_HALF_LENGTH / 2),
+            DhtArc::new(0, MAX_HALF_LENGTH / 2)
+        ]),
+        0
+    );
+    assert_eq!(
+        check_redundancy(vec![
+            DhtArc::new(0, MAX_HALF_LENGTH / 3 + 1),
+            DhtArc::new(MAX_HALF_LENGTH / 3, MAX_HALF_LENGTH / 3 + 1),
+            DhtArc::new((MAX_HALF_LENGTH / 3) * 2 + 100, MAX_HALF_LENGTH / 3 + 1)
+        ]),
+        0
+    );
+    assert_eq!(
+        check_redundancy(vec![
+            DhtArc::new(0, MAX_HALF_LENGTH / 3 + 1),
+            DhtArc::new(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
+            DhtArc::new(
+                MAX_HALF_LENGTH + (MAX_HALF_LENGTH / 3),
+                MAX_HALF_LENGTH / 2 + MAX_HALF_LENGTH / 8,
+            ),
+        ]),
+        0
+    );
+
+    // No Gaps
+    assert_eq!(check_redundancy(vec![DhtArc::new(0, MAX_HALF_LENGTH)]), 1);
+    assert_eq!(
+        check_redundancy(vec![DhtArc::new(0, MAX_HALF_LENGTH); 3]),
+        3
+    );
+    assert_eq!(
+        check_redundancy(vec![DhtArc::new(0, MAX_HALF_LENGTH - 1)]),
+        1
+    );
+    assert_eq!(
+        check_redundancy(vec![
+            DhtArc::new(0, MAX_HALF_LENGTH / 2 + 1),
+            DhtArc::new(MAX_HALF_LENGTH, MAX_HALF_LENGTH / 2 + 1)
+        ]),
+        1
+    );
+    assert_eq!(
+        check_redundancy(vec![
+            DhtArc::new(0, MAX_HALF_LENGTH / 3 + 1),
+            DhtArc::new(MAX_HALF_LENGTH / 3 - 1, MAX_HALF_LENGTH / 3 + 1),
+            DhtArc::new(
+                MAX_HALF_LENGTH + (MAX_HALF_LENGTH / 8) - 100,
+                MAX_HALF_LENGTH / 2 + MAX_HALF_LENGTH / 8,
+            )
+        ]),
+        1
+    );
+    let arm = Wrapping(MAX_HALF_LENGTH / 3);
+    let mut peers = Vec::new();
+    for i in 0..12 {
+        peers.push(DhtArc::new(arm * Wrapping(i), arm.0 + 10));
+    }
+    assert_eq!(check_redundancy(peers), 4);
+}
+
+#[test]
 fn test_peer_gaps() {
-    let min_online_peers = MIN_PEERS;
     let converge = |peers: &mut Vec<DhtArc>| {
         let mut gaps = true;
         for _ in 0..40 {
@@ -426,9 +476,6 @@ fn test_peer_gaps() {
                 let bucket = DhtArcBucket::new(*arc, p.clone());
                 let density = bucket.density();
                 arc.update_length(density);
-                // let bucket = DhtArcBucket::new(*arc, p.clone());
-                // println!("{}\n{:?}", bucket, bucket.density().est_gap());
-                // println!("{}", bucket.density().est_gap());
             }
             if gaps {
                 gaps = check_for_gaps(peers.clone());
@@ -436,23 +483,18 @@ fn test_peer_gaps() {
                 let bucket = DhtArcBucket::new(peers[0], peers.clone());
                 assert!(!check_for_gaps(peers.clone()), "{}", bucket);
             }
-            let bucket = DhtArcBucket::new(peers[0], peers.clone());
-            println!("{}\n{:?}", bucket, bucket.density().est_gap());
-            // std::thread::sleep(std::time::Duration::from_millis(20));
         }
     };
-    let mut peers = even_dist_peers(min_online_peers * 10, &[MAX_HALF_LENGTH / 4]);
+    let mut peers = even_dist_peers(MIN_STABLE_PEERS * 10, &[MAX_HALF_LENGTH / 4]);
     converge(&mut peers);
-    // - Converge to half coverage
     for arc in peers {
-        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.1);
+        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.05);
     }
 
-    let mut peers = even_dist_peers(min_online_peers * 2, &[20]);
+    let mut peers = even_dist_peers(MIN_STABLE_PEERS, &[20]);
     converge(&mut peers);
-    // - Converge to half coverage
     for arc in peers {
-        assert_eq!((arc.coverage() * 10.0).round() / 10.0, 0.5);
+        assert_eq!((arc.coverage() * 10.0).round() / 10.0, 0.6);
     }
 }
 
@@ -466,18 +508,4 @@ fn even_dist_peers(num: usize, half_lens: &[u32]) -> Vec<DhtArc> {
             DhtArc::new(dist as u32, *half_len)
         })
         .collect()
-}
-
-#[test]
-fn test_target() {
-    let filter = DhtArc::new(0, (MAX_HALF_LENGTH as f64 * 0.5) as u32);
-    let peers = even_dist_peers(
-        dbg!((MIN_STABLE_PEERS / 4 + 20) * 2),
-        &[(MAX_HALF_LENGTH as f64 * 0.5) as u32],
-    );
-    let bucket = DhtArcBucket::new(filter, peers);
-    let density = bucket.density();
-    dbg!(&density);
-    dbg!(density.est_total_redundancy());
-    dbg!(target(density));
 }
