@@ -146,7 +146,7 @@ impl AppBundleSource {
 /// Information needed to specify a Dna as part of an App
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct InstallAppDnaPayload {
-    /// The hash of the DnaFile
+    /// The hash of the DNA
     pub hash: DnaHash,
     /// The CellNick which will be assigned to this Dna when installed
     pub nick: CellNick,
