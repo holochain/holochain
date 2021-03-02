@@ -165,7 +165,7 @@ how_many: 42
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
 
     let orig_dna_hash = dna.dna_hash().clone();
-    let _dna_hash = register_and_install_dna(
+    register_and_install_dna(
         &mut holochain,
         &mut client,
         orig_dna_hash,
