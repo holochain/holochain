@@ -39,7 +39,7 @@ impl<T: 'static + Send> Share<T> {
     {
         let mut t = self.0.lock();
         if t.is_none() {
-            return Err(KitsuneError::Closed);
+            return Err(KitsuneErrorKind::Closed.into());
         }
         let mut close = false;
         let r = f(t.as_mut().unwrap(), &mut close);
@@ -96,7 +96,7 @@ impl<T: 'static + Send + Sync> ShareSync<T> {
     {
         let t = self.0.read();
         if t.is_none() {
-            return Err(KitsuneError::Closed);
+            return Err(KitsuneErrorKind::Closed.into());
         }
         f(t.as_ref().unwrap())
     }
@@ -111,7 +111,7 @@ impl<T: 'static + Send + Sync> ShareSync<T> {
     {
         let mut t = self.0.write();
         if t.is_none() {
-            return Err(KitsuneError::Closed);
+            return Err(KitsuneErrorKind::Closed.into());
         }
         let mut close = false;
         let r = f(t.as_mut().unwrap(), &mut close);

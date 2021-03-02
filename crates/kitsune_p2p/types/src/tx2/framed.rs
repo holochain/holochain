@@ -136,7 +136,7 @@ impl AsFramedReader for FramedReader {
     fn read(&mut self, timeout: KitsuneTimeout) -> BoxFuture<'_, KitsuneResult<RR>> {
         async move {
             let mut inner = match self.0.take() {
-                None => return Err(KitsuneError::Closed),
+                None => return Err(KitsuneErrorKind::Closed.into()),
                 Some(inner) => inner,
             };
 
@@ -228,7 +228,7 @@ impl AsFramedWriter for FramedWriter {
     ) -> BoxFuture<'_, KitsuneResult<()>> {
         async move {
             let mut inner = match self.0.take() {
-                None => return Err(KitsuneError::Closed),
+                None => return Err(KitsuneErrorKind::Closed.into()),
                 Some(inner) => inner,
             };
 

@@ -31,7 +31,10 @@ impl MemInChanRecvAdapt {
         Self(
             futures::stream::unfold((recv, active), move |(mut recv, active)| async move {
                 let fut = active.fut(async move {
-                    let item = recv.next().await.ok_or(KitsuneError::Closed)?;
+                    let item = recv
+                        .next()
+                        .await
+                        .ok_or_else(|| KitsuneError::from(KitsuneErrorKind::Closed))?;
                     Ok((item, recv))
                 });
                 match fut.await {
@@ -109,7 +112,10 @@ impl MemConRecvAdapt {
         Self(
             futures::stream::unfold((recv, active), move |(mut recv, active)| async move {
                 let fut = active.fut(async move {
-                    let item = recv.next().await.ok_or(KitsuneError::Closed)?;
+                    let item = recv
+                        .next()
+                        .await
+                        .ok_or_else(|| KitsuneError::from(KitsuneErrorKind::Closed))?;
                     Ok((item, recv))
                 });
                 match fut.await {
@@ -170,7 +176,7 @@ impl EndpointAdapt for MemEndpointAdapt {
     fn local_addr(&self) -> KitsuneResult<TxUrl> {
         let inner = self.0.lock();
         if !inner.ep_active.is_active() {
-            return Err(KitsuneError::Closed);
+            return Err(KitsuneErrorKind::Closed.into());
         }
         Ok(inner.url.clone())
     }
@@ -179,7 +185,7 @@ impl EndpointAdapt for MemEndpointAdapt {
         let (this_url, this_ep_active) = {
             let inner = self.0.lock();
             if !inner.ep_active.is_active() {
-                return async move { Err(KitsuneError::Closed) }.boxed();
+                return async move { Err(KitsuneErrorKind::Closed.into()) }.boxed();
             }
             (inner.url.clone(), inner.ep_active.clone())
         };

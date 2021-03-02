@@ -1,6 +1,191 @@
 #![allow(clippy::new_ret_no_self)]
 //! Types, traits, and an implementation for applying pooling to a tx backend.
 
+use crate::tx2::tx_backend::*;
+use crate::tx2::util::*;
+use crate::tx2::*;
+use crate::*;
+use futures::future::{BoxFuture, FutureExt};
+use tokio::sync::Semaphore;
+
+///
+pub enum TxPoolEvent {
+    ///
+    ReceiveData(TxUrl, MsgId, PoolBuf),
+
+    ///
+    ConnectionClosed(TxUrl, u32, String),
+}
+
+// -- concrete -- //
+
+#[allow(dead_code)]
+struct TxPoolEpInner {
+    max_cons: Arc<Semaphore>,
+    ep: Arc<dyn EndpointAdapt>,
+    cons: AsyncMap<TxUrl, Arc<dyn ConAdapt>>,
+    logic_handle: LogicChanHandle<TxPoolEvent>,
+}
+
+///
+pub struct TxPoolEpHandle(Share<TxPoolEpInner>);
+
+impl TxPoolEpHandle {
+    #[allow(dead_code)]
+    fn get_con(
+        &self,
+        url: TxUrl,
+        timeout: KitsuneTimeout,
+    ) -> BoxFuture<'static, KitsuneResult<Arc<dyn ConAdapt>>> {
+        let inner = self.0.clone();
+        async move {
+            timeout
+                .mix(async move {
+                    inner
+                        .share_mut(move |i, _| {
+                            let ep = i.ep.clone();
+                            Ok(i.cons.get(url.clone(), move || async move {
+                                let (con, _in_chan_recv) = ep.connect(url, timeout).await?;
+                                Ok(con)
+                            }))
+                        })?
+                        .await
+                })
+                .await
+        }
+        .boxed()
+    }
+
+    ///
+    pub fn local_addr(&self) -> KitsuneResult<TxUrl> {
+        self.0.share_mut(|i, _| i.ep.local_addr())
+    }
+
+    ///
+    pub fn write(
+        &self,
+        url: TxUrl,
+        _msg_id: MsgId,
+        _data: PoolBuf,
+        timeout: KitsuneTimeout,
+    ) -> BoxFuture<'static, KitsuneResult<()>> {
+        let con_fut = self.get_con(url, timeout);
+        async move {
+            let _con = con_fut.await?;
+            unimplemented!()
+        }
+        .boxed()
+    }
+
+    ///
+    pub fn close(&self) -> BoxFuture<'static, ()> {
+        match self.0.share_mut(|i, c| {
+            *c = true;
+            Ok(i.ep.close())
+        }) {
+            Err(_) => async move {}.boxed(),
+            Ok(fut) => fut,
+        }
+    }
+}
+
+///
+pub struct TxPoolEp {
+    handle: TxPoolEpHandle,
+    logic_chan: LogicChan<TxPoolEvent>,
+}
+
+impl TxPoolEp {
+    ///
+    pub fn new(
+        ep: Arc<dyn EndpointAdapt>,
+        _con_recv: Box<dyn ConRecvAdapt>,
+        max_cons: Arc<Semaphore>,
+    ) -> KitsuneResult<Self> {
+        let logic_chan = LogicChan::new(32);
+        let logic_handle = logic_chan.handle().clone();
+
+        let handle = TxPoolEpHandle(Share::new(TxPoolEpInner {
+            max_cons,
+            ep,
+            cons: AsyncMap::new(),
+            logic_handle,
+        }));
+
+        Ok(Self { handle, logic_chan })
+    }
+
+    ///
+    pub fn handle(&self) -> &TxPoolEpHandle {
+        &self.handle
+    }
+}
+
+impl futures::stream::Stream for TxPoolEp {
+    type Item = TxPoolEvent;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let inner = &mut self.logic_chan;
+        tokio::pin!(inner);
+        futures::stream::Stream::poll_next(inner, cx)
+    }
+}
+
+///
+#[allow(dead_code)]
+pub struct TxPoolFactoryWrapper {
+    sub_fact: BackendFactory,
+    max_cons: Arc<Semaphore>,
+}
+
+impl TxPoolFactoryWrapper {
+    ///
+    pub fn new(sub_fact: BackendFactory, max_cons: usize) -> Self {
+        let max_cons = Arc::new(Semaphore::new(max_cons));
+        Self { sub_fact, max_cons }
+    }
+
+    ///
+    pub fn bind(
+        &self,
+        url: TxUrl,
+        timeout: KitsuneTimeout,
+    ) -> BoxFuture<'static, KitsuneResult<TxPoolEp>> {
+        let ep_fut = self.sub_fact.bind(url, timeout);
+        let max_cons = self.max_cons.clone();
+        async move {
+            let (ep, con_recv) = ep_fut.await?;
+
+            TxPoolEp::new(ep, con_recv, max_cons)
+        }
+        .boxed()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_tx_pool() {
+        let t = KitsuneTimeout::from_millis(5000);
+
+        let fact = TxPoolFactoryWrapper::new(MemBackendAdapt::new(), 32);
+
+        let pool1 = fact.bind("none:".into(), t).await.unwrap();
+        let pool2 = fact.bind("none:".into(), t).await.unwrap();
+
+        let addr2 = pool2.handle().local_addr().unwrap();
+        println!("got addr2: {}", addr2);
+
+        pool1.handle().close().await;
+        pool2.handle().close().await;
+    }
+}
+
 /*
 use crate::tx2::tx_backend::*;
 use crate::tx2::util::*;

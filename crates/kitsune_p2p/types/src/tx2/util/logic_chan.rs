@@ -4,51 +4,54 @@ use futures::future::BoxFuture;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 #[allow(dead_code)]
-struct ActorInner<E: 'static + Send> {
+struct LogicChanInner<E: 'static + Send> {
     events: Vec<E>,
     waker: Option<std::task::Waker>,
     limit: Arc<Semaphore>,
     logic: Vec<(OwnedSemaphorePermit, BoxFuture<'static, ()>)>,
 }
 
-/// Handle to an actor instance.
-/// A clone of an ActorHandle is `Eq` to its origin.
-/// A clone of an ActorHandle will `Hash` the same as its origin.
-pub struct ActorHandle<E: 'static + Send>(Share<ActorInner<E>>);
+/// Handle to a logic_chan instance.
+/// A clone of a LogicChanHandle is `Eq` to its origin.
+/// A clone of a LogicChanHandle will `Hash` the same as its origin.
+pub struct LogicChanHandle<E: 'static + Send>(Share<LogicChanInner<E>>);
 
-impl<E: 'static + Send> Clone for ActorHandle<E> {
+impl<E: 'static + Send> Clone for LogicChanHandle<E> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-impl<E: 'static + Send> PartialEq for ActorHandle<E> {
+impl<E: 'static + Send> PartialEq for LogicChanHandle<E> {
     fn eq(&self, oth: &Self) -> bool {
         self.0.eq(&oth.0)
     }
 }
 
-impl<E: 'static + Send> Eq for ActorHandle<E> {}
+impl<E: 'static + Send> Eq for LogicChanHandle<E> {}
 
-impl<E: 'static + Send> std::hash::Hash for ActorHandle<E> {
+impl<E: 'static + Send> std::hash::Hash for LogicChanHandle<E> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.0.hash(state);
     }
 }
 
-impl<E: 'static + Send> ActorHandle<E> {
-    /// Cause the actor to emit an event.
+impl<E: 'static + Send> LogicChanHandle<E> {
+    /// Cause the logic_chan to emit an event.
     pub fn emit(&self, e: E) -> KitsuneResult<()> {
-        self.0.share_mut(move |i, _| {
+        let waker = self.0.share_mut(move |i, _| {
             i.events.push(e);
-            Ok(())
+            Ok(i.waker.take())
         })?;
+        if let Some(waker) = waker {
+            waker.wake();
+        }
         Ok(())
     }
 
-    /// Capture new logic into the actor.
+    /// Capture new logic into the logic_chan.
     /// The passed future can capture other async objects such as streams,
-    /// that will be polled as a part of the main actor stream,
+    /// that will be polled as a part of the main logic_chan stream,
     /// without introducing any executor tasks.
     /// Be careful calling `capture_logic()` from within previously captured
     /// logic. While there may be reason to do this, it can lead to
@@ -76,12 +79,12 @@ impl<E: 'static + Send> ActorHandle<E> {
         }
     }
 
-    /// Check if this actor was closed.
+    /// Check if this logic_chan was closed.
     pub fn is_closed(&self) -> bool {
         self.0.is_closed()
     }
 
-    /// Close this actor.
+    /// Close this logic_chan.
     pub fn close(&self) {
         let maybe_waker = self.0.share_mut(|i, c| {
             *c = true;
@@ -93,17 +96,17 @@ impl<E: 'static + Send> ActorHandle<E> {
     }
 }
 
-/// A task actor.
-/// Capture a handle to the actor.
-/// Fill it the actor with async logic.
+/// A logic channel.
+/// Capture a handle to the logic_chan.
+/// Fill the LogicChan with async logic.
 /// Report events to the handle in the async logic.
-/// Treat the actor as a stream, collecting the events.
-pub struct Actor<E: 'static + Send>(ActorHandle<E>);
+/// Treat the LogicChan as a stream, collecting the events.
+pub struct LogicChan<E: 'static + Send>(LogicChanHandle<E>);
 
-impl<E: 'static + Send> Actor<E> {
-    /// Create a new task actor instance.
+impl<E: 'static + Send> LogicChan<E> {
+    /// Create a new LogicChan instance.
     pub fn new(capture_bound: usize) -> Self {
-        Self(ActorHandle(Share::new(ActorInner {
+        Self(LogicChanHandle(Share::new(LogicChanInner {
             events: Vec::new(),
             waker: None,
             limit: Arc::new(Semaphore::new(capture_bound)),
@@ -111,13 +114,13 @@ impl<E: 'static + Send> Actor<E> {
         })))
     }
 
-    /// A handle to this actor. You can clone this.
-    pub fn handle(&self) -> &ActorHandle<E> {
+    /// A handle to this logic_chan. You can clone this.
+    pub fn handle(&self) -> &LogicChanHandle<E> {
         &self.0
     }
 }
 
-impl<E: 'static + Send> futures::stream::Stream for Actor<E> {
+impl<E: 'static + Send> futures::stream::Stream for LogicChan<E> {
     type Item = E;
 
     fn poll_next(
@@ -153,7 +156,6 @@ impl<E: 'static + Send> futures::stream::Stream for Actor<E> {
 
         // do a single logic loop - if any of this logic injects more logic
         // the waker will be woken and we'll just be polled again.
-        // make sure the lock is released while we execute the extracted logic:
         for (permit, mut task) in task_list {
             let mut keep = false;
             {
@@ -169,7 +171,6 @@ impl<E: 'static + Send> futures::stream::Stream for Actor<E> {
         }
 
         // we've run through the logic,
-        // - acquire the lock
         // - check for events
         // - if any logic was added in the mean time, trigger waker
         // - restore any logic that is still pending
@@ -178,8 +179,8 @@ impl<E: 'static + Send> futures::stream::Stream for Actor<E> {
             if i.events.is_empty() && !i.logic.is_empty() {
                 // logic was added since we pulled it out
                 // we need to explicitly wake for running again.
-                waker.wake_by_ref();
-            } else {
+                waker.wake();
+            } else if i.events.is_empty() {
                 i.waker = Some(waker);
             }
             i.logic.append(&mut pending_tasks);
@@ -193,6 +194,7 @@ impl<E: 'static + Send> futures::stream::Stream for Actor<E> {
             Ok(e) => (false, e),
         };
 
+        // return the appropriate poll variant
         match event {
             None => {
                 if is_closed {
@@ -212,21 +214,21 @@ mod tests {
     use std::sync::atomic;
 
     #[tokio::test(threaded_scheduler)]
-    async fn test_util_actor() {
-        let mut actor = <Actor<&'static str>>::new(32);
-        let h = actor.handle().clone();
-        let a = actor.handle().clone();
+    async fn test_util_logic_chan() {
+        let mut logic_chan = <LogicChan<&'static str>>::new(32);
+        let h = logic_chan.handle().clone();
+        let a = logic_chan.handle().clone();
 
         let count = Arc::new(atomic::AtomicUsize::new(0));
 
         let count2 = count.clone();
         let rt = tokio::task::spawn(async move {
-            while let Some(_res) = futures::stream::StreamExt::next(&mut actor).await {
+            while let Some(_res) = futures::stream::StreamExt::next(&mut logic_chan).await {
                 count2.fetch_add(1, atomic::Ordering::SeqCst);
             }
         });
 
-        tokio::task::spawn(async move {
+        let wt = tokio::task::spawn(async move {
             a.emit("a1").unwrap();
             let b = a.clone();
             a.capture_logic(async move {
@@ -243,6 +245,7 @@ mod tests {
         tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
         h.close();
 
+        wt.await.unwrap();
         rt.await.unwrap();
 
         assert_eq!(4, count.load(atomic::Ordering::SeqCst));

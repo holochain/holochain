@@ -28,7 +28,7 @@ impl KitsuneTimeout {
     /// `Ok(())` if not expired, `Err(KitsuneError::TimedOut)` if expired.
     pub fn ok(&self) -> KitsuneResult<()> {
         if self.is_expired() {
-            Err(KitsuneError::TimedOut)
+            Err(KitsuneErrorKind::TimedOut.into())
         } else {
             Ok(())
         }
@@ -49,7 +49,7 @@ impl KitsuneTimeout {
         async move {
             match futures::future::select(f, t_fut).await {
                 futures::future::Either::Left((v, _)) => v,
-                futures::future::Either::Right(_) => Err(KitsuneError::TimedOut),
+                futures::future::Either::Right(_) => Err(KitsuneErrorKind::TimedOut.into()),
             }
         }
     }

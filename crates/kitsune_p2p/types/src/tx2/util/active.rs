@@ -114,14 +114,14 @@ impl Active {
             // watch receive futures.
             for act in act_list.into_iter() {
                 if !act.load(atomic::Ordering::SeqCst) {
-                    return Err(KitsuneError::Closed);
+                    return Err(KitsuneErrorKind::Closed.into());
                 }
             }
 
             let f = f.boxed();
             use futures::future::Either;
             match futures::future::select(w_fut, f).await {
-                Either::Left(_) => Err(KitsuneError::Closed),
+                Either::Left(_) => Err(KitsuneErrorKind::Closed.into()),
                 Either::Right((v, _)) => v,
             }
         }

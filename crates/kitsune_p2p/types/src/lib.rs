@@ -18,7 +18,7 @@ use std::sync::Arc;
 /// Error related to remote communication.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
-pub enum KitsuneError {
+pub enum KitsuneErrorKind {
     /// The operation timed out.
     #[error("TimedOut")]
     TimedOut,
@@ -32,10 +32,28 @@ pub enum KitsuneError {
     Other(Box<dyn std::error::Error + Send + Sync>),
 }
 
+/// Error related to remote communication.
+#[derive(Clone, Debug)]
+pub struct KitsuneError(pub Arc<KitsuneErrorKind>);
+
+impl std::fmt::Display for KitsuneError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for KitsuneError {}
+
 impl KitsuneError {
     /// promote a custom error type to a KitsuneError
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
-        Self::Other(e.into())
+        Self(Arc::new(KitsuneErrorKind::Other(e.into())))
+    }
+}
+
+impl From<KitsuneErrorKind> for KitsuneError {
+    fn from(k: KitsuneErrorKind) -> Self {
+        Self(Arc::new(k))
     }
 }
 

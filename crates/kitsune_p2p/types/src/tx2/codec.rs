@@ -46,7 +46,7 @@ impl<C: Codec> CodecReader<C> {
     /// Read typed data from this CodecReader instance.
     pub async fn read(&mut self, timeout: KitsuneTimeout) -> KitsuneResult<Vec<CodecMessage<C>>> {
         let mut inner = match self.0.take() {
-            None => return Err(KitsuneError::Closed),
+            None => return Err(KitsuneErrorKind::Closed.into()),
             Some(inner) => inner,
         };
 
@@ -100,7 +100,7 @@ impl<C: Codec> CodecWriter<C> {
         timeout: KitsuneTimeout,
     ) -> KitsuneResult<()> {
         let mut inner = match self.0.take() {
-            None => return Err(KitsuneError::Closed),
+            None => return Err(KitsuneErrorKind::Closed.into()),
             Some(inner) => inner,
         };
 

@@ -8,8 +8,11 @@ use once_cell::sync::Lazy;
 mod active;
 pub use active::*;
 
-mod actor;
-pub use actor::*;
+mod async_map;
+pub use async_map::*;
+
+mod logic_chan;
+pub use logic_chan::*;
 
 mod tx_url;
 pub use tx_url::*;
