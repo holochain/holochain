@@ -18,7 +18,7 @@ pub type ResourceMap = HashMap<PathBuf, ResourceBytes>;
 /// by the receiver.
 ///
 /// The manifest may describe locations of resources not included in the Bundle.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Bundle<M>
 where
     M: Manifest,

@@ -94,10 +94,24 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     }
                     DnaSource::Path(ref path) => {
                         let bundle = Bundle::read_from_file(path).await?;
-                        bundle_to_tuple(payload.clone(), bundle.into()).await?
+                        let bundle: DnaBundle = bundle.into();
+                        let (uuid, properties) = resolve_phenotype(
+                            bundle.manifest(),
+                            payload.uuid.as_ref(),
+                            payload.properties.as_ref(),
+                        );
+                        let dna = bundle.into_dna_file().await?;
+                        (dna, uuid, properties)
                     }
-                    DnaSource::Bundle(ref bundle) => {
-                        bundle_to_tuple(payload.clone(), bundle.clone()).await?
+                    DnaSource::Bundle(bundle) => {
+                        let bundle: DnaBundle = bundle.into();
+                        let (uuid, properties) = resolve_phenotype(
+                            bundle.manifest(),
+                            payload.uuid.as_ref(),
+                            payload.properties.as_ref(),
+                        );
+                        let dna = bundle.into_dna_file().await?;
+                        (dna, uuid, properties)
                     }
                 };
                 if let Some(props) = maybe_properties {
@@ -255,40 +269,25 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
     }
 }
 
-async fn bundle_to_tuple(
-    payload: Box<RegisterDnaPayload>,
-    bundle: DnaBundle,
-) -> ConductorApiResult<(DnaFile, Option<Uuid>, Option<YamlProperties>)> {
-    let dna = bundle.clone().into_dna_file().await?;
-    let properties = if payload.properties.is_some() {
-        payload.properties.clone()
+fn resolve_phenotype(
+    manifest: &DnaManifest,
+    payload_uuid: Option<&Uuid>,
+    payload_properties: Option<&YamlProperties>,
+) -> (Option<Uuid>, Option<YamlProperties>) {
+    let bundle_uuid = manifest.uuid();
+    let bundle_properties = manifest.properties();
+    let properties = if payload_properties.is_some() {
+        payload_properties.cloned()
     } else {
-        bundle.manifest().properties()
+        bundle_properties
     };
-    let uuid = if payload.uuid.is_some() {
-        payload.uuid.clone()
+    let uuid = if payload_uuid.is_some() {
+        payload_uuid.cloned()
     } else {
-        bundle.manifest().uuid()
+        bundle_uuid
     };
-    Ok((dna, uuid, properties))
+    (uuid, properties)
 }
-/*
-/// Reads the [Dna] from disk and parses to [SerializedBytes]
-async fn read_parse_dna(
-    dna_path: PathBuf,
-    properties: Option<YamlProperties>,
-) -> ConductorApiResult<DnaFile> {
-    let dna_content = tokio::fs::read(dna_path)
-        .await
-        .map_err(|e| ConductorApiError::DnaReadError(format!("{:?}", e)))?;
-    let mut dna = DnaFile::from_file_content(&dna_content).await?;
-    if let Some(properties) = properties {
-        let properties = SerializedBytes::try_from(properties).map_err(SerializationError::from)?;
-        dna = dna.with_properties(properties).await?;
-    }
-    Ok(dna)
-}
- */
 
 #[async_trait::async_trait]
 impl InterfaceApi for RealAdminInterfaceApi {
@@ -343,22 +342,27 @@ mod test {
         );
         let dna_hash = dna.dna_hash().clone();
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-        let mut path_payload = RegisterDnaPayload {
+        let path_payload = RegisterDnaPayload {
             uuid: None,
             properties: None,
-            source: DnaSource::Path(dna_path),
+            source: DnaSource::Path(dna_path.clone()),
         };
-        let path0_install_response = admin_api
-            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload.clone())))
+        let path_install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload)))
             .await;
         assert_matches!(
-            path0_install_response,
+            path_install_response,
             AdminResponse::DnaRegistered(h) if h == dna_hash
         );
 
         // re-register idempotent
+        let path_payload = RegisterDnaPayload {
+            uuid: None,
+            properties: None,
+            source: DnaSource::Path(dna_path.clone()),
+        };
         let path1_install_response = admin_api
-            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload.clone())))
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload)))
             .await;
         assert_matches!(
             path1_install_response,
@@ -370,7 +374,7 @@ mod test {
         assert_matches!(dna_list, AdminResponse::DnasListed(a) if a == expects);
 
         // register by hash
-        let mut hash_payload = RegisterDnaPayload {
+        let hash_payload = RegisterDnaPayload {
             uuid: None,
             properties: None,
             source: DnaSource::Hash(dna_hash.clone()),
@@ -378,7 +382,7 @@ mod test {
 
         // without properties or uuid should throw error
         let hash_install_response = admin_api
-            .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload.clone())))
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
             .await;
         assert_matches!(
             hash_install_response,
@@ -387,9 +391,13 @@ mod test {
 
         // with a property should install and produce a different hash
         let json: serde_yaml::Value = serde_yaml::from_str("some prop: \"foo\"").unwrap();
-        hash_payload.properties = Some(YamlProperties::new(json.clone()));
+        let hash_payload = RegisterDnaPayload {
+            uuid: None,
+            properties: Some(YamlProperties::new(json.clone())),
+            source: DnaSource::Hash(dna_hash.clone()),
+        };
         let install_response = admin_api
-            .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload.clone())))
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
             .await;
         assert_matches!(
             install_response,
@@ -397,8 +405,11 @@ mod test {
         );
 
         // with a uuid should install and produce a different hash
-        hash_payload.properties = None;
-        hash_payload.uuid = Some(String::from("12345678900000000000000"));
+        let hash_payload = RegisterDnaPayload {
+            uuid: Some(String::from("12345678900000000000000")),
+            properties: None,
+            source: DnaSource::Hash(dna_hash.clone()),
+        };
         let hash2_install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
             .await;
@@ -415,9 +426,13 @@ mod test {
         );
 
         // from a path with a same uuid should return the already registered hash so it's idempotent
-        path_payload.uuid = Some(String::from("12345678900000000000000"));
+        let path_payload = RegisterDnaPayload {
+            uuid: Some(String::from("12345678900000000000000")),
+            properties: None,
+            source: DnaSource::Path(dna_path.clone()),
+        };
         let path2_install_response = admin_api
-            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload.clone())))
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload)))
             .await;
         assert_matches!(
             path2_install_response,
@@ -425,7 +440,11 @@ mod test {
         );
 
         // from a path with different uuid should produce different hash
-        path_payload.uuid = Some(String::from("foo"));
+        let path_payload = RegisterDnaPayload {
+            uuid: Some(String::from("foo")),
+            properties: None,
+            source: DnaSource::Path(dna_path),
+        };
         let path3_install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload)))
             .await;
@@ -480,11 +499,11 @@ mod test {
             properties: None,
             source: DnaSource::Path(dna_path),
         };
-        let path0_install_response = admin_api
-            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload.clone())))
+        let path_install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload)))
             .await;
         assert_matches!(
-            path0_install_response,
+            path_install_response,
             AdminResponse::DnaRegistered(h) if h == dna_hash
         );
 
@@ -549,25 +568,4 @@ mod test {
             .ok();
         Ok(())
     }
-
-    /*    #[tokio::test(threaded_scheduler)]
-        async fn dna_read_parses() -> Result<()> {
-            let uuid = Uuid::new_v4();
-            let dna = fake_dna_file(&uuid.to_string());
-            let (dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await?;
-            let json: serde_yaml::Value = serde_yaml::from_str(
-                r#"
-    test: "example"
-    how_many": 42
-            "#,
-            )
-            .unwrap();
-            let properties = Some(YamlProperties::new(json.clone()));
-            let result = read_parse_dna(dna_path, properties).await?;
-            let properties = YamlProperties::new(json);
-            let mut dna = dna.dna_def().clone();
-            dna.properties = properties.try_into().unwrap();
-            assert_eq!(&dna, result.dna_def());
-            Ok(())
-        }*/
 }

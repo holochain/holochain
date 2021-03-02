@@ -39,7 +39,7 @@ pub type CellNick = String;
 pub type SlotId = String;
 
 /// The source of the DNA to be installed, either as binary data, or from a path
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DnaSource {
     /// register the dna loaded from a bundle file on disk
@@ -51,7 +51,7 @@ pub enum DnaSource {
 }
 
 /// The instructions on how to get the DNA to be registered
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterDnaPayload {
     /// UUID to override when installing this Dna
     pub uuid: Option<String>,
