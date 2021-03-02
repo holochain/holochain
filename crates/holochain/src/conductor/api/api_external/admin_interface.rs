@@ -104,7 +104,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                         (dna, uuid, properties)
                     }
                     DnaSource::Bundle(bundle) => {
-                        let bundle: DnaBundle = bundle.into();
                         let (uuid, properties) = resolve_phenotype(
                             bundle.manifest(),
                             payload.uuid.as_ref(),
