@@ -26,6 +26,10 @@ use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
+use crate::core::ribosome::host_fn::app_info::app_info;
+use crate::core::ribosome::host_fn::call_info::call_info;
+use crate::core::ribosome::host_fn::sleep::sleep;
+use crate::core::ribosome::host_fn::dna_info::dna_info;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
 use crate::core::ribosome::host_fn::call::call;
 use crate::core::ribosome::host_fn::call_remote::call_remote;
@@ -237,8 +241,14 @@ impl RealRibosome {
         } = host_fn_access
         {
             ns.insert("__zome_info", func!(invoke_host_function!(zome_info)));
+            ns.insert("__app_info", func!(invoke_host_function!(app_info)));
+            ns.insert("__dna_info", func!(invoke_host_function!(dna_info)));
+            ns.insert("__call_info", func!(invoke_host_function!(call_info)));
         } else {
             ns.insert("__zome_info", func!(invoke_host_function!(unreachable)));
+            ns.insert("__app_info", func!(invoke_host_function!(unreachable)));
+            ns.insert("__dna_info", func!(invoke_host_function!(unreachable)));
+            ns.insert("__call_info", func!(invoke_host_function!(unreachable)));
         }
 
         if let HostFnAccess {
@@ -248,9 +258,11 @@ impl RealRibosome {
         {
             ns.insert("__random_bytes", func!(invoke_host_function!(random_bytes)));
             ns.insert("__sys_time", func!(invoke_host_function!(sys_time)));
+            ns.insert("__sleep", func!(invoke_host_function!(sleep)));
         } else {
             ns.insert("__random_bytes", func!(invoke_host_function!(unreachable)));
             ns.insert("__sys_time", func!(invoke_host_function!(unreachable)));
+            ns.insert("__sleep", func!(invoke_host_function!(unreachable)));
         }
 
         if let HostFnAccess {

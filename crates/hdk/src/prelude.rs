@@ -72,6 +72,7 @@ pub use std::convert::TryFrom;
 pub use tracing;
 pub use tracing::{debug, error, info, instrument, trace, warn};
 pub use tracing_subscriber;
+pub use crate::hdk::*;
 
 // This needs to be called at least once _somewhere_ and is idempotent.
 #[macro_export]

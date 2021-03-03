@@ -91,7 +91,7 @@
 //!
 //! ```ignore
 //! use crate::prelude::*;
-//! let _output: ExternResult<OutputType> = host_call::<InputType, OutputType>(__host_extern_name, input);
+//! let _output: HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.host_fn(input)
 //! ```
 //!
 //! And every host function defined by holochain has a convenience wrapper in HDK that does the type juggling for you.
@@ -478,3 +478,5 @@ pub mod time;
 ///
 /// The host provides the random bytes because any/all wasm implementations of randomness is flawed and insecure.
 pub mod random;
+
+pub mod hdk;

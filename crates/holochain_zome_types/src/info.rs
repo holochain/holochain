@@ -16,6 +16,24 @@ pub struct ZomeInfo {
     pub properties: SerializedBytes,
 }
 
+impl ZomeInfo {
+    pub fn new(
+        dna_name: String,
+        dna_hash: DnaHash,
+        zome_name: ZomeName,
+        zome_id: ZomeId,
+        properties: SerializedBytes,
+    ) -> Self {
+        Self {
+            dna_name,
+            dna_hash,
+            zome_name,
+            zome_id,
+            properties,
+        }
+    }
+}
+
 /// The struct containing all information about the executing agent's identity.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]

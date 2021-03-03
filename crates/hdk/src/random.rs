@@ -25,7 +25,9 @@ use crate::prelude::*;
 ///
 /// See the rand rust crate
 pub fn random_bytes(number_of_bytes: u32) -> ExternResult<Bytes> {
-    host_call::<u32, Bytes>(__random_bytes, number_of_bytes)
+    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.random_bytes(
+        number_of_bytes
+    )
 }
 
 pub trait TryFromRandom {

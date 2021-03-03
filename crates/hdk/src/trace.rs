@@ -65,21 +65,27 @@ impl tracing_core::Subscriber for WasmSubscriber {
 
         // The event is pushed to the host to be picked up by the subscriber on that side.
         // The visitor is dropped.
-        host_call::<TraceMsg, ()>(
-            __trace,
-            TraceMsg {
-                level: event.metadata().level().into(),
-                msg: format!(
-                    "{}:{}:{} {}{}",
-                    event.metadata().module_path().unwrap_or(""),
-                    event.metadata().file().unwrap_or(""),
-                    event.metadata().line().unwrap_or(0),
-                    visitor.fields,
-                    visitor.message
-                ),
+        match HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string())) {
+            Ok(hdk) => {
+                hdk.trace(
+                    TraceMsg {
+                        level: event.metadata().level().into(),
+                        msg: format!(
+                            "{}:{}:{} {}{}",
+                            event.metadata().module_path().unwrap_or(""),
+                            event.metadata().file().unwrap_or(""),
+                            event.metadata().line().unwrap_or(0),
+                            visitor.fields,
+                            visitor.message
+                        ),
+                    },
+                )
+                .ok();
             },
-        )
-        .ok();
+            // Not much to be done here.
+            // We tried to trace something without a registered HDK.
+            Err(_) => {}
+        }
     }
     fn enter(&self, _span: &tracing::Id) {
         // unimplemented

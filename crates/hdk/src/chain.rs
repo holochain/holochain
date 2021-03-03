@@ -11,9 +11,12 @@ pub fn get_agent_activity(
     query: ChainQueryFilter,
     request: ActivityRequest,
 ) -> ExternResult<AgentActivity> {
-    host_call::<GetAgentActivityInput, AgentActivity>(
-        __get_agent_activity,
-        GetAgentActivityInput::new(agent, query, request),
+    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.get_agent_activity(
+        GetAgentActivityInput::new(
+            agent,
+            query,
+            request
+        )
     )
 }
 
@@ -25,5 +28,7 @@ pub fn get_agent_activity(
 /// @todo do we want to return elements rather than hashes?
 /// @todo implement cap grant/claim usage in terms of query
 pub fn query(filter: ChainQueryFilter) -> ExternResult<Vec<Element>> {
-    host_call::<ChainQueryFilter, Vec<Element>>(__query, filter)
+    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.query(
+        filter
+    )
 }

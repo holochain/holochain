@@ -23,8 +23,7 @@ where
 {
     // @todo is this secure to set this in the wasm rather than have the host inject it?
     let provenance = agent_info()?.agent_latest_pubkey;
-    host_call::<Call, ZomeCallResponse>(
-        __call,
+    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.call(
         Call::new(
             to_cell,
             zome_name,
@@ -32,7 +31,7 @@ where
             cap_secret,
             ExternIO::encode(payload)?,
             provenance,
-        ),
+        )
     )
 }
 
@@ -69,9 +68,8 @@ pub fn call_remote<I>(
 where
     I: serde::Serialize + std::fmt::Debug,
 {
-    host_call::<CallRemote, ZomeCallResponse>(
-        __call_remote,
-        CallRemote::new(agent, zome, fn_name, cap_secret, ExternIO::encode(payload)?),
+    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.call_remote(
+        CallRemote::new(agent, zome, fn_name, cap_secret, ExternIO::encode(payload)?)
     )
 }
 
@@ -88,8 +86,9 @@ pub fn emit_signal<I>(input: I) -> ExternResult<()>
 where
     I: serde::Serialize + std::fmt::Debug,
 {
-    #[allow(clippy::unit_arg)]
-    host_call::<AppSignal, ()>(__emit_signal, AppSignal::new(ExternIO::encode(input)?))
+    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.emit_signal(
+        AppSignal::new(ExternIO::encode(input)?)
+    )
 }
 
 /// ## Remote Signal
@@ -123,12 +122,10 @@ pub fn remote_signal<I>(input: I, agents: Vec<AgentPubKey>) -> ExternResult<()>
 where
     I: serde::Serialize + std::fmt::Debug,
 {
-    #[allow(clippy::unit_arg)]
-    host_call::<RemoteSignal, ()>(
-        __remote_signal,
+    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.remote_signal(
         RemoteSignal {
             signal: ExternIO::encode(input)?,
             agents,
-        },
+        }
     )
 }

@@ -184,6 +184,7 @@ dependencies = [
  "holochain_wasmer_guest",
  "holochain_zome_types",
  "mockall",
+ "once_cell",
  "paste",
  "serde",
  "serde_bytes",

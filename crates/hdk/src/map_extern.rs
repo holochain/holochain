@@ -30,6 +30,11 @@ macro_rules! map_extern {
 
                 #[no_mangle]
                 pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr) -> $crate::prelude::GuestPtr {
+                    match $crate::prelude::set_global_hdk($crate::prelude::HostHdk) {
+                        Ok(_) => {},
+                        Err(_) => return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Guest("Failed to set the global HDK".to_string())),
+                    }
+
                     // Setup tracing.
                     // @TODO feature flag this?
                     match $crate::prelude::tracing::subscriber::set_global_default(
