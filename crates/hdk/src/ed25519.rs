@@ -7,7 +7,7 @@ where
     D: serde::Serialize + std::fmt::Debug,
 {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .sign(Sign::new(key.into(), data)?)
 }
 
@@ -22,7 +22,7 @@ where
     K: Into<AgentPubKey>,
 {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .sign(Sign::new_raw(key.into(), data))
 }
 
@@ -41,7 +41,7 @@ where
     D: serde::Serialize + std::fmt::Debug,
 {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .verify_signature(VerifySignature::new(key.into(), signature.into(), data)?)
 }
 
@@ -58,6 +58,6 @@ where
     S: Into<Signature>,
 {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .verify_signature(VerifySignature::new_raw(key.into(), signature.into(), data))
 }

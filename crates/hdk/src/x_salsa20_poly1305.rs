@@ -5,7 +5,7 @@ use crate::prelude::*;
 /// @todo ability to export secrets from lair in encrypted format to send to other agents.
 pub fn create_x25519_keypair() -> ExternResult<X25519PubKey> {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .create_x25519_keypair(())
 }
 
@@ -24,7 +24,7 @@ pub fn x_salsa20_poly1305_decrypt(
     encrypted_data: XSalsa20Poly1305EncryptedData,
 ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .x_salsa20_poly1305_decrypt(XSalsa20Poly1305Decrypt::new(key_ref, encrypted_data))
 }
 
@@ -64,7 +64,7 @@ pub fn x_salsa20_poly1305_encrypt(
     data: XSalsa20Poly1305Data,
 ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .x_salsa20_poly1305_encrypt(XSalsa20Poly1305Encrypt::new(key_ref, data))
 }
 
@@ -111,7 +111,7 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
     data: XSalsa20Poly1305Data,
 ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .x_25519_x_salsa20_poly1305_encrypt(X25519XSalsa20Poly1305Encrypt::new(
             sender, recipient, data,
         ))
@@ -133,7 +133,7 @@ pub fn x_25519_x_salsa20_poly1305_decrypt(
     encrypted_data: XSalsa20Poly1305EncryptedData,
 ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .x_25519_x_salsa20_poly1305_decrypt(X25519XSalsa20Poly1305Decrypt::new(
             recipient,
             sender,

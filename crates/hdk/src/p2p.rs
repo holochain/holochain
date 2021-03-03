@@ -24,7 +24,7 @@ where
     // @todo is this secure to set this in the wasm rather than have the host inject it?
     let provenance = agent_info()?.agent_latest_pubkey;
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .call(Call::new(
             to_cell,
             zome_name,
@@ -69,7 +69,7 @@ where
     I: serde::Serialize + std::fmt::Debug,
 {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .call_remote(CallRemote::new(
             agent,
             zome,
@@ -93,7 +93,7 @@ where
     I: serde::Serialize + std::fmt::Debug,
 {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .emit_signal(AppSignal::new(ExternIO::encode(input)?))
 }
 
@@ -129,7 +129,7 @@ where
     I: serde::Serialize + std::fmt::Debug,
 {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .remote_signal(RemoteSignal {
             signal: ExternIO::encode(input)?,
             agents,

@@ -113,20 +113,20 @@ impl HdkT for HostHdk {
         host_call::<GetInput, Option<Details>>(__get_details, get_input)
     }
 
-    fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo> {
-        host_call::<(), AgentInfo>(__agent_info, agent_info_input)
+    fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
+        host_call::<(), AgentInfo>(__agent_info, ())
     }
-    fn app_info(&self, app_info_input: ()) -> ExternResult<AppInfo> {
-        host_call::<(), AppInfo>(__app_info, app_info_input)
+    fn app_info(&self, _: ()) -> ExternResult<AppInfo> {
+        host_call::<(), AppInfo>(__app_info, ())
     }
-    fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo> {
-        host_call::<(), DnaInfo>(__dna_info, dna_info_input)
+    fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
+        host_call::<(), DnaInfo>(__dna_info, ())
     }
-    fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo> {
-        host_call::<(), ZomeInfo>(__zome_info, zome_info_input)
+    fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
+        host_call::<(), ZomeInfo>(__zome_info, ())
     }
-    fn call_info(&self, call_info_input: ()) -> ExternResult<CallInfo> {
-        host_call::<(), CallInfo>(__call_info, call_info_input)
+    fn call_info(&self, _: ()) -> ExternResult<CallInfo> {
+        host_call::<(), CallInfo>(__call_info, ())
     }
 
     fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<HeaderHash> {
@@ -159,8 +159,8 @@ impl HdkT for HostHdk {
         host_call::<u32, Bytes>(__random_bytes, number_of_bytes)
     }
 
-    fn sys_time(&self, sys_time_input: ()) -> ExternResult<core::time::Duration> {
-        host_call::<(), core::time::Duration>(__sys_time, sys_time_input)
+    fn sys_time(&self, _: ()) -> ExternResult<core::time::Duration> {
+        host_call::<(), core::time::Duration>(__sys_time, ())
     }
     fn schedule(&self, execute_after: std::time::Duration) -> ExternResult<()> {
         host_call::<std::time::Duration, ()>(__schedule, execute_after)
@@ -173,8 +173,8 @@ impl HdkT for HostHdk {
         host_call::<TraceMsg, ()>(__trace, trace_msg)
     }
 
-    fn create_x25519_keypair(&self, create_x25519_keypair_input: ()) -> ExternResult<X25519PubKey> {
-        host_call::<(), X25519PubKey>(__create_x25519_keypair, create_x25519_keypair_input)
+    fn create_x25519_keypair(&self, _: ()) -> ExternResult<X25519PubKey> {
+        host_call::<(), X25519PubKey>(__create_x25519_keypair, ())
     }
     fn x_salsa20_poly1305_decrypt(
         &self,

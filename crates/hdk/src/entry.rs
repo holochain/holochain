@@ -11,7 +11,7 @@ use crate::prelude::*;
 /// entry and standardises the internals of higher level create functions.
 pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .create(entry_with_def_id)
 }
 
@@ -27,7 +27,7 @@ pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
 /// entry and standardises the internals of higher level create functions.
 pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .update(UpdateInput::new(hash, entry_with_def_id))
 }
 
@@ -42,7 +42,7 @@ pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResu
 /// entry and standardises the internals of higher level create functions.
 pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .delete(hash)
 }
 
@@ -128,7 +128,7 @@ where
     WasmError: From<E>,
 {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .hash_entry(Entry::try_from(input)?)
 }
 
@@ -218,7 +218,7 @@ where
     AnyDhtHash: From<H>,
 {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .get(GetInput::new(AnyDhtHash::from(hash), options))
 }
 
@@ -271,7 +271,7 @@ pub fn get_details<H: Into<AnyDhtHash>>(
     options: GetOptions,
 ) -> ExternResult<Option<Details>> {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .get_details(GetInput::new(hash.into(), options))
 }
 

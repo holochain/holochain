@@ -12,7 +12,7 @@ pub fn get_agent_activity(
     request: ActivityRequest,
 ) -> ExternResult<AgentActivity> {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .get_agent_activity(GetAgentActivityInput::new(agent, query, request))
 }
 
@@ -25,6 +25,6 @@ pub fn get_agent_activity(
 /// @todo implement cap grant/claim usage in terms of query
 pub fn query(filter: ChainQueryFilter) -> ExternResult<Vec<Element>> {
     HDK.get()
-        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
         .query(filter)
 }

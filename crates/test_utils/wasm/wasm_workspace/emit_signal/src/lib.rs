@@ -13,7 +13,7 @@ fn signal_others(signal: RemoteSignal) -> ExternResult<()> {
 
 #[hdk_extern]
 fn recv_remote_signal(signal: ExternIO) -> ExternResult<()> {
-    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.emit_signal(AppSignal::new(signal))
+    HDK.get().ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.emit_signal(AppSignal::new(signal))
 }
 
 #[hdk_extern]
