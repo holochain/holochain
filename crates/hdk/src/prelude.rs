@@ -22,8 +22,8 @@ pub use crate::entry::update_entry;
 pub use crate::entry::EntryDefRegistration;
 pub use crate::entry_def;
 pub use crate::entry_def_index;
-pub use crate::entry_type;
 pub use crate::entry_defs;
+pub use crate::entry_type;
 pub use crate::hash_path::anchor::anchor;
 pub use crate::hash_path::anchor::get_anchor;
 pub use crate::hash_path::anchor::list_anchor_addresses;
@@ -31,6 +31,7 @@ pub use crate::hash_path::anchor::list_anchor_tags;
 pub use crate::hash_path::anchor::list_anchor_type_addresses;
 pub use crate::hash_path::anchor::Anchor;
 pub use crate::hash_path::path::Path;
+pub use crate::hdk::*;
 pub use crate::info::agent_info;
 pub use crate::info::zome_info;
 pub use crate::link::create_link;
@@ -72,7 +73,6 @@ pub use std::convert::TryFrom;
 pub use tracing;
 pub use tracing::{debug, error, info, instrument, trace, warn};
 pub use tracing_subscriber;
-pub use crate::hdk::*;
 
 // This needs to be called at least once _somewhere_ and is idempotent.
 #[macro_export]

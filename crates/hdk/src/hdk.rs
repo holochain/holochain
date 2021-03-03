@@ -11,7 +11,10 @@ pub static HDK: OnceCell<Box<dyn HdkT>> = OnceCell::new();
 #[automock]
 pub trait HdkT: Sync + Send {
     // Chain
-    fn get_agent_activity(&self, get_agent_activity_input: GetAgentActivityInput) -> ExternResult<AgentActivity>;
+    fn get_agent_activity(
+        &self,
+        get_agent_activity_input: GetAgentActivityInput,
+    ) -> ExternResult<AgentActivity>;
     fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Element>>;
     // Ed25519
     fn sign(&self, sign: Sign) -> ExternResult<Signature>;
@@ -27,7 +30,7 @@ pub trait HdkT: Sync + Send {
     fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
     fn app_info(&self, app_info_input: ()) -> ExternResult<AppInfo>;
     fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
-    fn zome_info(&self, zome_info_input:()) -> ExternResult<ZomeInfo>;
+    fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
     fn call_info(&self, call_info_input: ()) -> ExternResult<CallInfo>;
     // Link
     fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<HeaderHash>;
@@ -49,17 +52,32 @@ pub trait HdkT: Sync + Send {
     fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()>;
     // XSalsa20Poly1305
     fn create_x25519_keypair(&self, create_x25519_keypair_input: ()) -> ExternResult<X25519PubKey>;
-    fn x_salsa20_poly1305_decrypt(&self, x_salsa20_poly1305_decrypt: XSalsa20Poly1305Decrypt) -> ExternResult<Option<XSalsa20Poly1305Data>>;
-    fn x_salsa20_poly1305_encrypt(&self, x_salsa20_poly1305_encrypt: XSalsa20Poly1305Encrypt) -> ExternResult<XSalsa20Poly1305EncryptedData>;
-    fn x_25519_x_salsa20_poly1305_encrypt(&self, x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt) -> ExternResult<XSalsa20Poly1305EncryptedData>;
-    fn x_25519_x_salsa20_poly1305_decrypt(&self, x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt) -> ExternResult<Option<XSalsa20Poly1305Data>>;
+    fn x_salsa20_poly1305_decrypt(
+        &self,
+        x_salsa20_poly1305_decrypt: XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<Option<XSalsa20Poly1305Data>>;
+    fn x_salsa20_poly1305_encrypt(
+        &self,
+        x_salsa20_poly1305_encrypt: XSalsa20Poly1305Encrypt,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+    fn x_25519_x_salsa20_poly1305_encrypt(
+        &self,
+        x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+    fn x_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<Option<XSalsa20Poly1305Data>>;
 }
 
 /// The HDK implemented as externs provided by the host.
 pub struct HostHdk;
 
 impl HdkT for HostHdk {
-    fn get_agent_activity(&self, get_agent_activity_input: GetAgentActivityInput) -> ExternResult<AgentActivity> {
+    fn get_agent_activity(
+        &self,
+        get_agent_activity_input: GetAgentActivityInput,
+    ) -> ExternResult<AgentActivity> {
         host_call::<GetAgentActivityInput, AgentActivity>(
             __get_agent_activity,
             get_agent_activity_input,
@@ -73,10 +91,7 @@ impl HdkT for HostHdk {
         host_call::<Sign, Signature>(__sign, sign)
     }
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {
-        host_call::<VerifySignature, bool>(
-            __verify_signature,
-            verify_signature,
-        )
+        host_call::<VerifySignature, bool>(__verify_signature, verify_signature)
     }
 
     fn create(&self, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
@@ -161,20 +176,47 @@ impl HdkT for HostHdk {
     fn create_x25519_keypair(&self, create_x25519_keypair_input: ()) -> ExternResult<X25519PubKey> {
         host_call::<(), X25519PubKey>(__create_x25519_keypair, create_x25519_keypair_input)
     }
-    fn x_salsa20_poly1305_decrypt(&self, x_salsa20_poly1305_decrypt: XSalsa20Poly1305Decrypt) -> ExternResult<Option<XSalsa20Poly1305Data>> {
-        host_call::<XSalsa20Poly1305Decrypt, Option<XSalsa20Poly1305Data>>(__x_salsa20_poly1305_decrypt, x_salsa20_poly1305_decrypt)
+    fn x_salsa20_poly1305_decrypt(
+        &self,
+        x_salsa20_poly1305_decrypt: XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
+        host_call::<XSalsa20Poly1305Decrypt, Option<XSalsa20Poly1305Data>>(
+            __x_salsa20_poly1305_decrypt,
+            x_salsa20_poly1305_decrypt,
+        )
     }
-    fn x_salsa20_poly1305_encrypt(&self, x_salsa20_poly1305_encrypt: XSalsa20Poly1305Encrypt) -> ExternResult<XSalsa20Poly1305EncryptedData> {
-        host_call::<XSalsa20Poly1305Encrypt, XSalsa20Poly1305EncryptedData>(__x_salsa20_poly1305_encrypt, x_salsa20_poly1305_encrypt)
+    fn x_salsa20_poly1305_encrypt(
+        &self,
+        x_salsa20_poly1305_encrypt: XSalsa20Poly1305Encrypt,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+        host_call::<XSalsa20Poly1305Encrypt, XSalsa20Poly1305EncryptedData>(
+            __x_salsa20_poly1305_encrypt,
+            x_salsa20_poly1305_encrypt,
+        )
     }
-    fn x_25519_x_salsa20_poly1305_encrypt(&self, x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt) -> ExternResult<XSalsa20Poly1305EncryptedData> {
-        host_call::<X25519XSalsa20Poly1305Encrypt, XSalsa20Poly1305EncryptedData>(__x_25519_x_salsa20_poly1305_encrypt, x_25519_x_salsa20_poly1305_encrypt)
+    fn x_25519_x_salsa20_poly1305_encrypt(
+        &self,
+        x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+        host_call::<X25519XSalsa20Poly1305Encrypt, XSalsa20Poly1305EncryptedData>(
+            __x_25519_x_salsa20_poly1305_encrypt,
+            x_25519_x_salsa20_poly1305_encrypt,
+        )
     }
-    fn x_25519_x_salsa20_poly1305_decrypt(&self, x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt) -> ExternResult<Option<XSalsa20Poly1305Data>> {
-        host_call::<X25519XSalsa20Poly1305Decrypt, Option<XSalsa20Poly1305Data>>(__x_25519_x_salsa20_poly1305_decrypt, x_25519_x_salsa20_poly1305_decrypt)
+    fn x_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
+        host_call::<X25519XSalsa20Poly1305Decrypt, Option<XSalsa20Poly1305Data>>(
+            __x_25519_x_salsa20_poly1305_decrypt,
+            x_25519_x_salsa20_poly1305_decrypt,
+        )
     }
 }
 
-pub fn set_global_hdk<H: 'static>(hdk: H) -> Result<(), ()> where H: HdkT {
+pub fn set_global_hdk<H: 'static>(hdk: H) -> Result<(), ()>
+where
+    H: HdkT,
+{
     HDK.set(Box::new(hdk)).map_err(|_| ())
 }

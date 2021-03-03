@@ -6,12 +6,9 @@ where
     K: Into<AgentPubKey>,
     D: serde::Serialize + std::fmt::Debug,
 {
-    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.sign(
-        Sign::new(
-            key.into(),
-            data
-        )?
-    )
+    HDK.get()
+        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .sign(Sign::new(key.into(), data)?)
 }
 
 /// Sign some data using the private key for the passed public key.
@@ -24,12 +21,9 @@ pub fn sign_raw<K>(key: K, data: Vec<u8>) -> ExternResult<Signature>
 where
     K: Into<AgentPubKey>,
 {
-    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.sign(
-        Sign::new_raw(
-            key.into(),
-            data
-        )
-    )
+    HDK.get()
+        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .sign(Sign::new_raw(key.into(), data))
 }
 
 /// Verify the passed signature and public key against the passed serializable input.
@@ -46,9 +40,9 @@ where
     S: Into<Signature>,
     D: serde::Serialize + std::fmt::Debug,
 {
-    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.verify_signature(
-        VerifySignature::new(key.into(), signature.into(), data)?,
-    )
+    HDK.get()
+        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .verify_signature(VerifySignature::new(key.into(), signature.into(), data)?)
 }
 
 /// Verify the passed signature and public key against the literal bytes input.
@@ -63,7 +57,7 @@ where
     K: Into<AgentPubKey>,
     S: Into<Signature>,
 {
-    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.verify_signature(
-        VerifySignature::new_raw(key.into(), signature.into(), data)
-    )
+    HDK.get()
+        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .verify_signature(VerifySignature::new_raw(key.into(), signature.into(), data))
 }

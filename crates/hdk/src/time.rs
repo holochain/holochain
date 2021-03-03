@@ -62,15 +62,21 @@ use crate::prelude::*;
 /// environment e.g. a chess game between friends with time moves that balances security/trust and
 /// flaky networking, etc.
 pub fn sys_time() -> ExternResult<core::time::Duration> {
-    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.sys_time(())
+    HDK.get()
+        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .sys_time(())
 }
 
 /// @todo Not implemented
 pub fn schedule(execute_after: std::time::Duration) -> ExternResult<()> {
-    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.schedule(execute_after)
+    HDK.get()
+        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .schedule(execute_after)
 }
 
 /// @todo Not implemented
 pub fn sleep(wake_after: std::time::Duration) -> ExternResult<()> {
-    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.sleep(wake_after)
+    HDK.get()
+        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .sleep(wake_after)
 }

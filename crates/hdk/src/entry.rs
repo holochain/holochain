@@ -10,7 +10,9 @@ use crate::prelude::*;
 /// Usually you don't need to use this function directly; it is the most general way to create an
 /// entry and standardises the internals of higher level create functions.
 pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.create(entry_with_def_id)
+    HDK.get()
+        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .create(entry_with_def_id)
 }
 
 /// Update any entry type.
@@ -24,7 +26,9 @@ pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
 pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.update(UpdateInput::new(hash, entry_with_def_id))
+    HDK.get()
+        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .update(UpdateInput::new(hash, entry_with_def_id))
 }
 
 /// General function that can delete any entry type.
@@ -37,7 +41,9 @@ pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResu
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
 pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
-    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.delete(hash)
+    HDK.get()
+        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .delete(hash)
 }
 
 /// Create an app entry.
@@ -121,7 +127,9 @@ where
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.hash_entry(Entry::try_from(input)?)
+    HDK.get()
+        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .hash_entry(Entry::try_from(input)?)
 }
 
 /// Thin wrapper around update for app entries.
@@ -209,7 +217,9 @@ pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Element>>
 where
     AnyDhtHash: From<H>,
 {
-    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.get(GetInput::new(AnyDhtHash::from(hash), options))
+    HDK.get()
+        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .get(GetInput::new(AnyDhtHash::from(hash), options))
 }
 
 /// Get an element from the hash AND the details for the entry or header hash passed in.
@@ -260,7 +270,9 @@ pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,
 ) -> ExternResult<Option<Details>> {
-    HDK.get().ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.get_details(GetInput::new(hash.into(), options))
+    HDK.get()
+        .ok_or(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+        .get_details(GetInput::new(hash.into(), options))
 }
 
 /// Trait for binding static [ `EntryDef` ] property access for a type.
@@ -601,22 +613,14 @@ macro_rules! entry_def_index {
 macro_rules! entry_type {
     ( $t:ty ) => {
         match $crate::prelude::entry_def_index!($t) {
-            Ok(id) => {
-                match $crate::prelude::zome_info() {
-                    Ok(ZomeInfo { zome_id, ..}) => {
-                        Ok($crate::prelude::EntryType::App(
-                            $crate::prelude::AppEntryType::new(
-                                id,
-                                zome_id,
-                                <$t>::entry_visibility(),
-                            )
-                        ))
-                    },
-                    Err(e) => Err(e),
-                    _ => unreachable!(),
-                }
+            Ok(id) => match $crate::prelude::zome_info() {
+                Ok(ZomeInfo { zome_id, .. }) => Ok($crate::prelude::EntryType::App(
+                    $crate::prelude::AppEntryType::new(id, zome_id, <$t>::entry_visibility()),
+                )),
+                Err(e) => Err(e),
+                _ => unreachable!(),
             },
             Err(e) => Err(e),
         }
-    }
+    };
 }
