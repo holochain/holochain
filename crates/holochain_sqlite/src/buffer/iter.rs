@@ -303,7 +303,7 @@ pub struct SingleIterRaw<'txn, V> {
     __type: std::marker::PhantomData<V>,
 }
 
-type InnerItem<'a> = (&'a [u8], Option<rkv::Value<'a>>);
+type InnerItem<'a> = (&'a [u8], Option<rusqlite::types::Value>);
 
 impl<'txn, V> SingleIterRaw<'txn, V>
 where
@@ -323,9 +323,9 @@ where
         item: Option<Result<InnerItem<'txn>, StoreError>>,
     ) -> Result<Option<IterItem<'txn, V>>, IterError> {
         match item {
-            Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Ok(Some((
+            Some(Ok((k, Some(rusqlite::types::Value::Blob(buf))))) => Ok(Some((
                 k,
-                holochain_serialized_bytes::decode(buf).expect(
+                holochain_serialized_bytes::decode(&buf).expect(
                     "Failed to deserialize data from database. Database might be corrupted",
                 ),
             ))),

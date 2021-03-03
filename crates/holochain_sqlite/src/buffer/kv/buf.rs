@@ -342,7 +342,7 @@ where
             match op {
                 Put(v) => {
                     let buf = holochain_serialized_bytes::encode(v)?;
-                    let encoded = rkv::Value::Blob(&buf);
+                    let encoded = rusqlite::types::Value::Blob(&buf);
                     self.store.db().put(writer, k, &encoded)?;
                 }
                 Delete => self
@@ -378,7 +378,7 @@ where
             match op {
                 Put(v) => {
                     let buf = holochain_serialized_bytes::encode(v)?;
-                    let encoded = rkv::Value::Blob(&buf);
+                    let encoded = rusqlite::types::Value::Blob(&buf);
                     self.store.db().put(
                         writer,
                         IntKey::from_key_bytes_or_friendly_panic(k).as_ref(),

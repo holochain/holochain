@@ -5,18 +5,18 @@
 //! - We can upgrade some error types from rkv::StoreError, which does not implement
 //!     std::error::Error, into error types that do
 
-use crate::{error::DatabaseError, table::Table};
+use crate::{error::DatabaseError, prelude::DatabaseResult, table::Table};
 use chrono::offset::Local;
 use chrono::DateTime;
 use derive_more::From;
 use rkv::StoreError;
-use rkv::Value;
+use rusqlite::types::Value;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
 
 #[deprecated = "no need for read/write distinction with SQLite"]
 pub trait Readable {
-    fn get<K: AsRef<[u8]>>(&self, db: Table, k: &K) -> Result<Option<Value>, StoreError>;
+    fn get<K: ToSql>(&self, table: &Table, k: &K) -> DatabaseResult<Option<Value>>;
 }
 
 struct ReaderSpanInfo {
@@ -43,6 +43,20 @@ impl Drop for ReaderSpanInfo {
     }
 }
 
+fn get_kv<K: ToSql>(txn: &mut Transaction, table: &Table, k: &K) -> DatabaseResult<Option<Value>> {
+    let stmt = txn.prepare_cached("SELECT (key, val) FROM ?1 WHERE key = ?2")?;
+    Ok(stmt
+        .query_row(params![&table.name(), k], |row| {
+            // TODO: ideally we could call get_raw_unchecked to get a Value
+            // and avoid cloning, but it's hard to figure out how to line up the
+            // lifetime of the row with the lifetime of the transaction, or if
+            // that's even possible:
+            // row.get_raw_checked(1)
+            row.get(1)
+        })
+        .optional()?)
+}
+
 /// Wrapper around `rkv::Reader`, so it can be marked as threadsafe
 #[derive(Shrinkwrap)]
 pub struct Reader<'env>(#[shrinkwrap(main_field)] Transaction<'env>, ReaderSpanInfo);
@@ -58,8 +72,8 @@ unsafe impl<'env> Send for Reader<'env> {}
 unsafe impl<'env> Sync for Reader<'env> {}
 
 impl<'env> Readable for Reader<'env> {
-    fn get<K: AsRef<[u8]>>(&self, db: Table, k: &K) -> Result<Option<Value>, StoreError> {
-        todo!("do get on the table with sqlite")
+    fn get<K: ToSql>(&self, table: &Table, k: &K) -> DatabaseResult<Option<Value>> {
+        get_kv(&mut self.0, table, k)
     }
 }
 
@@ -76,8 +90,8 @@ impl<'env> From<Transaction<'env>> for Reader<'env> {
 pub struct Writer<'env>(Transaction<'env>);
 
 impl<'env> Readable for Writer<'env> {
-    fn get<K: AsRef<[u8]>>(&self, db: Table, k: &K) -> Result<Option<Value>, StoreError> {
-        todo!("do get on the table with sqlite")
+    fn get<K: ToSql>(&self, table: &Table, k: &K) -> DatabaseResult<Option<Value>> {
+        get_kv(self.0, table, k)
     }
 }
 

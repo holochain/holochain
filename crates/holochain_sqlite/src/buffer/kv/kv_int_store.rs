@@ -27,7 +27,7 @@ where
         k: &K,
     ) -> DatabaseResult<Option<&'env [u8]>> {
         match self.db.get(reader, (*k).as_ref())? {
-            Some(rkv::Value::Blob(buf)) => Ok(Some(buf)),
+            Some(rusqlite::types::Value::Blob(buf)) => Ok(Some(buf)),
             None => Ok(None),
             Some(_) => Err(DatabaseError::InvalidValue),
         }
@@ -44,7 +44,7 @@ where
     /// Put V into DB as serialized data
     fn put(&self, writer: &mut Writer, k: &K, v: &V) -> DatabaseResult<()> {
         let buf = holochain_serialized_bytes::encode(v)?;
-        let encoded = rkv::Value::Blob(&buf);
+        let encoded = rusqlite::types::Value::Blob(&buf);
         self.db.put(writer, k.as_ref(), &encoded)?;
         Ok(())
     }

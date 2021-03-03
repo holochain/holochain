@@ -4,6 +4,8 @@
 //! where as retrieve only checks that where the data was found
 //! the appropriate validation has been run.
 
+#![allow(deprecated)]
+
 use either::Either;
 use error::{AuthorityDataError, CascadeResult};
 use fallible_iterator::FallibleIterator;

@@ -7,7 +7,7 @@ use crate::{
     exports::{MultiTable, SingleTable},
 };
 use derive_more::Display;
-use rusqlite::*;
+use rusqlite::{types::Value, *};
 use std::path::Path;
 
 /// Enumeration of all databases needed by Holochain
@@ -59,6 +59,14 @@ pub enum TableName {
     ValidationReceipts,
     /// Single store for all known agents on the network
     Agent,
+}
+
+impl ToSql for TableName {
+    fn to_sql(&self) -> Result<rusqlite::types::ToSqlOutput<'_>> {
+        Ok(rusqlite::types::ToSqlOutput::Owned(
+            format!("{}", self).into(),
+        ))
+    }
 }
 
 fn initialize_table(conn: &mut Connection, name: TableName) -> DatabaseResult<()> {
@@ -124,18 +132,20 @@ pub(super) fn initialize_database(conn: &mut Connection, kind: &DbKind) -> Datab
 #[deprecated = "sqlite: placeholder"]
 pub trait GetTable {
     /// Placeholder
-    fn get_table(&self, _table_name: TableName) -> DatabaseResult<Table> {
-        todo!("rewrite to return a Table")
+    fn get_table(&self, name: TableName) -> DatabaseResult<Table> {
+        Ok(Table { name })
     }
 
     /// Placeholder
-    fn get_table_i(&self, _table_name: TableName) -> DatabaseResult<Table> {
-        todo!("rewrite to return a Table")
+    #[deprecated = "use get_table"]
+    fn get_table_i(&self, name: TableName) -> DatabaseResult<Table> {
+        self.get_table(name)
     }
 
     /// Placeholder
-    fn get_table_m(&self, _table_name: TableName) -> DatabaseResult<Table> {
-        todo!("rewrite to return a Table")
+    #[deprecated = "use get_table"]
+    fn get_table_m(&self, name: TableName) -> DatabaseResult<Table> {
+        self.get_table(name)
     }
 }
 
@@ -143,66 +153,58 @@ pub trait GetTable {
 /// This patten only exists as part of the naive LMDB refactor.
 #[deprecated = "lmdb: naive"]
 #[derive(Clone, Debug)]
-pub struct Table {}
+pub struct Table {
+    name: TableName,
+}
 
 impl Table {
-    pub fn get<R: Readable, K: AsRef<[u8]>>(
-        &self,
-        reader: &R,
-        k: K,
-    ) -> StoreResult<Option<rkv::Value>> {
-        todo!()
+    pub fn name(&self) -> &TableName {
+        &self.name
+    }
+
+    pub fn get<R: Readable, K: ToSql>(&self, reader: &R, k: K) -> StoreResult<Option<Value>> {
+        Ok(reader.get(self, k)?)
     }
 
     /// This handles the fact that getting from an rkv::MultiTable returns
     /// multiple results
     #[deprecated = "unneeded in the context of SQL"]
-    pub fn get_m<R: Readable, K: AsRef<[u8]>>(
+    pub fn get_m<R: Readable, K: ToSql>(
         &self,
         reader: &R,
         k: K,
-    ) -> StoreResult<impl Iterator<Item = StoreResult<(K, Option<rkv::Value>)>>> {
+    ) -> StoreResult<impl Iterator<Item = StoreResult<(K, Option<Value>)>>> {
         todo!();
         Ok(std::iter::empty())
     }
 
-    pub fn put<K: AsRef<[u8]>>(
-        &self,
-        writer: &mut Writer,
-        k: K,
-        v: &rkv::Value,
-    ) -> StoreResult<()> {
+    pub fn put<K: ToSql>(&self, writer: &mut Writer, k: K, v: &Value) -> StoreResult<()> {
         todo!()
     }
 
     #[deprecated = "unneeded in the context of SQL"]
-    pub fn put_with_flags<K: AsRef<[u8]>>(
+    pub fn put_with_flags<K: ToSql>(
         &self,
         writer: &mut Writer,
         k: K,
-        v: &rkv::Value,
+        v: &Value,
         flags: rkv::WriteFlags,
     ) -> StoreResult<()> {
         todo!()
     }
 
-    pub fn delete<K: AsRef<[u8]>>(&self, writer: &mut Writer, k: K) -> StoreResult<()> {
+    pub fn delete<K: ToSql>(&self, writer: &mut Writer, k: K) -> StoreResult<()> {
         todo!()
     }
 
-    pub fn delete_all<K: AsRef<[u8]>>(&self, writer: &mut Writer, k: K) -> StoreResult<()> {
+    pub fn delete_all<K: ToSql>(&self, writer: &mut Writer, k: K) -> StoreResult<()> {
         todo!()
     }
 
     /// This handles the fact that deleting from an rkv::MultiTable requires
     /// passing the value to delete (deleting a particular kv pair)
     #[deprecated = "unneeded in the context of SQL"]
-    pub fn delete_m<K: AsRef<[u8]>>(
-        &self,
-        writer: &mut Writer,
-        k: K,
-        v: &rkv::Value,
-    ) -> StoreResult<()> {
+    pub fn delete_m<K: ToSql>(&self, writer: &mut Writer, k: K, v: &Value) -> StoreResult<()> {
         todo!()
     }
 

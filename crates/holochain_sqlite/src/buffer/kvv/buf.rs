@@ -173,7 +173,7 @@ where
         trace!("test");
         let iter = self.db.get_m(r, k)?;
         Ok(iter.filter_map(|v| match v {
-            Ok((_, Some(rkv::Value::Blob(buf)))) => Some(
+            Ok((_, Some(rusqlite::types::Value::Blob(buf)))) => Some(
                 holochain_serialized_bytes::decode(buf)
                     .map(|n| {
                         trace!(?n);
@@ -243,7 +243,7 @@ where
                 match op {
                     Insert => {
                         let buf = holochain_serialized_bytes::encode(&v)?;
-                        let encoded = rkv::Value::Blob(&buf);
+                        let encoded = rusqlite::types::Value::Blob(&buf);
                         if self.no_dup_data {
                             self.db
                                 .put_with_flags(
@@ -278,7 +278,7 @@ where
                     Delete if *delete_all => {}
                     Delete => {
                         let buf = holochain_serialized_bytes::encode(&v)?;
-                        let encoded = rkv::Value::Blob(&buf);
+                        let encoded = rusqlite::types::Value::Blob(&buf);
                         self.db
                             .delete_m(writer, k.clone(), &encoded)
                             .or_else(StoreError::ok_if_not_found)?;

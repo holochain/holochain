@@ -32,6 +32,8 @@
 //! source: https://textik.com/#d7907793784e17e9
 //! ```
 
+#![allow(deprecated)]
+
 #[allow(missing_docs)]
 pub mod chain_sequence;
 pub mod dht_op_integration;

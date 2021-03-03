@@ -19,7 +19,7 @@ pub fn human_size(size: usize) -> String {
 
 fn dump_iter<'i>(
     name: &str,
-    it: impl Iterator<Item = Result<(&'i [u8], Option<rkv::Value<'i>>), StoreError>>,
+    it: impl Iterator<Item = Result<(&'i [u8], Option<rusqlite::types::Value<'i>>), StoreError>>,
 ) -> DatabaseResult<()> {
     let items = it
         .map(|kv| {
@@ -37,7 +37,7 @@ fn dump_iter<'i>(
 #[allow(dead_code)]
 fn dump_iter_multi<'i>(
     name: &str,
-    it: impl Iterator<Item = Result<(&'i [u8], rkv::Value<'i>), StoreError>>,
+    it: impl Iterator<Item = Result<(&'i [u8], rusqlite::types::Value<'i>), StoreError>>,
 ) -> DatabaseResult<()> {
     let items = it
         .map(|kv| {
