@@ -12,7 +12,7 @@ pub mod tx2_frontend_traits {
     use super::*;
 
     /// Trait representing a connection handle.
-    pub trait AsConHnd: 'static + Send + Sync + Unpin {
+    pub trait AsConHnd: std::fmt::Debug + 'static + Send + Sync + Unpin {
         /// Is this connection closed?
         fn is_closed(&self) -> bool;
 
@@ -70,7 +70,7 @@ pub mod tx2_frontend_traits {
 use tx2_frontend_traits::*;
 
 /// A connection handle - use this to manage an open connection.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ConHnd(pub Arc<dyn AsConHnd>);
 
 impl ConHnd {
@@ -176,6 +176,7 @@ impl AsEpHnd for EpHnd {
 }
 
 /// Event emitted by a transport endpoint.
+#[derive(Debug)]
 pub enum EpEvent {
     /// We've accepted an incoming connection.
     IncomingConnection(ConHnd),

@@ -6,7 +6,7 @@ use crate::tx2::util::{Active, TxUrl};
 use crate::tx2::*;
 use crate::*;
 use futures::{
-    future::{BoxFuture, FutureExt},
+    future::FutureExt,
     stream::{BoxStream, StreamExt},
 };
 use once_cell::sync::Lazy;
@@ -66,16 +66,23 @@ struct MemConAdaptInner {
     remote_addr: TxUrl,
     chan_send: ChanSend,
     con_active: Active,
+    mix_active: Active,
 }
 
 struct MemConAdapt(MemConAdaptInner);
 
 impl MemConAdapt {
-    fn new(remote_addr: TxUrl, chan_send: ChanSend, con_active: Active) -> Self {
+    fn new(
+        remote_addr: TxUrl,
+        chan_send: ChanSend,
+        con_active: Active,
+        mix_active: Active,
+    ) -> Self {
         Self(MemConAdaptInner {
             remote_addr,
             chan_send,
             con_active,
+            mix_active,
         })
     }
 }
@@ -99,9 +106,12 @@ impl ConAdapt for MemConAdapt {
         .boxed()
     }
 
-    fn close(&self) -> BoxFuture<'static, ()> {
+    fn is_closed(&self) -> bool {
+        !self.0.mix_active.is_active()
+    }
+
+    fn close(&self, _code: u32, _reason: &str) {
         self.0.con_active.kill();
-        async move {}.boxed()
     }
 }
 
@@ -221,10 +231,16 @@ impl EndpointAdapt for MemEndpointAdapt {
                 format!("{}/{}", this_url, con_id).into(),
                 oth_send,
                 con_active.clone(),
+                mix_active.clone(),
             );
             let oth_con: Arc<dyn ConAdapt> = Arc::new(oth_con);
 
-            let con = MemConAdapt::new(format!("{}/{}", url, con_id).into(), send, con_active);
+            let con = MemConAdapt::new(
+                format!("{}/{}", url, con_id).into(),
+                send,
+                con_active,
+                mix_active.clone(),
+            );
             let con: Arc<dyn ConAdapt> = Arc::new(con);
 
             let oth_chan_recv: Box<dyn InChanRecvAdapt> =
@@ -242,12 +258,12 @@ impl EndpointAdapt for MemEndpointAdapt {
         .boxed()
     }
 
-    fn close(&self) -> BoxFuture<'static, ()> {
-        {
-            let inner = self.0.lock();
-            inner.ep_active.kill();
-        }
-        async move {}.boxed()
+    fn is_closed(&self) -> bool {
+        !self.0.lock().ep_active.is_active()
+    }
+
+    fn close(&self, _code: u32, _reason: &str) {
+        self.0.lock().ep_active.kill();
     }
 }
 
@@ -333,8 +349,8 @@ mod tests {
         println!("GOT RESPONSE: {}", String::from_utf8_lossy(&buf[..]));
         assert_eq!(b"world", &buf[..]);
 
-        ep1.close().await;
-        ep2.close().await;
+        ep1.close(0, "");
+        ep2.close(0, "");
 
         rt.await.unwrap();
     }

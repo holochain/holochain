@@ -11,12 +11,6 @@ use futures::future::{BoxFuture, FutureExt};
 use futures::stream::{Stream, StreamExt};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
-/// Limit the number of active channels allowed per connection.
-const CHANNELS_PER_CONNECTION: usize = 3;
-
-/// Timeout after which we will give up trying to read from a channel.
-const MAX_READ_TIMEOUT: u64 = 1000 * 30;
-
 /// Promote a tx2 transport backend to a tx2 transport frontend.
 pub fn promote(backend: BackendFactory, max_cons: usize) -> EpFactory {
     let con_limit = Arc::new(Semaphore::new(max_cons));
@@ -28,6 +22,12 @@ pub fn promote(backend: BackendFactory, max_cons: usize) -> EpFactory {
 }
 
 // -- private -- //
+
+/// Limit the number of active channels allowed per connection.
+const CHANNELS_PER_CONNECTION: usize = 3;
+
+/// Timeout after which we will give up trying to read from a channel.
+const MAX_READ_TIMEOUT: u64 = 1000 * 30;
 
 struct WriteChan {
     _permit: OwnedSemaphorePermit,
@@ -41,6 +41,13 @@ struct PromoteConInner {
 }
 
 struct PromoteConHnd(Arc<PromoteConInner>);
+
+impl std::fmt::Debug for PromoteConHnd {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let a = self.0.con.remote_addr().map(|a| a.to_string());
+        f.debug_tuple("ConHnd").field(&a).finish()
+    }
+}
 
 async fn in_chan_recv_logic(
     raw_con: Arc<dyn ConAdapt>,
@@ -82,6 +89,8 @@ async fn in_chan_recv_logic(
     let write_fut = async move {
         let limit = Arc::new(Semaphore::new(CHANNELS_PER_CONNECTION));
         loop {
+            // TODO - FIXME - this loop may leak
+            // would be nice if we had tokio 1.0 kill-able Semaphore.
             let permit = limit.clone().acquire_owned().await;
             let writer = match raw_con
                 .out_chan(KitsuneTimeout::from_millis(MAX_READ_TIMEOUT))
@@ -135,13 +144,11 @@ impl PromoteConHnd {
 
 impl AsConHnd for PromoteConHnd {
     fn is_closed(&self) -> bool {
-        unimplemented!()
-        //self.0.con.is_closed()
+        self.0.con.is_closed()
     }
 
-    fn close(&self, _code: u32, _reason: &str) {
-        unimplemented!()
-        //self.0.close(code, reason)
+    fn close(&self, code: u32, reason: &str) {
+        self.0.con.close(code, reason)
     }
 
     fn remote_addr(&self) -> KitsuneResult<TxUrl> {
@@ -157,8 +164,11 @@ impl AsConHnd for PromoteConHnd {
         let inner = self.0.clone();
         async move {
             let mut writer = inner.writer_bucket.acquire(Some(timeout)).await?;
-            // TODO - FIXME - on error, also kill the connection
-            writer.writer.write(msg_id, data, timeout).await?;
+            if let Err(e) = writer.writer.write(msg_id, data, timeout).await {
+                let reason = format!("{:?}", e);
+                // TODO - standardize codes?
+                inner.con.close(500, &reason);
+            }
             inner.writer_bucket.release(writer);
             Ok(())
         }
@@ -190,13 +200,12 @@ impl PromoteEpHnd {
 
 impl AsEpHnd for PromoteEpHnd {
     fn is_closed(&self) -> bool {
-        unimplemented!()
-        //self.0.ep.is_closed()
+        self.0.ep.is_closed()
     }
 
-    fn close(&self, _code: u32, _reason: &str) {
-        unimplemented!()
-        //self.0.close(code, reason)
+    fn close(&self, code: u32, reason: &str) {
+        self.0.logic_hnd.close();
+        self.0.ep.close(code, reason);
     }
 
     fn local_addr(&self) -> KitsuneResult<TxUrl> {
@@ -346,6 +355,60 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_tx2_backend_frontend_promote() {
-        let _ = promote(MemBackendAdapt::new(), 32);
+        let t = KitsuneTimeout::from_millis(5000);
+
+        let f = promote(MemBackendAdapt::new(), 32);
+
+        let (rs, rr) = tokio::sync::oneshot::channel::<()>();
+        let mut rs = Some(rs);
+
+        let mut e1 = f.bind("none:".into(), t).await.unwrap();
+        let e1_hnd = e1.handle().clone();
+        let rt1 = tokio::task::spawn(async move {
+            while let Some(evt) = e1.next().await {
+                println!("E1 GOT: {:?}", evt);
+                match evt {
+                    EpEvent::IncomingData(_, _, data) => {
+                        assert_eq!(b"world", data.as_ref());
+                        rs.take().unwrap().send(()).unwrap();
+                    }
+                    _ => (),
+                }
+            }
+        });
+
+        let mut e2 = f.bind("none:".into(), t).await.unwrap();
+        let e2_hnd = e2.handle().clone();
+        let rt2 = tokio::task::spawn(async move {
+            while let Some(evt) = e2.next().await {
+                println!("E2 GOT: {:?}", evt);
+                match evt {
+                    EpEvent::IncomingData(con, _, mut data) => {
+                        assert_eq!(b"hello", data.as_ref());
+                        data.clear();
+                        data.extend_from_slice(b"world");
+                        con.write(0.into(), data, t).await.unwrap();
+                    }
+                    _ => (),
+                }
+            }
+        });
+
+        let addr2 = e2_hnd.local_addr().unwrap();
+        println!("got addr2: {}", addr2);
+
+        let con = e1_hnd.connect(addr2, t).await.unwrap();
+
+        let mut data = PoolBuf::new();
+        data.extend_from_slice(b"hello");
+        con.write(0.into(), data, t).await.unwrap();
+
+        rr.await.unwrap();
+
+        e1_hnd.close(0, "");
+        e2_hnd.close(0, "");
+
+        rt1.await.unwrap();
+        rt2.await.unwrap();
     }
 }

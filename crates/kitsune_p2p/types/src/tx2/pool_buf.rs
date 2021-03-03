@@ -21,8 +21,18 @@ pub(crate) const POOL_BUF_PRE_WRITE_SPACE: usize = 128;
 /// We avoid allocation by returning used buffers to a pool for later re-use.
 ///
 /// We avoid initialization by using `extend_from_slice()`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct PoolBuf(Option<(usize, Vec<u8>)>);
+
+impl std::fmt::Debug for PoolBuf {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let inner = self.0.as_ref().unwrap();
+        let byte_count = inner.1.len() - inner.0;
+        f.debug_struct("PoolBuf")
+            .field("byte_count", &byte_count)
+            .finish()
+    }
+}
 
 impl std::io::Write for PoolBuf {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {

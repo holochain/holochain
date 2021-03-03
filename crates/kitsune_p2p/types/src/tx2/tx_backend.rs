@@ -30,8 +30,11 @@ pub trait ConAdapt: 'static + Send + Sync + Unpin {
     /// Create a new outgoing channel to the remote.
     fn out_chan(&self, timeout: KitsuneTimeout) -> OutChanFut;
 
+    /// Check if this connection has closed.
+    fn is_closed(&self) -> bool;
+
     /// Close this open connection (and all associated Chans).
-    fn close(&self) -> BoxFuture<'static, ()>;
+    fn close(&self, code: u32, reason: &str);
 }
 
 /// A tx backend Con is both the ability to make outgoing channels,
@@ -53,8 +56,11 @@ pub trait EndpointAdapt: 'static + Send + Sync + Unpin {
     /// Create a new outgoing connection to a remote.
     fn connect(&self, url: TxUrl, timeout: KitsuneTimeout) -> ConFut;
 
+    /// Check if this endpoint has closed.
+    fn is_closed(&self) -> bool;
+
     /// Shutdown this endpoint / all connections / all channels.
-    fn close(&self) -> BoxFuture<'static, ()>;
+    fn close(&self, code: u32, reason: &str);
 }
 
 /// A tx backend Endpoint is both the ability to make outgoing connections,

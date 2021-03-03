@@ -1,6 +1,7 @@
 #![allow(clippy::new_ret_no_self)]
 //! Types, traits, and an implementation for applying pooling to a tx backend.
 
+/*
 use crate::tx2::tx_backend::*;
 use crate::tx2::util::*;
 use crate::tx2::*;
@@ -387,6 +388,7 @@ mod tests {
         rt.await.unwrap();
     }
 }
+*/
 
 /*
 use crate::tx2::tx_backend::*;
