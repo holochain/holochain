@@ -393,11 +393,11 @@ pub async fn consistency_envs(
     }
 }
 
-/// Same as wait_for_integration but with a default wait time of 10 seconds
+/// Same as wait_for_integration but with a default wait time of 60 seconds
 #[tracing::instrument(skip(env))]
-pub async fn wait_for_integration_10s(env: &EnvironmentWrite, expected_count: usize) {
-    const NUM_ATTEMPTS: usize = 100;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
+pub async fn wait_for_integration_1m(env: &EnvironmentWrite, expected_count: usize) {
+    const NUM_ATTEMPTS: usize = 120;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(500);
     wait_for_integration(env, expected_count, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
 }
 

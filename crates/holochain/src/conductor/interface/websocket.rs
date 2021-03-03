@@ -283,6 +283,7 @@ pub mod test {
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
+    use holochain_types::test_utils::fake_dna_hash;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_types::{app::InstallAppDnaPayload, prelude::InstallAppPayload};
     use holochain_wasm_test_utils::TestWasm;
@@ -375,8 +376,7 @@ pub mod test {
         observability::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
-        let dna_payload =
-            InstallAppDnaPayload::path_only("some$\\//weird00=-+[] \\Path".into(), "".to_string());
+        let dna_payload = InstallAppDnaPayload::hash_only(fake_dna_hash(1), "".to_string());
         let agent_key = fake_agent_pubkey_1();
         let payload = InstallAppPayload {
             dnas: vec![dna_payload],

@@ -17,8 +17,8 @@ use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_p2p::kitsune_p2p;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
-use holochain_types::prelude::InstallAppDnaPayload;
-use holochain_types::prelude::InstallAppPayload;
+//use holochain_types::prelude::InstallAppDnaPayload;
+//use holochain_types::prelude::InstallAppPayload;
 use holochain_types::prelude::InstalledCell;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppBundlePayload};
@@ -359,10 +359,11 @@ pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyho
 /// Creates an app per dna with the app id of `{app-id}-{dna-index}`
 /// e.g. `my-cool-app-3`.
 pub async fn install_app(
-    cmd: &mut CmdRunner,
-    args: InstallApp,
+    _cmd: &mut CmdRunner,
+    _args: InstallApp,
 ) -> anyhow::Result<HashSet<InstalledCell>> {
-    let InstallApp {
+    todo!("Currently unimplemented")
+    /*    let InstallApp {
         app_id,
         agent_key,
         dnas,
@@ -373,7 +374,7 @@ pub async fn install_app(
     };
 
     for path in &dnas {
-        ensure!(path.is_file(), "Dna path {} must be a file", path.display());
+        ensure!(path.is_file(), "Dna bundle {} must be a hash", path.display());
     }
 
     // Turn dnas into payloads
@@ -403,7 +404,7 @@ pub async fn install_app(
     Ok(installed_app
         .provisioned_cells()
         .map(|(n, c)| InstalledCell::new(c.clone(), n.clone()))
-        .collect())
+        .collect())*/
 }
 
 /// Calls [`AdminRequest::InstallApp`] and installs a new app.
