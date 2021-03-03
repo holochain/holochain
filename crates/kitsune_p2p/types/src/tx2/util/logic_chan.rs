@@ -136,6 +136,12 @@ impl<E: 'static + Send> futures::stream::Stream for LogicChan<E> {
         // or the task list for processing.
         let x = match self.0 .0.share_mut(|i, _| {
             if i.events.is_empty() {
+                // TODO
+                // Currently we're just polling all sub futures
+                // even though some/most of them may not have been woken.
+                // We could store an AtomicBool with each of these,
+                // passing custom context wakers that would flag these bools
+                // letting us know which tasks are actually ready to be polled.
                 Ok(X::L(std::mem::replace(&mut i.logic, Vec::new())))
             } else {
                 Ok(X::T(i.events.remove(0)))

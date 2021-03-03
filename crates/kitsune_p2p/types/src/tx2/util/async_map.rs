@@ -52,6 +52,17 @@ where
     }
 
     ///
+    pub fn insert(&self, k: K, v: V) -> KitsuneResult<()> {
+        self.0.share_mut(move |i, _| {
+            if i.contains_key(&k) {
+                return Err("refusing to overwrite AsyncMap entry".into());
+            }
+            i.insert(k, Entry::Ready(v));
+            Ok(())
+        })
+    }
+
+    ///
     pub fn get<F, C>(
         &self,
         k: K,

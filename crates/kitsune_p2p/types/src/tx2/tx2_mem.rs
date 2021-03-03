@@ -1,7 +1,296 @@
 #![allow(clippy::new_ret_no_self)]
 #![allow(clippy::never_loop)]
+//! tx2_mem
 
-use crate::tx2::tx_backend::*;
+use crate::*;
+use crate::tx2::*;
+use crate::tx2::util::*;
+use crate::tx2::tx2_backend::*;
+use crate::tx2::tx2_backend::tx2_backend_traits::*;
+use futures::future::{BoxFuture, FutureExt};
+use futures::stream::{Stream, StreamExt};
+use once_cell::sync::Lazy;
+use std::sync::atomic;
+use std::collections::HashMap;
+
+static NEXT_MEM_ID: atomic::AtomicU64 = atomic::AtomicU64::new(1);
+type EpRegEntry = (LogicChanHandle<EpEvent>, Active);
+static EP_REG: Lazy<Share<HashMap<u64, EpRegEntry>>> = Lazy::new(|| {
+    Share::new(HashMap::new())
+});
+
+struct MemConInner {
+}
+
+struct MemConHnd(Share<MemConInner>);
+
+fn framed_chan() -> (FramedWriter, FramedReader) {
+    let (send, recv) = bound_async_mem_channel(4096);
+    (
+        FramedWriter::new(send),
+        FramedReader::new(recv),
+    )
+}
+
+impl MemConHnd {
+    fn new_single(
+        logic_hnd: LogicChanHandle<EpEvent>,
+        _con_active: Active,
+        _mix_active: Active,
+        _s1: FramedWriter,
+        _s2: FramedWriter,
+        _s3: FramedWriter,
+        r1: FramedReader,
+        r2: FramedReader,
+        r3: FramedReader,
+    ) -> ConHnd {
+        // This is a calculated task spawn.
+        // We could let this future be polled in the top-level endpoint
+        // logic channel, but then our system would be single threaded.
+        // Instead, we spawn one task per connection, gathering
+        // the incoming channel data to be processed.
+        tokio::task::spawn(async move {
+            let mut r = futures::stream::select_all(vec![r1, r2, r3].into_iter().map(|r| {
+                futures::stream::StreamExt::boxed(futures::stream::unfold(r, |mut r| async move {
+                    let t = KitsuneTimeout::from_millis(1000 * 30);
+                    let i = match r.read(t).await {
+                        Ok(i) => i,
+                        Err(_) => return None,
+                    };
+                    Some((i, r))
+                }))
+            }));
+
+            while let Some((msg_id, data)) = r.next().await {
+                if let Err(e) = logic_hnd.emit(EpEvent::IncomingData(
+                    // TODO - FIXME - we need the other half here...
+                    ConHnd(Arc::new(Self(Share::new(MemConInner {
+                    })))),
+                    msg_id,
+                    data,
+                )) {
+                    // TODO - FIXME
+                    panic!("{:?}", e);
+                }
+            }
+        });
+
+        ConHnd(Arc::new(Self(Share::new(MemConInner {
+        }))))
+    }
+
+    pub fn new(
+        logic_hnd1: LogicChanHandle<EpEvent>,
+        ep_active1: Active,
+        logic_hnd2: LogicChanHandle<EpEvent>,
+        ep_active2: Active,
+    ) -> (ConHnd, ConHnd) {
+        //let sub_id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
+
+        let (s1_1, r2_1) = framed_chan();
+        let (s1_2, r2_2) = framed_chan();
+        let (s1_3, r2_3) = framed_chan();
+
+        let (s2_1, r1_1) = framed_chan();
+        let (s2_2, r1_2) = framed_chan();
+        let (s2_3, r1_3) = framed_chan();
+
+        let con_active = Active::new();
+        let mix_active = ep_active1.mix(&ep_active2).mix(&con_active);
+
+        let one = Self::new_single(logic_hnd1, con_active.clone(), mix_active.clone(), s1_1, s1_2, s1_3, r1_1, r1_2, r1_3);
+        let two = Self::new_single(logic_hnd2, con_active, mix_active, s2_1, s2_2, s2_3, r2_1, r2_2, r2_3);
+
+        (one, two)
+    }
+}
+
+impl AsConHnd for MemConHnd {
+    fn is_closed(&self) -> bool {
+        self.0.is_closed()
+    }
+
+    fn close(&self, _code: u32, _reason: &str) {
+        let _ = self.0.share_mut(|_, c| {
+            *c = true;
+            Ok(())
+        });
+    }
+
+    fn remote_addr(&self) -> KitsuneResult<TxUrl> {
+        unimplemented!()
+    }
+
+    fn write(
+        &self,
+        _msg_id: MsgId,
+        _data: PoolBuf,
+        _timeout: KitsuneTimeout,
+    ) -> BoxFuture<'static, KitsuneResult<()>> {
+        unimplemented!()
+    }
+}
+
+struct MemEpInner {
+    id: u64,
+    url: TxUrl,
+    logic_hnd: LogicChanHandle<EpEvent>,
+    ep_active: Active,
+}
+
+impl Drop for MemEpInner {
+    fn drop(&mut self) {
+        let _ = EP_REG.share_mut(|i, _| {
+            i.remove(&self.id);
+            self.ep_active.kill();
+            Ok(())
+        });
+    }
+}
+
+struct MemEpHnd(Share<MemEpInner>);
+
+impl MemEpHnd {
+    pub fn new(logic_hnd: LogicChanHandle<EpEvent>) -> EpHnd {
+        let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
+        let url = format!("kitsune-mem://{}", id).into();
+        let ep_active = Active::new();
+
+        let _ = EP_REG.share_mut(|i, _| {
+            i.insert(id, (logic_hnd.clone(), ep_active.clone()));
+            Ok(())
+        });
+
+        let inner = Share::new(MemEpInner {
+            id,
+            url,
+            logic_hnd,
+            ep_active,
+        });
+
+        let hnd: EpHnd = EpHnd(Arc::new(Self(inner)));
+        hnd
+    }
+}
+
+impl AsEpHnd for MemEpHnd {
+    fn is_closed(&self) -> bool {
+        self.0.is_closed()
+    }
+
+    fn close(&self, _code: u32, _reason: &str) {
+        let _ = self.0.share_mut(|_, c| {
+            *c = true;
+            Ok(())
+        });
+    }
+
+    fn local_addr(&self) -> KitsuneResult<TxUrl> {
+        self.0.share_mut(|i, _| Ok(i.url.clone()))
+    }
+
+    fn connect(
+        &self,
+        remote: TxUrl,
+        _timeout: KitsuneTimeout,
+    ) -> BoxFuture<'static, KitsuneResult<ConHnd>> {
+        let r = self.0.share_mut(|i, _| {
+            Ok((i.logic_hnd.clone(), i.ep_active.clone()))
+        });
+        async move {
+            let (my_logic_hnd, my_ep_active) = r?;
+
+            let id: Result<u64, ()> = 'top: loop {
+                if remote.scheme() == "kitsune-mem" {
+                    if let Some(id) = remote.host_str() {
+                        if let Ok(id) = id.parse::<u64>() {
+                            break 'top Ok(id);
+                        }
+                    }
+                }
+                break 'top Err(());
+            };
+
+            let id = match id {
+                Ok(id) => id,
+                Err(_) => return Err(format!("invalid url: {}", remote).into()),
+            };
+
+            let (logic_hnd, ep_active) = match EP_REG.share_mut(|i, _| {
+                i.get(&id).cloned().ok_or("".into())
+            }) {
+                Err(_) => return Err(format!("con refused: {}", remote).into()),
+                Ok(r) => r,
+            };
+
+            let (con1, con2) = MemConHnd::new(
+                my_logic_hnd,
+                my_ep_active,
+                logic_hnd.clone(),
+                ep_active,
+            );
+
+            logic_hnd.emit(EpEvent::IncomingConnection(con2))?;
+
+            Ok(con1)
+        }.boxed()
+    }
+}
+
+struct MemEp {
+    hnd: EpHnd,
+    logic_chan: LogicChan<EpEvent>,
+}
+
+impl MemEp {
+    pub fn new() -> Ep {
+        let logic_chan = LogicChan::new(32);
+        let logic_hnd = logic_chan.handle().clone();
+        let hnd = MemEpHnd::new(logic_hnd);
+        let inner = MemEp {
+            hnd,
+            logic_chan,
+        };
+        let ep: Ep = Ep(Box::new(inner));
+        ep
+    }
+}
+
+impl Stream for MemEp {
+    type Item = EpEvent;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let chan = &mut self.logic_chan;
+        futures::pin_mut!(chan);
+        Stream::poll_next(chan, cx)
+    }
+}
+
+impl AsEp for MemEp {
+    fn handle(&self) -> &EpHnd {
+        &self.hnd
+    }
+}
+
+pub struct MemEpFactory;
+
+impl AsEpFactory for MemEpFactory {
+    fn bind(
+        &self,
+        _bind_spec: TxUrl,
+        _timeout: KitsuneTimeout,
+    ) -> BoxFuture<'static, KitsuneResult<Ep>> {
+        async move {
+            Ok(MemEp::new())
+        }.boxed()
+    }
+}
+
+/*
+use crate::tx2::tx2_backend::*;
 use crate::tx2::util::{Active, TxUrl};
 use crate::tx2::*;
 use crate::*;
@@ -14,7 +303,8 @@ use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::atomic;
 
-static NEXT_MEM_ID: atomic::AtomicU64 = atomic::AtomicU64::new(1);
+
+
 
 type ChanSend = tokio::sync::mpsc::Sender<InChan>;
 type ChanRecv = tokio::sync::mpsc::Receiver<InChan>;
@@ -276,13 +566,15 @@ impl BackendAdapt for MemBackendAdapt {
         .boxed()
     }
 }
+*/
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    //use super::*;
 
     #[tokio::test(threaded_scheduler)]
-    async fn test_tx2_mem_backend() {
+    async fn test_tx2_mem2() {
+        /*
         let t = KitsuneTimeout::from_millis(5000);
 
         let back = MemBackendAdapt::new();
@@ -337,5 +629,6 @@ mod tests {
         ep2.close().await;
 
         rt.await.unwrap();
+        */
     }
 }

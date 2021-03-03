@@ -44,31 +44,29 @@ impl<C: Codec> CodecReader<C> {
     }
 
     /// Read typed data from this CodecReader instance.
-    pub async fn read(&mut self, timeout: KitsuneTimeout) -> KitsuneResult<Vec<CodecMessage<C>>> {
+    pub async fn read(&mut self, timeout: KitsuneTimeout) -> KitsuneResult<CodecMessage<C>> {
         let mut inner = match self.0.take() {
             None => return Err(KitsuneErrorKind::Closed.into()),
             Some(inner) => inner,
         };
 
-        let received = match inner.sub.read(timeout).await {
+        let (msg_id, data) = match inner.sub.read(timeout).await {
             Err(e) => return Err(e),
             Ok(r) => r,
         };
 
-        let mut out = Vec::new();
-        for (msg_id, data) in received {
-            let (_, dec) = match C::decode_ref(&data) {
-                Err(e) => return Err(KitsuneError::other(e)),
-                Ok(dec) => dec,
-            };
-            if msg_id.is_notify() {
-                out.push(CodecMessage::Notify(dec));
-            } else if msg_id.is_req() {
-                out.push(CodecMessage::Request(msg_id.as_id(), dec));
-            } else {
-                out.push(CodecMessage::Response(msg_id.as_id(), dec));
-            }
-        }
+        let (_, dec) = match C::decode_ref(&data) {
+            Err(e) => return Err(KitsuneError::other(e)),
+            Ok(dec) => dec,
+        };
+
+        let out = if msg_id.is_notify() {
+            CodecMessage::Notify(dec)
+        } else if msg_id.is_req() {
+            CodecMessage::Request(msg_id.as_id(), dec)
+        } else {
+            CodecMessage::Response(msg_id.as_id(), dec)
+        };
 
         self.0 = Some(inner);
 
@@ -197,9 +195,6 @@ mod tests {
         let data = recv
             .read(timeout)
             .await
-            .unwrap()
-            .into_iter()
-            .next()
             .unwrap();
         println!("{:?}", data);
         assert!(matches!(
@@ -209,9 +204,6 @@ mod tests {
         let data = recv
             .read(timeout)
             .await
-            .unwrap()
-            .into_iter()
-            .next()
             .unwrap();
         println!("{:?}", data);
         assert!(matches!(
@@ -221,9 +213,6 @@ mod tests {
         let data = recv
             .read(timeout)
             .await
-            .unwrap()
-            .into_iter()
-            .next()
             .unwrap();
         println!("{:?}", data);
         assert!(matches!(

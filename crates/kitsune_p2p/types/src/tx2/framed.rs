@@ -93,6 +93,8 @@ impl std::fmt::Debug for MsgId {
     }
 }
 
+type RR = (MsgId, PoolBuf);
+
 /// Efficiently read framed data.
 pub trait AsFramedReader: 'static + Send + Unpin {
     /// Read a frame of data from this AsFramedReader instance.
@@ -119,8 +121,6 @@ fn read_msg_id(b: &[u8]) -> MsgId {
     bytes.copy_from_slice(&b[..8]);
     u64::from_le_bytes(bytes).into()
 }
-
-type RR = Vec<(MsgId, PoolBuf)>;
 
 impl FramedReader {
     /// Create a new FramedReader instance.
@@ -172,7 +172,7 @@ impl AsFramedReader for FramedReader {
                         buf.extend_from_slice(&inner.local_buf[..read]);
                     }
 
-                    Ok(vec![(msg_id, buf)])
+                    Ok((msg_id, buf))
                 })
                 .await
             {
@@ -317,6 +317,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_framed() {
+        let t = KitsuneTimeout::from_millis(5000);
+
         let (send, recv) = util::bound_async_mem_channel(4096);
         let mut send = FramedWriter::new(send);
         let mut recv = FramedReader::new(recv);
@@ -324,24 +326,19 @@ mod tests {
         let wt = tokio::task::spawn(async move {
             let mut buf = PoolBuf::new();
             buf.extend_from_slice(&[0xd0; 512]);
-            send.write(1.into(), buf, KitsuneTimeout::from_millis(1000 * 30))
+            send.write(1.into(), buf, t)
                 .await
                 .unwrap();
             let mut buf = PoolBuf::new();
             buf.extend_from_slice(&[0xd1; 8000]);
-            send.write(2.into(), buf, KitsuneTimeout::from_millis(1000 * 30))
+            send.write(2.into(), buf, t)
                 .await
                 .unwrap();
         });
 
         for _ in 0..2 {
-            for (msg_id, data) in recv
-                .read(KitsuneTimeout::from_millis(1000 * 30))
-                .await
-                .unwrap()
-            {
-                println!("got {} - {} bytes", msg_id.as_id(), data.len());
-            }
+            let (msg_id, data) = recv.read(t).await.unwrap();
+            println!("got {} - {} bytes", msg_id.as_id(), data.len());
         }
 
         wt.await.unwrap();

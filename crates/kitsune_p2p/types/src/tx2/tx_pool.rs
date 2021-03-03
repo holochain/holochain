@@ -6,9 +6,11 @@ use crate::tx2::util::*;
 use crate::tx2::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
-use tokio::sync::Semaphore;
+use futures::stream::StreamExt;
+use tokio::sync::{Semaphore, OwnedSemaphorePermit};
 
 ///
+#[derive(Debug)]
 pub enum TxPoolEvent {
     ///
     ReceiveData(TxUrl, MsgId, PoolBuf),
@@ -20,40 +22,178 @@ pub enum TxPoolEvent {
 // -- concrete -- //
 
 #[allow(dead_code)]
+struct ConWrite(OutChan);
+
+impl ConWrite {
+    pub fn write(
+        &mut self,
+        msg_id: MsgId,
+        data: PoolBuf,
+        timeout: KitsuneTimeout,
+    ) -> BoxFuture<'_, KitsuneResult<()>> {
+        self.0.write(msg_id, data, timeout)
+    }
+}
+
+#[allow(dead_code)]
+struct ConInner {
+    _permit: OwnedSemaphorePermit,
+    con: Arc<dyn ConAdapt>,
+    write_bucket: ResourceBucket<ConWrite>,
+}
+
+#[derive(Clone)]
+struct ConRef(Share<ConInner>);
+
+async fn con_inner_logic(
+    inner: Share<ConInner>,
+    con: Arc<dyn ConAdapt>,
+    in_chan_recv: Box<dyn InChanRecvAdapt>,
+    timeout: KitsuneTimeout,
+) -> KitsuneResult<()> {
+    // for now, just always make 3 out chans to start
+    let (out1, out2, out3) = futures::future::try_join3(
+        con.out_chan(timeout),
+        con.out_chan(timeout),
+        con.out_chan(timeout),
+    ).await?;
+
+    // release the out chans to our write resource bucket
+    inner.share_mut(move |i, _| {
+        i.write_bucket.release(ConWrite(out1));
+        i.write_bucket.release(ConWrite(out2));
+        i.write_bucket.release(ConWrite(out3));
+        Ok(())
+    })?;
+
+    drop(inner);
+    drop(con);
+    drop(timeout);
+
+    // process exactly 3 concurrent incoming channels
+    in_chan_recv.for_each_concurrent(3, move |in_chan| async move {
+        let mut in_chan = match in_chan.await {
+            // TODO - FIXME
+            Err(e) => panic!("{:?}", e),
+            Ok(c) => c,
+        };
+        while let Ok((_msg_id, _buf)) = in_chan.read(KitsuneTimeout::from_millis(1000 * 30)).await {
+            println!("GOT INCOMING DATA!");
+        }
+    }).await;
+
+    Ok(())
+}
+
+impl ConRef {
+    pub fn new(
+        permit: OwnedSemaphorePermit,
+        con: Arc<dyn ConAdapt>,
+        in_chan_recv: Box<dyn InChanRecvAdapt>,
+        timeout: KitsuneTimeout,
+    ) -> Self {
+        let inner = Share::new(ConInner {
+            _permit: permit,
+            con: con.clone(),
+            write_bucket: ResourceBucket::new(),
+        });
+
+        // This is a calculated task spawn.
+        // We could let this future be polled in the top-level endpoint
+        // logic channel, but then our system would be single threaded.
+        // Instead, we spawn one task per connection, gathering
+        // the incoming channel data to be processed.
+        let inner2 = inner.clone();
+        tokio::task::spawn(async move {
+            if let Err(e) = con_inner_logic(inner2, con.clone(), in_chan_recv, timeout).await {
+                println!("CONNECTION ERROR: {:?}", e);
+                con.close().await;
+                // TODO - FIXME - also clean up the connection in the endpoint!!
+            }
+        });
+
+        Self(inner)
+    }
+
+    pub fn remote_addr(&self) -> KitsuneResult<TxUrl> {
+        self.0.share_mut(|i, _| i.con.remote_addr())
+    }
+
+    pub fn write(
+        &self,
+        msg_id: MsgId,
+        data: PoolBuf,
+        timeout: KitsuneTimeout,
+    ) -> BoxFuture<'static, KitsuneResult<()>> {
+        let inner = self.0.clone();
+        async move {
+            let mut con_write = inner.share_mut(|i, _| {
+                Ok(i.write_bucket.acquire(Some(timeout)))
+            })?.await?;
+            // TODO - FIXME - on error here, we need to close the connection
+            con_write.write(msg_id, data, timeout).await?;
+            inner.share_mut(move |i, _| {
+                i.write_bucket.release(con_write);
+                Ok(())
+            })?;
+            Ok(())
+        }.boxed()
+    }
+}
+
+#[allow(dead_code)]
 struct TxPoolEpInner {
-    max_cons: Arc<Semaphore>,
+    max_cons: usize,
+    con_limit: Arc<Semaphore>,
     ep: Arc<dyn EndpointAdapt>,
-    cons: AsyncMap<TxUrl, Arc<dyn ConAdapt>>,
+    cons: AsyncMap<TxUrl, ConRef>,
     logic_handle: LogicChanHandle<TxPoolEvent>,
 }
 
 ///
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct TxPoolEpHandle(Share<TxPoolEpInner>);
 
 impl TxPoolEpHandle {
-    #[allow(dead_code)]
+    fn insert_con(
+        &self,
+        con_ref: ConRef,
+    ) -> BoxFuture<'static, KitsuneResult<()>> {
+        let inner = self.0.clone();
+        async move {
+            let remote_addr = con_ref.remote_addr()?;
+            inner.share_mut(move |i, _| {
+                i.cons.insert(remote_addr, con_ref)
+            })
+        }.boxed()
+    }
+
     fn get_con(
         &self,
         url: TxUrl,
         timeout: KitsuneTimeout,
-    ) -> BoxFuture<'static, KitsuneResult<Arc<dyn ConAdapt>>> {
+    ) -> BoxFuture<'static, KitsuneResult<ConRef>> {
         let inner = self.0.clone();
-        async move {
-            timeout
-                .mix(async move {
-                    inner
-                        .share_mut(move |i, _| {
-                            let ep = i.ep.clone();
-                            Ok(i.cons.get(url.clone(), move || async move {
-                                let (con, _in_chan_recv) = ep.connect(url, timeout).await?;
-                                Ok(con)
-                            }))
-                        })?
-                        .await
-                })
-                .await
-        }
-        .boxed()
+
+        let inner2 = inner.clone();
+        let url2 = url.clone();
+        let get_logic = move || async move {
+            let (limit, ep) = inner2.share_mut(move |i, _| {
+                Ok((i.con_limit.clone(), i.ep.clone()))
+            })?;
+            let permit = limit.acquire_owned().await;
+            let (con, in_chan_recv) = ep.connect(url2, timeout).await?;
+            Ok(ConRef::new(permit, con, in_chan_recv, timeout))
+        };
+
+        timeout
+            .mix(async move {
+                let fut = inner.share_mut(move |i, _| {
+                    Ok(i.cons.get(url, get_logic))
+                })?;
+                fut.await
+            })
+            .boxed()
     }
 
     ///
@@ -65,14 +205,14 @@ impl TxPoolEpHandle {
     pub fn write(
         &self,
         url: TxUrl,
-        _msg_id: MsgId,
-        _data: PoolBuf,
+        msg_id: MsgId,
+        data: PoolBuf,
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<()>> {
         let con_fut = self.get_con(url, timeout);
         async move {
-            let _con = con_fut.await?;
-            unimplemented!()
+            con_fut.await?.write(msg_id, data, timeout).await?;
+            Ok(())
         }
         .boxed()
     }
@@ -95,22 +235,62 @@ pub struct TxPoolEp {
     logic_chan: LogicChan<TxPoolEvent>,
 }
 
+async fn con_recv_logic(
+    handle: TxPoolEpHandle,
+    con_recv: Box<dyn ConRecvAdapt>,
+    max_cons: usize,
+    con_limit: Arc<Semaphore>,
+) {
+    let con_limit = &con_limit;
+    let con_recv = con_recv.map(move |fut| async move {
+        let permit = con_limit.clone().acquire_owned().await;
+        let (con, in_chan_recv) = match fut.await {
+            Err(e) => return Err(e),
+            Ok(r) => r,
+        };
+        Ok((permit, con, in_chan_recv))
+    });
+    let handle = &handle;
+    con_recv.for_each_concurrent(max_cons, move |fut| async move {
+        let (permit, con, in_chan_recv) = match fut.await {
+            // TODO - FIXME
+            Err(e) => panic!("{:?}", e),
+            Ok(r) => r,
+        };
+        let t = KitsuneTimeout::from_millis(1000 * 30);
+        let con_ref = ConRef::new(permit, con, in_chan_recv, t);
+        if let Err(e) = handle.insert_con(con_ref).await {
+            // TODO - FIXME
+            panic!("{:?}", e);
+        }
+    }).await;
+}
+
 impl TxPoolEp {
     ///
-    pub fn new(
+    async fn new(
         ep: Arc<dyn EndpointAdapt>,
-        _con_recv: Box<dyn ConRecvAdapt>,
-        max_cons: Arc<Semaphore>,
+        con_recv: Box<dyn ConRecvAdapt>,
+        max_cons: usize,
+        con_limit: Arc<Semaphore>,
     ) -> KitsuneResult<Self> {
         let logic_chan = LogicChan::new(32);
         let logic_handle = logic_chan.handle().clone();
 
         let handle = TxPoolEpHandle(Share::new(TxPoolEpInner {
             max_cons,
+            con_limit: con_limit.clone(),
             ep,
             cons: AsyncMap::new(),
             logic_handle,
         }));
+
+        logic_chan.handle().capture_logic(con_recv_logic(
+            handle.clone(),
+            con_recv,
+            max_cons,
+            con_limit,
+        )).await?;
 
         Ok(Self { handle, logic_chan })
     }
@@ -138,14 +318,15 @@ impl futures::stream::Stream for TxPoolEp {
 #[allow(dead_code)]
 pub struct TxPoolFactoryWrapper {
     sub_fact: BackendFactory,
-    max_cons: Arc<Semaphore>,
+    max_cons: usize,
+    con_limit: Arc<Semaphore>,
 }
 
 impl TxPoolFactoryWrapper {
     ///
     pub fn new(sub_fact: BackendFactory, max_cons: usize) -> Self {
-        let max_cons = Arc::new(Semaphore::new(max_cons));
-        Self { sub_fact, max_cons }
+        let con_limit = Arc::new(Semaphore::new(max_cons));
+        Self { sub_fact, max_cons, con_limit }
     }
 
     ///
@@ -155,11 +336,12 @@ impl TxPoolFactoryWrapper {
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<TxPoolEp>> {
         let ep_fut = self.sub_fact.bind(url, timeout);
-        let max_cons = self.max_cons.clone();
+        let max_cons = self.max_cons;
+        let con_limit = self.con_limit.clone();
         async move {
             let (ep, con_recv) = ep_fut.await?;
 
-            TxPoolEp::new(ep, con_recv, max_cons)
+            TxPoolEp::new(ep, con_recv, max_cons, con_limit).await
         }
         .boxed()
     }
@@ -176,13 +358,26 @@ mod tests {
         let fact = TxPoolFactoryWrapper::new(MemBackendAdapt::new(), 32);
 
         let pool1 = fact.bind("none:".into(), t).await.unwrap();
-        let pool2 = fact.bind("none:".into(), t).await.unwrap();
+        let mut pool2 = fact.bind("none:".into(), t).await.unwrap();
+        let pool2handle = pool2.handle().clone();
 
-        let addr2 = pool2.handle().local_addr().unwrap();
+        let addr2 = pool2handle.local_addr().unwrap();
         println!("got addr2: {}", addr2);
 
+        let rt = tokio::task::spawn(async move {
+            while let Some(evt) = pool2.next().await {
+                println!("GOT EVT: {:?}", evt);
+            }
+        });
+
+        let mut buf = PoolBuf::new();
+        buf.extend_from_slice(b"hello");
+        pool1.handle().write(addr2, 0.into(), buf, t).await.unwrap();
+
         pool1.handle().close().await;
-        pool2.handle().close().await;
+        pool2handle.close().await;
+
+        rt.await.unwrap();
     }
 }
 

@@ -17,6 +17,10 @@ pub use resource_bucket::*;
 
 pub mod tx_backend;
 
+pub mod tx2_backend;
+
+pub mod tx2_mem;
+
 pub mod tx_pool;
 
 pub mod tx_frontend;

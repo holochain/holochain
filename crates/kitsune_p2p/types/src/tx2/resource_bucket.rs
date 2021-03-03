@@ -7,7 +7,6 @@ struct Inner<T: 'static + Send> {
         tokio::sync::oneshot::Sender<T>,
     )>,
     resources: Vec<T>,
-    timeout_ms: Option<u64>,
 }
 
 /// Control efficient access to shared resource pool.
@@ -18,13 +17,12 @@ pub struct ResourceBucket<T: 'static + Send> {
 
 impl<T: 'static + Send> ResourceBucket<T> {
     /// Create a new resource bucket.
-    pub fn new(timeout_ms: Option<u64>) -> Self {
+    pub fn new() -> Self {
         Self {
             inner: Arc::new(parking_lot::Mutex::new(Inner {
                 wait_limit: Arc::new(tokio::sync::Semaphore::new(1)),
                 waiting: None,
                 resources: Vec::new(),
-                timeout_ms,
             })),
         }
     }
@@ -78,20 +76,17 @@ impl<T: 'static + Send> ResourceBucket<T> {
     }
 
     /// Acquire a resource from the bucket.
-    pub fn acquire(&self) -> impl std::future::Future<Output = KitsuneResult<T>> + 'static + Send {
+    pub fn acquire(&self, timeout: Option<KitsuneTimeout>) -> impl std::future::Future<Output = KitsuneResult<T>> + 'static + Send {
         let inner = self.inner.clone();
         async move {
             // check if a resource is available,
             // or get a space in the waiting line.
-            let (permit_fut, timeout) = {
+            let permit_fut = {
                 let mut inner = inner.lock();
                 if !inner.resources.is_empty() {
                     return Ok(inner.resources.remove(0));
                 }
-                (
-                    inner.wait_limit.clone().acquire_owned(),
-                    inner.timeout_ms.map(KitsuneTimeout::from_millis),
-                )
+                inner.wait_limit.clone().acquire_owned()
             };
 
             // await the waiting permit (or maybe timeout)
@@ -134,18 +129,19 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_async_bucket_timeout() {
-        let bucket = <ResourceBucket<&'static str>>::new(Some(10));
-        let j1 = tokio::task::spawn(bucket.acquire());
-        let j2 = tokio::task::spawn(bucket.acquire());
+        let t = Some(KitsuneTimeout::from_millis(10));
+        let bucket = <ResourceBucket<&'static str>>::new();
+        let j1 = tokio::task::spawn(bucket.acquire(t));
+        let j2 = tokio::task::spawn(bucket.acquire(t));
         assert!(j1.await.unwrap().is_err());
         assert!(j2.await.unwrap().is_err());
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn test_async_bucket() {
-        let bucket = <ResourceBucket<&'static str>>::new(None);
-        let j1 = tokio::task::spawn(bucket.acquire());
-        let j2 = tokio::task::spawn(bucket.acquire());
+        let bucket = <ResourceBucket<&'static str>>::new();
+        let j1 = tokio::task::spawn(bucket.acquire(None));
+        let j2 = tokio::task::spawn(bucket.acquire(None));
         bucket.release("1");
         bucket.release("2");
         let j1 = j1.await.unwrap().unwrap();
@@ -155,8 +151,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_async_bucket_acquire_or_else() {
-        let bucket = <ResourceBucket<&'static str>>::new(None);
-        let j1 = tokio::task::spawn(bucket.acquire());
+        let bucket = <ResourceBucket<&'static str>>::new();
+        let j1 = tokio::task::spawn(bucket.acquire(None));
         let j2 = bucket.acquire_or_else(|| "2");
         bucket.release("1");
         let j1 = j1.await.unwrap().unwrap();
