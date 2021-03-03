@@ -143,36 +143,36 @@
 //!   - All zomes in a DNA define all their entries at the same time for the host
 //!   - All entry defs are combined into a single ordered list per zone and exposed to tooling such as DNA generation
 //!   - Entry defs are referenced by `u8` numerical position externally and in DHT headers and by id/name e.g. "post" in sparse callbacks
-//! - `fn init(_: ()) -> ExternResult<InitResult>`:
-//!   - Allows the guest to pass/fail/retry initialization with `InitResult`
+//! - `fn init(_: ()) -> ExternResult<InitCallbackResult>`:
+//!   - Allows the guest to pass/fail/retry initialization with `InitCallbackResult`
 //!   - All zomes in a DNA init at the same time
 //!   - Any failure fails initialization for the DNA, any retry (missing dependencies) causes the DNA to retry
 //!   - Failure overrides retry
-//! - `fn migrate_agent_{{ open|close }} -> ExternResult<MigrateAgentResult>`:
+//! - `fn migrate_agent_{{ open|close }} -> ExternResult<MigrateAgentCallbackResult>`:
 //!   - Allows the guest to pass/fail a migration attempt to/from another DNA
 //!   - Open runs when an agent is starting a new source chain from an old one
 //!   - Close runs when an agent is deprecating an old source chain in favour of a new one
 //!   - All zomes in a DNA migrate at the same time
 //!   - Any failure fails the migration
-//! - `fn post_commit(headers: Vec<HeaderHash>) -> ExternResult<PostCommitResult>`:
+//! - `fn post_commit(headers: Vec<HeaderHash>) -> ExternResult<PostCommitCallbackResult>`:
 //!   - Allows the guest a final veto to entry commits or to perform side effects in response
 //!   - Executes after the wasm call that originated the commits so not bound by the original atomic transaction
-//!   - Guest is guaranteed that the commits will not be rolled back if Ok(PostCommitResult::Pass) is returned
+//!   - Guest is guaranteed that the commits will not be rolled back if Ok(PostCommitCallbackResult::Pass) is returned
 //!   - Input is all the header hashes that were committed
 //!   - Only the zome that originated the commits is called
 //!   - Any failure fails (rolls back) all commits
-//! - `fn validate_create_link(create_link_data: ValidateCreateLinkData) -> ExternResult<ValidateLinkResult>`:
+//! - `fn validate_create_link(create_link_data: ValidateCreateLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
 //!   - Allows the guest to pass/fail/retry link creation validation
 //!   - Only the zome that created the link is called
-//! - `fn validate_delete_link(delete_link_data: ValidateDeleteLinkData) -> ExternResult<ValidateLinkResult>`:
+//! - `fn validate_delete_link(delete_link_data: ValidateDeleteLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
 //!   - Allows the guest to pass/fail/retry link deletion validation
 //!   - Only the zome that deleted the link is called
-//! - `fn validate_{{ create|update|delete }}_{{ agent|entry }}_{{ <entry_id> }}(validate_data: ValidateData) -> ExternResult<ValidateResult>`:
+//! - `fn validate_{{ create|update|delete }}_{{ agent|entry }}_{{ <entry_id> }}(validate_data: ValidateData) -> ExternResult<ValidateCallbackResult>`:
 //!   - Allows the guest to pass/fail/retry entry validation
 //!   - <entry_id> is the entry id defined by entry defs e.g. "comment"
 //!   - Only the originating zome is called
 //!   - Failure overrides retry
-//! - `fn validation_package_{{ <entry_id> }}(entry_type: AppEntryType) -> ExternResult<ValidationPackageResult>`:
+//! - `fn validation_package_{{ <entry_id> }}(entry_type: AppEntryType) -> ExternResult<ValidationPackageCallbackResult>`:
 //!   - Allows the guest to build a validation package for the given entry type
 //!   - Can pass/retry/fail/not-implemented in reverse override order
 //!   - <entry_id> is the entry id defined by entry defs e.g. "comment"
