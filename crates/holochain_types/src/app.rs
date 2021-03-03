@@ -11,7 +11,7 @@ mod app_bundle;
 mod app_manifest;
 mod dna_gamut;
 pub mod error;
-use crate::dna::{DnaFile, YamlProperties};
+use crate::dna::{DnaBundle, YamlProperties};
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
@@ -39,25 +39,26 @@ pub type CellNick = String;
 pub type SlotId = String;
 
 /// The source of the DNA to be installed, either as binary data, or from a path
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DnaSource {
-    /// register the dna loaded from a file on disk
+    /// register the dna loaded from a bundle file on disk
     Path(PathBuf),
-    /// register the dna as provided in the DnaFile data structure
-    DnaFile(DnaFile),
+    /// register the dna as provided in the DnaBundle data structure
+    Bundle(DnaBundle),
     /// register the dna from an existing registered DNA (assumes properties will be set)
     Hash(DnaHash),
 }
 
 /// The instructions on how to get the DNA to be registered
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterDnaPayload {
     /// UUID to override when installing this Dna
     pub uuid: Option<String>,
     /// Properties to override when installing this Dna
     pub properties: Option<YamlProperties>,
     /// Where to find the DNA
+    #[serde(flatten)]
     pub source: DnaSource,
 }
 
@@ -104,6 +105,7 @@ pub struct InstallAppPayload {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct InstallAppBundlePayload {
     /// The unique identifier for an installed app in this conductor.
+    #[serde(flatten)]
     pub source: AppBundleSource,
 
     /// The agent to use when creating Cells for this App.
@@ -121,7 +123,6 @@ pub struct InstallAppBundlePayload {
 /// The possible locations of an AppBundle
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[serde(untagged)]
 pub enum AppBundleSource {
     /// The actual serialized bytes of a bundle
     Bundle(AppBundle),
@@ -145,36 +146,20 @@ impl AppBundleSource {
 /// Information needed to specify a Dna as part of an App
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct InstallAppDnaPayload {
-    /// The path of the DnaFile
-    pub path: Option<PathBuf>, // This is a deprecated field should register dna contents via register
-    /// The path of the DnaFile
-    pub hash: Option<DnaHash>, // When path is removed, this will become non-opt
+    /// The hash of the DNA
+    pub hash: DnaHash,
     /// The CellNick which will be assigned to this Dna when installed
     pub nick: CellNick,
-    /// Properties to override when installing this Dna
-    pub properties: Option<YamlProperties>,
     /// App-specific proof-of-membrane-membership, if required by this app
     pub membrane_proof: Option<MembraneProof>,
 }
 
 impl InstallAppDnaPayload {
-    /// Create a payload with no YamlProperties or MembraneProof. Good for tests.
-    pub fn path_only(path: PathBuf, nick: CellNick) -> Self {
-        Self {
-            path: Some(path),
-            hash: None,
-            nick,
-            properties: None,
-            membrane_proof: None,
-        }
-    }
-    /// Create a payload with no JsonProperties or MembraneProof. Good for tests.
+    /// Create a payload from hash. Good for tests.
     pub fn hash_only(hash: DnaHash, nick: CellNick) -> Self {
         Self {
-            path: None,
-            hash: Some(hash),
+            hash,
             nick,
-            properties: None,
             membrane_proof: None,
         }
     }

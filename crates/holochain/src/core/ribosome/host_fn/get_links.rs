@@ -3,8 +3,8 @@ use crate::core::ribosome::RibosomeT;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_state::metadata::LinkMetaKey;
 use holochain_types::prelude::*;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_links<'a>(
@@ -12,10 +12,15 @@ pub fn get_links<'a>(
     call_context: Arc<CallContext>,
     input: GetLinksInput,
 ) -> Result<Links, WasmError> {
-    let GetLinksInput { base_address, tag_prefix } = input;
+    let GetLinksInput {
+        base_address,
+        tag_prefix,
+    } = input;
 
     // Get zome id
-    let zome_id = ribosome.zome_to_id(&call_context.zome).expect("Failed to get ID for current zome.");
+    let zome_id = ribosome
+        .zome_to_id(&call_context.zome)
+        .expect("Failed to get ID for current zome.");
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
@@ -48,7 +53,7 @@ pub mod slow_tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::test_utils::conductor_setup::ConductorTestData;
     use crate::test_utils::new_zome_call;
-    use crate::test_utils::wait_for_integration_10s;
+    use crate::test_utils::wait_for_integration_1m;
     use crate::test_utils::WaitOps;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
@@ -158,7 +163,10 @@ pub mod slow_tests {
 
         assert_eq!(
             anchor_address_one.get_raw_32().to_vec(),
-            vec![25, 68, 104, 205, 38, 19, 71, 158, 115, 188, 249, 175, 248, 71, 83, 86, 126, 131, 246, 20, 10, 222, 185, 123, 219, 175, 209, 66, 12, 140, 83, 215],
+            vec![
+                25, 68, 104, 205, 38, 19, 71, 158, 115, 188, 249, 175, 248, 71, 83, 86, 126, 131,
+                246, 20, 10, 222, 185, 123, 219, 175, 209, 66, 12, 140, 83, 215
+            ],
         );
 
         // anchor foo baz
@@ -171,7 +179,10 @@ pub mod slow_tests {
 
         assert_eq!(
             anchor_address_two.get_raw_32().to_vec(),
-            vec![130, 158, 169, 16, 161, 104, 109, 116, 108, 147, 130, 214, 150, 32, 57, 52, 27, 39, 35, 209, 47, 120, 63, 220, 122, 13, 21, 204, 51, 209, 241, 31],
+            vec![
+                130, 158, 169, 16, 161, 104, 109, 116, 108, 147, 130, 214, 150, 32, 57, 52, 27, 39,
+                35, 209, 47, 120, 63, 220, 122, 13, 21, 204, 51, 209, 241, 31
+            ],
         );
 
         let get_output: Option<Anchor> = crate::call_test_ribosome!(
@@ -202,7 +213,10 @@ pub mod slow_tests {
             (list_anchor_type_addresses_output.0)[0]
                 .get_raw_32()
                 .to_vec(),
-            vec![36, 198, 140, 31, 125, 166, 8, 15, 167, 149, 247, 118, 206, 134, 173, 221, 96, 215, 1, 227, 209, 230, 139, 169, 117, 216, 143, 92, 107, 122, 183, 189],
+            vec![
+                36, 198, 140, 31, 125, 166, 8, 15, 167, 149, 247, 118, 206, 134, 173, 221, 96, 215,
+                1, 227, 209, 230, 139, 169, 117, 216, 143, 92, 107, 122, 183, 189
+            ],
         );
 
         let list_anchor_addresses_output: EntryHashes = {
@@ -269,7 +283,7 @@ pub mod slow_tests {
         // Plus one length path for the commit existing.
         expected_count += WaitOps::ENTRY + WaitOps::LINK;
 
-        wait_for_integration_10s(&alice_call_data.env, expected_count).await;
+        wait_for_integration_1m(&alice_call_data.env, expected_count).await;
 
         let invocation = new_zome_call(
             &alice_call_data.cell_id,
