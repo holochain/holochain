@@ -326,14 +326,10 @@ mod tests {
         let wt = tokio::task::spawn(async move {
             let mut buf = PoolBuf::new();
             buf.extend_from_slice(&[0xd0; 512]);
-            send.write(1.into(), buf, t)
-                .await
-                .unwrap();
+            send.write(1.into(), buf, t).await.unwrap();
             let mut buf = PoolBuf::new();
             buf.extend_from_slice(&[0xd1; 8000]);
-            send.write(2.into(), buf, t)
-                .await
-                .unwrap();
+            send.write(2.into(), buf, t).await.unwrap();
         });
 
         for _ in 0..2 {

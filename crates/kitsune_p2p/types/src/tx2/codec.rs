@@ -192,28 +192,19 @@ mod tests {
         });
 
         let timeout = KitsuneTimeout::from_millis(1000 * 30);
-        let data = recv
-            .read(timeout)
-            .await
-            .unwrap();
+        let data = recv.read(timeout).await.unwrap();
         println!("{:?}", data);
         assert!(matches!(
             data,
             CodecMessage::Notify(Test::One(One { data: 42 }))
         ));
-        let data = recv
-            .read(timeout)
-            .await
-            .unwrap();
+        let data = recv.read(timeout).await.unwrap();
         println!("{:?}", data);
         assert!(matches!(
             data,
             CodecMessage::Request(42, Test::One(One { data: 42 }))
         ));
-        let data = recv
-            .read(timeout)
-            .await
-            .unwrap();
+        let data = recv.read(timeout).await.unwrap();
         println!("{:?}", data);
         assert!(matches!(
             data,

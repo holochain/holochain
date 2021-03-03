@@ -1,14 +1,14 @@
 //! Abstraction traits / types for tx2 networking transport.
 
-use crate::*;
-use crate::tx2::*;
 use crate::tx2::util::*;
+use crate::tx2::*;
+use crate::*;
 use futures::future::BoxFuture;
 use futures::stream::Stream;
 
-/// Backend Traits - you probably don't need these
-/// unless you are implementing a custom tx2 backend transport.
-pub mod tx2_backend_traits {
+/// Frontend Traits - you probably don't need these
+/// unless you are implementing a custom tx2 frontend transport.
+pub mod tx2_frontend_traits {
     use super::*;
 
     /// Trait representing a connection handle.
@@ -67,7 +67,7 @@ pub mod tx2_backend_traits {
     }
 }
 
-use tx2_backend_traits::*;
+use tx2_frontend_traits::*;
 
 /// A connection handle - use this to manage an open connection.
 #[derive(Clone)]
@@ -97,20 +97,6 @@ impl ConHnd {
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<()>> + 'static + Send {
         AsConHnd::write(self, msg_id, data, timeout)
-    }
-}
-
-impl PartialEq for ConHnd {
-    fn eq(&self, oth: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &oth.0)
-    }
-}
-
-impl Eq for ConHnd {}
-
-impl std::hash::Hash for ConHnd {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        Arc::as_ptr(&self.0).hash(state);
     }
 }
 
@@ -167,20 +153,6 @@ impl EpHnd {
     }
 }
 
-impl PartialEq for EpHnd {
-    fn eq(&self, oth: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &oth.0)
-    }
-}
-
-impl Eq for EpHnd {}
-
-impl std::hash::Hash for EpHnd {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        Arc::as_ptr(&self.0).hash(state);
-    }
-}
-
 impl AsEpHnd for EpHnd {
     fn is_closed(&self) -> bool {
         self.0.is_closed()
@@ -213,6 +185,9 @@ pub enum EpEvent {
 
     /// A connection has closed (Url, Code, Reason).
     ConnectionClosed(TxUrl, u32, String),
+
+    /// A non-fatal internal error.
+    Error(KitsuneError),
 }
 
 /// Represents a bound endpoint. To manage this endpoint, see handle()/EpHnd.
@@ -224,7 +199,7 @@ impl Stream for Ep {
 
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>
+        cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let inner = &mut self.0;
         futures::pin_mut!(inner);

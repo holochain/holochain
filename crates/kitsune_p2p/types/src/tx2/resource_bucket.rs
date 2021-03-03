@@ -10,9 +10,22 @@ struct Inner<T: 'static + Send> {
 }
 
 /// Control efficient access to shared resource pool.
-#[derive(Clone)]
 pub struct ResourceBucket<T: 'static + Send> {
     inner: Arc<parking_lot::Mutex<Inner<T>>>,
+}
+
+impl<T: 'static + Send> Clone for ResourceBucket<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<T: 'static + Send> Default for ResourceBucket<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T: 'static + Send> ResourceBucket<T> {
@@ -76,7 +89,10 @@ impl<T: 'static + Send> ResourceBucket<T> {
     }
 
     /// Acquire a resource from the bucket.
-    pub fn acquire(&self, timeout: Option<KitsuneTimeout>) -> impl std::future::Future<Output = KitsuneResult<T>> + 'static + Send {
+    pub fn acquire(
+        &self,
+        timeout: Option<KitsuneTimeout>,
+    ) -> impl std::future::Future<Output = KitsuneResult<T>> + 'static + Send {
         let inner = self.inner.clone();
         async move {
             // check if a resource is available,

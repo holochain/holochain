@@ -7,7 +7,7 @@ use crate::tx2::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
-use tokio::sync::{Semaphore, OwnedSemaphorePermit};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 ///
 #[derive(Debug)]
@@ -56,7 +56,8 @@ async fn con_inner_logic(
         con.out_chan(timeout),
         con.out_chan(timeout),
         con.out_chan(timeout),
-    ).await?;
+    )
+    .await?;
 
     // release the out chans to our write resource bucket
     inner.share_mut(move |i, _| {
@@ -68,19 +69,22 @@ async fn con_inner_logic(
 
     drop(inner);
     drop(con);
-    drop(timeout);
 
     // process exactly 3 concurrent incoming channels
-    in_chan_recv.for_each_concurrent(3, move |in_chan| async move {
-        let mut in_chan = match in_chan.await {
-            // TODO - FIXME
-            Err(e) => panic!("{:?}", e),
-            Ok(c) => c,
-        };
-        while let Ok((_msg_id, _buf)) = in_chan.read(KitsuneTimeout::from_millis(1000 * 30)).await {
-            println!("GOT INCOMING DATA!");
-        }
-    }).await;
+    in_chan_recv
+        .for_each_concurrent(3, move |in_chan| async move {
+            let mut in_chan = match in_chan.await {
+                // TODO - FIXME
+                Err(e) => panic!("{:?}", e),
+                Ok(c) => c,
+            };
+            while let Ok((_msg_id, _buf)) =
+                in_chan.read(KitsuneTimeout::from_millis(1000 * 30)).await
+            {
+                println!("GOT INCOMING DATA!");
+            }
+        })
+        .await;
 
     Ok(())
 }
@@ -127,9 +131,9 @@ impl ConRef {
     ) -> BoxFuture<'static, KitsuneResult<()>> {
         let inner = self.0.clone();
         async move {
-            let mut con_write = inner.share_mut(|i, _| {
-                Ok(i.write_bucket.acquire(Some(timeout)))
-            })?.await?;
+            let mut con_write = inner
+                .share_mut(|i, _| Ok(i.write_bucket.acquire(Some(timeout))))?
+                .await?;
             // TODO - FIXME - on error here, we need to close the connection
             con_write.write(msg_id, data, timeout).await?;
             inner.share_mut(move |i, _| {
@@ -137,7 +141,8 @@ impl ConRef {
                 Ok(())
             })?;
             Ok(())
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
@@ -155,17 +160,13 @@ struct TxPoolEpInner {
 pub struct TxPoolEpHandle(Share<TxPoolEpInner>);
 
 impl TxPoolEpHandle {
-    fn insert_con(
-        &self,
-        con_ref: ConRef,
-    ) -> BoxFuture<'static, KitsuneResult<()>> {
+    fn insert_con(&self, con_ref: ConRef) -> BoxFuture<'static, KitsuneResult<()>> {
         let inner = self.0.clone();
         async move {
             let remote_addr = con_ref.remote_addr()?;
-            inner.share_mut(move |i, _| {
-                i.cons.insert(remote_addr, con_ref)
-            })
-        }.boxed()
+            inner.share_mut(move |i, _| i.cons.insert(remote_addr, con_ref))
+        }
+        .boxed()
     }
 
     fn get_con(
@@ -178,9 +179,8 @@ impl TxPoolEpHandle {
         let inner2 = inner.clone();
         let url2 = url.clone();
         let get_logic = move || async move {
-            let (limit, ep) = inner2.share_mut(move |i, _| {
-                Ok((i.con_limit.clone(), i.ep.clone()))
-            })?;
+            let (limit, ep) =
+                inner2.share_mut(move |i, _| Ok((i.con_limit.clone(), i.ep.clone())))?;
             let permit = limit.acquire_owned().await;
             let (con, in_chan_recv) = ep.connect(url2, timeout).await?;
             Ok(ConRef::new(permit, con, in_chan_recv, timeout))
@@ -188,9 +188,7 @@ impl TxPoolEpHandle {
 
         timeout
             .mix(async move {
-                let fut = inner.share_mut(move |i, _| {
-                    Ok(i.cons.get(url, get_logic))
-                })?;
+                let fut = inner.share_mut(move |i, _| Ok(i.cons.get(url, get_logic)))?;
                 fut.await
             })
             .boxed()
@@ -251,19 +249,21 @@ async fn con_recv_logic(
         Ok((permit, con, in_chan_recv))
     });
     let handle = &handle;
-    con_recv.for_each_concurrent(max_cons, move |fut| async move {
-        let (permit, con, in_chan_recv) = match fut.await {
-            // TODO - FIXME
-            Err(e) => panic!("{:?}", e),
-            Ok(r) => r,
-        };
-        let t = KitsuneTimeout::from_millis(1000 * 30);
-        let con_ref = ConRef::new(permit, con, in_chan_recv, t);
-        if let Err(e) = handle.insert_con(con_ref).await {
-            // TODO - FIXME
-            panic!("{:?}", e);
-        }
-    }).await;
+    con_recv
+        .for_each_concurrent(max_cons, move |fut| async move {
+            let (permit, con, in_chan_recv) = match fut.await {
+                // TODO - FIXME
+                Err(e) => panic!("{:?}", e),
+                Ok(r) => r,
+            };
+            let t = KitsuneTimeout::from_millis(1000 * 30);
+            let con_ref = ConRef::new(permit, con, in_chan_recv, t);
+            if let Err(e) = handle.insert_con(con_ref).await {
+                // TODO - FIXME
+                panic!("{:?}", e);
+            }
+        })
+        .await;
 }
 
 impl TxPoolEp {
@@ -285,12 +285,15 @@ impl TxPoolEp {
             logic_handle,
         }));
 
-        logic_chan.handle().capture_logic(con_recv_logic(
-            handle.clone(),
-            con_recv,
-            max_cons,
-            con_limit,
-        )).await?;
+        logic_chan
+            .handle()
+            .capture_logic(con_recv_logic(
+                handle.clone(),
+                con_recv,
+                max_cons,
+                con_limit,
+            ))
+            .await?;
 
         Ok(Self { handle, logic_chan })
     }
@@ -326,7 +329,11 @@ impl TxPoolFactoryWrapper {
     ///
     pub fn new(sub_fact: BackendFactory, max_cons: usize) -> Self {
         let con_limit = Arc::new(Semaphore::new(max_cons));
-        Self { sub_fact, max_cons, con_limit }
+        Self {
+            sub_fact,
+            max_cons,
+            con_limit,
+        }
     }
 
     ///
