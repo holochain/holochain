@@ -22,6 +22,7 @@ pub use crate::entry::update_entry;
 pub use crate::entry::EntryDefRegistration;
 pub use crate::entry_def;
 pub use crate::entry_def_index;
+pub use crate::entry_type;
 pub use crate::entry_defs;
 pub use crate::hash_path::anchor::anchor;
 pub use crate::hash_path::anchor::get_anchor;
@@ -55,6 +56,7 @@ pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_encrypt;
 pub use hdk_derive::hdk_entry;
 pub use hdk_derive::hdk_extern;
+pub use holo_hash;
 pub use holo_hash::AgentPubKey;
 pub use holo_hash::AnyDhtHash;
 pub use holo_hash::EntryHash;
@@ -82,8 +84,6 @@ macro_rules! holochain_externs {
             __unreachable,
             __verify_signature,
             __sign,
-            __decrypt,
-            __encrypt,
             __zome_info,
             __call_info,
             __dna_info,
@@ -121,3 +121,66 @@ macro_rules! holochain_externs {
 }
 
 holochain_externs!();
+
+
+// holochain_wasmer_guest::memory_externs!();
+
+// pub use externs::*;
+
+
+// #[mockall_double::double]
+// pub use externs::ffi;
+
+// pub mod externs {
+//     use mockall::*;
+
+//     #[mockall::automock]
+//     pub mod ffi {
+
+//         use crate::prelude::*;
+
+//         extern "C" {
+//             pub fn __import_data(guest_allocation_ptr: GuestPtr) -> Len;
+
+//             pub fn __trace(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __hash_entry(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __unreachable(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __verify_signature(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __sign(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __zome_info(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __call_info(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __dna_info(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __app_info(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __random_bytes(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __sys_time(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __agent_info(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __capability_claims(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __capability_grants(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __capability_info(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __get(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __get_details(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __get_links(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __get_link_details(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __get_agent_activity(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __query(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __call_remote(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __call(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __create(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __emit_signal(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __remote_signal(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __create_link(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __delete_link(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __update(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __delete(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __schedule(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __sleep(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __x_salsa20_poly1305_encrypt(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __x_salsa20_poly1305_decrypt(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __x_25519_x_salsa20_poly1305_encrypt(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __x_25519_x_salsa20_poly1305_decrypt(guest_allocation_ptr: GuestPtr) -> Len;
+//             pub fn __create_x25519_keypair(guest_allocation_ptr: GuestPtr) -> Len;
+//         }
+
+//     }
+
+// }
