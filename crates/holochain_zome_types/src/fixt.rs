@@ -178,6 +178,11 @@ fixturator!(
 );
 
 fixturator!(
+    AgentInfo;
+    constructor fn new(AgentPubKey, AgentPubKey);
+);
+
+fixturator!(
     CapClaim;
     constructor fn new(String, AgentPubKey, CapSecret);
 );

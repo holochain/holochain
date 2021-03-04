@@ -3,11 +3,9 @@ use crate::prelude::*;
 #[cfg(feature = "mock")]
 use mockall::*;
 
-use once_cell::sync::OnceCell;
-
 pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 
-pub static HDK: OnceCell<Box<dyn HdkT>> = OnceCell::new();
+pub static HDK: std::cell::Cell<Box<dyn HdkT>> = std::cell::Cell::new();
 
 #[cfg_attr(feature = "mock", automock)]
 pub trait HdkT: Sync + Send {

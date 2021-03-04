@@ -47,6 +47,18 @@ pub struct AgentInfo {
     pub agent_latest_pubkey: AgentPubKey,
 }
 
+impl AgentInfo {
+    pub fn new(
+        agent_initial_pubkey: AgentPubKey,
+        agent_latest_pubkey: AgentPubKey,
+    ) -> Self {
+        Self {
+            agent_initial_pubkey,
+            agent_latest_pubkey,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppInfo;
 

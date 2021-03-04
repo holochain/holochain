@@ -16,4 +16,8 @@ tracing-subscriber = "0.2"
 
 [dependencies.hdk]
 path = "../../../../hdk"
-features = ["mock"]
+# features = ["mock"]
+
+[features]
+default = []
+mock = ["hdk/mock"]

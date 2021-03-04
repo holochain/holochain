@@ -726,6 +726,7 @@ dependencies = [
 name = "test_wasm_agent_info"
 version = "0.0.1"
 dependencies = [
+ "fixt",
  "hdk",
  "serde",
 ]
@@ -759,6 +760,7 @@ dependencies = [
 name = "test_wasm_crd"
 version = "0.0.1"
 dependencies = [
+ "fixt",
  "hdk",
  "holochain_test_wasm_common",
  "serde",

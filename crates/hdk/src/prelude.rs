@@ -78,7 +78,6 @@ pub use tracing_subscriber;
 pub use mockall;
 
 // This needs to be called at least once _somewhere_ and is idempotent.
-#[cfg(not(feature = "mock"))]
 #[macro_export]
 macro_rules! holochain_externs {
     () => {

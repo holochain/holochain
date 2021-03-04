@@ -9,5 +9,12 @@ name = "test_wasm_sys_time"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-hdk = { path = "../../../../hdk", features = ["mock"] }
+hdk = { path = "../../../../hdk" }
 serde = "1.0"
+
+[features]
+default = []
+mock = ["hdk/mock"]
+
+# [dev-dependencies]
+# hdk = { path = "../../../../hdk", features = ["mock"] }
