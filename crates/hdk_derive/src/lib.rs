@@ -224,8 +224,13 @@ pub fn hdk_extern(_attrs: TokenStream, item: TokenStream) -> TokenStream {
 
     let internal_fn_ident = external_fn_ident.clone();
 
+    #[cfg(feature = "mock")]
+    let init_hdk = false;
+    #[cfg(not(feature = "mock"))]
+    let init_hdk = true;
+
     (quote::quote! {
-        map_extern!(#external_fn_ident, #internal_fn_ident, #input_type, #output_type);
+        map_extern!(#external_fn_ident, #internal_fn_ident, #input_type, #output_type, #init_hdk);
         #item_fn
     })
     .into()

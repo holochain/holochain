@@ -10,8 +10,9 @@ fn create(_: ()) -> ExternResult<HeaderHash> {
     create_entry(&Thing)
 }
 
+/// `read` seems to be a reserved worked that causes SIGSEGV invalid memory reference when used as `#[hdk_extern]`
 #[hdk_extern]
-fn read(header_hash: HeaderHash) -> ExternResult<Option<Element>> {
+fn reed(header_hash: HeaderHash) -> ExternResult<Option<Element>> {
     get(header_hash, GetOptions::latest())
 }
 

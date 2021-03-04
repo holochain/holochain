@@ -9,5 +9,5 @@ name = "test_wasm_capability"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-hdk = { path = "../../../../hdk" }
+hdk = { path = "../../../../hdk", features = ["mock"] }
 serde = "1.0"

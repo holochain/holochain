@@ -14,8 +14,11 @@ edition = "2018"
 crate-type = [ "cdylib", "rlib" ]
 path = "src/lib.rs"
 
+[features]
+mock = ["hdk_derive/mock"]
+
 [dependencies]
-hdk_derive = { version = "^0.0.2-alpha.1", path = "../hdk_derive" }
+hdk_derive = { version = "^0.0.2-alpha.1", path = "../hdk_derive", features = ["mock"] }
 holo_hash = { version = "0.0.2-alpha.1", path = "../holo_hash" }
 holochain_wasmer_guest = "=0.0.67"
 holochain_zome_types = { version = "0.0.2-alpha.1", path = "../holochain_zome_types" }

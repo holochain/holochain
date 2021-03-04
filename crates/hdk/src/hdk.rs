@@ -1,5 +1,6 @@
 use crate::prelude::*;
 
+#[cfg(feature = "mock")]
 use mockall::*;
 
 use once_cell::sync::OnceCell;
@@ -8,7 +9,7 @@ pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 
 pub static HDK: OnceCell<Box<dyn HdkT>> = OnceCell::new();
 
-#[automock]
+#[cfg_attr(feature = "mock", automock)]
 pub trait HdkT: Sync + Send {
     // Chain
     fn get_agent_activity(
@@ -73,6 +74,7 @@ pub trait HdkT: Sync + Send {
 /// The HDK implemented as externs provided by the host.
 pub struct HostHdk;
 
+#[cfg(not(feature = "mock"))]
 impl HdkT for HostHdk {
     fn get_agent_activity(
         &self,

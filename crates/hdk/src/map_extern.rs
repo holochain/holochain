@@ -24,16 +24,27 @@ use crate::prelude::*;
 #[macro_export]
 macro_rules! map_extern {
     ( $name:tt, $f:ident, $input:ty, $output:ty ) => {
+        map_extern!($name, $f, $input, $output, true);
+    };
+    ( $name:tt, $f:ident, $input:ty, $output:ty, false) => {
+        map_extern!($name, $f, $input, $output: init = {};);
+    };
+    ( $name:tt, $f:ident, $input:ty, $output:ty, true ) => {
+        map_extern!($name, $f, $input, $output: init = {
+            match $crate::prelude::set_global_hdk($crate::prelude::HostHdk) {
+                Ok(_) => {},
+                Err(_) => return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Guest("Failed to set the global HDK".to_string())),
+            }
+        };);
+    };
+    ( $name:tt, $f:ident, $input:ty, $output:ty: init = $init_hdk:expr; ) => {
         $crate::paste::paste! {
             mod [< __ $name _extern >] {
                 use super::*;
 
                 #[no_mangle]
                 pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr) -> $crate::prelude::GuestPtr {
-                    match $crate::prelude::set_global_hdk($crate::prelude::HostHdk) {
-                        Ok(_) => {},
-                        Err(_) => return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Guest("Failed to set the global HDK".to_string())),
-                    }
+                    $init_hdk;
 
                     // Setup tracing.
                     // @TODO feature flag this?

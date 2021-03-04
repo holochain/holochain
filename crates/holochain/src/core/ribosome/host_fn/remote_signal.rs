@@ -141,7 +141,7 @@ mod tests {
             .call(&cells[0].zome("zome1"), "signal_others", ())
             .await;
 
-        tokio::time::delay_for(std::time::Duration::from_millis(1000)).await;
+        tokio::time::delay_for(std::time::Duration::from_millis(2000)).await;
         assert_eq!(num_signals.load(Ordering::SeqCst), NUM_CONDUCTORS);
 
         for mut signal in signals {

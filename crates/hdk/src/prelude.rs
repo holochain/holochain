@@ -74,7 +74,11 @@ pub use tracing;
 pub use tracing::{debug, error, info, instrument, trace, warn};
 pub use tracing_subscriber;
 
+#[cfg(feature = "mock")]
+pub use mockall;
+
 // This needs to be called at least once _somewhere_ and is idempotent.
+#[cfg(not(feature = "mock"))]
 #[macro_export]
 macro_rules! holochain_externs {
     () => {
@@ -121,4 +125,5 @@ macro_rules! holochain_externs {
     };
 }
 
+#[cfg(not(feature = "mock"))]
 holochain_externs!();
