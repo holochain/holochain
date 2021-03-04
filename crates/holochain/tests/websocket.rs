@@ -98,7 +98,7 @@ pub fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
 #[instrument(skip(holochain, response))]
 async fn check_timeout<T>(
     holochain: &mut Child,
-    response: impl Future<Output = Result<T, std::io::Error>>,
+    response: impl Future<Output = Result<T, WebsocketError>>,
     timeout_millis: u64,
 ) -> T {
     match tokio::time::timeout(std::time::Duration::from_millis(timeout_millis), response).await {
@@ -225,7 +225,6 @@ pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &
         (),
     )
     .await;
-    app_tx.close(1000, "Shutting down".into()).await.unwrap();
 }
 
 pub async fn call_zome_fn<S>(
@@ -408,7 +407,6 @@ async fn call_zome() {
             .is_err() // Err means the timeout elapsed
     );
 
-    client.close(1000, "Shutting down".into()).await.unwrap();
     // Shutdown holochain
     holochain.kill().expect("Failed to kill holochain");
     std::mem::drop(client);
@@ -549,21 +547,21 @@ async fn emit_signals() {
     )
     .await;
 
-    let msg1 = app_rx_1
+    let (sig1, msg1) = app_rx_1
         .timeout(Duration::from_secs(1))
         .next()
         .await
         .unwrap()
         .unwrap();
-    let sig1: SerializedBytes = unwrap_to::unwrap_to!(msg1 => WebsocketMessage::Signal).clone();
+    assert!(!msg1.is_request());
 
-    let msg2 = app_rx_2
+    let (sig2, msg2) = app_rx_2
         .timeout(Duration::from_secs(1))
         .next()
         .await
         .unwrap()
         .unwrap();
-    let sig2: SerializedBytes = unwrap_to::unwrap_to!(msg2 => WebsocketMessage::Signal).clone();
+    assert!(!msg2.is_request());
 
     assert_eq!(
         Signal::App(cell_id, AppSignal::new(ExternIO::encode(()).unwrap())),
@@ -573,7 +571,6 @@ async fn emit_signals() {
 
     ///////////////////////////////////////////////////////
 
-    admin_tx.close(1000, "Shutting down".into()).await.unwrap();
     // Shutdown holochain
     holochain.kill().expect("Failed to kill holochain");
 }
@@ -624,7 +621,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
-    let (mut client, rx): (WebsocketSender, WebsocketReceiver) = websocket_connect(
+    let (mut client, mut rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
         url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig {
             default_request_timeout_s: 1,
@@ -644,9 +641,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
         Err(ConductorError::ShuttingDown)
     );
 
-    let incoming: Vec<_> = rx.collect().await;
-    assert_eq!(incoming.len(), 1);
-    assert_matches!(incoming[0], WebsocketMessage::Close(_));
+    assert!(rx.next().await.is_none());
 
     info!("About to make failing request");
 
@@ -668,7 +663,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 
     // request should have encountered an error since the conductor shut down,
     // but should not have timed out (which would be an `Err(Err(_))`)
-    assert_matches!(response, Ok(Err(_)));
+    assert_matches!(response, Ok(Err(WebsocketError::Shutdown)));
 
     Ok(())
 }
@@ -686,7 +681,7 @@ async fn too_many_open() {
     info!("building conductor");
     for i in 0..1000 {
         dbg!(i);
-        let (_client, _rx): (WebsocketSender, WebsocketReceiver) = websocket_connect(
+        holochain_websocket::connect(
             url2!("ws://127.0.0.1:{}", port),
             Arc::new(WebsocketConfig {
                 default_request_timeout_s: 1,
