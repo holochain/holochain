@@ -15,7 +15,7 @@ fallible-iterator = "0.2"
 fixt = { version = "^0.0.2-alpha.1", path = "../fixt" }
 futures = "0.3"
 ghost_actor = "0.3.0-alpha.1"
-hdk = { version = "^0.0.100", path = "../hdk" }
+hdk = { version = "^0.0.101-alpha.0", path = "../hdk" }
 hdk_derive = { version = "^0.0.2-alpha.1", path = "../hdk_derive" }
 holo_hash = { version = "^0.0.2-alpha.1", path = "../holo_hash", features = ["full"] }
 holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }
