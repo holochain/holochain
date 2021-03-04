@@ -240,7 +240,7 @@ dependencies = [
  "memchr",
  "num_cpus",
  "once_cell",
- "pin-project-lite 0.2.4",
+ "pin-project-lite 0.2.5",
  "pin-utils",
  "slab",
  "wasm-bindgen-futures",
@@ -402,7 +402,7 @@ dependencies = [
  "block-padding 0.1.5",
  "byte-tools",
  "byteorder",
- "generic-array 0.12.3",
+ "generic-array 0.12.4",
 ]
 
 [[package]]
@@ -830,7 +830,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4434400df11d95d556bac068ddfedd482915eb18fe8bea89bc80b6e4b1c179e5"
 dependencies = [
- "generic-array 0.12.3",
+ "generic-array 0.12.4",
  "subtle 1.0.0",
 ]
 
@@ -1007,7 +1007,7 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3d0c8c8752312f9713efd397ff63acb9f85585afbf179282e720e7704954dd5"
 dependencies = [
- "generic-array 0.12.3",
+ "generic-array 0.12.4",
 ]
 
 [[package]]
@@ -1385,7 +1385,7 @@ dependencies = [
  "futures-io",
  "memchr",
  "parking",
- "pin-project-lite 0.2.4",
+ "pin-project-lite 0.2.5",
  "waker-fn",
 ]
 
@@ -1426,7 +1426,7 @@ dependencies = [
  "futures-sink",
  "futures-task",
  "memchr",
- "pin-project-lite 0.2.4",
+ "pin-project-lite 0.2.5",
  "pin-utils",
  "proc-macro-hack",
  "proc-macro-nested",
@@ -1441,9 +1441,9 @@ checksum = "8f5f3913fa0bfe7ee1fd8248b6b9f42a5af4b9d65ec2dd2c3c26132b950ecfc2"
 
 [[package]]
 name = "generic-array"
-version = "0.12.3"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c68f0274ae0e023facc3c97b2e00f076be70e254bc851d972503b328db79b2ec"
+checksum = "ffdf9f34f1447443d37393cc6c2b8313aebddcd96906caf34e54c68d8e57d7bd"
 dependencies = [
  "typenum",
 ]
@@ -1493,6 +1493,16 @@ dependencies = [
  "thiserror",
  "tracing",
  "tracing-futures",
+]
+
+[[package]]
+name = "ghost_actor"
+version = "0.4.0-alpha.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52cb0746ab4cf003d75cdbaaae2cf95139ec9607ae46bd5c68721bda2ca0c824"
+dependencies = [
+ "futures",
+ "tracing",
 ]
 
 [[package]]
@@ -1626,9 +1636,9 @@ dependencies = [
 
 [[package]]
 name = "hex"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "644f9158b2f133fd50f5fb3242878846d9eb792e445c893805ff0e3824006e35"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "holo_hash"
@@ -1666,7 +1676,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "hdk",
  "holo_hash",
  "holochain_cascade",
@@ -1733,7 +1743,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "hdk",
  "hdk_derive",
  "holo_hash",
@@ -1772,11 +1782,8 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "ffs",
- "holo_hash",
- "holochain",
  "holochain_serialized_bytes",
  "holochain_types",
- "holochain_zome_types",
  "matches",
  "mr_bundle",
  "predicates",
@@ -1843,7 +1850,7 @@ dependencies = [
 name = "holochain_keystore"
 version = "0.0.1"
 dependencies = [
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "holo_hash",
  "holochain_serialized_bytes",
  "holochain_zome_types",
@@ -1899,7 +1906,7 @@ dependencies = [
  "async-trait",
  "fixt",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "holo_hash",
  "holochain_keystore",
  "holochain_serialized_bytes",
@@ -2089,20 +2096,26 @@ dependencies = [
 name = "holochain_websocket"
 version = "0.0.1"
 dependencies = [
+ "criterion",
  "futures",
+ "ghost_actor 0.4.0-alpha.5",
  "holochain_serialized_bytes",
  "holochain_types",
  "linefeed",
+ "must_future",
  "nanoid",
  "net2",
  "observability",
  "serde",
  "serde_bytes",
+ "stream-cancel",
+ "thiserror",
  "tokio 0.2.25",
  "tokio-tungstenite",
  "tracing",
  "tracing-futures",
  "tungstenite",
+ "unwrap_to",
  "url2",
 ]
 
@@ -2457,7 +2470,7 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "kitsune_p2p_proxy",
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
@@ -2523,7 +2536,7 @@ version = "0.0.1"
 dependencies = [
  "derive_more",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "nanoid",
  "observability",
  "once_cell",
@@ -2560,7 +2573,7 @@ dependencies = [
  "derive_more",
  "directories 3.0.1",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "nanoid",
  "num_cpus",
  "once_cell",
@@ -2580,7 +2593,7 @@ version = "0.0.1-alpha.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61ee943659739a639033086b421eb19c155c9a8a64c64a6e37e1025ce5651bb2"
 dependencies = [
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "lair_keystore_api",
  "tempfile",
  "tokio 0.2.25",
@@ -2595,9 +2608,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.86"
+version = "0.2.87"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7282d924be3275cec7f6756ff4121987bc6481325397dde6ba3e7802b1a8b1c"
+checksum = "265d751d31d6780a3f956bb5b8022feba2d94eeee5a84ba64f4212eedca42213"
 
 [[package]]
 name = "libmdns"
@@ -3139,9 +3152,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.7.0"
+version = "1.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10acf907b94fc1b1a152d08ef97e7759650268cf986bf127f387e602b02c7e5a"
+checksum = "af8b08b04175473088b46763e51ee54da5f9a164bc162f615b91bc179dbf15a3"
 
 [[package]]
 name = "oorandom"
@@ -3398,15 +3411,15 @@ dependencies = [
 
 [[package]]
 name = "pin-project-lite"
-version = "0.1.11"
+version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c917123afa01924fc84bb20c4c03f004d9c38e5127e3c039bbf7f4b9c76a2f6b"
+checksum = "257b64915a082f7811703966789728173279bdebb956b143dbcd23f6f970a777"
 
 [[package]]
 name = "pin-project-lite"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "439697af366c49a6d0a010c56a0d97685bc140ce0d377b13a2ea2aa42d64a827"
+checksum = "0cf491442e4b033ed1c722cb9f0df5fcfcf4de682466c46469c36bc47dc5548a"
 
 [[package]]
 name = "pin-utils"
@@ -3985,7 +3998,7 @@ dependencies = [
  "mime_guess",
  "native-tls",
  "percent-encoding 2.1.0",
- "pin-project-lite 0.2.4",
+ "pin-project-lite 0.2.5",
  "serde",
  "serde_urlencoded",
  "tokio 0.2.25",
@@ -4019,7 +4032,7 @@ dependencies = [
  "mime",
  "native-tls",
  "percent-encoding 2.1.0",
- "pin-project-lite 0.2.4",
+ "pin-project-lite 0.2.5",
  "serde",
  "serde_urlencoded",
  "tokio 1.2.0",
@@ -4058,7 +4071,7 @@ dependencies = [
 [[package]]
 name = "rkv"
 version = "0.10.4"
-source = "git+https://github.com/holochain/rkv.git#6f6b4b5adc1eb6fe4a8f9587f3a3083cafadf0a1"
+source = "git+https://github.com/holochain/rkv.git?branch=master#6f6b4b5adc1eb6fe4a8f9587f3a3083cafadf0a1"
 dependencies = [
  "arrayref",
  "bincode",
@@ -4338,9 +4351,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.63"
+version = "1.0.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43535db9747a4ba938c0ce0a98cc631a46ebf943c9e1d604e091df6007620bf6"
+checksum = "799e97dc9fdae36a5c8b8f2cae9ce2ee9fdce2058c57a93e6099d919fd982f79"
 dependencies = [
  "indexmap",
  "itoa",
@@ -4505,6 +4518,17 @@ name = "str_stack"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9091b6114800a5f2141aee1d1b9d6ca3592ac062dc5decb3764ec5895a47b4eb"
+
+[[package]]
+name = "stream-cancel"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f36848ff9e3e8af125e00ab244aca7af0a8b270d4c6afcc9ccb4e523f7972c4c"
+dependencies = [
+ "futures-core",
+ "pin-project 1.0.5",
+ "tokio 1.2.0",
+]
 
 [[package]]
 name = "strsim"
@@ -4782,7 +4806,7 @@ dependencies = [
  "mio-named-pipes",
  "mio-uds",
  "num_cpus",
- "pin-project-lite 0.1.11",
+ "pin-project-lite 0.1.12",
  "signal-hook-registry",
  "slab",
  "tokio-macros",
@@ -4800,7 +4824,7 @@ dependencies = [
  "libc",
  "memchr",
  "mio 0.7.9",
- "pin-project-lite 0.2.4",
+ "pin-project-lite 0.2.5",
 ]
 
 [[package]]
@@ -4859,7 +4883,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "log",
- "pin-project-lite 0.1.11",
+ "pin-project-lite 0.1.12",
  "tokio 0.2.25",
 ]
 
@@ -4873,7 +4897,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "log",
- "pin-project-lite 0.2.4",
+ "pin-project-lite 0.2.5",
  "tokio 1.2.0",
 ]
 
@@ -4909,7 +4933,7 @@ checksum = "b0987850db3733619253fe60e17cb59b82d37c7e6c0236bb81e4d6b87c879f27"
 dependencies = [
  "cfg-if 0.1.10",
  "log",
- "pin-project-lite 0.1.11",
+ "pin-project-lite 0.1.12",
  "tracing-attributes",
  "tracing-core",
 ]

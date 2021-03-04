@@ -9,7 +9,7 @@ use std::sync::Arc;
 use assert_cmd::prelude::*;
 use holochain_conductor_api::AppRequest;
 use holochain_conductor_api::AppResponse;
-use holochain_websocket::{websocket_connect, WebsocketConfig, WebsocketReceiver, WebsocketSender};
+use holochain_websocket::{self as ws, WebsocketConfig, WebsocketReceiver, WebsocketSender};
 use matches::assert_matches;
 use portpicker::pick_unused_port;
 use tokio::process::Command;
@@ -20,7 +20,7 @@ const WEBSOCKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3)
 async fn websocket_client_by_port(
     port: u16,
 ) -> anyhow::Result<(WebsocketSender, WebsocketReceiver)> {
-    Ok(websocket_connect(
+    Ok(ws::connect(
         url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
     )
@@ -40,7 +40,7 @@ async fn call_app_interface(port: u16) {
     assert_matches!(r, AppResponse::AppInfo(None));
 }
 
-async fn check_timeout<T>(response: impl Future<Output = Result<T, std::io::Error>>) -> T {
+async fn check_timeout<T>(response: impl Future<Output = Result<T, ws::WebsocketError>>) -> T {
     match tokio::time::timeout(WEBSOCKET_TIMEOUT, response).await {
         Ok(response) => response.expect("Calling websocket failed"),
         Err(_) => {
