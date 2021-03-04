@@ -1,5 +1,6 @@
 //! Definitions of StructOpt options for use in the CLI
 
+use crate::bundles::DnasHapp;
 use crate::cmds::*;
 use holochain_types::prelude::InstalledAppId;
 use std::path::Path;
@@ -61,7 +62,11 @@ pub enum HcSandboxSubcommand {
 
         /// List of DNAs to use when installing the App for this sandbox.
         /// Defaults to searching the current directory for a single `*.dna` file.
-        dnas: Vec<PathBuf>,
+        #[structopt(long, conflicts_with = "happ", required_unless = "happ")]
+        dnas: Option<Vec<PathBuf>>,
+        #[structopt(long, required_unless = "dnas")]
+        /// A hApp bundle to install.
+        happ: Option<Option<PathBuf>>,
     },
     /// Run conductor(s) from existing sandbox(es).
     Run(Run),
@@ -106,8 +111,10 @@ impl HcSandbox {
                 create,
                 run,
                 dnas,
+                happ,
             } => {
-                let paths = generate(&self.holochain_path, dnas, create, app_id).await?;
+                let to_install = DnasHapp::new(dnas, happ);
+                let paths = generate(&self.holochain_path, to_install, create, app_id).await?;
                 for (port, path) in self
                     .force_admin_ports
                     .clone()
@@ -212,12 +219,12 @@ async fn run_n(
 
 async fn generate(
     holochain_path: &Path,
-    dnas: Vec<PathBuf>,
+    to_install: DnasHapp,
     create: Create,
     app_id: InstalledAppId,
 ) -> anyhow::Result<Vec<PathBuf>> {
-    let dnas = crate::dna::parse_dnas(dnas)?;
-    let paths = crate::sandbox::default_n(holochain_path, create, dnas, app_id).await?;
+    let to_install = to_install.parse()?;
+    let paths = crate::sandbox::default_n(holochain_path, create, to_install, app_id).await?;
     crate::save::save(std::env::current_dir()?, paths.clone())?;
     Ok(paths)
 }

@@ -4,7 +4,10 @@ use std::path::PathBuf;
 
 use holochain_types::prelude::InstalledAppId;
 
+use crate::bundles::DnasHapp;
 use crate::calls::InstallApp;
+use crate::calls::InstallAppBundle;
+use crate::calls::RegisterDna;
 use crate::cmds::*;
 use crate::run::run_async;
 use crate::CmdRunner;
@@ -16,19 +19,43 @@ pub async fn default_with_network(
     holochain_path: &Path,
     create: Create,
     directory: Option<PathBuf>,
-    dnas: Vec<PathBuf>,
+    to_install: DnasHapp,
     app_id: InstalledAppId,
 ) -> anyhow::Result<PathBuf> {
     let Create { network, root, .. } = create;
     let path = crate::generate::generate(network.map(|n| n.into_inner().into()), root, directory)?;
     let conductor = run_async(holochain_path, path.clone(), None).await?;
     let mut cmd = CmdRunner::new(conductor.0).await;
-    let install_app = InstallApp {
-        app_id,
-        agent_key: None,
-        dnas,
-    };
-    crate::calls::install_app(&mut cmd, install_app).await?;
+    match to_install {
+        DnasHapp::Dnas(dnas) => {
+            let mut hashes = Vec::with_capacity(dnas.len());
+            for dna in dnas {
+                let register_dna = RegisterDna {
+                    uuid: None,
+                    properties: None,
+                    path: Some(dna),
+                    hash: None,
+                };
+                let hash = crate::calls::register_dna(&mut cmd, register_dna).await?;
+                hashes.push(hash);
+            }
+            let install_app = InstallApp {
+                app_id,
+                agent_key: None,
+                dnas: hashes,
+            };
+            crate::calls::install_app(&mut cmd, install_app).await?;
+        }
+        DnasHapp::HApp(Some(happ)) => {
+            let install_bundle = InstallAppBundle {
+                app_id: Some(app_id),
+                agent_key: None,
+                path: happ,
+            };
+            crate::calls::install_app_bundle(&mut cmd, install_bundle).await?;
+        }
+        DnasHapp::HApp(None) => tracing::warn!("No happ found"),
+    }
     Ok(path)
 }
 
@@ -37,7 +64,7 @@ pub async fn default_with_network(
 pub async fn default_n(
     holochain_path: &Path,
     create: Create,
-    dnas: Vec<PathBuf>,
+    to_install: DnasHapp,
     app_id: InstalledAppId,
 ) -> anyhow::Result<Vec<PathBuf>> {
     let num_sandboxes = create.num_sandboxes;
@@ -51,7 +78,7 @@ pub async fn default_n(
             holochain_path,
             create.clone(),
             create.directories.get(i).cloned(),
-            dnas.clone(),
+            to_install.clone(),
             app_id.clone(),
         )
         .await?;
