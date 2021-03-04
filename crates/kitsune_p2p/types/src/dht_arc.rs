@@ -29,10 +29,12 @@ pub const MAX_HALF_LENGTH: u32 = (u32::MAX / 2) + 1 + 1;
 const U32_LEN: u64 = u32::MAX as u64 + 1;
 
 /// Number of copies of a given hash available at any given time.
-const REDUNDANCY_TARGET: usize = 20;
+const REDUNDANCY_TARGET: usize = 50;
 
-/// When distribution starts to become good.
-const STABLE_TARGET: usize = REDUNDANCY_TARGET + 40;
+/// If the redundancy drops due to inaccurate estimation we can't
+/// go lower then this level of redundancy.
+/// Note this can only be tested and not proved.
+const REDUNDANCY_FLOOR: usize = 20;
 
 /// Default assumed up time for nodes.
 const DEFAULT_UPTIME: f64 = 0.5;
@@ -41,8 +43,9 @@ const DEFAULT_UPTIME: f64 = 0.5;
 /// This factors in the expected uptime to reach the redundancy target.
 pub const MIN_PEERS: usize = (REDUNDANCY_TARGET as f64 / DEFAULT_UPTIME) as usize;
 
-/// Minimum number of peers before the network is considered stable
-pub const MIN_STABLE_PEERS: usize = (STABLE_TARGET as f64 / DEFAULT_UPTIME) as usize;
+/// The minimum number of peers we can consider acceptable to see in our arc
+/// during testing.
+pub const MIN_REDUNDANCY: usize = (REDUNDANCY_FLOOR as f64 / DEFAULT_UPTIME) as usize;
 
 /// The amount "change in arc" is scaled to prevent rapid changes.
 /// This also represents the maximum coverage change in a single update
@@ -74,14 +77,6 @@ fn clamp(min: f64, max: f64, mut x: f64) -> f64 {
     x
 }
 
-/// Hermite interpolation that is common in computer graphics.
-/// This makes a nice smooth transition between two points.
-fn smooth_step(start: f64, end: f64, x: f64) -> f64 {
-    let t = (x - start) / (end - start);
-    let t = clamp(0.0, 1.0, t);
-    t * t * (3.0 - 2.0 * t)
-}
-
 /// The ideal coverage if all peers were holding the same sized
 /// arcs and our estimated total peers is close.
 fn coverage_target(est_total_peers: usize) -> f64 {
@@ -110,19 +105,8 @@ fn target(density: PeerDensity) -> f64 {
         let ideal_target = coverage_target(density.est_total_peers());
         // Take whichever is larger. We prefer nodes to target the ideal
         // coverage but if there is a larger gap then it needs to be filled.
-        let mut target = est_gap.max(ideal_target);
+        let target = est_gap.max(ideal_target);
 
-        // If the network is small then we add a little padding to account for
-        // poor distribution of peers.
-        // TODO: We can probably scale this padding down a bit as it is probably
-        // more then we really need.
-        let small_network_padding = 1.0
-            - smooth_step(
-                REDUNDANCY_TARGET as f64,
-                STABLE_TARGET as f64,
-                density.est_total_peers() as f64,
-            );
-        target += small_network_padding;
         clamp(0.0, 1.0, target)
     }
 }
@@ -603,6 +587,7 @@ pub fn check_redundancy(peers: Vec<DhtArc>) -> usize {
     ),
                       arm: &Arm| {
         let mut connected = false;
+        let mut this_remove = None;
         match arm.side {
             Side::Left => {
                 // We must have added at least one arc otherwise
@@ -621,7 +606,7 @@ pub fn check_redundancy(peers: Vec<DhtArc>) -> usize {
             }
             Side::Right => {
                 // Set the last removed.
-                last_remove = Some(arm.pos);
+                this_remove = Some(arm.pos);
 
                 // Remove this id.
                 stack.remove(&arm.id);
@@ -632,7 +617,13 @@ pub fn check_redundancy(peers: Vec<DhtArc>) -> usize {
 
         // If we have started and the length has dropped then set a
         // lower redundancy.
-        let mut r = if len < r && started { len } else { r };
+        let mut r = if len < r && started {
+            // Only record removes that actually change the r level.
+            last_remove = this_remove;
+            len
+        } else {
+            r
+        };
 
         // If this was actually a connected insert then undo the last remove.
         if connected {

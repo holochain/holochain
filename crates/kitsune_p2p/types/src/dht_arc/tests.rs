@@ -227,7 +227,6 @@ fn test_peer_density() {
         assert_eq!(arc(1.0, i, MAX_HALF_LENGTH), 1.0);
     }
     assert_eq!(arc(1.0, MIN_PEERS, MAX_HALF_LENGTH), 1.0);
-    assert_eq!(arc(1.0, MIN_STABLE_PEERS, MAX_HALF_LENGTH), 0.9);
 
     // - Start with half coverage and minimum density
     let mut arc = DhtArc::new(0, MAX_HALF_LENGTH / 2);
@@ -245,7 +244,7 @@ fn test_peer_density() {
 
     // - Start with full coverage and low density
     let mut arc = DhtArc::new(u32::MAX / 2, MAX_HALF_LENGTH);
-    let peers = even_dist_peers(MIN_STABLE_PEERS * 2, &[20]);
+    let peers = even_dist_peers(MIN_PEERS * 2, &[20]);
     converge(&mut arc, &peers);
     // - Converge to a full coverage
     assert_eq!((arc.coverage() * 100.0).round() / 100.0, 1.0);
@@ -305,39 +304,15 @@ fn test_multiple() {
             }
             let r = check_redundancy(peers.clone());
             if mature {
-                assert!(r >= MIN_PEERS);
+                assert!(r >= MIN_REDUNDANCY);
             } else {
-                if r >= MIN_PEERS {
+                if r >= MIN_REDUNDANCY {
                     mature = true;
                 }
             }
         }
         assert!(mature)
     };
-
-    let mut peers = even_dist_peers(MIN_STABLE_PEERS, &[20]);
-    converge(&mut peers);
-    for arc in peers {
-        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.55);
-    }
-
-    let mut peers = even_dist_peers(MIN_STABLE_PEERS, &[MAX_HALF_LENGTH]);
-    converge(&mut peers);
-    for arc in peers {
-        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.55);
-    }
-
-    let mut peers = even_dist_peers(MIN_STABLE_PEERS * 4, &[20]);
-    converge(&mut peers);
-    for arc in peers {
-        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.13);
-    }
-
-    let mut peers = even_dist_peers(MIN_STABLE_PEERS * 4, &[MAX_HALF_LENGTH]);
-    converge(&mut peers);
-    for arc in peers {
-        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.13);
-    }
 
     let mut peers = even_dist_peers(MIN_PEERS, &[20]);
     converge(&mut peers);
@@ -349,6 +324,18 @@ fn test_multiple() {
     converge(&mut peers);
     for arc in peers {
         assert_eq!((arc.coverage() * 100.0).round() / 100.0, 1.0);
+    }
+
+    let mut peers = even_dist_peers(MIN_PEERS * 4, &[20]);
+    converge(&mut peers);
+    for arc in peers {
+        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.25);
+    }
+
+    let mut peers = even_dist_peers(MIN_PEERS * 4, &[MAX_HALF_LENGTH]);
+    converge(&mut peers);
+    for arc in peers {
+        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.25);
     }
 }
 
@@ -485,16 +472,16 @@ fn test_peer_gaps() {
             }
         }
     };
-    let mut peers = even_dist_peers(MIN_STABLE_PEERS * 10, &[MAX_HALF_LENGTH / 4]);
+    let mut peers = even_dist_peers(MIN_PEERS * 10, &[MAX_HALF_LENGTH / 4]);
     converge(&mut peers);
     for arc in peers {
-        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.05);
+        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.1);
     }
 
-    let mut peers = even_dist_peers(MIN_STABLE_PEERS, &[20]);
+    let mut peers = even_dist_peers(MIN_PEERS, &[20]);
     converge(&mut peers);
     for arc in peers {
-        assert_eq!((arc.coverage() * 10.0).round() / 10.0, 0.6);
+        assert_eq!((arc.coverage() * 10.0).round() / 10.0, 1.0);
     }
 }
 
