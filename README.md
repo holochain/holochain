@@ -30,12 +30,12 @@ Assuming you have [installed the nix shell](https://nixos.wiki/wiki/Nix_Installa
 nix-shell --argstr flavor happDev
 ```
 
-This nix-shell flavor installs wrapper binaries for `holochain` and `dna-util` that will automatically compile and run the binaries.  This is very useful if you are tracking changes in the holochain repo because when you check out a new rev, running holochain will compile automatically to the version at that rev.
+This nix-shell flavor installs wrapper binaries for `holochain` and `hc` that will automatically compile and run the binaries.  This is very useful if you are tracking changes in the holochain repo because when you check out a new rev, running holochain will compile automatically to the version at that rev.
 
 ### Building with cargo if you already have rust installed:
 ```
 cargo install --path crates/holochain
-cargo install --path crates/dna_util
+cargo install --path crates/hc
 ```
 ## Usage
 
@@ -142,7 +142,7 @@ Holochain is an open source project.  We welcome all sorts of participation and 
 ## License
  [![License: CAL 1.0](https://img.shields.io/badge/License-CAL%201.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
 
-Copyright (C) 2019 - 2020, Holochain Foundation
+Copyright (C) 2019 - 2021, Holochain Foundation
 
 This program is free software: you can redistribute it and/or modify it under the terms of the license
 provided in the LICENSE file (CAL-1.0).  This program is distributed in the hope that it will be useful,

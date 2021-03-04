@@ -1,8 +1,8 @@
-# Holochain Development Kit 3.0 (HDK)
+# Holochain Development Kit (HDK)
 
-This is the third major iteration of the holochain development kit.
+This HDK is currently in flux, expect rapid changes.
 
-There are two big differences between this kit and previous kits.
+There are a few big differences between this kit and previous kits.
 
 This kit:
 
@@ -19,8 +19,6 @@ Old kits:
 
 ## HDK API
 
-Welcome to the HDK 3.0.
-This HDK is currently in flux, expect rapid changes.
 There are low-level macros and high-level functions to aid writing happs.
 
 The intention is that most of the time most developers will use the high level

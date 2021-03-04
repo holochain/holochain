@@ -2,7 +2,7 @@
 name = "holochain_keystore"
 version = "0.0.1"
 description = "keystore for libsodium keypairs"
-license = "Apache-2.0"
+license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://github.com/holochain/holochain"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
@@ -12,12 +12,12 @@ edition = "2018"
 
 [dependencies]
 ghost_actor = "0.3.0-alpha.1"
-holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
-holochain_serialized_bytes = "=0.0.48"
+holo_hash = { version = "^0.0.2-alpha.1", path = "../holo_hash", features = ["full"] }
+holochain_serialized_bytes = "=0.0.50"
 holochain_zome_types = { path = "../holochain_zome_types" }
 lair_keystore_api = "=0.0.1-alpha.10"
 lair_keystore_client = "=0.0.1-alpha.10"
-serde = { version = "1.0.104", features = [ "derive" ] }
+serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 thiserror = "1.0.22"
 tokio = { version = "0.2", features = [ "full" ] }

@@ -1,6 +1,7 @@
 #![cfg(feature = "test_utils")]
 #![allow(unused_imports)]
 #![allow(dead_code)]
+#![allow(deprecated)]
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use futures::future::Either;
@@ -13,7 +14,6 @@ use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
-use holochain::conductor::dna_store::MockDnaStore;
 use holochain::conductor::interface::websocket::test_utils::setup_app;
 use holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
 use holochain::core::workflow::CallZomeWorkspace;

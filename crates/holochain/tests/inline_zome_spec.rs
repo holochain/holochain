@@ -3,7 +3,7 @@
 use hdk::prelude::*;
 use holochain::{
     conductor::api::error::ConductorApiResult,
-    test_utils::sweetest::{MaybeElement, SweetAgents, SweetConductor, SweetDnaFile},
+    test_utils::sweetest::{SweetAgents, SweetConductor, SweetDnaFile},
 };
 use holochain::{
     conductor::{api::error::ConductorApiError, CellError},
@@ -11,7 +11,7 @@ use holochain::{
     test_utils::WaitOps,
 };
 use holochain::{
-    core::ribosome::guest_callback::validate::ValidateResult, test_utils::wait_for_integration_10s,
+    core::ribosome::guest_callback::validate::ValidateResult, test_utils::wait_for_integration_1m,
 };
 use holochain::{core::SourceChainError, test_utils::display_agent_infos};
 use holochain_types::{dna::zome::inline_zome::InlineZome, signal::Signal};
@@ -102,17 +102,15 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    wait_for_integration_10s(
+    wait_for_integration_1m(
         bobbo.env(),
         WaitOps::start() + WaitOps::cold_start() + WaitOps::ENTRY,
     )
     .await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
-    let element: MaybeElement = conductor.call(&bobbo.zome("zome1"), "read", hash).await;
-    let element = element
-        .0
-        .expect("Element was None: bobbo couldn't `get` it");
+    let element: Option<Element> = conductor.call(&bobbo.zome("zome1"), "read", hash).await;
+    let element = element.expect("Element was None: bobbo couldn't `get` it");
 
     // Assert that the Element bobbo sees matches what alice committed
     assert_eq!(element.header().author(), alice.agent_pubkey());
@@ -162,7 +160,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     // Wait long enough for others to receive gossip
     for env in [bobbo_foo.env(), carol_bar.env()].iter() {
-        wait_for_integration_10s(
+        wait_for_integration_1m(
             env,
             WaitOps::start() * 1 + WaitOps::cold_start() * 2 + WaitOps::ENTRY * 1,
         )
@@ -171,12 +169,10 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
     // on the "foo" DNA
-    let element: MaybeElement = conductor
+    let element: Option<Element> = conductor
         .call(&bobbo_foo.zome("foozome"), "read", hash_foo)
         .await;
-    let element = element
-        .0
-        .expect("Element was None: bobbo couldn't `get` it");
+    let element = element.expect("Element was None: bobbo couldn't `get` it");
     assert_eq!(element.header().author(), alice_foo.agent_pubkey());
     assert_eq!(
         *element.entry(),
@@ -186,12 +182,10 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     // Verify that carol can run "read" on her cell and get alice's Header
     // on the "bar" DNA
     // Let's do it with the SweetZome instead of the SweetCell too, for fun
-    let element: MaybeElement = conductor
+    let element: Option<Element> = conductor
         .call(&carol_bar.zome("barzome"), "read", hash_bar)
         .await;
-    let element = element
-        .0
-        .expect("Element was None: carol couldn't `get` it");
+    let element = element.expect("Element was None: carol couldn't `get` it");
     assert_eq!(element.header().author(), alice_bar.agent_pubkey());
     assert_eq!(
         *element.entry(),
@@ -258,14 +252,12 @@ async fn get_deleted() -> anyhow::Result<()> {
         .await;
     let mut expected_count = WaitOps::start() + WaitOps::ENTRY;
 
-    wait_for_integration_10s(alice.env(), expected_count).await;
+    wait_for_integration_1m(alice.env(), expected_count).await;
 
-    let element: MaybeElement = conductor
+    let element: Option<Element> = conductor
         .call(&alice.zome("zome1"), "read", hash.clone())
         .await;
-    let element = element
-        .0
-        .expect("Element was None: bobbo couldn't `get` it");
+    let element = element.expect("Element was None: bobbo couldn't `get` it");
 
     assert_eq!(element.header().author(), alice.agent_pubkey());
     assert_eq!(
@@ -279,12 +271,12 @@ async fn get_deleted() -> anyhow::Result<()> {
         .await;
 
     expected_count += WaitOps::DELETE;
-    wait_for_integration_10s(alice.env(), expected_count).await;
+    wait_for_integration_1m(alice.env(), expected_count).await;
 
-    let element: MaybeElement = conductor
+    let element: Option<Element> = conductor
         .call(&alice.zome("zome1"), "read_entry", entry_hash)
         .await;
-    assert!(element.0.is_none());
+    assert!(element.is_none());
 
     Ok(())
 }
@@ -355,8 +347,8 @@ async fn simple_validation() -> anyhow::Result<()> {
 
     // This call passes validation
     let h1: HeaderHash = conductor.call(&alice, "create", AppString::new("A")).await;
-    let e1: MaybeElement = conductor.call(&alice, "read", &h1).await;
-    let s1: AppString = e1.0.unwrap().entry().to_app_option().unwrap().unwrap();
+    let e1: Option<Element> = conductor.call(&alice, "read", &h1).await;
+    let s1: AppString = e1.unwrap().entry().to_app_option().unwrap().unwrap();
     assert_eq!(s1, AppString::new("A"));
 
     // This call fails validation, and so results in an error
