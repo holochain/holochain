@@ -10,11 +10,15 @@ edition = "2018"
 
 [dependencies]
 futures = "0.3"
+ghost_actor = "0.4.0-alpha.5"
 holochain_serialized_bytes = "=0.0.50"
 nanoid = "0.3"
 net2 = "0.2"
+must_future = "0.1"
 serde = { version = "1", features = [ "derive" ] }
 serde_bytes = "0.11"
+stream-cancel = "0.8.0"
+thiserror = "1.0.22"
 tokio = { version = "0.2", features = [ "full" ] }
 tokio-tungstenite = { version = "0.10.1", features = [ "tls" ] }
 tracing = "0.1"
@@ -25,4 +29,10 @@ url2 = "0.0.6"
 [dev-dependencies]
 holochain_types = { version = "=0.0.1", path = "../holochain_types" }
 linefeed = "0.6"
+unwrap_to = "0.1.0"
 observability = "0.1.3"
+criterion = "0.3.4"
+
+[[bench]]
+name = "bench"
+harness = false

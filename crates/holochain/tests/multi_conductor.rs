@@ -4,7 +4,7 @@ use holochain::test_utils::host_fn_caller::Post;
 use holochain::test_utils::show_authored;
 use holochain::test_utils::sweetest::SweetNetwork;
 use holochain::test_utils::sweetest::{SweetConductorBatch, SweetDnaFile};
-use holochain::test_utils::wait_for_integration_10s;
+use holochain::test_utils::wait_for_integration_1m;
 use holochain::test_utils::wait_for_integration_with_others_10s;
 use holochain::test_utils::WaitOps;
 use holochain_types::dna::zome::inline_zome::InlineZome;
@@ -69,7 +69,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
     let hash: HeaderHash = conductors[0].call(&alice.zome("zome1"), "create", ()).await;
 
     // Wait long enough for Bob to receive gossip
-    wait_for_integration_10s(
+    wait_for_integration_1m(
         bobbo.env(),
         WaitOps::start() * 1 + WaitOps::cold_start() * 2 + WaitOps::ENTRY * 1,
     )
@@ -171,9 +171,9 @@ async fn invalid_cell() -> anyhow::Result<()> {
         .await;
 
     let expected_count = WaitOps::start() * 3 + WaitOps::ENTRY * 5;
-    // wait_for_integration_10s(&alice.env().await, expected_count).await;
+    // wait_for_integration_1m(&alice.env().await, expected_count).await;
     show_authored(&envs);
-    // wait_for_integration_10s(&carol_env, expected_count).await;
+    // wait_for_integration_1m(&carol_env, expected_count).await;
     wait_for_integration_with_others_10s(&alice_env, &envs, expected_count).await;
     let r: Option<Element> = conductors[0]
         .call(&alice.zome("zome1"), "read", hash.clone())

@@ -1,49 +1,196 @@
-//! defines the websocket listener struct
-
-use crate::*;
 use futures::stream::BoxStream;
-use futures::stream::StreamExt;
+use futures::StreamExt;
+use futures::TryStreamExt;
+use std::io::Error;
+use std::io::ErrorKind;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use stream_cancel::Trigger;
+use stream_cancel::Valve;
+use tracing::instrument;
 
-/// Websocket listening / server socket. This struct is an async Stream -
-/// calling `.next().await` will give you a Future that will in turn resolve
-/// to a split websocket pair (
-/// [WebsocketSender](struct.WebsocketSender.html),
-/// [WebsocketReceiver](struct.WebsocketReceiver.html)
-/// ).
+use url2::Url2;
+
+use crate::util::addr_to_url;
+use crate::util::url_to_addr;
+use crate::websocket::Websocket;
+use crate::WebsocketConfig;
+use crate::WebsocketError;
+use crate::WebsocketReceiver;
+use crate::WebsocketResult;
+use crate::WebsocketSender;
+
+/// Listens for connecting clients.
+///
+/// # Example
+/// ```no_run
+/// use futures::stream::StreamExt;
+/// use holochain_websocket::*;
+/// use url2::url2;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let mut listener = WebsocketListener::bind(
+///         url2!("ws://127.0.0.1:12345"),
+///         std::sync::Arc::new(WebsocketConfig::default()),
+///     )
+///     .await
+///     .unwrap();
+///
+///     while let Some(Ok((_send, _recv))) = listener.next().await {
+///         // New connection
+///     }
+/// }
+///```
 pub struct WebsocketListener {
-    config: Arc<WebsocketConfig>,
-    local_addr: Url2,
-    socket: BoxStream<'static, Result<(WebsocketSender, WebsocketReceiver)>>,
+    handle: ListenerHandle,
+    stream: ListenerStream,
 }
 
+/// Handle for shutting down a listener stream.
+///
+/// # Example
+///
+/// ```
+/// use futures::stream::StreamExt;
+/// use holochain_websocket::*;
+/// use url2::url2;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let (listener_handle, mut listener_stream) = WebsocketListener::bind_with_handle(
+///         url2!("ws://127.0.0.1:12345"),
+///         std::sync::Arc::new(WebsocketConfig::default()),
+///     )
+///     .await
+///     .unwrap();
+///
+///     tokio::spawn(async move { while let Some(Ok(_)) = listener_stream.next().await {} });
+///     listener_handle.close();
+/// }
+/// ```
+pub struct ListenerHandle {
+    shutdown: Trigger,
+    config: Arc<WebsocketConfig>,
+    local_addr: Url2,
+}
+
+/// [`WebsocketSender`] and [`WebsocketReceiver`] for an active connection.
+pub type Pair = (WebsocketSender, WebsocketReceiver);
+
+/// New connection result returned from the [`ListenerStream`].
+pub type ListenerItem = WebsocketResult<Pair>;
+
+/// Stream of new connections.
+pub type ListenerStream = BoxStream<'static, ListenerItem>;
+
 impl WebsocketListener {
+    /// Bind to a socket to accept incoming connections.
+    pub async fn bind(addr: Url2, config: Arc<WebsocketConfig>) -> WebsocketResult<Self> {
+        let (handle, stream) = Self::bind_with_handle(addr, config).await?;
+        Ok(Self {
+            handle,
+            stream: stream.boxed(),
+        })
+    }
+
+    #[instrument(skip(config, addr))]
+    /// Same as [`WebsocketListener::bind`] but gives you a [`ListenerHandle`] to shutdown
+    /// the listener and any open connections.
+    pub async fn bind_with_handle(
+        addr: Url2,
+        config: Arc<WebsocketConfig>,
+    ) -> WebsocketResult<(
+        ListenerHandle,
+        impl futures::stream::Stream<Item = ListenerItem>,
+    )> {
+        websocket_bind(addr, config).await
+    }
+    /// Shutdown the listener stream.
+    pub fn close(self) {
+        self.handle.close()
+    }
+    /// Get the url of the bound local listening socket.
+    pub fn local_addr(&self) -> &Url2 {
+        self.handle.local_addr()
+    }
+    /// Get the config associated with this listener.
+    pub fn get_config(&self) -> Arc<WebsocketConfig> {
+        self.handle.get_config()
+    }
+
+    /// Turn into a [`ListenerHandle`] and [`ListenerStream`].
+    /// Can be done in place with [`WebsocketListener::bind_with_handle`]
+    pub fn into_handle_and_stream(self) -> (ListenerHandle, ListenerStream) {
+        (self.handle, self.stream)
+    }
+}
+
+impl ListenerHandle {
+    /// Shutdown the listener stream.
+    pub fn close(self) {
+        self.shutdown.cancel()
+    }
     /// Get the url of the bound local listening socket.
     pub fn local_addr(&self) -> &Url2 {
         &self.local_addr
     }
-
     /// Get the config associated with this listener.
     pub fn get_config(&self) -> Arc<WebsocketConfig> {
         self.config.clone()
     }
-}
 
-impl tokio::stream::Stream for WebsocketListener {
-    type Item = Result<(WebsocketSender, WebsocketReceiver)>;
-
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        tracing::trace!("polling");
-        let p = std::pin::Pin::new(&mut self.socket);
-        tokio::stream::Stream::poll_next(p, cx)
+    /// Close the listener when the future resolves to true.
+    /// If the future returns false the listener will not be closed.
+    /// ```
+    /// # use futures::stream::StreamExt;
+    /// # use holochain_websocket::*;
+    /// # use url2::url2;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #     let (listener_handle, mut listener_stream) = WebsocketListener::bind_with_handle(
+    /// #         url2!("ws://127.0.0.1:12345"),
+    /// #         std::sync::Arc::new(WebsocketConfig::default()),
+    /// #     )
+    /// #     .await
+    /// #     .unwrap();
+    /// #
+    ///  tokio::spawn(async move { while let Some(Ok(_)) = listener_stream.next().await {} });
+    ///  let (tx, rx) = tokio::sync::oneshot::channel();
+    ///  tokio::task::spawn(listener_handle.close_on(async move { rx.await.unwrap_or(true) }));
+    ///  tx.send(true).unwrap();
+    /// # }
+    /// ```
+    pub async fn close_on<F>(self, f: F)
+    where
+        F: std::future::Future<Output = bool>,
+    {
+        if f.await {
+            self.close()
+        }
     }
 }
 
-/// Bind a new websocket listening socket, and begin awaiting incoming connections.
-/// Returns a [WebsocketListener](struct.WebsocketListener.html) instance.
-pub async fn websocket_bind(addr: Url2, config: Arc<WebsocketConfig>) -> Result<WebsocketListener> {
+impl futures::stream::Stream for WebsocketListener {
+    type Item = WebsocketResult<Pair>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let p = std::pin::Pin::new(&mut self.stream);
+        futures::stream::Stream::poll_next(p, cx)
+    }
+}
+
+async fn websocket_bind(
+    addr: Url2,
+    config: Arc<WebsocketConfig>,
+) -> WebsocketResult<(
+    ListenerHandle,
+    impl futures::stream::Stream<Item = ListenerItem>,
+)> {
     let addr = url_to_addr(&addr, config.scheme).await?;
     let socket = match &addr {
         SocketAddr::V4(_) => net2::TcpBuilder::new_v4()?,
@@ -55,52 +202,53 @@ pub async fn websocket_bind(addr: Url2, config: Arc<WebsocketConfig>) -> Result<
     socket.set_nonblocking(true)?;
     let socket = tokio::net::TcpListener::from_std(socket)?;
 
+    // Setup proper shutdown
+    let (shutdown, valve) = Valve::new();
+
     let local_addr = addr_to_url(socket.local_addr()?, config.scheme);
     let socket = socket
-        .map({
+        .map_err(WebsocketError::from)
+        .map_ok({
             let config = config.clone();
-            move |socket_result| connect(config.clone(), socket_result)
+            let valve = valve.clone();
+            move |socket_result| connect(config.clone(), socket_result, valve.clone())
         })
-        .buffer_unordered(config.max_pending_connections)
-        .boxed();
+        .try_buffer_unordered(config.max_pending_connections);
+    tracing::debug!(sever_listening_on = ?local_addr);
 
-    tracing::info!(
-        message = "bind",
-        local_addr = %local_addr,
-    );
-    Ok(WebsocketListener {
+    let stream = valve.wrap(socket);
+
+    let listener = ListenerHandle {
+        shutdown,
         config,
         local_addr,
-        socket,
-    })
+    };
+    Ok((listener, stream))
 }
 
-/// Connects the new listener
+#[instrument(skip(config, socket, valve))]
 async fn connect(
     config: Arc<WebsocketConfig>,
-    socket_result: std::io::Result<tokio::net::TcpStream>,
-) -> Result<(WebsocketSender, WebsocketReceiver)> {
-    match socket_result {
-        Ok(socket) => {
-            socket.set_keepalive(Some(std::time::Duration::from_secs(
-                config.tcp_keepalive_s as u64,
-            )))?;
-            tracing::debug!(
-                message = "accepted incoming raw socket",
-                remote_addr = %socket.peer_addr()?,
-            );
-            let socket = tokio_tungstenite::accept_async_with_config(
-                socket,
-                Some(tungstenite::protocol::WebSocketConfig {
-                    max_send_queue: Some(config.max_send_queue),
-                    max_message_size: Some(config.max_message_size),
-                    max_frame_size: Some(config.max_frame_size),
-                }),
-            )
-            .await
-            .map_err(|e| Error::new(ErrorKind::Other, e))?;
-            build_websocket_pair(config, socket)
-        }
-        Err(e) => Err(Error::new(ErrorKind::Other, e)),
-    }
+    socket: tokio::net::TcpStream,
+    valve: Valve,
+) -> WebsocketResult<Pair> {
+    socket.set_keepalive(Some(std::time::Duration::from_secs(
+        config.tcp_keepalive_s as u64,
+    )))?;
+    tracing::debug!(
+        message = "accepted incoming raw socket",
+        remote_addr = %socket.peer_addr()?,
+    );
+    let socket = tokio_tungstenite::accept_async_with_config(
+        socket,
+        Some(tungstenite::protocol::WebSocketConfig {
+            max_send_queue: Some(config.max_send_queue),
+            max_message_size: Some(config.max_message_size),
+            max_frame_size: Some(config.max_frame_size),
+        }),
+    )
+    .await
+    .map_err(|e| Error::new(ErrorKind::Other, e))?;
+
+    Websocket::create_ends(config, socket, valve)
 }
