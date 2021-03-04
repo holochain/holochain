@@ -1,6 +1,273 @@
 #![allow(clippy::new_ret_no_self)]
 //! Next-gen performance kitsune transport proxy
 
+use crate::*;
+use futures::future::BoxFuture;
+use futures::stream::{Stream, StreamExt};
+use kitsune_p2p_types::tx2::tx2_frontend::tx2_frontend_traits::*;
+use kitsune_p2p_types::tx2::tx2_frontend::*;
+use kitsune_p2p_types::tx2::tx2_promote::*;
+use kitsune_p2p_types::tx2::tx_backend::*;
+use kitsune_p2p_types::tx2::util::*;
+use kitsune_p2p_types::tx2::*;
+use kitsune_p2p_types::*;
+use std::collections::HashMap;
+
+/// Wrap a tx2 backend transport with proxy logic.
+pub fn tx2_proxy(sub_tx: BackendFactory, tls_config: TlsConfig, max_cons: usize) -> EpFactory {
+    ProxyEpFactory::new(sub_tx, tls_config, max_cons)
+}
+
+// -- private -- //
+
+#[allow(dead_code)]
+#[derive(Clone)]
+enum ConRef {
+    Ready(ConHnd),
+    Pending(futures::future::Shared<BoxFuture<'static, KitsuneResult<ConHnd>>>),
+}
+
+#[allow(dead_code)]
+struct ProxyEpInner {
+    proxy_cons: HashMap<CertDigest, ConRef>,
+    all_cons: HashMap<CertDigest, ConRef>,
+}
+
+#[allow(dead_code)]
+struct ProxyEpHnd {
+    sub_ep_hnd: EpHnd,
+    cert_digest: CertDigest,
+    inner: Share<ProxyEpInner>,
+}
+
+impl ProxyEpHnd {
+    pub fn new(sub_ep_hnd: EpHnd, cert_digest: CertDigest) -> EpHnd {
+        EpHnd(Arc::new(ProxyEpHnd {
+            sub_ep_hnd,
+            cert_digest,
+            inner: Share::new(ProxyEpInner {
+                proxy_cons: HashMap::new(),
+                all_cons: HashMap::new(),
+            }),
+        }))
+    }
+}
+
+const PROXY_HELLO_DIGEST: u8 = 0x20;
+
+async fn ingest_outgoing_con(
+    inner: Share<ProxyEpInner>,
+    local_digest: CertDigest,
+    remote_digest: CertDigest,
+    sub_con: ConHnd,
+    timeout: KitsuneTimeout,
+) -> KitsuneResult<ConHnd> {
+    let mut data = PoolBuf::new();
+    data.reserve(local_digest.len() + 1);
+    data.extend_from_slice(&[PROXY_HELLO_DIGEST]);
+    data.extend_from_slice(&local_digest);
+    sub_con.write(0.into(), data, timeout).await?;
+
+    let sub_con2 = sub_con.clone();
+    inner.share_mut(move |i, _| {
+        i.all_cons.insert(remote_digest, ConRef::Ready(sub_con2));
+        Ok(())
+    })?;
+    Ok(sub_con)
+}
+
+async fn clear_outgoing_con(
+    inner: Share<ProxyEpInner>,
+    remote_digest: CertDigest,
+    err: KitsuneError,
+) -> KitsuneError {
+    let _ = inner.share_mut(move |i, _| {
+        i.all_cons.remove(&remote_digest);
+        Ok(())
+    });
+    err
+}
+
+impl AsEpHnd for ProxyEpHnd {
+    fn is_closed(&self) -> bool {
+        self.sub_ep_hnd.is_closed()
+    }
+
+    fn close(&self, code: u32, reason: &str) {
+        self.sub_ep_hnd.close(code, reason)
+    }
+
+    fn local_addr(&self) -> KitsuneResult<TxUrl> {
+        let local_addr = self.sub_ep_hnd.local_addr()?;
+        let proxy_addr: TxUrl = ProxyUrl::new(local_addr.as_str(), self.cert_digest.clone())
+            .map_err(KitsuneError::other)?
+            .as_str()
+            .into();
+        Ok(proxy_addr)
+    }
+
+    fn connect(
+        &self,
+        remote: TxUrl,
+        timeout: KitsuneTimeout,
+    ) -> BoxFuture<'static, KitsuneResult<ConHnd>> {
+        let cert_digest = self.cert_digest.clone();
+        let sub_ep_hnd = self.sub_ep_hnd.clone();
+        let inner = self.inner.clone();
+        async move {
+            let url = ProxyUrl::from(remote.as_str());
+            let digest = url.digest();
+            if digest == cert_digest {
+                return Err("refusing to connect to self".into());
+            }
+
+            let inner2 = inner.clone();
+            let digest2 = digest.clone();
+            let base: TxUrl = url.as_base().as_str().into();
+            let connect = move || {
+                ConRef::Pending(
+                    async move {
+                        match sub_ep_hnd.connect(base, timeout).await {
+                            Ok(con) => {
+                                ingest_outgoing_con(inner2, cert_digest, digest2, con, timeout)
+                                    .await
+                            }
+                            Err(e) => Err(clear_outgoing_con(inner2, digest2, e).await),
+                        }
+                    }
+                    .boxed()
+                    .shared(),
+                )
+            };
+
+            let r = inner
+                .share_mut(|i, _| Ok(i.all_cons.entry(digest).or_insert_with(connect).clone()))?;
+
+            match r {
+                ConRef::Ready(c) => Ok(c),
+                ConRef::Pending(p) => p.await,
+            }
+        }
+        .boxed()
+    }
+}
+
+struct ProxyEp {
+    logic_chan: LogicChan<EpEvent>,
+    hnd: EpHnd,
+}
+
+impl ProxyEp {
+    pub async fn new(mut sub_ep: Ep, cert_digest: CertDigest) -> KitsuneResult<Ep> {
+        let logic_chan = LogicChan::new(32);
+        let logic_hnd = logic_chan.handle().clone();
+
+        let hnd = ProxyEpHnd::new(sub_ep.handle().clone(), cert_digest);
+
+        logic_chan
+            .handle()
+            .capture_logic(async move {
+                while let Some(evt) = sub_ep.next().await {
+                    // TODO - FIXME - just passing these for now
+                    if logic_hnd.emit(evt).is_err() {
+                        break;
+                    }
+                }
+            })
+            .await?;
+
+        Ok(Ep(Box::new(ProxyEp { logic_chan, hnd })))
+    }
+}
+
+impl Stream for ProxyEp {
+    type Item = EpEvent;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let chan = &mut self.logic_chan;
+        futures::pin_mut!(chan);
+        Stream::poll_next(chan, cx)
+    }
+}
+
+impl AsEp for ProxyEp {
+    fn handle(&self) -> &EpHnd {
+        &self.hnd
+    }
+}
+
+struct ProxyEpFactory {
+    tls_config: TlsConfig,
+    sub_fact: EpFactory,
+}
+
+impl ProxyEpFactory {
+    pub fn new(sub_fact: BackendFactory, tls_config: TlsConfig, max_cons: usize) -> EpFactory {
+        let sub_fact = tx2_promote(sub_fact, max_cons);
+        EpFactory(Arc::new(ProxyEpFactory {
+            tls_config,
+            sub_fact,
+        }))
+    }
+}
+
+impl AsEpFactory for ProxyEpFactory {
+    fn bind(
+        &self,
+        bind_spec: TxUrl,
+        timeout: KitsuneTimeout,
+    ) -> BoxFuture<'static, KitsuneResult<Ep>> {
+        let digest = self.tls_config.cert_digest.clone();
+        let fut = self.sub_fact.bind(bind_spec, timeout);
+        async move {
+            let sub_ep = fut.await?;
+            ProxyEp::new(sub_ep, digest).await
+        }
+        .boxed()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_tx2_proxy() {
+        let t = KitsuneTimeout::from_millis(5000);
+
+        let f = tx2_proxy(
+            MemBackendAdapt::new(),
+            TlsConfig::new_ephemeral().await.unwrap(),
+            32,
+        );
+        let ep1 = f.bind("none:", t).await.unwrap();
+        let ep1hnd = ep1.handle().clone();
+        let addr1 = ep1hnd.local_addr().unwrap();
+        println!("got addr1: {}", addr1);
+
+        let f = tx2_proxy(
+            MemBackendAdapt::new(),
+            TlsConfig::new_ephemeral().await.unwrap(),
+            32,
+        );
+        let ep2 = f.bind("none:", t).await.unwrap();
+        let ep2hnd = ep2.handle().clone();
+        let addr2 = ep2hnd.local_addr().unwrap();
+        println!("got addr2: {}", addr2);
+
+        let _con = ep1hnd.connect(addr2, t).await.unwrap();
+
+        tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
+
+        ep1hnd.close(0, "");
+        ep2hnd.close(0, "");
+    }
+}
+
+/*
 use crate::{ProxyUrl, TlsConfig};
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
@@ -279,3 +546,4 @@ mod tests {
         rt.await.unwrap();
     }
 }
+*/

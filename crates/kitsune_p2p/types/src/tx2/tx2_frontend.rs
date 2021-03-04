@@ -144,12 +144,12 @@ impl EpHnd {
     }
 
     /// Establish a new connection.
-    pub fn connect(
+    pub fn connect<U: Into<TxUrl>>(
         &self,
-        remote: TxUrl,
+        remote: U,
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<ConHnd>> + 'static + Send {
-        AsEpHnd::connect(self, remote, timeout)
+        AsEpHnd::connect(self, remote.into(), timeout)
     }
 }
 
@@ -227,12 +227,12 @@ pub struct EpFactory(pub Arc<dyn AsEpFactory>);
 
 impl EpFactory {
     /// Bind a new local transport endpoint.
-    pub fn bind(
+    pub fn bind<U: Into<TxUrl>>(
         &self,
-        bind_spec: TxUrl,
+        bind_spec: U,
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<Ep>> + 'static + Send {
-        AsEpFactory::bind(self, bind_spec, timeout)
+        AsEpFactory::bind(self, bind_spec.into(), timeout)
     }
 }
 

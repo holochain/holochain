@@ -12,7 +12,7 @@ use futures::stream::{Stream, StreamExt};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 /// Promote a tx2 transport backend to a tx2 transport frontend.
-pub fn promote(backend: BackendFactory, max_cons: usize) -> EpFactory {
+pub fn tx2_promote(backend: BackendFactory, max_cons: usize) -> EpFactory {
     let con_limit = Arc::new(Semaphore::new(max_cons));
     EpFactory(Arc::new(PromoteFactory {
         max_cons,
@@ -357,12 +357,12 @@ mod tests {
     async fn test_tx2_backend_frontend_promote() {
         let t = KitsuneTimeout::from_millis(5000);
 
-        let f = promote(MemBackendAdapt::new(), 32);
+        let f = tx2_promote(MemBackendAdapt::new(), 32);
 
         let (rs, rr) = tokio::sync::oneshot::channel::<()>();
         let mut rs = Some(rs);
 
-        let mut e1 = f.bind("none:".into(), t).await.unwrap();
+        let mut e1 = f.bind("none:", t).await.unwrap();
         let e1_hnd = e1.handle().clone();
         let rt1 = tokio::task::spawn(async move {
             while let Some(evt) = e1.next().await {
@@ -377,7 +377,7 @@ mod tests {
             }
         });
 
-        let mut e2 = f.bind("none:".into(), t).await.unwrap();
+        let mut e2 = f.bind("none:", t).await.unwrap();
         let e2_hnd = e2.handle().clone();
         let rt2 = tokio::task::spawn(async move {
             while let Some(evt) = e2.next().await {
