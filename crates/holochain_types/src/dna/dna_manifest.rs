@@ -45,4 +45,18 @@ impl DnaManifest {
     ) -> Self {
         DnaManifestCurrent::new(name, uuid, properties, zomes).into()
     }
+
+    /// Getter for properties
+    pub fn properties(&self) -> Option<YamlProperties> {
+        match self {
+            DnaManifest::V1(manifest) => manifest.properties.clone(),
+        }
+    }
+
+    /// Getter for uuid
+    pub fn uuid(&self) -> Option<String> {
+        match self {
+            DnaManifest::V1(manifest) => manifest.uuid.clone(),
+        }
+    }
 }

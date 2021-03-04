@@ -17,8 +17,8 @@ use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_p2p::kitsune_p2p;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
-use holochain_types::prelude::InstallAppDnaPayload;
-use holochain_types::prelude::InstallAppPayload;
+//use holochain_types::prelude::InstallAppDnaPayload;
+//use holochain_types::prelude::InstallAppPayload;
 use holochain_types::prelude::InstalledCell;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppBundlePayload};
@@ -195,16 +195,19 @@ pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
             match CmdRunner::try_new(port).await {
                 Ok(cmd) => cmds.push((cmd, None)),
-                Err(e) => match e.kind() {
-                    std::io::ErrorKind::ConnectionRefused => {
-                        let (port, holochain) = run_async(holochain_path, path, None).await?;
-                        cmds.push((CmdRunner::new(port).await, Some(holochain)))
+                Err(e) => {
+                    if let holochain_websocket::WebsocketError::Io(e) = &e {
+                        if let std::io::ErrorKind::ConnectionRefused = e.kind() {
+                            let (port, holochain) = run_async(holochain_path, path, None).await?;
+                            cmds.push((CmdRunner::new(port).await, Some(holochain)));
+                            continue;
+                        }
                     }
-                    _ => bail!(
+                    bail!(
                         "Failed to connect to running conductor or start one {:?}",
                         e
-                    ),
-                },
+                    )
+                }
             }
         }
         cmds
@@ -356,10 +359,11 @@ pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyho
 /// Creates an app per dna with the app id of `{app-id}-{dna-index}`
 /// e.g. `my-cool-app-3`.
 pub async fn install_app(
-    cmd: &mut CmdRunner,
-    args: InstallApp,
+    _cmd: &mut CmdRunner,
+    _args: InstallApp,
 ) -> anyhow::Result<HashSet<InstalledCell>> {
-    let InstallApp {
+    todo!("Currently unimplemented")
+    /*    let InstallApp {
         app_id,
         agent_key,
         dnas,
@@ -370,7 +374,7 @@ pub async fn install_app(
     };
 
     for path in &dnas {
-        ensure!(path.is_file(), "Dna path {} must be a file", path.display());
+        ensure!(path.is_file(), "Dna bundle {} must be a hash", path.display());
     }
 
     // Turn dnas into payloads
@@ -400,7 +404,7 @@ pub async fn install_app(
     Ok(installed_app
         .provisioned_cells()
         .map(|(n, c)| InstalledCell::new(c.clone(), n.clone()))
-        .collect())
+        .collect())*/
 }
 
 /// Calls [`AdminRequest::InstallApp`] and installs a new app.
