@@ -56,7 +56,7 @@ pub trait BufferedStore: Sized {
 macro_rules! fresh_reader {
     ($env: expr, $f: expr) => {{
         let mut g = $env.guard();
-        let r = $crate::db::ReadManager::reader(&mut g)?;
+        let mut r = $crate::db::ReadManager::reader(&mut g)?;
         $f(r)
     }};
 }
@@ -67,7 +67,7 @@ macro_rules! fresh_reader {
 macro_rules! fresh_reader_test {
     ($env: expr, $f: expr) => {{
         let mut g = $env.guard();
-        let r = $crate::db::ReadManager::reader(&mut g).unwrap();
+        let mut r = $crate::db::ReadManager::reader(&mut g).unwrap();
         $f(r)
     }};
 }

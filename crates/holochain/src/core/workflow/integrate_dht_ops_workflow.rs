@@ -54,9 +54,9 @@ pub async fn integrate_dht_ops_workflow(
     // Pull ops out of queue
     // TODO: PERF: Combine this collect with the sort when ElementBuf gets
     // aren't async
-    let ops: Vec<IntegrationLimboValue> = fresh_reader!(env, |r| workspace
+    let ops: Vec<IntegrationLimboValue> = fresh_reader!(env, |mut r| workspace
         .integration_limbo
-        .drain_iter(&r)?
+        .drain_iter(&mut r)?
         .collect())?;
 
     // Sort the ops
@@ -579,10 +579,10 @@ impl IntegrateDhtOpsWorkspace {
 
 pub fn dump_state(env: DbRead) -> WorkspaceResult<IntegrationStateDump> {
     let workspace = IncomingDhtOpsWorkspace::new(env.clone())?;
-    let (validation_limbo, integration_limbo, integrated) = fresh_reader!(env, |r| {
-        let v = workspace.validation_limbo.iter(&r)?.count()?;
-        let il = workspace.integration_limbo.iter(&r)?.count()?;
-        let i = workspace.integrated_dht_ops.iter(&r)?.count()?;
+    let (validation_limbo, integration_limbo, integrated) = fresh_reader!(env, |mut r| {
+        let v = workspace.validation_limbo.iter(&mut r)?.count()?;
+        let il = workspace.integration_limbo.iter(&mut r)?.count()?;
+        let i = workspace.integrated_dht_ops.iter(&mut r)?.count()?;
         DatabaseResult::Ok((v, il, i))
     })?;
 

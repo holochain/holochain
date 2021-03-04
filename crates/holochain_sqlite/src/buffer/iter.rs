@@ -3,6 +3,7 @@ use crate::error::DatabaseError;
 use crate::prelude::*;
 use fallible_iterator::DoubleEndedFallibleIterator;
 use fallible_iterator::FallibleIterator;
+use rusqlite::*;
 use std::collections::BTreeMap;
 use tracing::*;
 
@@ -295,9 +296,12 @@ where
     }
 }
 
+pub type SqlIter<'txn> =
+    Box<dyn Iterator<Item = rusqlite::Result<(&'txn [u8], Option<rusqlite::types::Value>)>> + 'txn>;
+
 pub struct SingleIterRaw<'txn, V> {
-    iter: rkv::store::single::Iter<'txn>,
-    rev: rkv::store::single::Iter<'txn>,
+    iter_front: SqlIter<'txn>,
+    iter_back: SqlIter<'txn>,
     key: Option<&'txn [u8]>,
     key_back: Option<&'txn [u8]>,
     __type: std::marker::PhantomData<V>,
@@ -309,10 +313,10 @@ impl<'txn, V> SingleIterRaw<'txn, V>
 where
     V: BufVal,
 {
-    pub fn new(iter: rkv::store::single::Iter<'txn>, rev: rkv::store::single::Iter<'txn>) -> Self {
+    pub fn new(iter_front: SqlIter<'txn>, iter_back: SqlIter<'txn>) -> Self {
         Self {
-            iter,
-            rev,
+            iter_front,
+            iter_back,
             key: None,
             key_back: None,
             __type: std::marker::PhantomData,
@@ -350,7 +354,7 @@ where
     type Item = IterItem<'env, V>;
 
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        let n = self.iter.next().map(|o| o.map_err(StoreError::from));
+        let n = self.iter_front.next().map(|o| o.map_err(StoreError::from));
         let r = Self::next_inner(n);
         if let Ok(Some((k, _))) = r {
             self.key = Some(k);
@@ -368,7 +372,7 @@ where
     V: BufVal,
 {
     fn next_back(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        let n = self.rev.next().map(|o| o.map_err(StoreError::from));
+        let n = self.iter_back.next().map(|o| o.map_err(StoreError::from));
         let r = Self::next_inner(n);
         if let Ok(Some((k_back, _))) = r {
             self.key_back = Some(k_back);

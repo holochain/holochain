@@ -9,7 +9,6 @@ use crate::error::DatabaseResult;
 use crate::test_utils::test_cell_env;
 use crate::test_utils::DbString;
 use crate::transaction::Readable;
-use rkv::StoreOptions;
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
 use std::collections::BTreeMap;
@@ -29,7 +28,7 @@ fn test_buf(
     }
 }
 
-fn test_persisted<R: Readable>(r: &R, a: &Store, b: impl Iterator<Item = (DbString, Vec<V>)>) {
+fn test_persisted<R: Readable>(r: &mut R, a: &Store, b: impl Iterator<Item = (DbString, Vec<V>)>) {
     for (k, v) in b {
         assert_eq!(collect_sorted(a.get_persisted(r, &k)), Ok(v));
     }
@@ -56,17 +55,14 @@ async fn kvvbuf_basics() {
     let arc = test_env.env();
     let mut env = arc.guard();
 
-    let multi_store = env
-        .inner()
-        .open_multi("kvv", StoreOptions::create())
-        .unwrap();
+    let multi_store = env.inner().open_multi("kvv").unwrap();
 
     arc.guard()
-        .with_reader::<DatabaseError, _, _>(|reader| {
+        .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut store: Store = Store::new(multi_store.clone());
             assert_eq!(
                 store
-                    .get(&reader, DbString::from("key"))
+                    .get(&mut reader, DbString::from("key"))
                     .unwrap()
                     .collect::<Vec<_>>(),
                 []
@@ -75,7 +71,7 @@ async fn kvvbuf_basics() {
             store.delete("key".into(), V(0));
             assert_eq!(
                 store
-                    .get(&reader, DbString::from("key"))
+                    .get(&mut reader, DbString::from("key"))
                     .unwrap()
                     .collect::<Vec<_>>(),
                 []
@@ -84,7 +80,7 @@ async fn kvvbuf_basics() {
             store.insert("key".into(), V(0));
             assert_eq!(
                 store
-                    .get(&reader, DbString::from("key"))
+                    .get(&mut reader, DbString::from("key"))
                     .unwrap()
                     .collect::<Vec<_>>(),
                 [Ok(V(0))]
@@ -98,17 +94,14 @@ async fn kvvbuf_basics() {
         })
         .unwrap();
 
-    let multi_store = env
-        .inner()
-        .open_multi("kvv", StoreOptions::default())
-        .unwrap();
+    let multi_store = env.inner().open_multi("kvv").unwrap();
 
     arc.guard()
-        .with_reader::<DatabaseError, _, _>(|reader| {
+        .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut store: Store = Store::new(multi_store.clone());
             assert_eq!(
                 store
-                    .get(&reader, DbString::from("key"))
+                    .get(&mut reader, DbString::from("key"))
                     .unwrap()
                     .collect::<Vec<_>>(),
                 [Ok(V(0))]
@@ -117,7 +110,7 @@ async fn kvvbuf_basics() {
             store.insert("key".into(), V(0));
             assert_eq!(
                 store
-                    .get(&reader, DbString::from("key"))
+                    .get(&mut reader, DbString::from("key"))
                     .unwrap()
                     .collect::<Vec<_>>(),
                 [Ok(V(0))]
@@ -126,7 +119,7 @@ async fn kvvbuf_basics() {
             store.delete("key".into(), V(0));
             assert_eq!(
                 store
-                    .get(&reader, DbString::from("key"))
+                    .get(&mut reader, DbString::from("key"))
                     .unwrap()
                     .collect::<Vec<_>>(),
                 []
@@ -140,17 +133,14 @@ async fn kvvbuf_basics() {
         })
         .unwrap();
 
-    let multi_store = env
-        .inner()
-        .open_multi("kvv", StoreOptions::default())
-        .unwrap();
+    let multi_store = env.inner().open_multi("kvv").unwrap();
 
     arc.guard()
-        .with_reader::<DatabaseError, _, _>(|reader| {
+        .with_reader::<DatabaseError, _, _>(|mut reader| {
             let store: Store = Store::new(multi_store.clone());
             assert_eq!(
                 store
-                    .get(&reader, DbString::from("key"))
+                    .get(&mut reader, DbString::from("key"))
                     .unwrap()
                     .collect::<Vec<_>>(),
                 []
@@ -167,17 +157,14 @@ async fn delete_all() {
     let arc = test_env.env();
     let mut env = arc.guard();
 
-    let multi_store = env
-        .inner()
-        .open_multi("kvv", StoreOptions::create())
-        .unwrap();
+    let multi_store = env.inner().open_multi("kvv").unwrap();
 
     arc.guard()
-        .with_reader::<DatabaseError, _, _>(|reader| {
+        .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut store: Store = Store::new(multi_store.clone());
             assert_eq!(
                 store
-                    .get(&reader, DbString::from("key"))
+                    .get(&mut reader, DbString::from("key"))
                     .unwrap()
                     .collect::<Vec<_>>(),
                 []
@@ -186,7 +173,7 @@ async fn delete_all() {
             store.insert("key".into(), V(0));
             assert_eq!(
                 store
-                    .get(&reader, DbString::from("key"))
+                    .get(&mut reader, DbString::from("key"))
                     .unwrap()
                     .collect::<Vec<_>>(),
                 [Ok(V(0))]
@@ -194,7 +181,7 @@ async fn delete_all() {
 
             store.insert("key".into(), V(1));
             assert_eq!(
-                collect_sorted(store.get(&reader, DbString::from("key"))),
+                collect_sorted(store.get(&mut reader, DbString::from("key"))),
                 Ok(vec![V(0), V(1)])
             );
 
@@ -206,29 +193,26 @@ async fn delete_all() {
         })
         .unwrap();
 
-    let multi_store = env
-        .inner()
-        .open_multi("kvv", StoreOptions::default())
-        .unwrap();
+    let multi_store = env.inner().open_multi("kvv").unwrap();
 
     arc.guard()
-        .with_reader::<DatabaseError, _, _>(|reader| {
+        .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut store: Store = Store::new(multi_store.clone());
             assert_eq!(
-                collect_sorted(store.get(&reader, DbString::from("key"))),
+                collect_sorted(store.get(&mut reader, DbString::from("key"))),
                 Ok(vec![V(0), V(1)])
             );
 
             store.insert("key".into(), V(2));
             assert_eq!(
-                collect_sorted(store.get(&reader, DbString::from("key"))),
+                collect_sorted(store.get(&mut reader, DbString::from("key"))),
                 Ok(vec![V(0), V(1), V(2)])
             );
 
             store.delete_all("key".into());
             assert_eq!(
                 store
-                    .get(&reader, DbString::from("key"))
+                    .get(&mut reader, DbString::from("key"))
                     .unwrap()
                     .collect::<Vec<_>>(),
                 []
@@ -237,7 +221,7 @@ async fn delete_all() {
             store.insert("key".into(), V(3));
             assert_eq!(
                 store
-                    .get(&reader, DbString::from("key"))
+                    .get(&mut reader, DbString::from("key"))
                     .unwrap()
                     .collect::<Vec<_>>(),
                 [Ok(V(3))]
@@ -251,17 +235,14 @@ async fn delete_all() {
         })
         .unwrap();
 
-    let multi_store = env
-        .inner()
-        .open_multi("kvv", StoreOptions::default())
-        .unwrap();
+    let multi_store = env.inner().open_multi("kvv").unwrap();
 
     arc.guard()
-        .with_reader::<DatabaseError, _, _>(|reader| {
+        .with_reader::<DatabaseError, _, _>(|mut reader| {
             let store: Store = Store::new(multi_store.clone());
             assert_eq!(
                 store
-                    .get(&reader, DbString::from("key"))
+                    .get(&mut reader, DbString::from("key"))
                     .unwrap()
                     .collect::<Vec<_>>(),
                 [Ok(V(3))]
@@ -281,40 +262,37 @@ async fn idempotent_inserts() {
     let arc = test_env.env();
     let mut env = arc.guard();
 
-    let multi_store = env
-        .inner()
-        .open_multi("kvv", StoreOptions::create())
-        .unwrap();
+    let multi_store = env.inner().open_multi("kvv").unwrap();
 
     arc.guard()
-        .with_reader::<DatabaseError, _, _>(|reader| {
+        .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut store: Store = Store::new(multi_store.clone());
             assert_eq!(
-                collect_sorted(store.get(&reader, DbString::from("key"))),
+                collect_sorted(store.get(&mut reader, DbString::from("key"))),
                 Ok(vec![])
             );
 
             store.insert("key".into(), V(2));
             assert_eq!(
-                collect_sorted(store.get(&reader, DbString::from("key"))),
+                collect_sorted(store.get(&mut reader, DbString::from("key"))),
                 Ok(vec![V(2)])
             );
 
             store.insert("key".into(), V(1));
             assert_eq!(
-                collect_sorted(store.get(&reader, DbString::from("key"))),
+                collect_sorted(store.get(&mut reader, DbString::from("key"))),
                 Ok(vec![V(1), V(2)])
             );
 
             store.insert("key".into(), V(1));
             assert_eq!(
-                collect_sorted(store.get(&reader, DbString::from("key"))),
+                collect_sorted(store.get(&mut reader, DbString::from("key"))),
                 Ok(vec![V(1), V(2)])
             );
 
             store.insert("key".into(), V(0));
             assert_eq!(
-                collect_sorted(store.get(&reader, DbString::from("key"))),
+                collect_sorted(store.get(&mut reader, DbString::from("key"))),
                 Ok(vec![V(0), V(1), V(2)])
             );
 
@@ -327,16 +305,16 @@ async fn idempotent_inserts() {
         .unwrap();
 
     arc.guard()
-        .with_reader::<DatabaseError, _, _>(|reader| {
+        .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut store: Store = Store::new(multi_store.clone());
             assert_eq!(
-                collect_sorted(store.get(&reader, DbString::from("key"))),
+                collect_sorted(store.get(&mut reader, DbString::from("key"))),
                 Ok(vec![V(0), V(1), V(2)])
             );
 
             store.insert("key".into(), V(1));
             assert_eq!(
-                collect_sorted(store.get(&reader, DbString::from("key"))),
+                collect_sorted(store.get(&mut reader, DbString::from("key"))),
                 Ok(vec![V(0), V(1), V(2)])
             );
 
@@ -351,18 +329,18 @@ async fn kvv_indicate_value_appends() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kvv", StoreOptions::create())?;
-    arc.guard().with_reader(|reader| {
+    let db = env.inner().open_multi("kvv")?;
+    arc.guard().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
 
         buf.insert("a".into(), V(1));
         assert_eq!(
-            buf.get(&reader, DbString::from("a"))?.next().unwrap()?,
+            buf.get(&mut reader, DbString::from("a"))?.next().unwrap()?,
             V(1)
         );
         buf.insert("a".into(), V(2));
         assert_eq!(
-            collect_sorted(buf.get(&reader, DbString::from("a"))),
+            collect_sorted(buf.get(&mut reader, DbString::from("a"))),
             Ok(vec![V(1), V(2)])
         );
         Ok(())
@@ -375,25 +353,25 @@ async fn kvv_indicate_value_overwritten() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kvv", StoreOptions::create())?;
-    arc.guard().with_reader(|reader| {
+    let db = env.inner().open_multi("kvv")?;
+    arc.guard().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
 
         buf.insert("a".into(), V(1));
         assert_eq!(
-            buf.get(&reader, DbString::from("a"))?.next().unwrap()?,
+            buf.get(&mut reader, DbString::from("a"))?.next().unwrap()?,
             V(1)
         );
         buf.delete_all("a".into());
         buf.insert("a".into(), V(2));
         assert_eq!(
-            buf.get(&reader, DbString::from("a"))?.next().unwrap()?,
+            buf.get(&mut reader, DbString::from("a"))?.next().unwrap()?,
             V(2)
         );
         buf.delete("a".into(), V(2));
         buf.insert("a".into(), V(3));
         assert_eq!(
-            buf.get(&reader, DbString::from("a"))?.next().unwrap()?,
+            buf.get(&mut reader, DbString::from("a"))?.next().unwrap()?,
             V(3)
         );
         Ok(())
@@ -406,7 +384,7 @@ async fn kvv_deleted_persisted() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kv", StoreOptions::create())?;
+    let db = env.inner().open_multi("kv")?;
 
     {
         let mut buf = Store::new(db.clone());
@@ -426,10 +404,10 @@ async fn kvv_deleted_persisted() -> DatabaseResult<()> {
         arc.guard()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
-    arc.guard().with_reader(|reader| {
+    arc.guard().with_reader(|mut reader| {
         let buf: KvvBufUsed<DbString, _> = Store::new(db.clone());
         test_persisted(
-            &reader,
+            &mut reader,
             &buf,
             [("a".into(), vec![V(1)]), ("c".into(), vec![V(3)])]
                 .iter()
@@ -446,7 +424,7 @@ async fn kvv_deleted_buffer() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kv", StoreOptions::create())?;
+    let db = env.inner().open_multi("kv")?;
 
     {
         let mut buf = Store::new(db.clone());
@@ -479,10 +457,10 @@ async fn kvv_deleted_buffer() -> DatabaseResult<()> {
         arc.guard()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
-    arc.guard().with_reader(|reader| {
+    arc.guard().with_reader(|mut reader| {
         let buf: KvvBufUsed<DbString, _> = Store::new(db.clone());
         test_persisted(
-            &reader,
+            &mut reader,
             &buf,
             [("a".into(), vec![V(5)]), ("c".into(), vec![V(9)])]
                 .iter()
@@ -498,15 +476,15 @@ async fn kvv_get_buffer() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kv", StoreOptions::create())?;
+    let db = env.inner().open_multi("kv")?;
 
-    arc.guard().with_reader(|reader| {
+    arc.guard().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
 
         buf.insert("a".into(), V(5));
         buf.insert("b".into(), V(4));
         buf.insert("c".into(), V(9));
-        let mut n = buf.get(&reader, DbString::from("b"))?;
+        let mut n = buf.get(&mut reader, DbString::from("b"))?;
         assert_eq!(n.next(), Some(Ok(V(4))));
 
         Ok(())
@@ -519,7 +497,7 @@ async fn kvv_get_persisted() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kv", StoreOptions::create())?;
+    let db = env.inner().open_multi("kv")?;
 
     {
         let mut buf = Store::new(db.clone());
@@ -532,10 +510,10 @@ async fn kvv_get_persisted() -> DatabaseResult<()> {
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
 
-    arc.guard().with_reader(|reader| {
+    arc.guard().with_reader(|mut reader| {
         let buf = Store::new(db.clone());
 
-        let mut n = buf.get(&reader, DbString::from("b"))?;
+        let mut n = buf.get(&mut reader, DbString::from("b"))?;
         assert_eq!(n.next(), Some(Ok(V(2))));
         Ok(())
     })
@@ -547,16 +525,16 @@ async fn kvv_get_del_buffer() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kv", StoreOptions::create())?;
+    let db = env.inner().open_multi("kv")?;
 
-    arc.guard().with_reader(|reader| {
+    arc.guard().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
 
         buf.insert("a".into(), V(5));
         buf.insert("b".into(), V(4));
         buf.insert("c".into(), V(9));
         buf.delete("b".into(), V(4));
-        let mut n = buf.get(&reader, DbString::from("b"))?;
+        let mut n = buf.get(&mut reader, DbString::from("b"))?;
         assert_eq!(n.next(), None);
         Ok(())
     })
@@ -568,7 +546,7 @@ async fn kvv_get_del_persisted() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kv", StoreOptions::create())?;
+    let db = env.inner().open_multi("kv")?;
 
     {
         let mut buf = Store::new(db.clone());
@@ -581,12 +559,12 @@ async fn kvv_get_del_persisted() -> DatabaseResult<()> {
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
 
-    arc.guard().with_reader(|reader| {
+    arc.guard().with_reader(|mut reader| {
         let mut buf: Store = Store::new(db.clone());
 
         buf.delete("b".into(), V(2));
         {
-            let mut n = buf.get(&reader, DbString::from("b"))?;
+            let mut n = buf.get(&mut reader, DbString::from("b"))?;
             assert_eq!(n.next(), None);
         }
 
@@ -594,10 +572,10 @@ async fn kvv_get_del_persisted() -> DatabaseResult<()> {
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))
     })?;
 
-    arc.guard().with_reader(|reader| {
+    arc.guard().with_reader(|mut reader| {
         let buf: KvvBufUsed<_, V> = Store::new(db.clone());
 
-        let mut n = buf.get(&reader, DbString::from("b"))?;
+        let mut n = buf.get(&mut reader, DbString::from("b"))?;
         assert_eq!(n.next(), None);
         Ok(())
     })

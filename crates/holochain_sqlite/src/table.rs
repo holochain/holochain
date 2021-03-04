@@ -162,7 +162,13 @@ impl Table {
         &self.name
     }
 
-    pub fn get<R: Readable, K: ToSql>(&self, reader: &R, k: K) -> StoreResult<Option<Value>> {
+    /// TODO: would be amazing if this could return a ValueRef instead.
+    ///       but I don't think it's possible. Could use a macro instead...
+    pub fn get<R: Readable, K: AsRef<[u8]>>(
+        &self,
+        reader: &mut R,
+        k: K,
+    ) -> DatabaseResult<Option<Value>> {
         Ok(reader.get(self, k)?)
     }
 
@@ -171,14 +177,14 @@ impl Table {
     #[deprecated = "unneeded in the context of SQL"]
     pub fn get_m<R: Readable, K: ToSql>(
         &self,
-        reader: &R,
+        reader: &mut R,
         k: K,
-    ) -> StoreResult<impl Iterator<Item = StoreResult<(K, Option<Value>)>>> {
+    ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<(K, Option<Value>)>>> {
         todo!();
         Ok(std::iter::empty())
     }
 
-    pub fn put<K: ToSql>(&self, writer: &mut Writer, k: K, v: &Value) -> StoreResult<()> {
+    pub fn put<K: ToSql>(&self, writer: &mut Writer, k: K, v: &Value) -> DatabaseResult<()> {
         todo!()
     }
 
@@ -188,55 +194,73 @@ impl Table {
         writer: &mut Writer,
         k: K,
         v: &Value,
-        flags: rkv::WriteFlags,
-    ) -> StoreResult<()> {
+        flags: (),
+    ) -> DatabaseResult<()> {
         todo!()
     }
 
-    pub fn delete<K: ToSql>(&self, writer: &mut Writer, k: K) -> StoreResult<()> {
+    pub fn delete<K: ToSql>(&self, writer: &mut Writer, k: K) -> DatabaseResult<()> {
         todo!()
     }
 
-    pub fn delete_all<K: ToSql>(&self, writer: &mut Writer, k: K) -> StoreResult<()> {
+    pub fn delete_all<K: ToSql>(&self, writer: &mut Writer, k: K) -> DatabaseResult<()> {
         todo!()
     }
 
     /// This handles the fact that deleting from an rkv::MultiTable requires
     /// passing the value to delete (deleting a particular kv pair)
     #[deprecated = "unneeded in the context of SQL"]
-    pub fn delete_m<K: ToSql>(&self, writer: &mut Writer, k: K, v: &Value) -> StoreResult<()> {
+    pub fn delete_m<K: ToSql>(&self, writer: &mut Writer, k: K, v: &Value) -> DatabaseResult<()> {
         todo!()
     }
 
     #[cfg(feature = "test_utils")]
-    pub fn clear(&mut self, writer: &mut Writer) -> StoreResult<()> {
+    pub fn clear(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         todo!()
     }
 }
 
+// TODO: probably remove
+// /// Macros to produce `impl Iterator` over a table's keys and values.
+// /// A macro is necessary to reduce boilerplate, since rusqlite's interface
+// /// requires preparing a statement and querying it in separate steps.
+// /// A normal function can't work with these intermediate values because the
+// /// borrow checker complains about dropped values
+// #[macro_export]
+// macro_rules! table_iter {
+//     (+ $table:ident) => {
+//         let stmt = txn.prepare_cached("SELECT (key, val) FROM ?1 ASC")?;
+//         stmt.query_map(params![table.name], |row| Ok((row.get(0)?, row.get(1)?)))?
+//     };
+//     (- $table:ident) => {
+//         let stmt = txn.prepare_cached("SELECT (key, val) FROM ?1 DESC")?;
+//         stmt.query_map(params![table.name], |row| Ok((row.get(0)?, row.get(1)?)))?
+//     };
+//     (+ $table:ident, $key:ident) => {
+//         let stmt = txn.prepare_cached("SELECT (key, val) FROM ?1 WHERE key >= ?2 ASC")?;
+//         stmt.query_map(params![table.name, $key], |row| {
+//             Ok((row.get(0)?, row.get(1)?))
+//         })?
+//     };
+// }
+
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
-    #[error("Error interacting with the underlying LMDB store: {0}")]
-    LmdbStoreError(#[from] failure::Compat<rkv::StoreError>),
+    #[error(transparent)]
+    SqlError(#[from] rusqlite::Error),
 }
 
 pub type StoreResult<T> = Result<T, StoreError>;
 
-impl From<rkv::StoreError> for StoreError {
-    fn from(e: rkv::StoreError) -> StoreError {
-        use failure::Fail;
-        StoreError::LmdbStoreError(e.compat())
-    }
-}
-
 impl StoreError {
     pub fn ok_if_not_found(self) -> StoreResult<()> {
-        match self {
-            StoreError::LmdbStoreError(err) => match err.into_inner() {
-                rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => Ok(()),
-                err => Err(err.into()),
-            },
-            err => Err(err),
-        }
+        todo!("implement for rusqlite errors")
+        // match self {
+        //     StoreError::LmdbStoreError(err) => match err.into_inner() {
+        //         rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => Ok(()),
+        //         err => Err(err.into()),
+        //     },
+        //     err => Err(err),
+        // }
     }
 }

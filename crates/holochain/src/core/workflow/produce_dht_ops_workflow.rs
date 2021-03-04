@@ -224,7 +224,7 @@ mod tests {
             // Get the authored ops
             let authored_results = workspace
                 .authored_dht_ops
-                .iter(&reader)
+                .iter(&mut reader)
                 .unwrap()
                 .map(|(k, v)| {
                     assert_matches!(
@@ -270,7 +270,7 @@ mod tests {
             let reader = g.reader().unwrap();
             let authored_count = workspace
                 .authored_dht_ops
-                .iter(&reader)
+                .iter(&mut reader)
                 .unwrap()
                 .count()
                 .unwrap();

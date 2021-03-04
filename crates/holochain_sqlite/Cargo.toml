@@ -27,7 +27,6 @@ must_future = "0.1.1"
 nanoid = "0.3.0"
 parking_lot = "0.10"
 rand = "0.7"
-rkv = "=0.10.4"
 rmp-serde = "0.15"
 serde = "1.0"
 serde_derive = "1.0"
@@ -54,6 +53,5 @@ rusqlite = { version = "0.24.1", features = [
 observability = { version = "0.1.3" }
 
 [features]
-default = [ "lmdb_no_tls", "test_utils" ]
-lmdb_no_tls = [ ]
+default = [ "test_utils" ]
 test_utils = [ ]

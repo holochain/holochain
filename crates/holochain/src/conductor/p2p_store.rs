@@ -145,7 +145,7 @@ impl AgentKv {
     /// Get a single agent info from the database
     pub fn get_agent_info<'r, R: Readable>(
         &'r self,
-        reader: &'r R,
+        reader: &'r mut R,
         space: DnaHash,
         agent: AgentPubKey,
     ) -> DatabaseResult<Option<AgentInfoSigned>> {
@@ -156,7 +156,7 @@ impl AgentKv {
     /// Get an iterator of the agent info stored in this database.
     pub fn iter<'r, R: Readable>(
         &'r self,
-        reader: &'r R,
+        reader: &'r mut R,
     ) -> DatabaseResult<
         impl FallibleIterator<Item = (AgentKvKey, AgentInfoSigned), Error = DatabaseError> + 'r,
     > {
@@ -188,8 +188,8 @@ pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
 /// Helper function to get all the peer data from this conductor
 pub fn all_agent_infos(env: DbRead) -> DatabaseResult<Vec<AgentInfoSigned>> {
     let p2p_store = AgentKv::new(env.clone())?;
-    fresh_reader!(env, |r| {
-        p2p_store.iter(&r)?.map(|(_, v)| Ok(v)).collect()
+    fresh_reader!(env, |mut r| {
+        p2p_store.iter(&mut r)?.map(|(_, v)| Ok(v)).collect()
     })
 }
 
@@ -200,7 +200,7 @@ pub fn get_single_agent_info(
     agent: AgentPubKey,
 ) -> DatabaseResult<Option<AgentInfoSigned>> {
     let p2p_store = AgentKv::new(env.clone())?;
-    fresh_reader!(env, |r| { p2p_store.get_agent_info(&r, space, agent) })
+    fresh_reader!(env, |mut r| { p2p_store.get_agent_info(&mut r, space, agent) })
 }
 
 /// Interconnect every provided pair of conductors via their peer store lmdb environments
@@ -459,9 +459,9 @@ mod tests {
         let p2p_store = AgentKv::new(env.clone().into()).unwrap();
 
         // - Check no data in the store to start
-        let count = fresh_reader_test!(env, |r| p2p_store
+        let count = fresh_reader_test!(env, |mut r| p2p_store
             .as_store_ref()
-            .iter(&r)
+            .iter(&mut r)
             .unwrap()
             .count()
             .unwrap());

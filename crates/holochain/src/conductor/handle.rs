@@ -550,7 +550,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
             .into_iter()
             // Remove successful and collect the errors
-            .filter_map(|r| r)
+            .filter_map(|mut r| r)
             .collect();
         Ok(r)
     }

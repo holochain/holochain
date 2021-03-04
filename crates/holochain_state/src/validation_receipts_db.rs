@@ -100,7 +100,7 @@ impl ValidationReceiptsBuf {
     /// List all the validation receipts for a given hash.
     pub fn list_receipts<'r, R: Readable>(
         &'r self,
-        r: &'r R,
+        r: &'r mut R,
         dht_op_hash: &'r DhtOpHash,
     ) -> DatabaseResult<
         impl fallible_iterator::FallibleIterator<
@@ -114,7 +114,7 @@ impl ValidationReceiptsBuf {
     /// Get the current valid receipt count for a given hash.
     pub fn count_valid<'r, R: Readable>(
         &'r self,
-        r: &'r R,
+        r: &'r mut R,
         dht_op_hash: &DhtOpHash,
     ) -> DatabaseResult<usize> {
         let mut count = 0;
@@ -208,10 +208,10 @@ mod tests {
         let reader = g.reader()?;
         let vr_buf = ValidationReceiptsBuf::new(&env)?;
 
-        assert_eq!(2, vr_buf.count_valid(&reader, &test_op_hash)?);
+        assert_eq!(2, vr_buf.count_valid(&mut reader, &test_op_hash)?);
 
         let mut list = vr_buf
-            .list_receipts(&reader, &test_op_hash)?
+            .list_receipts(&mut reader, &test_op_hash)?
             .collect::<Vec<_>>()?;
         list.sort_by(|a, b| {
             a.receipt

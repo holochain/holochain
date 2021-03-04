@@ -212,7 +212,7 @@ impl Db {
                     };
                     let res = workspace
                         .integration_limbo
-                        .iter(&reader)
+                        .iter(&mut reader)
                         .unwrap()
                         .filter_map(|(_, v)| if v == value { Ok(Some(v)) } else { Ok(None) })
                         .collect::<Vec<_>>()
@@ -294,7 +294,7 @@ impl Db {
                     let entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
                     let res = workspace
                         .meta
-                        .get_headers(&reader, entry_hash)
+                        .get_headers(&mut reader, entry_hash)
                         .unwrap()
                         .collect::<Vec<_>>()
                         .unwrap();
@@ -306,7 +306,7 @@ impl Db {
                     let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
-                        .get_activity(&reader, ChainItemKey::new(&header, ValidationStatus::Valid))
+                        .get_activity(&mut reader, ChainItemKey::new(&header, ValidationStatus::Valid))
                         .unwrap()
                         .collect::<Vec<_>>()
                         .unwrap();
@@ -318,7 +318,7 @@ impl Db {
                     let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
-                        .get_updates(&reader, base)
+                        .get_updates(&mut reader, base)
                         .unwrap()
                         .collect::<Vec<_>>()
                         .unwrap();
@@ -331,7 +331,7 @@ impl Db {
                     let res = workspace
                         .meta
                         .get_deletes_on_entry(
-                            &reader,
+                            &mut reader,
                             Delete::try_from(header).unwrap().deletes_entry_address,
                         )
                         .unwrap()
@@ -339,7 +339,7 @@ impl Db {
                         .unwrap();
                     let res2 = workspace
                         .meta
-                        .get_deletes_on_header(&reader, deleted_header_hash)
+                        .get_deletes_on_header(&mut reader, deleted_header_hash)
                         .unwrap()
                         .collect::<Vec<_>>()
                         .unwrap();
@@ -351,7 +351,7 @@ impl Db {
                     assert_eq!(
                         workspace
                             .integrated_dht_ops
-                            .iter(&reader)
+                            .iter(&mut reader)
                             .unwrap()
                             .count()
                             .unwrap(),
@@ -364,7 +364,7 @@ impl Db {
                     assert_eq!(
                         workspace
                             .integration_limbo
-                            .iter(&reader)
+                            .iter(&mut reader)
                             .unwrap()
                             .count()
                             .unwrap(),
@@ -402,7 +402,7 @@ impl Db {
                     for link_meta_key in link_meta_keys {
                         let res = workspace
                             .meta
-                            .get_live_links(&reader, &link_meta_key)
+                            .get_live_links(&mut reader, &link_meta_key)
                             .unwrap()
                             .collect::<Vec<_>>()
                             .unwrap();
@@ -440,7 +440,7 @@ impl Db {
                     for link_meta_key in link_meta_keys {
                         let res = workspace
                             .meta
-                            .get_live_links(&reader, &link_meta_key)
+                            .get_live_links(&mut reader, &link_meta_key)
                             .unwrap()
                             .collect::<Vec<_>>()
                             .unwrap();
@@ -1212,7 +1212,7 @@ async fn test_wasm_api_without_integration_delete() {
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let entry_header = workspace
             .meta_authored
-            .get_headers(&reader, base_address.clone())
+            .get_headers(&mut reader, base_address.clone())
             .unwrap()
             .next()
             .unwrap()
@@ -1402,7 +1402,7 @@ mod slow_tests {
                 .get_table(TableName::IntegratedDhtOps)
                 .unwrap();
             let ops_db = IntegratedDhtOpsStore::new(call_data.env.clone().into(), db);
-            let ops = ops_db.iter(&reader).unwrap().collect::<Vec<_>>().unwrap();
+            let ops = ops_db.iter(&mut reader).unwrap().collect::<Vec<_>>().unwrap();
             debug!(?ops);
             assert!(!ops.is_empty());
 
@@ -1410,7 +1410,7 @@ mod slow_tests {
             let meta = MetadataBuf::vault(call_data.env.clone().into()).unwrap();
             let key = LinkMetaKey::Base(&base_entry_hash);
             let links = meta
-                .get_live_links(&reader, &key)
+                .get_live_links(&mut reader, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();

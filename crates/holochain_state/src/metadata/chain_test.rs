@@ -41,22 +41,22 @@ async fn check_different_seq_num_on_separate_queries() {
 
     let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 1);
     assert_eq!(
-        meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
+        meta_buf.get_activity(&mut reader, k).unwrap().count().unwrap(),
         1
     );
     let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 2);
     assert_eq!(
-        meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
+        meta_buf.get_activity(&mut reader, k).unwrap().count().unwrap(),
         1
     );
     let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 0);
     assert_eq!(
-        meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
+        meta_buf.get_activity(&mut reader, k).unwrap().count().unwrap(),
         0
     );
     let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 3);
     assert_eq!(
-        meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
+        meta_buf.get_activity(&mut reader, k).unwrap().count().unwrap(),
         0
     );
 }
@@ -80,27 +80,27 @@ async fn check_equal_seq_num_on_same_query() {
 
     let k = ChainItemKey::new(&h1, ValidationStatus::Valid);
     assert_eq!(
-        meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
+        meta_buf.get_activity(&mut reader, k).unwrap().count().unwrap(),
         1
     );
     let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 1);
     assert_eq!(
-        meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
+        meta_buf.get_activity(&mut reader, k).unwrap().count().unwrap(),
         2
     );
     let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 2);
     assert_eq!(
-        meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
+        meta_buf.get_activity(&mut reader, k).unwrap().count().unwrap(),
         0
     );
     let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 0);
     assert_eq!(
-        meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
+        meta_buf.get_activity(&mut reader, k).unwrap().count().unwrap(),
         0
     );
     let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 3);
     assert_eq!(
-        meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
+        meta_buf.get_activity(&mut reader, k).unwrap().count().unwrap(),
         0
     );
 }
@@ -120,13 +120,13 @@ async fn chain_item_keys_ser() {
 
     let k = ChainItemKey::new(&h, ValidationStatus::Valid);
     assert_eq!(
-        meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
+        meta_buf.get_activity(&mut reader, k).unwrap().count().unwrap(),
         1
     );
 
     let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 1);
     let mut headers: Vec<_> = meta_buf
-        .get_activity(&reader, k)
+        .get_activity(&mut reader, k)
         .unwrap()
         .collect()
         .unwrap();
@@ -156,7 +156,7 @@ async fn check_large_seq_queries() {
     let k = ChainItemKey::Agent(agent_pubkey.clone());
     assert_eq!(
         &meta_buf
-            .get_activity_sequence(&reader, k)
+            .get_activity_sequence(&mut reader, k)
             .unwrap()
             .collect::<Vec<_>>()
             .unwrap()[..],

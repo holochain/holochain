@@ -52,7 +52,7 @@ where
     K: BufKey,
     V: BufMultiVal,
 {
-    db: MultiTable,
+    table: MultiTable,
     scratch: BTreeMap<K, ValuesDelta<V>>,
     no_dup_data: bool,
 }
@@ -63,15 +63,15 @@ where
     V: BufMultiVal + Debug,
 {
     /// Create a new KvvBufUsed
-    pub fn new(db: MultiTable) -> Self {
-        Self::new_opts(db, false)
+    pub fn new(table: MultiTable) -> Self {
+        Self::new_opts(table, false)
     }
 
     /// Create a new KvvBufUsed
     /// also allow switching to no_dup_data mode.
-    pub fn new_opts(db: MultiTable, no_dup_data: bool) -> Self {
+    pub fn new_opts(table: MultiTable, no_dup_data: bool) -> Self {
         Self {
-            db,
+            table,
             scratch: BTreeMap::new(),
             no_dup_data,
         }
@@ -82,7 +82,7 @@ where
     // #[instrument(skip(self, r))]
     // pub fn get<'r, R: Readable, KK: 'r + Debug + AsRef<K>>(
     //     &'r self,
-    //     r: &'r R,
+    //     r: &'r mut R,
     //     k: KK,
     // ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>> + 'r> {
 
@@ -91,7 +91,7 @@ where
     #[instrument(skip(self, r))]
     pub fn get<'r, R: Readable, KK: 'r + Debug + std::borrow::Borrow<K>>(
         &'r self,
-        r: &'r R,
+        r: &'r mut R,
         k: KK,
     ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>> + 'r> {
         todo!("Revisit later, too much to consider for the current basic type refactor");
@@ -128,7 +128,7 @@ where
                 from_scratch_space
                     // Otherwise, chain it with the persisted content,
                     // skipping only things that we've specifically deleted or returned.
-                    .chain(persisted.filter(move |r| match r {
+                    .chain(persisted.filter(move |mut r| match r {
                         Ok(v) => !deltas.contains_key(v),
                         Err(_e) => true,
                     })),
@@ -165,16 +165,16 @@ where
     #[instrument(skip(self, r))]
     fn get_persisted<'r, R: Readable>(
         &'r self,
-        r: &'r R,
+        r: &'r mut R,
         k: &'r K,
     ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>> + 'r> {
         let s = trace_span!("persisted");
         let _g = s.enter();
         trace!("test");
-        let iter = self.db.get_m(r, k)?;
+        let iter = self.table.get_m(r, k)?;
         Ok(iter.filter_map(|v| match v {
             Ok((_, Some(rusqlite::types::Value::Blob(buf)))) => Some(
-                holochain_serialized_bytes::decode(buf)
+                holochain_serialized_bytes::decode(&buf)
                     .map(|n| {
                         trace!(?n);
                         n
@@ -207,10 +207,10 @@ where
     }
 
     // TODO: This should be cfg test but can't because it's in a different crate
-    /// Clear all scratch and db, useful for tests
+    /// Clear all scratch and table, useful for tests
     pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         self.scratch.clear();
-        Ok(self.db.clear(writer)?)
+        Ok(self.table.clear(writer)?)
     }
 }
 
@@ -234,7 +234,7 @@ where
             // If delete_all is set, that we should delete everything persisted,
             // but then continue to add inserts from the ops, if present
             if *delete_all {
-                self.db.delete_all(writer, k.clone())?;
+                self.table.delete_all(writer, k.clone())?;
             }
             trace!(?k);
             trace!(?deltas);
@@ -243,14 +243,14 @@ where
                 match op {
                     Insert => {
                         let buf = holochain_serialized_bytes::encode(&v)?;
-                        let encoded = rusqlite::types::Value::Blob(&buf);
+                        let encoded = rusqlite::types::Value::Blob(buf);
                         if self.no_dup_data {
-                            self.db
+                            self.table
                                 .put_with_flags(
                                     writer,
                                     k.clone(),
                                     &encoded,
-                                    rkv::WriteFlags::NO_DUP_DATA,
+                                    (), //rkv::WriteFlags::NO_DUP_DATA,
                                 )
                                 .or_else(|err| {
                                     todo!(
@@ -270,7 +270,7 @@ where
                                     // }
                                 })?;
                         } else {
-                            self.db.put(writer, k.clone(), &encoded)?;
+                            self.table.put(writer, k.clone(), &encoded)?;
                         }
                     }
                     // Skip deleting unnecessarily if we have already deleted
@@ -278,10 +278,10 @@ where
                     Delete if *delete_all => {}
                     Delete => {
                         let buf = holochain_serialized_bytes::encode(&v)?;
-                        let encoded = rusqlite::types::Value::Blob(&buf);
-                        self.db
+                        let encoded = rusqlite::types::Value::Blob(buf);
+                        self.table
                             .delete_m(writer, k.clone(), &encoded)
-                            .or_else(StoreError::ok_if_not_found)?;
+                            .or_else(DatabaseError::ok_if_not_found)?;
                     }
                 }
             }
@@ -299,7 +299,7 @@ where
 {
     fn from(other: &KvvBufUsed<K, V>) -> Self {
         Self {
-            db: other.db.clone(),
+            table: other.table.clone(),
             scratch: other.scratch.clone(),
             no_dup_data: other.no_dup_data,
         }

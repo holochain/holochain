@@ -25,14 +25,12 @@ where
 }
 
 /// Key for adding a prefix to a bytes key
-#[derive(PartialOrd, Ord, PartialEq, Eq, derive_more::AsRef, Debug, Clone)]
-#[as_ref(forward)]
+#[derive(PartialOrd, Ord, PartialEq, Eq, Debug, Clone)]
 pub struct PrefixBytesKey<P = IntegratedPrefix>
 where
     P: PrefixType,
 {
     prefix_and_bytes: Vec<u8>,
-    #[as_ref(ignore)]
     __phantom: PhantomData<P>,
 }
 
@@ -144,6 +142,12 @@ impl<P: PrefixType> AsRef<[u8]> for PrefixHashKey<P> {
     }
 }
 
+impl<P: PrefixType> ToSql for PrefixHashKey<P> {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        Ok(rusqlite::types::ToSqlOutput::Borrowed(self.as_ref().into()))
+    }
+}
+
 impl<P: PrefixType> PartialEq for PrefixHashKey<P> {
     fn eq(&self, other: &PrefixHashKey<P>) -> bool {
         self.prefix_and_hash[..] == other.prefix_and_hash[..]
@@ -161,6 +165,18 @@ impl<P: PrefixType> PartialOrd for PrefixHashKey<P> {
 impl<P: PrefixType> Ord for PrefixHashKey<P> {
     fn cmp(&self, other: &PrefixHashKey<P>) -> Ordering {
         Ord::cmp(&&self.prefix_and_hash[..], &&other.prefix_and_hash[..])
+    }
+}
+
+impl<P: PrefixType> AsRef<[u8]> for PrefixBytesKey<P> {
+    fn as_ref(&self) -> &[u8] {
+        &self.prefix_and_bytes[..]
+    }
+}
+
+impl<P: PrefixType> ToSql for PrefixBytesKey<P> {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        Ok(rusqlite::types::ToSqlOutput::Borrowed(self.as_ref().into()))
     }
 }
 

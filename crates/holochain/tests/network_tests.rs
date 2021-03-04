@@ -145,7 +145,7 @@ let reader = g.reader().unwrap();
         workspace
             .meta_cache
             .get_headers(
-                &reader,
+                &mut reader,
                 match expected.0.hash_type().clone() {
                     hash_type::AnyDht::Entry => expected.0.clone().into(),
                     _ => unreachable!(),

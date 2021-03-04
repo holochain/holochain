@@ -48,7 +48,7 @@ impl ChainSequenceBuf {
         let buf: Store =
             KvIntBufFresh::new(env.clone(), env.get_table_i(TableName::ChainSequence)?);
         let (next_index, tx_seq, current_head) =
-            fresh_reader!(env, |r| { Self::head_info(buf.store(), &r) })?;
+            fresh_reader!(env, |mut r| { Self::head_info(buf.store(), &mut r) })?;
         let persisted_head = current_head.clone();
 
         Ok(ChainSequenceBuf {
@@ -62,7 +62,7 @@ impl ChainSequenceBuf {
 
     fn head_info<R: Readable>(
         store: &KvIntStore<ChainSequenceItem>,
-        r: &R,
+        r: &mut R,
     ) -> DatabaseResult<(u32, u32, Option<HeaderHash>)> {
         let latest = store.iter(r)?.next_back()?;
         debug!("{:?}", latest);
@@ -123,7 +123,7 @@ impl ChainSequenceBuf {
 
     pub fn get_items_with_incomplete_dht_ops<'txn, R: Readable>(
         &self,
-        r: &'txn R,
+        r: &'txn mut R,
     ) -> SourceChainResult<
         Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + 'txn>,
     > {
@@ -330,7 +330,7 @@ pub mod tests {
             let items: Vec<u32> = buf
                 .buf
                 .store()
-                .iter(&reader)?
+                .iter(&mut reader)?
                 .map(|(key, _)| Ok(IntKey::from_key_bytes_or_friendly_panic(key).into()))
                 .collect()?;
             assert_eq!(items, vec![0, 1, 2]);
@@ -379,7 +379,7 @@ pub mod tests {
             let items: Vec<u32> = buf
                 .buf
                 .store()
-                .iter(&reader)?
+                .iter(&mut reader)?
                 .map(|(_, i)| Ok(i.tx_seq))
                 .collect()?;
             assert_eq!(items, vec![0, 0, 0, 1, 1, 1]);

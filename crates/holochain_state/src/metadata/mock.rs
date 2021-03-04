@@ -133,7 +133,7 @@ mock! {
 impl MetadataBufT for MockMetadataBuf {
     fn get_live_links<'r, 'k, R: Readable>(
         &'r self,
-        _r: &'r R,
+        _r: &'r mut R,
         key: &'k LinkMetaKey<'k>,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>
     {
@@ -142,7 +142,7 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn get_links_all<'r, 'k, R: Readable>(
         &'r self,
-        _r: &'r R,
+        _r: &'r mut R,
         key: &'k LinkMetaKey<'k>,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>
     {
@@ -155,7 +155,7 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn get_dht_status<'r, R: Readable>(
         &'r self,
-        _r: &'r R,
+        _r: &'r mut R,
         entry_hash: &EntryHash,
     ) -> DatabaseResult<EntryDhtStatus> {
         MockMetadataBuf::get_dht_status(&self, entry_hash)
@@ -167,7 +167,7 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn get_headers<'r, R: Readable>(
         &'r self,
-        _reader: &'r R,
+        _reader: &'r mut R,
         entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
@@ -176,7 +176,7 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn get_rejected_headers<'r, R: Readable>(
         &'r self,
-        _reader: &'r R,
+        _reader: &'r mut R,
         entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
@@ -185,7 +185,7 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn get_all_headers<'r, R: Readable>(
         &'r self,
-        _reader: &'r R,
+        _reader: &'r mut R,
         entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
@@ -194,7 +194,7 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn get_activity<'r, R: Readable>(
         &'r self,
-        _reader: &'r R,
+        _reader: &'r mut R,
         key: ChainItemKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
@@ -202,7 +202,7 @@ impl MetadataBufT for MockMetadataBuf {
     }
     fn get_activity_sequence<'r, R: Readable>(
         &'r self,
-        _r: &'r R,
+        _r: &'r mut R,
         key: ChainItemKey,
     ) -> DatabaseResult<
         Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + '_>,
@@ -212,7 +212,7 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn get_validation_package<'r, R: Readable>(
         &'r self,
-        _r: &'r R,
+        _r: &'r mut R,
         hash: &HeaderHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
@@ -232,7 +232,7 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn get_updates<'r, R: Readable>(
         &'r self,
-        _reader: &'r R,
+        _reader: &'r mut R,
         hash: AnyDhtHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
@@ -241,7 +241,7 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn get_deletes_on_header<'r, R: Readable>(
         &'r self,
-        _reader: &'r R,
+        _reader: &'r mut R,
         new_entry_header: HeaderHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
@@ -250,7 +250,7 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn get_deletes_on_entry<'r, R: Readable>(
         &'r self,
-        _reader: &'r R,
+        _reader: &'r mut R,
         entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
@@ -259,7 +259,7 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn get_link_removes_on_link_add<'r, R: Readable>(
         &'r self,
-        _reader: &'r R,
+        _reader: &'r mut R,
         link_add: HeaderHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
@@ -267,7 +267,7 @@ impl MetadataBufT for MockMetadataBuf {
     }
     fn get_validation_status<'r, R: Readable>(
         &'r self,
-        _r: &'r R,
+        _r: &'r mut R,
         hash: &HeaderHash,
     ) -> DatabaseResult<DisputedStatus> {
         self.get_validation_status(hash)

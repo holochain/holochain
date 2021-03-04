@@ -217,11 +217,7 @@ pub struct ConnInner;
 
 impl ConnInner {
     /// SHIM
-    pub fn open_single<'s, T>(
-        &self,
-        name: T,
-        opts: rkv::StoreOptions,
-    ) -> Result<SingleTable, StoreError>
+    pub fn open_single<'s, T>(&self, name: T) -> Result<SingleTable, StoreError>
     where
         T: Into<Option<&'s str>>,
     {
@@ -229,11 +225,7 @@ impl ConnInner {
     }
 
     /// SHIM
-    pub fn open_integer<'s, T>(
-        &self,
-        name: T,
-        mut opts: rkv::StoreOptions,
-    ) -> Result<IntegerTable, StoreError>
+    pub fn open_integer<'s, T>(&self, name: T) -> Result<IntegerTable, StoreError>
     where
         T: Into<Option<&'s str>>,
     {
@@ -241,11 +233,7 @@ impl ConnInner {
     }
 
     /// SHIM
-    pub fn open_multi<'s, T>(
-        &self,
-        name: T,
-        mut opts: rkv::StoreOptions,
-    ) -> Result<MultiTable, StoreError>
+    pub fn open_multi<'s, T>(&self, name: T) -> Result<MultiTable, StoreError>
     where
         T: Into<Option<&'s str>>,
     {

@@ -7,6 +7,7 @@ use holo_hash::PrimitiveHashType;
 use holo_hash::HOLO_HASH_FULL_LEN;
 use holochain_serialized_bytes::prelude::*;
 pub use prefix::*;
+use rusqlite::ToSql;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::cmp::Ordering;
@@ -14,7 +15,7 @@ use std::cmp::Ordering;
 mod prefix;
 
 /// Any key type used in a [KvStore] or [KvvStore] must implement this trait
-pub trait BufKey: Sized + Ord + Eq + AsRef<[u8]> + Send + Sync {
+pub trait BufKey: Sized + Ord + Eq + AsRef<[u8]> + ToSql + Send + Sync {
     /// Convert to the key bytes.
     ///
     /// This is provided by the AsRef impl by default, but can be overridden if
@@ -32,8 +33,8 @@ pub trait BufKey: Sized + Ord + Eq + AsRef<[u8]> + Send + Sync {
 }
 
 /// Trait alias for the combination of constraints needed for keys in [KvIntStore](kv_int::KvIntStore)
-pub trait BufIntKey: Ord + Eq + rkv::store::integer::PrimitiveInt + Send + Sync {}
-impl<T> BufIntKey for T where T: Ord + Eq + rkv::store::integer::PrimitiveInt + Send + Sync {}
+pub trait BufIntKey: Ord + Eq + Send + Sync {}
+impl<T> BufIntKey for T where T: Ord + Eq + Send + Sync {}
 
 /// Trait alias for the combination of constraints needed for values in [KvStore](kv::KvStore) and [KvIntStore](kv_int::KvIntStore)
 pub trait BufVal: Clone + Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync {}
@@ -49,8 +50,6 @@ impl<T> BufMultiVal for T where T: Ord + Eq + Clone + Serialize + DeserializeOwn
 /// database abstractions
 #[derive(Copy, PartialOrd, Ord, PartialEq, Eq, Clone, Serialize, serde::Deserialize)]
 pub struct IntKey([u8; 4]);
-
-impl rkv::store::integer::PrimitiveInt for IntKey {}
 
 impl BufKey for IntKey {
     fn from_key_bytes_or_friendly_panic(vec: &[u8]) -> Self {
@@ -70,6 +69,12 @@ impl BufKey for IntKey {
 impl AsRef<[u8]> for IntKey {
     fn as_ref(&self) -> &[u8] {
         &self.0
+    }
+}
+
+impl ToSql for IntKey {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        Ok(rusqlite::types::ToSqlOutput::Borrowed(self.as_ref().into()))
     }
 }
 
@@ -107,6 +112,12 @@ pub struct UnitDbKey;
 impl AsRef<[u8]> for UnitDbKey {
     fn as_ref(&self) -> &[u8] {
         ARBITRARY_BYTE_SLICE
+    }
+}
+
+impl ToSql for UnitDbKey {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        Ok(rusqlite::types::ToSqlOutput::Borrowed(self.as_ref().into()))
     }
 }
 

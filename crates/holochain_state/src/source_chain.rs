@@ -107,14 +107,14 @@ impl SourceChain {
         // if we are here then the caller is not the current agent so we need to search the source
         // chain to see if there is a local grant that is valid for the provided secret/agent
         // combination
-        let committed_valid_grant = fresh_reader!(self.env(), |r| {
+        let committed_valid_grant = fresh_reader!(self.env(), |mut r| {
             let (references, headers): (
                 HashSet<HeaderHash>,
                 Vec<HoloHashed<holochain_zome_types::element::SignedHeader>>,
             ) = self
                 .0
                 .headers()
-                .iter_fail(&r)?
+                .iter_fail(&mut r)?
                 .filter(|header| {
                     Ok(match header.as_content().header() {
                         Header::Create(create) => {
@@ -177,7 +177,7 @@ impl SourceChain {
             .expect(
                 "SourceChainBuf must have access to private entries in order to access CapGrants",
             )
-            .iter_fail(&r)?
+            .iter_fail(&mut r)?
             // ensure we respect the header filtering we already did above
             .filter(|entry| {
                 Ok(live_cap_grants.contains(entry.as_hash()))
@@ -246,7 +246,7 @@ impl SourceChain {
     //             &self,
     //             query: &CapSecret,
     //         ) -> SourceChainResult<Option<CapClaim>> {
-    //             let hashes_n_claims: Vec<_> = fresh_reader!(self.env(), |r| {
+    //             let hashes_n_claims: Vec<_> = fresh_reader!(self.env(), |mut r| {
     //                 self
     //                 .0
     //                 .elements()
@@ -254,7 +254,7 @@ impl SourceChain {
     //                 .expect(
     //                     "SourceChainBuf must have access to private entries in order to access CapClaims",
     //                 )
-    //                 .iter_fail(&r)?
+    //                 .iter_fail(&mut r)?
     //                 .filter_map(|entry| {
     //                     if let (Entry::CapClaim(claim), entry_hash) = entry.into_inner() {
     //                         Ok(Some((entry_hash, claim)))

@@ -67,7 +67,7 @@ where
     /// Get a value from the underlying [KvBufUsed]
     pub fn get<'r, 'a: 'r, R: Readable>(
         &'a self,
-        r: &'r R,
+        r: &'r mut R,
         hash: &'a HoloHashOf<C>,
     ) -> DatabaseResult<Option<HoloHashed<C>>> {
         let k = PrefixHashKey::new(hash.as_hash());
@@ -79,7 +79,11 @@ where
     }
 
     /// Check if a value is stored at this key
-    pub fn contains<'r, R: Readable>(&self, r: &'r R, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
+    pub fn contains<'r, R: Readable>(
+        &self,
+        r: &'r mut R,
+        k: &HoloHashOf<C>,
+    ) -> DatabaseResult<bool> {
         let k = PrefixHashKey::new(k.as_hash());
         self.0.contains(r, &k)
     }
@@ -93,7 +97,7 @@ where
     /// Iterate over the underlying persisted data taking the scratch space into consideration
     pub fn iter_fail<'r, R: Readable>(
         &'r self,
-        r: &'r R,
+        r: &'r mut R,
     ) -> DatabaseResult<impl FallibleIterator<Item = HoloHashed<C>, Error = DatabaseError> + 'r>
     {
         Ok(Box::new(self.0.iter(r)?.map(|(h, c)| {
@@ -155,12 +159,12 @@ where
 
     /// Get a value from the underlying [KvBufFresh]
     pub fn get<'a>(&'a self, hash: &'a HoloHashOf<C>) -> DatabaseResult<Option<HoloHashed<C>>> {
-        fresh_reader!(self.env, |r| self.inner.get(&r, hash))
+        fresh_reader!(self.env, |mut r| self.inner.get(&mut r, hash))
     }
 
     /// Check if a value is stored at this key
     pub fn contains(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
-        fresh_reader!(self.env, |r| self.inner.contains(&r, k))
+        fresh_reader!(self.env, |mut r| self.inner.contains(&mut r, k))
     }
 
     /// Check if a value is in the scratch space

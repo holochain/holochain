@@ -6,19 +6,18 @@ use crate::{
     error::{DatabaseError, DatabaseResult},
     test_utils::test_cell_env,
 };
-use rkv::StoreOptions;
 
 #[tokio::test(threaded_scheduler)]
 async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
-    let db2 = env.inner().open_single("kv1", StoreOptions::create())?;
+    let db1 = env.inner().open_single("kv1")?;
+    let db2 = env.inner().open_single("kv1")?;
 
     let testval = DbString::from("Joe");
 
-    arc.guard().with_reader::<DatabaseError, _, _>(|reader| {
+    arc.guard().with_reader::<DatabaseError, _, _>(|mut reader| {
         let mut kv1: KvBufUsed<DbString, DbString> = KvBufUsed::new(db1)?;
         let mut kv2: KvBufUsed<DbString, DbString> = KvBufUsed::new(db2)?;
 
@@ -26,13 +25,13 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
             kv1.put("hi".into(), testval.clone()).unwrap();
             kv2.put("salutations".into(), "folks".into()).unwrap();
             // Check that the underlying store contains no changes yet
-            assert_eq!(kv1.store().get(&reader, &"hi".into())?, None);
-            assert_eq!(kv2.store().get(&reader, &"salutations".into())?, None);
+            assert_eq!(kv1.store().get(&mut reader, &"hi".into())?, None);
+            assert_eq!(kv2.store().get(&mut reader, &"salutations".into())?, None);
 
             // Check that the values are available due to the scratch space
-            assert_eq!(kv1.get(&reader, &"hi".into())?, Some(testval.clone()));
+            assert_eq!(kv1.get(&mut reader, &"hi".into())?, Some(testval.clone()));
             assert_eq!(
-                kv2.get(&reader, &"salutations".into())?,
+                kv2.get(&mut reader, &"salutations".into())?,
                 Some("folks".into())
             );
 
@@ -46,21 +45,21 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 
         arc.guard().with_commit(|writer| {
             let kv1a: KvBufUsed<DbString, DbString> = KvBufUsed::new(db1)?;
-            assert_eq!(kv1a.store().get(&reader, &"hi".into())?, None);
+            assert_eq!(kv1a.store().get(&mut reader, &"hi".into())?, None);
             kv2.flush_to_txn(writer)
         })?;
 
         Ok(())
     })?;
 
-    arc.guard().with_reader(|reader| {
+    arc.guard().with_reader(|mut reader| {
         // Now open some fresh Readers to see that our data was persisted
         let kv1b: KvBufUsed<DbString, DbString> = KvBufUsed::new(db1)?;
         let kv2b: KvBufUsed<DbString, DbString> = KvBufUsed::new(db2)?;
         // Check that the underlying store contains no changes yet
-        assert_eq!(kv1b.store().get(&reader, &"hi".into())?, Some(testval));
+        assert_eq!(kv1b.store().get(&mut reader, &"hi".into())?, Some(testval));
         assert_eq!(
-            kv2b.store().get(&reader, &"salutations".into())?,
+            kv2b.store().get(&mut reader, &"salutations".into())?,
             Some("folks".into())
         );
         Ok(())
@@ -101,9 +100,9 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 //     let test_env = test_cell_env();
 //     let arc = test_env.env();
 //     let mut env = arc.guard();
-//     let db = env.inner().open_single("kv", StoreOptions::create())?;
+//     let db = env.inner().open_single("kv")?;
 
-//     arc.guard().with_reader::<DatabaseError, _, _>(|reader| {
+//     arc.guard().with_reader::<DatabaseError, _, _>(|mut reader| {
 //         let mut buf: TestBuf = KvBufUsed::new)?;
 
 //         buf.put("a", V(1)).unwrap();
@@ -116,7 +115,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 //         Ok(())
 //     })?;
 
-//     arc.guard().with_reader(|reader| {
+//     arc.guard().with_reader(|mut reader| {
 //         let buf: TestBuf = KvBufUsed::new)?;
 
 //         let forward: Vec<_> = buf.iter_raw()?.map(|(_, v)| Ok(v)).collect().unwrap();
@@ -139,10 +138,10 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 //     let mut env = arc.guard();
 //     let db = env
 //         .inner()
-//         .open_single("kv", StoreOptions::create())
+//         .open_single("kv")
 //         .unwrap();
 
-//     arc.guard().with_reader(|reader| {
+//     arc.guard().with_reader(|mut reader| {
 //         let buf: TestBuf = KvBufUsed::new( db();
 
 //         let forward: Vec<_> = buf.iter_raw().unwrap().collect().unwrap();

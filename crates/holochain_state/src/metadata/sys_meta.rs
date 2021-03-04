@@ -331,7 +331,7 @@ mod tests {
                     .unwrap();
             }
             let mut headers = meta_buf
-                .get_headers(&reader, entry_hash.clone())
+                .get_headers(&mut reader, entry_hash.clone())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -346,7 +346,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
-                .get_headers(&reader, entry_hash.clone())
+                .get_headers(&mut reader, entry_hash.clone())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -389,7 +389,7 @@ mod tests {
                 meta_buf.register_update(update).unwrap();
             }
             let mut headers = meta_buf
-                .get_updates(&reader, original_entry_hash.clone().into())
+                .get_updates(&mut reader, original_entry_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -404,7 +404,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
-                .get_updates(&reader, original_entry_hash.into())
+                .get_updates(&mut reader, original_entry_hash.into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -447,7 +447,7 @@ mod tests {
                 meta_buf.register_update(update).unwrap();
             }
             let mut headers = meta_buf
-                .get_updates(&reader, original_entry_hash.clone().into())
+                .get_updates(&mut reader, original_entry_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -462,7 +462,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
-                .get_updates(&reader, original_entry_hash.into())
+                .get_updates(&mut reader, original_entry_hash.into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -495,7 +495,7 @@ mod tests {
                 meta_buf.register_delete(delete).unwrap();
             }
             let mut headers = meta_buf
-                .get_deletes_on_header(&reader, header_hash.clone().into())
+                .get_deletes_on_header(&mut reader, header_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -510,7 +510,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
-                .get_deletes_on_header(&reader, header_hash.clone().into())
+                .get_deletes_on_header(&mut reader, header_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -589,7 +589,7 @@ mod tests {
         )
         .await;
         let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
+            .get_dht_status(&mut reader, &entry_hash.clone().into())
             .unwrap();
         assert_eq!(status, EntryDhtStatus::Live);
         update_dbs(
@@ -602,7 +602,7 @@ mod tests {
         )
         .await;
         let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
+            .get_dht_status(&mut reader, &entry_hash.clone().into())
             .unwrap();
         assert_eq!(status, EntryDhtStatus::Dead);
 
@@ -617,7 +617,7 @@ mod tests {
         )
         .await;
         let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
+            .get_dht_status(&mut reader, &entry_hash.clone().into())
             .unwrap();
         assert_eq!(status, EntryDhtStatus::Dead);
 
@@ -643,7 +643,7 @@ mod tests {
         )
         .await;
         let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
+            .get_dht_status(&mut reader, &entry_hash.clone().into())
             .unwrap();
         assert_eq!(status, EntryDhtStatus::Live);
 
@@ -658,7 +658,7 @@ mod tests {
         )
         .await;
         let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
+            .get_dht_status(&mut reader, &entry_hash.clone().into())
             .unwrap();
         assert_eq!(status, EntryDhtStatus::Dead);
 
@@ -673,7 +673,7 @@ mod tests {
         )
         .await;
         let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
+            .get_dht_status(&mut reader, &entry_hash.clone().into())
             .unwrap();
         assert_eq!(status, EntryDhtStatus::Live);
 
@@ -688,7 +688,7 @@ mod tests {
         )
         .await;
         let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
+            .get_dht_status(&mut reader, &entry_hash.clone().into())
             .unwrap();
         assert_eq!(status, EntryDhtStatus::Dead);
     }
@@ -727,7 +727,7 @@ mod tests {
         )
         .await;
         let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
+            .get_dht_status(&mut reader, &entry_hash.clone().into())
             .unwrap();
         assert_eq!(status, EntryDhtStatus::Live);
         update_dbs(
@@ -740,7 +740,7 @@ mod tests {
         )
         .await;
         let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
+            .get_dht_status(&mut reader, &entry_hash.clone().into())
             .unwrap();
         assert_eq!(status, EntryDhtStatus::Live);
         update_dbs(
@@ -753,7 +753,7 @@ mod tests {
         )
         .await;
         let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
+            .get_dht_status(&mut reader, &entry_hash.clone().into())
             .unwrap();
         assert_eq!(status, EntryDhtStatus::Dead);
     }

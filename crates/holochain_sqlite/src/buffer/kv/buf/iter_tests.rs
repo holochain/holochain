@@ -12,7 +12,6 @@ use crate::test_utils::DbString;
 use ::fixt::prelude::*;
 use fallible_iterator::DoubleEndedFallibleIterator;
 use fallible_iterator::FallibleIterator;
-use rkv::StoreOptions;
 use std::collections::BTreeMap;
 use tracing::*;
 
@@ -23,10 +22,7 @@ fn kv_iter_from_partial() {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env
-        .inner()
-        .open_single("kv", StoreOptions::create())
-        .unwrap();
+    let db = env.inner().open_single("kv").unwrap();
 
     {
         let mut buf: Store = KvBufUsed::new(db.clone());
@@ -49,10 +45,13 @@ fn kv_iter_from_partial() {
     }
 
     arc.guard()
-        .with_reader::<DatabaseError, _, _>(|reader| {
+        .with_reader::<DatabaseError, _, _>(|mut reader| {
             let buf: Store = KvBufUsed::new(db.clone());
 
-            let iter = buf.store().iter_from(&reader, "dogs_likes".into()).unwrap();
+            let iter = buf
+                .store()
+                .iter_from(&mut reader, "dogs_likes".into())
+                .unwrap();
             let results = iter.collect::<Vec<_>>().unwrap();
             assert_eq!(
                 results,
@@ -82,7 +81,7 @@ enum TestData {
 // Vec of values to use for a test if a bug is found
 // and prints iton failure
 fn do_test<R: Readable>(
-    reader: &R,
+    reader: &mut R,
     buf: &mut Store,
     puts_dels_iter: &mut impl Iterator<Item = TestData>,
     expected_state: &mut BTreeMap<DbString, V>,
@@ -168,7 +167,7 @@ fn do_test<R: Readable>(
 
 // Runs the found bugs tests
 fn re_do_test<R: Readable>(
-    reader: &R,
+    reader: &mut R,
     buf: &mut Store,
     puts_dels_iter: &mut impl Iterator<Item = TestData>,
     expected_state: &mut BTreeMap<DbString, V>,
@@ -247,11 +246,7 @@ async fn kv_single_iter() {
     let mut rng = rand::thread_rng();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let db = arc
-        .guard()
-        .inner()
-        .open_single("kv", StoreOptions::create())
-        .unwrap();
+    let db = arc.guard().inner().open_single("kv").unwrap();
     let td = StringFixturator::new(Unpredictable)
         .zip(VFixturator::new(Unpredictable))
         .filter(|(k, _)| k.len() > 0)
@@ -286,7 +281,7 @@ async fn kv_single_iter() {
     let mut reproduce = vec!["\nReproduce:\n".into()];
 
     arc.guard()
-        .with_reader::<DatabaseError, _, _>(|reader| {
+        .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut buf: Store = KvBufUsed::new(db.clone());
             let span = trace_span!("in_scratch");
             let _g = span.enter();
@@ -299,7 +294,7 @@ async fn kv_single_iter() {
                 span.metadata().map(|f| f.name()).unwrap_or("")
             ));
             do_test(
-                &reader,
+                &mut reader,
                 &mut buf,
                 &mut puts_dels,
                 &mut expected_state,
@@ -315,7 +310,7 @@ async fn kv_single_iter() {
         .unwrap();
 
     arc.guard()
-        .with_reader::<DatabaseError, _, _>(|reader| {
+        .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut buf: Store = KvBufUsed::new(db.clone());
             let span = trace_span!("in_db_first");
             let _g = span.enter();
@@ -328,7 +323,7 @@ async fn kv_single_iter() {
                 span.metadata().map(|f| f.name()).unwrap_or("")
             ));
             do_test(
-                &reader,
+                &mut reader,
                 &mut buf,
                 &mut puts_dels,
                 &mut expected_state,
@@ -343,7 +338,7 @@ async fn kv_single_iter() {
         })
         .unwrap();
     arc.guard()
-        .with_reader::<DatabaseError, _, _>(|reader| {
+        .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut buf: Store = KvBufUsed::new(db.clone());
             let span = trace_span!("in_db_second");
             let _g = span.enter();
@@ -356,7 +351,7 @@ async fn kv_single_iter() {
                 span.metadata().map(|f| f.name()).unwrap_or("")
             ));
             do_test(
-                &reader,
+                &mut reader,
                 &mut buf,
                 &mut puts_dels,
                 &mut expected_state,
@@ -495,10 +490,7 @@ async fn exhaust_both_ends() {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env
-        .inner()
-        .open_single("kv", StoreOptions::create())
-        .unwrap();
+    let db = env.inner().open_single("kv").unwrap();
     let values = (b'a'..=b'z')
         .map(|a| DbString::from_key_bytes_or_friendly_panic(&[a]))
         .zip((0..).into_iter().map(V))
@@ -536,13 +528,13 @@ async fn exhaust_both_ends() {
         .map(|(k, v)| ([k[0]], v.clone()))
         .collect::<Vec<_>>();
     arc.guard()
-        .with_reader::<DatabaseError, _, _>(|reader| {
+        .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut buf: Store = KvBufUsed::new(db.clone());
             for (k, v) in values {
                 buf.put(k, v).unwrap();
             }
             {
-                let mut i = buf.iter(&reader).unwrap().map(|(k, v)| Ok(([k[0]], v)));
+                let mut i = buf.iter(&mut reader).unwrap().map(|(k, v)| Ok(([k[0]], v)));
                 let mut result = Vec::new();
                 loop {
                     match (i.next().unwrap(), i.next_back().unwrap()) {
@@ -564,9 +556,9 @@ async fn exhaust_both_ends() {
         })
         .unwrap();
     arc.guard()
-        .with_reader::<DatabaseError, _, _>(|reader| {
+        .with_reader::<DatabaseError, _, _>(|mut reader| {
             let buf: Store = KvBufUsed::new(db.clone());
-            let mut i = buf.iter(&reader).unwrap().map(|(k, v)| Ok(([k[0]], v)));
+            let mut i = buf.iter(&mut reader).unwrap().map(|(k, v)| Ok(([k[0]], v)));
             let mut result = Vec::new();
             loop {
                 match (i.next().unwrap(), i.next_back().unwrap()) {
@@ -594,10 +586,7 @@ fn kv_single_iter_runner(
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env
-        .inner()
-        .open_single("kv", StoreOptions::create())
-        .unwrap();
+    let db = env.inner().open_single("kv").unwrap();
 
     let mut runs = vec!["Start | ".into()];
     let mut expected_state: BTreeMap<DbString, V> = BTreeMap::new();

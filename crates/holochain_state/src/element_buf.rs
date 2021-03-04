@@ -179,7 +179,7 @@ where
 
     pub fn get_header_with_reader<'r, 'a: 'r, R: Readable>(
         &'a self,
-        r: &'r R,
+        r: &'r mut R,
         header_address: &HeaderHash,
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
         Ok(self.headers.inner().get(r, header_address)?.map(Into::into))

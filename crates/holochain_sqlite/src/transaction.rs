@@ -9,14 +9,13 @@ use crate::{error::DatabaseError, prelude::DatabaseResult, table::Table};
 use chrono::offset::Local;
 use chrono::DateTime;
 use derive_more::From;
-use rkv::StoreError;
 use rusqlite::types::Value;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
 
 #[deprecated = "no need for read/write distinction with SQLite"]
 pub trait Readable {
-    fn get<K: ToSql>(&self, table: &Table, k: &K) -> DatabaseResult<Option<Value>>;
+    fn get<K: AsRef<[u8]>>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>>;
 }
 
 struct ReaderSpanInfo {
@@ -43,10 +42,14 @@ impl Drop for ReaderSpanInfo {
     }
 }
 
-fn get_kv<K: ToSql>(txn: &mut Transaction, table: &Table, k: &K) -> DatabaseResult<Option<Value>> {
-    let stmt = txn.prepare_cached("SELECT (key, val) FROM ?1 WHERE key = ?2")?;
+fn get_kv<K: AsRef<[u8]>>(
+    txn: &mut Transaction,
+    table: &Table,
+    k: K,
+) -> DatabaseResult<Option<Value>> {
+    let mut stmt = txn.prepare_cached("SELECT (key, val) FROM ?1 WHERE key = ?2")?;
     Ok(stmt
-        .query_row(params![&table.name(), k], |row| {
+        .query_row(params![&table.name(), k.as_ref()], |row| {
             // TODO: ideally we could call get_raw_unchecked to get a Value
             // and avoid cloning, but it's hard to figure out how to line up the
             // lifetime of the row with the lifetime of the transaction, or if
@@ -72,7 +75,7 @@ unsafe impl<'env> Send for Reader<'env> {}
 unsafe impl<'env> Sync for Reader<'env> {}
 
 impl<'env> Readable for Reader<'env> {
-    fn get<K: ToSql>(&self, table: &Table, k: &K) -> DatabaseResult<Option<Value>> {
+    fn get<K: AsRef<[u8]>>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
         get_kv(&mut self.0, table, k)
     }
 }
@@ -90,8 +93,8 @@ impl<'env> From<Transaction<'env>> for Reader<'env> {
 pub struct Writer<'env>(Transaction<'env>);
 
 impl<'env> Readable for Writer<'env> {
-    fn get<K: ToSql>(&self, table: &Table, k: &K) -> DatabaseResult<Option<Value>> {
-        get_kv(self.0, table, k)
+    fn get<K: AsRef<[u8]>>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
+        get_kv(&mut self.0, table, k)
     }
 }
 

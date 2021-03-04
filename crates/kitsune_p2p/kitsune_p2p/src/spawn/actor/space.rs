@@ -101,7 +101,7 @@ impl gossip::GossipEventHandler for Space {
         if self.local_joined_agents.contains(&input.to_agent) {
             let fut = local_req_op_hashes(&self.evt_sender, self.space.clone(), input);
             Ok(
-                async move { fut.await.map(|r| (OpConsistency::Variance(r.0), r.1)) }
+                async move { fut.await.map(|mut r| (OpConsistency::Variance(r.0), r.1)) }
                     .boxed()
                     .into(),
             )
@@ -755,7 +755,7 @@ impl Space {
                         from_agent.clone(),
                         payload.clone(),
                     )
-                    .then(|r| async move { (r, agent) })
+                    .then(|mut r| async move { (r, agent) })
             })
             .collect::<Vec<_>>();
 

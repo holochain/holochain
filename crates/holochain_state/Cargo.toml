@@ -15,9 +15,6 @@ derive_more = "0.99.3"
 holochain_sqlite = { version = "0.0.1", path = "../holochain_sqlite" }
 holo_hash = { version = "^0.0.2-alpha.1", path = "../holo_hash", features = ["full"] }
 fallible-iterator = "0.2.0"
-serde = { version = "1.0", features = [ "derive" ] }
-tracing = "=0.1.21"
-tracing-futures = "0.2.4"
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.50"
 holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
@@ -26,10 +23,24 @@ holochain_wasm_test_utils = { path = "../test_utils/wasm", optional = true }
 holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
 mockall = "0.8"
 shrinkwraprs = "0.3.0"
+serde = { version = "1.0", features = [ "derive" ] }
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 thiserror = "1.0.22"
 tokio = { version = "0.2.11", features = [ "full" ] }
 tokio_safe_block_on = "0.1.2"
+tracing = "=0.1.21"
+tracing-futures = "0.2.4"
+
+rusqlite = { version = "0.24.1", features = [
+  "blob",        # better integration with blob types (Read, Write, etc)
+  "chrono",      # integration with chrono crate
+  "functions",   # rust scalar / agg / window functions
+  "hooks",       # sqlite notification callbacks
+  "serde_json",  # integration with serde_json crate
+  "sqlcipher",   # enable at-rest encryption
+  "url",         # integration with url crate
+  "uuid",        # integration with uuid crate
+] }
 
 [dev-dependencies]
 anyhow = "1.0.26"

@@ -786,9 +786,9 @@ pub mod test {
         tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
 
         // - Check no extra data in the store to start
-        let count = fresh_reader_test!(env, |r| p2p_store
+        let count = fresh_reader_test!(env, |mut r| p2p_store
             .as_store_ref()
-            .iter(&r)
+            .iter(&mut r)
             .unwrap()
             .count()
             .unwrap());

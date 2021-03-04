@@ -97,10 +97,10 @@ async fn run_test(
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should be empty
-        let res: Vec<_> = fresh_reader_test!(alice_env, |r| {
+        let res: Vec<_> = fresh_reader_test!(alice_env, |mut r| {
             workspace
                 .validation_limbo
-                .iter(&r)
+                .iter(&mut r)
                 .unwrap()
                 .map(|(k, i)| Ok((k.to_vec(), i)))
                 .collect()
@@ -117,20 +117,20 @@ async fn run_test(
             }
         }
         assert_eq!(res.len(), 0, "{:?}", res);
-        let int_limbo: Vec<_> = fresh_reader_test!(alice_env, |r| {
+        let int_limbo: Vec<_> = fresh_reader_test!(alice_env, |mut r| {
             workspace
                 .integration_limbo
-                .iter(&r)
+                .iter(&mut r)
                 .unwrap()
                 .map(|(k, i)| Ok((k.to_vec(), i)))
                 .collect()
                 .unwrap()
         });
         assert_eq!(int_limbo.len(), 0, "{:?}", int_limbo);
-        let res: Vec<_> = fresh_reader_test!(alice_env, |r| {
+        let res: Vec<_> = fresh_reader_test!(alice_env, |mut r| {
             workspace
                 .integrated_dht_ops
-                .iter(&r)
+                .iter(&mut r)
                 .unwrap()
                 // Every op should be valid
                 .inspect(|(_, i)| {
@@ -176,9 +176,9 @@ async fn run_test(
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should be empty
         assert_eq!(
-            fresh_reader_test!(alice_env, |r| workspace
+            fresh_reader_test!(alice_env, |mut r| workspace
                 .validation_limbo
-                .iter(&r)
+                .iter(&mut r)
                 .unwrap()
                 .inspect(|(_, i)| {
                     let s = debug_span!("inspect_ops");
@@ -194,18 +194,18 @@ async fn run_test(
 
         let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
 
-        let int_limbo: Vec<_> = fresh_reader_test!(alice_env, |r| workspace
+        let int_limbo: Vec<_> = fresh_reader_test!(alice_env, |mut r| workspace
             .integration_limbo
-            .iter(&r)
+            .iter(&mut r)
             .unwrap()
             .map(|(_, v)| Ok(v.clone()))
             .collect()
             .unwrap());
 
         assert_eq!(
-            fresh_reader_test!(alice_env, |r| workspace
+            fresh_reader_test!(alice_env, |mut r| workspace
                 .integrated_dht_ops
-                .iter(&r)
+                .iter(&mut r)
                 .unwrap()
                 // Every op should be valid except register updated by
                 // Store entry for the update
@@ -270,7 +270,7 @@ async fn run_test(
                 let r = guard.reader().unwrap();
                 workspace
                     .validation_limbo
-                    .iter(&r)
+                    .iter(&mut r)
                     .unwrap()
                     .inspect(|(_, i)| {
                         let s = debug_span!("inspect_ops");
@@ -294,7 +294,7 @@ async fn run_test(
                 let r = guard.reader().unwrap();
                 workspace
                     .integrated_dht_ops
-                    .iter(&r)
+                    .iter(&mut r)
                     .unwrap()
                     .count()
                     .unwrap()

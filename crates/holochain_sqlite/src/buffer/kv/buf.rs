@@ -102,7 +102,7 @@ where
     }
 
     /// See if a value exists, avoiding deserialization
-    pub fn contains<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<bool> {
+    pub fn contains<R: Readable>(&self, r: &mut R, k: &K) -> DatabaseResult<bool> {
         check_empty_key(k)?;
         use KvOp::*;
         let exists = match self.scratch.get(k.as_ref()) {
@@ -127,7 +127,7 @@ where
 
     /// Get a value, taking the scratch space into account,
     /// or from persistence if needed
-    pub fn get<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<Option<V>> {
+    pub fn get<R: Readable>(&self, r: &mut R, k: &K) -> DatabaseResult<Option<V>> {
         check_empty_key(k)?;
         use KvOp::*;
         let val = match self.scratch.get(k.as_ref()) {
@@ -173,7 +173,7 @@ where
     }
 
     /// Iterator that checks the scratch space
-    pub fn iter<'a, R: Readable>(&'a self, r: &'a R) -> DatabaseResult<SingleIter<'a, '_, V>> {
+    pub fn iter<'r, R: Readable>(&'r self, r: &'r mut R) -> DatabaseResult<SingleIter<'r, '_, V>> {
         Ok(SingleIter::new(
             &self.scratch,
             self.scratch.iter(),
@@ -182,10 +182,10 @@ where
     }
 
     /// Iterator that tracks elements so they can be deleted
-    pub fn drain_iter<'a, R: Readable>(
+    pub fn drain_iter<'r, R: Readable>(
         &mut self,
-        r: &'a R,
-    ) -> DatabaseResult<DrainIter<'a, '_, V>> {
+        r: &'r mut R,
+    ) -> DatabaseResult<DrainIter<'r, '_, V>> {
         Ok(DrainIter::new(&mut self.scratch, self.store.iter(r)?))
     }
 
@@ -194,13 +194,13 @@ where
     ///
     /// NB: if we ever have to implement other iter methods, we should
     /// consider passing in a raw iter to DrainIter
-    pub fn drain_iter_filter<'a, F, R>(
+    pub fn drain_iter_filter<'r, F, R>(
         &mut self,
-        r: &'a R,
+        r: &'r mut R,
         filter: F,
-    ) -> DatabaseResult<DrainIter<'a, '_, V>>
+    ) -> DatabaseResult<DrainIter<'r, '_, V>>
     where
-        F: FnMut(&(&[u8], V)) -> Result<bool, DatabaseError> + 'a,
+        F: FnMut(&(&[u8], V)) -> Result<bool, DatabaseError> + 'r,
         R: Readable,
     {
         Ok(DrainIter::new(
@@ -212,7 +212,7 @@ where
     /// Iterator that returns all partial matches to this key
     pub fn iter_all_key_matches<'r, R: Readable>(
         &'r self,
-        r: &'r R,
+        r: &'r mut R,
         k: K,
     ) -> DatabaseResult<SingleIterKeyMatch<'r, 'r, V>> {
         check_empty_key(&k)?;
@@ -224,11 +224,11 @@ where
     }
 
     /// Iterate from a key onwards
-    pub fn iter_from<'a, R: Readable>(
-        &'a self,
-        r: &'a R,
+    pub fn iter_from<'r, R: Readable>(
+        &'r self,
+        r: &'r mut R,
         k: K,
-    ) -> DatabaseResult<SingleIterFrom<'a, '_, V>> {
+    ) -> DatabaseResult<SingleIterFrom<'r, '_, V>> {
         check_empty_key(&k)?;
 
         let key = k.as_ref().to_vec();
@@ -241,19 +241,19 @@ where
 
     /// Iterate over the data in reverse
     #[deprecated = "just use rev()"]
-    pub fn iter_reverse<'a, R: Readable>(
-        &'a self,
-        r: &'a R,
-    ) -> DatabaseResult<fallible_iterator::Rev<SingleIter<'a, '_, V>>> {
+    pub fn iter_reverse<'r, R: Readable>(
+        &'r self,
+        r: &'r mut R,
+    ) -> DatabaseResult<fallible_iterator::Rev<SingleIter<'r, '_, V>>> {
         Ok(self.iter(r)?.rev())
     }
 
     /// Iterator that tracks elements so they can be deleted but in reverse
     #[deprecated = "just use rev()"]
-    pub fn drain_iter_reverse<'a, R: Readable>(
-        &'a mut self,
-        r: &'a R,
-    ) -> DatabaseResult<fallible_iterator::Rev<DrainIter<'a, '_, V>>> {
+    pub fn drain_iter_reverse<'r, R: Readable>(
+        &'r mut self,
+        r: &'r mut R,
+    ) -> DatabaseResult<fallible_iterator::Rev<DrainIter<'r, '_, V>>> {
         Ok(self.drain_iter(r)?.rev())
     }
 }
@@ -310,13 +310,13 @@ where
 
     /// See if a value exists, avoiding deserialization
     pub fn contains(&self, k: &K) -> DatabaseResult<bool> {
-        fresh_reader!(self.env, |reader| self.inner.contains(&reader, k))
+        fresh_reader!(self.env, |mut r| self.inner.contains(&mut r, k))
     }
 
     /// Get a value, taking the scratch space into account,
     /// or from persistence if needed
     pub fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
-        fresh_reader!(self.env, |reader| self.inner.get(&reader, k))
+        fresh_reader!(self.env, |mut r| self.inner.get(&mut r, k))
     }
 }
 
@@ -342,14 +342,14 @@ where
             match op {
                 Put(v) => {
                     let buf = holochain_serialized_bytes::encode(v)?;
-                    let encoded = rusqlite::types::Value::Blob(&buf);
-                    self.store.db().put(writer, k, &encoded)?;
+                    let encoded = rusqlite::types::Value::Blob(buf);
+                    self.store.table().put(writer, k, &encoded)?;
                 }
                 Delete => self
                     .store
-                    .db()
+                    .table()
                     .delete(writer, k)
-                    .or_else(StoreError::ok_if_not_found)?,
+                    .or_else(DatabaseError::ok_if_not_found)?,
             }
         }
 
@@ -378,8 +378,8 @@ where
             match op {
                 Put(v) => {
                     let buf = holochain_serialized_bytes::encode(v)?;
-                    let encoded = rusqlite::types::Value::Blob(&buf);
-                    self.store.db().put(
+                    let encoded = rusqlite::types::Value::Blob(buf);
+                    self.store.table().put(
                         writer,
                         IntKey::from_key_bytes_or_friendly_panic(k).as_ref(),
                         &encoded,
@@ -387,9 +387,9 @@ where
                 }
                 Delete => self
                     .store
-                    .db()
+                    .table()
                     .delete(writer, IntKey::from_key_bytes_or_friendly_panic(k).as_ref())
-                    .or_else(StoreError::ok_if_not_found)?,
+                    .or_else(DatabaseError::ok_if_not_found)?,
             }
         }
 
@@ -437,7 +437,7 @@ where
 {
     fn from(other: &Used<K, V, KvStore<K, V>>) -> Self {
         Self {
-            store: KvStore::new(other.store.db()),
+            store: KvStore::new(other.store.table()),
             scratch: other.scratch.clone(),
             __phantom: std::marker::PhantomData,
         }

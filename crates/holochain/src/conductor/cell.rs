@@ -498,7 +498,7 @@ impl Cell {
             AnyDht::Entry => self.handle_get_entry(dht_hash.into(), options).await,
             AnyDht::Header => self.handle_get_element(dht_hash.into()).await,
         };
-        if let Err(e) = &r {
+        if let Err(e) = &mut r {
             error!(msg = "Error handling a get", ?e, agent = ?self.id.agent_pubkey());
         }
         r
@@ -574,7 +574,7 @@ impl Cell {
         let reader = g.reader()?;
         let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into())?;
         let result: Vec<DhtOpHash> = integrated_dht_ops
-            .query(&reader, Some(since), Some(until), Some(dht_arc))?
+            .query(&mut reader, Some(since), Some(until), Some(dht_arc))?
             .map(|(k, _)| Ok(k))
             .collect()?;
         Ok(result)

@@ -86,8 +86,8 @@ impl TestData {
 
     async fn empty<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
-        let val = fresh_reader_test!(self.env, |r| meta_buf
-            .get_live_links(&r, &key)
+        let val = fresh_reader_test!(self.env, |mut r| meta_buf
+            .get_live_links(&mut r, &key)
             .unwrap()
             .collect::<Vec<_>>()
             .unwrap()
@@ -99,8 +99,8 @@ impl TestData {
     async fn is_on_full_key<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
         assert!(
-            fresh_reader_test!(self.env, |r| meta_buf
-                .get_live_links(&r, &key)
+            fresh_reader_test!(self.env, |mut r| meta_buf
+                .get_live_links(&mut r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
@@ -112,9 +112,9 @@ impl TestData {
 
     async fn only_on_full_key<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
-        fresh_reader_test!(self.env, |r| assert_eq!(
+        fresh_reader_test!(self.env, |mut r| assert_eq!(
             &meta_buf
-                .get_live_links(&r, &key)
+                .get_live_links(&mut r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
@@ -127,8 +127,8 @@ impl TestData {
     async fn not_on_full_key<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
         assert!(
-            fresh_reader_test!(self.env, |r| !meta_buf
-                .get_live_links(&r, &key)
+            fresh_reader_test!(self.env, |mut r| !meta_buf
+                .get_live_links(&mut r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
@@ -143,8 +143,8 @@ impl TestData {
     async fn is_on_base<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::Base(&self.base_hash);
         assert!(
-            fresh_reader_test!(self.env, |r| meta_buf
-                .get_live_links(&r, &key)
+            fresh_reader_test!(self.env, |mut r| meta_buf
+                .get_live_links(&mut r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
@@ -157,9 +157,9 @@ impl TestData {
 
     async fn only_on_base<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::Base(&self.base_hash);
-        fresh_reader_test!(self.env, |r| assert_eq!(
+        fresh_reader_test!(self.env, |mut r| assert_eq!(
             &meta_buf
-                .get_live_links(&r, &key)
+                .get_live_links(&mut r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
@@ -173,8 +173,8 @@ impl TestData {
     async fn is_on_zome_id<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::BaseZome(&self.base_hash, self.zome_id);
         assert!(
-            fresh_reader_test!(self.env, |r| meta_buf
-                .get_live_links(&r, &key)
+            fresh_reader_test!(self.env, |mut r| meta_buf
+                .get_live_links(&mut r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
@@ -187,9 +187,9 @@ impl TestData {
 
     async fn only_on_zome_id<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::BaseZome(&self.base_hash, self.zome_id);
-        fresh_reader_test!(self.env, |r| assert_eq!(
+        fresh_reader_test!(self.env, |mut r| assert_eq!(
             &meta_buf
-                .get_live_links(&r, &key)
+                .get_live_links(&mut r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
@@ -205,9 +205,9 @@ impl TestData {
         let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
         let half_tag = LinkTag::new(&self.tag.0[..half_tag]);
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &half_tag);
-        fresh_reader_test!(self.env, |r| assert_eq!(
+        fresh_reader_test!(self.env, |mut r| assert_eq!(
             &meta_buf
-                .get_live_links(&r, &key)
+                .get_live_links(&mut r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
@@ -224,8 +224,8 @@ impl TestData {
         let half_tag = LinkTag::new(&self.tag.0[..half_tag]);
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &half_tag);
         assert!(
-            fresh_reader_test!(self.env, |r| meta_buf
-                .get_live_links(&r, &key)
+            fresh_reader_test!(self.env, |mut r| meta_buf
+                .get_live_links(&mut r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
@@ -257,9 +257,9 @@ impl TestData {
         expected.sort_by_key(|d| BytesKey::from(LinkMetaKey::from((&d.0, &d.1.link_add_hash))));
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::Base(&base_hash);
-        fresh_reader_test!(td[0].env, |r| assert_eq!(
+        fresh_reader_test!(td[0].env, |mut r| assert_eq!(
             &meta_buf
-                .get_live_links(&r, &key)
+                .get_live_links(&mut r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
@@ -284,9 +284,9 @@ impl TestData {
         expected.sort_by_key(|d| BytesKey::from(LinkMetaKey::from((&d.0, &d.1.link_add_hash))));
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::BaseZome(&base_hash, zome_id);
-        fresh_reader_test!(td[0].env, |r| assert_eq!(
+        fresh_reader_test!(td[0].env, |mut r| assert_eq!(
             &meta_buf
-                .get_live_links(&r, &key)
+                .get_live_links(&mut r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
@@ -313,9 +313,9 @@ impl TestData {
         expected.sort_by_key(|d| BytesKey::from(LinkMetaKey::from((&d.0, &d.1.link_add_hash))));
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::BaseZomeTag(&base_hash, zome_id, &tag);
-        fresh_reader_test!(td[0].env, |r| assert_eq!(
+        fresh_reader_test!(td[0].env, |mut r| assert_eq!(
             &meta_buf
-                .get_live_links(&r, &key)
+                .get_live_links(&mut r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
@@ -345,9 +345,9 @@ impl TestData {
         expected.sort_by_key(|d| BytesKey::from(LinkMetaKey::from((&d.0, &d.1.link_add_hash))));
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::BaseZomeTag(&base_hash, zome_id, &half_tag);
-        fresh_reader_test!(td[0].env, |r| assert_eq!(
+        fresh_reader_test!(td[0].env, |mut r| assert_eq!(
             &meta_buf
-                .get_live_links(&r, &key)
+                .get_live_links(&mut r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
@@ -395,7 +395,8 @@ async fn can_add_and_delete_link() {
         td.only_on_full_key(here!("Is still in the scratch"), &meta_buf)
             .await;
 
-        arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+        arc.guard()
+            .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
 
@@ -410,7 +411,8 @@ async fn can_add_and_delete_link() {
         td.delete_link(&mut meta_buf).await;
         // Is empty
         td.empty(here!("empty after remove"), &meta_buf).await;
-        arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+        arc.guard()
+            .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
 
@@ -435,7 +437,8 @@ async fn can_add_and_delete_link() {
         td.only_on_zome_id(here!("scratch"), &meta_buf).await;
         // Half the tag
         td.only_on_half_tag(here!("scratch"), &meta_buf).await;
-        arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+        arc.guard()
+            .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
 
@@ -499,7 +502,8 @@ async fn multiple_links() {
                 .await;
         }
 
-        arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+        arc.guard()
+            .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
 
@@ -518,7 +522,8 @@ async fn multiple_links() {
         td[0]
             .not_on_full_key(here!("removed in scratch"), &meta_buf)
             .await;
-        arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+        arc.guard()
+            .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
 
@@ -569,7 +574,8 @@ async fn duplicate_links() {
             // Half the tag
             d.is_on_half_tag(here!("re add"), &meta_buf).await;
         }
-        arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+        arc.guard()
+            .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
     {
@@ -588,7 +594,8 @@ async fn duplicate_links() {
             // Half the tag
             d.is_on_half_tag(here!("re add"), &meta_buf).await;
         }
-        arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+        arc.guard()
+            .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
     let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
@@ -637,7 +644,8 @@ async fn links_on_same_base() {
             d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
         TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
-        arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+        arc.guard()
+            .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
     {
@@ -667,7 +675,8 @@ async fn links_on_same_base() {
         td[0]
             .not_on_full_key(here!("removed in scratch"), &meta_buf)
             .await;
-        arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+        arc.guard()
+            .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
     {
@@ -723,7 +732,8 @@ async fn links_on_same_zome_id() {
         }
         TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
         TestData::only_these_on_zome_id(&td, here!("check all return on same base"), &meta_buf);
-        arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+        arc.guard()
+            .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
     {
@@ -757,7 +767,8 @@ async fn links_on_same_zome_id() {
         td[9]
             .not_on_full_key(here!("removed in scratch"), &meta_buf)
             .await;
-        arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+        arc.guard()
+            .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
     {
@@ -825,7 +836,8 @@ async fn links_on_same_tag() {
             here!("check all return on same base"),
             &meta_buf,
         );
-        arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+        arc.guard()
+            .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
     {
@@ -872,7 +884,8 @@ async fn links_on_same_tag() {
             here!("check all return on same base"),
             &meta_buf,
         );
-        arc.guard().with_commit(|writer| meta_buf.flush_to_txn(writer))
+        arc.guard()
+            .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
     {

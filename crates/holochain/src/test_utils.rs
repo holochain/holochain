@@ -500,10 +500,10 @@ async fn count_integration(env: &DbWrite) -> IntegrationStateDump {
 async fn display_integration(env: &DbWrite) -> usize {
     let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
 
-    let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+    let val_limbo: Vec<_> = fresh_reader_test!(env, |mut r| {
         workspace
             .validation_limbo
-            .iter(&r)
+            .iter(&mut r)
             .unwrap()
             .map(|(_, v)| Ok(v))
             .collect()
@@ -511,10 +511,10 @@ async fn display_integration(env: &DbWrite) -> usize {
     });
     tracing::debug!(?val_limbo);
 
-    let int_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+    let int_limbo: Vec<_> = fresh_reader_test!(env, |mut r| {
         workspace
             .integration_limbo
-            .iter(&r)
+            .iter(&mut r)
             .unwrap()
             .map(|(_, v)| Ok(v))
             .collect()
@@ -522,10 +522,10 @@ async fn display_integration(env: &DbWrite) -> usize {
     });
     tracing::debug!(?int_limbo);
 
-    let int: Vec<_> = fresh_reader_test!(env, |r| {
+    let int: Vec<_> = fresh_reader_test!(env, |mut r| {
         workspace
             .integrated_dht_ops
-            .iter(&r)
+            .iter(&mut r)
             .unwrap()
             .map(|(_, v)| Ok(v))
             .collect()

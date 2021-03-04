@@ -86,13 +86,13 @@ async fn sys_validation_workflow_inner(
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.validation_limbo.env().clone();
     // Drain all the ops
-    let sorted_ops: BinaryHeap<OrderedOp<ValidationLimboValue>> = fresh_reader!(env, |r| {
+    let sorted_ops: BinaryHeap<OrderedOp<ValidationLimboValue>> = fresh_reader!(env, |mut r| {
         let validation_limbo = &mut workspace.validation_limbo;
         let element_pending = &workspace.element_pending;
 
         let sorted_ops: Result<BinaryHeap<OrderedOp<ValidationLimboValue>>, WorkflowError> =
             validation_limbo
-                .drain_iter_filter(&r, |(_, vlv)| {
+                .drain_iter_filter(&mut r, |(_, vlv)| {
                     match vlv.status {
                         // We only want pending or awaiting sys dependency ops
                         ValidationLimboStatus::Pending

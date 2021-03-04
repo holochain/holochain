@@ -170,6 +170,12 @@ impl AsRef<[u8]> for DbString {
     }
 }
 
+impl rusqlite::ToSql for DbString {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        Ok(rusqlite::types::ToSqlOutput::Borrowed(self.as_ref().into()))
+    }
+}
+
 impl BufKey for DbString {
     fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
         Self(String::from_utf8(bytes.to_vec()).unwrap())

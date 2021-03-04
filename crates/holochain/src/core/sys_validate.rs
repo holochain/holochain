@@ -83,10 +83,10 @@ pub async fn check_valid_if_dna(
     header: &Header,
     meta_vault: &impl MetadataBufT,
 ) -> SysValidationResult<()> {
-    fresh_reader!(meta_vault.env(), |r| {
+    fresh_reader!(meta_vault.env(), |mut r| {
         match header {
             Header::Dna(_) => meta_vault
-                .get_activity(&r, ChainItemKey::Agent(header.author().clone()))?
+                .get_activity(&mut r, ChainItemKey::Agent(header.author().clone()))?
                 .next()?
                 .map_or(Ok(()), |_| {
                     Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
@@ -113,15 +113,15 @@ pub async fn check_chain_rollback(
     let env = workspace.meta_vault.env();
     // Check there are no conflicting chain items
     // at any valid or potentially valid stores.
-    let count = fresh_reader!(env, |r| {
+    let count = fresh_reader!(env, |mut r| {
         let vault_count = workspace
             .meta_vault
-            .get_activity(&r, k.clone())?
+            .get_activity(&mut r, k.clone())?
             .filter(|thh| Ok(thh.header_hash != header_hash))
             .count()?;
         let pending_count = workspace
             .meta_pending
-            .get_activity(&r, k.clone())?
+            .get_activity(&mut r, k.clone())?
             .filter(|thh| Ok(thh.header_hash != header_hash))
             .count()?;
         DatabaseResult::Ok(vault_count + pending_count)

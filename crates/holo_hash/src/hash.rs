@@ -177,6 +177,13 @@ impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
     }
 }
 
+#[cfg(feature = "rusqlite")]
+impl<T: HashType> rusqlite::ToSql for HoloHash<T> {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        Ok(rusqlite::types::ToSqlOutput::Borrowed(self.as_ref().into()))
+    }
+}
+
 impl<T: HashType> IntoIterator for HoloHash<T> {
     type Item = u8;
     type IntoIter = std::vec::IntoIter<Self::Item>;

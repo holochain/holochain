@@ -32,32 +32,8 @@ pub enum DatabaseError {
     )]
     NoPrivateDb(String),
 
-    // TODO: the following is necessary for actual backtraces, and would be ideal,
-    // but requires the unstable "backtrace" feature, so we are doing without for now.
-    //
-    // #[error("Error interacting with the underlying LMDB store: {source}")]
-    // LmdbStoreError {
-    //     #[from]
-    //     source: failure::Compat<rkv::StoreError>,
-    //     backtrace: Backtrace,
-    // },
-    #[error("Error interacting with the underlying LMDB store: {0}")]
-    LmdbStoreError(#[from] failure::Compat<rkv::StoreError>),
-
     #[error(transparent)]
     ShimStoreError(#[from] StoreError),
-
-    // TODO: the following is necessary for actual backtraces, and would be ideal,
-    // but requires the unstable "backtrace" feature, so we are doing without for now.
-    //
-    // #[error("Error when attempting an LMDB data transformation: {source}")]
-    // LmdbDataError {
-    //     #[from]
-    //     source: failure::Compat<rkv::DataError>,
-    //     backtrace: Backtrace,
-    // },
-    #[error("Error when attempting an LMDB data transformation: {0}")]
-    LmdbDataError(#[from] failure::Compat<rkv::DataError>),
 
     #[error("Error encoding to MsgPack: {0}")]
     MsgPackEncodeError(#[from] rmp_serde::encode::Error),
@@ -98,51 +74,15 @@ impl PartialEq for DatabaseError {
 
 impl DatabaseError {
     pub fn ok_if_not_found(self) -> DatabaseResult<()> {
-        match self {
-            DatabaseError::LmdbStoreError(err) => match err.into_inner() {
-                rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => Ok(()),
-                err => Err(err.into()),
-            },
-            err => Err(err),
-        }
+        todo!("implement for rusqlite errors")
+        // match self {
+        //     DatabaseError::LmdbStoreError(err) => match err.into_inner() {
+        //         rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => Ok(()),
+        //         err => Err(err.into()),
+        //     },
+        //     err => Err(err),
+        // }
     }
 }
 
 pub type DatabaseResult<T> = Result<T, DatabaseError>;
-
-// Note: these are necessary since rkv Errors do not have std::Error impls,
-// so we have to do some finagling
-
-// TODO: the following is necessary for actual backtraces, and would be ideal,
-// but requires the unstable "backtrace" feature, so we are doing without for now.
-//
-// impl From<rkv::StoreError> for DatabaseError {
-//     fn from(e: rkv::StoreError) -> DatabaseError {
-//         DatabaseError::LmdbStoreError {
-//             source: e.compat(),
-//             backtrace: Backtrace::capture(),
-//         }
-//     }
-// }
-impl From<rkv::StoreError> for DatabaseError {
-    fn from(e: rkv::StoreError) -> DatabaseError {
-        DatabaseError::LmdbStoreError(e.compat())
-    }
-}
-
-// TODO: the following is necessary for actual backtraces, and would be ideal,
-// but requires the unstable "backtrace" feature, so we are doing without for now.
-//
-// impl From<rkv::DataError> for DatabaseError {
-//     fn from(e: rkv::DataError) -> DatabaseError {
-//         DatabaseError::LmdbDataError {
-//             source: e.compat(),
-//             backtrace: Backtrace::capture(),
-//         }
-//     }
-// }
-impl From<rkv::DataError> for DatabaseError {
-    fn from(e: rkv::DataError) -> DatabaseError {
-        DatabaseError::LmdbDataError(e.compat())
-    }
-}

@@ -101,10 +101,10 @@ impl SourceChainBuf {
 
     pub async fn get_incomplete_dht_ops(&self) -> SourceChainResult<Vec<(u32, Vec<DhtOp>)>> {
         let mut ops = Vec::new();
-        let ops_headers = fresh_reader!(self.env(), |r| {
+        let ops_headers = fresh_reader!(self.env(), |mut r| {
             SourceChainResult::Ok(
                 self.sequence
-                    .get_items_with_incomplete_dht_ops(&r)?
+                    .get_items_with_incomplete_dht_ops(&mut r)?
                     .collect::<Vec<_>>()?,
             )
         })?;

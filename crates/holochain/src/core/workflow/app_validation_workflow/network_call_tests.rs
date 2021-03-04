@@ -799,11 +799,11 @@ async fn slow_lmdb_reads_test() {
     for _ in 0..runs {
         let element_integrated = ElementBuf::vault(alice_env.clone().into(), false).unwrap();
         let meta_integrated = MetadataBuf::vault(alice_env.clone().into()).unwrap();
-        fresh_reader_test!(alice_env, |r| {
+        fresh_reader_test!(alice_env, |mut r| {
             let now = std::time::Instant::now();
             let hashes = meta_integrated
                 .get_activity_sequence(
-                    &r,
+                    &mut r,
                     ChainItemKey::AgentStatus(
                         alice_call_data.cell_id.agent_pubkey().clone(),
                         ValidationStatus::Valid,

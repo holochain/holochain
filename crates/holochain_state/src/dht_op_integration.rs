@@ -122,7 +122,7 @@ impl IntegratedDhtOpsBuf {
     /// - match a dht location
     pub fn query<'r, R: Readable>(
         &'r self,
-        r: &'r R,
+        r: &'r mut R,
         from: Option<Timestamp>,
         to: Option<Timestamp>,
         dht_arc: Option<DhtArc>,
@@ -217,16 +217,16 @@ mod tests {
             let buf = IntegratedDhtOpsBuf::new(env.clone().into()).unwrap();
             // No filter
             let mut r = buf
-                .query(&reader, None, None, None)
+                .query(&mut reader, None, None, None)
                 .unwrap()
                 .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
                 .unwrap();
             r.sort_by_key(|v| v.when_integrated.clone());
-            assert_eq!(&r[..], &expected[..]);
+            assert_eq!(&mut r[..], &expected[..]);
             // From now
             let mut r = buf
-                .query(&reader, Some(times_exp[1].clone().into()), None, None)
+                .query(&mut reader, Some(times_exp[1].clone().into()), None, None)
                 .unwrap()
                 .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
@@ -241,7 +241,7 @@ mod tests {
             let ages_ago = times_exp[0] - Duration::weeks(5);
             let future = times_exp[1] + Duration::hours(1);
             let mut r = buf
-                .query(&reader, Some(ages_ago.into()), Some(future.into()), None)
+                .query(&mut reader, Some(ages_ago.into()), Some(future.into()), None)
                 .unwrap()
                 .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
@@ -258,7 +258,7 @@ mod tests {
             let future = times_exp[1] + Duration::hours(1);
             let mut r = buf
                 .query(
-                    &reader,
+                    &mut reader,
                     Some(ages_ago.into()),
                     Some(future.into()),
                     Some(DhtArc::new(same_basis.get_loc(), 1)),
@@ -274,7 +274,7 @@ mod tests {
             // Same basis all
             let mut r = buf
                 .query(
-                    &reader,
+                    &mut reader,
                     None,
                     None,
                     Some(DhtArc::new(same_basis.get_loc(), 1)),

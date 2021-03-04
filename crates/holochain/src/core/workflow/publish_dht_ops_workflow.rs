@@ -85,9 +85,9 @@ pub async fn publish_dht_ops_workflow_inner(
     // one of many ways to access the env
     let env = workspace.elements.headers().env().clone();
 
-    let values = fresh_reader!(env, |r| workspace
+    let values = fresh_reader!(env, |mut r| workspace
         .authored()
-        .iter(&r)?
+        .iter(&mut r)?
         .filter_map(|(k, mut r)| {
             Ok(if r.receipt_count < DEFAULT_RECEIPT_BUNDLE_SIZE {
                 let needs_publish = r
@@ -359,7 +359,7 @@ mod tests {
                 let mut g = env.guard();
                 let reader = g.reader().unwrap();
                 let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
-                for i in workspace.authored().iter(&reader).unwrap().iterator() {
+                for i in workspace.authored().iter(&mut reader).unwrap().iterator() {
                     // Check that each item now has a publish time
                     assert!(i.expect("can iterate").1.last_publish_time.is_some())
                 }
@@ -404,7 +404,7 @@ mod tests {
                 // Update authored to R
                 let values = workspace
                     .authored_dht_ops
-                    .iter(&reader)
+                    .iter(&mut reader)
                     .unwrap()
                     .map(|(k, mut v)| {
                         v.receipt_count = DEFAULT_RECEIPT_BUNDLE_SIZE;

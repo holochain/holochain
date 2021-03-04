@@ -490,7 +490,7 @@ impl SweetConductorHandle {
             provenance: provenance.clone(),
             payload,
         };
-        self.0.call_zome(call).await.map(|r| {
+        self.0.call_zome(call).await.map(|mut r| {
             unwrap_to!(r.unwrap() => ZomeCallResponse::Ok)
                 .decode()
                 .expect("Couldn't deserialize zome call output")

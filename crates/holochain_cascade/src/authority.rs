@@ -72,11 +72,11 @@ pub fn handle_get_entry(
 
     // ### Gather headers closure
     // This gathers the headers and deletes we want
-    let gather_headers = |reader| {
+    let gather_headers = |mut reader| {
         let mut deletes = Vec::new();
         let mut updates = Vec::new();
         let headers = meta_vault
-            .get_all_headers(&reader, hash.clone())?
+            .get_all_headers(&mut reader, hash.clone())?
             .collect::<Vec<_>>()?;
         let mut live_headers = BTreeSet::new();
 
@@ -85,14 +85,14 @@ pub fn handle_get_entry(
             for hash in headers {
                 deletes.extend(
                     meta_vault
-                        .get_deletes_on_header(&reader, hash.header_hash.clone())?
+                        .get_deletes_on_header(&mut reader, hash.header_hash.clone())?
                         .iterator(),
                 );
                 let header_status = render_header_and_status(hash)?;
                 live_headers.insert(header_status.try_into()?);
             }
             let updates_returns = meta_vault
-                .get_updates(&reader, hash.clone().into())?
+                .get_updates(&mut reader, hash.clone().into())?
                 .collect::<Vec<_>>()?;
             let updates_returns = updates_returns.into_iter().map(|update| {
                 let update: WireHeaderStatus<WireUpdateRelationship> =
@@ -108,7 +108,7 @@ pub fn handle_get_entry(
             for hash in headers {
                 // Check for a delete
                 let is_deleted = meta_vault
-                    .get_deletes_on_header(&reader, hash.header_hash.clone())?
+                    .get_deletes_on_header(&mut reader, hash.header_hash.clone())?
                     .next()?
                     .is_some();
 
@@ -116,7 +116,7 @@ pub fn handle_get_entry(
                 if is_deleted {
                     deletes.extend(
                         meta_vault
-                            .get_deletes_on_header(&reader, hash.header_hash.clone())?
+                            .get_deletes_on_header(&mut reader, hash.header_hash.clone())?
                             .iterator(),
                     );
 
@@ -141,8 +141,8 @@ pub fn handle_get_entry(
     // ### Gather the entry
     // Get the entry from the first header
 
-    fresh_reader!(state_env, |reader| {
-        let first_header = meta_vault.get_all_headers(&reader, hash.clone())?.next()?;
+    fresh_reader!(state_env, |mut reader| {
+        let first_header = meta_vault.get_all_headers(&mut reader, hash.clone())?.next()?;
         let entry_data = match first_header {
             Some(first_header) => {
                 let header = render_header_and_status(first_header)?.0;
@@ -189,7 +189,7 @@ pub fn handle_get_element(env: DbWrite, hash: HeaderHash) -> CascadeResult<GetEl
 
     // Look for a deletes on the header and collect them
     let deletes = meta_vault
-        .get_deletes_on_header(&reader, hash.clone())?
+        .get_deletes_on_header(&mut reader, hash.clone())?
         .map_err(CascadeError::from)
         .map(|delete_header| {
             let delete_hash = delete_header.header_hash;
@@ -210,7 +210,7 @@ pub fn handle_get_element(env: DbWrite, hash: HeaderHash) -> CascadeResult<GetEl
 
     // Look for a updates on the header and collect them
     let updates = meta_vault
-        .get_updates(&reader, hash.clone().into())?
+        .get_updates(&mut reader, hash.clone().into())?
         .map_err(CascadeError::from)
         .map(|update_header| {
             let update_hash = update_header.header_hash;
@@ -263,9 +263,9 @@ pub fn handle_get_agent_activity(
 
     // Valid headers
     let valid_activity = if options.include_valid_activity {
-        fresh_reader!(env, |r| {
+        fresh_reader!(env, |mut r| {
             let hashes = meta_integrated.get_activity_sequence(
-                &r,
+                &mut r,
                 ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Valid),
             )?;
             check_headers(
@@ -273,7 +273,7 @@ pub fn handle_get_agent_activity(
                 query.clone(),
                 options.clone(),
                 element_integrated,
-                &r,
+                &mut r,
             )
         })?
     } else {
@@ -282,12 +282,12 @@ pub fn handle_get_agent_activity(
 
     // Rejected hashes
     let rejected_activity = if options.include_rejected_activity {
-        fresh_reader!(env, |r| {
+        fresh_reader!(env, |mut r| {
             let hashes = meta_integrated.get_activity_sequence(
-                &r,
+                &mut r,
                 ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Rejected),
             )?;
-            check_headers(hashes, query, options, element_rejected, &r)
+            check_headers(hashes, query, options, element_rejected, &mut r)
         })?
     } else {
         ChainItems::NotRequested
@@ -306,7 +306,7 @@ fn get_full_headers<'a, P: PrefixType + 'a, R: Readable>(
     hashes: impl FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + 'a,
     query: ChainQueryFilter,
     database: ElementBuf<P>,
-    reader: &'a R,
+    reader: &'r mut R,
 ) -> impl FallibleIterator<Item = (u32, SignedHeaderHashed), Error = DatabaseError> + 'a {
     hashes
         .filter_map(move |(s, h)| {
@@ -322,7 +322,7 @@ fn check_headers<P: PrefixType, R: Readable>(
     query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
     database: ElementBuf<P>,
-    reader: &R,
+    reader: &mut R,
 ) -> CascadeResult<ChainItems> {
     if options.include_full_headers {
         CascadeResult::Ok(ChainItems::Full(
@@ -352,11 +352,11 @@ pub fn handle_get_links(
     let meta_vault = MetadataBuf::vault(env.clone())?;
 
     let links = meta_vault
-        .get_links_all(&reader, &LinkMetaKey::from(&link_key))?
+        .get_links_all(&mut reader, &LinkMetaKey::from(&link_key))?
         .map(|link_add| {
             // Collect the link removes on this link add
             let link_removes = meta_vault
-                .get_link_removes_on_link_add(&reader, link_add.link_add_hash.clone())?
+                .get_link_removes_on_link_add(&mut reader, link_add.link_add_hash.clone())?
                 .collect::<BTreeSet<_>>()?;
             // Create timed header hash
             let link_add = TimedHeaderHash {

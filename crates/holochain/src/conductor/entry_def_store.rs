@@ -82,7 +82,7 @@ impl EntryDefBuf {
     /// Get all the entry defs in the database
     pub fn get_all<'r, R: Readable>(
         &self,
-        r: &'r R,
+        r: &'r mut R,
     ) -> DatabaseResult<
         Box<dyn FallibleIterator<Item = (EntryDefBufferKey, EntryDef), Error = DatabaseError> + 'r>,
     > {

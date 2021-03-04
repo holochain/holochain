@@ -502,10 +502,10 @@ fn inspect_val_limbo(
 ) -> Vec<(DhtOpHash, ValidationLimboValue, Option<Element>)> {
     debug!("start");
     let element_buf = ElementBuf::pending(env.clone().into()).unwrap();
-    fresh_reader_test!(env, |r| {
+    fresh_reader_test!(env, |mut r| {
         workspace
             .validation_limbo
-            .iter(&r)
+            .iter(&mut r)
             .unwrap()
             .map(|(k, i)| {
                 let hash = DhtOpHash::from_raw_39_panicky(k.to_vec());
@@ -526,10 +526,10 @@ fn inspect_integrated(
     debug!("start");
     let element_buf = ElementBuf::vault(env.clone().into(), true).unwrap();
     let element_buf_reject = ElementBuf::rejected(env.clone().into()).unwrap();
-    fresh_reader_test!(env, |r| {
+    fresh_reader_test!(env, |mut r| {
         workspace
             .integrated_dht_ops
-            .iter(&r)
+            .iter(&mut r)
             .unwrap()
             .map(|(k, i)| {
                 let hash = DhtOpHash::from_raw_39_panicky(k.to_vec());
