@@ -1,7 +1,14 @@
 //! App Manifest format, version 1.
 //!
-//! NB: After stabilization, *do not modify this file*! Create a new version of
-//! the spec and leave this one alone to maintain backwards compatibility.
+//! **NB: do not modify the types in this file**!
+//! (at least not after this initial schema has been stabilized).
+//! For any modifications, create a new version of the spec and leave this one
+//! alone to maintain backwards compatibility.
+//!
+//! This is the initial version of the App Manifest. Not all functionality is
+//! implemented yet, notably:
+//! - Using existing Cells is not implemented
+//! - Specifying DNA version is not implemented (DNA migration needs to land first)
 
 use super::{
     app_manifest_validated::{AppManifestValidated, AppSlotManifestValidated},
@@ -21,13 +28,13 @@ pub type Uuid = String;
 #[serde(rename_all = "snake_case")]
 pub struct AppManifestV1 {
     /// Name of the App. This may be used as the installed_app_id.
-    pub(super) name: String,
+    pub name: String,
 
     /// Description of the app, just for context.
-    pub(super) description: Option<String>,
+    pub description: Option<String>,
 
     /// The Cell manifests that make up this app.
-    pub(super) slots: Vec<AppSlotManifest>,
+    pub slots: Vec<AppSlotManifest>,
 }
 
 /// Description of an app "slot" defined by this app.
@@ -37,14 +44,14 @@ pub struct AppManifestV1 {
 #[serde(rename_all = "snake_case")]
 pub struct AppSlotManifest {
     /// The SlotId which will be given to the installed Cell for this Dna.
-    pub(super) id: SlotId,
+    pub id: SlotId,
 
     /// Determines if, how, and when a Cell will be provisioned.
-    pub(super) provisioning: Option<CellProvisioning>,
+    pub provisioning: Option<CellProvisioning>,
 
     /// Declares where to find the DNA, and options to modify it before
     /// inclusion in a Cell
-    pub(super) dna: AppSlotDnaManifest,
+    pub dna: AppSlotDnaManifest,
 }
 
 impl AppSlotManifest {
@@ -68,17 +75,17 @@ pub struct AppSlotDnaManifest {
     /// Note that since this is flattened,
     /// there is no actual "location" key in the manifest.
     #[serde(flatten)]
-    pub(super) location: Option<mr_bundle::Location>,
+    pub location: Option<mr_bundle::Location>,
 
     /// Optional default properties. May be overridden during installation.
-    pub(super) properties: Option<YamlProperties>,
+    pub properties: Option<YamlProperties>,
 
     /// Optional fixed UUID. May be overridden during installation.
-    pub(super) uuid: Option<Uuid>,
+    pub uuid: Option<Uuid>,
 
     /// The versioning constraints for the DNA. Ensures that only a DNA that
     /// matches the version spec will be used.
-    pub(super) version: Option<DnaVersionFlexible>,
+    pub version: Option<DnaVersionFlexible>,
 
     /// Allow up to this many "clones" to be created at runtime.
     /// Each runtime clone is created by the `CreateClone` strategy,
