@@ -9,6 +9,7 @@ use crate::tx2::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::{Stream, StreamExt};
+use std::collections::HashSet;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 /// Promote a tx2 transport backend to a tx2 transport frontend.
@@ -34,17 +35,24 @@ struct WriteChan {
     writer: OutChan,
 }
 
+type CloseCon = Box<dyn FnOnce(ConHnd, u32, &str) -> BoxFuture<'static, ()> + 'static + Send>;
+
 struct PromoteConInner {
     _permit: OwnedSemaphorePermit,
+    hnd: ConHnd,
     con: Arc<dyn ConAdapt>,
+    close_con: Option<CloseCon>,
     writer_bucket: ResourceBucket<WriteChan>,
 }
 
-struct PromoteConHnd(Arc<PromoteConInner>);
+struct PromoteConHnd(Share<PromoteConInner>, Uniq);
 
 impl std::fmt::Debug for PromoteConHnd {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let a = self.0.con.remote_addr().map(|a| a.to_string());
+        let a = self
+            .0
+            .share_mut(|i, _| i.con.remote_addr().map(|a| a.to_string()))
+            .unwrap_or_else(|_| "[closed]".to_string());
         f.debug_tuple("ConHnd").field(&a).finish()
     }
 }
@@ -117,14 +125,31 @@ impl PromoteConHnd {
         permit: OwnedSemaphorePermit,
         raw_con: Arc<dyn ConAdapt>,
         in_chan_recv: Box<dyn InChanRecvAdapt>,
+        close_con: CloseCon,
     ) -> ConHnd {
+        let standin = ConHnd(Arc::new(Self(Share::new_closed(), Uniq::default())));
+
+        let uniq = raw_con.uniq();
         let writer_bucket = ResourceBucket::new();
-        let con = Self(Arc::new(PromoteConInner {
-            _permit: permit,
-            con: raw_con.clone(),
-            writer_bucket: writer_bucket.clone(),
-        }));
-        let con = ConHnd(Arc::new(con));
+        let con = Self(
+            Share::new(PromoteConInner {
+                _permit: permit,
+                hnd: standin,
+                con: raw_con.clone(),
+                close_con: Some(close_con),
+                writer_bucket: writer_bucket.clone(),
+            }),
+            uniq,
+        );
+
+        let a = Arc::new(con);
+        let con = ConHnd(a.clone());
+        let hnd = con.clone();
+        a.0.share_mut(move |i, _| {
+            i.hnd = hnd;
+            Ok(())
+        })
+        .unwrap();
 
         // This is a calculated task spawn.
         // We could let this future be polled in the top-level endpoint
@@ -145,19 +170,19 @@ impl PromoteConHnd {
 
 impl AsConHnd for PromoteConHnd {
     fn uniq(&self) -> Uniq {
-        self.0.con.uniq()
+        self.1
     }
 
     fn is_closed(&self) -> bool {
-        self.0.con.is_closed()
+        self.0.is_closed()
     }
 
     fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
-        self.0.con.close(code, reason)
+        close_inner(&self.0, code, reason)
     }
 
     fn remote_addr(&self) -> KitsuneResult<TxUrl> {
-        self.0.con.remote_addr()
+        self.0.share_mut(|i, _| i.con.remote_addr())
     }
 
     fn write(
@@ -168,16 +193,41 @@ impl AsConHnd for PromoteConHnd {
     ) -> BoxFuture<'static, KitsuneResult<()>> {
         let inner = self.0.clone();
         async move {
-            let mut writer = inner.writer_bucket.acquire(Some(timeout)).await?;
+            let mut writer = inner
+                .share_mut(|i, _| Ok(i.writer_bucket.acquire(Some(timeout))))?
+                .await?;
             if let Err(e) = writer.writer.write(msg_id, data, timeout).await {
                 let reason = format!("{:?}", e);
                 // TODO - standardize codes?
-                inner.con.close(500, &reason);
+                close_inner(&inner, 500, &reason).await;
+                return Err(e);
             }
-            inner.writer_bucket.release(writer);
+            inner.share_mut(|i, _| {
+                i.writer_bucket.release(writer);
+                Ok(())
+            })?;
             Ok(())
         }
         .boxed()
+    }
+}
+
+fn close_inner(this: &Share<PromoteConInner>, code: u32, reason: &str) -> BoxFuture<'static, ()> {
+    match this.share_mut(move |i, c| {
+        *c = true;
+        let f1 = if let Some(close_con) = i.close_con.take() {
+            close_con(i.hnd.clone(), code, reason)
+        } else {
+            async move {}.boxed()
+        };
+        let f2 = i.con.close(code, reason);
+        Ok(async move {
+            futures::future::join(f1, f2).await;
+        }
+        .boxed())
+    }) {
+        Ok(fut) => fut,
+        Err(_) => async move {}.boxed(),
     }
 }
 
@@ -185,9 +235,10 @@ struct PromoteEpInner {
     con_limit: Arc<Semaphore>,
     logic_hnd: LogicChanHandle<EpEvent>,
     ep: Arc<dyn EndpointAdapt>,
+    all_cons: HashSet<ConHnd>,
 }
 
-struct PromoteEpHnd(Arc<PromoteEpInner>);
+struct PromoteEpHnd(Share<PromoteEpInner>, Uniq);
 
 impl PromoteEpHnd {
     pub fn new(
@@ -195,37 +246,85 @@ impl PromoteEpHnd {
         logic_hnd: LogicChanHandle<EpEvent>,
         ep: Arc<dyn EndpointAdapt>,
     ) -> Self {
-        Self(Arc::new(PromoteEpInner {
-            con_limit,
-            logic_hnd,
-            ep,
-        }))
+        let uniq = ep.uniq();
+        Self(
+            Share::new(PromoteEpInner {
+                con_limit,
+                logic_hnd,
+                ep,
+                all_cons: HashSet::new(),
+            }),
+            uniq,
+        )
     }
+}
+
+fn reg_con_hnd_inner(
+    inner: &Share<PromoteEpInner>,
+    permit: OwnedSemaphorePermit,
+    raw_con: Arc<dyn ConAdapt>,
+    in_chan_recv: Box<dyn InChanRecvAdapt>,
+) -> KitsuneResult<ConHnd> {
+    let inner2 = inner.clone();
+    inner.share_mut(move |i, _| {
+        let logic_hnd = i.logic_hnd.clone();
+        let con_close: CloseCon = Box::new(move |con, code, reason| {
+            let _ = inner2.share_mut(|i, _| {
+                i.all_cons.remove(&con);
+                Ok(())
+            });
+            logic_hnd
+                .emit(EpEvent::ConnectionClosed(con, code, reason.to_string()))
+                .map(|_| ())
+                .boxed()
+        });
+        let con = PromoteConHnd::new(
+            i.logic_hnd.clone(),
+            permit,
+            raw_con,
+            in_chan_recv,
+            con_close,
+        );
+        i.all_cons.insert(con.clone());
+        Ok(con)
+    })
 }
 
 impl AsEpHnd for PromoteEpHnd {
     fn uniq(&self) -> Uniq {
-        self.0.ep.uniq()
+        self.1
     }
 
     fn is_closed(&self) -> bool {
-        self.0.ep.is_closed()
+        self.0.is_closed()
     }
 
     fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
-        let f1 = self.0.logic_hnd.emit(EpEvent::EndpointClosed);
-        let f2 = self.0.ep.close(code, reason);
-        let logic_hnd = self.0.logic_hnd.clone();
+        // we have to be careful with this so we don't deadlock on
+        // the connection cleanup, but we actually get closed.
+        let reason = reason.to_string();
+        let inner = self.0.clone();
         async move {
-            let _ = f1.await;
-            f2.await;
+            let (ep, cons, logic_hnd) = inner.share_mut(|i, c| {
+                *c = true;
+                Ok((
+                    i.ep.clone(),
+                    i.all_cons.iter().cloned().collect::<Vec<_>>(),
+                    i.logic_hnd.clone(),
+                ))
+            })?;
+            ep.close(code, &reason).await;
+            futures::future::join_all(cons.into_iter().map(|c| c.close(code, &reason))).await;
+            let _ = logic_hnd.emit(EpEvent::EndpointClosed).await;
             logic_hnd.close();
+            KitsuneResult::Ok(())
         }
+        .map(|_| ())
         .boxed()
     }
 
     fn local_addr(&self) -> KitsuneResult<TxUrl> {
-        self.0.ep.local_addr()
+        self.0.share_mut(|i, _| i.ep.local_addr())
     }
 
     fn connect(
@@ -233,12 +332,16 @@ impl AsEpHnd for PromoteEpHnd {
         remote: TxUrl,
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<ConHnd>> {
+        let r = self
+            .0
+            .share_mut(|i, _| Ok((i.con_limit.clone(), i.ep.clone())));
         let inner = self.0.clone();
         async move {
-            let permit = inner.con_limit.clone().acquire_owned().await;
-            let (con, in_chan_recv) = inner.ep.connect(remote, timeout).await?;
+            let (limit, ep) = r?;
+            let permit = limit.acquire_owned().await;
+            let (con, in_chan_recv) = ep.connect(remote, timeout).await?;
 
-            let con = PromoteConHnd::new(inner.logic_hnd.clone(), permit, con, in_chan_recv);
+            let con = reg_con_hnd_inner(&inner, permit, con, in_chan_recv)?;
             Ok(con)
         }
         .boxed()
@@ -251,6 +354,7 @@ struct PromoteEp {
 }
 
 async fn con_recv_logic(
+    inner: Share<PromoteEpInner>,
     logic_hnd: LogicChanHandle<EpEvent>,
     _max_cons: usize,
     con_limit: Arc<Semaphore>,
@@ -282,6 +386,7 @@ async fn con_recv_logic(
 
     // Iterate on the pend_stream, handshaking all connections in parallel.
     // This *is* actually bound, by the max connections semaphore.
+    let inner = &inner;
     let logic_hnd = &logic_hnd;
     pend_stream
         .for_each_concurrent(None, move |r| async move {
@@ -293,7 +398,13 @@ async fn con_recv_logic(
                 }
                 Ok(r) => r,
             };
-            let con = PromoteConHnd::new(logic_hnd.clone(), permit, con, in_chan_recv);
+            let con = match reg_con_hnd_inner(&inner, permit, con, in_chan_recv) {
+                Err(e) => {
+                    let _ = logic_hnd.emit(EpEvent::Error(e));
+                    return;
+                }
+                Ok(r) => r,
+            };
             let _ = logic_hnd.emit(EpEvent::IncomingConnection(con));
         })
         .await;
@@ -313,8 +424,14 @@ impl PromoteEp {
 
         let hnd2 = logic_chan.handle().clone();
 
-        hnd2.capture_logic(con_recv_logic(logic_hnd, max_cons, con_limit, con_recv))
-            .await?;
+        hnd2.capture_logic(con_recv_logic(
+            hnd.0.clone(),
+            logic_hnd,
+            max_cons,
+            con_limit,
+            con_recv,
+        ))
+        .await?;
 
         let hnd = EpHnd(Arc::new(hnd));
         Ok(Self { hnd, logic_chan })

@@ -29,6 +29,11 @@ impl<T: 'static + Send> Share<T> {
         Self(Arc::new(parking_lot::Mutex::new(Some(t))))
     }
 
+    /// Create a new closed share lock.
+    pub fn new_closed() -> Self {
+        Self(Arc::new(parking_lot::Mutex::new(None)))
+    }
+
     /// Execute code with mut access to the internal state.
     /// The second param, if set to true, will drop the shared state,
     /// any further access will `Err(KitsuneError::Closed)`.

@@ -236,7 +236,7 @@ pub enum EpEvent {
     IncomingData(ConHnd, MsgId, PoolBuf),
 
     /// A connection has closed (Url, Code, Reason).
-    ConnectionClosed(TxUrl, u32, String),
+    ConnectionClosed(ConHnd, u32, String),
 
     /// A non-fatal internal error.
     Error(KitsuneError),
