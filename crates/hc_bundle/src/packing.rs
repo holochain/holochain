@@ -49,21 +49,27 @@ fn bundle_path_to_dir(path: &Path, extension: &'static str) -> HcBundleResult<Pa
 pub async fn pack<M: Manifest>(
     dir_path: &std::path::Path,
     target_path: Option<PathBuf>,
+    name: String,
 ) -> HcBundleResult<(PathBuf, Bundle<M>)> {
     let dir_path = ffs::canonicalize(dir_path).await?;
     let manifest_path = dir_path.join(&M::path());
     let bundle: Bundle<M> = Bundle::pack_yaml(&manifest_path).await?;
-    let target_path = target_path
-        .map(Ok)
-        .unwrap_or_else(|| dir_to_bundle_path(&dir_path, M::bundle_extension()))?;
+    let target_path = match target_path {
+        Some(target_path) => {
+            if target_path.is_dir() {
+                dir_to_bundle_path(&dir_path, name, M::bundle_extension())?
+            } else {
+                target_path
+            }
+        }
+        None => dir_to_bundle_path(&dir_path, name, M::bundle_extension())?,
+    };
     bundle.write_to_file(&target_path).await?;
     Ok((target_path, bundle))
 }
 
-fn dir_to_bundle_path(dir_path: &Path, extension: &str) -> HcBundleResult<PathBuf> {
-    let dir_name = dir_path.file_name().expect("Cannot pack `/`");
-    let parent_path = dir_path.parent().expect("Cannot pack `/`");
-    Ok(parent_path.join(format!("{}.{}", dir_name.to_string_lossy(), extension)))
+fn dir_to_bundle_path(dir_path: &Path, name: String, extension: &str) -> HcBundleResult<PathBuf> {
+    Ok(dir_path.join(format!("{}.{}", name, extension)))
 }
 
 #[cfg(test)]
@@ -82,7 +88,7 @@ mod tests {
         let manifest_yaml = r#"
 ---
 manifest_version: "1"
-name: test dna
+name: test_dna
 uuid: blablabla
 properties:
   some: 42
@@ -106,7 +112,9 @@ zomes:
         // in the parent directory
         std::fs::write(tmpdir.path().join("zome-3.wasm"), &[7, 8, 9]).unwrap();
 
-        let (bundle_path, bundle) = pack::<DnaManifest>(&dir, None).await.unwrap();
+        let (bundle_path, bundle) = pack::<DnaManifest>(&dir, None, "test_dna".to_string())
+            .await
+            .unwrap();
 
         // Ensure the bundle path was generated as expected
         assert!(bundle_path.is_file());
@@ -144,7 +152,7 @@ zomes:
         assert_eq!(dir.read_dir().unwrap().collect::<Vec<_>>().len(), 3);
 
         // Ensure that we get the same bundle after the roundtrip
-        let (_, bundle2) = pack(&dir, None).await.unwrap();
+        let (_, bundle2) = pack(&dir, None, "test_dna".to_string()).await.unwrap();
         assert_eq!(bundle, bundle2);
     }
 }

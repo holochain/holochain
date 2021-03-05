@@ -61,6 +61,8 @@ pub enum AdminRequestCli {
     RegisterDna(RegisterDna),
     InstallApp(InstallApp),
     InstallAppBundle(InstallAppBundle),
+    /// Calls AdminRequest::ListAppInterfaces.
+    ListAppWs,
     /// Calls AdminRequest::ListDnas.
     ListDnas,
     /// Calls AdminRequest::GenerateAgentPubKey.
@@ -256,6 +258,10 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
         AdminRequestCli::AddAppWs(args) => {
             let port = attach_app_interface(cmd, args).await?;
             msg!("Added App port {}", port);
+        }
+        AdminRequestCli::ListAppWs => {
+            let ports = list_app_ws(cmd).await?;
+            msg!("Attached App Interfaces {:?}", ports);
         }
         AdminRequestCli::RegisterDna(args) => {
             let dnas = register_dna(cmd, args).await?;
@@ -497,6 +503,12 @@ pub async fn install_app_bundle(
     )
     .await?;
     Ok(installed_app)
+}
+
+/// Calls [`AdminRequest::ListAppInterfaces`].
+pub async fn list_app_ws(cmd: &mut CmdRunner) -> anyhow::Result<Vec<u16>> {
+    let resp = cmd.command(AdminRequest::ListAppInterfaces).await?;
+    Ok(expect_match!(resp => AdminResponse::AppInterfacesListed, "Failed to list app interfaces"))
 }
 
 /// Calls [`AdminRequest::ListCellIds`].

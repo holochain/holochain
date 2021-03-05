@@ -251,7 +251,7 @@ pub mod test_utils {
 
         (
             envs.tempdir(),
-            RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+            RealAppInterfaceApi::new(conductor_handle, Default::default()),
             handle,
         )
     }
