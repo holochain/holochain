@@ -5,6 +5,19 @@ use crate::tx2::*;
 use crate::*;
 
 use futures::{future::BoxFuture, stream::Stream};
+use std::sync::atomic;
+
+static UNIQ: atomic::AtomicUsize = atomic::AtomicUsize::new(1);
+
+/// Opaque identifier, allows Eq/Hash through trait-object types.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Uniq(usize);
+
+impl Default for Uniq {
+    fn default() -> Self {
+        Self(UNIQ.fetch_add(1, atomic::Ordering::Relaxed))
+    }
+}
 
 /// Tx backend read stream type.
 pub type InChan = Box<dyn AsFramedReader>;
@@ -24,6 +37,9 @@ pub type OutChanFut = BoxFuture<'static, KitsuneResult<OutChan>>;
 
 /// Tx backend adapter represents an open connection to a remote.
 pub trait ConAdapt: 'static + Send + Sync + Unpin {
+    /// Get the opaque Uniq identifier for this connection.
+    fn uniq(&self) -> Uniq;
+
     /// Get the string address (url) of the remote.
     fn remote_addr(&self) -> KitsuneResult<TxUrl>;
 
@@ -34,7 +50,7 @@ pub trait ConAdapt: 'static + Send + Sync + Unpin {
     fn is_closed(&self) -> bool;
 
     /// Close this open connection (and all associated Chans).
-    fn close(&self, code: u32, reason: &str);
+    fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()>;
 }
 
 /// A tx backend Con is both the ability to make outgoing channels,
@@ -50,6 +66,9 @@ pub trait ConRecvAdapt: 'static + Send + Unpin + Stream<Item = ConFut> {}
 
 /// Tx backend adapter represents a bound local endpoint.
 pub trait EndpointAdapt: 'static + Send + Sync + Unpin {
+    /// Get the opaque Uniq identifier for this endpoint.
+    fn uniq(&self) -> Uniq;
+
     /// Get the string address (url) of this binding.
     fn local_addr(&self) -> KitsuneResult<TxUrl>;
 
@@ -60,7 +79,7 @@ pub trait EndpointAdapt: 'static + Send + Sync + Unpin {
     fn is_closed(&self) -> bool;
 
     /// Shutdown this endpoint / all connections / all channels.
-    fn close(&self, code: u32, reason: &str);
+    fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()>;
 }
 
 /// A tx backend Endpoint is both the ability to make outgoing connections,

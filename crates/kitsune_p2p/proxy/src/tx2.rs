@@ -41,15 +41,15 @@ struct ProxyEpHnd {
 }
 
 impl ProxyEpHnd {
-    pub fn new(sub_ep_hnd: EpHnd, cert_digest: CertDigest) -> EpHnd {
-        EpHnd(Arc::new(ProxyEpHnd {
+    pub fn new(sub_ep_hnd: EpHnd, cert_digest: CertDigest) -> Arc<ProxyEpHnd> {
+        Arc::new(ProxyEpHnd {
             sub_ep_hnd,
             cert_digest,
             inner: Share::new(ProxyEpInner {
                 proxy_cons: HashMap::new(),
                 all_cons: HashMap::new(),
             }),
-        }))
+        })
     }
 }
 
@@ -152,31 +152,59 @@ impl AsEpHnd for ProxyEpHnd {
     }
 }
 
+async fn incoming_evt_logic(
+    mut sub_ep: Ep,
+    _hnd: Arc<ProxyEpHnd>,
+    logic_hnd: LogicChanHandle<EpEvent>,
+) {
+    while let Some(evt) = sub_ep.next().await {
+        println!("RECEIVE EVENT: {:?}", evt);
+        use EpEvent::*;
+        if match evt {
+            IncomingConnection(_) => Ok(()),
+            IncomingData(_con, _msg_id, data) => {
+                if data.is_empty() {
+                    // TODO - FIXME - kill connection
+                    panic!("corrupt incoming data");
+                }
+                match data[0] {
+                    PROXY_HELLO_DIGEST => {}
+                    // TODO - FIXME - kill connection
+                    _ => panic!("corrupt incoming data"),
+                }
+                Ok(())
+            }
+            ConnectionClosed(_url, _code, _reason) => Ok(()),
+            Error(e) => logic_hnd.emit(Error(e)),
+            EndpointClosed => logic_hnd.emit(EndpointClosed),
+        }
+        .is_err()
+        {
+            break;
+        }
+    }
+}
+
 struct ProxyEp {
     logic_chan: LogicChan<EpEvent>,
     hnd: EpHnd,
 }
 
 impl ProxyEp {
-    pub async fn new(mut sub_ep: Ep, cert_digest: CertDigest) -> KitsuneResult<Ep> {
+    pub async fn new(sub_ep: Ep, cert_digest: CertDigest) -> KitsuneResult<Ep> {
         let logic_chan = LogicChan::new(32);
         let logic_hnd = logic_chan.handle().clone();
 
         let hnd = ProxyEpHnd::new(sub_ep.handle().clone(), cert_digest);
 
-        logic_chan
-            .handle()
-            .capture_logic(async move {
-                while let Some(evt) = sub_ep.next().await {
-                    // TODO - FIXME - just passing these for now
-                    if logic_hnd.emit(evt).is_err() {
-                        break;
-                    }
-                }
-            })
-            .await?;
+        let logic = incoming_evt_logic(sub_ep, hnd.clone(), logic_hnd);
 
-        Ok(Ep(Box::new(ProxyEp { logic_chan, hnd })))
+        logic_chan.handle().capture_logic(logic).await?;
+
+        Ok(Ep(Box::new(ProxyEp {
+            logic_chan,
+            hnd: EpHnd(hnd),
+        })))
     }
 }
 
@@ -243,20 +271,32 @@ mod tests {
             TlsConfig::new_ephemeral().await.unwrap(),
             32,
         );
-        let ep1 = f.bind("none:", t).await.unwrap();
+        let mut ep1 = f.bind("none:", t).await.unwrap();
         let ep1hnd = ep1.handle().clone();
         let addr1 = ep1hnd.local_addr().unwrap();
         println!("got addr1: {}", addr1);
+
+        let rt1 = tokio::task::spawn(async move {
+            while let Some(evt) = ep1.next().await {
+                println!("RT1: {:?}", evt);
+            }
+        });
 
         let f = tx2_proxy(
             MemBackendAdapt::new(),
             TlsConfig::new_ephemeral().await.unwrap(),
             32,
         );
-        let ep2 = f.bind("none:", t).await.unwrap();
+        let mut ep2 = f.bind("none:", t).await.unwrap();
         let ep2hnd = ep2.handle().clone();
         let addr2 = ep2hnd.local_addr().unwrap();
         println!("got addr2: {}", addr2);
+
+        let rt2 = tokio::task::spawn(async move {
+            while let Some(evt) = ep2.next().await {
+                println!("RT2: {:?}", evt);
+            }
+        });
 
         let _con = ep1hnd.connect(addr2, t).await.unwrap();
 
@@ -264,6 +304,9 @@ mod tests {
 
         ep1hnd.close(0, "");
         ep2hnd.close(0, "");
+
+        rt1.await.unwrap();
+        rt2.await.unwrap();
     }
 }
 

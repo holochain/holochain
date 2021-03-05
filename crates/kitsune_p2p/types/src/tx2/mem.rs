@@ -6,7 +6,7 @@ use crate::tx2::util::{Active, TxUrl};
 use crate::tx2::*;
 use crate::*;
 use futures::{
-    future::FutureExt,
+    future::{BoxFuture, FutureExt},
     stream::{BoxStream, StreamExt},
 };
 use once_cell::sync::Lazy;
@@ -63,6 +63,7 @@ impl futures::stream::Stream for MemInChanRecvAdapt {
 impl InChanRecvAdapt for MemInChanRecvAdapt {}
 
 struct MemConAdaptInner {
+    uniq: Uniq,
     remote_addr: TxUrl,
     chan_send: ChanSend,
     con_active: Active,
@@ -79,6 +80,7 @@ impl MemConAdapt {
         mix_active: Active,
     ) -> Self {
         Self(MemConAdaptInner {
+            uniq: Uniq::default(),
             remote_addr,
             chan_send,
             con_active,
@@ -88,6 +90,10 @@ impl MemConAdapt {
 }
 
 impl ConAdapt for MemConAdapt {
+    fn uniq(&self) -> Uniq {
+        self.0.uniq
+    }
+
     fn remote_addr(&self) -> KitsuneResult<TxUrl> {
         Ok(self.0.remote_addr.clone())
     }
@@ -110,8 +116,9 @@ impl ConAdapt for MemConAdapt {
         !self.0.mix_active.is_active()
     }
 
-    fn close(&self, _code: u32, _reason: &str) {
+    fn close(&self, _code: u32, _reason: &str) -> BoxFuture<'static, ()> {
         self.0.con_active.kill();
+        async move {}.boxed()
     }
 }
 
@@ -165,24 +172,31 @@ impl Drop for MemEndpointAdaptInner {
     }
 }
 
-struct MemEndpointAdapt(Mutex<MemEndpointAdaptInner>);
+struct MemEndpointAdapt(Mutex<MemEndpointAdaptInner>, Uniq);
 
 impl MemEndpointAdapt {
     pub fn new(id: u64) -> (Self, Active) {
         let url = format!("kitsune-mem://{}", id);
         let ep_active = Active::new();
         (
-            Self(Mutex::new(MemEndpointAdaptInner {
-                id,
-                url: url.into(),
-                ep_active: ep_active.clone(),
-            })),
+            Self(
+                Mutex::new(MemEndpointAdaptInner {
+                    id,
+                    url: url.into(),
+                    ep_active: ep_active.clone(),
+                }),
+                Uniq::default(),
+            ),
             ep_active,
         )
     }
 }
 
 impl EndpointAdapt for MemEndpointAdapt {
+    fn uniq(&self) -> Uniq {
+        self.1
+    }
+
     fn local_addr(&self) -> KitsuneResult<TxUrl> {
         let inner = self.0.lock();
         if !inner.ep_active.is_active() {
@@ -262,8 +276,9 @@ impl EndpointAdapt for MemEndpointAdapt {
         !self.0.lock().ep_active.is_active()
     }
 
-    fn close(&self, _code: u32, _reason: &str) {
+    fn close(&self, _code: u32, _reason: &str) -> BoxFuture<'static, ()> {
         self.0.lock().ep_active.kill();
+        async move {}.boxed()
     }
 }
 

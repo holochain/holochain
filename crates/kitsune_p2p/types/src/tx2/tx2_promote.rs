@@ -78,6 +78,7 @@ async fn in_chan_recv_logic(
 
                 if logic_hnd
                     .emit(EpEvent::IncomingData(con.clone(), msg_id, data))
+                    .await
                     .is_err()
                 {
                     break;
@@ -143,11 +144,15 @@ impl PromoteConHnd {
 }
 
 impl AsConHnd for PromoteConHnd {
+    fn uniq(&self) -> Uniq {
+        self.0.con.uniq()
+    }
+
     fn is_closed(&self) -> bool {
         self.0.con.is_closed()
     }
 
-    fn close(&self, code: u32, reason: &str) {
+    fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
         self.0.con.close(code, reason)
     }
 
@@ -199,13 +204,24 @@ impl PromoteEpHnd {
 }
 
 impl AsEpHnd for PromoteEpHnd {
+    fn uniq(&self) -> Uniq {
+        self.0.ep.uniq()
+    }
+
     fn is_closed(&self) -> bool {
         self.0.ep.is_closed()
     }
 
-    fn close(&self, code: u32, reason: &str) {
-        self.0.logic_hnd.close();
-        self.0.ep.close(code, reason);
+    fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
+        let f1 = self.0.logic_hnd.emit(EpEvent::EndpointClosed);
+        let f2 = self.0.ep.close(code, reason);
+        let logic_hnd = self.0.logic_hnd.clone();
+        async move {
+            let _ = f1.await;
+            f2.await;
+            logic_hnd.close();
+        }
+        .boxed()
     }
 
     fn local_addr(&self) -> KitsuneResult<TxUrl> {
@@ -295,9 +311,9 @@ impl PromoteEp {
         let logic_hnd = logic_chan.handle().clone();
         let hnd = PromoteEpHnd::new(con_limit.clone(), logic_hnd.clone(), ep);
 
-        logic_chan
-            .handle()
-            .capture_logic(con_recv_logic(logic_hnd, max_cons, con_limit, con_recv))
+        let hnd2 = logic_chan.handle().clone();
+
+        hnd2.capture_logic(con_recv_logic(logic_hnd, max_cons, con_limit, con_recv))
             .await?;
 
         let hnd = EpHnd(Arc::new(hnd));
@@ -359,8 +375,8 @@ mod tests {
 
         let f = tx2_promote(MemBackendAdapt::new(), 32);
 
-        let (rs, rr) = tokio::sync::oneshot::channel::<()>();
-        let mut rs = Some(rs);
+        let (t_comp_s, t_comp_r) = tokio::sync::oneshot::channel::<()>();
+        let mut t_comp_s = Some(t_comp_s);
 
         let mut e1 = f.bind("none:", t).await.unwrap();
         let e1_hnd = e1.handle().clone();
@@ -370,7 +386,7 @@ mod tests {
                 match evt {
                     EpEvent::IncomingData(_, _, data) => {
                         assert_eq!(b"world", data.as_ref());
-                        rs.take().unwrap().send(()).unwrap();
+                        t_comp_s.take().unwrap().send(()).unwrap();
                     }
                     _ => (),
                 }
@@ -403,10 +419,10 @@ mod tests {
         data.extend_from_slice(b"hello");
         con.write(0.into(), data, t).await.unwrap();
 
-        rr.await.unwrap();
+        t_comp_r.await.unwrap();
 
-        e1_hnd.close(0, "");
-        e2_hnd.close(0, "");
+        e1_hnd.close(0, "").await;
+        e2_hnd.close(0, "").await;
 
         rt1.await.unwrap();
         rt2.await.unwrap();

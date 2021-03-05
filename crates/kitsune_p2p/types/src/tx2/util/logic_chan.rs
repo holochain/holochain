@@ -1,14 +1,20 @@
 use crate::tx2::util::Share;
 use crate::*;
-use futures::future::BoxFuture;
+use futures::future::{BoxFuture, FutureExt};
+use futures::stream::futures_unordered::FuturesUnordered;
+use futures::stream::Stream;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
-#[allow(dead_code)]
+enum LType<E: 'static + Send> {
+    Event(E),
+    Logic(OwnedSemaphorePermit, BoxFuture<'static, ()>),
+}
+type LTypeSend<E> = tokio::sync::mpsc::Sender<LType<E>>;
+type LTypeRecv<E> = tokio::sync::mpsc::Receiver<LType<E>>;
+
 struct LogicChanInner<E: 'static + Send> {
-    events: Vec<E>,
-    waker: Option<std::task::Waker>,
-    limit: Arc<Semaphore>,
-    logic: Vec<(OwnedSemaphorePermit, BoxFuture<'static, ()>)>,
+    send: LTypeSend<E>,
+    logic_limit: Arc<Semaphore>,
 }
 
 /// Handle to a logic_chan instance.
@@ -38,15 +44,19 @@ impl<E: 'static + Send> std::hash::Hash for LogicChanHandle<E> {
 
 impl<E: 'static + Send> LogicChanHandle<E> {
     /// Cause the logic_chan to emit an event.
-    pub fn emit(&self, e: E) -> KitsuneResult<()> {
-        let waker = self.0.share_mut(move |i, _| {
-            i.events.push(e);
-            Ok(i.waker.take())
-        })?;
-        if let Some(waker) = waker {
-            waker.wake();
+    pub fn emit(
+        &self,
+        e: E,
+    ) -> impl std::future::Future<Output = KitsuneResult<()>> + 'static + Send {
+        let e = LType::Event(e);
+        let send = self.0.share_mut(|i, _| Ok(i.send.clone()));
+        async move {
+            send?
+                .send(e)
+                .await
+                .map_err(|_| KitsuneError::from(KitsuneErrorKind::Closed))?;
+            Ok(())
         }
-        Ok(())
     }
 
     /// Capture new logic into the logic_chan.
@@ -64,17 +74,16 @@ impl<E: 'static + Send> LogicChanHandle<E> {
         L: std::future::Future<Output = ()> + 'static + Send,
     {
         let l = futures::future::FutureExt::boxed(l);
-        let inner = self.0.clone();
+        let r = self
+            .0
+            .share_mut(|i, _| Ok((i.logic_limit.clone(), i.send.clone())));
         async move {
-            let limit = inner.share_mut(|i, _| Ok(i.limit.clone()))?;
+            let (limit, mut send) = r?;
             let permit = limit.acquire_owned().await;
-            let waker = inner.share_mut(move |i, _| {
-                i.logic.push((permit, l));
-                Ok(i.waker.take())
-            })?;
-            if let Some(waker) = waker {
-                waker.wake();
-            }
+            let l = LType::Logic(permit, l);
+            send.send(l)
+                .await
+                .map_err(|_| KitsuneError::from(KitsuneErrorKind::Closed))?;
             Ok(())
         }
     }
@@ -86,13 +95,10 @@ impl<E: 'static + Send> LogicChanHandle<E> {
 
     /// Close this logic_chan.
     pub fn close(&self) {
-        let maybe_waker = self.0.share_mut(|i, c| {
+        let _ = self.0.share_mut(|_, c| {
             *c = true;
-            Ok(i.waker.take())
+            Ok(())
         });
-        if let Ok(Some(waker)) = maybe_waker {
-            waker.wake();
-        }
     }
 }
 
@@ -101,22 +107,44 @@ impl<E: 'static + Send> LogicChanHandle<E> {
 /// Fill the LogicChan with async logic.
 /// Report events to the handle in the async logic.
 /// Treat the LogicChan as a stream, collecting the events.
-pub struct LogicChan<E: 'static + Send>(LogicChanHandle<E>);
+pub struct LogicChan<E: 'static + Send> {
+    recv: LTypeRecv<E>,
+    hnd: LogicChanHandle<E>,
+    logic: FuturesUnordered<BoxFuture<'static, ()>>,
+}
 
 impl<E: 'static + Send> LogicChan<E> {
     /// Create a new LogicChan instance.
     pub fn new(capture_bound: usize) -> Self {
-        Self(LogicChanHandle(Share::new(LogicChanInner {
-            events: Vec::new(),
-            waker: None,
-            limit: Arc::new(Semaphore::new(capture_bound)),
-            logic: Vec::with_capacity(capture_bound),
-        })))
+        let (send, recv) = tokio::sync::mpsc::channel(capture_bound);
+        let logic_limit = Arc::new(Semaphore::new(capture_bound));
+        let inner = LogicChanInner { send, logic_limit };
+        let hnd = LogicChanHandle(Share::new(inner));
+        let logic = FuturesUnordered::new();
+        Self { recv, hnd, logic }
     }
 
     /// A handle to this logic_chan. You can clone this.
     pub fn handle(&self) -> &LogicChanHandle<E> {
-        &self.0
+        &self.hnd
+    }
+}
+
+impl<E: 'static + Send> LogicChan<E> {
+    fn poll_logic(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) {
+        loop {
+            if self.logic.is_empty() {
+                return;
+            }
+
+            let l = &mut self.logic;
+            futures::pin_mut!(l);
+            match Stream::poll_next(l, cx) {
+                std::task::Poll::Pending => return,
+                std::task::Poll::Ready(None) => return,
+                _ => continue,
+            }
+        }
     }
 }
 
@@ -124,92 +152,32 @@ impl<E: 'static + Send> futures::stream::Stream for LogicChan<E> {
     type Item = E;
 
     fn poll_next(
-        self: std::pin::Pin<&mut Self>,
+        mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        enum X<E: 'static + Send> {
-            T(E),
-            L(Vec<(OwnedSemaphorePermit, BoxFuture<'static, ()>)>),
-        }
+        loop {
+            Self::poll_logic(std::pin::Pin::new(&mut *self), cx);
 
-        // either pull one event to emit,
-        // or the task list for processing.
-        let x = match self.0 .0.share_mut(|i, _| {
-            if i.events.is_empty() {
-                // TODO
-                // Currently we're just polling all sub futures
-                // even though some/most of them may not have been woken.
-                // We could store an AtomicBool with each of these,
-                // passing custom context wakers that would flag these bools
-                // letting us know which tasks are actually ready to be polled.
-                Ok(X::L(std::mem::replace(&mut i.logic, Vec::new())))
-            } else {
-                Ok(X::T(i.events.remove(0)))
-            }
-        }) {
-            Err(_) => return std::task::Poll::Ready(None),
-            Ok(x) => x,
-        };
-
-        // if we got an event, return it.
-        let task_list = match x {
-            X::T(e) => return std::task::Poll::Ready(Some(e)),
-            X::L(l) => l,
-        };
-
-        // tasks marked as pending - we'll need to re-queue them
-        let mut pending_tasks = Vec::new();
-
-        // do a single logic loop - if any of this logic injects more logic
-        // the waker will be woken and we'll just be polled again.
-        for (permit, mut task) in task_list {
-            let mut keep = false;
-            {
-                let task = &mut task;
-                tokio::pin!(task);
-                if let std::task::Poll::Pending = std::future::Future::poll(task, cx) {
-                    keep = true;
+            let (permit, new_logic) = {
+                let r = &mut self.recv;
+                futures::pin_mut!(r);
+                match Stream::poll_next(r, cx) {
+                    std::task::Poll::Ready(Some(t)) => match t {
+                        LType::Event(e) => return std::task::Poll::Ready(Some(e)),
+                        LType::Logic(permit, logic) => (permit, logic),
+                    },
+                    std::task::Poll::Ready(None) => return std::task::Poll::Ready(None),
+                    std::task::Poll::Pending => return std::task::Poll::Pending,
                 }
-            }
-            if keep {
-                pending_tasks.push((permit, task));
-            }
-        }
+            };
 
-        // we've run through the logic,
-        // - check for events
-        // - if any logic was added in the mean time, trigger waker
-        // - restore any logic that is still pending
-        let waker = cx.waker().clone();
-        let (is_closed, event) = match self.0 .0.share_mut(move |i, _| {
-            if i.events.is_empty() && !i.logic.is_empty() {
-                // logic was added since we pulled it out
-                // we need to explicitly wake for running again.
-                waker.wake();
-            } else if i.events.is_empty() {
-                i.waker = Some(waker);
-            }
-            i.logic.append(&mut pending_tasks);
-            if i.events.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(i.events.remove(0)))
-            }
-        }) {
-            Err(_) => (true, None),
-            Ok(e) => (false, e),
-        };
-
-        // return the appropriate poll variant
-        match event {
-            None => {
-                if is_closed {
-                    std::task::Poll::Ready(None)
-                } else {
-                    std::task::Poll::Pending
+            self.logic.push(
+                async move {
+                    let _permit = permit;
+                    new_logic.await;
                 }
-            }
-            Some(event) => std::task::Poll::Ready(Some(event)),
+                .boxed(),
+            );
         }
     }
 }
@@ -235,17 +203,17 @@ mod tests {
         });
 
         let wt = tokio::task::spawn(async move {
-            a.emit("a1").unwrap();
+            a.emit("a1").await.unwrap();
             let b = a.clone();
             a.capture_logic(async move {
-                b.emit("b1").unwrap();
+                b.emit("b1").await.unwrap();
                 tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
-                b.emit("b2").unwrap();
+                b.emit("b2").await.unwrap();
             })
             .await
             .unwrap();
             tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
-            a.emit("a2").unwrap();
+            a.emit("a2").await.unwrap();
         });
 
         tokio::time::delay_for(std::time::Duration::from_millis(100)).await;

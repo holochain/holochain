@@ -1,5 +1,6 @@
 //! Abstraction traits / types for tx2 networking transport.
 
+use crate::tx2::tx_backend::Uniq;
 use crate::tx2::util::*;
 use crate::tx2::*;
 use crate::*;
@@ -13,11 +14,14 @@ pub mod tx2_frontend_traits {
 
     /// Trait representing a connection handle.
     pub trait AsConHnd: std::fmt::Debug + 'static + Send + Sync + Unpin {
+        /// Get the opaque Uniq identifier for this connection.
+        fn uniq(&self) -> Uniq;
+
         /// Is this connection closed?
         fn is_closed(&self) -> bool;
 
         /// Close this connection.
-        fn close(&self, code: u32, reason: &str);
+        fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()>;
 
         /// Get the remote address of this connection.
         fn remote_addr(&self) -> KitsuneResult<TxUrl>;
@@ -33,11 +37,14 @@ pub mod tx2_frontend_traits {
 
     /// Trait representing a connection handle.
     pub trait AsEpHnd: 'static + Send + Sync + Unpin {
+        /// Get the opaque Uniq identifier for this endpoint.
+        fn uniq(&self) -> Uniq;
+
         /// Is this endpoint closed?
         fn is_closed(&self) -> bool;
 
         /// Close this endpoint.
-        fn close(&self, code: u32, reason: &str);
+        fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()>;
 
         /// Get the bound local address of this endpoint.
         fn local_addr(&self) -> KitsuneResult<TxUrl>;
@@ -73,6 +80,20 @@ use tx2_frontend_traits::*;
 #[derive(Clone, Debug)]
 pub struct ConHnd(pub Arc<dyn AsConHnd>);
 
+impl PartialEq for ConHnd {
+    fn eq(&self, oth: &Self) -> bool {
+        self.uniq().eq(&oth.uniq())
+    }
+}
+
+impl Eq for ConHnd {}
+
+impl std::hash::Hash for ConHnd {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.uniq().hash(state);
+    }
+}
+
 impl ConHnd {
     /// Is this connection closed?
     pub fn is_closed(&self) -> bool {
@@ -80,7 +101,11 @@ impl ConHnd {
     }
 
     /// Close this connection.
-    pub fn close(&self, code: u32, reason: &str) {
+    pub fn close(
+        &self,
+        code: u32,
+        reason: &str,
+    ) -> impl std::future::Future<Output = ()> + 'static + Send {
         AsConHnd::close(self, code, reason)
     }
 
@@ -101,11 +126,15 @@ impl ConHnd {
 }
 
 impl AsConHnd for ConHnd {
+    fn uniq(&self) -> Uniq {
+        self.0.uniq()
+    }
+
     fn is_closed(&self) -> bool {
         self.0.is_closed()
     }
 
-    fn close(&self, code: u32, reason: &str) {
+    fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
         self.0.close(code, reason)
     }
 
@@ -127,6 +156,20 @@ impl AsConHnd for ConHnd {
 #[derive(Clone)]
 pub struct EpHnd(pub Arc<dyn AsEpHnd>);
 
+impl PartialEq for EpHnd {
+    fn eq(&self, oth: &Self) -> bool {
+        self.uniq().eq(&oth.uniq())
+    }
+}
+
+impl Eq for EpHnd {}
+
+impl std::hash::Hash for EpHnd {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.uniq().hash(state);
+    }
+}
+
 impl EpHnd {
     /// Is this endpoint closed?
     pub fn is_closed(&self) -> bool {
@@ -134,7 +177,11 @@ impl EpHnd {
     }
 
     /// Close this endpoint.
-    pub fn close(&self, code: u32, reason: &str) {
+    pub fn close(
+        &self,
+        code: u32,
+        reason: &str,
+    ) -> impl std::future::Future<Output = ()> + 'static + Send {
         AsEpHnd::close(self, code, reason)
     }
 
@@ -154,11 +201,15 @@ impl EpHnd {
 }
 
 impl AsEpHnd for EpHnd {
+    fn uniq(&self) -> Uniq {
+        self.0.uniq()
+    }
+
     fn is_closed(&self) -> bool {
         self.0.is_closed()
     }
 
-    fn close(&self, code: u32, reason: &str) {
+    fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
         self.0.close(code, reason)
     }
 
@@ -189,6 +240,9 @@ pub enum EpEvent {
 
     /// A non-fatal internal error.
     Error(KitsuneError),
+
+    /// The endpoint has closed.
+    EndpointClosed,
 }
 
 /// Represents a bound endpoint. To manage this endpoint, see handle()/EpHnd.
