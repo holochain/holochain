@@ -44,13 +44,14 @@ pub struct AppManifestV1 {
 #[serde(rename_all = "snake_case")]
 pub struct AppSlotManifest {
     /// The SlotId which will be given to the installed Cell for this Dna.
+    /// Must be unique within an app manifest.
     pub id: SlotId,
 
     /// Determines if, how, and when a Cell will be provisioned.
     pub provisioning: Option<CellProvisioning>,
 
     /// Declares where to find the DNA, and options to modify it before
-    /// inclusion in a Cell
+    /// inclusion in a Cell.
     pub dna: AppSlotDnaManifest,
 }
 
@@ -77,7 +78,11 @@ pub struct AppSlotDnaManifest {
     #[serde(flatten)]
     pub location: Option<mr_bundle::Location>,
 
-    /// Optional default properties. May be overridden during installation.
+    /// Optional default properties.
+    /// Overrides any default properties specified in the DNA file,
+    /// and may also be overridden during installation.
+    /// A set of properties completely overrides previously specified default properties,
+    /// rather than being interpolated into them.
     pub properties: Option<YamlProperties>,
 
     /// Optional fixed UUID. May be overridden during installation.
