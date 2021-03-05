@@ -15,6 +15,3 @@ hdk = { path = "../../../../hdk" }
 [features]
 default = []
 mock = ["hdk/mock"]
-
-# [dev-dependencies]
-# hdk = { path = "../../../../hdk", features = ["mock"]}

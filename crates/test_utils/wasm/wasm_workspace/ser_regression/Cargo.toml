@@ -13,9 +13,6 @@ derive_more = "0.99.11"
 serde = "1.0"
 hdk = { path = "../../../../hdk" }
 
-# [dev-dependencies]
-# hdk = { path = "../../../../hdk", features = ["mock"]}
-
 [features]
 default = []
 mock = ["hdk/mock"]
