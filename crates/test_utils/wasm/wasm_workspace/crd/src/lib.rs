@@ -6,7 +6,7 @@ struct Thing;
 entry_defs![Thing::entry_def()];
 
 #[hdk_extern]
-fn xcreate(_: ()) -> ExternResult<HeaderHash> {
+fn create(_: ()) -> ExternResult<HeaderHash> {
     create_entry(&Thing)
 }
 
@@ -48,7 +48,7 @@ pub mod test {
 
         hdk::prelude::set_global_hdk(mock_hdk).unwrap();
 
-        let result = super::xcreate(());
+        let result = super::create(());
 
         assert_eq!(
             result,

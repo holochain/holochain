@@ -262,8 +262,7 @@ pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,
 ) -> ExternResult<Option<Details>> {
-    HDK.read()?
-        .get_details(GetInput::new(hash.into(), options))
+    HDK.read()?.get_details(GetInput::new(hash.into(), options))
 }
 
 /// Trait for binding static [ `EntryDef` ] property access for a type.

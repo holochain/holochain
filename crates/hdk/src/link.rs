@@ -60,12 +60,11 @@ pub fn create_link<T: Into<LinkTag>>(
     target_address: EntryHash,
     tag: T,
 ) -> ExternResult<HeaderHash> {
-    HDK.read()?
-        .create_link(CreateLinkInput::new(
-            base_address,
-            target_address,
-            tag.into(),
-        ))
+    HDK.read()?.create_link(CreateLinkInput::new(
+        base_address,
+        target_address,
+        tag.into(),
+    ))
 }
 
 /// Delete a specific link creation element by its header.
@@ -92,8 +91,7 @@ pub fn create_link<T: Into<LinkTag>>(
 /// All of this is bad so link creates point to entries (See [ `create_link` ]) and deletes point to
 /// creates.
 pub fn delete_link(add_link_header: HeaderHash) -> ExternResult<HeaderHash> {
-    HDK.read()?
-        .delete_link(add_link_header)
+    HDK.read()?.delete_link(add_link_header)
 }
 
 /// Returns all links that reference a base entry hash, optionally filtered by tag.
@@ -116,8 +114,7 @@ pub fn delete_link(add_link_header: HeaderHash) -> ExternResult<HeaderHash> {
 ///
 /// See [ `get_link_details` ].
 pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Links> {
-    HDK.read()?
-        .get_links(GetLinksInput::new(base, link_tag))
+    HDK.read()?.get_links(GetLinksInput::new(base, link_tag))
 }
 
 /// Get all link creates and deletes that reference a base entry hash, optionally filtered by tag
