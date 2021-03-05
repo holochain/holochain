@@ -167,7 +167,7 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn get_headers<'r, R: Readable>(
         &'r self,
-        _reader: &'r mut R,
+        _reader: &mut R,
         entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {

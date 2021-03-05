@@ -89,12 +89,11 @@ where
     /// Get a set of values, taking the scratch space into account,
     /// or from persistence if needed
     #[instrument(skip(self, r))]
-    pub fn get<'r, R: Readable, KK: 'r + Debug + std::borrow::Borrow<K>>(
-        &'r self,
-        r: &'r mut R,
+    pub fn get<R: Readable, KK: Debug + std::borrow::Borrow<K>>(
+        &self,
+        r: &mut R,
         k: KK,
-    ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>> + 'r> {
-        todo!("Revisit later, too much to consider for the current basic type refactor");
+    ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>>> {
         // Depending on which branches get taken, this function could return
         // any of three different iterator types, in order to unify all three
         // into a single type, we return (in the happy path) a value of type
@@ -102,23 +101,24 @@ where
         // Either<__GetPersistedIter, Either<__ScratchSpaceITer, Chain<...>>>
         // ```
 
-        let values_delta = if let Some(v) = self.scratch.get(k.borrow()) {
-            v
+        let values_delta: ValuesDelta<V> = if let Some(v) = self.scratch.get(k.borrow()) {
+            v.clone()
         } else {
             // Only do the persisted call if it's not in the scratch
             trace!(?k);
             let persisted = Self::check_not_found(self.get_persisted(r, k.borrow()))?;
 
-            return Ok(Either::Left(persisted));
+            return Ok(persisted.collect::<Vec<_>>().into_iter());
         };
         let ValuesDelta { delete_all, deltas } = values_delta;
 
         let from_scratch_space = deltas
-            .iter()
-            .filter(|(_v, op)| **op == KvvOp::Insert)
+            .clone()
+            .into_iter()
+            .filter(|(_v, op)| *op == KvvOp::Insert)
             .map(|(v, _op)| Ok(v.clone()));
 
-        let iter = if *delete_all {
+        let iter = if delete_all {
             // If delete_all is set, return only scratch content,
             // skipping persisted content (as it will all be deleted)
             Either::Left(from_scratch_space)
@@ -128,14 +128,14 @@ where
                 from_scratch_space
                     // Otherwise, chain it with the persisted content,
                     // skipping only things that we've specifically deleted or returned.
-                    .chain(persisted.filter(move |mut r| match r {
+                    .chain(persisted.filter(move |r| match r {
                         Ok(v) => !deltas.contains_key(v),
                         Err(_e) => true,
                     })),
             )
         };
 
-        Ok(Either::Right(iter))
+        Ok(iter.collect::<Vec<_>>().into_iter())
     }
 
     /// Update the scratch space to record an Insert operation for the KV
@@ -163,11 +163,11 @@ where
 
     /// Fetch data from DB, deserialize into V type
     #[instrument(skip(self, r))]
-    fn get_persisted<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
-        k: &'r K,
-    ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>> + 'r> {
+    fn get_persisted<R: Readable>(
+        &self,
+        r: &mut R,
+        k: &K,
+    ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>>> {
         let s = trace_span!("persisted");
         let _g = s.enter();
         trace!("test");

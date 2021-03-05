@@ -1,14 +1,10 @@
 //! Functionality for safely accessing LMDB database references.
 
+use crate::error::DatabaseResult;
 use crate::prelude::Writer;
-use crate::{db::DbKind, exports::IntegerTable, prelude::Readable};
-use crate::{
-    error::DatabaseResult,
-    exports::{MultiTable, SingleTable},
-};
+use crate::{db::DbKind, prelude::Readable};
 use derive_more::Display;
 use rusqlite::{types::Value, *};
-use std::path::Path;
 
 /// Enumeration of all databases needed by Holochain
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Display)]
@@ -178,7 +174,7 @@ impl Table {
     pub fn get_m<R: Readable, K: ToSql>(
         &self,
         reader: &mut R,
-        k: K,
+        k: &K,
     ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<(K, Option<Value>)>>> {
         todo!();
         Ok(std::iter::empty())

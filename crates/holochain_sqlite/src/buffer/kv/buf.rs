@@ -212,7 +212,7 @@ where
     /// Iterator that returns all partial matches to this key
     pub fn iter_all_key_matches<'r, R: Readable>(
         &'r self,
-        r: &'r mut R,
+        r: &mut R,
         k: K,
     ) -> DatabaseResult<SingleIterKeyMatch<'r, V>> {
         check_empty_key(&k)?;

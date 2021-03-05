@@ -17,12 +17,6 @@ use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
-use holochain_sqlite::prelude::*;
-use holochain_sqlite::prelude::*;
-use holochain_sqlite::prelude::*;
-use holochain_sqlite::prelude::*;
-use holochain_sqlite::prelude::*;
-use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::HeaderHashed;
 use std::collections::HashSet;
@@ -228,7 +222,7 @@ where
     /// Returns all the valid [HeaderHash]es of headers that created this [Entry]
     fn get_headers<'r, R: Readable>(
         &'r self,
-        reader: &'r mut R,
+        reader: &mut R,
         entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
@@ -954,24 +948,26 @@ where
             .delete(MiscMetaKey::chain_observed(&agent).into())
     }
 
-    fn get_headers<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_headers<R: Readable>(
+        &self,
+        r: &mut R,
         entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
-        Ok(Box::new(
+        Ok(Box::new(fallible_iterator::convert(
             fallible_iterator::convert(
                 self.system_meta
                     .get(r, PrefixBytesKey::from(SysMetaKey::from(entry_hash)))?,
             )
             .filter_map(|h| {
                 Ok(match h {
-                    SysMetaVal::NewEntry(h) => Some(h),
+                    SysMetaVal::NewEntry(h) => Some(Ok(h)),
                     _ => None,
                 })
-            }),
-        ))
+            })
+            .collect::<Vec<_>>()?
+            .into_iter(),
+        )))
     }
 
     fn get_all_headers<'r, R: Readable>(
