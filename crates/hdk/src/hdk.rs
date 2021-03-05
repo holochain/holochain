@@ -348,11 +348,19 @@ impl HdkT for HostHdk {
     }
 }
 
-pub fn set_global_hdk<H: 'static>(hdk: H) -> ExternResult<()>
+pub fn set_global_hdk<'lock, H: 'static>(
+    hdk: H,
+) -> ExternResult<std::sync::RwLockWriteGuard<'lock, ()>>
 where
     H: HdkT,
 {
-    let mut hdk_write = HDK.write()?;
-    *hdk_write = Box::new(hdk);
-    Ok(())
+    // The SET_LOCK allows us to return a write guard to prevent concurrent mocking
+    // without preventing the code being tested from aquiring a read lock on the HDK
+    static SET_LOCK: Lazy<RwLock<()>> = Lazy::new(|| RwLock::new(()));
+    let set_lock = SET_LOCK.write()?;
+
+    let mut hdk_lock = HDK.write()?;
+    *hdk_lock = Box::new(hdk);
+
+    Ok(set_lock)
 }

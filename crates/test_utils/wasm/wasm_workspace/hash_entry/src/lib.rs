@@ -56,7 +56,7 @@ pub mod tests {
             .times(1)
             .return_once(move |_| Ok(output_hash_closure));
 
-        hdk::prelude::set_global_hdk(mock_hdk).unwrap();
+        let _mock_lock = hdk::prelude::set_global_hdk(mock_hdk).unwrap();
 
         let result = super::hash_entry(input_entry);
 

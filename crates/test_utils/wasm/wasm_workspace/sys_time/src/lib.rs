@@ -17,7 +17,7 @@ pub mod test {
             .times(1)
             .return_once(|_| Ok(core::time::Duration::new(5, 0)));
 
-        hdk::prelude::set_global_hdk(mock_hdk).unwrap();
+        let _mock_lock = hdk::prelude::set_global_hdk(mock_hdk).unwrap();
 
         let result = super::sys_time(());
 

@@ -119,11 +119,9 @@ zomes:
         // Unpack without forcing, which will fail
         matches::assert_matches!(
             unpack::<DnaManifest>("dna", &bundle_path, None, false).await,
-            Err(
-                HcBundleError::MrBundleError(
-                    MrBundleError::UnpackingError(UnpackingError::DirectoryExists(_)),
-                ),
-            )
+            Err(HcBundleError::MrBundleError(MrBundleError::UnpackingError(
+                UnpackingError::DirectoryExists(_)
+            ),),)
         );
         // Now unpack with forcing to overwrite original directory
         unpack::<DnaManifest>("dna", &bundle_path, None, true)

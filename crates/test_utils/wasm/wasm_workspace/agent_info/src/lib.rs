@@ -21,7 +21,7 @@ pub mod test {
             .times(1)
             .return_once(move |_| Ok(closure_agent_info));
 
-        hdk::prelude::set_global_hdk(mock_hdk).unwrap();
+        let _mock_lock = hdk::prelude::set_global_hdk(mock_hdk).unwrap();
 
         let result = super::agent_info(());
 

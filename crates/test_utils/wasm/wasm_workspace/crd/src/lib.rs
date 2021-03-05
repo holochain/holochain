@@ -27,13 +27,6 @@ pub mod test {
     use ::fixt::prelude::*;
 
     #[test]
-    /// Run the tests sequentially because concurrent mocks can fail each other.
-    fn smokes() {
-        create_smoke();
-        get_smoke();
-        delete_smoke();
-    }
-
     fn create_smoke() {
         let mut mock_hdk = hdk::prelude::MockHdkT::new();
 
@@ -46,7 +39,7 @@ pub mod test {
             .times(1)
             .return_once(move |_| Ok(closure_header_hash));
 
-        hdk::prelude::set_global_hdk(mock_hdk).unwrap();
+        let _mock_lock = hdk::prelude::set_global_hdk(mock_hdk).unwrap();
 
         let result = super::create(());
 
@@ -58,6 +51,7 @@ pub mod test {
         )
     }
 
+    #[test]
     fn get_smoke() {
         let mut mock_hdk = hdk::prelude::MockHdkT::new();
 
@@ -69,7 +63,7 @@ pub mod test {
             .times(1)
             .return_once(move |_| Ok(None));
 
-        hdk::prelude::set_global_hdk(mock_hdk).unwrap();
+        let _mock_lock = hdk::prelude::set_global_hdk(mock_hdk).unwrap();
 
         let result = super::reed(input_header_hash);
 
@@ -81,6 +75,7 @@ pub mod test {
         )
     }
 
+    #[test]
     fn delete_smoke() {
         let mut mock_hdk = hdk::prelude::MockHdkT::new();
 
@@ -94,7 +89,7 @@ pub mod test {
             .times(1)
             .return_once(move |_| Ok(output_header_hash_closure));
 
-        hdk::prelude::set_global_hdk(mock_hdk).unwrap();
+        let _mock_lock = hdk::prelude::set_global_hdk(mock_hdk).unwrap();
 
         let result = super::delete(input_header_hash);
 
