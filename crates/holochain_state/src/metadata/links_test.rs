@@ -362,7 +362,7 @@ impl TestData {
 async fn can_add_and_delete_link() {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
 
     let mut td = fixtures(arc.clone(), 1).await.into_iter().next().unwrap();
 
@@ -457,7 +457,7 @@ async fn can_add_and_delete_link() {
 async fn multiple_links() {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
 
     let mut td = fixtures(arc.clone().into(), 10).await;
 
@@ -540,7 +540,7 @@ async fn duplicate_links() {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
 
     let td = fixtures(arc.clone(), 10).await;
     // Add to db then the same to scratch and expect on one result
@@ -616,7 +616,7 @@ async fn links_on_same_base() {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
 
     let mut td = fixtures(arc.clone(), 10).await;
     let base_hash = td[0].base_hash.clone();
@@ -698,7 +698,7 @@ async fn links_on_same_zome_id() {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
 
     let mut td = fixtures(arc.clone(), 10).await;
     let base_hash = td[0].base_hash.clone();
@@ -795,7 +795,7 @@ async fn links_on_same_tag() {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
 
     let mut td = fixtures(arc.clone(), 10).await;
     let base_hash = td[0].base_hash.clone();

@@ -191,10 +191,10 @@ impl Table {
     #[deprecated = "unneeded in the context of SQL"]
     pub fn put_with_flags<K: ToSql>(
         &self,
-        writer: &mut Writer,
-        k: K,
-        v: &Value,
-        flags: (),
+        _writer: &mut Writer,
+        _k: K,
+        _v: &Value,
+        _flags: (),
     ) -> DatabaseResult<()> {
         todo!()
     }

@@ -135,7 +135,7 @@ impl ChainSequenceBuf {
         Ok(Box::new(self.buf.store().iter(r)?.filter_map(|(i, c)| {
             Ok(if !c.dht_transforms_complete {
                 Some((
-                    IntKey::from_key_bytes_or_friendly_panic(i).into(),
+                    IntKey::from_key_bytes_or_friendly_panic(i.as_slice()).into(),
                     c.header_address,
                 ))
             } else {

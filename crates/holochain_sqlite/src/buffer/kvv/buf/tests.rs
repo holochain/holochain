@@ -53,7 +53,7 @@ fn collect_sorted<T: Ord, E, I: IntoIterator<Item = Result<T, E>>>(
 async fn kvvbuf_basics() {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
 
     let multi_store = env.inner().open_multi("kvv").unwrap();
 
@@ -155,7 +155,7 @@ async fn delete_all() {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
 
     let multi_store = env.inner().open_multi("kvv").unwrap();
 
@@ -260,7 +260,7 @@ async fn delete_all() {
 async fn idempotent_inserts() {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
 
     let multi_store = env.inner().open_multi("kvv").unwrap();
 
@@ -328,7 +328,7 @@ async fn kvv_indicate_value_appends() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
     let db = env.inner().open_multi("kvv")?;
     arc.guard().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
@@ -352,7 +352,7 @@ async fn kvv_indicate_value_overwritten() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
     let db = env.inner().open_multi("kvv")?;
     arc.guard().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
@@ -383,7 +383,7 @@ async fn kvv_deleted_persisted() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
     let db = env.inner().open_multi("kv")?;
 
     {
@@ -423,7 +423,7 @@ async fn kvv_deleted_buffer() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
     let db = env.inner().open_multi("kv")?;
 
     {
@@ -475,7 +475,7 @@ async fn kvv_get_buffer() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
     let db = env.inner().open_multi("kv")?;
 
     arc.guard().with_reader(|mut reader| {
@@ -496,7 +496,7 @@ async fn kvv_get_persisted() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
     let db = env.inner().open_multi("kv")?;
 
     {
@@ -524,7 +524,7 @@ async fn kvv_get_del_buffer() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
     let db = env.inner().open_multi("kv")?;
 
     arc.guard().with_reader(|mut reader| {
@@ -545,7 +545,7 @@ async fn kvv_get_del_persisted() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
     let db = env.inner().open_multi("kv")?;
 
     {

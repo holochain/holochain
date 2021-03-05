@@ -322,7 +322,7 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
-            let mut env = arc.guard();
+            let env = arc.guard();
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for create in entry_creates {
@@ -342,7 +342,7 @@ mod tests {
                 .unwrap();
         }
         {
-            let mut env = arc.guard();
+            let env = arc.guard();
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
@@ -382,7 +382,7 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
-            let mut env = arc.guard();
+            let env = arc.guard();
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for update in entry_updates {
@@ -400,7 +400,7 @@ mod tests {
                 .unwrap();
         }
         {
-            let mut env = arc.guard();
+            let env = arc.guard();
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
@@ -440,7 +440,7 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
-            let mut env = arc.guard();
+            let env = arc.guard();
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for update in entry_updates {
@@ -458,7 +458,7 @@ mod tests {
                 .unwrap();
         }
         {
-            let mut env = arc.guard();
+            let env = arc.guard();
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
@@ -488,7 +488,7 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
-            let mut env = arc.guard();
+            let env = arc.guard();
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for delete in entry_deletes {
@@ -506,7 +506,7 @@ mod tests {
                 .unwrap();
         }
         {
-            let mut env = arc.guard();
+            let env = arc.guard();
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
@@ -559,7 +559,7 @@ mod tests {
     async fn test_entry_dht_status() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let mut env = arc.guard();
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut entry_creates = Vec::new();
@@ -697,7 +697,7 @@ mod tests {
     async fn test_entry_dht_status_one_less() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let mut env = arc.guard();
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut entry_creates = Vec::new();
