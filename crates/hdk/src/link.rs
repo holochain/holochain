@@ -60,8 +60,7 @@ pub fn create_link<T: Into<LinkTag>>(
     target_address: EntryHash,
     tag: T,
 ) -> ExternResult<HeaderHash> {
-    HDK.get()
-        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+    HDK.read()?
         .create_link(CreateLinkInput::new(
             base_address,
             target_address,
@@ -93,8 +92,7 @@ pub fn create_link<T: Into<LinkTag>>(
 /// All of this is bad so link creates point to entries (See [ `create_link` ]) and deletes point to
 /// creates.
 pub fn delete_link(add_link_header: HeaderHash) -> ExternResult<HeaderHash> {
-    HDK.get()
-        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+    HDK.read()?
         .delete_link(add_link_header)
 }
 
@@ -118,8 +116,7 @@ pub fn delete_link(add_link_header: HeaderHash) -> ExternResult<HeaderHash> {
 ///
 /// See [ `get_link_details` ].
 pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Links> {
-    HDK.get()
-        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+    HDK.read()?
         .get_links(GetLinksInput::new(base, link_tag))
 }
 
@@ -143,7 +140,6 @@ pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Lin
 ///
 /// See [ `get_links` ].
 pub fn get_link_details(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<LinkDetails> {
-    HDK.get()
-        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+    HDK.read()?
         .get_link_details(GetLinksInput::new(base, link_tag))
 }

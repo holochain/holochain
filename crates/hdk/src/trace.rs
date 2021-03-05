@@ -65,10 +65,7 @@ impl tracing_core::Subscriber for WasmSubscriber {
 
         // The event is pushed to the host to be picked up by the subscriber on that side.
         // The visitor is dropped.
-        if let Ok(hdk) = HDK
-            .get()
-            .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))
-        {
+        if let Ok(hdk) = HDK.read() {
             hdk.trace(TraceMsg {
                 level: event.metadata().level().into(),
                 msg: format!(

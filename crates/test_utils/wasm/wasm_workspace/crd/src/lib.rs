@@ -27,10 +27,11 @@ pub mod test {
     use ::fixt::prelude::*;
 
     #[test]
-    /// Wrapper test to serialize the tests so they don't overwrite the global concurrently.
+    /// Run the tests sequentially because concurrent mocks can fail each other.
     fn smokes() {
         create_smoke();
         get_smoke();
+        delete_smoke();
     }
 
     fn create_smoke() {
@@ -76,6 +77,31 @@ pub mod test {
             result,
             Ok(
                 None
+            )
+        )
+    }
+
+    fn delete_smoke() {
+        let mut mock_hdk = hdk::prelude::MockHdkT::new();
+
+        let input_header_hash = fixt!(HeaderHash);
+        let output_header_hash = fixt!(HeaderHash);
+        let output_header_hash_closure = output_header_hash.clone();
+        mock_hdk.expect_delete()
+            .with(hdk::prelude::mockall::predicate::eq(
+                input_header_hash.clone()
+            ))
+            .times(1)
+            .return_once(move |_| Ok(output_header_hash_closure));
+
+        hdk::prelude::set_global_hdk(mock_hdk).unwrap();
+
+        let result = super::delete(input_header_hash);
+
+        assert_eq!(
+            result,
+            Ok(
+                output_header_hash
             )
         )
     }

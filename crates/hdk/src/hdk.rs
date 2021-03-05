@@ -5,10 +5,15 @@ use mockall::*;
 
 pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 
-pub static HDK: std::cell::Cell<Box<dyn HdkT>> = std::cell::Cell::new();
+/// This is a cell so it can be set many times.
+/// Every test needs its own mock so each test needs to set it.
+// pub static mut HDK: std::cell::Cell<Box<dyn HdkT>> = std::cell::Cell::new(Box::new(ErrHdk));
+use std::sync::RwLock;
+use once_cell::sync::Lazy;
+pub static HDK: Lazy<RwLock<Box<dyn HdkT>>> = Lazy::new(|| RwLock::new(Box::new(ErrHdk)));
 
 #[cfg_attr(feature = "mock", automock)]
-pub trait HdkT: Sync + Send {
+pub trait HdkT: Send + Sync {
     // Chain
     fn get_agent_activity(
         &self,
@@ -67,6 +72,135 @@ pub trait HdkT: Sync + Send {
         &self,
         x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
     ) -> ExternResult<Option<XSalsa20Poly1305Data>>;
+}
+
+/// Used as a placeholder before any other Hdk is registered.
+pub struct ErrHdk;
+
+impl ErrHdk {
+    fn err<T>() -> ExternResult<T> {
+        Err(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))
+    }
+}
+
+impl HdkT for ErrHdk {
+    fn get_agent_activity(&self, _: GetAgentActivityInput) -> ExternResult<AgentActivity> {
+        Self::err()
+    }
+    fn query(&self, _: ChainQueryFilter) -> ExternResult<Vec<Element>> {
+        Self::err()
+    }
+    fn sign(&self, _: Sign) -> ExternResult<Signature> {
+        Self::err()
+    }
+    fn verify_signature(&self, _: VerifySignature) -> ExternResult<bool> {
+        Self::err()
+    }
+    fn create(&self, _: EntryWithDefId) -> ExternResult<HeaderHash> {
+        Self::err()
+    }
+    fn update(&self, _: UpdateInput) -> ExternResult<HeaderHash> {
+        Self::err()
+    }
+    fn delete(&self, _: HeaderHash) -> ExternResult<HeaderHash> {
+        Self::err()
+    }
+    fn hash_entry(&self, _: Entry) -> ExternResult<EntryHash> {
+        Self::err()
+    }
+    fn get(&self, _: GetInput) -> ExternResult<Option<Element>> {
+        Self::err()
+    }
+    fn get_details(&self, _: GetInput) -> ExternResult<Option<Details>> {
+        Self::err()
+    }
+    fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
+        Self::err()
+    }
+    fn app_info(&self, _: ()) -> ExternResult<AppInfo> {
+        Self::err()
+    }
+    fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
+        Self::err()
+    }
+    fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
+        Self::err()
+    }
+    fn call_info(&self, _: ()) -> ExternResult<CallInfo> {
+        Self::err()
+    }
+    // Link
+    fn create_link(&self, _: CreateLinkInput) -> ExternResult<HeaderHash> {
+        Self::err()
+    }
+    fn delete_link(&self, _: HeaderHash) -> ExternResult<HeaderHash> {
+        Self::err()
+    }
+    fn get_links(&self, _: GetLinksInput) -> ExternResult<Links> {
+        Self::err()
+    }
+    fn get_link_details(&self, _: GetLinksInput) -> ExternResult<LinkDetails> {
+        Self::err()
+    }
+    // P2P
+    fn call(&self, _: Call) -> ExternResult<ZomeCallResponse> {
+        Self::err()
+    }
+    fn call_remote(&self, _: CallRemote) -> ExternResult<ZomeCallResponse> {
+        Self::err()
+    }
+    fn emit_signal(&self, _: AppSignal) -> ExternResult<()> {
+        Self::err()
+    }
+    fn remote_signal(&self, _: RemoteSignal) -> ExternResult<()> {
+        Self::err()
+    }
+    // Random
+    fn random_bytes(&self, _: u32) -> ExternResult<Bytes> {
+        Self::err()
+    }
+    // Time
+    fn sys_time(&self, _: ()) -> ExternResult<core::time::Duration> {
+        Self::err()
+    }
+    fn schedule(&self, _: std::time::Duration) -> ExternResult<()> {
+        Self::err()
+    }
+    fn sleep(&self, _: std::time::Duration) -> ExternResult<()> {
+        Self::err()
+    }
+    // Trace
+    fn trace(&self, _: TraceMsg) -> ExternResult<()> {
+        Self::err()
+    }
+    // XSalsa20Poly1305
+    fn create_x25519_keypair(&self, _: ()) -> ExternResult<X25519PubKey> {
+        Self::err()
+    }
+    fn x_salsa20_poly1305_decrypt(
+        &self,
+        _: XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
+        Self::err()
+    }
+    fn x_salsa20_poly1305_encrypt(
+        &self,
+        _: XSalsa20Poly1305Encrypt,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+        Self::err()
+    }
+    fn x_25519_x_salsa20_poly1305_encrypt(
+        &self,
+        _: X25519XSalsa20Poly1305Encrypt,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+        Self::err()
+    }
+    fn x_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        _: X25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
+        Self::err()
+    }
 }
 
 /// The HDK implemented as externs provided by the host.
@@ -214,9 +348,11 @@ impl HdkT for HostHdk {
     }
 }
 
-pub fn set_global_hdk<H: 'static>(hdk: H) -> Result<(), ()>
+pub fn set_global_hdk<H: 'static>(hdk: H) -> ExternResult<()>
 where
     H: HdkT,
 {
-    HDK.set(Box::new(hdk)).map_err(|_| ())
+    let mut hdk_write = HDK.write()?;
+    *hdk_write = Box::new(hdk);
+    Ok(())
 }

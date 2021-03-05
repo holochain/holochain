@@ -6,8 +6,7 @@ where
     K: Into<AgentPubKey>,
     D: serde::Serialize + std::fmt::Debug,
 {
-    HDK.get()
-        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+    HDK.read()?
         .sign(Sign::new(key.into(), data)?)
 }
 
@@ -21,8 +20,7 @@ pub fn sign_raw<K>(key: K, data: Vec<u8>) -> ExternResult<Signature>
 where
     K: Into<AgentPubKey>,
 {
-    HDK.get()
-        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+    HDK.read()?
         .sign(Sign::new_raw(key.into(), data))
 }
 
@@ -40,8 +38,7 @@ where
     S: Into<Signature>,
     D: serde::Serialize + std::fmt::Debug,
 {
-    HDK.get()
-        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+    HDK.read()?
         .verify_signature(VerifySignature::new(key.into(), signature.into(), data)?)
 }
 
@@ -57,7 +54,6 @@ where
     K: Into<AgentPubKey>,
     S: Into<Signature>,
 {
-    HDK.get()
-        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+    HDK.read()?
         .verify_signature(VerifySignature::new_raw(key.into(), signature.into(), data))
 }

@@ -10,9 +10,7 @@ use crate::prelude::*;
 /// Usually you don't need to use this function directly; it is the most general way to create an
 /// entry and standardises the internals of higher level create functions.
 pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-    HDK.get()
-        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
-        .create(entry_with_def_id)
+    HDK.read()?.create(entry_with_def_id)
 }
 
 /// Update any entry type.
@@ -26,8 +24,7 @@ pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
 pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-    HDK.get()
-        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+    HDK.read()?
         .update(UpdateInput::new(hash, entry_with_def_id))
 }
 
@@ -41,9 +38,7 @@ pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResu
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
 pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
-    HDK.get()
-        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
-        .delete(hash)
+    HDK.read()?.delete(hash)
 }
 
 /// Create an app entry.
@@ -127,9 +122,7 @@ where
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    HDK.get()
-        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
-        .hash_entry(Entry::try_from(input)?)
+    HDK.read()?.hash_entry(Entry::try_from(input)?)
 }
 
 /// Thin wrapper around update for app entries.
@@ -217,8 +210,7 @@ pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Element>>
 where
     AnyDhtHash: From<H>,
 {
-    HDK.get()
-        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+    HDK.read()?
         .get(GetInput::new(AnyDhtHash::from(hash), options))
 }
 
@@ -270,8 +262,7 @@ pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,
 ) -> ExternResult<Option<Details>> {
-    HDK.get()
-        .ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?
+    HDK.read()?
         .get_details(GetInput::new(hash.into(), options))
 }
 
