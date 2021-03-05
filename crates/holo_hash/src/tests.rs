@@ -22,7 +22,7 @@ struct TestHeader(String);
 impl_hashable_content!(TestDhtOp, DhtOp);
 impl_hashable_content!(TestHeader, Header);
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_hashed_type() {
     let my_type = TestDhtOp {
         s: "test".to_string(),
@@ -81,8 +81,7 @@ fn holo_hash_parse() {
         &format!("{:?}", h),
     );
 
-    let h = EntryHash::try_from("uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm")
-        .unwrap();
+    let h = EntryHash::try_from("uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm").unwrap();
     assert_eq!(3_860_645_936, h.get_loc());
     assert_eq!(
         "EntryHash(uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
@@ -97,7 +96,7 @@ fn holo_hash_parse() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn agent_id_as_bytes() {
     tokio::task::spawn(async move {
         let hash = vec![0xdb; 32];
@@ -109,7 +108,7 @@ async fn agent_id_as_bytes() {
     .unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn agent_id_prehash_display() {
     tokio::task::spawn(async move {
         let agent_id = HeaderHash::from_raw_32(vec![0xdb; 32]);
@@ -129,7 +128,7 @@ fn agent_id_try_parse() {
     assert_eq!(3_492_283_899, agent_id.get_loc());
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn agent_id_debug() {
     tokio::task::spawn(async move {
         let agent_id = HeaderHash::with_data_sync(&TestHeader("hi".to_string()));
@@ -142,7 +141,7 @@ async fn agent_id_debug() {
     .unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn agent_id_display() {
     tokio::task::spawn(async move {
         let agent_id = HeaderHash::with_data_sync(&TestHeader("hi".to_string()));
@@ -155,7 +154,7 @@ async fn agent_id_display() {
     .unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn agent_id_loc() {
     tokio::task::spawn(async move {
         let agent_id = HeaderHash::with_data_sync(&TestHeader("hi".to_string()));

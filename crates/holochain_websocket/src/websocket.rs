@@ -57,14 +57,14 @@ struct WebsocketInner {
 /// Send from application to the websocket.
 pub(crate) type TxToWebsocket = tokio::sync::mpsc::Sender<OutgoingMessage>;
 /// Receive in the websocket from the application.
-type RxToWebsocket = tokio::sync::mpsc::Receiver<OutgoingMessage>;
+type RxToWebsocket = tokio_stream::wrappers::ReceiverStream<OutgoingMessage>;
 
 // Channel from external socket then from the websocket to the application.
 
 /// Send from the websocket to the application.
 pub(crate) type TxFromWebsocket = tokio::sync::mpsc::Sender<IncomingMessage>;
 /// Receive in the application from the websocket.
-pub(crate) type RxFromWebsocket = tokio::sync::mpsc::Receiver<IncomingMessage>;
+pub(crate) type RxFromWebsocket = tokio_stream::wrappers::ReceiverStream<IncomingMessage>;
 
 #[derive(Debug)]
 /// When dropped both to / from socket tasks are shutdown.
@@ -134,9 +134,12 @@ impl Websocket {
 
         // Channel to the websocket from the application
         let (tx_to_websocket, rx_to_websocket) = tokio::sync::mpsc::channel(config.max_send_queue);
+        let rx_to_websocket_stream = tokio_stream::wrappers::ReceiverStream::new(rx_to_websocket);
         // Channel from the websocket to the application
         let (tx_from_websocket, rx_from_websocket) =
             tokio::sync::mpsc::channel(config.max_send_queue);
+        let rx_from_websocket_stream =
+            tokio_stream::wrappers::ReceiverStream::new(rx_from_websocket);
 
         // ---- PAIR SHUTDOWN ---- //
         // If both channel ends are dropped then we want to shutdown the to/from socket tasks
@@ -152,13 +155,13 @@ impl Websocket {
 
         // Shutdown the receiver stream if the listener is dropped
         // TODO: Should this shutdown immediately or gracefully. Currently it is immediately.
-        let rx_from_websocket = listener_shutdown.wrap(rx_from_websocket);
+        let rx_from_websocket = listener_shutdown.wrap(rx_from_websocket_stream);
 
         // Run the to and from external socket tasks.
         Websocket::run(
             socket,
             tx_to_websocket.clone(),
-            rx_to_websocket,
+            rx_to_websocket_stream,
             tx_from_websocket,
             pair_shutdown,
         );
@@ -248,13 +251,14 @@ impl Websocket {
     async fn run_to_socket(
         self,
         to_socket: impl futures::sink::Sink<tungstenite::Message, Error = tungstenite::error::Error>,
-        mut to_websocket: Valved<RxToWebsocket>,
+        to_websocket: impl futures::stream::Stream<Item = OutgoingMessage>,
         // When dropped this will shutdown the `from_socket` task.
         _shutdown_from_socket: Trigger,
     ) {
         let mut task = Task::Continue;
         tracing::trace!("starting sending external socket");
         futures::pin_mut!(to_socket);
+        futures::pin_mut!(to_websocket);
         loop {
             if let Err(t) = self
                 .process_to_websocket(to_websocket.next().await, &mut to_socket)
@@ -517,7 +521,7 @@ impl Websocket {
     ) -> (SerializedBytes, Respond) {
         let resp = {
             // Get the sender to the "to socket" task so we can reply.
-            let mut send_response = send_response.clone();
+            let send_response = send_response.clone();
             // If the reply closure is never run and only dropped we want
             // to send a canceled response to the other sides WebsocketSender.
             let cancel_response = CancelResponse::new(send_response.clone(), id);
@@ -767,7 +771,7 @@ mod tests {
     use crate::WebsocketListener;
     use url2::url2;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_register_response() {
         observability::test_run().ok();
         let (handle, mut listener) = WebsocketListener::bind_with_handle(
@@ -800,7 +804,7 @@ mod tests {
             .request_timeout::<_, SerializedBytes, _, _>(msg, std::time::Duration::from_secs(1))
             .await
             .ok();
-        tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         let state = sender.debug().await.unwrap();
         assert_eq!(state, (vec![], 1));
 

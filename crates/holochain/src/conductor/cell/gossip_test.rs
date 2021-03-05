@@ -13,7 +13,7 @@ use kitsune_p2p::KitsuneBinType;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn gossip_test() {
     observability::test_run().ok();
     const NUM: usize = 1;
@@ -37,7 +37,7 @@ async fn gossip_test() {
     }
 
     // Give publish time to finish
-    tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     // Bring Bob online
     conductor_test.bring_bob_online().await;
@@ -78,7 +78,7 @@ async fn gossip_test() {
     conductor_test.shutdown_conductor().await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn signature_smoke_test() {
     observability::test_run().ok();
     let mut network_config = KitsuneP2pConfig::default();
@@ -92,7 +92,7 @@ async fn signature_smoke_test() {
     conductor_test.shutdown_conductor().await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "Conductors are not currently talking to each other"]
 async fn agent_info_test() {
     observability::test_run().ok();
@@ -145,7 +145,7 @@ async fn agent_info_test() {
     let bob_key: AgentKvKey = (&dna_kit, &bob_kit).into();
 
     // Give publish time to finish
-    tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     let p2p_kv = AgentKv::new(p2p_env.clone().into()).unwrap();
     let (alice_agent_info, bob_agent_info, len) = fresh_reader_test!(p2p_env, |r| {

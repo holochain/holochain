@@ -1,7 +1,7 @@
 use holochain_serialized_bytes::prelude::*;
 use holochain_websocket::*;
 use std::convert::TryInto;
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 use url2::prelude::*;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -10,7 +10,7 @@ struct BroadcastMessage(pub String);
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 struct ResponseMessage(pub String);
 
-#[tokio::main(threaded_scheduler)]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     observability::test_run().unwrap();
 
@@ -49,7 +49,7 @@ async fn main() {
             });
 
             tokio::task::spawn(async move {
-                while let Some(Ok(msg)) = loc_recv_b.next().await {
+                while let Ok(msg) = loc_recv_b.recv().await {
                     send_socket.signal(msg).await.unwrap();
                 }
             });
@@ -58,5 +58,5 @@ async fn main() {
     tokio::signal::ctrl_c().await.unwrap();
     listener_handle.close();
     eprintln!("\nShutting down...");
-    tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 }

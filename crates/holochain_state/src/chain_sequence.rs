@@ -208,7 +208,7 @@ pub mod tests {
     use matches::assert_matches;
     use observability;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
         observability::test_run().ok();
         let test_env = test_cell_env();
@@ -271,7 +271,7 @@ pub mod tests {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn chain_sequence_functionality() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
@@ -388,7 +388,7 @@ pub mod tests {
 
     /// If we attempt to move the chain head, but it has already moved from
     /// under us, error
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn chain_sequence_head_moved_triggers_error() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc1 = test_env.env();
@@ -486,7 +486,7 @@ pub mod tests {
 
     /// If the chain head has moved from under us, but we are not moving the
     /// chain head ourselves, proceed as usual
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn chain_sequence_head_moved_triggers_no_error_if_clean() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc1 = test_env.env();

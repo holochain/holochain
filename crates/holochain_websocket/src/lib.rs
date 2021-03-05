@@ -24,7 +24,7 @@
 //! use holochain_websocket::*;
 //!
 //! use std::convert::TryInto;
-//! use tokio::stream::StreamExt;
+//! use tokio_stream::StreamExt;
 //! use url2::prelude::*;
 //!
 //! #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
@@ -115,9 +115,10 @@ pub async fn connect(
 ) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
     let addr = url_to_addr(&url, config.scheme).await?;
     let socket = tokio::net::TcpStream::connect(addr).await?;
-    socket.set_keepalive(Some(std::time::Duration::from_secs(
-        config.tcp_keepalive_s as u64,
-    )))?;
+    // TODO: find equivalent of this in new tokio
+    // socket.set_keepalive(Some(std::time::Duration::from_secs(
+    //     config.tcp_keepalive_s as u64,
+    // )))?;
     let (socket, _) = tokio_tungstenite::client_async_with_config(
         url.as_str(),
         socket,
