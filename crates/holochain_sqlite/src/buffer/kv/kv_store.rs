@@ -59,10 +59,7 @@ where
     }
 
     /// Iterate over the underlying persisted data
-    fn iter<'env, R: Readable>(
-        &self,
-        reader: &'env mut R,
-    ) -> DatabaseResult<SingleIterRaw<'env, V>> {
+    fn iter<'env, R: Readable>(&self, reader: &'env mut R) -> DatabaseResult<SingleIterRaw<V>> {
         todo!("lmdb iter")
         // Ok(SingleIterRaw::new(
         //     self.table.iter_start(reader)?,
@@ -75,7 +72,7 @@ where
         &self,
         reader: &'env mut R,
         k: K,
-    ) -> DatabaseResult<SingleIterRaw<'env, V>> {
+    ) -> DatabaseResult<SingleIterRaw<V>> {
         check_empty_key(&k)?;
         todo!("lmdb iter")
         // Ok(SingleIterRaw::new(
@@ -88,7 +85,7 @@ where
     fn iter_reverse<'env, R: Readable>(
         &self,
         reader: &'env mut R,
-    ) -> DatabaseResult<fallible_iterator::Rev<SingleIterRaw<'env, V>>> {
+    ) -> DatabaseResult<fallible_iterator::Rev<SingleIterRaw<V>>> {
         todo!("lmdb iter")
         // Ok(SingleIterRaw::new(self.table.iter_start(reader)?, self.table.iter_end(reader)?).rev())
     }

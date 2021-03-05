@@ -7,33 +7,38 @@ use rusqlite::*;
 use std::collections::BTreeMap;
 use tracing::*;
 
-type IterItem<'env, V> = (&'env [u8], V);
+type IterItem<V> = (Vec<u8>, V);
+type IterItemRef<'a, V> = (&'a [u8], V);
 type IterError = DatabaseError;
 
+fn item_owned<'a, V>(item_ref: IterItemRef<'a, V>) -> IterItem<V> {
+    (item_ref.0.to_owned(), item_ref.1)
+}
+
 /// Returns all the elements on this key
-pub struct SingleIterKeyMatch<'env, 'a, V>
+pub struct SingleIterKeyMatch<'a, V>
 where
     V: BufVal,
 {
-    iter: SingleIterFrom<'env, 'a, V>,
+    iter: SingleIterFrom<'a, V>,
     key: Vec<u8>,
 }
 
-impl<'env, 'a: 'env, V> SingleIterKeyMatch<'env, 'a, V>
+impl<'a, V> SingleIterKeyMatch<'a, V>
 where
     V: BufVal,
 {
-    pub fn new(iter: SingleIterFrom<'env, 'a, V>, key: Vec<u8>) -> Self {
+    pub fn new(iter: SingleIterFrom<'a, V>, key: Vec<u8>) -> Self {
         Self { iter, key }
     }
 }
 
-impl<'env, 'a: 'env, V> FallibleIterator for SingleIterKeyMatch<'env, 'a, V>
+impl<'a, V> FallibleIterator for SingleIterKeyMatch<'a, V>
 where
     V: BufVal,
 {
     type Error = DatabaseError;
-    type Item = IterItem<'env, V>;
+    type Item = IterItem<V>;
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let item = self.iter.next()?;
         match &item {
@@ -53,20 +58,20 @@ pub fn partial_key_match(partial_key: &[u8], key: &[u8]) -> bool {
 }
 
 /// Iterate from a key
-pub struct SingleIterFrom<'env, 'a, V>
+pub struct SingleIterFrom<'a, V>
 where
     V: BufVal,
 {
-    iter: SingleIter<'env, 'a, V>,
+    iter: SingleIter<'a, V>,
 }
 
-impl<'env, 'a: 'env, V> SingleIterFrom<'env, 'a, V>
+impl<'a, V> SingleIterFrom<'a, V>
 where
     V: BufVal,
 {
     pub fn new(
         scratch: &'a BTreeMap<Vec<u8>, KvOp<V>>,
-        iter: SingleIterRaw<'env, V>,
+        iter: SingleIterRaw<V>,
         key: Vec<u8>,
     ) -> Self {
         let iter = SingleIter::new(&scratch, scratch.range(key..), iter);
@@ -74,35 +79,33 @@ where
     }
 }
 
-impl<'env, 'a: 'env, V> FallibleIterator for SingleIterFrom<'env, 'a, V>
+impl<'a, V> FallibleIterator for SingleIterFrom<'a, V>
 where
     V: BufVal,
 {
     type Error = DatabaseError;
-    type Item = IterItem<'env, V>;
+    type Item = IterItem<V>;
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         self.iter.next()
     }
 }
 
 /// Draining iterator that only touches the db on commit
-pub struct DrainIter<'env, 'a: 'env, V>
+pub struct DrainIter<'a, V>
 where
     V: BufVal,
 {
     scratch: &'a mut BTreeMap<Vec<u8>, KvOp<V>>,
-    iter: Box<
-        dyn DoubleEndedFallibleIterator<Item = IterItem<'env, V>, Error = DatabaseError> + 'env,
-    >,
+    iter: Box<dyn DoubleEndedFallibleIterator<Item = IterItem<V>, Error = DatabaseError> + 'a>,
 }
 
-impl<'env, 'a: 'env, V> DrainIter<'env, 'a, V>
+impl<'a, V> DrainIter<'a, V>
 where
     V: BufVal,
 {
     pub fn new(
         scratch: &'a mut BTreeMap<Vec<u8>, KvOp<V>>,
-        iter: impl DoubleEndedFallibleIterator<Item = IterItem<'env, V>, Error = DatabaseError> + 'env,
+        iter: impl DoubleEndedFallibleIterator<Item = IterItem<V>, Error = DatabaseError> + 'a,
     ) -> Self {
         Self {
             scratch,
@@ -111,7 +114,7 @@ where
     }
 }
 
-impl<'env, 'a, V> FallibleIterator for DrainIter<'env, 'a, V>
+impl<'a, V> FallibleIterator for DrainIter<'a, V>
 where
     V: BufVal,
 {
@@ -125,7 +128,7 @@ where
     }
 }
 
-impl<'env, 'a: 'env, V> DoubleEndedFallibleIterator for DrainIter<'env, 'a, V>
+impl<'a, V> DoubleEndedFallibleIterator for DrainIter<'a, V>
 where
     V: BufVal,
 {
@@ -137,26 +140,24 @@ where
     }
 }
 /// Iterate taking into account the scratch
-pub struct SingleIter<'env, 'a, V>
+pub struct SingleIter<'a, V>
 where
     V: BufVal,
 {
-    scratch_iter: Box<dyn DoubleEndedIterator<Item = IterItem<'a, V>> + 'a>,
-    iter: Box<
-        dyn DoubleEndedFallibleIterator<Item = IterItem<'env, V>, Error = DatabaseError> + 'env,
-    >,
-    current: Option<IterItem<'env, V>>,
-    scratch_current: Option<IterItem<'a, V>>,
+    scratch_iter: Box<dyn DoubleEndedIterator<Item = IterItemRef<'a, V>> + 'a>,
+    iter: Box<dyn DoubleEndedFallibleIterator<Item = IterItem<V>, Error = DatabaseError> + 'a>,
+    current: Option<IterItem<V>>,
+    scratch_current: Option<IterItemRef<'a, V>>,
 }
 
-impl<'env, 'a: 'env, V> SingleIter<'env, 'a, V>
+impl<'a, V> SingleIter<'a, V>
 where
     V: BufVal,
 {
     pub fn new(
         scratch: &'a BTreeMap<Vec<u8>, KvOp<V>>,
         scratch_iter: impl DoubleEndedIterator<Item = (&'a Vec<u8>, &'a KvOp<V>)> + 'a,
-        iter: SingleIterRaw<'env, V>,
+        iter: SingleIterRaw<V>,
     ) -> Self {
         let scratch_iter = scratch_iter
             // TODO: These inspects should be eventally removed
@@ -192,7 +193,7 @@ where
             // If there is a put in the scratch we want to return
             // that instead of this matching item as the scratch
             // is more up to date
-            .filter_map(move |(k, v)| match scratch.get(k) {
+            .filter_map(move |(k, v)| match scratch.get(&k) {
                 Some(KvOp::Put(sv)) => Ok(Some((k, *sv.clone()))),
                 Some(KvOp::Delete) => Ok(None),
                 None => Ok(Some((k, v))),
@@ -213,21 +214,21 @@ where
 
     fn check_scratch(
         &mut self,
-        scratch_current: Option<IterItem<'a, V>>,
-        db: IterItem<'env, V>,
+        scratch_current: Option<IterItemRef<'a, V>>,
+        db: IterItem<V>,
         compare: fn(scratch: &[u8], db: &[u8]) -> bool,
-    ) -> Option<IterItem<'env, V>> {
+    ) -> Option<IterItem<V>> {
         match scratch_current {
             // Return scratch value and keep db value
-            Some(scratch) if compare(scratch.0, db.0) => {
+            Some(scratch) if compare(scratch.0, db.0.as_slice()) => {
                 trace!(msg = "r scratch key first", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
                 self.current = Some(db);
-                Some(scratch)
+                Some(item_owned(scratch))
             }
             // Return scratch value (or db value) and throw the other away
             Some(scratch) if scratch.0 == db.0 => {
                 trace!(msg = "r scratch key ==", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
-                Some(scratch)
+                Some(item_owned(scratch))
             }
             // Return db value and keep the scratch
             _ => {
@@ -240,10 +241,10 @@ where
 
     fn next_inner(
         &mut self,
-        current: Option<IterItem<'env, V>>,
-        scratch_current: Option<IterItem<'a, V>>,
+        current: Option<IterItem<V>>,
+        scratch_current: Option<IterItemRef<'a, V>>,
         compare: fn(scratch: &[u8], db: &[u8]) -> bool,
-    ) -> Result<Option<IterItem<'env, V>>, IterError> {
+    ) -> Result<Option<IterItem<V>>, IterError> {
         let r = match current {
             Some(db) => self.check_scratch(scratch_current, db, compare),
             None => {
@@ -252,19 +253,19 @@ where
                 } else {
                     trace!("r None")
                 }
-                scratch_current
+                scratch_current.map(item_owned)
             }
         };
         Ok(r)
     }
 }
 
-impl<'env, 'a: 'env, V> FallibleIterator for SingleIter<'env, 'a, V>
+impl<'a, V> FallibleIterator for SingleIter<'a, V>
 where
     V: BufVal,
 {
     type Error = IterError;
-    type Item = IterItem<'env, V>;
+    type Item = IterItem<V>;
 
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let current = match self.current.take() {
@@ -279,7 +280,7 @@ where
     }
 }
 
-impl<'env, 'a: 'env, V> DoubleEndedFallibleIterator for SingleIter<'env, 'a, V>
+impl<'a, V> DoubleEndedFallibleIterator for SingleIter<'a, V>
 where
     V: BufVal,
 {
@@ -296,24 +297,24 @@ where
     }
 }
 
-pub type SqlIter<'txn> =
-    Box<dyn Iterator<Item = rusqlite::Result<(&'txn [u8], Option<rusqlite::types::Value>)>> + 'txn>;
+pub type SqlIter =
+    Box<dyn Iterator<Item = rusqlite::Result<(Vec<u8>, Option<rusqlite::types::Value>)>>>;
 
-pub struct SingleIterRaw<'txn, V> {
-    iter_front: SqlIter<'txn>,
-    iter_back: SqlIter<'txn>,
-    key: Option<&'txn [u8]>,
-    key_back: Option<&'txn [u8]>,
+pub struct SingleIterRaw<V> {
+    iter_front: SqlIter,
+    iter_back: SqlIter,
+    key: Option<Vec<u8>>,
+    key_back: Option<Vec<u8>>,
     __type: std::marker::PhantomData<V>,
 }
 
-type InnerItem<'a> = (&'a [u8], Option<rusqlite::types::Value>);
+type InnerItem = (Vec<u8>, Option<rusqlite::types::Value>);
 
-impl<'txn, V> SingleIterRaw<'txn, V>
+impl<V> SingleIterRaw<V>
 where
     V: BufVal,
 {
-    pub fn new(iter_front: SqlIter<'txn>, iter_back: SqlIter<'txn>) -> Self {
+    pub fn new(iter_front: SqlIter, iter_back: SqlIter) -> Self {
         Self {
             iter_front,
             iter_back,
@@ -324,8 +325,8 @@ where
     }
 
     fn next_inner(
-        item: Option<Result<InnerItem<'txn>, StoreError>>,
-    ) -> Result<Option<IterItem<'txn, V>>, IterError> {
+        item: Option<Result<InnerItem, StoreError>>,
+    ) -> Result<Option<IterItem<V>>, IterError> {
         match item {
             Some(Ok((k, Some(rusqlite::types::Value::Blob(buf))))) => Ok(Some((
                 k,
@@ -346,19 +347,20 @@ where
 /// NOTE: While the value is deserialized to the proper type, the key is returned as raw bytes.
 /// This is to enable a wider range of keys, such as String, because there is no uniform trait which
 /// enables conversion from a byte slice to a given type.
-impl<'env, V> FallibleIterator for SingleIterRaw<'env, V>
+impl<V> FallibleIterator for SingleIterRaw<V>
 where
     V: BufVal,
 {
     type Error = IterError;
-    type Item = IterItem<'env, V>;
+    type Item = IterItem<V>;
 
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let n = self.iter_front.next().map(|o| o.map_err(StoreError::from));
         let r = Self::next_inner(n);
-        if let Ok(Some((k, _))) = r {
-            self.key = Some(k);
-            match self.key_back {
+        if let Ok(Some((k, _))) = &r {
+            // FIXME: probably unnecessary clone
+            self.key = Some(k.clone());
+            match &self.key_back {
                 Some(k_back) if k >= k_back => return Ok(None),
                 _ => {}
             }
@@ -367,16 +369,17 @@ where
     }
 }
 
-impl<'env, V> DoubleEndedFallibleIterator for SingleIterRaw<'env, V>
+impl<V> DoubleEndedFallibleIterator for SingleIterRaw<V>
 where
     V: BufVal,
 {
     fn next_back(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let n = self.iter_back.next().map(|o| o.map_err(StoreError::from));
         let r = Self::next_inner(n);
-        if let Ok(Some((k_back, _))) = r {
-            self.key_back = Some(k_back);
-            match self.key {
+        if let Ok(Some((k_back, _))) = &r {
+            // FIXME: probably unnecessary clone
+            self.key_back = Some(k_back.clone());
+            match &self.key {
                 Some(key) if k_back <= key => return Ok(None),
                 _ => {}
             }

@@ -56,13 +56,13 @@ fn kv_iter_from_partial() {
             assert_eq!(
                 results,
                 vec![
-                    (&b"dogs_likes_3"[..], V(3)),
-                    (&b"dogs_likes_7"[..], V(1)),
-                    (&b"dogs_likes_79"[..], V(2)),
-                    (&b"dogs_likes_88"[..], V(4)),
-                    (&b"dogs_likes_f"[..], V(5)),
-                    (&b"e"[..], V(104)),
-                    (&b"eeeeeeeeeeeeeeeeeeee"[..], V(106)),
+                    (b"dogs_likes_3".to_vec(), V(3)),
+                    (b"dogs_likes_7".to_vec(), V(1)),
+                    (b"dogs_likes_79".to_vec(), V(2)),
+                    (b"dogs_likes_88".to_vec(), V(4)),
+                    (b"dogs_likes_f".to_vec(), V(5)),
+                    (b"e".to_vec(), V(104)),
+                    (b"eeeeeeeeeeeeeeeeeeee".to_vec(), V(106)),
                 ]
             );
 
@@ -116,7 +116,7 @@ fn do_test<R: Readable>(
     assert_eq!(
         buf.iter(reader)
             .unwrap()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(&k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -132,7 +132,7 @@ fn do_test<R: Readable>(
     assert_eq!(
         buf.iter_from(reader, from_key.clone())
             .unwrap()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(&k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -150,7 +150,7 @@ fn do_test<R: Readable>(
         buf.iter(reader)
             .unwrap()
             .rev()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(&k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -192,7 +192,7 @@ fn re_do_test<R: Readable>(
     assert_eq!(
         buf.iter(reader)
             .unwrap()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(&k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -206,7 +206,7 @@ fn re_do_test<R: Readable>(
     assert_eq!(
         buf.iter_from(reader, from_key.clone())
             .unwrap()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(&k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -221,7 +221,7 @@ fn re_do_test<R: Readable>(
         buf.iter(reader)
             .unwrap()
             .rev()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(&k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),

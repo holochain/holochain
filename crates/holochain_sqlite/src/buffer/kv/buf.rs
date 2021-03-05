@@ -173,7 +173,7 @@ where
     }
 
     /// Iterator that checks the scratch space
-    pub fn iter<'r, R: Readable>(&'r self, r: &'r mut R) -> DatabaseResult<SingleIter<'r, '_, V>> {
+    pub fn iter<'r, R: Readable>(&'r self, r: &'r mut R) -> DatabaseResult<SingleIter<'_, V>> {
         Ok(SingleIter::new(
             &self.scratch,
             self.scratch.iter(),
@@ -185,7 +185,7 @@ where
     pub fn drain_iter<'r, R: Readable>(
         &mut self,
         r: &'r mut R,
-    ) -> DatabaseResult<DrainIter<'r, '_, V>> {
+    ) -> DatabaseResult<DrainIter<'_, V>> {
         Ok(DrainIter::new(&mut self.scratch, self.store.iter(r)?))
     }
 
@@ -195,12 +195,12 @@ where
     /// NB: if we ever have to implement other iter methods, we should
     /// consider passing in a raw iter to DrainIter
     pub fn drain_iter_filter<'r, F, R>(
-        &mut self,
+        &'r mut self, // maybe need new lifetime instead of 'r
         r: &'r mut R,
         filter: F,
-    ) -> DatabaseResult<DrainIter<'r, '_, V>>
+    ) -> DatabaseResult<DrainIter<'_, V>>
     where
-        F: FnMut(&(&[u8], V)) -> Result<bool, DatabaseError> + 'r,
+        F: FnMut(&(Vec<u8>, V)) -> Result<bool, DatabaseError> + 'r,
         R: Readable,
     {
         Ok(DrainIter::new(
@@ -214,7 +214,7 @@ where
         &'r self,
         r: &'r mut R,
         k: K,
-    ) -> DatabaseResult<SingleIterKeyMatch<'r, 'r, V>> {
+    ) -> DatabaseResult<SingleIterKeyMatch<'r, V>> {
         check_empty_key(&k)?;
         let key = k.as_ref().to_vec();
         Ok(SingleIterKeyMatch::new(
@@ -228,7 +228,7 @@ where
         &'r self,
         r: &'r mut R,
         k: K,
-    ) -> DatabaseResult<SingleIterFrom<'r, '_, V>> {
+    ) -> DatabaseResult<SingleIterFrom<'_, V>> {
         check_empty_key(&k)?;
 
         let key = k.as_ref().to_vec();
@@ -244,7 +244,7 @@ where
     pub fn iter_reverse<'r, R: Readable>(
         &'r self,
         r: &'r mut R,
-    ) -> DatabaseResult<fallible_iterator::Rev<SingleIter<'r, '_, V>>> {
+    ) -> DatabaseResult<fallible_iterator::Rev<SingleIter<'_, V>>> {
         Ok(self.iter(r)?.rev())
     }
 
@@ -253,7 +253,7 @@ where
     pub fn drain_iter_reverse<'r, R: Readable>(
         &'r mut self,
         r: &'r mut R,
-    ) -> DatabaseResult<fallible_iterator::Rev<DrainIter<'r, '_, V>>> {
+    ) -> DatabaseResult<fallible_iterator::Rev<DrainIter<'_, V>>> {
         Ok(self.drain_iter(r)?.rev())
     }
 }
@@ -381,14 +381,17 @@ where
                     let encoded = rusqlite::types::Value::Blob(buf);
                     self.store.table().put(
                         writer,
-                        IntKey::from_key_bytes_or_friendly_panic(k).as_ref(),
+                        IntKey::from_key_bytes_or_friendly_panic(&k).as_ref(),
                         &encoded,
                     )?;
                 }
                 Delete => self
                     .store
                     .table()
-                    .delete(writer, IntKey::from_key_bytes_or_friendly_panic(k).as_ref())
+                    .delete(
+                        writer,
+                        IntKey::from_key_bytes_or_friendly_panic(&k).as_ref(),
+                    )
                     .or_else(DatabaseError::ok_if_not_found)?,
             }
         }

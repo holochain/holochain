@@ -4,11 +4,7 @@ use crate::prelude::*;
 
 pub trait KvStoreT<K, V> {
     /// Fetch data from DB as raw byte slice
-    fn get_bytes<'env, R: Readable>(
-        &'env self,
-        reader: &'env mut R,
-        k: &K,
-    ) -> DatabaseResult<Option<Vec<u8>>>;
+    fn get_bytes<R: Readable>(&self, reader: &mut R, k: &K) -> DatabaseResult<Option<Vec<u8>>>;
 
     /// Fetch data from DB, deserialize into V type
     fn get<R: Readable>(&self, reader: &mut R, k: &K) -> DatabaseResult<Option<V>>;
@@ -20,22 +16,15 @@ pub trait KvStoreT<K, V> {
     fn delete(&self, writer: &mut Writer, k: &K) -> DatabaseResult<()>;
 
     /// Iterate over the underlying persisted data
-    fn iter<'env, R: Readable>(
-        &self,
-        reader: &'env mut R,
-    ) -> DatabaseResult<SingleIterRaw<'env, V>>;
+    fn iter<R: Readable>(&self, reader: &mut R) -> DatabaseResult<SingleIterRaw<V>>;
 
     /// Iterate from a key onwards
-    fn iter_from<'env, R: Readable>(
-        &self,
-        reader: &'env mut R,
-        k: K,
-    ) -> DatabaseResult<SingleIterRaw<'env, V>>;
+    fn iter_from<R: Readable>(&self, reader: &mut R, k: K) -> DatabaseResult<SingleIterRaw<V>>;
 
     /// Iterate over the underlying persisted data in reverse
     #[deprecated = "just use rev()"]
-    fn iter_reverse<'env, R: Readable>(
+    fn iter_reverse<R: Readable>(
         &self,
-        reader: &'env mut R,
-    ) -> DatabaseResult<fallible_iterator::Rev<SingleIterRaw<'env, V>>>;
+        reader: &mut R,
+    ) -> DatabaseResult<fallible_iterator::Rev<SingleIterRaw<V>>>;
 }

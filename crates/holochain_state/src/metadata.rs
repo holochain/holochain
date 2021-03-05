@@ -1082,7 +1082,7 @@ where
         Ok(Box::new(self.misc_meta.iter_all_key_matches(r, k)?.map(
             |(k, v)| {
                 let k: MiscMetaKey<ChainItemPrefix> =
-                    PrefixBytesKey::<P>::from_key_bytes_or_friendly_panic(k).into();
+                    PrefixBytesKey::<P>::from_key_bytes_or_friendly_panic(&k).into();
                 let header_hash = ChainItemKey::from(k).into();
                 let timestamp = MiscMetaValue::chain_item(v);
                 let r = TimedHeaderHash {
@@ -1105,7 +1105,7 @@ where
         Ok(Box::new(self.misc_meta.iter_all_key_matches(r, k)?.map(
             |(k, _)| {
                 let k: MiscMetaKey<ChainItemPrefix> =
-                    PrefixBytesKey::<P>::from_key_bytes_or_friendly_panic(k).into();
+                    PrefixBytesKey::<P>::from_key_bytes_or_friendly_panic(&k).into();
                 let key = ChainItemKey::from(k);
                 let sequence = (&key).into();
                 let header_hash = key.into();

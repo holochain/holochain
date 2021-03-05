@@ -215,7 +215,7 @@ fn kv_deleted_persisted() -> DatabaseResult<()> {
             .collect::<Vec<_>>()
             .unwrap();
         debug!(?forward);
-        assert_eq!(forward, vec![(&b"a"[..], V(1)), (&b"c"[..], V(3))],);
+        assert_eq!(forward, vec![(b"a".to_vec(), V(1)), (b"c".to_vec(), V(3))],);
         assert!(!buf.contains(&mut reader, &"b".into())?);
         Ok(())
     })
@@ -256,7 +256,7 @@ async fn kv_deleted_buffer() -> DatabaseResult<()> {
         let buf: KvBufUsed<DbString, _> = KvBufUsed::new(db.clone());
 
         let forward: Vec<_> = buf.store().iter(&mut reader).unwrap().collect().unwrap();
-        assert_eq!(forward, vec![(&b"a"[..], V(5)), (&b"c"[..], V(9))]);
+        assert_eq!(forward, vec![(b"a".to_vec(), V(5)), (b"c".to_vec(), V(9))]);
         Ok(())
     })
 }

@@ -72,7 +72,7 @@ impl ChainSequenceBuf {
                     (
                         // TODO: this is a bit ridiculous -- reevaluate whether the
                         //       IntKey is really needed (vs simple u32)
-                        u32::from(IntKey::from_key_bytes_or_friendly_panic(key)) + 1,
+                        u32::from(IntKey::from_key_bytes_or_friendly_panic(&key)) + 1,
                         item.tx_seq + 1,
                         Some(item.header_address),
                     )
@@ -331,7 +331,7 @@ pub mod tests {
                 .buf
                 .store()
                 .iter(&mut reader)?
-                .map(|(key, _)| Ok(IntKey::from_key_bytes_or_friendly_panic(key).into()))
+                .map(|(key, _)| Ok(IntKey::from_key_bytes_or_friendly_panic(&key).into()))
                 .collect()?;
             assert_eq!(items, vec![0, 1, 2]);
         }

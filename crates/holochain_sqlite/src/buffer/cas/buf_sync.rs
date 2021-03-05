@@ -101,7 +101,7 @@ where
     ) -> DatabaseResult<impl FallibleIterator<Item = HoloHashed<C>, Error = DatabaseError> + 'r>
     {
         Ok(Box::new(self.0.iter(r)?.map(|(h, c)| {
-            let k: PrefixHashKey<P> = PrefixHashKey::from_key_bytes_or_friendly_panic(h);
+            let k: PrefixHashKey<P> = PrefixHashKey::from_key_bytes_or_friendly_panic(&h);
             Ok(Self::deserialize_and_hash(k.as_hash_bytes(), c))
         })))
     }
