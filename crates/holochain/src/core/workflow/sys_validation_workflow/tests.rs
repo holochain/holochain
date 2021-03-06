@@ -267,7 +267,7 @@ async fn run_test(
         assert_eq!(
             {
                 let mut guard = alice_env.guard();
-                let r = guard.reader().unwrap();
+                let mut r = guard.reader().unwrap();
                 workspace
                     .validation_limbo
                     .iter(&mut r)
@@ -291,7 +291,7 @@ async fn run_test(
         assert_eq!(
             {
                 let mut guard = alice_env.guard();
-                let r = guard.reader().unwrap();
+                let mut r = guard.reader().unwrap();
                 workspace
                     .integrated_dht_ops
                     .iter(&mut r)

@@ -494,7 +494,7 @@ impl Cell {
         // we can just have these defaults depending on whether or not
         // the hash is an entry or header.
         // In the future we should use GetOptions to choose which get to run.
-        let r = match *dht_hash.hash_type() {
+        let mut r = match *dht_hash.hash_type() {
             AnyDht::Entry => self.handle_get_entry(dht_hash.into(), options).await,
             AnyDht::Header => self.handle_get_element(dht_hash.into()).await,
         };

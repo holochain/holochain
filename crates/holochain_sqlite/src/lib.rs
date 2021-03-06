@@ -64,3 +64,6 @@ pub mod transaction;
 
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils;
+
+// Re-export rusqlite for use with `impl_to_sql!` macro
+pub use ::rusqlite;

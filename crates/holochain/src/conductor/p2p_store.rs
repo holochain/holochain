@@ -7,7 +7,6 @@ use holochain_conductor_api::AgentInfoDump;
 use holochain_conductor_api::P2pStateDump;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
-use holochain_sqlite::buffer::KvStore;
 use holochain_sqlite::buffer::KvStoreT;
 use holochain_sqlite::db::DbRead;
 use holochain_sqlite::db::DbWrite;
@@ -18,6 +17,7 @@ use holochain_sqlite::fresh_reader;
 use holochain_sqlite::key::BufKey;
 use holochain_sqlite::prelude::Readable;
 use holochain_sqlite::prelude::*;
+use holochain_sqlite::{buffer::KvStore, impl_to_sql};
 use holochain_zome_types::CellId;
 use std::convert::TryFrom;
 use std::convert::TryInto;
@@ -100,11 +100,19 @@ impl From<&[u8]> for AgentKvKey {
     }
 }
 
+impl From<Vec<u8>> for AgentKvKey {
+    fn from(v: Vec<u8>) -> Self {
+        v.as_slice().into()
+    }
+}
+
 impl AsRef<[u8]> for AgentKvKey {
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
+
+holochain_sqlite::impl_to_sql!(AgentKvKey);
 
 impl BufKey for AgentKvKey {
     fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
@@ -200,7 +208,9 @@ pub fn get_single_agent_info(
     agent: AgentPubKey,
 ) -> DatabaseResult<Option<AgentInfoSigned>> {
     let p2p_store = AgentKv::new(env.clone())?;
-    fresh_reader!(env, |mut r| { p2p_store.get_agent_info(&mut r, space, agent) })
+    fresh_reader!(env, |mut r| {
+        p2p_store.get_agent_info(&mut r, space, agent)
+    })
 }
 
 /// Interconnect every provided pair of conductors via their peer store lmdb environments
@@ -443,7 +453,7 @@ mod tests {
         let ret = &store_buf
             .as_store_ref()
             .get(
-                &g.reader().unwrap(),
+                &mut g.reader().unwrap(),
                 &(&agent_info_signed).try_into().unwrap(),
             )
             .unwrap();

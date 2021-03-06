@@ -35,6 +35,8 @@ impl AsRef<[u8]> for EntryDefStoreKey {
     }
 }
 
+holochain_sqlite::impl_to_sql!(EntryDefStoreKey);
+
 impl BufKey for EntryDefStoreKey {
     fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
         Self(UnsafeBytes::from(bytes.to_vec()).into())
@@ -86,12 +88,9 @@ impl EntryDefBuf {
     ) -> DatabaseResult<
         Box<dyn FallibleIterator<Item = (EntryDefBufferKey, EntryDef), Error = DatabaseError> + 'r>,
     > {
-        Ok(Box::new(
-            self.0
-                .store()
-                .iter(r)?
-                .map(|(k, v)| Ok((EntryDefStoreKey::from(k).into(), v))),
-        ))
+        Ok(Box::new(self.0.store().iter(r)?.map(|(k, v)| {
+            Ok((EntryDefStoreKey::from(k.as_slice()).into(), v))
+        })))
     }
 }
 

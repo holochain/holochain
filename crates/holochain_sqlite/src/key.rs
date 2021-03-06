@@ -14,6 +14,19 @@ use std::cmp::Ordering;
 
 mod prefix;
 
+#[macro_export]
+macro_rules! impl_to_sql {
+    ($s: ty) => {
+        impl $crate::rusqlite::ToSql for $s {
+            fn to_sql(&self) -> $crate::rusqlite::Result<$crate::rusqlite::types::ToSqlOutput<'_>> {
+                Ok($crate::rusqlite::types::ToSqlOutput::Borrowed(
+                    self.as_ref().into(),
+                ))
+            }
+        }
+    };
+}
+
 /// Any key type used in a [KvStore] or [KvvStore] must implement this trait
 pub trait BufKey: Sized + Ord + Eq + AsRef<[u8]> + ToSql + Send + Sync {
     /// Convert to the key bytes.
