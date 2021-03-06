@@ -218,7 +218,7 @@ mod tests {
         // Pull out the results and check them
         let last_count = {
             let mut g = env.guard();
-            let reader = g.reader().unwrap();
+            let mut reader = g.reader().unwrap();
             let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
 
             // Get the authored ops
@@ -267,7 +267,7 @@ mod tests {
         {
             let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
             let mut g = env.guard();
-            let reader = g.reader().unwrap();
+            let mut reader = g.reader().unwrap();
             let authored_count = workspace
                 .authored_dht_ops
                 .iter(&mut reader)

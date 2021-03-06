@@ -571,7 +571,7 @@ impl Cell {
         until: Timestamp,
     ) -> CellResult<Vec<DhtOpHash>> {
         let mut g = self.env().guard();
-        let reader = g.reader()?;
+        let mut reader = g.reader()?;
         let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into())?;
         let result: Vec<DhtOpHash> = integrated_dht_ops
             .query(&mut reader, Some(since), Some(until), Some(dht_arc))?

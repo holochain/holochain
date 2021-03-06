@@ -139,7 +139,7 @@ async fn get_meta_updates_meta_cache() {
     assert_eq!(returned.headers.into_iter().next().unwrap(), expected.1);
     let result = {
         let mut g = env.guard();
-let reader = g.reader().unwrap();
+let mut reader = g.reader().unwrap();
 
         // Check the cache has been updated
         workspace

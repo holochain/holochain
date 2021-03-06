@@ -213,7 +213,7 @@ mod tests {
         // Check queries
         {
             let mut g = env.guard();
-            let reader = g.reader().unwrap();
+            let mut reader = g.reader().unwrap();
             let buf = IntegratedDhtOpsBuf::new(env.clone().into()).unwrap();
             // No filter
             let mut r = buf
@@ -241,7 +241,12 @@ mod tests {
             let ages_ago = times_exp[0] - Duration::weeks(5);
             let future = times_exp[1] + Duration::hours(1);
             let mut r = buf
-                .query(&mut reader, Some(ages_ago.into()), Some(future.into()), None)
+                .query(
+                    &mut reader,
+                    Some(ages_ago.into()),
+                    Some(future.into()),
+                    None,
+                )
                 .unwrap()
                 .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()

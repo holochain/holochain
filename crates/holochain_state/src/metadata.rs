@@ -11,12 +11,12 @@ use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
-use holochain_sqlite::buffer::KvBufUsed;
 use holochain_sqlite::buffer::KvvBufUsed;
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
+use holochain_sqlite::{buffer::KvBufUsed, rewrap_fallible_iter};
 use holochain_types::prelude::*;
 use holochain_zome_types::HeaderHashed;
 use std::collections::HashSet;
@@ -58,18 +58,18 @@ where
     // Links
     /// Get all the links on this base that match the tag
     /// that do not have removes on them
-    fn get_live_links<'r, 'k, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_live_links<'k, R: Readable>(
+        &self,
+        r: &mut R,
         key: &'k LinkMetaKey<'k>,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>>;
 
     /// Get all the links on this base that match the tag regardless of removes
-    fn get_links_all<'r, 'k, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_links_all<'k, R: Readable>(
+        &self,
+        r: &mut R,
         key: &'k LinkMetaKey<'k>,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>>;
 
     /// Add a link
     fn add_link(&mut self, link_add: CreateLink) -> DatabaseResult<()>;
@@ -220,25 +220,25 @@ where
     fn deregister_validation_status(&mut self, hash: HeaderHash, status: ValidationStatus);
 
     /// Returns all the valid [HeaderHash]es of headers that created this [Entry]
-    fn get_headers<'r, R: Readable>(
-        &'r self,
+    fn get_headers<R: Readable>(
+        &self,
         reader: &mut R,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
 
     /// Returns all the rejected [HeaderHash]es of headers that created this [Entry]
-    fn get_rejected_headers<'r, R: Readable>(
-        &'r self,
-        reader: &'r mut R,
+    fn get_rejected_headers<R: Readable>(
+        &self,
+        reader: &mut R,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
 
     /// Returns all the valid and rejected [HeaderHash]es of headers that created this [Entry]
-    fn get_all_headers<'r, R: Readable>(
-        &'r self,
-        reader: &'r mut R,
+    fn get_all_headers<R: Readable>(
+        &self,
+        reader: &mut R,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
 
     /// Get chain items on an agents source chain.
     /// This is how we query for RegisterAgentActivity items.
@@ -249,27 +249,25 @@ where
     /// There can be multiple headers at a sequence number.
     /// This means there's a fork in the chain.
     /// We store the data as proof.
-    fn get_activity<'r, R: Readable>(
-        &'r self,
-        reader: &'r mut R,
+    fn get_activity<R: Readable>(
+        &self,
+        reader: &mut R,
         key: ChainItemKey,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
 
     /// Same as get activity but includes the sequence number in the iterator value
-    fn get_activity_sequence<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_activity_sequence<R: Readable>(
+        &self,
+        r: &mut R,
         key: ChainItemKey,
-    ) -> DatabaseResult<
-        Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + '_>,
-    >;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError>>>;
 
     /// Get a custom validation package on this header hash
-    fn get_validation_package<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_validation_package<R: Readable>(
+        &self,
+        r: &mut R,
         hash: &HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
 
     /// Get the current status of this agents chain
     fn get_activity_status(&self, agent: &AgentPubKey) -> DatabaseResult<Option<ChainStatus>>;
@@ -279,39 +277,39 @@ where
         -> DatabaseResult<Option<HighestObserved>>;
 
     /// Returns all the hashes of [Update] headers registered on an [Entry]
-    fn get_updates<'r, R: Readable>(
-        &'r self,
-        reader: &'r mut R,
+    fn get_updates<R: Readable>(
+        &self,
+        reader: &mut R,
         hash: AnyDhtHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
 
     /// Returns all the hashes of [Delete] headers registered on a Header
-    fn get_deletes_on_header<'r, R: Readable>(
-        &'r self,
-        reader: &'r mut R,
+    fn get_deletes_on_header<R: Readable>(
+        &self,
+        reader: &mut R,
         new_entry_header: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
 
     /// Returns all the hashes of [Delete] headers registered on an Entry's header
-    fn get_deletes_on_entry<'r, R: Readable>(
-        &'r self,
-        reader: &'r mut R,
+    fn get_deletes_on_entry<R: Readable>(
+        &self,
+        reader: &mut R,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
 
     /// Returns the current [EntryDhtStatus] of an [Entry]
-    fn get_dht_status<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_dht_status<R: Readable>(
+        &self,
+        r: &mut R,
         entry_hash: &EntryHash,
     ) -> DatabaseResult<EntryDhtStatus>;
 
     /// Returns the current set of [ValidationStatus] for a [Header].
     /// A set of disputed status is returned.
     /// If the set only contains one entry there is no dispute.
-    fn get_validation_status<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_validation_status<R: Readable>(
+        &self,
+        r: &mut R,
         header_hash: &HeaderHash,
     ) -> DatabaseResult<DisputedStatus>;
 
@@ -322,11 +320,11 @@ where
     fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
 
     /// Returns all the link remove headers attached to a link add header
-    fn get_link_removes_on_link_add<'r, R: Readable>(
-        &'r self,
-        reader: &'r mut R,
+    fn get_link_removes_on_link_add<R: Readable>(
+        &self,
+        reader: &mut R,
         link_add: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
 
     /// Finds if there is a valid or rejected StoreElement for this header
     fn has_any_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool>;
@@ -602,13 +600,12 @@ impl<P> MetadataBufT<P> for MetadataBuf<P>
 where
     P: PrefixType,
 {
-    fn get_live_links<'r, 'k, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_live_links<'k, R: Readable>(
+        &self,
+        r: &mut R,
         key: &'k LinkMetaKey<'k>,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>
-    {
-        Ok(Box::new(
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>> {
+        Ok(Box::new(fallible_iterator::convert(
             self.links_meta
                 .iter_all_key_matches(r, key.into())?
                 .filter_map(move |(_, link)| {
@@ -620,21 +617,22 @@ where
                         Some(_) => Ok(None),
                         None => Ok(Some(link)),
                     }
-                }),
-        ))
+                })
+                .collect::<Vec<_>>()?
+                .into_iter()
+                .map(Ok),
+        )))
     }
 
-    fn get_links_all<'r, 'k, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_links_all<'k, R: Readable>(
+        &self,
+        r: &mut R,
         key: &'k LinkMetaKey<'k>,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>
-    {
-        Ok(Box::new(
-            self.links_meta
-                .iter_all_key_matches(r, key.into())?
-                .map(|(_, v)| Ok(v)),
-        ))
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>> {
+        Ok(Box::new(rewrap_fallible_iter!(self
+            .links_meta
+            .iter_all_key_matches(r, key.into())?
+            .map(|(_, v)| Ok(v)))))
     }
 
     fn add_link(&mut self, link_add: CreateLink) -> DatabaseResult<()> {
@@ -952,7 +950,7 @@ where
         &self,
         r: &mut R,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
         Ok(Box::new(fallible_iterator::convert(
             fallible_iterator::convert(
@@ -970,113 +968,125 @@ where
         )))
     }
 
-    fn get_all_headers<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_all_headers<R: Readable>(
+        &self,
+        r: &mut R,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
-        Ok(Box::new(
+        Ok(Box::new(fallible_iterator::convert(
             fallible_iterator::convert(
                 self.system_meta
                     .get(r, PrefixBytesKey::from(SysMetaKey::from(entry_hash)))?,
             )
             .filter_map(|h| {
                 Ok(match h {
-                    SysMetaVal::NewEntry(h) => Some(h),
-                    SysMetaVal::RejectedNewEntry(h) => Some(h),
+                    SysMetaVal::NewEntry(h) => Some(Ok(h)),
+                    SysMetaVal::RejectedNewEntry(h) => Some(Ok(h)),
                     _ => None,
                 })
-            }),
-        ))
+            })
+            .collect::<Vec<_>>()?
+            .into_iter(),
+        )))
     }
 
-    fn get_rejected_headers<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_rejected_headers<R: Readable>(
+        &self,
+        r: &mut R,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
-        Ok(Box::new(
+        Ok(Box::new(fallible_iterator::convert(
             fallible_iterator::convert(
                 self.system_meta
                     .get(r, PrefixBytesKey::from(SysMetaKey::from(entry_hash)))?,
             )
             .filter_map(|h| {
                 Ok(match h {
-                    SysMetaVal::RejectedNewEntry(h) => Some(h),
+                    SysMetaVal::RejectedNewEntry(h) => Some(Ok(h)),
                     _ => None,
                 })
-            }),
-        ))
+            })
+            .collect::<Vec<_>>()?
+            .into_iter(),
+        )))
     }
 
-    fn get_updates<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_updates<R: Readable>(
+        &self,
+        r: &mut R,
         hash: AnyDhtHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
-        Ok(Box::new(
+        Ok(Box::new(fallible_iterator::convert(
             fallible_iterator::convert(self.system_meta.get(r, PrefixBytesKey::from(hash))?)
                 .filter_map(|h| {
                     Ok(match h {
-                        SysMetaVal::Update(h) => Some(h),
+                        SysMetaVal::Update(h) => Some(Ok(h)),
                         _ => None,
                     })
-                }),
-        ))
+                })
+                .collect::<Vec<_>>()?
+                .into_iter(),
+        )))
     }
 
-    fn get_deletes_on_header<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_deletes_on_header<R: Readable>(
+        &self,
+        r: &mut R,
         new_entry_header: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
-        Ok(Box::new(
+        Ok(Box::new(fallible_iterator::convert(
             fallible_iterator::convert(
                 self.system_meta
                     .get(r, PrefixBytesKey::from(SysMetaKey::from(new_entry_header)))?,
             )
             .filter_map(|h| {
                 Ok(match h {
-                    SysMetaVal::Delete(h) => Some(h),
+                    SysMetaVal::Delete(h) => Some(Ok(h)),
                     _ => None,
                 })
-            }),
-        ))
+            })
+            .collect::<Vec<_>>()?
+            .into_iter(),
+        )))
     }
 
-    fn get_deletes_on_entry<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_deletes_on_entry<R: Readable>(
+        &self,
+        r: &mut R,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
-        Ok(Box::new(
+        Ok(Box::new(fallible_iterator::convert(
             fallible_iterator::convert(
                 self.system_meta
                     .get(r, PrefixBytesKey::from(SysMetaKey::from(entry_hash)))?,
             )
             .filter_map(|h| {
                 Ok(match h {
-                    SysMetaVal::Delete(h) => Some(h),
+                    SysMetaVal::Delete(h) => Some(Ok(h)),
                     _ => None,
                 })
-            }),
-        ))
+            })
+            .collect::<Vec<_>>()?
+            .into_iter(),
+        )))
     }
 
-    fn get_activity<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_activity<R: Readable>(
+        &self,
+        r: &mut R,
         key: ChainItemKey,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
         let k = MiscMetaKey::chain_item(&key).into();
-        Ok(Box::new(self.misc_meta.iter_all_key_matches(r, k)?.map(
-            |(k, v)| {
+        Ok(Box::new(rewrap_fallible_iter!(self
+            .misc_meta
+            .iter_all_key_matches(r, k)?
+            .map(|(k, v)| {
                 let k: MiscMetaKey<ChainItemPrefix> =
                     PrefixBytesKey::<P>::from_key_bytes_or_friendly_panic(&k).into();
                 let header_hash = ChainItemKey::from(k).into();
@@ -1086,48 +1096,48 @@ where
                     header_hash,
                 };
                 Ok(r)
-            },
-        )))
+            },))))
     }
 
-    fn get_activity_sequence<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_activity_sequence<R: Readable>(
+        &self,
+        r: &mut R,
         key: ChainItemKey,
-    ) -> DatabaseResult<
-        Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + '_>,
-    > {
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError>>>
+    {
         let k = MiscMetaKey::chain_item(&key).into();
-        Ok(Box::new(self.misc_meta.iter_all_key_matches(r, k)?.map(
-            |(k, _)| {
+        Ok(Box::new(rewrap_fallible_iter!(self
+            .misc_meta
+            .iter_all_key_matches(r, k)?
+            .map(|(k, _)| {
                 let k: MiscMetaKey<ChainItemPrefix> =
                     PrefixBytesKey::<P>::from_key_bytes_or_friendly_panic(&k).into();
                 let key = ChainItemKey::from(k);
                 let sequence = (&key).into();
                 let header_hash = key.into();
                 Ok((sequence, header_hash))
-            },
-        )))
+            },))))
     }
 
-    fn get_validation_package<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_validation_package<R: Readable>(
+        &self,
+        r: &mut R,
         hash: &HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
-    {
-        Ok(Box::new(
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>> {
+        Ok(Box::new(fallible_iterator::convert(
             fallible_iterator::convert(
                 self.system_meta
                     .get(r, PrefixBytesKey::from(SysMetaKey::from(hash.clone())))?,
             )
             .filter_map(|h| {
                 Ok(match h {
-                    SysMetaVal::CustomPackage(h) => Some(h),
+                    SysMetaVal::CustomPackage(h) => Some(Ok(h)),
                     _ => None,
                 })
-            }),
-        ))
+            })
+            .collect::<Vec<_>>()?
+            .into_iter(),
+        )))
     }
 
     fn get_activity_status(&self, agent: &AgentPubKey) -> DatabaseResult<Option<ChainStatus>> {
@@ -1151,9 +1161,9 @@ where
 
     // TODO: For now this is only checking for deletes
     // Once the validation is finished this should check for that as well
-    fn get_dht_status<'r, R: Readable>(
+    fn get_dht_status<R: Readable>(
         &self,
-        r: &'r mut R,
+        r: &mut R,
         entry_hash: &EntryHash,
     ) -> DatabaseResult<EntryDhtStatus> {
         Ok(self
@@ -1163,9 +1173,9 @@ where
             .unwrap_or(EntryDhtStatus::Dead))
     }
 
-    fn get_validation_status<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_validation_status<R: Readable>(
+        &self,
+        r: &mut R,
         hash: &HeaderHash,
     ) -> DatabaseResult<DisputedStatus> {
         Ok(fallible_iterator::convert(
@@ -1190,24 +1200,26 @@ where
         todo!("Cannot implement until redirects are implemented")
     }
 
-    fn get_link_removes_on_link_add<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    fn get_link_removes_on_link_add<R: Readable>(
+        &self,
+        r: &mut R,
         link_add: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
-        Ok(Box::new(
+        Ok(Box::new(fallible_iterator::convert(
             fallible_iterator::convert(
                 self.system_meta
                     .get(r, PrefixBytesKey::from(SysMetaKey::from(link_add)))?,
             )
             .filter_map(|h| {
                 Ok(match h {
-                    SysMetaVal::DeleteLink(h) => Some(h),
+                    SysMetaVal::DeleteLink(h) => Some(Ok(h)),
                     _ => None,
                 })
-            }),
-        ))
+            })
+            .collect::<Vec<_>>()?
+            .into_iter(),
+        )))
     }
 
     fn has_any_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool> {

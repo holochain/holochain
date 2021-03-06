@@ -392,7 +392,7 @@ pub mod tests {
         let test_env = test_cell_env();
         let env = test_env.env();
         let mut g = env.guard();
-        let reader = g.reader().unwrap();
+        let mut reader = g.reader().unwrap();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let ribosome = MockRibosomeT::new();
         // FIXME: CAP: Set this function to private

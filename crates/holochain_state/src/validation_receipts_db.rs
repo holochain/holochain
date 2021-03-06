@@ -205,7 +205,7 @@ mod tests {
         }
 
         let mut g = env.guard();
-        let reader = g.reader()?;
+        let mut reader = g.reader()?;
         let vr_buf = ValidationReceiptsBuf::new(&env)?;
 
         assert_eq!(2, vr_buf.count_valid(&mut reader, &test_op_hash)?);

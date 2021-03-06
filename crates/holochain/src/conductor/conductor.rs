@@ -731,7 +731,9 @@ where
             .collect::<Vec<_>>();
         // try to join all the tasks and return the list of dna files
         let dnas = futures::future::try_join_all(wasm_tasks).await?;
-        let defs = fresh_reader!(environ, |mut r| entry_def_buf.get_all(&mut r)?.collect::<Vec<_>>())?;
+        let defs = fresh_reader!(environ, |mut r| entry_def_buf
+            .get_all(&mut r)?
+            .collect::<Vec<_>>())?;
         Ok((dnas, defs))
     }
 
@@ -917,8 +919,11 @@ where
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
         let mut guard = self.env.guard();
-        let reader = guard.reader()?;
-        Ok(self.state_db.get(&mut reader, &UnitDbKey)?.unwrap_or_default())
+        let mut reader = guard.reader()?;
+        Ok(self
+            .state_db
+            .get(&mut reader, &UnitDbKey)?
+            .unwrap_or_default())
     }
 
     /// Update the internal state with a pure function mapping old state to new

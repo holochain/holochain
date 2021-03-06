@@ -142,7 +142,9 @@ pub fn handle_get_entry(
     // Get the entry from the first header
 
     fresh_reader!(state_env, |mut reader| {
-        let first_header = meta_vault.get_all_headers(&mut reader, hash.clone())?.next()?;
+        let first_header = meta_vault
+            .get_all_headers(&mut reader, hash.clone())?
+            .next()?;
         let entry_data = match first_header {
             Some(first_header) => {
                 let header = render_header_and_status(first_header)?.0;
@@ -176,7 +178,7 @@ pub fn handle_get_entry(
 pub fn handle_get_element(env: DbWrite, hash: HeaderHash) -> CascadeResult<GetElementResponse> {
     // Get the vaults
     let mut g = env.guard();
-    let reader = g.reader()?;
+    let mut reader = g.reader()?;
     let element_vault = ElementBuf::vault(env.clone().into(), false)?;
     let meta_vault = MetadataBuf::vault(env.clone().into())?;
     let element_rejected = ElementBuf::rejected(env.clone().into())?;
@@ -306,7 +308,7 @@ fn get_full_headers<'a, P: PrefixType + 'a, R: Readable>(
     hashes: impl FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + 'a,
     query: ChainQueryFilter,
     database: ElementBuf<P>,
-    reader: &'r mut R,
+    reader: &'a mut R, // maybe not 'a
 ) -> impl FallibleIterator<Item = (u32, SignedHeaderHashed), Error = DatabaseError> + 'a {
     hashes
         .filter_map(move |(s, h)| {
@@ -347,7 +349,7 @@ pub fn handle_get_links(
 ) -> CascadeResult<GetLinksResponse> {
     // Get the vaults
     let mut g = env.guard();
-    let reader = g.reader()?;
+    let mut reader = g.reader()?;
     let element_vault = ElementBuf::vault(env.clone(), false)?;
     let meta_vault = MetadataBuf::vault(env.clone())?;
 

@@ -314,7 +314,7 @@ pub mod tests {
                 .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
         }
         let mut g = arc.guard();
-        let reader = g.reader()?;
+        let mut reader = g.reader()?;
         {
             let buf = ChainSequenceBuf::new(arc.clone().into())?;
             assert_eq!(
@@ -363,7 +363,7 @@ pub mod tests {
                 .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
         }
         let mut g = arc.guard();
-        let reader = g.reader()?;
+        let mut reader = g.reader()?;
         {
             let buf = ChainSequenceBuf::new(arc.clone().into())?;
             assert_eq!(

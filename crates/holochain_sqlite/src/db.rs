@@ -299,7 +299,7 @@ pub trait WriteManager<'e> {
 impl<'e> ReadManager<'e> for Conn<'e> {
     fn reader(&'e mut self) -> DatabaseResult<Reader<'e>> {
         let txn = self.conn.transaction()?;
-        let reader = Reader::from(txn);
+        let mut reader = Reader::from(txn);
         Ok(reader)
     }
 
@@ -316,7 +316,7 @@ impl<'e> ReadManager<'e> for Conn<'e> {
 //     fn reader(&'e mut self) -> DatabaseResult<Reader<'e>> {
 //         let mut conn = self.connection_naive()?;
 //         let txn = conn.transaction()?;
-//         let reader = Reader::from(txn);
+//         let mut reader = Reader::from(txn);
 //         Ok(reader)
 //     }
 

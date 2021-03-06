@@ -322,8 +322,8 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
-            let env = arc.guard();
-            let reader = env.reader().unwrap();
+            let mut env = arc.guard();
+            let mut reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for create in entry_creates {
                 meta_buf
@@ -342,8 +342,8 @@ mod tests {
                 .unwrap();
         }
         {
-            let env = arc.guard();
-            let reader = env.reader().unwrap();
+            let mut env = arc.guard();
+            let mut reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
                 .get_headers(&mut reader, entry_hash.clone())
@@ -382,8 +382,8 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
-            let env = arc.guard();
-            let reader = env.reader().unwrap();
+            let mut env = arc.guard();
+            let mut reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for update in entry_updates {
                 meta_buf.register_update(update).unwrap();
@@ -400,8 +400,8 @@ mod tests {
                 .unwrap();
         }
         {
-            let env = arc.guard();
-            let reader = env.reader().unwrap();
+            let mut env = arc.guard();
+            let mut reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
                 .get_updates(&mut reader, original_entry_hash.into())
@@ -440,8 +440,8 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
-            let env = arc.guard();
-            let reader = env.reader().unwrap();
+            let mut env = arc.guard();
+            let mut reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for update in entry_updates {
                 meta_buf.register_update(update).unwrap();
@@ -458,8 +458,8 @@ mod tests {
                 .unwrap();
         }
         {
-            let env = arc.guard();
-            let reader = env.reader().unwrap();
+            let mut env = arc.guard();
+            let mut reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
                 .get_updates(&mut reader, original_entry_hash.into())
@@ -488,8 +488,8 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
-            let env = arc.guard();
-            let reader = env.reader().unwrap();
+            let mut env = arc.guard();
+            let mut reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for delete in entry_deletes {
                 meta_buf.register_delete(delete).unwrap();
@@ -506,8 +506,8 @@ mod tests {
                 .unwrap();
         }
         {
-            let env = arc.guard();
-            let reader = env.reader().unwrap();
+            let mut env = arc.guard();
+            let mut reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
                 .get_deletes_on_header(&mut reader, header_hash.clone().into())
@@ -559,7 +559,7 @@ mod tests {
     async fn test_entry_dht_status() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
+        let mut env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut entry_creates = Vec::new();
@@ -577,7 +577,7 @@ mod tests {
         )
         .await;
 
-        let reader = env.reader().unwrap();
+        let mut reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         update_dbs(
             &entry_creates[..],
@@ -697,7 +697,7 @@ mod tests {
     async fn test_entry_dht_status_one_less() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
+        let mut env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut entry_creates = Vec::new();
@@ -715,7 +715,7 @@ mod tests {
         )
         .await;
 
-        let reader = env.reader().unwrap();
+        let mut reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         update_dbs(
             &entry_creates[..],

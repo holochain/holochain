@@ -21,7 +21,7 @@ pub(super) type Store = KvBufUsed<DbString, V>;
 fn kv_iter_from_partial() {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard();
+    let mut env = arc.guard();
     let db = env.inner().open_single("kv").unwrap();
 
     {
@@ -489,7 +489,7 @@ async fn kv_single_iter_found_4() {
 async fn exhaust_both_ends() {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard();
+    let mut env = arc.guard();
     let db = env.inner().open_single("kv").unwrap();
     let values = (b'a'..=b'z')
         .map(|a| DbString::from_key_bytes_or_friendly_panic(&[a]))
@@ -585,7 +585,7 @@ fn kv_single_iter_runner(
 ) {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard();
+    let mut env = arc.guard();
     let db = env.inner().open_single("kv").unwrap();
 
     let mut runs = vec!["Start | ".into()];

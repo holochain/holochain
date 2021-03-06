@@ -357,7 +357,7 @@ mod tests {
             let check = async move {
                 recv_task.await.unwrap();
                 let mut g = env.guard();
-                let reader = g.reader().unwrap();
+                let mut reader = g.reader().unwrap();
                 let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
                 for i in workspace.authored().iter(&mut reader).unwrap().iterator() {
                     // Check that each item now has a publish time
@@ -398,7 +398,7 @@ mod tests {
             // Update the authored to have > R counts
             {
                 let mut g = env.guard();
-                let reader = g.reader().unwrap();
+                let mut reader = g.reader().unwrap();
                 let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
 
                 // Update authored to R

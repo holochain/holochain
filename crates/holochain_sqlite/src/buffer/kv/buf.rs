@@ -173,7 +173,7 @@ where
     }
 
     /// Iterator that checks the scratch space
-    pub fn iter<'r, R: Readable>(&'r self, r: &'r mut R) -> DatabaseResult<SingleIter<'_, V>> {
+    pub fn iter<R: Readable>(&self, r: &mut R) -> DatabaseResult<SingleIter<'_, V>> {
         Ok(SingleIter::new(
             &self.scratch,
             self.scratch.iter(),
@@ -182,10 +182,7 @@ where
     }
 
     /// Iterator that tracks elements so they can be deleted
-    pub fn drain_iter<'r, R: Readable>(
-        &mut self,
-        r: &'r mut R,
-    ) -> DatabaseResult<DrainIter<'_, V>> {
+    pub fn drain_iter<R: Readable>(&mut self, r: &mut R) -> DatabaseResult<DrainIter<'_, V>> {
         Ok(DrainIter::new(&mut self.scratch, self.store.iter(r)?))
     }
 
@@ -196,7 +193,7 @@ where
     /// consider passing in a raw iter to DrainIter
     pub fn drain_iter_filter<'r, F, R>(
         &'r mut self, // maybe need new lifetime instead of 'r
-        r: &'r mut R,
+        r: &mut R,
         filter: F,
     ) -> DatabaseResult<DrainIter<'_, V>>
     where
@@ -210,11 +207,11 @@ where
     }
 
     /// Iterator that returns all partial matches to this key
-    pub fn iter_all_key_matches<'r, R: Readable>(
-        &'r self,
+    pub fn iter_all_key_matches<R: Readable>(
+        &self,
         r: &mut R,
         k: K,
-    ) -> DatabaseResult<SingleIterKeyMatch<'r, V>> {
+    ) -> DatabaseResult<SingleIterKeyMatch<V>> {
         check_empty_key(&k)?;
         let key = k.as_ref().to_vec();
         Ok(SingleIterKeyMatch::new(
@@ -224,11 +221,7 @@ where
     }
 
     /// Iterate from a key onwards
-    pub fn iter_from<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
-        k: K,
-    ) -> DatabaseResult<SingleIterFrom<'_, V>> {
+    pub fn iter_from<R: Readable>(&self, r: &mut R, k: K) -> DatabaseResult<SingleIterFrom<'_, V>> {
         check_empty_key(&k)?;
 
         let key = k.as_ref().to_vec();
@@ -241,18 +234,18 @@ where
 
     /// Iterate over the data in reverse
     #[deprecated = "just use rev()"]
-    pub fn iter_reverse<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
+    pub fn iter_reverse<R: Readable>(
+        &self,
+        r: &mut R,
     ) -> DatabaseResult<fallible_iterator::Rev<SingleIter<'_, V>>> {
         Ok(self.iter(r)?.rev())
     }
 
     /// Iterator that tracks elements so they can be deleted but in reverse
     #[deprecated = "just use rev()"]
-    pub fn drain_iter_reverse<'r, R: Readable>(
-        &'r mut self,
-        r: &'r mut R,
+    pub fn drain_iter_reverse<R: Readable>(
+        &mut self,
+        r: &mut R,
     ) -> DatabaseResult<fallible_iterator::Rev<DrainIter<'_, V>>> {
         Ok(self.drain_iter(r)?.rev())
     }

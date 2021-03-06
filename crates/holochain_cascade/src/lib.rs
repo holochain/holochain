@@ -21,9 +21,9 @@ use holochain_p2p::actor::GetMetaOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
-use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
+use holochain_sqlite::{error::DatabaseResult, rewrap_fallible_iter};
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use std::collections::BTreeMap;
@@ -832,14 +832,22 @@ where
                 let rejected_headers = cache_data
                     .meta
                     .get_rejected_headers(&mut r, hash.clone())?
-                    .chain(authored_data.meta.get_rejected_headers(&mut r, hash.clone())?)
+                    .chain(
+                        authored_data
+                            .meta
+                            .get_rejected_headers(&mut r, hash.clone())?,
+                    )
                     .collect::<BTreeSet<_>>()?;
 
                 // Get the delete hashes
                 let deletes = cache_data
                     .meta
                     .get_deletes_on_entry(&mut r, hash.clone())?
-                    .chain(authored_data.meta.get_deletes_on_entry(&mut r, hash.clone())?)
+                    .chain(
+                        authored_data
+                            .meta
+                            .get_deletes_on_entry(&mut r, hash.clone())?,
+                    )
                     .collect::<BTreeSet<_>>()?;
 
                 // Get the update hashes
@@ -885,12 +893,20 @@ where
                     let deletes = cache_data
                         .meta
                         .get_deletes_on_header(&mut r, hash.clone())?
-                        .chain(authored_data.meta.get_deletes_on_header(&mut r, hash.clone())?)
+                        .chain(
+                            authored_data
+                                .meta
+                                .get_deletes_on_header(&mut r, hash.clone())?,
+                        )
                         .collect::<BTreeSet<_>>()?;
                     let updates = cache_data
                         .meta
                         .get_updates(&mut r, hash.clone().into())?
-                        .chain(authored_data.meta.get_updates(&mut r, hash.clone().into())?)
+                        .chain(
+                            authored_data
+                                .meta
+                                .get_updates(&mut r, hash.clone().into())?,
+                        )
                         .collect::<BTreeSet<_>>()?;
                     let validation_status = cache_data.meta.get_validation_status(&mut r, &hash)?;
                     DatabaseResult::Ok((deletes, updates, validation_status))
@@ -1204,7 +1220,7 @@ where
         let env = ok_or_return!(self.env.as_ref(), None);
         debug!("in get header");
         let found_local_delete = fresh_reader!(env, |mut r| {
-            let in_cache = || {
+            let in_cache = {
                 DatabaseResult::Ok({
                     cache_data
                         .meta
@@ -1213,7 +1229,7 @@ where
                         .is_some()
                 })
             };
-            let in_authored = || {
+            let in_authored = {
                 DatabaseResult::Ok({
                     authored_data
                         .meta
@@ -1222,7 +1238,7 @@ where
                         .is_some()
                 })
             };
-            let in_vault = || {
+            let in_vault = {
                 DatabaseResult::Ok({
                     integrated_data
                         .meta
@@ -1231,7 +1247,7 @@ where
                         .is_some()
                 })
             };
-            DatabaseResult::Ok(in_cache()? || in_authored()? || in_vault()?)
+            DatabaseResult::Ok(in_cache? || in_authored? || in_vault?)
         })?;
         if found_local_delete {
             return Ok(None);
@@ -1593,28 +1609,30 @@ where
         // Get the links and collect the CreateLink / DeleteLink hashes by time.
         // Search authored and combine with cache_data
         let links = fresh_reader!(env, |mut r| {
-            cache_data
-                .meta
-                .get_links_all(&mut r, key)?
-                .map(|link_add| {
-                    // Collect the link removes on this link add
-                    let link_removes = cache_data
-                        .meta
-                        .get_link_removes_on_link_add(&mut r, link_add.link_add_hash.clone())?
-                        .collect::<BTreeSet<_>>()?;
-                    // Return all link removes with this link add
-                    Ok((link_add.link_add_hash, link_removes))
-                })
-                .chain(authored_data.meta.get_links_all(&mut r, key)?.map(|link_add| {
-                    // Collect the link removes on this link add
-                    let link_removes = authored_data
-                        .meta
-                        .get_link_removes_on_link_add(&mut r, link_add.link_add_hash.clone())?
-                        .collect::<BTreeSet<_>>()?;
-                    // Return all link removes with this link add
-                    Ok((link_add.link_add_hash, link_removes))
-                }))
-                .collect::<BTreeMap<_, _>>()
+            rewrap_fallible_iter!(cache_data.meta.get_links_all(&mut r, key)?.map(|link_add| {
+                // Collect the link removes on this link add
+                let link_removes = cache_data
+                    .meta
+                    .get_link_removes_on_link_add(&mut r, link_add.link_add_hash.clone())?
+                    .collect::<BTreeSet<_>>()?;
+                // Return all link removes with this link add
+                Ok((link_add.link_add_hash, link_removes))
+            }))
+            .chain(
+                authored_data
+                    .meta
+                    .get_links_all(&mut r, key)?
+                    .map(|link_add| {
+                        // Collect the link removes on this link add
+                        let link_removes = authored_data
+                            .meta
+                            .get_link_removes_on_link_add(&mut r, link_add.link_add_hash.clone())?
+                            .collect::<BTreeSet<_>>()?;
+                        // Return all link removes with this link add
+                        Ok((link_add.link_add_hash, link_removes))
+                    }),
+            )
+            .collect::<BTreeMap<_, _>>()
         })?;
         // Get the headers from the element stores
         fallible_iterator::convert(links.into_iter().map(Ok))

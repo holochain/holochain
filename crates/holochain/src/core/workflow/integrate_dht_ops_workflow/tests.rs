@@ -186,7 +186,7 @@ impl Db {
     #[instrument(skip(expects, env))]
     async fn check(expects: Vec<Self>, env: DbWrite, here: String) {
         let mut g = env.guard();
-        let reader = g.reader().unwrap();
+        let mut reader = g.reader().unwrap();
         let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
         for expect in expects {
             match expect {
@@ -306,7 +306,10 @@ impl Db {
                     let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
-                        .get_activity(&mut reader, ChainItemKey::new(&header, ValidationStatus::Valid))
+                        .get_activity(
+                            &mut reader,
+                            ChainItemKey::new(&header, ValidationStatus::Valid),
+                        )
                         .unwrap()
                         .collect::<Vec<_>>()
                         .unwrap();
@@ -1208,7 +1211,7 @@ async fn test_wasm_api_without_integration_delete() {
 
     {
         let mut g = env.guard();
-        let reader = g.reader().unwrap();
+        let mut reader = g.reader().unwrap();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let entry_header = workspace
             .meta_authored
@@ -1396,13 +1399,17 @@ mod slow_tests {
 
             // Check the ops are not empty
             let mut guard = call_data.env.guard();
-            let reader = guard.reader().unwrap();
+            let mut reader = guard.reader().unwrap();
             let db = call_data
                 .env
                 .get_table(TableName::IntegratedDhtOps)
                 .unwrap();
             let ops_db = IntegratedDhtOpsStore::new(call_data.env.clone().into(), db);
-            let ops = ops_db.iter(&mut reader).unwrap().collect::<Vec<_>>().unwrap();
+            let ops = ops_db
+                .iter(&mut reader)
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap();
             debug!(?ops);
             assert!(!ops.is_empty());
 

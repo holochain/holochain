@@ -131,21 +131,19 @@ mock! {
 }
 
 impl MetadataBufT for MockMetadataBuf {
-    fn get_live_links<'r, 'k, R: Readable>(
-        &'r self,
-        _r: &'r mut R,
+    fn get_live_links<'k, R: Readable>(
+        &self,
+        _r: &mut R,
         key: &'k LinkMetaKey<'k>,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>
-    {
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>> {
         MockMetadataBuf::get_live_links(&self, key)
     }
 
-    fn get_links_all<'r, 'k, R: Readable>(
-        &'r self,
-        _r: &'r mut R,
+    fn get_links_all<'k, R: Readable>(
+        &self,
+        _r: &mut R,
         key: &'k LinkMetaKey<'k>,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>
-    {
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>> {
         MockMetadataBuf::get_links_all(&self, key)
     }
 
@@ -153,9 +151,9 @@ impl MetadataBufT for MockMetadataBuf {
         self.get_canonical_entry_hash(entry_hash)
     }
 
-    fn get_dht_status<'r, R: Readable>(
-        &'r self,
-        _r: &'r mut R,
+    fn get_dht_status<R: Readable>(
+        &self,
+        _r: &mut R,
         entry_hash: &EntryHash,
     ) -> DatabaseResult<EntryDhtStatus> {
         MockMetadataBuf::get_dht_status(&self, entry_hash)
@@ -165,57 +163,55 @@ impl MetadataBufT for MockMetadataBuf {
         self.get_canonical_header_hash(header_hash)
     }
 
-    fn get_headers<'r, R: Readable>(
-        &'r self,
+    fn get_headers<R: Readable>(
+        &self,
         _reader: &mut R,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
         self.get_headers(entry_hash)
     }
 
-    fn get_rejected_headers<'r, R: Readable>(
-        &'r self,
-        _reader: &'r mut R,
+    fn get_rejected_headers<R: Readable>(
+        &self,
+        _reader: &mut R,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
         self.get_rejected_headers(entry_hash)
     }
 
-    fn get_all_headers<'r, R: Readable>(
-        &'r self,
-        _reader: &'r mut R,
+    fn get_all_headers<R: Readable>(
+        &self,
+        _reader: &mut R,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
         self.get_all_headers(entry_hash)
     }
 
-    fn get_activity<'r, R: Readable>(
-        &'r self,
-        _reader: &'r mut R,
+    fn get_activity<R: Readable>(
+        &self,
+        _reader: &mut R,
         key: ChainItemKey,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
         self.get_activity(key)
     }
-    fn get_activity_sequence<'r, R: Readable>(
-        &'r self,
-        _r: &'r mut R,
+    fn get_activity_sequence<R: Readable>(
+        &self,
+        _r: &mut R,
         key: ChainItemKey,
-    ) -> DatabaseResult<
-        Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + '_>,
-    > {
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError>>>
+    {
         self.get_activity_sequence(key)
     }
 
-    fn get_validation_package<'r, R: Readable>(
-        &'r self,
-        _r: &'r mut R,
+    fn get_validation_package<R: Readable>(
+        &self,
+        _r: &mut R,
         hash: &HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
-    {
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>> {
         self.get_validation_package(hash)
     }
 
@@ -230,44 +226,44 @@ impl MetadataBufT for MockMetadataBuf {
         self.get_activity_observed(agent)
     }
 
-    fn get_updates<'r, R: Readable>(
-        &'r self,
-        _reader: &'r mut R,
+    fn get_updates<R: Readable>(
+        &self,
+        _reader: &mut R,
         hash: AnyDhtHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
         self.get_updates(hash)
     }
 
-    fn get_deletes_on_header<'r, R: Readable>(
-        &'r self,
-        _reader: &'r mut R,
+    fn get_deletes_on_header<R: Readable>(
+        &self,
+        _reader: &mut R,
         new_entry_header: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
         self.get_deletes_on_header(new_entry_header)
     }
 
-    fn get_deletes_on_entry<'r, R: Readable>(
-        &'r self,
-        _reader: &'r mut R,
+    fn get_deletes_on_entry<R: Readable>(
+        &self,
+        _reader: &mut R,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
         self.get_deletes_on_entry(entry_hash)
     }
 
-    fn get_link_removes_on_link_add<'r, R: Readable>(
-        &'r self,
-        _reader: &'r mut R,
+    fn get_link_removes_on_link_add<R: Readable>(
+        &self,
+        _reader: &mut R,
         link_add: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>
     {
         self.get_link_removes_on_link_add(link_add)
     }
-    fn get_validation_status<'r, R: Readable>(
-        &'r self,
-        _r: &'r mut R,
+    fn get_validation_status<R: Readable>(
+        &self,
+        _r: &mut R,
         hash: &HeaderHash,
     ) -> DatabaseResult<DisputedStatus> {
         self.get_validation_status(hash)
