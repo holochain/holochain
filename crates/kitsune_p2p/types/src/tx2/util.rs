@@ -281,7 +281,7 @@ impl futures::io::AsyncRead for MemRead {
                     );
 
                     buf[..amount].copy_from_slice(&lock.buf[..amount]);
-                    lock.buf.truncate_front(amount);
+                    lock.buf.shift_data_forward(amount);
                     if let Some(waker) = lock.want_write_waker.take() {
                         waker.wake();
                     }

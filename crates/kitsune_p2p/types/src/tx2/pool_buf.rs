@@ -129,7 +129,9 @@ impl PoolBuf {
     }
 
     /// Like `drain(..len)` but without the iterator trappings.
-    pub fn truncate_front(&mut self, len: usize) {
+    /// Note, this actually copies the memory, leaving start the same.
+    /// perhaps you want `cheap_move_start()`?
+    pub fn shift_data_forward(&mut self, len: usize) {
         if len == 0 {
             return;
         }
@@ -148,6 +150,29 @@ impl PoolBuf {
         let r = len + start..inner.1.len();
         inner.1.copy_within(r, start);
         inner.1.truncate(inner.1.len() - len);
+    }
+
+    /// Like `drain(..len)` but without the iterator trappings.
+    /// Note, this just moves the start pointer forward,
+    /// if you actually want to reclaim space,
+    /// perhaps you want `shift_data_forward()`?
+    pub fn cheap_move_start(&mut self, len: usize) {
+        if len == 0 {
+            return;
+        }
+
+        let inner = self.0.as_mut().unwrap();
+
+        let start = inner.0;
+        let data_len = inner.1.len() - start;
+
+        if len >= data_len {
+            reset(&mut inner.1, false);
+            inner.0 = POOL_BUF_PRE_WRITE_SPACE;
+            return;
+        }
+
+        inner.0 += len;
     }
 
     /// Reserve desired capacity. Prefer doing this once at the beginning
