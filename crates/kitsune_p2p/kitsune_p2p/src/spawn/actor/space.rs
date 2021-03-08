@@ -6,6 +6,10 @@ use ghost_actor::dependencies::tracing_futures::Instrument;
 use kitsune_p2p_types::codec::Codec;
 use std::collections::HashSet;
 use std::convert::TryFrom;
+//use futures_util::{self, pin_mut/*, stream::StreamExt*/};
+//use tokio::stream::{Stream, StreamExt};
+use kitsune_p2p_mdns::*;
+use std::sync::atomic::AtomicBool;
 
 /// if the user specifies None or zero (0) for race_timeout_ms
 /// (david.b) this is not currently used
@@ -462,16 +466,34 @@ impl SpaceInternalHandler for Space {
                 )?;
                 tracing::debug!(?agent_info, ?sig);
                 evt_sender
-                    .put_agent_info_signed(PutAgentInfoSignedEvt {
-                        space: space.clone(),
-                        agent,
-                        agent_info_signed: agent_info_signed.clone(),
-                    })
-                    .await?;
+                   .put_agent_info_signed(PutAgentInfoSignedEvt {
+                       space: space.clone(),
+                       agent: agent.clone(),
+                       agent_info_signed: agent_info_signed.clone(),
+                   })
+                   .await?;
+                // Push to the network as well
+                match self.config.network_type {
+                    NetworkType::QuicMdns => {
+                        // Broadcast by using Space as service type and Agent as service name
+                        let dna_str = String::from_utf8(space.get_bytes().to_owned()).unwrap();
+                        let agent_str = String::from_utf8(agent.get_bytes().to_owned()).unwrap();
+                        let mut buffer = Vec::new();
+                        kitsune_p2p_types::codec::rmp_encode(&mut buffer, &agent_info_signed)?;
+                        tracing::debug!(?dna_str, ?agent_str);
+                        let handle = kitsune_p2p_mdns::mdns_create_broadcast_thread(dna_str.clone(), agent_str, &buffer);
+                        // store mdns_handle in self? Unless all threads are killed on drop?
+                        // self.mdns_handles.push(handle);
+                        // Listen to same service type
+                        let stream = kitsune_p2p_mdns::mdns_listen(dna_str);
+                        //self.mdns_streams.push(stream);
 
-                // Push to the bootstrap as well.
-                crate::spawn::actor::bootstrap::put(bootstrap_service.clone(), agent_info_signed)
-                    .await?;
+                    },
+                    NetworkType::QuicBootstrap => {
+                        crate::spawn::actor::bootstrap::put(bootstrap_service.clone(), agent_info_signed)
+                           .await?;
+                    }
+                }
             }
             Ok(())
         }
@@ -487,6 +509,7 @@ impl SpaceInternalHandler for Space {
         Ok(async move { Ok(res) }.boxed().into())
     }
 }
+
 
 impl ghost_actor::GhostControlHandler for Space {}
 
@@ -688,6 +711,8 @@ pub(crate) struct Space {
     pub(crate) transport: ghost_actor::GhostSender<TransportListener>,
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
+    //mdns_handles: Vec<Arc<AtomicBool>>,
+    //mdns_streams: Vec<dyn Stream<Item = Result<MdnsResponse, MdnsError>>>,
 }
 
 impl Space {
@@ -716,6 +741,7 @@ impl Space {
             transport,
             local_joined_agents: HashSet::new(),
             config,
+            //mdns_handles: Vec::new(),
         }
     }
 
@@ -868,4 +894,31 @@ impl Space {
         .boxed()
         .into())
     }
+
+    // /// Check each MDNS discovery stream and add responses to local DB
+    // async fn check_mdns_streams(&mut self) {
+    //     let evt_sender = self.evt_sender.clone();
+    //     let mdns_streams = self.mdns_streams.clone();
+    //     for stream in mdns_streams {
+    //         //pin_mut!(stream);
+    //         if let Some(maybe_response) = stream.next().await {
+    //             match maybe_response {
+    //                 Ok(response) => {
+    //                     tracing::debug!("MDNS peer found: {:?}", response);
+    //                     let agent_info_signed = kitsune_p2p_types::codec::rmp_decode(response.buffer)?;
+    //                     evt_sender
+    //                        .put_agent_info_signed(PutAgentInfoSignedEvt {
+    //                            space: response.service_type,
+    //                            agent: response.service_name,
+    //                            agent_info_signed,
+    //                        })
+    //                        .await?;
+    //                 }
+    //                 Err(e) => {
+    //                     tracing::error!("!!! MDNS listen Error: {:?}", e);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 }

@@ -14,6 +14,7 @@ edition = "2018"
 derive_more = "0.99.11"
 futures = "0.3"
 ghost_actor = "0.3.0-alpha.1"
+kitsune_p2p_mdns = { version = "0.0.1", path = "../mdns" }
 kitsune_p2p_types = { version = "0.0.1", path = "../types" }
 kitsune_p2p_proxy = { version = "0.0.1", path = "../proxy" }
 kitsune_p2p_transport_quic = { version = "0.0.1", path = "../transport_quic" }
