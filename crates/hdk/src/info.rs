@@ -10,17 +10,17 @@ use crate::prelude::*;
 /// the [ `AgentInfo` ] is the current agent's original pubkey/address that they joined the network with
 /// and their most recent pubkey/address.
 pub fn agent_info() -> ExternResult<AgentInfo> {
-    HDK.read()?.agent_info(())
+    HDK.read().agent_info(())
 }
 
 /// @todo Not implemented
 pub fn app_info() -> ExternResult<AppInfo> {
-    HDK.read()?.app_info(())
+    HDK.read().app_info(())
 }
 
 /// @todo Not implemented
 pub fn dna_info() -> ExternResult<DnaInfo> {
-    HDK.read()?.dna_info(())
+    HDK.read().dna_info(())
 }
 
 /// Get the zome information.
@@ -31,10 +31,10 @@ pub fn dna_info() -> ExternResult<DnaInfo> {
 /// In general any holochain compatible wasm can be compiled and run in any zome so the zome info
 /// needs to be looked up at runtime to e.g. know where to send/receive `call_remote` rpc calls to.
 pub fn zome_info() -> ExternResult<ZomeInfo> {
-    HDK.read()?.zome_info(())
+    HDK.read().zome_info(())
 }
 
 /// @todo Not implemented
 pub fn call_info() -> ExternResult<CallInfo> {
-    HDK.read()?.call_info(())
+    HDK.read().call_info(())
 }

@@ -11,7 +11,7 @@ pub fn get_agent_activity(
     query: ChainQueryFilter,
     request: ActivityRequest,
 ) -> ExternResult<AgentActivity> {
-    HDK.read()?
+    HDK.read()
         .get_agent_activity(GetAgentActivityInput::new(agent, query, request))
 }
 
@@ -23,5 +23,5 @@ pub fn get_agent_activity(
 /// @todo do we want to return elements rather than hashes?
 /// @todo implement cap grant/claim usage in terms of query
 pub fn query(filter: ChainQueryFilter) -> ExternResult<Vec<Element>> {
-    HDK.read()?.query(filter)
+    HDK.read().query(filter)
 }

@@ -6,7 +6,7 @@ where
     K: Into<AgentPubKey>,
     D: serde::Serialize + std::fmt::Debug,
 {
-    HDK.read()?.sign(Sign::new(key.into(), data)?)
+    HDK.read().sign(Sign::new(key.into(), data)?)
 }
 
 /// Sign some data using the private key for the passed public key.
@@ -19,7 +19,7 @@ pub fn sign_raw<K>(key: K, data: Vec<u8>) -> ExternResult<Signature>
 where
     K: Into<AgentPubKey>,
 {
-    HDK.read()?.sign(Sign::new_raw(key.into(), data))
+    HDK.read().sign(Sign::new_raw(key.into(), data))
 }
 
 /// Verify the passed signature and public key against the passed serializable input.
@@ -36,7 +36,7 @@ where
     S: Into<Signature>,
     D: serde::Serialize + std::fmt::Debug,
 {
-    HDK.read()?
+    HDK.read()
         .verify_signature(VerifySignature::new(key.into(), signature.into(), data)?)
 }
 
@@ -52,6 +52,6 @@ where
     K: Into<AgentPubKey>,
     S: Into<Signature>,
 {
-    HDK.read()?
+    HDK.read()
         .verify_signature(VerifySignature::new_raw(key.into(), signature.into(), data))
 }

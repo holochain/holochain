@@ -23,7 +23,7 @@ where
 {
     // @todo is this secure to set this in the wasm rather than have the host inject it?
     let provenance = agent_info()?.agent_latest_pubkey;
-    HDK.read()?.call(Call::new(
+    HDK.read().call(Call::new(
         to_cell,
         zome_name,
         fn_name,
@@ -66,7 +66,7 @@ pub fn call_remote<I>(
 where
     I: serde::Serialize + std::fmt::Debug,
 {
-    HDK.read()?.call_remote(CallRemote::new(
+    HDK.read().call_remote(CallRemote::new(
         agent,
         zome,
         fn_name,
@@ -88,7 +88,7 @@ pub fn emit_signal<I>(input: I) -> ExternResult<()>
 where
     I: serde::Serialize + std::fmt::Debug,
 {
-    HDK.read()?
+    HDK.read()
         .emit_signal(AppSignal::new(ExternIO::encode(input)?))
 }
 
@@ -123,7 +123,7 @@ pub fn remote_signal<I>(input: I, agents: Vec<AgentPubKey>) -> ExternResult<()>
 where
     I: serde::Serialize + std::fmt::Debug,
 {
-    HDK.read()?.remote_signal(RemoteSignal {
+    HDK.read().remote_signal(RemoteSignal {
         signal: ExternIO::encode(input)?,
         agents,
     })
