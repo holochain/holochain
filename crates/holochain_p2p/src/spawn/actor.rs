@@ -83,7 +83,7 @@ impl HolochainP2pActor {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             let res = evt_sender.get(dna_hash, to_agent, dht_hash, options).await;
-            res.and_then(|mut r| Ok(SerializedBytes::try_from(r)?))
+            res.and_then(|r| Ok(SerializedBytes::try_from(r)?))
                 .map_err(kitsune_p2p::KitsuneP2pError::from)
                 .map(|res| UnsafeBytes::from(res).into())
         }
@@ -105,7 +105,7 @@ impl HolochainP2pActor {
             let res = evt_sender
                 .get_meta(dna_hash, to_agent, dht_hash, options)
                 .await;
-            res.and_then(|mut r| Ok(SerializedBytes::try_from(r)?))
+            res.and_then(|r| Ok(SerializedBytes::try_from(r)?))
                 .map_err(kitsune_p2p::KitsuneP2pError::from)
                 .map(|res| UnsafeBytes::from(res).into())
         }
@@ -126,7 +126,7 @@ impl HolochainP2pActor {
             let res = evt_sender
                 .get_links(dna_hash, to_agent, link_key, options)
                 .await;
-            res.and_then(|mut r| Ok(SerializedBytes::try_from(r)?))
+            res.and_then(|r| Ok(SerializedBytes::try_from(r)?))
                 .map_err(kitsune_p2p::KitsuneP2pError::from)
                 .map(|res| UnsafeBytes::from(res).into())
         }
@@ -148,7 +148,7 @@ impl HolochainP2pActor {
             let res = evt_sender
                 .get_agent_activity(dna_hash, to_agent, agent, query, options)
                 .await;
-            res.and_then(|mut r| Ok(SerializedBytes::try_from(r)?))
+            res.and_then(|r| Ok(SerializedBytes::try_from(r)?))
                 .map_err(kitsune_p2p::KitsuneP2pError::from)
                 .map(|res| UnsafeBytes::from(res).into())
         }
@@ -219,7 +219,7 @@ impl HolochainP2pActor {
                 .get_validation_package(dna_hash, agent_pub_key, header_hash)
                 .await;
 
-            res.and_then(|mut r| Ok(SerializedBytes::try_from(r)?))
+            res.and_then(|r| Ok(SerializedBytes::try_from(r)?))
                 .map_err(kitsune_p2p::KitsuneP2pError::from)
                 .map(|res| UnsafeBytes::from(res).into())
         }

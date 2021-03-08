@@ -16,6 +16,13 @@ fn item_owned<'a, V>(item_ref: IterItemRef<'a, V>) -> IterItem<V> {
 }
 
 #[macro_export]
+macro_rules! rewrap_iter {
+    ($it:expr) => {
+        $it.collect::<Vec<_>>().into_iter()
+    };
+}
+
+#[macro_export]
 macro_rules! rewrap_fallible_iter {
     ($it:expr) => {
         fallible_iterator::convert($it.collect::<Vec<_>>()?.into_iter().map(Ok))

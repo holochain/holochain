@@ -52,7 +52,7 @@ fn test_buf(a: &BTreeMap<Vec<u8>, KvOp<V>>, b: impl Iterator<Item = (&'static st
 async fn kv_iterators() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let env = arc.guard();
     let db = env.inner().open_single("kv")?;
 
     {

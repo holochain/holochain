@@ -1,7 +1,8 @@
 //! Functionality for safely accessing LMDB database references.
 
-use crate::error::DatabaseResult;
-use crate::prelude::Writer;
+use crate::prelude::{Reader, Writer};
+use crate::rewrap_iter;
+use crate::{buffer::iter::SqlIter, error::DatabaseResult};
 use crate::{db::DbKind, prelude::Readable};
 use derive_more::Display;
 use rusqlite::{types::Value, *};
@@ -71,17 +72,23 @@ fn initialize_table(conn: &mut Connection, name: TableName) -> DatabaseResult<()
 
     // create table
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS ?1 (
+        &format!(
+            "CREATE TABLE IF NOT EXISTS {} (
             key       BLOB PRIMARY KEY,
             val       BLOB NOT NULL
         );",
-        &[table_name.clone()],
+            table_name
+        ),
+        NO_PARAMS,
     )?;
 
     // create index
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS ?1 ON ?2 ( key );",
-        &[index_name, table_name],
+        &format!(
+            "CREATE INDEX IF NOT EXISTS {} ON {} ( key );",
+            index_name, table_name
+        ),
+        NO_PARAMS,
     )?;
     Ok(())
 }
@@ -210,35 +217,27 @@ impl Table {
         todo!()
     }
 
+    pub fn iter_start<R: Readable>(&self, reader: &mut R) -> DatabaseResult<SqlIter> {
+        reader.iter_start(self)
+    }
+
+    pub fn iter_end<R: Readable>(&self, reader: &mut R) -> DatabaseResult<SqlIter> {
+        reader.iter_end(self)
+    }
+
+    pub fn iter_from<R: Readable, K: ToSql>(
+        &self,
+        reader: &mut R,
+        k: &K,
+    ) -> DatabaseResult<SqlIter> {
+        reader.iter_from(self, k)
+    }
+
     #[cfg(feature = "test_utils")]
     pub fn clear(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         todo!()
     }
 }
-
-// TODO: probably remove
-// /// Macros to produce `impl Iterator` over a table's keys and values.
-// /// A macro is necessary to reduce boilerplate, since rusqlite's interface
-// /// requires preparing a statement and querying it in separate steps.
-// /// A normal function can't work with these intermediate values because the
-// /// borrow checker complains about dropped values
-// #[macro_export]
-// macro_rules! table_iter {
-//     (+ $table:ident) => {
-//         let stmt = txn.prepare_cached("SELECT (key, val) FROM ?1 ASC")?;
-//         stmt.query_map(params![table.name], |row| Ok((row.get(0)?, row.get(1)?)))?
-//     };
-//     (- $table:ident) => {
-//         let stmt = txn.prepare_cached("SELECT (key, val) FROM ?1 DESC")?;
-//         stmt.query_map(params![table.name], |row| Ok((row.get(0)?, row.get(1)?)))?
-//     };
-//     (+ $table:ident, $key:ident) => {
-//         let stmt = txn.prepare_cached("SELECT (key, val) FROM ?1 WHERE key >= ?2 ASC")?;
-//         stmt.query_map(params![table.name, $key], |row| {
-//             Ok((row.get(0)?, row.get(1)?))
-//         })?
-//     };
-// }
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {

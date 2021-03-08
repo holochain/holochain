@@ -5,7 +5,8 @@
 //! - We can upgrade some error types from rkv::StoreError, which does not implement
 //!     std::error::Error, into error types that do
 
-use crate::{error::DatabaseError, prelude::DatabaseResult, table::Table};
+use crate::rewrap_iter;
+use crate::{buffer::iter::SqlIter, error::DatabaseError, prelude::DatabaseResult, table::Table};
 use chrono::offset::Local;
 use chrono::DateTime;
 use derive_more::From;
@@ -16,6 +17,12 @@ use shrinkwraprs::Shrinkwrap;
 #[deprecated = "no need for read/write distinction with SQLite"]
 pub trait Readable {
     fn get<K: AsRef<[u8]>>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>>;
+
+    fn iter_start(&mut self, table: &Table) -> DatabaseResult<SqlIter>;
+
+    fn iter_end(&mut self, table: &Table) -> DatabaseResult<SqlIter>;
+
+    fn iter_from<K: ToSql>(&mut self, table: &Table, k: &K) -> DatabaseResult<SqlIter>;
 }
 
 struct ReaderSpanInfo {
@@ -47,7 +54,7 @@ fn get_kv<K: AsRef<[u8]>>(
     table: &Table,
     k: K,
 ) -> DatabaseResult<Option<Value>> {
-    let mut stmt = txn.prepare_cached("SELECT (key, val) FROM ?1 WHERE key = ?2")?;
+    let mut stmt = txn.prepare_cached("SELECT key, val FROM ?1 WHERE key = ?2")?;
     Ok(stmt
         .query_row(params![&table.name(), k.as_ref()], |row| {
             // TODO: ideally we could call get_raw_unchecked to get a Value
@@ -74,11 +81,49 @@ unsafe impl<'env> Send for Reader<'env> {}
 #[cfg(feature = "lmdb_no_tls")]
 unsafe impl<'env> Sync for Reader<'env> {}
 
-impl<'env> Readable for Reader<'env> {
-    fn get<K: AsRef<[u8]>>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
-        get_kv(&mut self.0, table, k)
-    }
+macro_rules! impl_readable {
+    ($t:ident) => {
+        impl<'env> Readable for $t<'env> {
+            fn get<K: AsRef<[u8]>>(
+                &mut self,
+                table: &Table,
+                k: K,
+            ) -> DatabaseResult<Option<Value>> {
+                get_kv(&mut self.0, table, k)
+            }
+
+            fn iter_start(&mut self, table: &Table) -> DatabaseResult<SqlIter> {
+                Ok(Box::new(rewrap_iter!(self
+                    .0
+                    .prepare_cached("SELECT key, val FROM ?1 ORDER BY key ASC")?
+                    .query_map(params![&table.name()], |row| {
+                        Ok((row.get(0)?, Some(row.get(1)?)))
+                    })?)))
+            }
+
+            fn iter_end(&mut self, table: &Table) -> DatabaseResult<SqlIter> {
+                Ok(Box::new(rewrap_iter!(self
+                    .0
+                    .prepare_cached("SELECT key, val FROM ?1 ORDER BY key DESC")?
+                    .query_map(params![&table.name()], |row| {
+                        Ok((row.get(0)?, Some(row.get(1)?)))
+                    })?)))
+            }
+
+            fn iter_from<K: ToSql>(&mut self, table: &Table, k: &K) -> DatabaseResult<SqlIter> {
+                Ok(Box::new(rewrap_iter!(self
+                    .0
+                    .prepare_cached("SELECT key, val FROM ?1 WHERE key >= ?2 ORDER BY key ASC")?
+                    .query_map(params![&table.name(), k], |row| {
+                        Ok((row.get(0)?, Some(row.get(1)?)))
+                    })?)))
+            }
+        }
+    };
 }
+
+impl_readable!(Reader);
+impl_readable!(Writer);
 
 impl<'env> From<Transaction<'env>> for Reader<'env> {
     fn from(r: Transaction<'env>) -> Self {
@@ -91,12 +136,6 @@ impl<'env> From<Transaction<'env>> for Reader<'env> {
 #[derive(From, Shrinkwrap)]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
 pub struct Writer<'env>(Transaction<'env>);
-
-impl<'env> Readable for Writer<'env> {
-    fn get<K: AsRef<[u8]>>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
-        get_kv(&mut self.0, table, k)
-    }
-}
 
 impl<'env> Writer<'env> {
     /// This override exists solely to raise the Error from the rkv::StoreError,
