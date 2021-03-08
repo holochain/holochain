@@ -52,7 +52,7 @@ codegen-units = 16
 rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
 lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
-holochain_wasmer_common = { path = "../holochain-wasmer/crates/common" }
+# holochain_wasmer_common = { path = "../holochain-wasmer/crates/common" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
 # holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
