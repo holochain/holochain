@@ -338,7 +338,7 @@ impl<'e> WriteManager<'e> for Conn<'e> {
         let txn = self.conn.transaction().map_err(DatabaseError::from)?;
         let mut writer = Writer::from(txn);
         let result = f(&mut writer)?;
-        writer.commit()?;
+        writer.commit().map_err(DatabaseError::from)?;
         Ok(result)
     }
 

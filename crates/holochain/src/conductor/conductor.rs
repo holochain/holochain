@@ -67,7 +67,6 @@ use holochain_sqlite::db::ReadManager;
 use holochain_sqlite::exports::SingleTable;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
-use holochain_sqlite::prelude::*;
 use holochain_state::source_chain::SourceChainBuf;
 use holochain_state::wasm::WasmBuf;
 use holochain_types::prelude::*;

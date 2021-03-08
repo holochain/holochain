@@ -123,15 +123,15 @@ pub mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn genesis_initializes_source_chain() -> Result<(), anyhow::Error> {
-        observability::test_run()?;
+    async fn genesis_initializes_source_chain() {
+        observability::test_run().unwrap();
         let test_env = test_cell_env();
         let arc = test_env.env();
         let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
         {
-            let workspace = GenesisWorkspace::new(arc.clone().into()).await?;
+            let workspace = GenesisWorkspace::new(arc.clone().into()).await.unwrap();
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
@@ -140,12 +140,14 @@ pub mod tests {
                 agent_pubkey: agent_pubkey.clone(),
                 membrane_proof: None,
             };
-            let _: () = genesis_workflow(workspace, arc.clone().into(), api, args).await?;
+            let _: () = genesis_workflow(workspace, arc.clone().into(), api, args)
+                .await
+                .unwrap();
         }
 
         {
-            let source_chain = SourceChain::new(arc.clone().into())?;
-            assert_eq!(source_chain.agent_pubkey()?, agent_pubkey);
+            let source_chain = SourceChain::new(arc.clone().into()).unwrap();
+            assert_eq!(source_chain.agent_pubkey().unwrap(), agent_pubkey);
             source_chain.chain_head().expect("chain head should be set");
 
             let mut iter = source_chain.iter_back();
@@ -162,8 +164,6 @@ pub mod tests {
                 [Header::Create(_), Header::AgentValidationPkg(_), Header::Dna(_)]
             );
         }
-
-        Ok(())
     }
 }
 

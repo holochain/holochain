@@ -177,7 +177,7 @@ impl Table {
 
     /// This handles the fact that getting from an rkv::MultiTable returns
     /// multiple results
-    #[deprecated = "unneeded in the context of SQL"]
+    #[deprecated = "unneeded in the context of SQL?"]
     pub fn get_m<R: Readable, K: ToSql>(
         &self,
         reader: &mut R,
@@ -187,8 +187,8 @@ impl Table {
         Ok(std::iter::empty())
     }
 
-    pub fn put<K: ToSql>(&self, writer: &mut Writer, k: K, v: &Value) -> DatabaseResult<()> {
-        todo!()
+    pub fn put<K: ToSql>(&self, writer: &mut Writer, k: &K, v: &Value) -> DatabaseResult<()> {
+        crate::transaction::put_kv(writer, self, k, v)
     }
 
     #[deprecated = "unneeded in the context of SQL"]

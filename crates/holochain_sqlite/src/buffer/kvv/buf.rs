@@ -270,7 +270,7 @@ where
                                     // }
                                 })?;
                         } else {
-                            self.table.put(writer, k.clone(), &encoded)?;
+                            self.table.put(writer, &k, &encoded)?;
                         }
                     }
                     // Skip deleting unnecessarily if we have already deleted

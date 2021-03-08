@@ -45,7 +45,7 @@ where
     fn put(&self, writer: &mut Writer, k: &K, v: &V) -> DatabaseResult<()> {
         let buf = holochain_serialized_bytes::encode(v)?;
         let encoded = rusqlite::types::Value::Blob(buf);
-        self.table.put(writer, k.as_ref(), &encoded)?;
+        self.table.put(writer, k, &encoded)?;
         Ok(())
     }
 

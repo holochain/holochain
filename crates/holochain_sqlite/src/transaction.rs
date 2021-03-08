@@ -54,9 +54,12 @@ fn get_kv<K: AsRef<[u8]>>(
     table: &Table,
     k: K,
 ) -> DatabaseResult<Option<Value>> {
-    let mut stmt = txn.prepare_cached("SELECT key, val FROM ?1 WHERE key = ?2")?;
+    let mut stmt = txn.prepare_cached(&format!(
+        "SELECT key, val FROM {} WHERE key = ?1",
+        table.name()
+    ))?;
     Ok(stmt
-        .query_row(params![&table.name(), k.as_ref()], |row| {
+        .query_row(params![k.as_ref()], |row| {
             // TODO: ideally we could call get_raw_unchecked to get a Value
             // and avoid cloning, but it's hard to figure out how to line up the
             // lifetime of the row with the lifetime of the transaction, or if
@@ -65,6 +68,20 @@ fn get_kv<K: AsRef<[u8]>>(
             row.get(1)
         })
         .optional()?)
+}
+
+pub(crate) fn put_kv<K: ToSql, V: ToSql>(
+    txn: &mut Transaction,
+    table: &Table,
+    k: &K,
+    v: &V,
+) -> DatabaseResult<()> {
+    let mut stmt = txn.prepare_cached(&format!(
+        "INSERT INTO {} (key, val) VALUES (?1, ?2)",
+        table.name()
+    ))?;
+    let _ = stmt.execute(params![k, v])?;
+    Ok(())
 }
 
 /// Wrapper around `rkv::Reader`, so it can be marked as threadsafe
@@ -81,49 +98,51 @@ unsafe impl<'env> Send for Reader<'env> {}
 #[cfg(feature = "lmdb_no_tls")]
 unsafe impl<'env> Sync for Reader<'env> {}
 
-macro_rules! impl_readable {
-    ($t:ident) => {
-        impl<'env> Readable for $t<'env> {
-            fn get<K: AsRef<[u8]>>(
-                &mut self,
-                table: &Table,
-                k: K,
-            ) -> DatabaseResult<Option<Value>> {
-                get_kv(&mut self.0, table, k)
-            }
+impl<'env> Readable for Reader<'env> {
+    fn get<K: AsRef<[u8]>>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
+        get_kv(&mut self.0, table, k)
+    }
 
-            fn iter_start(&mut self, table: &Table) -> DatabaseResult<SqlIter> {
-                Ok(Box::new(rewrap_iter!(self
-                    .0
-                    .prepare_cached("SELECT key, val FROM ?1 ORDER BY key ASC")?
-                    .query_map(params![&table.name()], |row| {
-                        Ok((row.get(0)?, Some(row.get(1)?)))
-                    })?)))
-            }
+    fn iter_start(&mut self, table: &Table) -> DatabaseResult<SqlIter> {
+        Ok(Box::new(rewrap_iter!(&mut self
+            .0
+            .prepare_cached(&format!(
+                "SELECT key, val FROM {} ORDER BY key ASC",
+                table.name()
+            ))?
+            .query_map(NO_PARAMS, |row| {
+                Ok((row.get(0)?, Some(row.get(1)?)))
+            })?)))
+    }
 
-            fn iter_end(&mut self, table: &Table) -> DatabaseResult<SqlIter> {
-                Ok(Box::new(rewrap_iter!(self
-                    .0
-                    .prepare_cached("SELECT key, val FROM ?1 ORDER BY key DESC")?
-                    .query_map(params![&table.name()], |row| {
-                        Ok((row.get(0)?, Some(row.get(1)?)))
-                    })?)))
-            }
+    fn iter_end(&mut self, table: &Table) -> DatabaseResult<SqlIter> {
+        Ok(Box::new(rewrap_iter!(&mut self
+            .0
+            .prepare_cached(&format!(
+                "SELECT key, val FROM {} ORDER BY key DESC",
+                table.name()
+            ))?
+            .query_map(NO_PARAMS, |row| {
+                Ok((row.get(0)?, Some(row.get(1)?)))
+            })?)))
+    }
 
-            fn iter_from<K: ToSql>(&mut self, table: &Table, k: &K) -> DatabaseResult<SqlIter> {
-                Ok(Box::new(rewrap_iter!(self
-                    .0
-                    .prepare_cached("SELECT key, val FROM ?1 WHERE key >= ?2 ORDER BY key ASC")?
-                    .query_map(params![&table.name(), k], |row| {
-                        Ok((row.get(0)?, Some(row.get(1)?)))
-                    })?)))
-            }
-        }
-    };
+    fn iter_from<K: ToSql>(&mut self, table: &Table, k: &K) -> DatabaseResult<SqlIter> {
+        Ok(Box::new(rewrap_iter!(&mut self
+            .0
+            .prepare_cached(&format!(
+                "SELECT key, val FROM {} WHERE key >= ?1 ORDER BY key ASC",
+                table.name()
+            ))?
+            .query_map(params![k], |row| {
+                Ok((row.get(0)?, Some(row.get(1)?)))
+            })?)))
+    }
 }
 
-impl_readable!(Reader);
-impl_readable!(Writer);
+pub fn get_0<'t>(reader: &'t mut Reader<'t>) -> &'t mut Transaction<'t> {
+    &mut reader.0
+}
 
 impl<'env> From<Transaction<'env>> for Reader<'env> {
     fn from(r: Transaction<'env>) -> Self {
@@ -131,16 +150,45 @@ impl<'env> From<Transaction<'env>> for Reader<'env> {
     }
 }
 
-/// Wrapper around `rkv::Writer`, which lifts some of the return values to types recognized by this crate,
-/// rather than the rkv-specific values
-#[derive(From, Shrinkwrap)]
-#[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct Writer<'env>(Transaction<'env>);
+pub type Writer<'t> = Transaction<'t>;
 
-impl<'env> Writer<'env> {
-    /// This override exists solely to raise the Error from the rkv::StoreError,
-    /// which does not implement std::error::Error, into a DatabaseError, which does.
-    pub fn commit(self) -> Result<(), DatabaseError> {
-        todo!("sqlite")
+// XXX: this is copy-pasted from the Reader impl because I couldn't find an easy
+// way to abstract the `self` vs `self.0` difference between the two
+impl<'env> Readable for Writer<'env> {
+    fn get<K: AsRef<[u8]>>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
+        get_kv(self, table, k)
+    }
+
+    fn iter_start(&mut self, table: &Table) -> DatabaseResult<SqlIter> {
+        Ok(Box::new(rewrap_iter!(self
+            .prepare_cached(&format!(
+                "SELECT key, val FROM {} ORDER BY key ASC",
+                table.name()
+            ))?
+            .query_map(NO_PARAMS, |row| {
+                Ok((row.get(0)?, Some(row.get(1)?)))
+            })?)))
+    }
+
+    fn iter_end(&mut self, table: &Table) -> DatabaseResult<SqlIter> {
+        Ok(Box::new(rewrap_iter!(self
+            .prepare_cached(&format!(
+                "SELECT key, val FROM {} ORDER BY key DESC",
+                table.name()
+            ))?
+            .query_map(NO_PARAMS, |row| {
+                Ok((row.get(0)?, Some(row.get(1)?)))
+            })?)))
+    }
+
+    fn iter_from<K: ToSql>(&mut self, table: &Table, k: &K) -> DatabaseResult<SqlIter> {
+        Ok(Box::new(rewrap_iter!(self
+            .prepare_cached(&format!(
+                "SELECT key, val FROM {} WHERE key >= ?1 ORDER BY key ASC",
+                table.name()
+            ))?
+            .query_map(params![k], |row| {
+                Ok((row.get(0)?, Some(row.get(1)?)))
+            })?)))
     }
 }

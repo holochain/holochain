@@ -72,7 +72,7 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 );
                 self.handle_app_request_inner(AppRequest::ZomeCall(call))
                     .await
-                    .map(|mut r| {
+                    .map(|r| {
                         match r {
                             // if successful, re-wrap in the deprecated response type
                             AppResponse::ZomeCall(zc) => AppResponse::ZomeCallInvocation(zc),

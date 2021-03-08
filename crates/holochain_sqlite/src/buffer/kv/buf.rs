@@ -374,17 +374,14 @@ where
                     let encoded = rusqlite::types::Value::Blob(buf);
                     self.store.table().put(
                         writer,
-                        IntKey::from_key_bytes_or_friendly_panic(&k).as_ref(),
+                        &IntKey::from_key_bytes_or_friendly_panic(&k),
                         &encoded,
                     )?;
                 }
                 Delete => self
                     .store
                     .table()
-                    .delete(
-                        writer,
-                        IntKey::from_key_bytes_or_friendly_panic(&k).as_ref(),
-                    )
+                    .delete(writer, &IntKey::from_key_bytes_or_friendly_panic(&k))
                     .or_else(DatabaseError::ok_if_not_found)?,
             }
         }

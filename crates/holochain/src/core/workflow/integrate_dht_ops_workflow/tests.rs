@@ -1298,8 +1298,6 @@ mod slow_tests {
     use holo_hash::EntryHash;
     use holochain_serialized_bytes::SerializedBytes;
     use holochain_sqlite::db::ReadManager;
-    use holochain_sqlite::prelude::*;
-    use holochain_sqlite::prelude::*;
     use holochain_state::prelude::*;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
