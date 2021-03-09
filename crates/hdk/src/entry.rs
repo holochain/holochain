@@ -24,8 +24,7 @@ pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
 pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-    HDK.read()
-        .update(UpdateInput::new(hash, entry_with_def_id))
+    HDK.read().update(UpdateInput::new(hash, entry_with_def_id))
 }
 
 /// General function that can delete any entry type.
