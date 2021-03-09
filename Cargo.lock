@@ -1806,6 +1806,7 @@ dependencies = [
  "assert_cmd",
  "chrono",
  "futures",
+ "holochain_cli_bundle",
  "holochain_conductor_api",
  "holochain_p2p",
  "holochain_types",

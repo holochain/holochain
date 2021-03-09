@@ -30,6 +30,27 @@ pub fn parse_dnas(mut dnas: Vec<PathBuf>) -> anyhow::Result<Vec<PathBuf>> {
     Ok(dnas)
 }
 
+/// Parse a happ bundle.
+/// If paths are directories then each directory
+/// will be searched for the first file that matches
+/// `*.dna`.
+pub fn parse_happ(happ: Option<PathBuf>) -> anyhow::Result<PathBuf> {
+    let mut happ = happ.unwrap_or(std::env::current_dir()?);
+    if happ.is_dir() {
+        let file_path = search_for_happ(&happ)?;
+        happ = file_path;
+    }
+    ensure!(
+        happ.file_name()
+            .map(|f| f.to_string_lossy().ends_with(".happ"))
+            .unwrap_or(false),
+        "File {} is not a valid dna file name: (e.g. my-happ.happ)",
+        happ.display()
+    );
+    Ok(happ)
+}
+
+// TODO: Look for multiple dnas
 fn search_for_dna(dna: &Path) -> anyhow::Result<PathBuf> {
     let dir: Vec<_> = WalkDir::new(dna)
         .max_depth(1)
@@ -46,4 +67,23 @@ fn search_for_dna(dna: &Path) -> anyhow::Result<PathBuf> {
         )
     }
     Ok(dir.into_iter().next().expect("Safe due to check above"))
+}
+
+fn search_for_happ(happ: &Path) -> anyhow::Result<PathBuf> {
+    let dir = WalkDir::new(happ)
+        .max_depth(1)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|d| d.file_type().is_file())
+        .find(|f| f.file_name().to_string_lossy().ends_with(".happ"))
+        .map(|f| f.into_path());
+    match dir {
+        Some(dir) => Ok(dir),
+        None => {
+            bail!(
+                "Could not find a DNA file (e.g. my-dna.dna) in directory {}",
+                happ.display()
+            )
+        }
+    }
 }

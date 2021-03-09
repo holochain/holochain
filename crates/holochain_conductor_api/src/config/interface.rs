@@ -26,3 +26,12 @@ pub enum InterfaceDriver {
         port: u16,
     },
 }
+
+impl InterfaceDriver {
+    /// Get the port for this driver.
+    pub fn port(&self) -> u16 {
+        match self {
+            InterfaceDriver::Websocket { port } => *port,
+        }
+    }
+}

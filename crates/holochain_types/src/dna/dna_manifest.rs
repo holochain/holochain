@@ -59,4 +59,11 @@ impl DnaManifest {
             DnaManifest::V1(manifest) => manifest.uuid.clone(),
         }
     }
+
+    /// Getter for name
+    pub fn name(&self) -> String {
+        match self {
+            DnaManifest::V1(manifest) => manifest.name.clone(),
+        }
+    }
 }
