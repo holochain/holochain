@@ -55,6 +55,12 @@ pub enum TableName {
     ValidationReceipts,
     /// Single store for all known agents on the network
     Agent,
+
+    #[cfg(feature = "test_utils")]
+    TestSingle(String),
+
+    #[cfg(feature = "test_utils")]
+    TestMulti(String),
 }
 
 impl TableName {
@@ -85,6 +91,10 @@ impl TableName {
             ValidationLimbo => Single,
             ValidationReceipts => Multi,
             Agent => Single,
+            #[cfg(feature = "test_utils")]
+            TestSingle(_) => Single,
+            #[cfg(feature = "test_utils")]
+            TestMulti(_) => Multi,
         }
     }
 }
@@ -120,7 +130,7 @@ impl TableKind {
     }
 }
 
-fn initialize_table_single(
+pub(crate) fn initialize_table_single(
     conn: &mut Connection,
     table_name: String,
     index_name: String,
@@ -148,7 +158,7 @@ fn initialize_table_single(
     Ok(())
 }
 
-fn initialize_table_multi(
+pub(crate) fn initialize_table_multi(
     conn: &mut Connection,
     table_name: String,
     index_name: String,
@@ -250,7 +260,7 @@ pub trait GetTable {
 #[deprecated = "lmdb: naive"]
 #[derive(Clone, Debug)]
 pub struct Table {
-    name: TableName,
+    pub(crate) name: TableName,
 }
 
 impl Table {
@@ -328,27 +338,8 @@ impl Table {
 
     #[cfg(feature = "test_utils")]
     pub fn clear(&mut self, txn: &mut Writer) -> DatabaseResult<()> {
-        todo!()
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum StoreError {
-    #[error(transparent)]
-    SqlError(#[from] rusqlite::Error),
-}
-
-pub type StoreResult<T> = Result<T, StoreError>;
-
-impl StoreError {
-    pub fn ok_if_not_found(self) -> StoreResult<()> {
-        todo!("implement for rusqlite errors")
-        // match self {
-        //     StoreError::LmdbStoreError(err) => match err.into_inner() {
-        //         rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => Ok(()),
-        //         err => Err(err.into()),
-        //     },
-        //     err => Err(err),
-        // }
+        let mut stmt = txn.prepare_cached(&format!("DELETE FROM {}", self.name()))?;
+        let _ = stmt.execute(NO_PARAMS)?;
+        Ok(())
     }
 }

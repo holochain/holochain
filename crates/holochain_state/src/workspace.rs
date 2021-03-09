@@ -47,9 +47,6 @@ pub mod tests {
     use holochain_sqlite::buffer::BufferedStore;
     use holochain_sqlite::buffer::KvBufFresh;
     use holochain_sqlite::prelude::*;
-    use holochain_sqlite::prelude::*;
-    use holochain_sqlite::prelude::*;
-    use holochain_sqlite::prelude::*;
     use holochain_sqlite::test_utils::test_cell_env;
     use holochain_sqlite::test_utils::DbString;
     use holochain_types::prelude::*;

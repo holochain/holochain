@@ -52,8 +52,8 @@ fn test_buf(a: &BTreeMap<Vec<u8>, KvOp<V>>, b: impl Iterator<Item = (&'static st
 async fn kv_iterators() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard();
-    let db = env.inner().open_single("kv")?;
+    let mut env = arc.guard();
+    let db = env.open_single("kv")?;
 
     {
         let mut buf = Store::new(db.clone());
@@ -96,8 +96,8 @@ async fn kv_iterators() -> DatabaseResult<()> {
 async fn kv_empty_iterators() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard();
-    let db = env.inner().open_single("kv").unwrap();
+    let mut env = arc.guard();
+    let db = env.open_single("kv").unwrap();
 
     arc.guard().with_reader(|mut reader| {
         let buf = Store::new(db.clone());
@@ -122,9 +122,9 @@ async fn kv_empty_iterators() -> DatabaseResult<()> {
 async fn kv_store_sanity_check() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard();
-    let db1 = env.inner().open_single("kv1")?;
-    let db2 = env.inner().open_single("kv1")?;
+    let mut env = arc.guard();
+    let db1 = env.open_single("kv1")?;
+    let db2 = env.open_single("kv1")?;
 
     let testval = TestVal { name: "Joe".into() };
 
@@ -163,8 +163,8 @@ async fn kv_indicate_value_overwritten() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard();
-    let db = env.inner().open_single("kv")?;
+    let mut env = arc.guard();
+    let db = env.open_single("kv")?;
     arc.guard().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
 
@@ -182,8 +182,8 @@ fn kv_deleted_persisted() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard();
-    let db = env.inner().open_single("kv")?;
+    let mut env = arc.guard();
+    let db = env.open_single("kv")?;
 
     arc.guard().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
@@ -226,8 +226,8 @@ async fn kv_deleted_buffer() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard();
-    let db = env.inner().open_single("kv")?;
+    let mut env = arc.guard();
+    let db = env.open_single("kv")?;
 
     {
         let mut buf = Store::new(db.clone());
@@ -266,8 +266,8 @@ async fn kv_get_buffer() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard();
-    let db = env.inner().open_single("kv")?;
+    let mut env = arc.guard();
+    let db = env.open_single("kv")?;
 
     arc.guard().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
@@ -287,8 +287,8 @@ async fn kv_get_persisted() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard();
-    let db = env.inner().open_single("kv")?;
+    let mut env = arc.guard();
+    let db = env.open_single("kv")?;
 
     {
         let mut buf = Store::new(db.clone());
@@ -316,8 +316,8 @@ async fn kv_get_del_buffer() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard();
-    let db = env.inner().open_single("kv")?;
+    let mut env = arc.guard();
+    let db = env.open_single("kv")?;
 
     arc.guard().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
@@ -338,8 +338,8 @@ async fn kv_get_del_persisted() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard();
-    let db = env.inner().open_single("kv")?;
+    let mut env = arc.guard();
+    let db = env.open_single("kv")?;
 
     {
         let mut buf = Store::new(db.clone());

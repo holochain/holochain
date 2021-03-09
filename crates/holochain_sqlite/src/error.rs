@@ -3,7 +3,6 @@
 // missing_docs allowed here since the errors already have self-descriptive strings
 #![allow(missing_docs)]
 
-use crate::prelude::*;
 use crate::table::TableName;
 use holochain_serialized_bytes::SerializedBytesError;
 use std::path::PathBuf;
@@ -30,9 +29,6 @@ pub enum DatabaseError {
         "Attempted to access a private entry in a context where no private database is specified: {0}"
     )]
     NoPrivateDb(String),
-
-    #[error(transparent)]
-    ShimStoreError(#[from] StoreError),
 
     #[error("Error encoding to MsgPack: {0}")]
     MsgPackEncodeError(#[from] rmp_serde::encode::Error),
@@ -76,7 +72,7 @@ impl DatabaseError {
         todo!("implement for rusqlite errors")
         // match self {
         //     DatabaseError::LmdbStoreError(err) => match err.into_inner() {
-        //         rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => Ok(()),
+        //         rkv::TableError::LmdbError(rkv::LmdbError::NotFound) => Ok(()),
         //         err => Err(err.into()),
         //     },
         //     err => Err(err),

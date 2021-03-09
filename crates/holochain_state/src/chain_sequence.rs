@@ -17,8 +17,6 @@ use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
-use holochain_sqlite::prelude::*;
-use holochain_sqlite::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use tracing::*;

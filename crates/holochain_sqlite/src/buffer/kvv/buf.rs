@@ -245,30 +245,12 @@ where
                         let buf = holochain_serialized_bytes::encode(&v)?;
                         let encoded = rusqlite::types::Value::Blob(buf);
                         if self.no_dup_data {
-                            self.table
-                                .put_with_flags(
-                                    writer,
-                                    &k,
-                                    &encoded,
-                                    (), //rkv::WriteFlags::NO_DUP_DATA,
-                                )
-                                .or_else(|err| {
-                                    todo!(
-                                        "remove this, should be unnecessary in the context of SQL"
-                                    );
-                                    StoreResult::Ok(())
-                                    // // This error is a little misleading...
-                                    // // In a MultiTable with NO_DUP_DATA, it is
-                                    // // actually returned if there is a duplicate
-                                    // // value... which we want to ignore.
-                                    // if let rkv::StoreError::LmdbError(rkv::LmdbError::KeyExist) =
-                                    //     err
-                                    // {
-                                    //     Ok(())
-                                    // } else {
-                                    //     Err(err)
-                                    // }
-                                })?;
+                            self.table.put_with_flags(
+                                writer,
+                                &k,
+                                &encoded,
+                                (), //rkv::WriteFlags::NO_DUP_DATA,
+                            )?;
                         } else {
                             self.table.put(writer, &k, &encoded)?;
                         }

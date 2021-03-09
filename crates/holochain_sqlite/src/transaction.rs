@@ -1,10 +1,3 @@
-//! This module is just wrappers around the rkv transaction representations.
-//! They are necessary/useful for a few reasons:
-//! - Reader is not marked Send + Sync in rkv, but we must mark it such to make
-//!     use of the threadsafe read-only transactions provided by the MDB_NOTLS flag
-//! - We can upgrade some error types from rkv::StoreError, which does not implement
-//!     std::error::Error, into error types that do
-
 use crate::rewrap_iter;
 use crate::{buffer::iter::SqlIter, prelude::DatabaseResult, table::Table};
 use chrono::offset::Local;

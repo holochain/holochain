@@ -12,8 +12,8 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db1 = env.inner().open_single("kv1")?;
-    let db2 = env.inner().open_single("kv1")?;
+    let db1 = env.open_single("kv1")?;
+    let db2 = env.open_single("kv1")?;
 
     let testval = DbString::from("Joe");
 
@@ -100,7 +100,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 //     let test_env = test_cell_env();
 //     let arc = test_env.env();
 //     let mut env = arc.guard();
-//     let db = env.inner().open_single("kv")?;
+//     let db = env.open_single("kv")?;
 
 //     arc.guard().with_reader::<DatabaseError, _, _>(|mut reader| {
 //         let mut buf: TestBuf = KvBufUsed::new)?;

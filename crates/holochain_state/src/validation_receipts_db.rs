@@ -154,7 +154,6 @@ mod tests {
     use super::*;
     use holochain_keystore::KeystoreSenderExt;
     use holochain_sqlite::db::ReadManager;
-    use holochain_sqlite::prelude::*;
     use holochain_types::test_utils::fake_dht_op_hash;
 
     async fn fake_vr(

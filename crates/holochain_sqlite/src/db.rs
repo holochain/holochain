@@ -52,7 +52,7 @@ pub struct DbRead {
 }
 
 impl DbRead {
-    #[deprecated = "remove this identity function"]
+    #[deprecated = "rename to `conn`"]
     pub fn guard(&self) -> Conn<'_> {
         self.connection_naive().expect("TODO: Can't fail")
     }
@@ -82,9 +82,12 @@ impl DbRead {
         Ok(Conn::new(&self.path, &self.kind)?)
     }
 
-    fn connection(&self) -> DatabaseResult<Conn> {
-        todo!("use thread-local")
-    }
+    // fn connection(&self) -> DatabaseResult<Conn> {
+    //     CONNECTIONS.with(|conns| {
+
+    //         conns.borrow_mut().get_mut(k)
+    //     });
+    // }
 }
 
 impl GetTable for DbRead {}
@@ -194,9 +197,30 @@ impl<'e> Conn<'e> {
         self.conn
     }
 
-    #[deprecated = "Shim for `Rkv`, just because we have methods that call these"]
-    pub fn inner(&self) -> ConnInner {
-        ConnInner
+    #[deprecated = "remove this identity"]
+    pub fn inner(&mut self) -> &mut Self {
+        self
+    }
+
+    #[cfg(feature = "test_utils")]
+    pub fn open_single(&mut self, name: &str) -> Result<SingleTable, DatabaseError> {
+        crate::table::initialize_table_single(&mut self.conn, name.to_string(), name.to_string())?;
+        Ok(Table {
+            name: TableName::TestSingle(name.to_string()),
+        })
+    }
+
+    #[cfg(feature = "test_utils")]
+    pub fn open_integer(&mut self, name: &str) -> Result<IntegerTable, DatabaseError> {
+        self.open_single(name)
+    }
+
+    #[cfg(feature = "test_utils")]
+    pub fn open_multi(&mut self, name: &str) -> Result<MultiTable, DatabaseError> {
+        crate::table::initialize_table_multi(&mut self.conn, name.to_string(), name.to_string())?;
+        Ok(Table {
+            name: TableName::TestMulti(name.to_string()),
+        })
     }
 }
 
@@ -211,31 +235,7 @@ fn get_encryption_key_shim() -> [u8; 32] {
 #[deprecated = "Shim for `Rkv`, just because we have methods that call these"]
 pub struct ConnInner;
 
-impl ConnInner {
-    /// SHIM
-    pub fn open_single<'s, T>(&self, name: T) -> Result<SingleTable, StoreError>
-    where
-        T: Into<Option<&'s str>>,
-    {
-        todo!("this is a shim")
-    }
-
-    /// SHIM
-    pub fn open_integer<'s, T>(&self, name: T) -> Result<IntegerTable, StoreError>
-    where
-        T: Into<Option<&'s str>>,
-    {
-        todo!("this is a shim")
-    }
-
-    /// SHIM
-    pub fn open_multi<'s, T>(&self, name: T) -> Result<MultiTable, StoreError>
-    where
-        T: Into<Option<&'s str>>,
-    {
-        todo!("this is a shim")
-    }
-}
+impl ConnInner {}
 
 /// The various types of LMDB environment, used to specify the list of databases to initialize
 #[derive(Clone)]
@@ -295,7 +295,7 @@ pub trait WriteManager<'e> {
 impl<'e> ReadManager<'e> for Conn<'e> {
     fn reader(&'e mut self) -> DatabaseResult<Reader<'e>> {
         let txn = self.conn.transaction()?;
-        let mut reader = Reader::from(txn);
+        let reader = Reader::from(txn);
         Ok(reader)
     }
 

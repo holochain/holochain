@@ -339,7 +339,7 @@ where
     }
 
     fn next_inner(
-        item: Option<Result<InnerItem, StoreError>>,
+        item: Option<Result<InnerItem, DatabaseError>>,
     ) -> Result<Option<IterItem<V>>, IterError> {
         match item {
             Some(Ok((k, Some(rusqlite::types::Value::Blob(buf))))) => Ok(Some((
@@ -369,7 +369,10 @@ where
     type Item = IterItem<V>;
 
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        let n = self.iter_front.next().map(|o| o.map_err(StoreError::from));
+        let n = self
+            .iter_front
+            .next()
+            .map(|o| o.map_err(DatabaseError::from));
         let r = Self::next_inner(n);
         if let Ok(Some((k, _))) = &r {
             // FIXME: probably unnecessary clone
@@ -388,7 +391,10 @@ where
     V: BufVal,
 {
     fn next_back(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        let n = self.iter_back.next().map(|o| o.map_err(StoreError::from));
+        let n = self
+            .iter_back
+            .next()
+            .map(|o| o.map_err(DatabaseError::from));
         let r = Self::next_inner(n);
         if let Ok(Some((k_back, _))) = &r {
             // FIXME: probably unnecessary clone
