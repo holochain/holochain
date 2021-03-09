@@ -234,7 +234,7 @@ where
             // If delete_all is set, that we should delete everything persisted,
             // but then continue to add inserts from the ops, if present
             if *delete_all {
-                self.table.delete_all(writer, k.clone())?;
+                self.table.delete_all(writer, &k)?;
             }
             trace!(?k);
             trace!(?deltas);
@@ -280,7 +280,7 @@ where
                         let buf = holochain_serialized_bytes::encode(&v)?;
                         let encoded = rusqlite::types::Value::Blob(buf);
                         self.table
-                            .delete_m(writer, k.clone(), &encoded)
+                            .delete_kv(writer, &k, &encoded)
                             .or_else(DatabaseError::ok_if_not_found)?;
                     }
                 }

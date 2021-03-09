@@ -1,13 +1,10 @@
 //! Functionality for safely accessing LMDB database references.
 
-use crate::prelude::Writer;
+use crate::prelude::*;
 use crate::{buffer::iter::SqlIter, error::DatabaseResult};
 use crate::{db::DbKind, prelude::Readable};
 use derive_more::Display;
-use rusqlite::{
-    types::{FromSql, Value},
-    *,
-};
+use rusqlite::{types::Value, *};
 
 /// Enumeration of all databases needed by Holochain
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Display)]
@@ -301,19 +298,16 @@ impl Table {
         crate::transaction::put_kv(txn, self, k, v)
     }
 
-    pub fn delete<K: ToSql>(&self, txn: &mut Writer, k: K) -> DatabaseResult<()> {
-        todo!()
+    pub fn delete<K: ToSql>(&self, txn: &mut Writer, k: &K) -> DatabaseResult<()> {
+        delete_k(txn, self, k)
     }
 
-    pub fn delete_all<K: ToSql>(&self, txn: &mut Writer, k: K) -> DatabaseResult<()> {
-        todo!()
+    pub fn delete_all<K: ToSql>(&self, txn: &mut Writer, k: &K) -> DatabaseResult<()> {
+        delete_multi(txn, self, k)
     }
 
-    /// This handles the fact that deleting from an rkv::MultiTable requires
-    /// passing the value to delete (deleting a particular kv pair)
-    #[deprecated = "unneeded in the context of SQL"]
-    pub fn delete_m<K: ToSql>(&self, txn: &mut Writer, k: K, v: &Value) -> DatabaseResult<()> {
-        todo!()
+    pub fn delete_kv<K: ToSql>(&self, txn: &mut Writer, k: &K, v: &Value) -> DatabaseResult<()> {
+        delete_kv(txn, self, k, v)
     }
 
     pub fn iter_start<R: Readable>(&self, reader: &mut R) -> DatabaseResult<SqlIter> {

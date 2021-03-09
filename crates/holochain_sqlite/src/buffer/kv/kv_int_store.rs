@@ -51,7 +51,7 @@ where
 
     /// Delete value from DB
     fn delete(&self, writer: &mut Writer, k: &K) -> DatabaseResult<()> {
-        Ok(self.table.delete(writer, k.as_ref())?)
+        Ok(self.table.delete(writer, k)?)
     }
 
     /// Iterate over the underlying persisted data

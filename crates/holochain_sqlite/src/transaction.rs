@@ -50,7 +50,7 @@ impl Drop for ReaderSpanInfo {
     }
 }
 
-fn get_kv<K: ToSql>(txn: &mut Transaction, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
+fn get_k<K: ToSql>(txn: &mut Transaction, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
     assert!(
         table.kind().is_single(),
         "table is not single: {}",
@@ -100,13 +100,54 @@ pub(crate) fn put_kv<K: ToSql, V: ToSql>(
     Ok(())
 }
 
+pub fn delete_k<K: ToSql>(txn: &mut Transaction, table: &Table, k: &K) -> DatabaseResult<()> {
+    assert!(
+        table.kind().is_single(),
+        "table is not single: {}",
+        table.name()
+    );
+    let mut stmt = txn.prepare_cached(&format!("DELETE FROM {} WHERE key = ?1", table.name()))?;
+    let _ = stmt.execute(params![k])?;
+    Ok(())
+}
+
+pub fn delete_kv<K: ToSql, V: ToSql>(
+    txn: &mut Transaction,
+    table: &Table,
+    k: &K,
+    v: &V,
+) -> DatabaseResult<()> {
+    assert!(
+        table.kind().is_multi(),
+        "table is not multi: {}",
+        table.name()
+    );
+    let mut stmt = txn.prepare_cached(&format!(
+        "DELETE FROM {} WHERE key = ?1 AND val = ?2",
+        table.name()
+    ))?;
+    let _ = stmt.execute(params![k, v])?;
+    Ok(())
+}
+
+pub fn delete_multi<K: ToSql>(txn: &mut Transaction, table: &Table, k: &K) -> DatabaseResult<()> {
+    assert!(
+        table.kind().is_multi(),
+        "table is not multi: {}",
+        table.name()
+    );
+    let mut stmt = txn.prepare_cached(&format!("DELETE FROM {} WHERE key = ?1", table.name()))?;
+    let _ = stmt.execute(params![k])?;
+    Ok(())
+}
+
 /// Wrapper around `rkv::Reader`, so it can be marked as threadsafe
 #[derive(Shrinkwrap)]
 pub struct Reader<'env>(#[shrinkwrap(main_field)] Transaction<'env>, ReaderSpanInfo);
 
 impl<'env> Readable for Reader<'env> {
     fn get<K: ToSql>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
-        get_kv(&mut self.0, table, k)
+        get_k(&mut self.0, table, k)
     }
 
     fn get_multi<K: ToSql>(&mut self, table: &Table, k: K) -> DatabaseResult<SqlIter> {
@@ -167,7 +208,7 @@ pub type Writer<'t> = Transaction<'t>;
 impl<'env> Readable for Writer<'env> {
     fn get<K: ToSql>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
         assert!(table.kind().is_single());
-        get_kv(self, table, k)
+        get_k(self, table, k)
     }
 
     fn get_multi<K: ToSql>(&mut self, table: &Table, k: K) -> DatabaseResult<SqlIter> {
