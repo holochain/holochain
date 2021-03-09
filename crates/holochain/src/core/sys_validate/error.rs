@@ -139,7 +139,7 @@ impl ValidationOutcome {
 pub enum PrevHeaderError {
     #[error("Root of source chain must be Dna")]
     InvalidRoot,
-    #[error("Previous header sequence number {1} is not {0} - 1")]
+    #[error("Previous header sequence number {1} != ({0} - 1)")]
     InvalidSeq(u32, u32),
     #[error("Previous header was missing from the metadata store")]
     MissingMeta(HeaderHash),

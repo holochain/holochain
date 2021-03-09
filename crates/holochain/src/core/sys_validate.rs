@@ -161,7 +161,7 @@ pub fn check_prev_timestamp(header: &Header, prev_header: &Header) -> SysValidat
     }
 }
 
-/// Check the previous header is one less then the current
+/// Check the previous header is one less than the current
 pub fn check_prev_seq(header: &Header, prev_header: &Header) -> SysValidationResult<()> {
     let header_seq = header.header_seq();
     let prev_seq = prev_header.header_seq();
