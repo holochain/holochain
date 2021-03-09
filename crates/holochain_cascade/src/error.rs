@@ -1,7 +1,7 @@
 use holo_hash::{AnyDhtHash, HeaderHash};
-use holochain_sqlite::error::DatabaseError;
 use holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::SerializedBytesError;
+use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
 use holochain_zome_types::header::conversions::WrongHeaderError;
