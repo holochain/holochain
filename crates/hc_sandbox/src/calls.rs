@@ -26,7 +26,6 @@ use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppBundlePayload};
 use holochain_types::prelude::{DnaHash, InstalledApp};
-use portpicker::is_free;
 use std::convert::TryFrom;
 
 use crate::cmds::Existing;
@@ -126,7 +125,7 @@ pub struct InstallApp {
     #[structopt(short, long, default_value = "test-app")]
     /// Sets the InstalledAppId.
     pub app_id: String,
-    #[structopt(short, long, parse(try_from_str = parse_agent_key))]
+    #[structopt(short = "i", long, parse(try_from_str = parse_agent_key))]
     /// If not set then a key will be generated.
     /// Agent key is Base64 (same format that is used in logs).
     /// e.g. `uhCAk71wNXTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF4b_o`
@@ -365,13 +364,7 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
 
 /// Calls [`AdminRequest::AddAdminInterfaces`] and adds another admin interface.
 pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyhow::Result<u16> {
-    let port = match args.port {
-        Some(port) => {
-            ensure!(is_free(port), "port {} is not free", port);
-            port
-        }
-        None => 0,
-    };
+    let port = args.port.unwrap_or(0);
     let resp = cmd
         .command(AdminRequest::AddAdminInterfaces(vec![
             AdminInterfaceConfig {
@@ -569,12 +562,10 @@ pub async fn deactivate_app(cmd: &mut CmdRunner, args: DeactivateApp) -> anyhow:
 
 /// Calls [`AdminRequest::AttachAppInterface`] and adds another app interface.
 pub async fn attach_app_interface(cmd: &mut CmdRunner, args: AddAppWs) -> anyhow::Result<u16> {
-    if let Some(port) = args.port {
-        ensure!(is_free(port), "port {} is not free", port);
-    }
     let resp = cmd
         .command(AdminRequest::AttachAppInterface { port: args.port })
         .await?;
+    tracing::debug!(?resp);
     match resp {
         AdminResponse::AppInterfaceAttached { port } => Ok(port),
         _ => Err(anyhow!(

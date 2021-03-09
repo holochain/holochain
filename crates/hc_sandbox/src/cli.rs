@@ -88,6 +88,8 @@ pub struct Run {
     /// Optionally specifies app interface ports to bind when running.
     /// This allows your UI to talk to the conductor.
     /// For example, `hc -p=0,9000,0` will create three app interfaces.
+    /// Important: Interfaces are persistent. If you add an interface
+    /// it will be there next time you run the conductor.
     #[structopt(short, long, value_delimiter = ",")]
     ports: Vec<u16>,
 

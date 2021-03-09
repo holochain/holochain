@@ -314,7 +314,7 @@ where
         port: u16,
         handle: ConductorHandle,
     ) -> ConductorResult<u16> {
-        // let interface_id: AppInterfaceId = format!("interface-{}", port).into();
+        tracing::debug!("Attaching interface {}", port);
         let interface_id = AppInterfaceId::new(port);
         let app_api = RealAppInterfaceApi::new(handle, interface_id.clone());
         // This receiver is thrown away because we can produce infinite new

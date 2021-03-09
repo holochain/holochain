@@ -118,7 +118,6 @@ zomes:
 
         // Ensure the bundle path was generated as expected
         assert!(bundle_path.is_file());
-        assert_eq!(bundle_path.parent(), dir.parent());
         assert_eq!(bundle_path, dir.parent().unwrap().join("test-dna.dna"));
 
         // Ensure we can resolve all files, including the local one
