@@ -57,7 +57,7 @@ pub async fn pack<M: Manifest>(
     let target_path = match target_path {
         Some(target_path) => {
             if target_path.is_dir() {
-                dir_to_bundle_path(&dir_path, name, M::bundle_extension())?
+                dir_to_bundle_path(&target_path, name, M::bundle_extension())?
             } else {
                 target_path
             }
@@ -118,14 +118,20 @@ zomes:
 
         // Ensure the bundle path was generated as expected
         assert!(bundle_path.is_file());
-        assert_eq!(bundle_path, dir.parent().unwrap().join("test-dna.dna"));
+        assert_eq!(bundle_path, dir.join("test_dna.dna"));
 
         // Ensure we can resolve all files, including the local one
         assert_eq!(bundle.resolve_all().await.unwrap().values().len(), 3);
 
         // Unpack without forcing, which will fail
         matches::assert_matches!(
-            unpack::<DnaManifest>("dna", &bundle_path, None, false).await,
+            unpack::<DnaManifest>(
+                "dna",
+                &bundle_path,
+                Some(bundle_path.parent().unwrap().to_path_buf()),
+                false
+            )
+            .await,
             Err(
                 HcBundleError::MrBundleError(
                     MrBundleError::UnpackingError(UnpackingError::DirectoryExists(_)),
@@ -133,14 +139,28 @@ zomes:
             )
         );
         // Now unpack with forcing to overwrite original directory
-        unpack::<DnaManifest>("dna", &bundle_path, None, true)
-            .await
-            .unwrap();
+        unpack::<DnaManifest>(
+            "dna",
+            &bundle_path,
+            Some(bundle_path.parent().unwrap().to_path_buf()),
+            true,
+        )
+        .await
+        .unwrap();
+
+        let (bundle_path, bundle) = pack::<DnaManifest>(
+            &dir,
+            Some(dbg!(dir.parent().unwrap().to_path_buf())),
+            "test_dna".to_string(),
+        )
+        .await
+        .unwrap();
+        dbg!(&bundle_path);
 
         // Now remove the directory altogether, unpack again, and check that
         // all of the same files are present
         std::fs::remove_dir_all(&dir).unwrap();
-        unpack::<DnaManifest>("dna", &bundle_path, None, false)
+        unpack::<DnaManifest>("dna", &bundle_path, Some(dir.to_owned()), false)
             .await
             .unwrap();
         assert!(dir.join("zome-1.wasm").is_file());

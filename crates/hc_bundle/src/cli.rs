@@ -30,7 +30,7 @@ pub enum HcDnaBundle {
     ///
     /// $ hc-dna pack ./some/directory/foo/`
     ///
-    /// will create file `./some/directory/foo.dna`
+    /// will create file `./some/directory/foo/foo.dna`
     Pack {
         /// The path to the unpacked directory containing a `dna.yaml` manifest
         path: std::path::PathBuf,
