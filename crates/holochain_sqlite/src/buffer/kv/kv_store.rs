@@ -4,7 +4,6 @@ use crate::buffer::iter::SingleIterRaw;
 use crate::error::DatabaseError;
 use crate::error::DatabaseResult;
 use crate::prelude::*;
-use fallible_iterator::FallibleIterator;
 use SingleTable;
 
 /// Wrapper around an rkv SingleTable which provides strongly typed values
@@ -60,11 +59,10 @@ where
 
     /// Iterate over the underlying persisted data
     fn iter<'env, R: Readable>(&self, reader: &'env mut R) -> DatabaseResult<SingleIterRaw<V>> {
-        todo!("lmdb iter")
-        // Ok(SingleIterRaw::new(
-        //     self.table.iter_start(reader)?,
-        //     self.table.iter_end(reader)?,
-        // ))
+        Ok(SingleIterRaw::new(
+            self.table.iter_start(reader)?,
+            self.table.iter_end(reader)?,
+        ))
     }
 
     /// Iterate from a key onwards
@@ -74,11 +72,10 @@ where
         k: K,
     ) -> DatabaseResult<SingleIterRaw<V>> {
         check_empty_key(&k)?;
-        todo!("lmdb iter")
-        // Ok(SingleIterRaw::new(
-        //     self.table.iter_from(reader, k)?,
-        //     self.table.iter_end(reader)?,
-        // ))
+        Ok(SingleIterRaw::new(
+            self.table.iter_from(reader, &k)?,
+            self.table.iter_end(reader)?,
+        ))
     }
 
     /// Iterate over the underlying persisted data in reverse
@@ -86,8 +83,7 @@ where
         &self,
         reader: &'env mut R,
     ) -> DatabaseResult<fallible_iterator::Rev<SingleIterRaw<V>>> {
-        todo!("lmdb iter")
-        // Ok(SingleIterRaw::new(self.table.iter_start(reader)?, self.table.iter_end(reader)?).rev())
+        Ok(SingleIterRaw::new(self.table.iter_start(reader)?, self.table.iter_end(reader)?).rev())
     }
 }
 

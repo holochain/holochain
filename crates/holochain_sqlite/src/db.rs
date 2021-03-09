@@ -8,13 +8,12 @@ use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
-use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::{collections::hash_map, marker::PhantomData};
+use std::{collections::HashMap, time::Duration};
 
-const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024; // 100MB
-const MAX_DBS: u32 = 32;
+const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
 lazy_static! {
     static ref ENVIRONMENTS: RwLock<HashMap<PathBuf, DbWrite>> = {
@@ -144,12 +143,6 @@ impl DbWrite {
 
     /// Remove the db and directory
     pub async fn remove(self) -> DatabaseResult<()> {
-        todo!();
-
-        // let mut map = ENVIRONMENTS.write();
-        // map.remove(&self.0.path);
-
-        // remove the directory
         std::fs::remove_dir_all(&self.0.path)?;
         Ok(())
     }
@@ -187,6 +180,9 @@ impl<'e> Conn<'e> {
 
         // set to faster write-ahead-log mode
         conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
+
+        // tell SQLite to wait this long during write contention
+        conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
 
         Ok(Self {
             conn,

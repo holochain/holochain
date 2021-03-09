@@ -5,7 +5,6 @@
 
 use crate::prelude::*;
 use crate::table::TableName;
-use failure::Fail;
 use holochain_serialized_bytes::SerializedBytesError;
 use std::path::PathBuf;
 use thiserror::Error;

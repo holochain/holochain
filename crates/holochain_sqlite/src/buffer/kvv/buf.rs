@@ -171,7 +171,7 @@ where
         let s = trace_span!("persisted");
         let _g = s.enter();
         trace!("test");
-        let iter = self.table.get_m(r, k)?;
+        let iter = self.table.get_multi(r, k)?;
         Ok(iter.filter_map(|v| match v {
             Ok((_, Some(rusqlite::types::Value::Blob(buf)))) => Some(
                 holochain_serialized_bytes::decode(&buf)
@@ -248,7 +248,7 @@ where
                             self.table
                                 .put_with_flags(
                                     writer,
-                                    k.clone(),
+                                    &k,
                                     &encoded,
                                     (), //rkv::WriteFlags::NO_DUP_DATA,
                                 )

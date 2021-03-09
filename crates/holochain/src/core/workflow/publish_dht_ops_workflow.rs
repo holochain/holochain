@@ -23,7 +23,6 @@ use holochain_sqlite::buffer::BufferedStore;
 use holochain_sqlite::buffer::KvBufFresh;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
-use holochain_sqlite::prelude::*;
 use holochain_sqlite::transaction::Writer;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;

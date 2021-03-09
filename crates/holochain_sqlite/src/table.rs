@@ -1,11 +1,13 @@
 //! Functionality for safely accessing LMDB database references.
 
-use crate::prelude::{Reader, Writer};
-use crate::rewrap_iter;
+use crate::prelude::Writer;
 use crate::{buffer::iter::SqlIter, error::DatabaseResult};
 use crate::{db::DbKind, prelude::Readable};
 use derive_more::Display;
-use rusqlite::{types::Value, *};
+use rusqlite::{
+    types::{FromSql, Value},
+    *,
+};
 
 /// Enumeration of all databases needed by Holochain
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Display)]
@@ -58,6 +60,38 @@ pub enum TableName {
     Agent,
 }
 
+impl TableName {
+    /// Associates a [TableKind] to each [TableName]
+    pub fn kind(&self) -> TableKind {
+        use TableKind::*;
+        use TableName::*;
+        match self {
+            ElementVaultPublicEntries => Single,
+            ElementVaultPrivateEntries => Single,
+            ElementVaultHeaders => Single,
+            MetaVaultSys => Multi,
+            MetaVaultLinks => Single,
+            MetaVaultMisc => Single,
+            ChainSequence => Single, // int
+            ElementCacheEntries => Single,
+            ElementCacheHeaders => Single,
+            MetaCacheSys => Multi,
+            MetaCacheLinks => Single,
+            MetaCacheStatus => Single,
+            ConductorState => Single,
+            Wasm => Single,
+            DnaDef => Single,
+            EntryDef => Single,
+            AuthoredDhtOps => Single,
+            IntegratedDhtOps => Single,
+            IntegrationLimbo => Single,
+            ValidationLimbo => Single,
+            ValidationReceipts => Multi,
+            Agent => Single,
+        }
+    }
+}
+
 impl ToSql for TableName {
     fn to_sql(&self) -> Result<rusqlite::types::ToSqlOutput<'_>> {
         Ok(rusqlite::types::ToSqlOutput::Owned(
@@ -66,10 +100,34 @@ impl ToSql for TableName {
     }
 }
 
-fn initialize_table(conn: &mut Connection, name: TableName) -> DatabaseResult<()> {
-    let table_name = format!("{}", name);
-    let index_name = format!("{}_idx", table_name);
+pub enum TableKind {
+    Single,
+    Multi,
+}
 
+impl TableKind {
+    pub fn is_single(&self) -> bool {
+        if let Self::Single = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_multi(&self) -> bool {
+        if let Self::Multi = self {
+            true
+        } else {
+            false
+        }
+    }
+}
+
+fn initialize_table_single(
+    conn: &mut Connection,
+    table_name: String,
+    index_name: String,
+) -> DatabaseResult<()> {
     // create table
     conn.execute(
         &format!(
@@ -93,8 +151,46 @@ fn initialize_table(conn: &mut Connection, name: TableName) -> DatabaseResult<()
     Ok(())
 }
 
-pub(super) fn initialize_database(conn: &mut Connection, kind: &DbKind) -> DatabaseResult<()> {
-    match kind {
+fn initialize_table_multi(
+    conn: &mut Connection,
+    table_name: String,
+    index_name: String,
+) -> DatabaseResult<()> {
+    // create table
+    conn.execute(
+        &format!(
+            "CREATE TABLE IF NOT EXISTS {} (
+            key       BLOB NOT NULL,
+            val       BLOB NOT NULL
+        );",
+            table_name
+        ),
+        NO_PARAMS,
+    )?;
+
+    // create index
+    conn.execute(
+        &format!(
+            "CREATE INDEX IF NOT EXISTS {} ON {} ( key, val );",
+            index_name, table_name
+        ),
+        NO_PARAMS,
+    )?;
+    Ok(())
+}
+
+fn initialize_table(conn: &mut Connection, name: TableName) -> DatabaseResult<()> {
+    let table_name = format!("{}", name);
+    let index_name = format!("{}_idx", table_name);
+
+    match name.kind() {
+        TableKind::Single => initialize_table_single(conn, table_name, index_name),
+        TableKind::Multi => initialize_table_multi(conn, table_name, index_name),
+    }
+}
+
+pub(super) fn initialize_database(conn: &mut Connection, db_kind: &DbKind) -> DatabaseResult<()> {
+    match db_kind {
         DbKind::Cell(_) => {
             initialize_table(conn, TableName::ElementVaultPublicEntries)?;
             initialize_table(conn, TableName::ElementVaultPrivateEntries)?;
@@ -165,9 +261,13 @@ impl Table {
         &self.name
     }
 
+    pub fn kind(&self) -> TableKind {
+        self.name.kind()
+    }
+
     /// TODO: would be amazing if this could return a ValueRef instead.
     ///       but I don't think it's possible. Could use a macro instead...
-    pub fn get<R: Readable, K: AsRef<[u8]>>(
+    pub fn get<R: Readable, K: ToSql>(
         &self,
         reader: &mut R,
         k: K,
@@ -175,45 +275,44 @@ impl Table {
         Ok(reader.get(self, k)?)
     }
 
-    /// This handles the fact that getting from an rkv::MultiTable returns
-    /// multiple results
-    #[deprecated = "unneeded in the context of SQL?"]
-    pub fn get_m<R: Readable, K: ToSql>(
+    /// Get all key-value pairs for a given key on a TableKind::Multi table.
+    /// Calling this on a Single table is a mistake, and there is no type-level
+    /// enforcement of this.
+    pub fn get_multi<R: Readable, K: ToSql>(
         &self,
         reader: &mut R,
         k: &K,
-    ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<(K, Option<Value>)>>> {
-        todo!();
-        Ok(std::iter::empty())
+    ) -> DatabaseResult<SqlIter> {
+        Ok(reader.get_multi(self, k)?)
     }
 
-    pub fn put<K: ToSql>(&self, writer: &mut Writer, k: &K, v: &Value) -> DatabaseResult<()> {
-        crate::transaction::put_kv(writer, self, k, v)
+    pub fn put<K: ToSql>(&self, txn: &mut Writer, k: &K, v: &Value) -> DatabaseResult<()> {
+        crate::transaction::put_kv(txn, self, k, v)
     }
 
-    #[deprecated = "unneeded in the context of SQL"]
+    #[deprecated = "remove if this is identical to `put`"]
     pub fn put_with_flags<K: ToSql>(
         &self,
-        _writer: &mut Writer,
-        _k: K,
-        _v: &Value,
+        txn: &mut Writer,
+        k: &K,
+        v: &Value,
         _flags: (),
     ) -> DatabaseResult<()> {
+        crate::transaction::put_kv(txn, self, k, v)
+    }
+
+    pub fn delete<K: ToSql>(&self, txn: &mut Writer, k: K) -> DatabaseResult<()> {
         todo!()
     }
 
-    pub fn delete<K: ToSql>(&self, writer: &mut Writer, k: K) -> DatabaseResult<()> {
-        todo!()
-    }
-
-    pub fn delete_all<K: ToSql>(&self, writer: &mut Writer, k: K) -> DatabaseResult<()> {
+    pub fn delete_all<K: ToSql>(&self, txn: &mut Writer, k: K) -> DatabaseResult<()> {
         todo!()
     }
 
     /// This handles the fact that deleting from an rkv::MultiTable requires
     /// passing the value to delete (deleting a particular kv pair)
     #[deprecated = "unneeded in the context of SQL"]
-    pub fn delete_m<K: ToSql>(&self, writer: &mut Writer, k: K, v: &Value) -> DatabaseResult<()> {
+    pub fn delete_m<K: ToSql>(&self, txn: &mut Writer, k: K, v: &Value) -> DatabaseResult<()> {
         todo!()
     }
 
@@ -234,7 +333,7 @@ impl Table {
     }
 
     #[cfg(feature = "test_utils")]
-    pub fn clear(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+    pub fn clear(&mut self, txn: &mut Writer) -> DatabaseResult<()> {
         todo!()
     }
 }

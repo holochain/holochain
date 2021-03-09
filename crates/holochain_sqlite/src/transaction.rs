@@ -6,17 +6,18 @@
 //!     std::error::Error, into error types that do
 
 use crate::rewrap_iter;
-use crate::{buffer::iter::SqlIter, error::DatabaseError, prelude::DatabaseResult, table::Table};
+use crate::{buffer::iter::SqlIter, prelude::DatabaseResult, table::Table};
 use chrono::offset::Local;
 use chrono::DateTime;
-use derive_more::From;
-use rusqlite::types::Value;
+use rusqlite::types::{ToSql, Value};
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
 
 #[deprecated = "no need for read/write distinction with SQLite"]
 pub trait Readable {
-    fn get<K: AsRef<[u8]>>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>>;
+    fn get<K: ToSql>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>>;
+
+    fn get_multi<K: ToSql>(&mut self, table: &Table, k: K) -> DatabaseResult<SqlIter>;
 
     fn iter_start(&mut self, table: &Table) -> DatabaseResult<SqlIter>;
 
@@ -49,17 +50,18 @@ impl Drop for ReaderSpanInfo {
     }
 }
 
-fn get_kv<K: AsRef<[u8]>>(
-    txn: &mut Transaction,
-    table: &Table,
-    k: K,
-) -> DatabaseResult<Option<Value>> {
+fn get_kv<K: ToSql>(txn: &mut Transaction, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
+    assert!(
+        table.kind().is_single(),
+        "table is not single: {}",
+        table.name()
+    );
     let mut stmt = txn.prepare_cached(&format!(
         "SELECT key, val FROM {} WHERE key = ?1",
         table.name()
     ))?;
     Ok(stmt
-        .query_row(params![k.as_ref()], |row| {
+        .query_row(params![k], |row| {
             // TODO: ideally we could call get_raw_unchecked to get a Value
             // and avoid cloning, but it's hard to figure out how to line up the
             // lifetime of the row with the lifetime of the transaction, or if
@@ -70,6 +72,20 @@ fn get_kv<K: AsRef<[u8]>>(
         .optional()?)
 }
 
+fn get_multi<K: ToSql>(txn: &mut Transaction, table: &Table, k: K) -> DatabaseResult<SqlIter> {
+    assert!(
+        table.kind().is_multi(),
+        "table is not multi: {}",
+        table.name()
+    );
+    let mut stmt = txn.prepare_cached(&format!(
+        "SELECT key, val FROM {} WHERE key = ?1 ORDER BY key ASC",
+        table.name()
+    ))?;
+    let it = rewrap_iter!(stmt.query_map(params![k], |row| { Ok((row.get(0)?, row.get(1)?)) })?);
+    Ok(Box::new(it))
+}
+
 pub(crate) fn put_kv<K: ToSql, V: ToSql>(
     txn: &mut Transaction,
     table: &Table,
@@ -77,7 +93,7 @@ pub(crate) fn put_kv<K: ToSql, V: ToSql>(
     v: &V,
 ) -> DatabaseResult<()> {
     let mut stmt = txn.prepare_cached(&format!(
-        "INSERT INTO {} (key, val) VALUES (?1, ?2)",
+        "INSERT OR REPLACE INTO {} (key, val) VALUES (?1, ?2)",
         table.name()
     ))?;
     let _ = stmt.execute(params![k, v])?;
@@ -88,19 +104,13 @@ pub(crate) fn put_kv<K: ToSql, V: ToSql>(
 #[derive(Shrinkwrap)]
 pub struct Reader<'env>(#[shrinkwrap(main_field)] Transaction<'env>, ReaderSpanInfo);
 
-/// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
-/// and we can mark them as such
-#[cfg(feature = "lmdb_no_tls")]
-unsafe impl<'env> Send for Reader<'env> {}
-
-/// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
-/// and we can mark them as such
-#[cfg(feature = "lmdb_no_tls")]
-unsafe impl<'env> Sync for Reader<'env> {}
-
 impl<'env> Readable for Reader<'env> {
-    fn get<K: AsRef<[u8]>>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
+    fn get<K: ToSql>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
         get_kv(&mut self.0, table, k)
+    }
+
+    fn get_multi<K: ToSql>(&mut self, table: &Table, k: K) -> DatabaseResult<SqlIter> {
+        get_multi(&mut self.0, table, k)
     }
 
     fn iter_start(&mut self, table: &Table) -> DatabaseResult<SqlIter> {
@@ -155,8 +165,14 @@ pub type Writer<'t> = Transaction<'t>;
 // XXX: this is copy-pasted from the Reader impl because I couldn't find an easy
 // way to abstract the `self` vs `self.0` difference between the two
 impl<'env> Readable for Writer<'env> {
-    fn get<K: AsRef<[u8]>>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
+    fn get<K: ToSql>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
+        assert!(table.kind().is_single());
         get_kv(self, table, k)
+    }
+
+    fn get_multi<K: ToSql>(&mut self, table: &Table, k: K) -> DatabaseResult<SqlIter> {
+        assert!(table.kind().is_multi());
+        get_multi(self, table, k)
     }
 
     fn iter_start(&mut self, table: &Table) -> DatabaseResult<SqlIter> {
