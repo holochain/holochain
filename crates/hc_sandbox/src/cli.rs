@@ -59,9 +59,8 @@ pub enum HcSandboxSubcommand {
         #[structopt(short, long, value_delimiter = ",")]
         run: Option<Vec<u16>>,
 
-        /// List of DNAs to use when installing the App for this sandbox.
-        /// Defaults to searching the current directory for a single `*.dna` file.
-        dnas: Vec<PathBuf>,
+        /// A hApp bundle to install.
+        happ: Option<PathBuf>,
     },
     /// Run conductor(s) from existing sandbox(es).
     Run(Run),
@@ -89,6 +88,8 @@ pub struct Run {
     /// Optionally specifies app interface ports to bind when running.
     /// This allows your UI to talk to the conductor.
     /// For example, `hc -p=0,9000,0` will create three app interfaces.
+    /// Important: Interfaces are persistent. If you add an interface
+    /// it will be there next time you run the conductor.
     #[structopt(short, long, value_delimiter = ",")]
     ports: Vec<u16>,
 
@@ -105,9 +106,9 @@ impl HcSandbox {
                 app_id,
                 create,
                 run,
-                dnas,
+                happ,
             } => {
-                let paths = generate(&self.holochain_path, dnas, create, app_id).await?;
+                let paths = generate(&self.holochain_path, happ, create, app_id).await?;
                 for (port, path) in self
                     .force_admin_ports
                     .clone()
@@ -212,12 +213,12 @@ async fn run_n(
 
 async fn generate(
     holochain_path: &Path,
-    dnas: Vec<PathBuf>,
+    happ: Option<PathBuf>,
     create: Create,
     app_id: InstalledAppId,
 ) -> anyhow::Result<Vec<PathBuf>> {
-    let dnas = crate::dna::parse_dnas(dnas)?;
-    let paths = crate::sandbox::default_n(holochain_path, create, dnas, app_id).await?;
+    let happ = crate::bundles::parse_happ(happ)?;
+    let paths = crate::sandbox::default_n(holochain_path, create, happ, app_id).await?;
     crate::save::save(std::env::current_dir()?, paths.clone())?;
     Ok(paths)
 }
