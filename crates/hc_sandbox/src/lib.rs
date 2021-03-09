@@ -130,12 +130,12 @@ macro_rules! msg {
     })
 }
 
+pub mod bundles;
 pub mod calls;
 pub mod cli;
 #[doc(hidden)]
 pub mod cmds;
 pub mod config;
-pub mod dna;
 pub mod generate;
 pub mod run;
 pub mod sandbox;
