@@ -125,7 +125,9 @@ impl PoolBuf {
 
     /// Reset this buffer
     pub fn clear(&mut self) {
-        reset(&mut self.0.as_mut().unwrap().1, false);
+        let inner = self.0.as_mut().unwrap();
+        reset(&mut inner.1, false);
+        inner.0 = inner.1.len();
     }
 
     /// Like `drain(..len)` but without the iterator trappings.
@@ -270,5 +272,19 @@ mod tests {
         assert_eq!(b"apple", &b[518..523]);
         assert_eq!(&D[..], &b[6..518]);
         assert_eq!(523, b.len());
+    }
+
+    #[test]
+    fn pool_buf_grow_shrink_reset_reuse() {
+        let mut b = PoolBuf::new();
+        b.extend_from_slice(b"bar");
+        assert_eq!(b"bar", &*b);
+        b.prepend_from_slice(b"foo");
+        assert_eq!(b"foobar", &*b);
+        b.cheap_move_start(3);
+        assert_eq!(b"bar", &*b);
+        b.clear();
+        b.extend_from_slice(b"ab");
+        assert_eq!(b"ab", &*b);
     }
 }

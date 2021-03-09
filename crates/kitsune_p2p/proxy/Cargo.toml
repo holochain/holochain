@@ -29,3 +29,11 @@ structopt = "0.3"
 tokio = { version = "0.2", features = [ "full" ] }
 tracing-subscriber = "0.2"
 webpki = "0.21.2"
+
+[dev-dependencies]
+criterion = "*"
+once_cell = "*"
+
+[[bench]]
+name = "thru"
+harness = false

@@ -282,7 +282,6 @@ async fn incoming_evt_logic(
     logic_hnd: LogicChanHandle<EpEvent>,
 ) {
     while let Some(evt) = sub_ep.next().await {
-        println!("RECEIVE EVENT: {:?}", evt);
         use EpEvent::*;
         if match evt {
             IncomingConnection(_) => Ok(()),
@@ -370,7 +369,6 @@ async fn incoming_evt_logic(
             break;
         }
     }
-    println!("ep incoming loop closed");
 }
 
 struct ProxyEp {
