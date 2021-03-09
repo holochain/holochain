@@ -9,7 +9,8 @@ use crate::conductor::manager::ManagedTaskHandle;
 use crate::conductor::manager::ManagedTaskResult;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::signal::Signal;
-use holochain_websocket::websocket_bind;
+use holochain_websocket::ListenerHandle;
+use holochain_websocket::ListenerItem;
 use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketMessage;
@@ -17,12 +18,11 @@ use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 use std::convert::TryFrom;
 
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::stream::StreamExt;
 use tokio::sync::broadcast;
-use tokio::task::JoinHandle;
 use tracing::*;
 use url2::url2;
 
@@ -30,81 +30,59 @@ use url2::url2;
 /// Number of signals in buffer before applying
 /// back pressure.
 pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
-const MAX_CONNECTIONS: usize = 400;
+const MAX_CONNECTIONS: isize = 400;
 
 /// Create a WebsocketListener to be used in interfaces
-pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketListener> {
+pub async fn spawn_websocket_listener(
+    port: u16,
+) -> InterfaceResult<(
+    ListenerHandle,
+    impl futures::stream::Stream<Item = ListenerItem>,
+)> {
     trace!("Initializing Admin interface");
-    let listener = websocket_bind(
+    let listener = WebsocketListener::bind_with_handle(
         url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
     )
     .await?;
-    trace!("LISTENING AT: {}", listener.local_addr());
+    trace!("LISTENING AT: {}", listener.0.local_addr());
     Ok(listener)
 }
 
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
 pub fn spawn_admin_interface_task<A: InterfaceApi>(
-    mut listener: WebsocketListener,
+    handle: ListenerHandle,
+    listener: impl futures::stream::Stream<Item = ListenerItem> + Send + 'static,
     api: A,
     mut stop_rx: StopReceiver,
 ) -> InterfaceResult<ManagedTaskHandle> {
     Ok(tokio::task::spawn(async move {
-        let mut listener_handles = Vec::new();
-        let mut send_sockets = Vec::new();
-        let num_connections = Arc::new(AtomicUsize::new(0));
-        loop {
-            tokio::select! {
-                // break if we receive on the stop channel
-                _ = stop_rx.recv() => { break; },
+        // Task that will kill the listener and all child connections.
+        tokio::task::spawn(
+            handle.close_on(async move { stop_rx.recv().await.map(|_| true).unwrap_or(true) }),
+        );
 
-                // establish a new connection to a client
-                maybe_con = listener.next() => if let Some(connection) = maybe_con {
-                    match connection {
-                        Ok((mut tx_to_iface, rx_from_iface)) => {
-                            if num_connections.fetch_add(1, Ordering::Relaxed) > MAX_CONNECTIONS {
-                                if let Err(e) = WebsocketSender::close(&mut tx_to_iface, 1000, "Connections Full".into()).await {
-                                    warn!("Admin socket full failed to close: {}", e);
-                                }
-                                continue;
-                            };
-                            send_sockets.push(tx_to_iface.clone());
-                            listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
-                                api.clone(),
-                                rx_from_iface,
-                                tx_to_iface,
-                                num_connections.clone(),
-                            )));
-                        }
-                        Err(err) => {
-                            warn!("Admin socket connection failed: {}", err);
-                        }
-                    }
-                } else {
-                    warn!(line = line!(), "Listener has returned none");
-                    // This shouldn't actually ever happen, but if it did,
-                    // we would just stop the listener task
-                    break;
+        let num_connections = Arc::new(AtomicIsize::new(0));
+        futures::pin_mut!(listener);
+        // establish a new connection to a client
+        while let Some(connection) = listener.next().await {
+            match connection {
+                Ok((_, rx_from_iface)) => {
+                    if num_connections.fetch_add(1, Ordering::Relaxed) > MAX_CONNECTIONS {
+                        // Max connections so drop this connection
+                        // which will close it.
+                        continue;
+                    };
+                    tokio::task::spawn(recv_incoming_admin_msgs(
+                        api.clone(),
+                        rx_from_iface,
+                        num_connections.clone(),
+                    ));
                 }
-            }
-        }
-        // TODO: TK-01261: drop listener, make sure all these tasks finish!
-        drop(listener);
-
-        // TODO: TK-01261: Make tx_to_iface close tell the recv socket to close locally in the websocket code
-        for mut tx_to_iface in send_sockets {
-            // TODO: TK-01261: change from u16 code to enum
-            WebsocketSender::close(&mut tx_to_iface, 1000, "Shutting down".into()).await?;
-        }
-
-        // These SHOULD end soon after we get here, or by the time we get here.
-        for h in listener_handles {
-            // Show if these are actually finishing
-            match tokio::time::timeout(std::time::Duration::from_secs(1), h).await {
-                Ok(r) => r?,
-                Err(_) => warn!("Websocket listener failed to join child tasks"),
+                Err(err) => {
+                    warn!("Admin socket connection failed: {}", err);
+                }
             }
         }
         ManagedTaskResult::Ok(())
@@ -120,65 +98,42 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
     mut stop_rx: StopReceiver,
 ) -> InterfaceResult<(u16, ManagedTaskHandle)> {
     trace!("Initializing App interface");
-    let mut listener = websocket_bind(
+    let (handle, mut listener) = WebsocketListener::bind_with_handle(
         url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
     )
     .await?;
-    trace!("LISTENING AT: {}", listener.local_addr());
-    let port = listener
+    trace!("LISTENING AT: {}", handle.local_addr());
+    let port = handle
         .local_addr()
         .port()
         .ok_or(InterfaceError::PortError)?;
+    // Task that will kill the listener and all child connections.
+    tokio::task::spawn(
+        handle.close_on(async move { stop_rx.recv().await.map(|_| true).unwrap_or(true) }),
+    );
     let task = tokio::task::spawn(async move {
-        let mut listener_handles = Vec::new();
-
-        let mut handle_connection =
-            |tx_to_iface: WebsocketSender, rx_from_iface: WebsocketReceiver| {
-                let rx_from_cell = signal_broadcaster.subscribe();
-                listener_handles.push(tokio::task::spawn(recv_incoming_msgs_and_outgoing_signals(
-                    api.clone(),
-                    rx_from_iface,
-                    rx_from_cell,
-                    tx_to_iface,
-                )));
-            };
-
-        loop {
-            tokio::select! {
-                // break if we receive on the stop channel
-                _ = stop_rx.recv() => { break; },
-
-                // establish a new connection to a client
-                maybe_con = listener.next() => if let Some(connection) = maybe_con {
-                    match connection {
-                        Ok((tx_to_iface, rx_from_iface)) => {
-                            handle_connection(tx_to_iface, rx_from_iface);
-                        }
-                        Err(err) => {
-                            warn!("Admin socket connection failed: {}", err);
-                        }
-                    }
-                } else {
-                    break;
+        // establish a new connection to a client
+        while let Some(connection) = listener.next().await {
+            match connection {
+                Ok((tx_to_iface, rx_from_iface)) => {
+                    let rx_from_cell = signal_broadcaster.subscribe();
+                    tokio::task::spawn(recv_incoming_msgs_and_outgoing_signals(
+                        api.clone(),
+                        rx_from_iface,
+                        rx_from_cell,
+                        tx_to_iface,
+                    ));
+                }
+                Err(err) => {
+                    warn!("Admin socket connection failed: {}", err);
                 }
             }
         }
 
-        handle_shutdown(listener_handles).await;
         ManagedTaskResult::Ok(())
     });
     Ok((port, task))
-}
-
-async fn handle_shutdown(listener_handles: Vec<JoinHandle<InterfaceResult<()>>>) {
-    for h in listener_handles {
-        // Show if these are actually finishing
-        match tokio::time::timeout(std::time::Duration::from_secs(1), h).await {
-            Ok(Ok(Ok(_))) => {}
-            r => warn!(message = "Websocket listener failed to join child tasks", result = ?r),
-        }
-    }
 }
 
 /// Polls for messages coming in from the external client.
@@ -186,38 +141,17 @@ async fn handle_shutdown(listener_handles: Vec<JoinHandle<InterfaceResult<()>>>)
 async fn recv_incoming_admin_msgs<A: InterfaceApi>(
     api: A,
     mut rx_from_iface: WebsocketReceiver,
-    mut tx_to_iface: WebsocketSender,
-    num_connections: Arc<AtomicUsize>,
+    num_connections: Arc<AtomicIsize>,
 ) {
     while let Some(msg) = rx_from_iface.next().await {
         match handle_incoming_message(msg, api.clone()).await {
-            Err(InterfaceError::Closed) => {
-                if let Err(e) =
-                    WebsocketSender::close(&mut tx_to_iface, 1000, "Shutting down".into()).await
-                {
-                    warn!("Admin socket failed to close: {}", e);
-                }
-                // Do an atomic checked sub.
-                // This can still fail to decrement but won't overflow.
-                // This is ok because we really only need a rough idea if of the number of connections
-                // and failing to decrement should be rare.
-                let old_value = num_connections.load(Ordering::SeqCst);
-                if old_value > 0 {
-                    let prev_value = num_connections.compare_and_swap(
-                        old_value,
-                        old_value - 1,
-                        Ordering::SeqCst,
-                    );
-                    if prev_value != old_value {
-                        warn!(msg = "Websocket didn't successfully decrement connections on close");
-                    }
-                }
-                break;
+            Err(e) => {
+                error!(error = &e as &dyn std::error::Error)
             }
-            Err(e) => error!(error = &e as &dyn std::error::Error),
             Ok(()) => {}
         }
     }
+    num_connections.fetch_sub(1, Ordering::SeqCst);
 }
 
 /// Polls for messages coming in from the external client while simultaneously
@@ -235,8 +169,6 @@ async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
         tokio::select! {
             // If we receive a Signal broadcasted from a Cell, push it out
             // across the interface
-            // NOTE: we could just use futures::StreamExt::forward to hook this
-            // tx and rx together in a new spawned task
             signal = rx_from_cell.next() => {
                 if let Some(signal) = signal {
                     trace!(msg = "Sending signal!", ?signal);
@@ -270,16 +202,10 @@ async fn handle_incoming_message<A>(ws_msg: WebsocketMessage, api: A) -> Interfa
 where
     A: InterfaceApi,
 {
-    match ws_msg {
-        WebsocketMessage::Request(bytes, respond) => {
-            Ok(respond(api.handle_request(bytes.try_into()).await?.try_into()?).await?)
-        }
-        WebsocketMessage::Signal(msg) => {
-            error!(msg = ?msg, "Got an unexpected Signal while handing incoming message");
-            Ok(())
-        }
-        WebsocketMessage::Close(_) => Err(InterfaceError::Closed),
-    }
+    let (bytes, respond) = ws_msg;
+    Ok(respond
+        .respond(api.handle_request(bytes.try_into()).await?.try_into()?)
+        .await?)
 }
 
 /// Test items needed by other crates
@@ -325,7 +251,7 @@ pub mod test_utils {
 
         (
             envs.tempdir(),
-            RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+            RealAppInterfaceApi::new(conductor_handle, Default::default()),
             handle,
         )
     }
@@ -357,10 +283,11 @@ pub mod test {
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
+    use holochain_types::test_utils::fake_dna_hash;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_types::{app::InstallAppDnaPayload, prelude::InstallAppPayload};
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_websocket::WebsocketMessage;
+    use holochain_websocket::Respond;
     use holochain_zome_types::cell::CellId;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
     use holochain_zome_types::ExternIO;
@@ -436,10 +363,10 @@ pub mod test {
                 response,
                 AdminResponse::Error(ExternalApiWireError::Deserialization(_))
             );
-            async { Ok(()) }.boxed()
+            async { Ok(()) }.boxed().into()
         };
-        let respond = Box::new(respond);
-        let msg = WebsocketMessage::Request(msg, respond);
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
         conductor_handle.shutdown().await;
     }
@@ -449,8 +376,7 @@ pub mod test {
         observability::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
-        let dna_payload =
-            InstallAppDnaPayload::path_only("some$\\//weird00=-+[] \\Path".into(), "".to_string());
+        let dna_payload = InstallAppDnaPayload::hash_only(fake_dna_hash(1), "".to_string());
         let agent_key = fake_agent_pubkey_1();
         let payload = InstallAppPayload {
             dnas: vec![dna_payload],
@@ -465,10 +391,10 @@ pub mod test {
                 response,
                 AdminResponse::Error(ExternalApiWireError::DnaReadError(_))
             );
-            async { Ok(()) }.boxed()
+            async { Ok(()) }.boxed().into()
         };
-        let respond = Box::new(respond);
-        let msg = WebsocketMessage::Request(msg, respond);
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
         conductor_handle.shutdown().await;
     }
@@ -531,11 +457,10 @@ pub mod test {
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
             assert_matches!(response, AppResponse::ZomeCallInvocation { .. });
-            async { Ok(()) }.boxed()
+            async { Ok(()) }.boxed().into()
         };
-        let respond = Box::new(respond);
-
-        let msg = WebsocketMessage::Request(msg, respond);
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
         handle_incoming_message(msg, app_api).await.unwrap();
         // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
         // the overhead of a websocket request locally is small
@@ -587,10 +512,10 @@ pub mod test {
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
             assert_matches!(response, AdminResponse::AppActivated);
-            async { Ok(()) }.boxed()
+            async { Ok(()) }.boxed().into()
         };
-        let respond = Box::new(respond);
-        let msg = WebsocketMessage::Request(msg, respond);
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
 
         handle_incoming_message(msg, RealAdminInterfaceApi::new(conductor_handle.clone()))
             .await
@@ -637,10 +562,10 @@ pub mod test {
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
             assert_matches!(response, AdminResponse::AppDeactivated);
-            async { Ok(()) }.boxed()
+            async { Ok(()) }.boxed().into()
         };
-        let respond = Box::new(respond);
-        let msg = WebsocketMessage::Request(msg, respond);
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
 
         handle_incoming_message(msg, RealAdminInterfaceApi::new(conductor_handle.clone()))
             .await
@@ -688,10 +613,10 @@ pub mod test {
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
             assert_matches!(response, AdminResponse::AppInterfaceAttached { .. });
-            async { Ok(()) }.boxed()
+            async { Ok(()) }.boxed().into()
         };
-        let respond = Box::new(respond);
-        let msg = WebsocketMessage::Request(msg, respond);
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
         conductor_handle.shutdown().await;
         shutdown.await.unwrap();
@@ -736,10 +661,10 @@ pub mod test {
         let respond = move |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
             assert_matches!(response, AdminResponse::StateDumped(s) if s == expected);
-            async { Ok(()) }.boxed()
+            async { Ok(()) }.boxed().into()
         };
-        let respond = Box::new(respond);
-        let msg = WebsocketMessage::Request(msg, respond);
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
         conductor_handle.shutdown().await;
         shutdown.await.unwrap();
@@ -873,10 +798,10 @@ pub mod test {
         let respond = move |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
             tx.send(response).unwrap();
-            async { Ok(()) }.boxed()
+            async { Ok(()) }.boxed().into()
         };
-        let respond = Box::new(respond);
-        let msg = WebsocketMessage::Request(msg, respond);
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
 
         handle_incoming_message(msg, admin_api).await.unwrap();
         rx

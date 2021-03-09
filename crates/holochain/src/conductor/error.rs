@@ -63,7 +63,7 @@ pub enum ConductorError {
     #[error("Workflow error: {0:?}")]
     WorkflowError(#[from] WorkflowError),
 
-    #[error("Attempted to add two app interfaces with the same id: {0}")]
+    #[error("Attempted to add two app interfaces with the same id: {0:?}")]
     AppInterfaceIdCollision(AppInterfaceId),
 
     // Box is to avoid cycle in error definition

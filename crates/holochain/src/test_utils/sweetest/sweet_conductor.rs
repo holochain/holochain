@@ -154,7 +154,7 @@ impl SweetConductor {
     ) -> SweetConductor {
         // Automatically add a test app interface
         handle
-            .add_test_app_interface("sweet-interface".into())
+            .add_test_app_interface(Default::default())
             .await
             .expect("Couldn't set up test app interface");
 

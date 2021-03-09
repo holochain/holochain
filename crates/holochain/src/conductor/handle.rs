@@ -101,6 +101,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// Add an app interface
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16>;
 
+    /// List the app interfaces currently install.
+    async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>>;
+
     /// Install a [Dna] in this Conductor
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
@@ -275,16 +278,22 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn startup_app_interfaces(self: Arc<Self>) -> ConductorResult<()> {
-        self.conductor
+        let _ = self
+            .conductor
             .write()
             .await
             .startup_app_interfaces_via_handle(self.clone())
-            .await
+            .await?;
+        Ok(())
     }
 
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16> {
         let mut lock = self.conductor.write().await;
         lock.add_app_interface_via_handle(port, self.clone()).await
+    }
+
+    async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>> {
+        self.conductor.read().await.list_app_interfaces().await
     }
 
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
@@ -479,11 +488,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let app = InstalledApp::new_legacy(installed_app_id, cell_data)?;
 
         // Update the db
-        self.conductor
+        let _ = self
+            .conductor
             .write()
             .await
             .add_inactive_app_to_db(app)
-            .await
+            .await?;
+
+        Ok(())
     }
 
     async fn install_app_bundle(

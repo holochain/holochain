@@ -12,6 +12,7 @@ use holochain_state::source_chain::SourceChainError;
 use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
+use mr_bundle::error::MrBundleError;
 use thiserror::Error;
 
 /// Errors occurring during a [CellConductorApi] or [InterfaceApi] call
@@ -87,6 +88,9 @@ pub enum ConductorApiError {
 
     #[error(transparent)]
     AppBundleError(#[from] AppBundleError),
+
+    #[error(transparent)]
+    MrBundleError(#[from] MrBundleError),
 
     #[error(transparent)]
     JsonDumpError(#[from] serde_json::Error),

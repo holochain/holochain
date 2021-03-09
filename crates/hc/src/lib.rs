@@ -117,6 +117,7 @@ use structopt::StructOpt;
 /// Work with DNA and hApp bundle files, set up sandbox environments for testing
 /// and development purposes, make direct admin calls to running conductors,
 /// and more.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, StructOpt)]
 #[structopt(setting = structopt::clap::AppSettings::InferSubcommands)]
 pub enum Opt {
