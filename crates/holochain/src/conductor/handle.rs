@@ -101,6 +101,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// Add an app interface
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16>;
 
+    /// List the app interfaces currently install.
+    async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>>;
+
     /// Install a [Dna] in this Conductor
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
@@ -287,6 +290,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16> {
         let mut lock = self.conductor.write().await;
         lock.add_app_interface_via_handle(port, self.clone()).await
+    }
+
+    async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>> {
+        self.conductor.read().await.list_app_interfaces().await
     }
 
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {

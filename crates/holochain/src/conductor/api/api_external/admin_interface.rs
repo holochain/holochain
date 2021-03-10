@@ -252,6 +252,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
+            ListAppInterfaces => {
+                let interfaces = self.conductor_handle.list_app_interfaces().await?;
+                Ok(AdminResponse::AppInterfacesListed(interfaces))
+            }
             DumpState { cell_id } => {
                 let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
                 Ok(AdminResponse::StateDumped(state))
