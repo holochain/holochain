@@ -27,7 +27,7 @@ pub fn create_link<'a>(
             let mut guard = call_context.host_access.workspace().write().await;
             let workspace: &mut CallZomeWorkspace = &mut guard;
             // push the header into the source chain
-            let header_hash = workspace.source_chain.put(header_builder, None).await?;
+            let header_hash = workspace.source_chain.put(header_builder, None, None).await?;
             let element = workspace
                 .source_chain
                 .get_element(&header_hash)?

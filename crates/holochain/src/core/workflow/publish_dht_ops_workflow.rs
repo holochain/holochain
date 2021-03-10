@@ -524,6 +524,7 @@ mod tests {
                                 entry_hash: original_entry_hash.clone(),
                             },
                             Some(original_entry),
+                            None,
                         )
                         .await
                         .unwrap();
@@ -543,6 +544,7 @@ mod tests {
                                 original_entry_address: original_entry_hash,
                             },
                             Some(new_entry),
+                            None,
                         )
                         .await
                         .unwrap();

@@ -1223,7 +1223,11 @@ async fn test_wasm_api_without_integration_delete() {
             deletes_address: entry_header.header_hash,
             deletes_entry_address: base_address.clone(),
         };
-        workspace.source_chain.put(delete, None).await.unwrap();
+        workspace
+            .source_chain
+            .put(delete, None, None)
+            .await
+            .unwrap();
         env_ref
             .with_commit(|writer| workspace.flush_to_txn(writer))
             .unwrap();

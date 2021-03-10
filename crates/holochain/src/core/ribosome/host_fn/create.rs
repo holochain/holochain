@@ -40,7 +40,9 @@ pub fn create<'a>(
         EntryDefId::CapClaim => EntryType::CapClaim,
     };
 
-    // build a header for the entry being committed
+    // build a header for the entry being committed.  Either the EntryWithDefId supplies a desired
+    // Header timestamp, or we'll supply the current time when we put the Entry in the source_chain.
+    let maybe_timestamp: Option<Timestamp> = AsRef::<Option<Timestamp>>::as_ref(&input).to_owned();
     let header_builder = builder::Create {
         entry_type,
         entry_hash,
@@ -56,7 +58,8 @@ pub fn create<'a>(
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
         // push the header and the entry into the source chain
-        let header_hash = source_chain.put(header_builder, Some(entry)).await.map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+        let header_hash = source_chain.put(header_builder, Some(entry), maybe_timestamp).await
+	    .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
         // fetch the element we just added so we can integrate its DhtOps
         let element = source_chain
             .get_element(&header_hash).map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?

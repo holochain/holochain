@@ -9,6 +9,18 @@ use crate::prelude::*;
 ///
 /// Usually you don't need to use this function directly; it is the most general way to create an
 /// entry and standardises the internals of higher level create functions.
+///
+/// It can be useful if you need a specific header Timestamp; if your committed Entry is dependent
+/// on the actual header commit timestamp, e.g.
+///
+/// ```ignore
+/// #[hdk_entry(id = "secs")]
+/// pub struct Secs(i64);
+/// let now: Timestamp = (Timestamp::epoch() + sys_time()?)?;
+/// let secs = Secs(now.0);
+/// let entry_def_with_id: EntryDefWithId = secs.try_into()?;
+/// create(entry_def_with_id.at(now))?; // The source-chain Header timestamp.0 == Secs.0
+/// ```
 pub fn create(entry_def_with_id: EntryWithDefId) -> ExternResult<HeaderHash> {
     host_call::<EntryWithDefId, HeaderHash>(__create, entry_def_with_id)
 }

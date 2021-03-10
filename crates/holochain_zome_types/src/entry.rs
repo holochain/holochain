@@ -8,6 +8,7 @@
 use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
+use crate::timestamp::Timestamp;
 use holo_hash::hash_type;
 use holo_hash::AgentPubKey;
 use holo_hash::HashableContent;
@@ -170,11 +171,14 @@ impl HashableContent for Entry {
     }
 }
 
-/// Data to create an entry.
+/// Data to create an entry, optionally with a certain header Timestamp; necessary in order to
+/// support algorithms that compute Entry contents deterministically based on the difference in time
+/// (dt) between commits, eg. PID loops.  If no Timestamp is supplied, one is provided at commit.
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct EntryWithDefId {
     entry_def_id: crate::entry_def::EntryDefId,
     entry: crate::entry::Entry,
+    maybe_timestamp: Option<Timestamp>,
 }
 
 impl EntryWithDefId {
@@ -183,6 +187,27 @@ impl EntryWithDefId {
         Self {
             entry_def_id,
             entry,
+            maybe_timestamp: None,
+        }
+    }
+    /// Constructor, with a specified header Timestamp .
+    pub fn new_at(
+        entry_def_id: crate::entry_def::EntryDefId,
+        entry: crate::entry::Entry,
+        timestamp: Timestamp,
+    ) -> Self {
+        Self {
+            entry_def_id,
+            entry,
+            maybe_timestamp: Some(timestamp),
+        }
+    }
+    /// Specify a specific header Timestamp for an EntryWithDefId
+    pub fn at(self, timestamp: Timestamp) -> Self {
+        Self {
+            entry_def_id: self.entry_def_id,
+            entry: self.entry,
+            maybe_timestamp: Some(timestamp),
         }
     }
 }
@@ -196,6 +221,12 @@ impl AsRef<crate::Entry> for EntryWithDefId {
 impl AsRef<crate::EntryDefId> for EntryWithDefId {
     fn as_ref(&self) -> &crate::EntryDefId {
         &self.entry_def_id
+    }
+}
+
+impl AsRef<Option<Timestamp>> for EntryWithDefId {
+    fn as_ref(&self) -> &Option<Timestamp> {
+        &self.maybe_timestamp
     }
 }
 

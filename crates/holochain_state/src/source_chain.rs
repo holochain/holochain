@@ -49,15 +49,16 @@ impl SourceChain {
         self.0
     }
 
-    /// Add a Element to the source chain, using a HeaderBuilder
+    /// Add a Element to the source chain, using a HeaderBuilder, and maybe a certain timestamp
     pub async fn put<H: HeaderInner, B: HeaderBuilder<H>>(
         &mut self,
         header_builder: B,
         maybe_entry: Option<Entry>,
+        maybe_timestamp: Option<Timestamp>,
     ) -> SourceChainResult<HeaderHash> {
         let common = HeaderBuilderCommon {
             author: self.agent_pubkey()?,
-            timestamp: timestamp::now(),
+            timestamp: maybe_timestamp.unwrap_or_else(|| timestamp::now()),
             header_seq: self.len() as u32,
             prev_header: self.chain_head()?.to_owned(),
         };
@@ -76,7 +77,7 @@ impl SourceChain {
             entry_type: EntryType::CapClaim,
             entry_hash,
         };
-        self.put(header_builder, Some(entry)).await
+        self.put(header_builder, Some(entry), None).await
     }
 
     /// Fetch a relevant CapGrant from the private entries.
@@ -372,7 +373,7 @@ pub mod tests {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
             };
-            let header = chain.put(header_builder, Some(entry)).await?;
+            let header = chain.put(header_builder, Some(entry), None).await?;
 
             env.guard()
                 .with_commit(|writer| chain.flush_to_txn(writer))?;
@@ -414,7 +415,7 @@ pub mod tests {
                 original_header_address,
                 original_entry_address,
             };
-            let header = chain.put(header_builder, Some(entry)).await?;
+            let header = chain.put(header_builder, Some(entry), None).await?;
 
             env.guard()
                 .with_commit(|writer| chain.flush_to_txn(writer))?;
@@ -452,7 +453,7 @@ pub mod tests {
                 deletes_address: updated_header_hash,
                 deletes_entry_address: updated_entry_hash,
             };
-            chain.put(header_builder, None).await?;
+            chain.put(header_builder, None, None).await?;
 
             env.guard()
                 .with_commit(|writer| chain.flush_to_txn(writer))?;

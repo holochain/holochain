@@ -43,7 +43,9 @@ pub fn update<'a>(
     let original_entry_address =
         get_original_address(call_context.clone(), original_header_address.clone())?;
 
-    // build a header for the entry being updated
+    // build a header for the entry being updated.  Either the EntryWithDefId supplies a desired
+    // Header timestamp, or we'll supply the current time when we put the Entry in the source_chain.
+    let maybe_timestamp: Option<Timestamp> = AsRef::<Option<Timestamp>>::as_ref(&entry_with_def_id).to_owned();
     let header_builder = builder::Update {
         entry_type,
         entry_hash,
@@ -63,7 +65,8 @@ pub fn update<'a>(
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
         // push the header and the entry into the source chain
-        let header_hash = source_chain.put(header_builder, Some(entry)).await.map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+        let header_hash = source_chain.put(header_builder, Some(entry), maybe_timestamp).await
+	    .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
         // fetch the element we just added so we can integrate its DhtOps
         let element = source_chain
             .get_element(&header_hash).map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?

@@ -133,6 +133,7 @@ mod tests {
                         entry_hash,
                     },
                     Some(app_entry),
+                    None,
                 )
                 .await
                 .unwrap();

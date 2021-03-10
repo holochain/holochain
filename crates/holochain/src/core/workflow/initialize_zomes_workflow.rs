@@ -64,7 +64,7 @@ async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
         .write()
         .await
         .source_chain
-        .put(builder::InitZomesComplete {}, None)
+        .put(builder::InitZomesComplete {}, None, None)
         .await?;
 
     Ok(result)

@@ -7,6 +7,25 @@ use hdk::prelude::*;
 )]
 struct Setup(String);
 
+/// An entry that only validates if the Entry's Timestamp matches the Header Timestamp.  This is
+/// impossible, unless we can specify the Header Timestamp used for source-chain Element create,
+/// via hdk::prelude::create with EntryWithDefId.at(<Timestamp>).
+#[hdk_entry(
+    id = "secs",
+    required_validations = 5,
+    required_validation_type = "full"
+)]
+struct Secs(Timestamp);
+
+/// Construct an EntryDefWithId from Secs with the same Timestamp as the Header will have.
+fn secs_now() -> ExternResult<EntryWithDefId> {
+    let now: Timestamp = (Timestamp::epoch() + hdk::prelude::sys_time()?)
+	.map_err(|e| WasmError::Guest(format!("Timestamp error: {}", e)))?;
+    let secs = Secs(now);
+    let entry_def_with_id: EntryWithDefId = secs.try_into()?;
+    Ok(entry_def_with_id.at(now)) // And, specify a desired Header Timestamp!
+}
+
 #[hdk_entry(
     id = "post",
     required_validations = 5,
@@ -29,7 +48,9 @@ struct Msg(String);
 )]
 struct PrivMsg(String);
 
-entry_defs![Post::entry_def(), Msg::entry_def(), PrivMsg::entry_def(), Setup::entry_def()];
+entry_defs![
+    Post::entry_def(), Msg::entry_def(), PrivMsg::entry_def(), Setup::entry_def(), Secs::entry_def()
+];
 
 fn post() -> Post {
     Post("foo".into())
@@ -93,6 +114,24 @@ fn validate_create_entry_post(
     Ok(r)
 }
 
+
+#[hdk_extern]
+fn validate_create_entry_secs(
+    validation_data: ValidateData,
+) -> ExternResult<ValidateCallbackResult> {
+    let r = match validation_data.element.entry().to_app_option::<Secs>() {
+        Ok(Some(secs)) => if secs.0 == validation_data.element.header().timestamp() {
+	    ValidateCallbackResult::Valid // Header Timestamp matches Sec(Timestamp)!
+        } else {
+            ValidateCallbackResult::Invalid(format!(
+		"Timestamp Mismatch: {:?} vs. {:?}", secs, validation_data.element.header() ))
+	},
+        other => ValidateCallbackResult::Invalid(format!("Not a Secs Entry: {:?}", other ))
+    };
+    Ok(r)
+}
+
+
 #[hdk_extern]
 fn get_activity(
     input: holochain_test_wasm_common::AgentActivitySearch,
@@ -127,6 +166,10 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
     // Creating multiple entries in a Zome function should also be fine.
     hdk::prelude::create_entry(&Setup(String::from("Hello, before Post...")))?;
+
+    // Creating an entry with a custom EntryWithDefId timestamp should pose no issues
+    hdk::prelude::create(secs_now()?)?;
+
     // Create an entry directly via. the hdk.
     hdk::prelude::create_entry(&post())?;
     // Create an entry via a `call`.
