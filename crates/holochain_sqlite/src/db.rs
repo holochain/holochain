@@ -107,11 +107,11 @@ impl DbWrite {
         keystore: KeystoreSender,
     ) -> DatabaseResult<DbWrite> {
         let mut map = ENVIRONMENTS.write();
-        let path = path_prefix.join(kind.path());
-        if !path.is_dir() {
-            std::fs::create_dir(path.clone())
-                .map_err(|_e| DatabaseError::EnvironmentMissing(path.clone()))?;
+        if !path_prefix.is_dir() {
+            std::fs::create_dir(path_prefix.clone())
+                .map_err(|_e| DatabaseError::EnvironmentMissing(path_prefix.to_owned()))?;
         }
+        let path = path_prefix.join(kind.filename());
         let mut conn = Conn::new(&path, &kind)?.into_raw();
         let env: DbWrite = match map.entry(path.clone()) {
             hash_map::Entry::Occupied(e) => e.get().clone(),
@@ -163,10 +163,7 @@ pub struct Conn<'e> {
 
 impl<'e> Conn<'e> {
     /// Create a new connection with decryption key set
-    pub fn new(path: &Path, kind: &DbKind) -> DatabaseResult<Self> {
-        let mut filename = kind.path();
-        filename.set_extension("sqlite3");
-        let path = path.join(filename);
+    pub fn new(path: &Path, _kind: &DbKind) -> DatabaseResult<Self> {
         let conn = Connection::open(path)?;
 
         let key = get_encryption_key_shim();
@@ -252,13 +249,15 @@ pub enum DbKind {
 
 impl DbKind {
     /// Constuct a partial Path based on the kind
-    fn path(&self) -> PathBuf {
-        match self {
+    fn filename(&self) -> PathBuf {
+        let mut path = match self {
             DbKind::Cell(cell_id) => PathBuf::from(cell_id.to_string()),
             DbKind::Conductor => PathBuf::from("conductor"),
             DbKind::Wasm => PathBuf::from("wasm"),
             DbKind::P2p => PathBuf::from("p2p"),
-        }
+        };
+        path.set_extension("sqlite3");
+        path
     }
 }
 
