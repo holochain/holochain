@@ -477,32 +477,22 @@ impl SpaceInternalHandler for Space {
                 // Push to the network as well
                 match network_type {
                     NetworkType::QuicMdns => {
-                        // Broadcast by using Space as service type and Agent as service name
-                        println!("(MDNS) - Space: {:?} ({})", space.get_bytes(), space.get_bytes().len());
-                        let space_b64 = base64::encode_config(&space[..], base64::STANDARD_NO_PAD);
-                        println!("(MDNS) - Space base64: {:?} ({})", space_b64, space_b64.len());
-                        let space_copy = base64::decode_config(&space_b64[..], base64::STANDARD_NO_PAD).expect("Space base64 failed");
-                        let dna_copy = KitsuneSpace(space_copy.clone());
-                        println!("(MDNS) - Copy : {:?} ({})", dna_copy.get_bytes(), dna_copy.get_bytes().len());
-                        assert!(dna_copy == *space);
-                        let mut dna_str = String::from_utf8(space_copy).unwrap().to_string();
-                        if dna_str.len() > 55 {
-                            dna_str = dna_str[..55].to_string();
+                        // Broadcast only valid AgentInfo
+                        if urls.len() > 0 {
+                            // Broadcast by using Space as service type and Agent as service name
+                            let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
+                            if let Some(current_handle) = mdns_handles.get(&space_b64) {
+                                mdns_kill_thread(current_handle.to_owned());
+                            }
+                            let agent_b64 = base64::encode_config(&agent[..], base64::URL_SAFE_NO_PAD);
+                            //println!("(MDNS) - Broadcasting of Agent {:?} ({}) in space {:?} ({} ; {})", agent, agent.get_bytes().len(), space, space.get_bytes().len(), space_b64.len());
+                            let mut buffer = Vec::new();
+                            kitsune_p2p_types::codec::rmp_encode(&mut buffer, &agent_info_signed)?;
+                            tracing::debug!(?space_b64, ?agent_b64);
+                            let handle = mdns_create_broadcast_thread(space_b64.clone(), agent_b64, &buffer);
+                            // store mdns_handle in self
+                            mdns_handles.insert(space_b64, handle);
                         }
-                        if let Some(current_handle) = mdns_handles.get(&dna_str) {
-                            mdns_kill_thread(current_handle.to_owned());
-                        }
-                        let mut agent_str = String::from_utf8_lossy(agent.get_bytes()).to_string();
-                        if agent_str.len() > 55 {
-                            agent_str = dna_str[..55].to_string();
-                        }
-                        println!("(MDNS) - Broadcasting of Agent {:?} ({}) in space {:?} ({} ; {})", agent, agent.get_bytes().len(), space, space.get_bytes().len(), dna_str.len());
-                        let mut buffer = Vec::new();
-                        kitsune_p2p_types::codec::rmp_encode(&mut buffer, &agent_info_signed)?;
-                        tracing::debug!(?dna_str, ?agent_str);
-                        let handle = mdns_create_broadcast_thread(dna_str.clone(), agent_str, &buffer);
-                        // store mdns_handle in self
-                        mdns_handles.insert(dna_str, handle);
                     },
                     NetworkType::QuicBootstrap => {
                         crate::spawn::actor::bootstrap::put(bootstrap_service.clone(), agent_info_signed)
@@ -549,31 +539,33 @@ impl KitsuneP2pHandler for Space {
         match self.config.network_type {
             NetworkType::QuicMdns => {
                 // Listen to MDNS service that has that space as service type
-                let mut dna_str = String::from_utf8_lossy(space.get_bytes()).to_string();
-                if dna_str.len() > 55 {
-                    dna_str = dna_str[..55].to_string();
-                }
+                let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
                 //println!("(MDNS) - Agent {:?} ({}) joined space {:?} ({} ; {})", agent, agent.get_bytes().len(), space, space.get_bytes().len(), dna_str.len());
-                println!("(MDNS) - Listening to {:?}", space);
                 tokio::task::spawn(async move {
-                    let stream = mdns_listen(dna_str);
+                    let stream = mdns_listen(space_b64);
                     tokio::pin!(stream);
                     while let Some(maybe_response) = stream.next().await {
                         match maybe_response {
                             Ok(response) => {
                                 tracing::debug!(msg = "Peer found via MDNS", ?response);
-                                println!("(MDNS) - Peer found via MDNS: {:?})", response);
-                                // Add response to local storage
+                                // Decode response
+                                let remote_agent_vec = base64::decode_config(&response.service_name[..], base64::URL_SAFE_NO_PAD)
+                                   .expect("Agent base64 decode failed");
+                                let remote_agent = Arc::new(KitsuneAgent(remote_agent_vec));
+                                // println!("(MDNS) - Peer found via MDNS: {:?})", *remote_agent);
                                 let maybe_agent_info_signed = kitsune_p2p_types::codec::rmp_decode(&mut &*response.buffer);
                                 if let Err(e) = maybe_agent_info_signed {
                                     tracing::error!(msg = "Failed to decode peer from MDNS", ?e);
                                     continue;
                                 }
+                                let remote_agent_info_signed = maybe_agent_info_signed.unwrap();
+                                //println!("(MDNS) - Found agent_info_signed: {:?})", remote_agent_info_signed);
+                                // Add to local storage
                                 let _result = evt_sender
                                    .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                       space: Arc::new(KitsuneSpace::new(response.service_type.into_bytes())),
-                                       agent: Arc::new(KitsuneAgent::new(response.service_name.into_bytes())),
-                                       agent_info_signed: maybe_agent_info_signed.unwrap(),
+                                       space: space.clone(),
+                                       agent: remote_agent,
+                                       agent_info_signed: remote_agent_info_signed,
                                    })
                                    .await;
                             }
