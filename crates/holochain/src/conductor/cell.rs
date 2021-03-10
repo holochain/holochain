@@ -558,8 +558,39 @@ impl Cell {
 
     /// a remote agent is sending us a validation receipt.
     #[tracing::instrument(skip(self))]
-    async fn handle_validation_receipt(&self, _receipt: SerializedBytes) -> CellResult<()> {
-        unimplemented!()
+    async fn handle_validation_receipt(&self, receipt: SerializedBytes) -> CellResult<()> {
+        let receipt: SignedValidationReceipt = receipt.try_into()?;
+
+        // Add to authored
+        let db = self.env.get_db(&*AUTHORED_DHT_OPS)?;
+        let mut authored_dht_ops: AuthoredDhtOpsStore =
+            KvBufFresh::new(self.env.clone().into(), db);
+        match authored_dht_ops.get(&receipt.receipt.dht_op_hash)? {
+            Some(mut auth) => {
+                auth.receipt_count += 1;
+                authored_dht_ops.put(receipt.receipt.dht_op_hash.clone(), auth)?;
+            }
+            None => {
+                warn!(
+                    "Got receipt {:?} but it's missing from authored db so throwing receipt away",
+                    receipt
+                );
+                return Ok(());
+            }
+        }
+
+        // Add to receipts db
+        let mut receipts_db = ValidationReceiptsBuf::new(&self.env)?;
+        receipts_db.add_if_unique(receipt)?;
+
+        // Write to db
+        self.env.with_commit(|w| {
+            authored_dht_ops.flush_to_txn_ref(w)?;
+            receipts_db.flush_to_txn_ref(w)?;
+            DatabaseResult::Ok(())
+        })?;
+
+        Ok(())
     }
 
     #[instrument(skip(self, dht_arc, since, until))]

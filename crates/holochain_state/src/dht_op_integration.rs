@@ -91,6 +91,8 @@ pub struct IntegratedDhtOpsValue {
     pub op: DhtOpLight,
     /// Time when the op was integrated
     pub when_integrated: Timestamp,
+    /// The receipt has been received by the author.
+    pub receipt_acknowledged: bool,
 }
 
 /// A type for storing in databases that only need the hashes.
@@ -193,6 +195,7 @@ mod tests {
                 validation_status: ValidationStatus::Valid,
                 op: DhtOpLight::RegisterAgentActivity(fixt!(HeaderHash), basis.next().unwrap()),
                 when_integrated: when_integrated.into(),
+                receipt_acknowledged: false,
             });
 
         // Put them in the db
