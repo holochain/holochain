@@ -479,19 +479,22 @@ impl SpaceInternalHandler for Space {
                     NetworkType::QuicMdns => {
                         // Broadcast only valid AgentInfo
                         if urls.len() > 0 {
+                            // Get handle map key
+                            let key = [space.get_bytes(), agent.get_bytes()].concat();
                             // Broadcast by using Space as service type and Agent as service name
                             let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
-                            if let Some(current_handle) = mdns_handles.get(&space_b64) {
+                            if let Some(current_handle) = mdns_handles.get(&key) {
                                 mdns_kill_thread(current_handle.to_owned());
                             }
                             let agent_b64 = base64::encode_config(&agent[..], base64::URL_SAFE_NO_PAD);
-                            //println!("(MDNS) - Broadcasting of Agent {:?} ({}) in space {:?} ({} ; {})", agent, agent.get_bytes().len(), space, space.get_bytes().len(), space_b64.len());
+                            //println!("(MDNS) - Broadcasting of Agent {:?} ({}) in space {:?} ({} ; {})",
+                            // agent, agent.get_bytes().len(), space, space.get_bytes().len(), space_b64.len());
                             let mut buffer = Vec::new();
                             kitsune_p2p_types::codec::rmp_encode(&mut buffer, &agent_info_signed)?;
                             tracing::debug!(?space_b64, ?agent_b64);
                             let handle = mdns_create_broadcast_thread(space_b64.clone(), agent_b64, &buffer);
                             // store mdns_handle in self
-                            mdns_handles.insert(space_b64, handle);
+                            mdns_handles.insert(key, handle);
                         }
                     },
                     NetworkType::QuicBootstrap => {
@@ -552,7 +555,7 @@ impl KitsuneP2pHandler for Space {
                                 let remote_agent_vec = base64::decode_config(&response.service_name[..], base64::URL_SAFE_NO_PAD)
                                    .expect("Agent base64 decode failed");
                                 let remote_agent = Arc::new(KitsuneAgent(remote_agent_vec));
-                                // println!("(MDNS) - Peer found via MDNS: {:?})", *remote_agent);
+                                //println!("(MDNS) - Peer found via MDNS: {:?})", *remote_agent);
                                 let maybe_agent_info_signed = kitsune_p2p_types::codec::rmp_decode(&mut &*response.buffer);
                                 if let Err(e) = maybe_agent_info_signed {
                                     tracing::error!(msg = "Failed to decode peer from MDNS", ?e);
@@ -760,7 +763,7 @@ pub(crate) struct Space {
     pub(crate) transport: ghost_actor::GhostSender<TransportListener>,
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
-    mdns_handles: HashMap<String, Arc<AtomicBool>>,
+    mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
 }
 
 impl Space {
