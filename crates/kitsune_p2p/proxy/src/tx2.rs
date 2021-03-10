@@ -5,10 +5,10 @@
 use crate::*;
 use futures::future::BoxFuture;
 use futures::stream::{Stream, StreamExt};
+use kitsune_p2p_types::tx2::tx2_backend::*;
 use kitsune_p2p_types::tx2::tx2_frontend::tx2_frontend_traits::*;
 use kitsune_p2p_types::tx2::tx2_frontend::*;
 use kitsune_p2p_types::tx2::tx2_promote::*;
-use kitsune_p2p_types::tx2::tx2_backend::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;

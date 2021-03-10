@@ -1,6 +1,6 @@
 use crate::codec::*;
-use crate::tx2::*;
 use crate::tx2::tx2_utils::*;
+use crate::tx2::*;
 use crate::*;
 
 /// Result type returned from CodecReader::read

@@ -1,9 +1,9 @@
 #![allow(clippy::new_ret_no_self)]
 //! Promote a tx2 transport backend to a tx2 transport frontend.
 
+use crate::tx2::tx2_backend::*;
 use crate::tx2::tx2_frontend::tx2_frontend_traits::*;
 use crate::tx2::tx2_frontend::*;
-use crate::tx2::tx2_backend::*;
 use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
 use crate::*;

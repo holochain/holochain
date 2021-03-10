@@ -1,7 +1,7 @@
 use criterion::{/*black_box,*/ criterion_group, criterion_main, Criterion};
-use kitsune_p2p_types::*;
-use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
+use kitsune_p2p_types::tx2::*;
+use kitsune_p2p_types::*;
 use once_cell::sync::{Lazy, OnceCell};
 
 static RUNTIME: Lazy<tokio::runtime::Handle> = Lazy::new(|| {

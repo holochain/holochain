@@ -19,6 +19,10 @@ use std::sync::Arc;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum KitsuneErrorKind {
+    /// Temp error type for internal logic.
+    #[error("Unit")]
+    Unit,
+
     /// The operation timed out.
     #[error("TimedOut")]
     TimedOut,
@@ -79,6 +83,12 @@ impl From<&str> for KitsuneError {
 
 impl From<KitsuneError> for () {
     fn from(_: KitsuneError) {}
+}
+
+impl From<()> for KitsuneError {
+    fn from(_: ()) -> Self {
+        KitsuneErrorKind::Unit.into()
+    }
 }
 
 /// Result type for remote communication.

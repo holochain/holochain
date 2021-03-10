@@ -1,24 +1,17 @@
+use crate::tx2::tx2_utils::*;
 use crate::*;
 
 struct Inner<T: 'static + Send> {
-    wait_limit: Arc<tokio::sync::Semaphore>,
-    waiting: Option<(
-        tokio::sync::OwnedSemaphorePermit,
-        tokio::sync::oneshot::Sender<T>,
-    )>,
-    resources: Vec<T>,
+    bucket: Vec<T>,
+    notify: Arc<tokio::sync::Notify>,
 }
 
 /// Control efficient access to shared resource pool.
-pub struct ResourceBucket<T: 'static + Send> {
-    inner: Arc<parking_lot::Mutex<Inner<T>>>,
-}
+pub struct ResourceBucket<T: 'static + Send>(Arc<Share<Inner<T>>>);
 
 impl<T: 'static + Send> Clone for ResourceBucket<T> {
     fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
+        Self(self.0.clone())
     }
 }
 
@@ -31,44 +24,20 @@ impl<T: 'static + Send> Default for ResourceBucket<T> {
 impl<T: 'static + Send> ResourceBucket<T> {
     /// Create a new resource bucket.
     pub fn new() -> Self {
-        Self {
-            inner: Arc::new(parking_lot::Mutex::new(Inner {
-                wait_limit: Arc::new(tokio::sync::Semaphore::new(1)),
-                waiting: None,
-                resources: Vec::new(),
-            })),
-        }
+        Self(Arc::new(Share::new(Inner {
+            bucket: Vec::new(),
+            notify: Arc::new(tokio::sync::Notify::new()),
+        })))
     }
 
     /// Add a resource to the bucket.
     /// Could be a new resource, or a previously acquired resource.
     pub fn release(&self, t: T) {
-        let mut t = t;
-        loop {
-            let sender = {
-                let mut inner = self.inner.lock();
-
-                // if no-one is awaiting, add directly to resource vec
-                if inner.waiting.is_none() {
-                    inner.resources.push(t);
-                    return;
-                }
-
-                // if someone is waiting, let's send it to them
-                // also release the waiting permit
-                let (_permit, sender) = inner.waiting.take().unwrap();
-                sender
-            };
-
-            // attempt to send - if they are no longer waiting
-            // try again to store the resource
-            match sender.send(t) {
-                Ok(_) => return,
-                Err(t_) => {
-                    t = t_;
-                }
-            }
-        }
+        let _ = self.0.share_mut(move |i, _| {
+            i.bucket.push(t);
+            i.notify.notify();
+            Ok(())
+        });
     }
 
     /// Acquire a resource that is immediately available from the bucket
@@ -77,15 +46,15 @@ impl<T: 'static + Send> ResourceBucket<T> {
     where
         F: FnOnce() -> T + 'static + Send,
     {
-        let r = {
-            let mut inner = self.inner.lock();
-            if inner.resources.is_empty() {
-                None
-            } else {
-                Some(inner.resources.remove(0))
+        if let Ok(t) = self.0.share_mut(|i, _| {
+            if !i.bucket.is_empty() {
+                return Ok(i.bucket.remove(0));
             }
-        };
-        r.unwrap_or_else(f)
+            Err(().into())
+        }) {
+            return t;
+        }
+        f()
     }
 
     /// Acquire a resource from the bucket.
@@ -93,46 +62,44 @@ impl<T: 'static + Send> ResourceBucket<T> {
         &self,
         timeout: Option<KitsuneTimeout>,
     ) -> impl std::future::Future<Output = KitsuneResult<T>> + 'static + Send {
-        let inner = self.inner.clone();
+        let inner = self.0.clone();
         async move {
-            // check if a resource is available,
-            // or get a space in the waiting line.
-            let permit_fut = {
-                let mut inner = inner.lock();
-                if !inner.resources.is_empty() {
-                    return Ok(inner.resources.remove(0));
+            let notify = match inner.share_mut(|i, _| {
+                if !i.bucket.is_empty() {
+                    return Ok((Some(i.bucket.remove(0)), None));
                 }
-                inner.wait_limit.clone().acquire_owned()
+                Ok((None, Some(i.notify.clone())))
+            }) {
+                Err(e) => return Err(e),
+                Ok((Some(t), None)) => return Ok(t),
+                Ok((None, Some(notify))) => notify,
+                _ => unreachable!(),
             };
-
-            // await the waiting permit (or maybe timeout)
-            tokio::pin!(permit_fut);
-            let permit = match timeout {
-                None => permit_fut.await,
-                Some(timeout) => timeout.mix(async move { Ok(permit_fut.await) }).await?,
-            };
-
-            let (s, r) = tokio::sync::oneshot::channel();
-
-            // we're at the head of the line - register ourselves
-            // to receive the next resource that becomes available
-            {
-                let mut inner = inner.lock();
-                if !inner.resources.is_empty() {
-                    return Ok(inner.resources.remove(0));
-                }
-                // ensure no race-condition / logic problem
-                assert!(inner.waiting.is_none());
-                inner.waiting = Some((permit, s));
-            }
-
-            // now await on our waiting receiver (or maybe timeout)
-            match timeout {
-                None => r.await.map_err(KitsuneError::other),
-                Some(timeout) => {
-                    timeout
-                        .mix(async move { r.await.map_err(KitsuneError::other) })
-                        .await
+            loop {
+                let n = notify.notified();
+                match timeout {
+                    Some(timeout) => {
+                        timeout
+                            .mix(async move {
+                                n.await;
+                                Ok(())
+                            })
+                            .await
+                    }
+                    None => {
+                        n.await;
+                        Ok(())
+                    }
+                }?;
+                match inner.share_mut(|i, _| {
+                    if !i.bucket.is_empty() {
+                        return Ok(Some(i.bucket.remove(0)));
+                    }
+                    Ok(None)
+                }) {
+                    Err(e) => return Err(e),
+                    Ok(Some(t)) => return Ok(t),
+                    _ => (),
                 }
             }
         }
