@@ -1,4 +1,4 @@
-use crate::tx2::*;
+use crate::tx2::tx2_utils::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use futures::io::AsyncReadExt;
@@ -319,7 +319,7 @@ mod tests {
     async fn test_framed() {
         let t = KitsuneTimeout::from_millis(5000);
 
-        let (send, recv) = util::bound_async_mem_channel(4096);
+        let (send, recv) = bound_async_mem_channel(4096);
         let mut send = FramedWriter::new(send);
         let mut recv = FramedReader::new(recv);
 

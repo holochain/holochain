@@ -1,5 +1,6 @@
 use crate::codec::*;
 use crate::tx2::*;
+use crate::tx2::tx2_utils::*;
 use crate::*;
 
 /// Result type returned from CodecReader::read
@@ -176,7 +177,7 @@ mod tests {
             }
         }
 
-        let (send, recv) = util::bound_async_mem_channel(4096);
+        let (send, recv) = tx2_utils::bound_async_mem_channel(4096);
         let mut send = <CodecWriter<Test>>::new(FramedWriter::new(send));
         let mut recv = <CodecReader<Test>>::new(FramedReader::new(recv));
 

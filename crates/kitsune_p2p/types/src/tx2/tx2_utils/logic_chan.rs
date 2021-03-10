@@ -1,4 +1,4 @@
-use crate::tx2::util::Share;
+use crate::tx2::tx2_utils::Share;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::futures_unordered::FuturesUnordered;

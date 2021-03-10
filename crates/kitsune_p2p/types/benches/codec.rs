@@ -1,5 +1,7 @@
 use criterion::{/*black_box,*/ criterion_group, criterion_main, Criterion};
-use kitsune_p2p_types::{tx2::*, KitsuneTimeout};
+use kitsune_p2p_types::*;
+use kitsune_p2p_types::tx2::*;
+use kitsune_p2p_types::tx2::tx2_utils::*;
 use once_cell::sync::{Lazy, OnceCell};
 
 static RUNTIME: Lazy<tokio::runtime::Handle> = Lazy::new(|| {
@@ -32,7 +34,7 @@ static NEXT_MESSAGE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64
 
 fn codec() {
     T.get_or_init(|| {
-        let (send, recv) = util::bound_async_mem_channel(4096);
+        let (send, recv) = tx2_utils::bound_async_mem_channel(4096);
         tokio::sync::Mutex::new(Some((
             CodecWriter::new(FramedWriter::new(send)),
             CodecReader::new(FramedReader::new(recv)),
@@ -58,15 +60,10 @@ fn codec() {
                 send
             });
 
-            let mut got = 0;
-            for _data in recv
+            let _data = recv
                 .read(KitsuneTimeout::from_millis(1000 * 30))
                 .await
-                .unwrap()
-            {
-                got += 1;
-            }
-            assert_eq!(1, got);
+                .unwrap();
 
             let send = wt.await.unwrap();
 

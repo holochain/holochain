@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use kitsune_p2p_types::tx2::ResourceBucket;
+use kitsune_p2p_types::tx2::tx2_utils::*;
 use once_cell::sync::Lazy;
 
 static RUNTIME: Lazy<tokio::runtime::Handle> = Lazy::new(|| {
@@ -15,7 +15,7 @@ static RUNTIME: Lazy<tokio::runtime::Handle> = Lazy::new(|| {
     handle
 });
 
-static BUCKET: Lazy<ResourceBucket<&'static str>> = Lazy::new(|| ResourceBucket::new(None));
+static BUCKET: Lazy<ResourceBucket<&'static str>> = Lazy::new(|| ResourceBucket::new());
 
 fn resource_bucket() {
     futures::executor::block_on(RUNTIME.enter(|| {
@@ -24,7 +24,7 @@ fn resource_bucket() {
             for _ in 0..50 {
                 all.push(tokio::task::spawn(async move {
                     for _ in 0..50 {
-                        let res = BUCKET.acquire().await.unwrap();
+                        let res = BUCKET.acquire(None).await.unwrap();
                         assert!(res == "1" || res == "2");
                         BUCKET.release(black_box(res));
                     }

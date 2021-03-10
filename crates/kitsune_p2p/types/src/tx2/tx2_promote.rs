@@ -3,8 +3,8 @@
 
 use crate::tx2::tx2_frontend::tx2_frontend_traits::*;
 use crate::tx2::tx2_frontend::*;
-use crate::tx2::tx_backend::*;
-use crate::tx2::util::*;
+use crate::tx2::tx2_backend::*;
+use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};

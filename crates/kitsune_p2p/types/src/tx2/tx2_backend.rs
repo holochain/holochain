@@ -1,6 +1,6 @@
 //! Types and Traits for writing tx2 backends.
 
-use crate::tx2::util::TxUrl;
+use crate::tx2::tx2_utils::TxUrl;
 use crate::tx2::*;
 use crate::*;
 

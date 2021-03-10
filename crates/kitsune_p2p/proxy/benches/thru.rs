@@ -3,7 +3,7 @@ use futures::stream::StreamExt;
 use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_proxy::*;
 use kitsune_p2p_types::tx2::tx2_frontend::*;
-use kitsune_p2p_types::tx2::util::*;
+use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
 use once_cell::sync::Lazy;

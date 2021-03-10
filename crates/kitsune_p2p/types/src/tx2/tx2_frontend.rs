@@ -1,7 +1,7 @@
 //! Abstraction traits / types for tx2 networking transport.
 
-use crate::tx2::tx_backend::Uniq;
-use crate::tx2::util::*;
+use crate::tx2::tx2_backend::Uniq;
+use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
 use crate::*;
 use futures::future::BoxFuture;

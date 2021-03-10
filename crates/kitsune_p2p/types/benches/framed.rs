@@ -1,5 +1,7 @@
 use criterion::{/*black_box,*/ criterion_group, criterion_main, Criterion};
-use kitsune_p2p_types::{tx2::*, KitsuneTimeout};
+use kitsune_p2p_types::*;
+use kitsune_p2p_types::tx2::*;
+use kitsune_p2p_types::tx2::tx2_utils::*;
 use once_cell::sync::{Lazy, OnceCell};
 
 static RUNTIME: Lazy<tokio::runtime::Handle> = Lazy::new(|| {
@@ -21,7 +23,7 @@ static T: OnceCell<tokio::sync::Mutex<Option<(FramedWriter, FramedReader)>>> = O
 
 fn framed() {
     T.get_or_init(|| {
-        let (send, recv) = util::bound_async_mem_channel(4096);
+        let (send, recv) = bound_async_mem_channel(4096);
         tokio::sync::Mutex::new(Some((FramedWriter::new(send), FramedReader::new(recv))))
     });
 
@@ -39,17 +41,13 @@ fn framed() {
                 send
             });
 
-            let mut got = 0;
-            for (msg_id, data) in recv
+            let (msg_id, data) = recv
                 .read(KitsuneTimeout::from_millis(1000 * 30))
                 .await
-                .unwrap()
-            {
-                got += 1;
-                assert_eq!(1, msg_id.as_id());
-                assert_eq!(SIZE, data.len());
-            }
-            assert_eq!(1, got);
+                .unwrap();
+
+            assert_eq!(1, msg_id.as_id());
+            assert_eq!(SIZE, data.len());
 
             let send = wt.await.unwrap();
 

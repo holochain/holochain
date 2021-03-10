@@ -1,8 +1,8 @@
 #![allow(clippy::new_ret_no_self)]
 #![allow(clippy::never_loop)]
 
-use crate::tx2::tx_backend::*;
-use crate::tx2::util::{Active, TxUrl};
+use crate::tx2::tx2_backend::*;
+use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
 use crate::*;
 use futures::{
@@ -101,7 +101,7 @@ impl ConAdapt for MemConAdapt {
     fn out_chan(&self, _timeout: KitsuneTimeout) -> OutChanFut {
         let mut sender = self.0.chan_send.clone();
         async move {
-            let (send, recv) = util::bound_async_mem_channel(4096);
+            let (send, recv) = bound_async_mem_channel(4096);
             let send: OutChan = Box::new(FramedWriter::new(send));
             let recv: InChan = Box::new(FramedReader::new(recv));
             if sender.send(recv).await.is_err() {
