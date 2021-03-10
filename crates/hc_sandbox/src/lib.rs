@@ -114,6 +114,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use holochain_conductor_api::{AdminRequest, AdminResponse};
+use holochain_websocket::WebsocketResult;
 use holochain_websocket::WebsocketSender;
 use ports::get_admin_api;
 
@@ -129,12 +130,12 @@ macro_rules! msg {
     })
 }
 
+pub mod bundles;
 pub mod calls;
 pub mod cli;
 #[doc(hidden)]
 pub mod cmds;
 pub mod config;
-pub mod dna;
 pub mod generate;
 pub mod run;
 pub mod sandbox;
@@ -159,7 +160,7 @@ impl CmdRunner {
     }
 
     /// Create a new connection for calling admin interface commands.
-    pub async fn try_new(port: u16) -> std::io::Result<Self> {
+    pub async fn try_new(port: u16) -> WebsocketResult<Self> {
         let client = get_admin_api(port).await?;
         Ok(Self { client })
     }
@@ -187,13 +188,6 @@ impl CmdRunner {
     pub async fn command(&mut self, cmd: AdminRequest) -> anyhow::Result<AdminResponse> {
         let response: Result<AdminResponse, _> = self.client.request(cmd).await;
         Ok(response?)
-    }
-}
-
-impl Drop for CmdRunner {
-    fn drop(&mut self) {
-        let f = self.client.close(0, "closing connection".to_string());
-        tokio::task::spawn(f);
     }
 }
 

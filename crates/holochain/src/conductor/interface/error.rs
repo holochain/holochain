@@ -23,10 +23,8 @@ pub enum InterfaceError {
     Other(String),
     #[error("Interface closed")]
     Closed,
-    // FIXME: update error types in holochain_websocket to use a more specific
-    // type than io::Error
     #[error(transparent)]
-    IoTodo(#[from] std::io::Error),
+    WebsocketError(#[from] holochain_websocket::WebsocketError),
     #[error("Failed to find free port")]
     PortError,
 }

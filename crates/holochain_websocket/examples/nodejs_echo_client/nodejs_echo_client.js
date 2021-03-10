@@ -29,9 +29,11 @@ class HolochainWebsocket {
   }
 
   signal (data) {
+      console.log(data)
     data = msgpack.encode(data)
     data = msgpack.encode({
-      type: 'Signal',
+      type: 'Request',
+      id: 0,
       data,
     })
     this.socket.send(data)

@@ -2,8 +2,12 @@
 //! Binary `hc-dna` command executable.
 
 use holochain_types::prelude::{AppManifest, DnaManifest};
+use mr_bundle::Manifest;
+use std::path::Path;
 use std::path::PathBuf;
 use structopt::StructOpt;
+
+use crate::error::HcBundleResult;
 
 /// The file extension to use for DNA bundles
 pub const DNA_BUNDLE_EXT: &str = "dna";
@@ -26,7 +30,7 @@ pub enum HcDnaBundle {
     ///
     /// $ hc-dna pack ./some/directory/foo/`
     ///
-    /// will create file `./some/directory/foo.dna`
+    /// will create file `./some/directory/foo/foo.dna`
     Pack {
         /// The path to the unpacked directory containing a `dna.yaml` manifest
         path: std::path::PathBuf,
@@ -117,7 +121,9 @@ impl HcDnaBundle {
                 crate::init::init_dna(path).await?;
             }
             Self::Pack { path, output } => {
-                let (bundle_path, _) = crate::packing::pack::<DnaManifest>(&path, output).await?;
+                let name = get_dna_name(&path).await?;
+                let (bundle_path, _) =
+                    crate::packing::pack::<DnaManifest>(&path, output, name).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
@@ -143,7 +149,9 @@ impl HcAppBundle {
                 crate::init::init_app(path).await?;
             }
             Self::Pack { path, output } => {
-                let (bundle_path, _) = crate::packing::pack::<AppManifest>(&path, output).await?;
+                let name = get_app_name(&path).await?;
+                let (bundle_path, _) =
+                    crate::packing::pack::<AppManifest>(&path, output, name).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
@@ -159,4 +167,20 @@ impl HcAppBundle {
         }
         Ok(())
     }
+}
+
+async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
+    let manifest_path = manifest_path.to_path_buf();
+    let manifest_path = manifest_path.join(&DnaManifest::path());
+    let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
+    let manifest: DnaManifest = serde_yaml::from_str(&manifest_yaml)?;
+    Ok(manifest.name())
+}
+
+async fn get_app_name(manifest_path: &Path) -> HcBundleResult<String> {
+    let manifest_path = manifest_path.to_path_buf();
+    let manifest_path = manifest_path.join(&AppManifest::path());
+    let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
+    let manifest: AppManifest = serde_yaml::from_str(&manifest_yaml)?;
+    Ok(manifest.app_name().to_string())
 }
