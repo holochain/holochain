@@ -478,7 +478,7 @@ impl SpaceInternalHandler for Space {
                 match network_type {
                     NetworkType::QuicMdns => {
                         // Broadcast only valid AgentInfo
-                        if urls.len() > 0 {
+                        if !urls.is_empty() {
                             // Kill previous broadcast for this space + agent
                             let key = [space.get_bytes(), agent.get_bytes()].concat();
                             if let Some(current_handle) = mdns_handles.get(&key) {
