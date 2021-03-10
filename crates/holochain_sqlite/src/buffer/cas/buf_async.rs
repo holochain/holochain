@@ -55,10 +55,10 @@ where
     }
 
     /// Get a value from the underlying [KvBufUsed]
-    pub async fn get<'r, 'a: 'r, R: Readable>(
-        &'a self,
-        r: &'r mut R,
-        hash: &'a HoloHashOf<C>,
+    pub async fn get<R: Readable>(
+        &self,
+        r: &mut R,
+        hash: &HoloHashOf<C>,
     ) -> DatabaseResult<Option<HoloHashed<C>>> {
         let k = PrefixHashKey::new(hash.as_hash());
         Ok(if let Some(content) = self.0.get(r, &k)? {
@@ -69,10 +69,10 @@ where
     }
 
     /// Get a value from the underlying [KvBufUsed]
-    pub fn get_blocking<'r, 'a: 'r, R: Readable>(
-        &'a self,
-        r: &'r mut R,
-        hash: &'a HoloHashOf<C>,
+    pub fn get_blocking<R: Readable>(
+        &self,
+        r: &mut R,
+        hash: &HoloHashOf<C>,
     ) -> DatabaseResult<Option<HoloHashed<C>>> {
         let k = PrefixHashKey::new(hash.as_hash());
         Ok(if let Some(content) = self.0.get(r, &k)? {
@@ -86,20 +86,16 @@ where
     }
 
     /// Check if a value is stored at this key
-    pub fn contains<'r, R: Readable>(
-        &self,
-        r: &'r mut R,
-        k: &HoloHashOf<C>,
-    ) -> DatabaseResult<bool> {
+    pub fn contains<R: Readable>(&self, r: &mut R, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
         let k = PrefixHashKey::new(k.as_hash());
         self.0.contains(r, &k)
     }
 
     /// Iterate over the underlying persisted data taking the scratch space into consideration
-    pub fn iter_fail<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
-    ) -> DatabaseResult<impl FallibleIterator<Item = HoloHashed<C>, Error = DatabaseError> + 'r>
+    pub fn iter_fail<'a, R: Readable>(
+        &'a self,
+        r: &mut R,
+    ) -> DatabaseResult<impl FallibleIterator<Item = HoloHashed<C>, Error = DatabaseError> + 'a>
     {
         Ok(Box::new(self.0.iter(r)?.map(|(h, c)| {
             let k: PrefixHashKey<P> = PrefixHashKey::from_key_bytes_or_friendly_panic(&h);
@@ -164,10 +160,7 @@ where
     }
 
     /// Get a value from the underlying [CasBufFresh]
-    pub async fn get<'a>(
-        &'a self,
-        hash: &'a HoloHashOf<C>,
-    ) -> DatabaseResult<Option<HoloHashed<C>>> {
+    pub async fn get(&self, hash: &HoloHashOf<C>) -> DatabaseResult<Option<HoloHashed<C>>> {
         fresh_reader!(self.env, |mut r| { self.inner.get_blocking(&mut r, hash) })
     }
 

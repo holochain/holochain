@@ -5,18 +5,23 @@ use derive_more::Into;
 use holochain_keystore::KeystoreSender;
 use holochain_zome_types::cell::CellId;
 use lazy_static::lazy_static;
-use parking_lot::RwLock;
+use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
-use std::path::Path;
-use std::path::PathBuf;
-use std::{collections::hash_map, marker::PhantomData};
 use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::{hash_map, HashSet},
+    marker::PhantomData,
+};
+use std::{path::Path, sync::atomic::Ordering};
+use std::{path::PathBuf, sync::atomic::AtomicUsize};
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
+static GLOBAL_CONNECTION_COUNT: AtomicUsize = AtomicUsize::new(0);
+
 lazy_static! {
-    static ref ENVIRONMENTS: RwLock<HashMap<PathBuf, DbWrite>> = {
+    static ref INITIALIZED_DBS: Mutex<HashSet<PathBuf>> = {
         // This is just a convenient place that we know gets initialized
         // both in the final binary holochain && in all relevant tests
         //
@@ -38,7 +43,7 @@ lazy_static! {
             // std::process::abort();
         }));
 
-        RwLock::new(HashMap::new())
+        Mutex::new(HashSet::new())
     };
 }
 
@@ -106,27 +111,16 @@ impl DbWrite {
         kind: DbKind,
         keystore: KeystoreSender,
     ) -> DatabaseResult<DbWrite> {
-        let mut map = ENVIRONMENTS.write();
         if !path_prefix.is_dir() {
             std::fs::create_dir(path_prefix.clone())
                 .map_err(|_e| DatabaseError::EnvironmentMissing(path_prefix.to_owned()))?;
         }
         let path = path_prefix.join(kind.filename());
-        let mut conn = Conn::new(&path, &kind)?.into_raw();
-        let env: DbWrite = match map.entry(path.clone()) {
-            hash_map::Entry::Occupied(e) => e.get().clone(),
-            hash_map::Entry::Vacant(e) => e
-                .insert({
-                    tracing::debug!("Initializing databases for path {:?}", path);
-                    initialize_database(&mut conn, &kind)?;
-                    DbWrite(DbRead {
-                        kind,
-                        keystore,
-                        path,
-                    })
-                })
-                .clone(),
-        };
+        let env: DbWrite = DbWrite(DbRead {
+            kind,
+            keystore,
+            path,
+        });
         Ok(env)
     }
 
@@ -163,8 +157,18 @@ pub struct Conn<'e> {
 
 impl<'e> Conn<'e> {
     /// Create a new connection with decryption key set
-    pub fn new(path: &Path, _kind: &DbKind) -> DatabaseResult<Self> {
-        let conn = Connection::open(path)?;
+    pub fn new(path: &Path, kind: &DbKind) -> DatabaseResult<Self> {
+        let mut map = INITIALIZED_DBS.lock();
+        let first = map.insert(path.to_owned());
+        // let mut conn = if first {
+        //     Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_SHARED_CACHE)?
+        // } else {
+        //     Connection::open(path)?
+        // };
+        let mut conn = Connection::open(path)?;
+
+        // tell SQLite to wait this long during write contention
+        conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
 
         let key = get_encryption_key_shim();
         let mut cmd = *br#"PRAGMA key = "x'0000000000000000000000000000000000000000000000000000000000000000'";"#;
@@ -181,8 +185,15 @@ impl<'e> Conn<'e> {
         // set to faster write-ahead-log mode
         conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
 
-        // tell SQLite to wait this long during write contention
-        conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
+        if first {
+            tracing::debug!("Initializing databases for path {:?}", path);
+            initialize_database(&mut conn, &kind)?;
+        }
+
+        let count = GLOBAL_CONNECTION_COUNT.fetch_add(1, Ordering::SeqCst);
+        if count % 100 == 0 {
+            dbg!(count);
+        }
 
         Ok(Self {
             conn,
@@ -220,6 +231,16 @@ impl<'e> Conn<'e> {
         })
     }
 }
+
+// TODO: rewrite fresh_reader! to pass mutable reference, not owned reader,
+// so that this will be possible
+//
+// impl<'e> Drop for Conn<'e> {
+//     fn drop(&mut self) {
+//         GLOBAL_CONNECTION_COUNT.fetch_sub(1, Ordering::SeqCst);
+//         dbg!("drop");
+//     }
+// }
 
 /// Simulate getting an encryption key from Lair.
 fn get_encryption_key_shim() -> [u8; 32] {
