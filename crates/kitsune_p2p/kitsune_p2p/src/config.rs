@@ -146,7 +146,7 @@ impl Default for KitsuneP2pConfig {
             transport_pool: Vec::new(),
             bootstrap_service: None,
             tuning_params: KitsuneP2pTuningParams::default(),
-            network_type: NetworkType::QuicBootstrap,
+            network_type: NetworkType::QuicMdns,
         }
     }
 }

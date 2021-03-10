@@ -478,11 +478,25 @@ impl SpaceInternalHandler for Space {
                 match network_type {
                     NetworkType::QuicMdns => {
                         // Broadcast by using Space as service type and Agent as service name
-                        let dna_str = String::from_utf8(space.get_bytes().to_owned()).unwrap();
+                        println!("(MDNS) - Space: {:?} ({})", space.get_bytes(), space.get_bytes().len());
+                        let space_b64 = base64::encode_config(&space[..], base64::STANDARD_NO_PAD);
+                        println!("(MDNS) - Space base64: {:?} ({})", space_b64, space_b64.len());
+                        let space_copy = base64::decode_config(&space_b64[..], base64::STANDARD_NO_PAD).expect("Space base64 failed");
+                        let dna_copy = KitsuneSpace(space_copy.clone());
+                        println!("(MDNS) - Copy : {:?} ({})", dna_copy.get_bytes(), dna_copy.get_bytes().len());
+                        assert!(dna_copy == *space);
+                        let mut dna_str = String::from_utf8(space_copy).unwrap().to_string();
+                        if dna_str.len() > 55 {
+                            dna_str = dna_str[..55].to_string();
+                        }
                         if let Some(current_handle) = mdns_handles.get(&dna_str) {
                             mdns_kill_thread(current_handle.to_owned());
                         }
-                        let agent_str = String::from_utf8(agent.get_bytes().to_owned()).unwrap();
+                        let mut agent_str = String::from_utf8_lossy(agent.get_bytes()).to_string();
+                        if agent_str.len() > 55 {
+                            agent_str = dna_str[..55].to_string();
+                        }
+                        println!("(MDNS) - Broadcasting of Agent {:?} ({}) in space {:?} ({} ; {})", agent, agent.get_bytes().len(), space, space.get_bytes().len(), dna_str.len());
                         let mut buffer = Vec::new();
                         kitsune_p2p_types::codec::rmp_encode(&mut buffer, &agent_info_signed)?;
                         tracing::debug!(?dna_str, ?agent_str);
@@ -535,7 +549,12 @@ impl KitsuneP2pHandler for Space {
         match self.config.network_type {
             NetworkType::QuicMdns => {
                 // Listen to MDNS service that has that space as service type
-                let dna_str = String::from_utf8(space.get_bytes().to_owned()).unwrap();
+                let mut dna_str = String::from_utf8_lossy(space.get_bytes()).to_string();
+                if dna_str.len() > 55 {
+                    dna_str = dna_str[..55].to_string();
+                }
+                //println!("(MDNS) - Agent {:?} ({}) joined space {:?} ({} ; {})", agent, agent.get_bytes().len(), space, space.get_bytes().len(), dna_str.len());
+                println!("(MDNS) - Listening to {:?}", space);
                 tokio::task::spawn(async move {
                     let stream = mdns_listen(dna_str);
                     tokio::pin!(stream);
@@ -543,6 +562,7 @@ impl KitsuneP2pHandler for Space {
                         match maybe_response {
                             Ok(response) => {
                                 tracing::debug!(msg = "Peer found via MDNS", ?response);
+                                println!("(MDNS) - Peer found via MDNS: {:?})", response);
                                 // Add response to local storage
                                 let maybe_agent_info_signed = kitsune_p2p_types::codec::rmp_decode(&mut &*response.buffer);
                                 if let Err(e) = maybe_agent_info_signed {

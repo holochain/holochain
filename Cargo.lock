@@ -2438,6 +2438,7 @@ dependencies = [
 name = "kitsune_p2p"
 version = "0.0.1"
 dependencies = [
+ "base64 0.13.0",
  "derive_more",
  "fixt",
  "futures",
