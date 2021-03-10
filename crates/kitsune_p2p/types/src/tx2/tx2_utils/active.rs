@@ -3,8 +3,14 @@ use futures::future::FutureExt;
 use std::sync::atomic;
 use std::sync::Arc;
 
+/// Represents a single active bool...
+/// See Active below, which can be mixed to contain up to 4 of these.
 struct ActiveInner {
+    /// the actual active boolean value
     act: Arc<atomic::AtomicBool>,
+
+    // below is a temp workaround until tokio 1
+
     // NOTE - with tokio 1 we'll be able to use Notify
     //        becasue notify_waiters will exist.
     w_send: tokio::sync::broadcast::Sender<bool>,
@@ -33,6 +39,9 @@ impl ActiveInner {
 }
 
 /// Active tracking helper for related items.
+/// This facilitates e.g. an endpoint with sub connections.
+/// The endpoint can close, closing all connections.
+/// Or, individual connections can close, without closing the endpoint.
 #[derive(Clone)]
 pub struct Active([Option<Arc<ActiveInner>>; 4]);
 

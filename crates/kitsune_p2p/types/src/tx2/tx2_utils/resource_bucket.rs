@@ -64,6 +64,8 @@ impl<T: 'static + Send> ResourceBucket<T> {
     ) -> impl std::future::Future<Output = KitsuneResult<T>> + 'static + Send {
         let inner = self.0.clone();
         async move {
+            // first, see if there is a resource to return immediately
+            // or, capture a notifier for when there might be again
             let notify = match inner.share_mut(|i, _| {
                 if !i.bucket.is_empty() {
                     return Ok((Some(i.bucket.remove(0)), None));
@@ -75,8 +77,12 @@ impl<T: 'static + Send> ResourceBucket<T> {
                 Ok((None, Some(notify))) => notify,
                 _ => unreachable!(),
             };
+
             loop {
+                // capture the notifier future
                 let n = notify.notified();
+
+                // mix with timeout if appropriate
                 match timeout {
                     Some(timeout) => {
                         timeout
@@ -91,6 +97,8 @@ impl<T: 'static + Send> ResourceBucket<T> {
                         Ok(())
                     }
                 }?;
+
+                // we've been notified, see if there is data
                 match inner.share_mut(|i, _| {
                     if !i.bucket.is_empty() {
                         return Ok(Some(i.bucket.remove(0)));

@@ -131,6 +131,7 @@ impl<E: 'static + Send> LogicChan<E> {
 }
 
 impl<E: 'static + Send> LogicChan<E> {
+    /// if there is any pending logic, poll it to pending
     fn poll_logic(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) {
         loop {
             if self.logic.is_empty() {
@@ -156,8 +157,17 @@ impl<E: 'static + Send> futures::stream::Stream for LogicChan<E> {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         loop {
+            // always poll logic to start
+            // note, we could make this more efficient by differentiating
+            // a custom waker that identified whether logic or stream
+            // was woken.
             Self::poll_logic(std::pin::Pin::new(&mut *self), cx);
 
+            // always poll in stream to start
+            // (see efficiency note above)
+            // this accepts:
+            //   - new incoming logic (queued to be polled as we continue loop)
+            //   - new events to emit (emitted right away)
             let (permit, new_logic) = {
                 let r = &mut self.recv;
                 futures::pin_mut!(r);
@@ -171,6 +181,9 @@ impl<E: 'static + Send> futures::stream::Stream for LogicChan<E> {
                 }
             };
 
+            // queue the new logic
+            // capture the permit such that it will drop
+            // when the logic completes.
             self.logic.push(
                 async move {
                     let _permit = permit;
