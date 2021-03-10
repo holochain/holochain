@@ -344,7 +344,7 @@ pub async fn setup_app(
 
     (
         envs,
-        RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+        RealAppInterfaceApi::new(conductor_handle, Default::default()),
         handle,
     )
 }
