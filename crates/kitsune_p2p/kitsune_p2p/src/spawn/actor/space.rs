@@ -479,21 +479,22 @@ impl SpaceInternalHandler for Space {
                     NetworkType::QuicMdns => {
                         // Broadcast only valid AgentInfo
                         if urls.len() > 0 {
-                            // Get handle map key
+                            // Kill previous broadcast for this space + agent
                             let key = [space.get_bytes(), agent.get_bytes()].concat();
-                            // Broadcast by using Space as service type and Agent as service name
-                            let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
                             if let Some(current_handle) = mdns_handles.get(&key) {
                                 mdns_kill_thread(current_handle.to_owned());
                             }
+                            // Broadcast by using Space as service type and Agent as service name
+                            let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
                             let agent_b64 = base64::encode_config(&agent[..], base64::URL_SAFE_NO_PAD);
                             //println!("(MDNS) - Broadcasting of Agent {:?} ({}) in space {:?} ({} ; {})",
                             // agent, agent.get_bytes().len(), space, space.get_bytes().len(), space_b64.len());
+                            // Broadcast rmp encoded agent_info_signed
                             let mut buffer = Vec::new();
                             kitsune_p2p_types::codec::rmp_encode(&mut buffer, &agent_info_signed)?;
                             tracing::debug!(?space_b64, ?agent_b64);
-                            let handle = mdns_create_broadcast_thread(space_b64.clone(), agent_b64, &buffer);
-                            // store mdns_handle in self
+                            let handle = mdns_create_broadcast_thread(space_b64, agent_b64, &buffer);
+                            // store handle in self
                             mdns_handles.insert(key, handle);
                         }
                     },
