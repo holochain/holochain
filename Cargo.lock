@@ -275,9 +275,9 @@ checksum = "e91831deabf0d6d7ec49552e489aed63b7456a7a3c46cff62adad428110b0af0"
 
 [[package]]
 name = "async-trait"
-version = "0.1.48"
+version = "0.1.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36ea56748e10732c49404c153638a15ec3d6211ec5ff35d9bb20e13b93576adf"
+checksum = "d3340571769500ddef1e94b45055fabed6b08a881269b7570c830b8f32ef84ef"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -850,9 +850,9 @@ dependencies = [
 
 [[package]]
 name = "csv"
-version = "1.1.6"
+version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22813a6dc45b335f9bade10bf7271dc477e81113e89eb251a0bc2a8a81c536e1"
+checksum = "f9d58633299b24b515ac72a3f869f8b91306a3cec616a602843a383acd6f9e97"
 dependencies = [
  "bstr",
  "csv-core",
@@ -1496,6 +1496,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ghost_actor"
+version = "0.4.0-alpha.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52cb0746ab4cf003d75cdbaaae2cf95139ec9607ae46bd5c68721bda2ca0c824"
+dependencies = [
+ "futures",
+ "tracing",
+]
+
+[[package]]
 name = "gimli"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1577,7 +1587,7 @@ checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 
 [[package]]
 name = "hdk"
-version = "0.0.100-alpha.1"
+version = "0.0.101-alpha.0"
 dependencies = [
  "fixt",
  "hdk_derive",
@@ -1664,7 +1674,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "hdk",
  "holo_hash",
  "holochain_cascade",
@@ -1731,7 +1741,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "hdk",
  "hdk_derive",
  "holo_hash",
@@ -1770,11 +1780,8 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "ffs",
- "holo_hash",
- "holochain",
  "holochain_serialized_bytes",
  "holochain_types",
- "holochain_zome_types",
  "matches",
  "mr_bundle",
  "predicates",
@@ -1796,6 +1803,7 @@ dependencies = [
  "assert_cmd",
  "chrono",
  "futures",
+ "holochain_cli_bundle",
  "holochain_conductor_api",
  "holochain_p2p",
  "holochain_types",
@@ -1841,7 +1849,7 @@ dependencies = [
 name = "holochain_keystore"
 version = "0.0.1"
 dependencies = [
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "holo_hash",
  "holochain_serialized_bytes",
  "holochain_zome_types",
@@ -1897,7 +1905,7 @@ dependencies = [
  "async-trait",
  "fixt",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "holo_hash",
  "holochain_keystore",
  "holochain_serialized_bytes",
@@ -2087,20 +2095,26 @@ dependencies = [
 name = "holochain_websocket"
 version = "0.0.1"
 dependencies = [
+ "criterion",
  "futures",
+ "ghost_actor 0.4.0-alpha.5",
  "holochain_serialized_bytes",
  "holochain_types",
  "linefeed",
+ "must_future",
  "nanoid",
  "net2",
  "observability",
  "serde",
  "serde_bytes",
+ "stream-cancel",
+ "thiserror",
  "tokio 0.2.25",
  "tokio-tungstenite",
  "tracing",
  "tracing-futures",
  "tungstenite",
+ "unwrap_to",
  "url2",
 ]
 
@@ -2316,9 +2330,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.6.2"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "824845a0bf897a9042383849b02c1bc219c2383772efcd5c6f9766fa4b81aef3"
+checksum = "4fb1fa934250de4de8aef298d81c729a7d33d8c239daa3a7575e6b92bfc7313b"
 dependencies = [
  "autocfg 1.0.1",
  "hashbrown",
@@ -2435,15 +2449,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "kitsune_mdns"
+version = "0.0.1"
+dependencies = [
+ "async-stream",
+ "base64 0.13.0",
+ "err-derive",
+ "futures-core",
+ "futures-util",
+ "libmdns",
+ "mdns",
+ "tokio 0.2.25",
+]
+
+[[package]]
 name = "kitsune_p2p"
 version = "0.0.1"
 dependencies = [
- "base64 0.13.0",
  "derive_more",
  "fixt",
  "futures",
- "ghost_actor",
- "kitsune_p2p_mdns",
+ "ghost_actor 0.3.0-alpha.1",
  "kitsune_p2p_proxy",
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
@@ -2460,20 +2486,6 @@ dependencies = [
  "tokio 0.2.25",
  "tracing-subscriber",
  "url2",
-]
-
-[[package]]
-name = "kitsune_p2p_mdns"
-version = "0.0.1"
-dependencies = [
- "async-stream",
- "base64 0.13.0",
- "err-derive",
- "futures-core",
- "futures-util",
- "libmdns",
- "mdns",
- "tokio 0.2.25",
 ]
 
 [[package]]
@@ -2523,7 +2535,7 @@ version = "0.0.1"
 dependencies = [
  "derive_more",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "nanoid",
  "observability",
  "once_cell",
@@ -2560,7 +2572,7 @@ dependencies = [
  "derive_more",
  "directories 3.0.1",
  "futures",
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "nanoid",
  "num_cpus",
  "once_cell",
@@ -2580,7 +2592,7 @@ version = "0.0.1-alpha.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61ee943659739a639033086b421eb19c155c9a8a64c64a6e37e1025ce5651bb2"
 dependencies = [
- "ghost_actor",
+ "ghost_actor 0.3.0-alpha.1",
  "lair_keystore_api",
  "tempfile",
  "tokio 0.2.25",
@@ -2959,7 +2971,7 @@ dependencies = [
  "openssl-probe",
  "openssl-sys",
  "schannel",
- "security-framework 2.1.2",
+ "security-framework 2.1.1",
  "security-framework-sys 2.1.1",
  "tempfile",
 ]
@@ -4032,7 +4044,7 @@ dependencies = [
 [[package]]
 name = "rkv"
 version = "0.10.4"
-source = "git+https://github.com/holochain/rkv.git#6f6b4b5adc1eb6fe4a8f9587f3a3083cafadf0a1"
+source = "git+https://github.com/holochain/rkv.git?branch=master#6f6b4b5adc1eb6fe4a8f9587f3a3083cafadf0a1"
 dependencies = [
  "arrayref",
  "bincode",
@@ -4206,9 +4218,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework"
-version = "2.1.2"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d493c5f39e02dfb062cd8f33301f90f9b13b650e8c1b1d0fd75c19dd64bff69d"
+checksum = "2dfd318104249865096c8da1dfabf09ddbb6d0330ea176812a62ec75e40c4166"
 dependencies = [
  "bitflags",
  "core-foundation 0.9.1",
@@ -4481,6 +4493,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9091b6114800a5f2141aee1d1b9d6ca3592ac062dc5decb3764ec5895a47b4eb"
 
 [[package]]
+name = "stream-cancel"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f36848ff9e3e8af125e00ab244aca7af0a8b270d4c6afcc9ccb4e523f7972c4c"
+dependencies = [
+ "futures-core",
+ "pin-project 1.0.5",
+ "tokio 1.2.0",
+]
+
+[[package]]
 name = "strsim"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4548,9 +4571,9 @@ checksum = "1e81da0851ada1f3e9d4312c704aa4f8806f0f9d69faaf8df2f3464b4a9437c2"
 
 [[package]]
 name = "syn"
-version = "1.0.62"
+version = "1.0.61"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "123a78a3596b24fee53a6464ce52d8ecbf62241e6294c7e7fe12086cd161f512"
+checksum = "ed22b90a0e734a23a7610f4283ac9e5acfb96cbb30dfefa540d66f866f1c09c5"
 dependencies = [
  "proc-macro2",
  "quote",
