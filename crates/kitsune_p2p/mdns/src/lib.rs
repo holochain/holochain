@@ -38,7 +38,13 @@ pub fn mdns_create_broadcast_thread(
 ) -> ::std::sync::Arc<AtomicBool> {
     let svc_type = format!("_{}{}", service_type, HC_SERVICE_PROTOCOL);
     // Constraints in libmdns
-    assert!(svc_type.len() < 63, "len = {} ({}) ; {}", svc_type.len(), service_type.len(), service_type);
+    assert!(
+        svc_type.len() < 63,
+        "len = {} ({}) ; {}",
+        svc_type.len(),
+        service_type.len(),
+        service_type
+    );
     assert!(service_name.len() < 63);
     // Create Termination command variable
     let can_run = ::std::sync::Arc::new(AtomicBool::new(true));
