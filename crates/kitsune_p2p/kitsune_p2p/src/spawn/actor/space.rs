@@ -3,12 +3,12 @@ use crate::types::metrics::KitsuneMetrics;
 use super::*;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
-use kitsune_p2p_types::codec::Codec;
-use std::collections::{HashSet, HashMap};
-use std::convert::TryFrom;
-use tokio::stream::{StreamExt};
 use kitsune_p2p_mdns::*;
+use kitsune_p2p_types::codec::Codec;
+use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
 use std::sync::atomic::AtomicBool;
+use tokio::stream::StreamExt;
 
 /// if the user specifies None or zero (0) for race_timeout_ms
 /// (david.b) this is not currently used
@@ -468,12 +468,12 @@ impl SpaceInternalHandler for Space {
                 )?;
                 tracing::debug!(?agent_info, ?sig);
                 evt_sender
-                   .put_agent_info_signed(PutAgentInfoSignedEvt {
-                       space: space.clone(),
-                       agent: agent.clone(),
-                       agent_info_signed: agent_info_signed.clone(),
-                   })
-                   .await?;
+                    .put_agent_info_signed(PutAgentInfoSignedEvt {
+                        space: space.clone(),
+                        agent: agent.clone(),
+                        agent_info_signed: agent_info_signed.clone(),
+                    })
+                    .await?;
                 // Push to the network as well
                 match network_type {
                     NetworkType::QuicMdns => {
@@ -485,22 +485,28 @@ impl SpaceInternalHandler for Space {
                                 mdns_kill_thread(current_handle.to_owned());
                             }
                             // Broadcast by using Space as service type and Agent as service name
-                            let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
-                            let agent_b64 = base64::encode_config(&agent[..], base64::URL_SAFE_NO_PAD);
+                            let space_b64 =
+                                base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
+                            let agent_b64 =
+                                base64::encode_config(&agent[..], base64::URL_SAFE_NO_PAD);
                             //println!("(MDNS) - Broadcasting of Agent {:?} ({}) in space {:?} ({} ; {})",
                             // agent, agent.get_bytes().len(), space, space.get_bytes().len(), space_b64.len());
                             // Broadcast rmp encoded agent_info_signed
                             let mut buffer = Vec::new();
                             kitsune_p2p_types::codec::rmp_encode(&mut buffer, &agent_info_signed)?;
                             tracing::debug!(?space_b64, ?agent_b64);
-                            let handle = mdns_create_broadcast_thread(space_b64, agent_b64, &buffer);
+                            let handle =
+                                mdns_create_broadcast_thread(space_b64, agent_b64, &buffer);
                             // store handle in self
                             mdns_handles.insert(key, handle);
                         }
-                    },
+                    }
                     NetworkType::QuicBootstrap => {
-                        crate::spawn::actor::bootstrap::put(bootstrap_service.clone(), agent_info_signed)
-                           .await?;
+                        crate::spawn::actor::bootstrap::put(
+                            bootstrap_service.clone(),
+                            agent_info_signed,
+                        )
+                        .await?;
                     }
                 }
             }
@@ -518,7 +524,6 @@ impl SpaceInternalHandler for Space {
         Ok(async move { Ok(res) }.boxed().into())
     }
 }
-
 
 impl ghost_actor::GhostControlHandler for Space {}
 
@@ -553,11 +558,15 @@ impl KitsuneP2pHandler for Space {
                             Ok(response) => {
                                 tracing::debug!(msg = "Peer found via MDNS", ?response);
                                 // Decode response
-                                let remote_agent_vec = base64::decode_config(&response.service_name[..], base64::URL_SAFE_NO_PAD)
-                                   .expect("Agent base64 decode failed");
+                                let remote_agent_vec = base64::decode_config(
+                                    &response.service_name[..],
+                                    base64::URL_SAFE_NO_PAD,
+                                )
+                                .expect("Agent base64 decode failed");
                                 let remote_agent = Arc::new(KitsuneAgent(remote_agent_vec));
                                 //println!("(MDNS) - Peer found via MDNS: {:?})", *remote_agent);
-                                let maybe_agent_info_signed = kitsune_p2p_types::codec::rmp_decode(&mut &*response.buffer);
+                                let maybe_agent_info_signed =
+                                    kitsune_p2p_types::codec::rmp_decode(&mut &*response.buffer);
                                 if let Err(e) = maybe_agent_info_signed {
                                     tracing::error!(msg = "Failed to decode peer from MDNS", ?e);
                                     continue;
@@ -566,12 +575,12 @@ impl KitsuneP2pHandler for Space {
                                 //println!("(MDNS) - Found agent_info_signed: {:?})", remote_agent_info_signed);
                                 // Add to local storage
                                 let _result = evt_sender
-                                   .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                       space: space.clone(),
-                                       agent: remote_agent,
-                                       agent_info_signed: remote_agent_info_signed,
-                                   })
-                                   .await;
+                                    .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                        space: space.clone(),
+                                        agent: remote_agent,
+                                        agent_info_signed: remote_agent_info_signed,
+                                    })
+                                    .await;
                             }
                             Err(e) => {
                                 tracing::error!(msg = "Failed to get peers from MDNS", ?e);
@@ -579,13 +588,14 @@ impl KitsuneP2pHandler for Space {
                         }
                     }
                 });
-            },
+            }
             NetworkType::QuicBootstrap => {
                 let bootstrap_service = self.config.bootstrap_service.clone();
                 if let Some(bootstrap_service) = bootstrap_service {
                     tokio::task::spawn(async move {
                         const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
-                        const MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+                        const MAX_DELAY: std::time::Duration =
+                            std::time::Duration::from_secs(60 * 60);
                         let mut delay_len = START_DELAY;
 
                         loop {
@@ -601,14 +611,14 @@ impl KitsuneP2pHandler for Space {
                                 evt_sender.clone(),
                                 bootstrap_service.clone(),
                             )
-                               .await
+                            .await
                             {
                                 tracing::error!(msg = "Failed to get peers from bootstrap", ?e);
                             }
                         }
                     });
                 }
-            },
+            }
         }
 
         Ok(async move { fut.await }.boxed().into())
