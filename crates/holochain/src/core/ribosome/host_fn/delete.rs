@@ -91,7 +91,7 @@ pub(crate) fn get_original_address<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
     use crate::core::workflow::CallZomeWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use holochain_wasm_test_utils::TestWasm;
@@ -118,7 +118,7 @@ pub mod wasm_test {
         let thing_a: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "create", ());
         let get_thing: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "read", thing_a);
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a);
         match get_thing {
             Some(element) => assert!(element.entry().as_option().is_some()),
 
@@ -129,7 +129,7 @@ pub mod wasm_test {
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete", thing_a);
 
         let get_thing: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "read", thing_a);
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a);
         match get_thing {
             None => {
                 // this is what we want, deletion => None for a get

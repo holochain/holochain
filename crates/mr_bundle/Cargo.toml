@@ -1,0 +1,36 @@
+[package]
+name = "mr_bundle"
+version = "0.0.1"
+authors = ["Michael Dougherty <maackle.d@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+bytes = "1.0"
+derive_more = "0.99"
+either = "1.5"
+flate2 = "1.0"
+ffs = { path = "../ffs", features = ["tokio"] }
+futures = "0.3"
+reqwest = "0.11"
+rmp-serde = "0.15"
+serde = { version = "1.0", features = [ "serde_derive", "derive" ] }
+serde_bytes = "0.11"
+serde_derive = "1.0"
+thiserror = "1.0"
+
+serde_yaml = {version = "0.8", optional = true}
+
+[dev-dependencies]
+anyhow = "1.0"
+matches = "0.1"
+maplit = "1"
+serde_yaml = "0.8"
+tokio = { version = "0.2", features = ["full"]}
+tempdir = "0.3"
+
+[features]
+
+packing = [
+  "serde_yaml",
+  "ffs/tokio",
+]

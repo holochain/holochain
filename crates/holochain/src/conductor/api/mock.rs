@@ -1,10 +1,8 @@
 #![allow(missing_docs)]
-#![allow(clippy::ptr_arg)]
 
 use super::CellConductorApiT;
 use super::ZomeCall;
 use crate::conductor::api::error::ConductorApiResult;
-use crate::conductor::entry_def_store::EntryDefBufferKey;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;

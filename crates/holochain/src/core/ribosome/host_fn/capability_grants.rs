@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
 
 /// list all the grants stored locally in the chain filtered by tag
 /// this is only the current grants as per local CRUD
@@ -17,14 +17,14 @@ pub fn capability_grants(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::{conductor::dna_store::MockDnaStore, test_utils::sweetest::MaybeElement};
     use crate::{conductor::ConductorBuilder, test_utils::sweetest::SweetConductor};
     use crate::{
         core::workflow::call_zome_workflow::CallZomeWorkspace, test_utils::sweetest::SweetDnaFile,
     };
     use ::fixt::prelude::*;
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
     use holochain_types::fixt::CapSecretFixturator;
+    use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
@@ -91,7 +91,7 @@ pub mod wasm_test {
 
     // TODO: [ B-03669 ] can move this to an integration test (may need to switch to using a RealDnaStore)
     #[tokio::test(threaded_scheduler)]
-    async fn ribosome_authorized_call() {
+    async fn ribosome_authorized_call() -> anyhow::Result<()> {
         observability::test_run().ok();
         let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
             .await
@@ -168,11 +168,11 @@ pub mod wasm_test {
             .call(&bobbo, "roll_cap_grant", original_grant_hash)
             .await;
 
-        let output: MaybeElement = conductor
+        let output: Option<Element> = conductor
             .call(&bobbo, "get_entry", new_grant_header_hash.clone())
             .await;
 
-        let new_secret: CapSecret = match output.0 {
+        let new_secret: CapSecret = match output {
             Some(element) => match element.entry().to_grant_option() {
                 Some(zome_call_cap_grant) => match zome_call_cap_grant.access {
                     CapAccess::Transferable { secret, .. } => secret,
@@ -200,10 +200,7 @@ pub mod wasm_test {
                 CapFor(new_secret, bob_agent_id.clone().try_into().unwrap()),
             )
             .await;
-        assert_eq!(
-            output,
-            ZomeCallResponse::Ok(ExternIO::encode(()).unwrap()),
-        );
+        assert_eq!(output, ZomeCallResponse::Ok(ExternIO::encode(()).unwrap()),);
 
         // BOB DELETES THE GRANT SO NO SECRETS WORK
 
@@ -234,5 +231,7 @@ pub mod wasm_test {
 
         let mut conductor = conductor;
         conductor.shutdown().await;
+
+        Ok(())
     }
 }

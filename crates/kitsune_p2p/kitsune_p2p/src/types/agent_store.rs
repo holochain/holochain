@@ -1,5 +1,7 @@
 //! Data structures to be stored in the agent/peer database.
 
+use std::convert::TryInto;
+
 use crate::types::KitsuneAgent;
 use crate::types::KitsuneP2pError;
 use crate::types::KitsuneSignature;
@@ -22,11 +24,11 @@ pub type Urls = Vec<Url2>;
     std::cmp::PartialOrd,
 )]
 pub struct AgentInfoSigned {
-    // Agent public key that needs to be the same as the agent in the signed agent_info.
+    /// Agent public key that needs to be the same as the agent in the signed agent_info.
     agent: KitsuneAgent,
-    // Raw bytes of agent info signature as kitsune signature.
+    /// Raw bytes of agent info signature as kitsune signature.
     signature: KitsuneSignature,
-    // The agent info as encoded MessagePack data as the exact bytes signed by the signature above.
+    /// The agent info as encoded MessagePack data as the exact bytes signed by the signature above.
     #[serde(with = "serde_bytes")]
     agent_info: Vec<u8>,
 }
@@ -73,18 +75,28 @@ impl AgentInfoSigned {
     serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, derive_more::AsRef, Hash, Eq,
 )]
 pub struct AgentInfo {
-    // The space this agent info is relevant to.
+    /// The space this agent info is relevant to.
     space: KitsuneSpace,
-    // The pub key of the agent id this info is relevant to.
+    /// The pub key of the agent id this info is relevant to.
     agent: KitsuneAgent,
-    // List of urls the agent can be reached at, in the agent's own preference order.
+    /// List of urls the agent can be reached at, in the agent's own preference order.
     urls: Urls,
-    // The unix ms timestamp that the agent info was signed at, according to the agent's own clock.
+    /// The unix ms timestamp that the agent info was signed at, according to the agent's own clock.
     #[as_ref(ignore)]
     signed_at_ms: u64,
-    // The expiry ttl for the agent info relative to the signing time.
+    /// The expiry ttl for the agent info relative to the signing time.
     #[as_ref(ignore)]
     expires_after_ms: u64,
+    /// Extra info as encoded MessagePack data.
+    #[serde(with = "serde_bytes")]
+    meta_info: Vec<u8>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Hash, Eq)]
+/// Extra info that is not used by the bootstrap server.
+pub struct AgentMetaInfo {
+    /// The half length of the [`DhtArc`]
+    pub dht_storage_arc_half_length: u32,
 }
 
 impl std::convert::TryFrom<&AgentInfoSigned> for AgentInfo {
@@ -93,6 +105,24 @@ impl std::convert::TryFrom<&AgentInfoSigned> for AgentInfo {
         Ok(kitsune_p2p_types::codec::rmp_decode(
             &mut &*agent_info_signed.agent_info,
         )?)
+    }
+}
+
+impl std::convert::TryFrom<AgentMetaInfo> for Vec<u8> {
+    type Error = KitsuneP2pError;
+    fn try_from(agent_meta_info: AgentMetaInfo) -> Result<Self, Self::Error> {
+        // Change this vec size if more data is added to AgentMetaInfo.
+        let mut buf = Vec::with_capacity(4);
+        kitsune_p2p_types::codec::rmp_encode(&mut buf, agent_meta_info)?;
+        Ok(buf)
+    }
+}
+
+impl std::convert::TryFrom<&[u8]> for AgentMetaInfo {
+    type Error = KitsuneP2pError;
+    fn try_from(mut bytes: &[u8]) -> Result<Self, Self::Error> {
+        // Change this vec size if more data is added to AgentMetaInfo.
+        Ok(kitsune_p2p_types::codec::rmp_decode(&mut bytes)?)
     }
 }
 
@@ -111,7 +141,19 @@ impl AgentInfo {
             urls,
             signed_at_ms,
             expires_after_ms,
+            meta_info: Vec::with_capacity(0),
         }
+    }
+
+    /// Add meta info to this agent info.
+    pub fn with_meta_info(mut self, meta_info: AgentMetaInfo) -> Result<Self, KitsuneP2pError> {
+        self.meta_info = meta_info.try_into()?;
+        Ok(self)
+    }
+
+    /// Decode the meta info.
+    pub fn meta_info(&self) -> Result<AgentMetaInfo, KitsuneP2pError> {
+        Ok(self.meta_info[..].try_into()?)
     }
 }
 
@@ -157,5 +199,35 @@ impl From<AgentInfoSigned> for KitsuneAgent {
 impl From<AgentInfo> for KitsuneAgent {
     fn from(ai: AgentInfo) -> Self {
         ai.agent
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fixt::*;
+    use fixt::prelude::*;
+
+    #[test]
+    fn agent_info_meta() {
+        let agent = AgentInfo {
+            space: fixt!(KitsuneSpace),
+            agent: fixt!(KitsuneAgent),
+            urls: Vec::new(),
+            signed_at_ms: 1,
+            expires_after_ms: 600_000,
+            meta_info: Vec::new(),
+        };
+        let info = agent
+            .with_meta_info(AgentMetaInfo {
+                dht_storage_arc_half_length: 10,
+            })
+            .unwrap();
+        let mut data = Vec::new();
+        kitsune_p2p_types::codec::rmp_encode(&mut data, &info).unwrap();
+        let result: AgentInfo = kitsune_p2p_types::codec::rmp_decode(&mut &data[..]).unwrap();
+        assert_eq!(result, info);
+        let meta = result.meta_info().unwrap();
+        assert_eq!(meta.dht_storage_arc_half_length, 10);
     }
 }

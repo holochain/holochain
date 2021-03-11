@@ -1,85 +1,75 @@
 # holochain_websocket
 
-[![Project](https://img.shields.io/badge/project-holochain-blue.svg?style=flat-square)](http://holochain.org/)
-[![Forum](https://img.shields.io/badge/chat-forum%2eholochain%2enet-blue.svg?style=flat-square)](https://forum.holochain.org)
-[![Chat](https://img.shields.io/badge/chat-chat%2eholochain%2enet-blue.svg?style=flat-square)](https://chat.holochain.org)
-
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
-
-Current version: 0.0.1
-
 Holochain utilities for websocket serving and connecting.
 
-To establish an outgoing connection, use [websocket_connect](fn.websocket_connect.html)
-which will return a tuple (
-[WebsocketSender](struct.WebsocketSender.html),
-[WebsocketReceiver](struct.WebsocketReceiver.html)
-).
+ To establish an outgoing connection, use [`connect`]
+which will return a tuple
+([`WebsocketSender`], [`WebsocketReceiver`])
 
-To open a listening socket, use [websocket_bind](fn.websocket_bind.html)
-which will give you a [WebsocketListener](struct.WebsocketListener.html)
+To open a listening socket, use [`WebsocketListener::bind`]
+which will give you a [`WebsocketListener`]
 which is an async Stream whose items resolve to that same tuple (
 [WebsocketSender](struct.WebsocketSender.html),
 [WebsocketReceiver](struct.WebsocketReceiver.html)
 ).
 
+If you want to be able to shutdown the stream use [`WebsocketListener::bind_with_handle`]
+which will give you a tuple ([`ListenerHandle`], [`ListenerStream`]).
+You can use [`ListenerHandle::close`] to close immediately or
+[`ListenerHandle::close_on`] to close on a future completing.
+
 ## Example
 
 ```rust
-#
-use crate::*;
+use holochain_serialized_bytes::prelude::*;
+use holochain_websocket::*;
 
-use url2::prelude::*;
-use tokio::stream::StreamExt;
 use std::convert::TryInto;
+use tokio::stream::StreamExt;
+use url2::prelude::*;
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 struct TestMessage(pub String);
-try_from_serialized_bytes!(TestMessage);
 
-let mut server = websocket_bind(
+// Create a new server listening for connections
+let mut server = WebsocketListener::bind(
     url2!("ws://127.0.0.1:0"),
     std::sync::Arc::new(WebsocketConfig::default()),
 )
 .await
 .unwrap();
 
+// Get the address of the server
 let binding = server.local_addr().clone();
 
 tokio::task::spawn(async move {
-    while let Some(maybe_con) = server.next().await {
-        let (_send, mut recv) = maybe_con.unwrap();
-
+    // Handle new connections
+    while let Some(Ok((_send, mut recv))) = server.next().await {
         tokio::task::spawn(async move {
-            if let Some(msg) = recv.next().await {
-                if let WebsocketMessage::Request(data, respond) = msg {
-                    let msg: TestMessage = data.try_into().unwrap();
-                    let msg = TestMessage(
-                        format!("echo: {}", msg.0),
-                    );
-                    respond(msg.try_into().unwrap()).await.unwrap();
+            // Receive a message and echo it back
+            if let Some((msg, resp)) = recv.next().await {
+                // Deserialize the message
+                let msg: TestMessage = msg.try_into().unwrap();
+                // If this message is a request then we can respond
+                if resp.is_request() {
+                    let msg = TestMessage(format!("echo: {}", msg.0));
+                    resp.respond(msg.try_into().unwrap()).await.unwrap();
                 }
             }
         });
     }
 });
 
-let (mut send, _recv) = websocket_connect(
-    binding,
-    std::sync::Arc::new(WebsocketConfig::default()),
-)
-.await
-.unwrap();
+// Connect the client to the server
+let (mut send, _recv) = connect(binding, std::sync::Arc::new(WebsocketConfig::default()))
+    .await
+    .unwrap();
 
 let msg = TestMessage("test".to_string());
+// Make a request and get the echoed response
 let rsp: TestMessage = send.request(msg).await.unwrap();
 
-assert_eq!(
-    "echo: test",
-    &rsp.0,
-);
-#
-#
+assert_eq!("echo: test", &rsp.0,);
 ```
 
 ## Contribute
@@ -90,9 +80,6 @@ Holochain is an open source project.  We welcome all sorts of participation and 
 ## License
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
-Copyright (C) 2019 - 2020, Holochain Foundation
+Copyright (C) 2019 - 2021, Holochain Foundation
 
-This program is free software: you can redistribute it and/or modify it under the terms of the license
-provided in the LICENSE file (Apache 2.0).  This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-PURPOSE.
+License: Apache-2.0

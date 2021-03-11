@@ -3,7 +3,7 @@
 use crate::dna::zome::WasmZome;
 use crate::dna::DnaDef;
 use crate::dna::DnaFile;
-use crate::dna::JsonProperties;
+use crate::dna::YamlProperties;
 use crate::element::SignedHeaderHashedExt;
 use crate::fixt::*;
 use crate::prelude::*;
@@ -32,7 +32,7 @@ pub fn fake_dna_file(uuid: &str) -> DnaFile {
 pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     let mut dna = DnaDef {
         name: "test".to_string(),
-        properties: JsonProperties::new(serde_json::json!({"p": "hi"}))
+        properties: YamlProperties::new(serde_yaml::from_str("p: hi").unwrap())
             .try_into()
             .unwrap(),
         uuid: uuid.to_string(),
@@ -53,10 +53,11 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
 
 /// Save a Dna to a file and return the path and tempdir that contains it
 pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
+    let bundle = DnaBundle::from_dna_file(dna).await?;
     let tmp_dir = tempdir::TempDir::new("fake_dna")?;
     let mut path: PathBuf = tmp_dir.path().into();
-    path.push("test-dna.dna.gz");
-    tokio::fs::write(path.clone(), dna.to_file_content().await?).await?;
+    path.push("test-dna.dna");
+    bundle.write_to_file(&path).await?;
     Ok((path, tmp_dir))
 }
 

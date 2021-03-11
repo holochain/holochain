@@ -15,8 +15,10 @@
 //! hard to automate piping from tests stderr.
 //!
 
+#![allow(deprecated)]
+
 use ::fixt::prelude::*;
-use hdk3::prelude::*;
+use hdk::prelude::*;
 use holochain::conductor::api::AdminRequest;
 use holochain::conductor::api::AdminResponse;
 use holochain::conductor::api::AppRequest;
@@ -26,7 +28,6 @@ use holochain::conductor::api::ZomeCall;
 use holochain::conductor::config::AdminInterfaceConfig;
 use holochain::conductor::config::ConductorConfig;
 use holochain::conductor::config::InterfaceDriver;
-use holochain::conductor::dna_store::MockDnaStore;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 
@@ -35,6 +36,7 @@ use holochain_lmdb::test_utils::TestEnvironments;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_websocket::WebsocketResult;
 use holochain_websocket::WebsocketSender;
 use matches::assert_matches;
 use observability;
@@ -233,7 +235,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
     async fn call(
         app_interface: &mut WebsocketSender,
         invocation: ZomeCall,
-    ) -> std::io::Result<AppResponse> {
+    ) -> WebsocketResult<AppResponse> {
         let request = AppRequest::ZomeCall(Box::new(invocation));
         app_interface.request(request).await
     }
@@ -300,10 +302,6 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
             break;
         }
     }
-    app_interface
-        .close(1000, "Shutting down".into())
-        .await
-        .unwrap();
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
     shutdown.await.unwrap();
@@ -346,7 +344,7 @@ pub async fn setup_app(
 
     (
         envs,
-        RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+        RealAppInterfaceApi::new(conductor_handle, Default::default()),
         handle,
     )
 }

@@ -9,6 +9,10 @@ name = "test_wasm_ser_regression"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-serde = "1.0.104"
-hdk3 = { path = "../../../../hdk3" }
 derive_more = "0.99.11"
+serde = "1.0"
+hdk = { path = "../../../../hdk" }
+
+[features]
+default = []
+mock = ["hdk/mock"]

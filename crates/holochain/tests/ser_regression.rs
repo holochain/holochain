@@ -1,12 +1,13 @@
+#![allow(deprecated)]
+
 use ::fixt::prelude::*;
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 use holochain::conductor::api::AppInterfaceApi;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
 use holochain::conductor::api::RealAppInterfaceApi;
 use holochain::conductor::api::ZomeCall;
-use holochain::conductor::dna_store::MockDnaStore;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 
@@ -206,7 +207,7 @@ pub async fn setup_app(
 
     (
         envs.tempdir(),
-        RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+        RealAppInterfaceApi::new(conductor_handle, Default::default()),
         handle,
     )
 }

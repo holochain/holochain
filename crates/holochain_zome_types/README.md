@@ -6,8 +6,6 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
-Current version: 0.0.1
-
 zome_types provides the types needed by Holochain application developers in their zome code, nothing more.
 
 This crate is intentionally kept as minimal as possible, since it is typically included as a dependency in Holochain Zomes, which are distributed as chunks of Wasm. In contrast, the [holochain_types crate](https://crates.io/crates/holochain_types) contains more types which are used by Holochain itself.
@@ -20,7 +18,7 @@ Holochain is an open source project.  We welcome all sorts of participation and 
 ## License
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
-Copyright (C) 2019 - 2020, Holochain Foundation
+Copyright (C) 2019 - 2021, Holochain Foundation
 
 This program is free software: you can redistribute it and/or modify it under the terms of the license
 provided in the LICENSE file (Apache 2.0).  This program is distributed in the hope that it will be useful,

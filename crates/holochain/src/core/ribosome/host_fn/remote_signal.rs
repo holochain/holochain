@@ -1,12 +1,12 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_wasmer_host::prelude::WasmError;
 use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use std::sync::Arc;
 use tracing::Instrument;
-use holochain_wasmer_host::prelude::WasmError;
 
 #[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn remote_signal(
@@ -58,7 +58,7 @@ mod tests {
     use crate::test_utils::sweetest::SweetDnaFile;
     use crate::test_utils::sweetest::{SweetAgents, SweetConductorBatch};
     use futures::future;
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
     use holochain_types::dna::zome::inline_zome::InlineZome;
     use holochain_zome_types::signal::AppSignal;
     use matches::assert_matches;
@@ -94,8 +94,11 @@ mod tests {
                     access: ().into(),
                     functions,
                 };
-                api.create(EntryWithDefId::new(EntryDefId::CapGrant, Entry::CapGrant(cap_grant_entry)))
-                    .unwrap();
+                api.create(EntryWithDefId::new(
+                    EntryDefId::CapGrant,
+                    Entry::CapGrant(cap_grant_entry),
+                ))
+                .unwrap();
 
                 Ok(InitCallbackResult::Pass)
             })
@@ -138,8 +141,11 @@ mod tests {
             .call(&cells[0].zome("zome1"), "signal_others", ())
             .await;
 
-        tokio::time::delay_for(std::time::Duration::from_millis(1000)).await;
-        assert_eq!(num_signals.load(Ordering::SeqCst), NUM_CONDUCTORS);
+        crate::wait_for_any_10s!(
+            num_signals.load(Ordering::SeqCst),
+            |&n| n == NUM_CONDUCTORS,
+            |n| assert_eq!(n, NUM_CONDUCTORS)
+        );
 
         for mut signal in signals {
             let r = signal.try_recv();

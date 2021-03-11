@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// The bootstrap service is much more thoroughly documented in the default service implementation.
-/// @see https://github.com/holochain/bootstrap
+/// See https://github.com/holochain/bootstrap
 mod bootstrap;
 mod discover;
 mod gossip;
