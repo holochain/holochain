@@ -21,11 +21,13 @@ async fn tls_server_and_client() {
 async fn tls_server_and_client_inner() -> TransportResult<()> {
     tracing::warn!("start test");
 
+    let tuning_params =
+        std::sync::Arc::new(kitsune_p2p_types::config::KitsuneP2pTuningParams::default());
     let tls_config_1 = TlsConfig::new_ephemeral().await?;
     let tls_config_2 = TlsConfig::new_ephemeral().await?;
 
-    let (tls_srv_conf, _tls_cli_conf) = gen_tls_configs(&tls_config_1)?;
-    let (_tls_srv_conf, tls_cli_conf) = gen_tls_configs(&tls_config_2)?;
+    let (tls_srv_conf, _tls_cli_conf) = gen_tls_configs(&tls_config_1, tuning_params.clone())?;
+    let (_tls_srv_conf, tls_cli_conf) = gen_tls_configs(&tls_config_2, tuning_params)?;
 
     let (in_con_send, mut in_con_recv) = futures::channel::mpsc::channel::<TransportEvent>(10);
 

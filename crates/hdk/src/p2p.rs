@@ -23,17 +23,16 @@ where
 {
     // @todo is this secure to set this in the wasm rather than have the host inject it?
     let provenance = agent_info()?.agent_latest_pubkey;
-    host_call::<Call, ZomeCallResponse>(
-        __call,
-        Call::new(
+    HDK.with(|h| {
+        h.borrow().call(Call::new(
             to_cell,
             zome_name,
             fn_name,
             cap_secret,
             ExternIO::encode(payload)?,
             provenance,
-        ),
-    )
+        ))
+    })
 }
 
 /// Wrapper for __call_remote host function.
@@ -69,10 +68,15 @@ pub fn call_remote<I>(
 where
     I: serde::Serialize + std::fmt::Debug,
 {
-    host_call::<CallRemote, ZomeCallResponse>(
-        __call_remote,
-        CallRemote::new(agent, zome, fn_name, cap_secret, ExternIO::encode(payload)?),
-    )
+    HDK.with(|h| {
+        h.borrow().call_remote(CallRemote::new(
+            agent,
+            zome,
+            fn_name,
+            cap_secret,
+            ExternIO::encode(payload)?,
+        ))
+    })
 }
 
 /// Emit an app-defined Signal.
@@ -88,8 +92,10 @@ pub fn emit_signal<I>(input: I) -> ExternResult<()>
 where
     I: serde::Serialize + std::fmt::Debug,
 {
-    #[allow(clippy::unit_arg)]
-    host_call::<AppSignal, ()>(__emit_signal, AppSignal::new(ExternIO::encode(input)?))
+    HDK.with(|h| {
+        h.borrow()
+            .emit_signal(AppSignal::new(ExternIO::encode(input)?))
+    })
 }
 
 /// ## Remote Signal
@@ -123,12 +129,10 @@ pub fn remote_signal<I>(input: I, agents: Vec<AgentPubKey>) -> ExternResult<()>
 where
     I: serde::Serialize + std::fmt::Debug,
 {
-    #[allow(clippy::unit_arg)]
-    host_call::<RemoteSignal, ()>(
-        __remote_signal,
-        RemoteSignal {
+    HDK.with(|h| {
+        h.borrow().remote_signal(RemoteSignal {
             signal: ExternIO::encode(input)?,
             agents,
-        },
-    )
+        })
+    })
 }
