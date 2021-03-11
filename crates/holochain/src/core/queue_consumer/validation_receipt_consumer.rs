@@ -1,4 +1,4 @@
-//! The workflow and queue consumer for DhtOp integration
+//! The workflow and queue consumer for validation receipt
 
 use super::*;
 
@@ -10,7 +10,7 @@ use holochain_lmdb::env::EnvironmentWrite;
 use tokio::task::JoinHandle;
 use tracing::*;
 
-/// Spawn the QueueConsumer for DhtOpIntegration workflow
+/// Spawn the QueueConsumer for validation receipt workflow
 #[instrument(skip(env, stop, cell_network))]
 pub fn spawn_validation_receipt_consumer(
     env: EnvironmentWrite,

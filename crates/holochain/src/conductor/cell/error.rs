@@ -56,6 +56,8 @@ pub enum CellError {
     DhtOpConvertError(#[from] DhtOpConvertError),
     #[error("Todo")]
     Todo,
+    #[error("The op: {0:?} is missing for this receipt")]
+    OpMissingForReceipt(DhtOpHash),
 }
 
 pub type CellResult<T> = Result<T, CellError>;

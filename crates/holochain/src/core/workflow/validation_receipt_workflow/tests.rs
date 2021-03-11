@@ -13,11 +13,6 @@ use holochain_state::prelude::*;
 use holochain_types::dht_op::produce_ops_from_element;
 use holochain_types::dna::zome::inline_zome::InlineZome;
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
-#[serde(transparent)]
-#[repr(transparent)]
-struct AppString(String);
-
 fn simple_crud_zome() -> InlineZome {
     let entry_def = EntryDef::default_with_id("entrydef");
 
@@ -62,13 +57,30 @@ async fn test_validation_receipt() {
     let ops = produce_ops_from_element(&element)
         .unwrap()
         .into_iter()
-        .map(|op| DhtOpHash::with_data_sync(&op));
+        .map(|op| DhtOpHash::with_data_sync(&op))
+        .collect::<Vec<_>>();
 
-    // TODO: Wait for receipts to be sent
-    tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+    // Wait for receipts to be sent
+    let db = ValidationReceiptsBuf::new(&env).unwrap();
+
+    crate::wait_for_any_10s!(
+        {
+            let mut counts = Vec::new();
+            for hash in &ops {
+                let count = fresh_reader_test!(env, |r| db
+                    .list_receipts(&r, hash)
+                    .unwrap()
+                    .count()
+                    .unwrap());
+                counts.push(count);
+            }
+            counts
+        },
+        |counts| counts == &vec![2, 2],
+        |_| ()
+    );
 
     // Check alice has receipts from both bobbo and carol
-    let db = ValidationReceiptsBuf::new(&env).unwrap();
     for hash in ops {
         let receipts: Vec<_> = fresh_reader_test!(env, |r| db
             .list_receipts(&r, &hash)

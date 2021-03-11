@@ -575,7 +575,7 @@ impl Cell {
                     "Got receipt {:?} but it's missing from authored db so throwing receipt away",
                     receipt
                 );
-                return Ok(());
+                return Err(CellError::OpMissingForReceipt(receipt.receipt.dht_op_hash));
             }
         }
 
