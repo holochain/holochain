@@ -27,7 +27,9 @@ use crate::core::ribosome::guest_callback::validation_package::ValidationPackage
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
+use crate::core::ribosome::host_fn::app_info::app_info;
 use crate::core::ribosome::host_fn::call::call;
+use crate::core::ribosome::host_fn::call_info::call_info;
 use crate::core::ribosome::host_fn::call_remote::call_remote;
 use crate::core::ribosome::host_fn::capability_claims::capability_claims;
 use crate::core::ribosome::host_fn::capability_grants::capability_grants;
@@ -37,6 +39,7 @@ use crate::core::ribosome::host_fn::create_link::create_link;
 use crate::core::ribosome::host_fn::create_x25519_keypair::create_x25519_keypair;
 use crate::core::ribosome::host_fn::delete::delete;
 use crate::core::ribosome::host_fn::delete_link::delete_link;
+use crate::core::ribosome::host_fn::dna_info::dna_info;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
@@ -48,6 +51,7 @@ use crate::core::ribosome::host_fn::random_bytes::random_bytes;
 use crate::core::ribosome::host_fn::remote_signal::remote_signal;
 use crate::core::ribosome::host_fn::schedule::schedule;
 use crate::core::ribosome::host_fn::sign::sign;
+use crate::core::ribosome::host_fn::sleep::sleep;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::trace::trace;
 use crate::core::ribosome::host_fn::unreachable::unreachable;
@@ -237,8 +241,14 @@ impl RealRibosome {
         } = host_fn_access
         {
             ns.insert("__zome_info", func!(invoke_host_function!(zome_info)));
+            ns.insert("__app_info", func!(invoke_host_function!(app_info)));
+            ns.insert("__dna_info", func!(invoke_host_function!(dna_info)));
+            ns.insert("__call_info", func!(invoke_host_function!(call_info)));
         } else {
             ns.insert("__zome_info", func!(invoke_host_function!(unreachable)));
+            ns.insert("__app_info", func!(invoke_host_function!(unreachable)));
+            ns.insert("__dna_info", func!(invoke_host_function!(unreachable)));
+            ns.insert("__call_info", func!(invoke_host_function!(unreachable)));
         }
 
         if let HostFnAccess {
@@ -248,9 +258,11 @@ impl RealRibosome {
         {
             ns.insert("__random_bytes", func!(invoke_host_function!(random_bytes)));
             ns.insert("__sys_time", func!(invoke_host_function!(sys_time)));
+            ns.insert("__sleep", func!(invoke_host_function!(sleep)));
         } else {
             ns.insert("__random_bytes", func!(invoke_host_function!(unreachable)));
             ns.insert("__sys_time", func!(invoke_host_function!(unreachable)));
+            ns.insert("__sleep", func!(invoke_host_function!(unreachable)));
         }
 
         if let HostFnAccess {

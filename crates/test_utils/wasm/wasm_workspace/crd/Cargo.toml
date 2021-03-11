@@ -12,3 +12,10 @@ crate-type = [ "cdylib", "rlib" ]
 serde = "1.0"
 holochain_test_wasm_common = { version = "=0.0.1", path = "../../../wasm_common" }
 hdk = { path = "../../../../hdk" }
+
+[features]
+default = []
+mock = ["hdk/mock"]
+
+[dev-dependencies]
+fixt = { path = "../../../../fixt" }

@@ -17,13 +17,15 @@ use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_p2p::kitsune_p2p;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
-//use holochain_types::prelude::InstallAppDnaPayload;
-//use holochain_types::prelude::InstallAppPayload;
+use holochain_types::prelude::DnaSource;
+use holochain_types::prelude::InstallAppDnaPayload;
+use holochain_types::prelude::InstallAppPayload;
 use holochain_types::prelude::InstalledCell;
+use holochain_types::prelude::RegisterDnaPayload;
+use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppBundlePayload};
 use holochain_types::prelude::{DnaHash, InstalledApp};
-use portpicker::is_free;
 use std::convert::TryFrom;
 
 use crate::cmds::Existing;
@@ -55,8 +57,11 @@ pub struct Call {
 pub enum AdminRequestCli {
     AddAdminWs(AddAdminWs),
     AddAppWs(AddAppWs),
+    RegisterDna(RegisterDna),
     InstallApp(InstallApp),
     InstallAppBundle(InstallAppBundle),
+    /// Calls AdminRequest::ListAppInterfaces.
+    ListAppWs,
     /// Calls AdminRequest::ListDnas.
     ListDnas,
     /// Calls AdminRequest::GenerateAgentPubKey.
@@ -92,6 +97,24 @@ pub struct AddAppWs {
 }
 
 #[derive(Debug, StructOpt, Clone)]
+/// Calls AdminRequest::RegisterDna
+/// and registers a Dna. You can only use a path or a hash not both.
+pub struct RegisterDna {
+    #[structopt(short, long)]
+    /// UUID to override when installing this Dna
+    pub uuid: Option<String>,
+    #[structopt(short, long)]
+    /// Properties to override when installing this Dna
+    pub properties: Option<PathBuf>,
+    #[structopt(short, long, conflicts_with = "hash", required_unless = "hash")]
+    /// Path to a DnaBundle file.
+    pub path: Option<PathBuf>,
+    #[structopt(short, long, parse(try_from_str = parse_dna_hash), required_unless = "path")]
+    /// Hash of an existing dna you want to register.
+    pub hash: Option<DnaHash>,
+}
+
+#[derive(Debug, StructOpt, Clone)]
 /// Calls AdminRequest::InstallApp
 /// and installs a new app.
 ///
@@ -102,14 +125,14 @@ pub struct InstallApp {
     #[structopt(short, long, default_value = "test-app")]
     /// Sets the InstalledAppId.
     pub app_id: String,
-    #[structopt(short, long, parse(try_from_str = parse_agent_key))]
+    #[structopt(short = "i", long, parse(try_from_str = parse_agent_key))]
     /// If not set then a key will be generated.
     /// Agent key is Base64 (same format that is used in logs).
     /// e.g. `uhCAk71wNXTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF4b_o`
     pub agent_key: Option<AgentPubKey>,
-    #[structopt(required = true, min_values = 1)]
-    /// List of dnas to install.
-    pub dnas: Vec<PathBuf>,
+    #[structopt(required = true, min_values = 1, parse(try_from_str = parse_dna_hash))]
+    /// The dna hashes to use in this app.
+    pub dnas: Vec<DnaHash>,
 }
 
 #[derive(Debug, StructOpt, Clone)]
@@ -164,6 +187,7 @@ pub struct DumpState {
     /// The agent half of the cell id to dump.
     pub agent_key: AgentPubKey,
 }
+
 #[derive(Debug, StructOpt, Clone)]
 /// Calls AdminRequest::RequestAgentInfo
 /// and pretty prints the agent info on
@@ -233,6 +257,14 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
         AdminRequestCli::AddAppWs(args) => {
             let port = attach_app_interface(cmd, args).await?;
             msg!("Added App port {}", port);
+        }
+        AdminRequestCli::ListAppWs => {
+            let ports = list_app_ws(cmd).await?;
+            msg!("Attached App Interfaces {:?}", ports);
+        }
+        AdminRequestCli::RegisterDna(args) => {
+            let dnas = register_dna(cmd, args).await?;
+            msg!("Registered Dna: {:?}", dnas);
         }
         AdminRequestCli::InstallApp(args) => {
             let app_id = args.app_id.clone();
@@ -332,13 +364,7 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
 
 /// Calls [`AdminRequest::AddAdminInterfaces`] and adds another admin interface.
 pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyhow::Result<u16> {
-    let port = match args.port {
-        Some(port) => {
-            ensure!(is_free(port), "port {} is not free", port);
-            port
-        }
-        None => 0,
-    };
+    let port = args.port.unwrap_or(0);
     let resp = cmd
         .command(AdminRequest::AddAdminInterfaces(vec![
             AdminInterfaceConfig {
@@ -355,15 +381,46 @@ pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyho
     Ok(port)
 }
 
+/// Calls [`AdminRequest::RegisterDna`] and registers dna.
+pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Result<DnaHash> {
+    let RegisterDna {
+        uuid,
+        properties,
+        path,
+        hash,
+    } = args;
+    let properties = match properties {
+        Some(path) => Some(YamlProperties::new(serde_yaml::from_str(
+            &std::fs::read_to_string(path)?,
+        )?)),
+        None => None,
+    };
+    let source = match (path, hash) {
+        (None, Some(hash)) => DnaSource::Hash(hash),
+        (Some(path), None) => DnaSource::Path(path),
+        _ => unreachable!("Can't have hash and path for dna source"),
+    };
+    let dna = RegisterDnaPayload {
+        uuid,
+        properties,
+        source,
+    };
+
+    let r = AdminRequest::RegisterDna(Box::new(dna));
+    let registered_dna = cmd.command(r).await?;
+    let hash =
+        expect_match!(registered_dna => AdminResponse::DnaRegistered, "Failed to register dna");
+    Ok(hash)
+}
+
 /// Calls [`AdminRequest::InstallApp`] and installs a new app.
 /// Creates an app per dna with the app id of `{app-id}-{dna-index}`
 /// e.g. `my-cool-app-3`.
 pub async fn install_app(
-    _cmd: &mut CmdRunner,
-    _args: InstallApp,
+    cmd: &mut CmdRunner,
+    args: InstallApp,
 ) -> anyhow::Result<HashSet<InstalledCell>> {
-    todo!("Currently unimplemented")
-    /*    let InstallApp {
+    let InstallApp {
         app_id,
         agent_key,
         dnas,
@@ -373,16 +430,11 @@ pub async fn install_app(
         None => generate_agent_pub_key(cmd).await?,
     };
 
-    for path in &dnas {
-        ensure!(path.is_file(), "Dna bundle {} must be a hash", path.display());
-    }
-
-    // Turn dnas into payloads
     let dnas = dnas
         .into_iter()
         .enumerate()
-        .map(|(i, path)| InstallAppDnaPayload::path_only(path, format!("{}-{}", app_id, i)))
-        .collect::<Vec<_>>();
+        .map(|(i, hash)| InstallAppDnaPayload::hash_only(hash, format!("{}-{}", app_id, i)))
+        .collect();
 
     let app = InstallAppPayload {
         installed_app_id: app_id,
@@ -404,7 +456,7 @@ pub async fn install_app(
     Ok(installed_app
         .provisioned_cells()
         .map(|(n, c)| InstalledCell::new(c.clone(), n.clone()))
-        .collect())*/
+        .collect())
 }
 
 /// Calls [`AdminRequest::InstallApp`] and installs a new app.
@@ -444,6 +496,12 @@ pub async fn install_app_bundle(
     )
     .await?;
     Ok(installed_app)
+}
+
+/// Calls [`AdminRequest::ListAppInterfaces`].
+pub async fn list_app_ws(cmd: &mut CmdRunner) -> anyhow::Result<Vec<u16>> {
+    let resp = cmd.command(AdminRequest::ListAppInterfaces).await?;
+    Ok(expect_match!(resp => AdminResponse::AppInterfacesListed, "Failed to list app interfaces"))
 }
 
 /// Calls [`AdminRequest::ListCellIds`].
@@ -504,12 +562,10 @@ pub async fn deactivate_app(cmd: &mut CmdRunner, args: DeactivateApp) -> anyhow:
 
 /// Calls [`AdminRequest::AttachAppInterface`] and adds another app interface.
 pub async fn attach_app_interface(cmd: &mut CmdRunner, args: AddAppWs) -> anyhow::Result<u16> {
-    if let Some(port) = args.port {
-        ensure!(is_free(port), "port {} is not free", port);
-    }
     let resp = cmd
         .command(AdminRequest::AttachAppInterface { port: args.port })
         .await?;
+    tracing::debug!(?resp);
     match resp {
         AdminResponse::AppInterfaceAttached { port } => Ok(port),
         _ => Err(anyhow!(
