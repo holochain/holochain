@@ -21,7 +21,7 @@ mock = ["hdk_derive/mock", "mockall"]
 [dependencies]
 hdk_derive = { version = "^0.0.2-alpha.1", path = "../hdk_derive" }
 holo_hash = { version = "0.0.2-alpha.1", path = "../holo_hash" }
-holochain_wasmer_guest = { version = "=0.0.67" }
+holochain_wasmer_guest = "=0.0.67"
 holochain_zome_types = { version = "0.0.2-alpha.1", path = "../holochain_zome_types" }
 paste = "=1.0.3"
 serde = "1.0"
@@ -30,8 +30,6 @@ thiserror = "1.0.22"
 tracing = "0.1"
 tracing-core = "0.1"
 mockall = { version = "0.9", optional = true }
-once_cell = "1"
-parking_lot = "0.11"
 
 [dependencies.tracing-subscriber]
 version = "0.2"

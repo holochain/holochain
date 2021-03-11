@@ -36,8 +36,10 @@ where
     S: Into<Signature>,
     D: serde::Serialize + std::fmt::Debug,
 {
-    HDK.with(|h| h.borrow()
-        .verify_signature(VerifySignature::new(key.into(), signature.into(), data)?))
+    HDK.with(|h| {
+        h.borrow()
+            .verify_signature(VerifySignature::new(key.into(), signature.into(), data)?)
+    })
 }
 
 /// Verify the passed signature and public key against the literal bytes input.
@@ -52,6 +54,8 @@ where
     K: Into<AgentPubKey>,
     S: Into<Signature>,
 {
-    HDK.with(|h| h.borrow()
-        .verify_signature(VerifySignature::new_raw(key.into(), signature.into(), data)))
+    HDK.with(|h| {
+        h.borrow()
+            .verify_signature(VerifySignature::new_raw(key.into(), signature.into(), data))
+    })
 }

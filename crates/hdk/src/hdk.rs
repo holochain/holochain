@@ -5,12 +5,8 @@ use mockall::*;
 
 pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 
-// use once_cell::sync::Lazy;
 /// This is a cell so it can be set many times.
 /// Every test needs its own mock so each test needs to set it.
-// pub static mut HDK: std::cell::Cell<Box<dyn HdkT>> = std::cell::Cell::new(Box::new(ErrHdk));
-// use parking_lot::RwLock;
-// pub static HDK: Lazy<RwLock<Box<dyn HdkT>>> = Lazy::new(|| RwLock::new(Box::new(ErrHdk)));
 use core::cell::RefCell;
 thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(ErrHdk)));
 
@@ -350,9 +346,7 @@ impl HdkT for HostHdk {
     }
 }
 
-pub fn set_hdk<'lock, H: 'static>(
-    hdk: H,
-)
+pub fn set_hdk<'lock, H: 'static>(hdk: H)
 where
     H: HdkT,
 {

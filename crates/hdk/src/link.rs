@@ -60,11 +60,13 @@ pub fn create_link<T: Into<LinkTag>>(
     target_address: EntryHash,
     tag: T,
 ) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().create_link(CreateLinkInput::new(
-        base_address,
-        target_address,
-        tag.into(),
-    )))
+    HDK.with(|h| {
+        h.borrow().create_link(CreateLinkInput::new(
+            base_address,
+            target_address,
+            tag.into(),
+        ))
+    })
 }
 
 /// Delete a specific link creation element by its header.
@@ -137,6 +139,8 @@ pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Lin
 ///
 /// See [ `get_links` ].
 pub fn get_link_details(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<LinkDetails> {
-    HDK.with(|h| h.borrow()
-        .get_link_details(GetLinksInput::new(base, link_tag)))
+    HDK.with(|h| {
+        h.borrow()
+            .get_link_details(GetLinksInput::new(base, link_tag))
+    })
 }

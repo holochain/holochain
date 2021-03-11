@@ -209,8 +209,10 @@ pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Element>>
 where
     AnyDhtHash: From<H>,
 {
-    HDK.with(|h| h.borrow()
-        .get(GetInput::new(AnyDhtHash::from(hash), options)))
+    HDK.with(|h| {
+        h.borrow()
+            .get(GetInput::new(AnyDhtHash::from(hash), options))
+    })
 }
 
 /// Get an element from the hash AND the details for the entry or header hash passed in.

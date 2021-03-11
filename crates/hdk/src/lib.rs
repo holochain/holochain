@@ -91,7 +91,7 @@
 //!
 //! ```ignore
 //! use crate::prelude::*;
-//! let _output: HDK.get().ok_or_else(|| WasmError::Guest(HDK_NOT_REGISTERED.to_string()))?.host_fn(input)
+//! let _output: HDK.with(|h| h.borrow().host_fn(input));
 //! ```
 //!
 //! And every host function defined by holochain has a convenience wrapper in HDK that does the type juggling for you.

@@ -11,8 +11,10 @@ pub fn get_agent_activity(
     query: ChainQueryFilter,
     request: ActivityRequest,
 ) -> ExternResult<AgentActivity> {
-    HDK.with(|h| h.borrow()
-        .get_agent_activity(GetAgentActivityInput::new(agent, query, request)))
+    HDK.with(|h| {
+        h.borrow()
+            .get_agent_activity(GetAgentActivityInput::new(agent, query, request))
+    })
 }
 
 /// Walks the source chain in reverse (latest to oldest) filtering by header and/or entry type

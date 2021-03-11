@@ -21,8 +21,10 @@ pub fn x_salsa20_poly1305_decrypt(
     key_ref: XSalsa20Poly1305KeyRef,
     encrypted_data: XSalsa20Poly1305EncryptedData,
 ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
-    HDK.with(|h| h.borrow()
-        .x_salsa20_poly1305_decrypt(XSalsa20Poly1305Decrypt::new(key_ref, encrypted_data)))
+    HDK.with(|h| {
+        h.borrow()
+            .x_salsa20_poly1305_decrypt(XSalsa20Poly1305Decrypt::new(key_ref, encrypted_data))
+    })
 }
 
 /// Libsodium secret-key authenticated encryption: secretbox.
@@ -60,8 +62,10 @@ pub fn x_salsa20_poly1305_encrypt(
     key_ref: XSalsa20Poly1305KeyRef,
     data: XSalsa20Poly1305Data,
 ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
-    HDK.with(|h| h.borrow()
-        .x_salsa20_poly1305_encrypt(XSalsa20Poly1305Encrypt::new(key_ref, data)))
+    HDK.with(|h| {
+        h.borrow()
+            .x_salsa20_poly1305_encrypt(XSalsa20Poly1305Encrypt::new(key_ref, data))
+    })
 }
 
 /// Libsodium keypair based authenticated encryption: box.
@@ -106,10 +110,12 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
     recipient: X25519PubKey,
     data: XSalsa20Poly1305Data,
 ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
-    HDK.with(|h| h.borrow()
-        .x_25519_x_salsa20_poly1305_encrypt(X25519XSalsa20Poly1305Encrypt::new(
-            sender, recipient, data,
-        )))
+    HDK.with(|h| {
+        h.borrow()
+            .x_25519_x_salsa20_poly1305_encrypt(X25519XSalsa20Poly1305Encrypt::new(
+                sender, recipient, data,
+            ))
+    })
 }
 
 /// Libsodium keypair based authenticated encryption: box_open
@@ -127,10 +133,12 @@ pub fn x_25519_x_salsa20_poly1305_decrypt(
     sender: X25519PubKey,
     encrypted_data: XSalsa20Poly1305EncryptedData,
 ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
-    HDK.with(|h| h.borrow()
-        .x_25519_x_salsa20_poly1305_decrypt(X25519XSalsa20Poly1305Decrypt::new(
-            recipient,
-            sender,
-            encrypted_data,
-        )))
+    HDK.with(|h| {
+        h.borrow()
+            .x_25519_x_salsa20_poly1305_decrypt(X25519XSalsa20Poly1305Decrypt::new(
+                recipient,
+                sender,
+                encrypted_data,
+            ))
+    })
 }
