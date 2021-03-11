@@ -23,10 +23,13 @@ holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.50"
 holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
 lazy_static = "1.4.0"
+once_cell = "1.4.1"
 must_future = "0.1.1"
 nanoid = "0.3.0"
 parking_lot = "0.10"
 rand = "0.7"
+r2d2 = "0.8"
+r2d2_sqlite = "0.17"
 rmp-serde = "0.15"
 serde = "1.0"
 serde_derive = "1.0"

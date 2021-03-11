@@ -6,6 +6,7 @@ use holochain_keystore::KeystoreSender;
 use holochain_zome_types::cell::CellId;
 use lazy_static::lazy_static;
 use parking_lot::{Mutex, MutexGuard, RwLock};
+use once_cell::sync::Lazy;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
 use std::path::Path;
@@ -44,6 +45,14 @@ lazy_static! {
 
         RwLock::new(HashMap::new())
     };
+}
+
+static CONNECTION_POOL: Lazy<r2d2::Pool> = Lazy::new(connection_pool);
+
+fn connection_pool() -> r2d2::Pool {
+    use r2d2_sqlite::SqliteConnectionManager;
+    let manager = SqliteConnectionManager::file("file.db");
+    let pool = r2d2::Pool::new(manager).unwrap();
 }
 
 /// A read-only version of [DbWrite].
