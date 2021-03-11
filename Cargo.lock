@@ -1594,6 +1594,7 @@ dependencies = [
  "holo_hash",
  "holochain_wasmer_guest",
  "holochain_zome_types",
+ "mockall 0.9.1",
  "paste 1.0.3",
  "serde",
  "serde_bytes",
@@ -1696,7 +1697,7 @@ dependencies = [
  "lazy_static",
  "maplit",
  "matches",
- "mockall",
+ "mockall 0.8.3",
  "mr_bundle",
  "must_future",
  "nanoid",
@@ -1913,7 +1914,7 @@ dependencies = [
  "holochain_zome_types",
  "kitsune_p2p",
  "kitsune_p2p_types",
- "mockall",
+ "mockall 0.8.3",
  "observability",
  "serde",
  "serde_bytes",
@@ -1967,7 +1968,7 @@ dependencies = [
  "holochain_wasm_test_utils",
  "holochain_zome_types",
  "matches",
- "mockall",
+ "mockall 0.8.3",
  "observability",
  "pretty_assertions",
  "serde",
@@ -2016,7 +2017,7 @@ dependencies = [
  "lazy_static",
  "maplit",
  "matches",
- "mockall",
+ "mockall 0.8.3",
  "mr_bundle",
  "must_future",
  "nanoid",
@@ -2889,7 +2890,22 @@ dependencies = [
  "downcast",
  "fragile",
  "lazy_static",
- "mockall_derive",
+ "mockall_derive 0.8.3",
+ "predicates",
+ "predicates-tree",
+]
+
+[[package]]
+name = "mockall"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18d614ad23f9bb59119b8b5670a85c7ba92c5e9adf4385c81ea00c51c8be33d5"
+dependencies = [
+ "cfg-if 1.0.0",
+ "downcast",
+ "fragile",
+ "lazy_static",
+ "mockall_derive 0.9.1",
  "predicates",
  "predicates-tree",
 ]
@@ -2901,6 +2917,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c461918bf7f59eefb1459252756bf2351a995d6bd510d0b2061bd86bcdabfa6"
 dependencies = [
  "cfg-if 0.1.10",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "mockall_derive"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5dd4234635bca06fc96c7368d038061e0aae1b00a764dc817e900dc974e3deea"
+dependencies = [
+ "cfg-if 1.0.0",
  "proc-macro2",
  "quote",
  "syn",
