@@ -8,7 +8,10 @@ use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
-use std::{collections::HashSet, marker::PhantomData};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+};
 use std::{path::Path, sync::atomic::Ordering};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
 use std::{rc::Rc, time::Duration};
@@ -44,6 +47,10 @@ lazy_static! {
     };
 }
 
+thread_local! {
+    static CONNECTIONS: RefCell<HashMap<PathBuf, Conn>> = RefCell::new(HashMap::new());
+}
+
 /// A read-only version of [DbWrite].
 /// This environment can only generate read-only transactions, never read-write.
 #[derive(Clone)]
@@ -55,7 +62,7 @@ pub struct DbRead {
 
 impl DbRead {
     #[deprecated = "rename to `conn`"]
-    pub fn guard(&self) -> Conn<'_> {
+    pub fn guard(&self) -> Conn {
         self.connection_naive().expect("TODO: Can't fail")
     }
 
@@ -81,7 +88,7 @@ impl DbRead {
 
     #[deprecated = "TODO: use `connection`"]
     fn connection_naive(&self) -> DatabaseResult<Conn> {
-        Ok(Conn::new(&self.path, &self.kind)?)
+        Ok(Conn::open(&self.path, &self.kind)?)
     }
 
     // fn connection(&self) -> DatabaseResult<Conn> {
@@ -142,61 +149,78 @@ impl DbWrite {
     }
 }
 
-/// Wrapper around Connection with a phantom lifetime.
+/// Wrapper around Connection.
 /// Needed to allow borrowing transactions in the same fashion as our LMDB
 /// lifetime model
 // #[derive(Shrinkwrap)]
 #[derive(Clone)]
-pub struct Conn<'e> {
+pub struct Conn {
     // #[shrinkwrap(main_field)]
     conn: Rc<Mutex<Connection>>,
-    lt: PhantomData<&'e ()>,
 }
 
-impl<'e> Conn<'e> {
+fn initialize_connection(
+    mut conn: Connection,
+    kind: &DbKind,
+    is_first: bool,
+) -> DatabaseResult<Connection> {
+    // tell SQLite to wait this long during write contention
+    conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
+
+    let key = get_encryption_key_shim();
+    let mut cmd =
+        *br#"PRAGMA key = "x'0000000000000000000000000000000000000000000000000000000000000000'";"#;
+    {
+        use std::io::Write;
+        let mut c = std::io::Cursor::new(&mut cmd[16..80]);
+        for b in &key {
+            write!(c, "{:02X}", b)
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+        }
+    }
+    conn.execute(std::str::from_utf8(&cmd).unwrap(), NO_PARAMS)?;
+
+    // set to faster write-ahead-log mode
+    conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
+
+    if is_first {
+        initialize_database(&mut conn, &kind)?;
+    }
+
+    let count = GLOBAL_CONNECTION_COUNT.fetch_add(1, Ordering::SeqCst);
+    if count % 100 == 0 {
+        dbg!(count);
+    }
+    Ok(conn)
+}
+
+impl Conn {
     /// Create a new connection with decryption key set
-    pub fn new(path: &Path, kind: &DbKind) -> DatabaseResult<Self> {
+    pub fn open(path: &Path, kind: &DbKind) -> DatabaseResult<Self> {
         let mut map = INITIALIZED_DBS.lock();
-        let first = map.insert(path.to_owned());
-        // let mut conn = if first {
-        //     Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_SHARED_CACHE)?
-        // } else {
-        //     Connection::open(path)?
-        // };
-        let mut conn = Connection::open(path)?;
+        let is_first = map.insert(path.to_owned());
 
-        // tell SQLite to wait this long during write contention
-        conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
+        let conn = CONNECTIONS.with(|connections| {
+            connections
+                .borrow_mut()
+                .get(path)
+                .map(|c| Ok(c.to_owned()))
+                .unwrap_or_else(|| {
+                    DatabaseResult::Ok(Self::new(initialize_connection(
+                        Connection::open(path)?,
+                        kind,
+                        is_first,
+                    )?))
+                })
+        })?;
 
-        let key = get_encryption_key_shim();
-        let mut cmd = *br#"PRAGMA key = "x'0000000000000000000000000000000000000000000000000000000000000000'";"#;
-        {
-            use std::io::Write;
-            let mut c = std::io::Cursor::new(&mut cmd[16..80]);
-            for b in &key {
-                write!(c, "{:02X}", b)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
-            }
+        Ok(conn)
+    }
+
+    fn new(inner: Connection) -> Self {
+        Self {
+            conn: Rc::new(Mutex::new(inner)),
         }
-        conn.execute(std::str::from_utf8(&cmd).unwrap(), NO_PARAMS)?;
-
-        // set to faster write-ahead-log mode
-        conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
-
-        if first {
-            tracing::debug!("Initializing databases for path {:?}", path);
-            initialize_database(&mut conn, &kind)?;
-        }
-
-        let count = GLOBAL_CONNECTION_COUNT.fetch_add(1, Ordering::SeqCst);
-        if count % 100 == 0 {
-            dbg!(count);
-        }
-
-        Ok(Self {
-            conn: Rc::new(Mutex::new(conn)),
-            lt: PhantomData,
-        })
     }
 
     #[deprecated = "remove this identity"]
@@ -316,7 +340,7 @@ pub trait WriteManager<'e> {
     // fn writer_unmanaged(&'e mut self) -> DatabaseResult<Writer<'e>>;
 }
 
-impl<'e> ReadManager<'e> for Conn<'e> {
+impl<'e> ReadManager<'e> for Conn {
     fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
@@ -354,7 +378,7 @@ impl<'e> ReadManager<'e> for Conn<'e> {
 //     }
 // }
 
-impl<'e> WriteManager<'e> for Conn<'e> {
+impl<'e> WriteManager<'e> for Conn {
     fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
