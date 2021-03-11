@@ -4,7 +4,7 @@ use super::*;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
 use kitsune_p2p_mdns::*;
-use kitsune_p2p_types::codec::Codec;
+use kitsune_p2p_types::codec::{Codec, rmp_encode, rmp_decode};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::sync::atomic::AtomicBool;
@@ -454,7 +454,7 @@ impl SpaceInternalHandler for Space {
                     expires_after,
                 );
                 let mut data = Vec::new();
-                kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info)?;
+                rmp_encode(&mut data, &agent_info)?;
                 let sign_req = SignNetworkDataEvt {
                     space: space.clone(),
                     agent: agent.clone(),
@@ -493,7 +493,7 @@ impl SpaceInternalHandler for Space {
                             // agent, agent.get_bytes().len(), space, space.get_bytes().len(), space_b64.len());
                             // Broadcast rmp encoded agent_info_signed
                             let mut buffer = Vec::new();
-                            kitsune_p2p_types::codec::rmp_encode(&mut buffer, &agent_info_signed)?;
+                            rmp_encode(&mut buffer, &agent_info_signed)?;
                             tracing::trace!(?space_b64, ?agent_b64);
                             let handle =
                                 mdns_create_broadcast_thread(space_b64, agent_b64, &buffer);
@@ -568,9 +568,9 @@ impl KitsuneP2pHandler for Space {
                                     let remote_agent = Arc::new(KitsuneAgent(remote_agent_vec));
                                     //println!("(MDNS) - Peer found via MDNS: {:?})", *remote_agent);
                                     let maybe_agent_info_signed =
-                                        kitsune_p2p_types::codec::rmp_decode(&mut &*response.buffer);
+                                        rmp_decode(&mut &*response.buffer);
                                     if let Err(e) = maybe_agent_info_signed {
-                                        tracing::error!(msg = "Failed to decode peer from MDNS", ?e);
+                                        tracing::error!(msg = "Failed to decode MDNS peer", ?e);
                                         continue;
                                     }
                                     let remote_agent_info_signed = maybe_agent_info_signed.unwrap();
