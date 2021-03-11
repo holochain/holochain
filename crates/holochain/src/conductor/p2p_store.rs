@@ -448,17 +448,15 @@ mod tests {
                 )
             })
             .unwrap();
-        let mut g = environ.guard();
 
-        let ret = &store_buf
-            .as_store_ref()
-            .get(
-                &mut g.reader().unwrap(),
-                &(&agent_info_signed).try_into().unwrap(),
-            )
-            .unwrap();
+        environ.guard().with_reader_test(|mut reader| {
+            let ret = &store_buf
+                .as_store_ref()
+                .get(&mut reader, &(&agent_info_signed).try_into().unwrap())
+                .unwrap();
 
-        assert_eq!(ret, &Some(agent_info_signed),);
+            assert_eq!(ret, &Some(agent_info_signed),);
+        })
     }
 
     #[tokio::test(threaded_scheduler)]

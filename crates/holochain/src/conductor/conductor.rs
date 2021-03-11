@@ -63,7 +63,6 @@ use holochain_sqlite::buffer::KvStore;
 use holochain_sqlite::buffer::KvStoreT;
 use holochain_sqlite::db::DbKind;
 use holochain_sqlite::db::DbWrite;
-use holochain_sqlite::db::ReadManager;
 use holochain_sqlite::exports::SingleTable;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
@@ -934,12 +933,10 @@ where
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        let mut guard = self.env.guard();
-        let mut reader = guard.reader()?;
-        Ok(self
+        fresh_reader!(self.env, |mut reader| Ok(self
             .state_db
             .get(&mut reader, &UnitDbKey)?
-            .unwrap_or_default())
+            .unwrap_or_default()))
     }
 
     /// Update the internal state with a pure function mapping old state to new

@@ -37,44 +37,44 @@ async fn check_different_seq_num_on_separate_queries() {
         .unwrap();
 
     let mut g = meta_buf.env().guard();
-    let mut reader = g.reader().unwrap();
-
-    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 1);
-    assert_eq!(
-        meta_buf
-            .get_activity(&mut reader, k)
-            .unwrap()
-            .count()
-            .unwrap(),
-        1
-    );
-    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 2);
-    assert_eq!(
-        meta_buf
-            .get_activity(&mut reader, k)
-            .unwrap()
-            .count()
-            .unwrap(),
-        1
-    );
-    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 0);
-    assert_eq!(
-        meta_buf
-            .get_activity(&mut reader, k)
-            .unwrap()
-            .count()
-            .unwrap(),
-        0
-    );
-    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 3);
-    assert_eq!(
-        meta_buf
-            .get_activity(&mut reader, k)
-            .unwrap()
-            .count()
-            .unwrap(),
-        0
-    );
+    g.with_reader_test(|mut reader| {
+        let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 1);
+        assert_eq!(
+            meta_buf
+                .get_activity(&mut reader, k)
+                .unwrap()
+                .count()
+                .unwrap(),
+            1
+        );
+        let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 2);
+        assert_eq!(
+            meta_buf
+                .get_activity(&mut reader, k)
+                .unwrap()
+                .count()
+                .unwrap(),
+            1
+        );
+        let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 0);
+        assert_eq!(
+            meta_buf
+                .get_activity(&mut reader, k)
+                .unwrap()
+                .count()
+                .unwrap(),
+            0
+        );
+        let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 3);
+        assert_eq!(
+            meta_buf
+                .get_activity(&mut reader, k)
+                .unwrap()
+                .count()
+                .unwrap(),
+            0
+        );
+    });
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -92,53 +92,53 @@ async fn check_equal_seq_num_on_same_query() {
         .unwrap();
 
     let mut g = meta_buf.env().guard();
-    let mut reader = g.reader().unwrap();
-
-    let k = ChainItemKey::new(&h1, ValidationStatus::Valid);
-    assert_eq!(
-        meta_buf
-            .get_activity(&mut reader, k)
-            .unwrap()
-            .count()
-            .unwrap(),
-        1
-    );
-    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 1);
-    assert_eq!(
-        meta_buf
-            .get_activity(&mut reader, k)
-            .unwrap()
-            .count()
-            .unwrap(),
-        2
-    );
-    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 2);
-    assert_eq!(
-        meta_buf
-            .get_activity(&mut reader, k)
-            .unwrap()
-            .count()
-            .unwrap(),
-        0
-    );
-    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 0);
-    assert_eq!(
-        meta_buf
-            .get_activity(&mut reader, k)
-            .unwrap()
-            .count()
-            .unwrap(),
-        0
-    );
-    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 3);
-    assert_eq!(
-        meta_buf
-            .get_activity(&mut reader, k)
-            .unwrap()
-            .count()
-            .unwrap(),
-        0
-    );
+    g.with_reader_test(|mut reader| {
+        let k = ChainItemKey::new(&h1, ValidationStatus::Valid);
+        assert_eq!(
+            meta_buf
+                .get_activity(&mut reader, k)
+                .unwrap()
+                .count()
+                .unwrap(),
+            1
+        );
+        let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 1);
+        assert_eq!(
+            meta_buf
+                .get_activity(&mut reader, k)
+                .unwrap()
+                .count()
+                .unwrap(),
+            2
+        );
+        let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 2);
+        assert_eq!(
+            meta_buf
+                .get_activity(&mut reader, k)
+                .unwrap()
+                .count()
+                .unwrap(),
+            0
+        );
+        let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 0);
+        assert_eq!(
+            meta_buf
+                .get_activity(&mut reader, k)
+                .unwrap()
+                .count()
+                .unwrap(),
+            0
+        );
+        let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 3);
+        assert_eq!(
+            meta_buf
+                .get_activity(&mut reader, k)
+                .unwrap()
+                .count()
+                .unwrap(),
+            0
+        );
+    });
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -152,27 +152,27 @@ async fn chain_item_keys_ser() {
         .unwrap();
 
     let mut g = meta_buf.env().guard();
-    let mut reader = g.reader().unwrap();
+    g.with_reader_test(|mut reader| {
+        let k = ChainItemKey::new(&h, ValidationStatus::Valid);
+        assert_eq!(
+            meta_buf
+                .get_activity(&mut reader, k)
+                .unwrap()
+                .count()
+                .unwrap(),
+            1
+        );
 
-    let k = ChainItemKey::new(&h, ValidationStatus::Valid);
-    assert_eq!(
-        meta_buf
+        let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 1);
+        let mut headers: Vec<_> = meta_buf
             .get_activity(&mut reader, k)
             .unwrap()
-            .count()
-            .unwrap(),
-        1
-    );
-
-    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 1);
-    let mut headers: Vec<_> = meta_buf
-        .get_activity(&mut reader, k)
-        .unwrap()
-        .collect()
-        .unwrap();
-    assert_eq!(headers.len(), 1);
-    println!("expect hash {:?}", expect_hash.clone().into_inner());
-    assert_eq!(headers.pop().unwrap().header_hash, expect_hash);
+            .collect()
+            .unwrap();
+        assert_eq!(headers.len(), 1);
+        println!("expect hash {:?}", expect_hash.clone().into_inner());
+        assert_eq!(headers.pop().unwrap().header_hash, expect_hash);
+    });
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -191,15 +191,15 @@ async fn check_large_seq_queries() {
         .unwrap();
 
     let mut g = meta_buf.env().guard();
-    let mut reader = g.reader().unwrap();
-
-    let k = ChainItemKey::Agent(agent_pubkey.clone());
-    assert_eq!(
-        &meta_buf
-            .get_activity_sequence(&mut reader, k)
-            .unwrap()
-            .collect::<Vec<_>>()
-            .unwrap()[..],
-        &[(1, h2_hash), (256, h1_hash)]
-    );
+    g.with_reader_test(|mut reader| {
+        let k = ChainItemKey::Agent(agent_pubkey.clone());
+        assert_eq!(
+            &meta_buf
+                .get_activity_sequence(&mut reader, k)
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap()[..],
+            &[(1, h2_hash), (256, h1_hash)]
+        );
+    });
 }

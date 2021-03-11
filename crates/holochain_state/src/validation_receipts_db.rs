@@ -204,31 +204,33 @@ mod tests {
         }
 
         let mut g = env.guard();
-        let mut reader = g.reader()?;
-        let vr_buf = ValidationReceiptsBuf::new(&env)?;
+        g.with_reader_test(|mut reader| {
+            let vr_buf = ValidationReceiptsBuf::new(&env).unwrap();
 
-        assert_eq!(2, vr_buf.count_valid(&mut reader, &test_op_hash)?);
+            assert_eq!(2, vr_buf.count_valid(&mut reader, &test_op_hash).unwrap());
 
-        let mut list = vr_buf
-            .list_receipts(&mut reader, &test_op_hash)?
-            .collect::<Vec<_>>()?;
-        list.sort_by(|a, b| {
-            a.receipt
-                .validator
-                .partial_cmp(&b.receipt.validator)
+            let mut list = vr_buf
+                .list_receipts(&mut reader, &test_op_hash)
                 .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap();
+            list.sort_by(|a, b| {
+                a.receipt
+                    .validator
+                    .partial_cmp(&b.receipt.validator)
+                    .unwrap()
+            });
+
+            let mut expects = vec![vr1, vr2];
+            expects.sort_by(|a, b| {
+                a.receipt
+                    .validator
+                    .partial_cmp(&b.receipt.validator)
+                    .unwrap()
+            });
+
+            assert_eq!(expects, list);
         });
-
-        let mut expects = vec![vr1, vr2];
-        expects.sort_by(|a, b| {
-            a.receipt
-                .validator
-                .partial_cmp(&b.receipt.validator)
-                .unwrap()
-        });
-
-        assert_eq!(expects, list);
-
         Ok(())
     }
 }

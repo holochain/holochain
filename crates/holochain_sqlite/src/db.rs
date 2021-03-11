@@ -8,10 +8,10 @@ use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
-use std::{cell::RefCell, rc::Rc, time::Duration};
 use std::{collections::HashSet, marker::PhantomData};
 use std::{path::Path, sync::atomic::Ordering};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
+use std::{rc::Rc, time::Duration};
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -286,15 +286,17 @@ impl DbKind {
 
 /// Implementors are able to create a new read-only LMDB transaction
 pub trait ReadManager<'e> {
-    /// Create a new read-only LMDB transaction
-    // NB: this has to be mutable now because SQLite has only read-write txns
-    fn reader(&'e mut self) -> DatabaseResult<Reader<'e>>;
-
     /// Run a closure, passing in a new read-only transaction
-    fn with_reader<E, R, F: Send>(&'e mut self, f: F) -> Result<R, E>
+    fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: 'e + FnOnce(Reader) -> Result<R, E>;
+
+    #[cfg(feature = "test_utils")]
+    /// Same as with_reader, but with no Results: everything gets unwrapped
+    fn with_reader_test<R, F>(&'e mut self, f: F) -> R
+    where
+        F: 'e + FnOnce(Reader) -> R;
 }
 
 /// Implementors are able to create a new read-write LMDB transaction
@@ -303,7 +305,7 @@ pub trait WriteManager<'e> {
     /// transaction, and commit the transaction after the closure has run.
     /// If there is a LMDB error, recover from it and re-run the closure.
     // FIXME: B-01566: implement write failure detection
-    fn with_commit<E, R, F: Send>(&'e mut self, f: F) -> Result<R, E>
+    fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: 'e + FnOnce(&mut Writer) -> Result<R, E>;
@@ -315,11 +317,7 @@ pub trait WriteManager<'e> {
 }
 
 impl<'e> ReadManager<'e> for Conn<'e> {
-    fn reader(&'e mut self) -> DatabaseResult<Reader<'e>> {
-        todo!("replace all")
-    }
-
-    fn with_reader<E, R, F: Send>(&'e mut self, f: F) -> Result<R, E>
+    fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: 'e + FnOnce(Reader) -> Result<R, E>,
@@ -328,6 +326,14 @@ impl<'e> ReadManager<'e> for Conn<'e> {
         let txn = g.transaction().map_err(DatabaseError::from)?;
         let reader = Reader::from(txn);
         f(reader)
+    }
+
+    #[cfg(feature = "test_utils")]
+    fn with_reader_test<R, F>(&'e mut self, f: F) -> R
+    where
+        F: 'e + FnOnce(Reader) -> R,
+    {
+        self.with_reader(|r| DatabaseResult::Ok(f(r))).unwrap()
     }
 }
 
@@ -339,7 +345,7 @@ impl<'e> ReadManager<'e> for Conn<'e> {
 //         Ok(reader)
 //     }
 
-//     fn with_reader<E, R, F: Send>(&'e mut self, f: F) -> Result<R, E>
+//     fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
 //     where
 //         E: From<DatabaseError>,
 //         F: 'e + FnOnce(Reader) -> Result<R, E>,
@@ -349,7 +355,7 @@ impl<'e> ReadManager<'e> for Conn<'e> {
 // }
 
 impl<'e> WriteManager<'e> for Conn<'e> {
-    fn with_commit<E, R, F: Send>(&'e mut self, f: F) -> Result<R, E>
+    fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: 'e + FnOnce(&mut Writer) -> Result<R, E>,

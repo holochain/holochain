@@ -211,9 +211,9 @@ mod tests {
         }
 
         // Check queries
-        {
-            let mut g = env.guard();
-            let mut reader = g.reader().unwrap();
+
+        let mut g = env.guard();
+        g.with_reader_test(|mut reader| {
             let buf = IntegratedDhtOpsBuf::new(env.clone().into()).unwrap();
             // No filter
             let mut r = buf
@@ -293,6 +293,6 @@ mod tests {
             assert!(r.contains(&expected[3]));
             assert!(r.contains(&expected[5]));
             assert_eq!(r.len(), 3);
-        }
+        });
     }
 }

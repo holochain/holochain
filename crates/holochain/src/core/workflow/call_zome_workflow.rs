@@ -347,7 +347,6 @@ pub mod tests {
     use ::fixt::prelude::*;
 
     use holochain_p2p::HolochainP2pCellFixturator;
-    use holochain_sqlite::db::ReadManager;
     use holochain_sqlite::test_utils::test_cell_env;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;
@@ -391,8 +390,6 @@ pub mod tests {
     async fn private_zome_call() {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let mut g = env.guard();
-        let reader = g.reader().unwrap();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let ribosome = MockRibosomeT::new();
         // FIXME: CAP: Set this function to private

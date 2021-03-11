@@ -312,8 +312,7 @@ pub mod tests {
                 .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
         }
         let mut g = arc.guard();
-        let mut reader = g.reader()?;
-        {
+        g.with_reader(|mut reader| {
             let buf = ChainSequenceBuf::new(arc.clone().into())?;
             assert_eq!(
                 buf.chain_head(),
@@ -332,7 +331,8 @@ pub mod tests {
                 .map(|(key, _)| Ok(IntKey::from_key_bytes_or_friendly_panic(&key).into()))
                 .collect()?;
             assert_eq!(items, vec![0, 1, 2]);
-        }
+            DatabaseResult::Ok(())
+        })?;
 
         {
             let mut buf = ChainSequenceBuf::new(arc.clone().into())?;
@@ -361,8 +361,7 @@ pub mod tests {
                 .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
         }
         let mut g = arc.guard();
-        let mut reader = g.reader()?;
-        {
+        g.with_reader(|mut reader| {
             let buf = ChainSequenceBuf::new(arc.clone().into())?;
             assert_eq!(
                 buf.chain_head(),
@@ -381,9 +380,8 @@ pub mod tests {
                 .map(|(_, i)| Ok(i.tx_seq))
                 .collect()?;
             assert_eq!(items, vec![0, 0, 0, 1, 1, 1]);
-        }
-
-        Ok(())
+            Ok(())
+        })
     }
 
     /// If we attempt to move the chain head, but it has already moved from

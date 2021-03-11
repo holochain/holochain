@@ -7,6 +7,7 @@ pub use crate::exports::*;
 pub use crate::key::*;
 pub use crate::table::*;
 pub use crate::transaction::*;
+pub use crate::{fresh_reader, fresh_reader_test};
 
 #[cfg(any(test, feature = "test_utils"))]
 pub use crate::test_utils::*;

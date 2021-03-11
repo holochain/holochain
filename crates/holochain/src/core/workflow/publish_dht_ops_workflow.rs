@@ -355,13 +355,13 @@ mod tests {
 
             let check = async move {
                 recv_task.await.unwrap();
-                let mut g = env.guard();
-                let mut reader = g.reader().unwrap();
                 let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
-                for i in workspace.authored().iter(&mut reader).unwrap().iterator() {
-                    // Check that each item now has a publish time
-                    assert!(i.expect("can iterate").1.last_publish_time.is_some())
-                }
+                fresh_reader_test!(env, |mut reader| {
+                    for i in workspace.authored().iter(&mut reader).unwrap().iterator() {
+                        // Check that each item now has a publish time
+                        assert!(i.expect("can iterate").1.last_publish_time.is_some())
+                    }
+                })
             };
 
             // Shutdown
@@ -396,12 +396,10 @@ mod tests {
 
             // Update the authored to have > R counts
             {
-                let mut g = env.guard();
-                let mut reader = g.reader().unwrap();
                 let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
 
                 // Update authored to R
-                let values = workspace
+                let values = fresh_reader_test!(env, |mut reader| workspace
                     .authored_dht_ops
                     .iter(&mut reader)
                     .unwrap()
@@ -410,7 +408,7 @@ mod tests {
                         Ok((DhtOpHash::from_raw_39_panicky(k.to_vec()), v))
                     })
                     .collect::<Vec<_>>()
-                    .unwrap();
+                    .unwrap());
 
                 for (hash, v) in values.into_iter() {
                     workspace.authored_dht_ops.put(hash, v).unwrap();

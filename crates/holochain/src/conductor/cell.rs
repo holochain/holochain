@@ -40,7 +40,7 @@ use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_sqlite::prelude::*;
+use holochain_sqlite::{fresh_reader, prelude::*};
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use observability::OpenSpanExt;
@@ -567,13 +567,11 @@ impl Cell {
         since: Timestamp,
         until: Timestamp,
     ) -> CellResult<Vec<DhtOpHash>> {
-        let mut g = self.env().guard();
-        let mut reader = g.reader()?;
         let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into())?;
-        let result: Vec<DhtOpHash> = integrated_dht_ops
+        let result: Vec<DhtOpHash> = fresh_reader!(self.env(), |mut reader| integrated_dht_ops
             .query(&mut reader, Some(since), Some(until), Some(dht_arc))?
             .map(|(k, _)| Ok(k))
-            .collect()?;
+            .collect())?;
         Ok(result)
     }
 

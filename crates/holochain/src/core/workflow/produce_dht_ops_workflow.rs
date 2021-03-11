@@ -84,15 +84,10 @@ impl Workspace for ProduceDhtOpsWorkspace {
 mod tests {
     use super::super::genesis_workflow::tests::fake_genesis;
     use super::*;
-    use holochain_state::source_chain::SourceChain;
-
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
     use holo_hash::*;
-
-    use holochain_sqlite::db::ReadManager;
-    use holochain_sqlite::db::WriteManager;
-    use holochain_sqlite::test_utils::test_cell_env;
+    use holochain_state::source_chain::SourceChain;
     use holochain_types::dht_op::produce_ops_from_element;
     use holochain_types::dht_op::DhtOp;
     use holochain_types::fixt::*;
@@ -216,9 +211,7 @@ mod tests {
         }
 
         // Pull out the results and check them
-        let last_count = {
-            let mut g = env.guard();
-            let mut reader = g.reader().unwrap();
+        let last_count = fresh_reader_test!(env, |mut reader| {
             let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
 
             // Get the authored ops
@@ -248,7 +241,7 @@ mod tests {
             assert_eq!(authored_results, expected_hashes);
 
             authored_results.len()
-        };
+        });
 
         // Call the workflow again now the queue should be the same length as last time
         // because no new ops should hav been added
@@ -264,10 +257,9 @@ mod tests {
         }
 
         // Check the lengths are unchanged
-        {
+        fresh_reader_test!(env, |mut reader| {
             let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
-            let mut g = env.guard();
-            let mut reader = g.reader().unwrap();
+
             let authored_count = workspace
                 .authored_dht_ops
                 .iter(&mut reader)
@@ -276,6 +268,6 @@ mod tests {
                 .unwrap();
 
             assert_eq!(last_count, authored_count);
-        }
+        });
     }
 }

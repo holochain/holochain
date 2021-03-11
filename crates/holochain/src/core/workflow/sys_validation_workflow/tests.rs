@@ -12,7 +12,6 @@ use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::fresh_reader_test;
-use holochain_sqlite::prelude::ReadManager;
 use holochain_state::element_buf::ElementBuf;
 use holochain_state::validation_db::ValidationLimboStatus;
 use holochain_types::prelude::*;
@@ -264,43 +263,41 @@ async fn run_test(
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should still contain bobs link pending because the target was missing
-        assert_eq!(
-            {
-                let mut guard = alice_env.guard();
-                let mut r = guard.reader().unwrap();
-                workspace
-                    .validation_limbo
-                    .iter(&mut r)
-                    .unwrap()
-                    .inspect(|(_, i)| {
-                        let s = debug_span!("inspect_ops");
-                        let _g = s.enter();
-                        debug!(?i.op);
-                        assert_matches!(
-                            i.status,
-                            ValidationLimboStatus::Pending
-                                | ValidationLimboStatus::AwaitingAppDeps(_)
-                        );
-                        Ok(())
-                    })
-                    .count()
-                    .unwrap()
-            },
-            2
-        );
-        assert_eq!(
-            {
-                let mut guard = alice_env.guard();
-                let mut r = guard.reader().unwrap();
-                workspace
-                    .integrated_dht_ops
-                    .iter(&mut r)
-                    .unwrap()
-                    .count()
-                    .unwrap()
-            },
-            expected_count
-        );
+        fresh_reader_test!(alice_env, |mut reader| {
+            assert_eq!(
+                {
+                    workspace
+                        .validation_limbo
+                        .iter(&mut reader)
+                        .unwrap()
+                        .inspect(|(_, i)| {
+                            let s = debug_span!("inspect_ops");
+                            let _g = s.enter();
+                            debug!(?i.op);
+                            assert_matches!(
+                                i.status,
+                                ValidationLimboStatus::Pending
+                                    | ValidationLimboStatus::AwaitingAppDeps(_)
+                            );
+                            Ok(())
+                        })
+                        .count()
+                        .unwrap()
+                },
+                2
+            );
+            assert_eq!(
+                {
+                    workspace
+                        .integrated_dht_ops
+                        .iter(&mut reader)
+                        .unwrap()
+                        .count()
+                        .unwrap()
+                },
+                expected_count
+            );
+        });
     }
 }
 
