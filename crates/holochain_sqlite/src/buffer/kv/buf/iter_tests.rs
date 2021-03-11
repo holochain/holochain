@@ -246,7 +246,7 @@ async fn kv_single_iter() {
     let mut rng = rand::thread_rng();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let db = arc.guard().inner().open_single("kv").unwrap();
+    let db = arc.guard().open_single("kv").unwrap();
     let td = StringFixturator::new(Unpredictable)
         .zip(VFixturator::new(Unpredictable))
         .filter(|(k, _)| k.len() > 0)

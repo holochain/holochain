@@ -55,7 +55,7 @@ async fn kvvbuf_basics() {
     let arc = test_env.env();
     let mut env = arc.guard();
 
-    let multi_store = env.inner().open_multi("kvv").unwrap();
+    let multi_store = env.open_multi("kvv").unwrap();
 
     arc.guard()
         .with_reader::<DatabaseError, _, _>(|mut reader| {
@@ -94,7 +94,7 @@ async fn kvvbuf_basics() {
         })
         .unwrap();
 
-    let multi_store = env.inner().open_multi("kvv").unwrap();
+    let multi_store = env.open_multi("kvv").unwrap();
 
     arc.guard()
         .with_reader::<DatabaseError, _, _>(|mut reader| {
@@ -133,7 +133,7 @@ async fn kvvbuf_basics() {
         })
         .unwrap();
 
-    let multi_store = env.inner().open_multi("kvv").unwrap();
+    let multi_store = env.open_multi("kvv").unwrap();
 
     arc.guard()
         .with_reader::<DatabaseError, _, _>(|mut reader| {
@@ -157,7 +157,7 @@ async fn delete_all() {
     let arc = test_env.env();
     let mut env = arc.guard();
 
-    let multi_store = env.inner().open_multi("kvv").unwrap();
+    let multi_store = env.open_multi("kvv").unwrap();
 
     arc.guard()
         .with_reader::<DatabaseError, _, _>(|mut reader| {
@@ -193,7 +193,7 @@ async fn delete_all() {
         })
         .unwrap();
 
-    let multi_store = env.inner().open_multi("kvv").unwrap();
+    let multi_store = env.open_multi("kvv").unwrap();
 
     arc.guard()
         .with_reader::<DatabaseError, _, _>(|mut reader| {
@@ -235,7 +235,7 @@ async fn delete_all() {
         })
         .unwrap();
 
-    let multi_store = env.inner().open_multi("kvv").unwrap();
+    let multi_store = env.open_multi("kvv").unwrap();
 
     arc.guard()
         .with_reader::<DatabaseError, _, _>(|mut reader| {
@@ -262,7 +262,7 @@ async fn idempotent_inserts() {
     let arc = test_env.env();
     let mut env = arc.guard();
 
-    let multi_store = env.inner().open_multi("kvv").unwrap();
+    let multi_store = env.open_multi("kvv").unwrap();
 
     arc.guard()
         .with_reader::<DatabaseError, _, _>(|mut reader| {
@@ -329,7 +329,7 @@ async fn kvv_indicate_value_appends() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kvv")?;
+    let db = env.open_multi("kvv")?;
     arc.guard().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
 
@@ -353,7 +353,7 @@ async fn kvv_indicate_value_overwritten() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kvv")?;
+    let db = env.open_multi("kvv")?;
     arc.guard().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
 
@@ -384,7 +384,7 @@ async fn kvv_deleted_persisted() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kv")?;
+    let db = env.open_multi("kv")?;
 
     {
         let mut buf = Store::new(db.clone());
@@ -424,7 +424,7 @@ async fn kvv_deleted_buffer() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kv")?;
+    let db = env.open_multi("kv")?;
 
     {
         let mut buf = Store::new(db.clone());
@@ -476,7 +476,7 @@ async fn kvv_get_buffer() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kv")?;
+    let db = env.open_multi("kv")?;
 
     arc.guard().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
@@ -497,7 +497,7 @@ async fn kvv_get_persisted() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kv")?;
+    let db = env.open_multi("kv")?;
 
     {
         let mut buf = Store::new(db.clone());
@@ -525,7 +525,7 @@ async fn kvv_get_del_buffer() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kv")?;
+    let db = env.open_multi("kv")?;
 
     arc.guard().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
@@ -546,7 +546,7 @@ async fn kvv_get_del_persisted() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let mut env = arc.guard();
-    let db = env.inner().open_multi("kv")?;
+    let db = env.open_multi("kv")?;
 
     {
         let mut buf = Store::new(db.clone());
