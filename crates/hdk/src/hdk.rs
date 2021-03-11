@@ -346,7 +346,7 @@ impl HdkT for HostHdk {
     }
 }
 
-pub fn set_hdk<'lock, H: 'static>(hdk: H)
+pub fn set_hdk<H: 'static>(hdk: H)
 where
     H: HdkT,
 {
