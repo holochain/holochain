@@ -149,7 +149,7 @@ impl DbWrite {
 #[derive(Clone)]
 pub struct Conn<'e> {
     // #[shrinkwrap(main_field)]
-    conn: Rc<RefCell<Connection>>,
+    conn: Rc<Mutex<Connection>>,
     lt: PhantomData<&'e ()>,
 }
 
@@ -194,14 +194,9 @@ impl<'e> Conn<'e> {
         }
 
         Ok(Self {
-            conn: Rc::new(RefCell::new(conn)),
+            conn: Rc::new(Mutex::new(conn)),
             lt: PhantomData,
         })
-    }
-
-    pub fn transaction(&'e mut self) -> DatabaseResult<Transaction<'e>> {
-        let mut b = self.conn.borrow_mut();
-        Ok(b.transaction()?)
     }
 
     #[deprecated = "remove this identity"]
@@ -212,7 +207,7 @@ impl<'e> Conn<'e> {
     #[cfg(feature = "test_utils")]
     pub fn open_single(&mut self, name: &str) -> Result<SingleTable, DatabaseError> {
         crate::table::initialize_table_single(
-            self.conn.get_mut(),
+            &mut self.conn.lock(),
             name.to_string(),
             name.to_string(),
         )?;
@@ -229,7 +224,7 @@ impl<'e> Conn<'e> {
     #[cfg(feature = "test_utils")]
     pub fn open_multi(&mut self, name: &str) -> Result<MultiTable, DatabaseError> {
         crate::table::initialize_table_multi(
-            self.conn.get_mut(),
+            &mut self.conn.lock(),
             name.to_string(),
             name.to_string(),
         )?;
@@ -321,9 +316,7 @@ pub trait WriteManager<'e> {
 
 impl<'e> ReadManager<'e> for Conn<'e> {
     fn reader(&'e mut self) -> DatabaseResult<Reader<'e>> {
-        let txn = self.conn.get_mut().transaction()?;
-        let reader = Reader::from(txn);
-        Ok(reader)
+        todo!("replace all")
     }
 
     fn with_reader<E, R, F: Send>(&'e mut self, f: F) -> Result<R, E>
@@ -331,7 +324,10 @@ impl<'e> ReadManager<'e> for Conn<'e> {
         E: From<DatabaseError>,
         F: 'e + FnOnce(Reader) -> Result<R, E>,
     {
-        f(self.reader()?)
+        let mut g = self.conn.lock();
+        let txn = g.transaction().map_err(DatabaseError::from)?;
+        let reader = Reader::from(txn);
+        f(reader)
     }
 }
 
@@ -358,7 +354,7 @@ impl<'e> WriteManager<'e> for Conn<'e> {
         E: From<DatabaseError>,
         F: 'e + FnOnce(&mut Writer) -> Result<R, E>,
     {
-        let mut b = self.conn.borrow_mut();
+        let mut b = self.conn.lock();
         let txn = b.transaction().map_err(DatabaseError::from)?;
         let mut writer = Writer::from(txn);
         let result = f(&mut writer)?;
