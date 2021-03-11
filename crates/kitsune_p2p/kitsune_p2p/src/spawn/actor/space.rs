@@ -4,7 +4,7 @@ use super::*;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
 use kitsune_p2p_mdns::*;
-use kitsune_p2p_types::codec::{Codec, rmp_encode, rmp_decode};
+use kitsune_p2p_types::codec::{rmp_decode, rmp_encode, Codec};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::sync::atomic::AtomicBool;
