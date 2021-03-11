@@ -9,8 +9,8 @@ use crate::prelude::*;
 ///
 /// Usually you don't need to use this function directly; it is the most general way to create an
 /// entry and standardises the internals of higher level create functions.
-pub fn create(entry_def_with_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-    host_call::<EntryWithDefId, HeaderHash>(__create, entry_def_with_id)
+pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
+    HDK.with(|h| h.borrow().create(entry_with_def_id))
 }
 
 /// Update any entry type.
@@ -24,7 +24,7 @@ pub fn create(entry_def_with_id: EntryWithDefId) -> ExternResult<HeaderHash> {
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
 pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-    host_call::<UpdateInput, HeaderHash>(__update, UpdateInput::new(hash, entry_with_def_id))
+    HDK.with(|h| h.borrow().update(UpdateInput::new(hash, entry_with_def_id)))
 }
 
 /// General function that can delete any entry type.
@@ -37,7 +37,7 @@ pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResu
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
 pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
-    host_call::<HeaderHash, HeaderHash>(__delete, hash)
+    HDK.with(|h| h.borrow().delete(hash))
 }
 
 /// Create an app entry.
@@ -121,7 +121,7 @@ where
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    host_call::<Entry, EntryHash>(__hash_entry, Entry::try_from(input)?)
+    HDK.with(|h| h.borrow().hash_entry(Entry::try_from(input)?))
 }
 
 /// Thin wrapper around update for app entries.
@@ -209,7 +209,10 @@ pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Element>>
 where
     AnyDhtHash: From<H>,
 {
-    host_call::<GetInput, Option<Element>>(__get, GetInput::new(AnyDhtHash::from(hash), options))
+    HDK.with(|h| {
+        h.borrow()
+            .get(GetInput::new(AnyDhtHash::from(hash), options))
+    })
 }
 
 /// Get an element from the hash AND the details for the entry or header hash passed in.
@@ -260,7 +263,7 @@ pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,
 ) -> ExternResult<Option<Details>> {
-    host_call::<GetInput, Option<Details>>(__get_details, GetInput::new(hash.into(), options))
+    HDK.with(|h| h.borrow().get_details(GetInput::new(hash.into(), options)))
 }
 
 /// Trait for binding static [ `EntryDef` ] property access for a type.
@@ -541,7 +544,7 @@ macro_rules! entry_def {
 macro_rules! entry_defs {
     [ $( $def:expr ),* ] => {
         #[hdk_extern]
-        fn entry_defs(_: ()) -> $crate::prelude::ExternResult<$crate::prelude::EntryDefsCallbackResult> {
+        pub fn entry_defs(_: ()) -> $crate::prelude::ExternResult<$crate::prelude::EntryDefsCallbackResult> {
             Ok($crate::prelude::EntryDefsCallbackResult::from(vec![ $( $def ),* ]))
         }
     };
@@ -593,6 +596,22 @@ macro_rules! entry_def_index {
                 $crate::prelude::tracing::error!(?error, "Failed to lookup entry defs.");
                 Err::<$crate::prelude::EntryDefIndex, $crate::prelude::WasmError>(error)
             }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! entry_type {
+    ( $t:ty ) => {
+        match $crate::prelude::entry_def_index!($t) {
+            Ok(id) => match $crate::prelude::zome_info() {
+                Ok(ZomeInfo { zome_id, .. }) => Ok($crate::prelude::EntryType::App(
+                    $crate::prelude::AppEntryType::new(id, zome_id, <$t>::entry_visibility()),
+                )),
+                Err(e) => Err(e),
+                _ => unreachable!(),
+            },
+            Err(e) => Err(e),
         }
     };
 }

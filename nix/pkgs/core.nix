@@ -21,6 +21,8 @@ rec {
     cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture
     # run all the remaining cargo tests
     cargo test --workspace --exclude holochain -- --nocapture
+    # run all the wasm tests (within wasm) with the conductor mocked
+    cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
   '';
 
   hcMergeTest = let
