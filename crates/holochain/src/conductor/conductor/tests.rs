@@ -228,7 +228,15 @@ async fn proxy_tls_inner(
     let proxy_config =
         ProxyConfig::local_proxy_server(tls_config1, AcceptProxyCallback::reject_all());
     let (bind, evt) = kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?;
-    let (bind1, mut evt1) = spawn_kitsune_proxy_listener(proxy_config, bind, evt).await?;
+    let (bind1, mut evt1) = spawn_kitsune_proxy_listener(
+        proxy_config,
+        std::sync::Arc::new(
+            kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams::default(),
+        ),
+        bind,
+        evt,
+    )
+    .await?;
     tokio::task::spawn(async move {
         while let Some(evt) = evt1.next().await {
             match evt {
@@ -249,7 +257,15 @@ async fn proxy_tls_inner(
     let proxy_config =
         ProxyConfig::local_proxy_server(tls_config2, AcceptProxyCallback::reject_all());
     let (bind, evt) = kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?;
-    let (bind2, _evt2) = spawn_kitsune_proxy_listener(proxy_config, bind, evt).await?;
+    let (bind2, _evt2) = spawn_kitsune_proxy_listener(
+        proxy_config,
+        std::sync::Arc::new(
+            kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams::default(),
+        ),
+        bind,
+        evt,
+    )
+    .await?;
     println!("{:?}", bind2.bound_url().await?);
 
     let (_url, mut write, read) = bind2.create_channel(url1).await?;
