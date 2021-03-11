@@ -10,7 +10,7 @@ use crate::prelude::*;
 /// Usually you don't need to use this function directly; it is the most general way to create an
 /// entry and standardises the internals of higher level create functions.
 pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-    HDK.read().create(entry_with_def_id)
+    HDK.with(|h| h.borrow().create(entry_with_def_id))
 }
 
 /// Update any entry type.
@@ -24,7 +24,7 @@ pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
 pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-    HDK.read().update(UpdateInput::new(hash, entry_with_def_id))
+    HDK.with(|h| h.borrow().update(UpdateInput::new(hash, entry_with_def_id)))
 }
 
 /// General function that can delete any entry type.
@@ -37,7 +37,7 @@ pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResu
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
 pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
-    HDK.read().delete(hash)
+    HDK.with(|h| h.borrow().delete(hash))
 }
 
 /// Create an app entry.
@@ -121,7 +121,7 @@ where
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    HDK.read().hash_entry(Entry::try_from(input)?)
+    HDK.with(|h| h.borrow().hash_entry(Entry::try_from(input)?))
 }
 
 /// Thin wrapper around update for app entries.
@@ -209,8 +209,8 @@ pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Element>>
 where
     AnyDhtHash: From<H>,
 {
-    HDK.read()
-        .get(GetInput::new(AnyDhtHash::from(hash), options))
+    HDK.with(|h| h.borrow()
+        .get(GetInput::new(AnyDhtHash::from(hash), options)))
 }
 
 /// Get an element from the hash AND the details for the entry or header hash passed in.
@@ -261,7 +261,7 @@ pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,
 ) -> ExternResult<Option<Details>> {
-    HDK.read().get_details(GetInput::new(hash.into(), options))
+    HDK.with(|h| h.borrow().get_details(GetInput::new(hash.into(), options)))
 }
 
 /// Trait for binding static [ `EntryDef` ] property access for a type.
@@ -542,7 +542,7 @@ macro_rules! entry_def {
 macro_rules! entry_defs {
     [ $( $def:expr ),* ] => {
         #[hdk_extern]
-        fn entry_defs(_: ()) -> $crate::prelude::ExternResult<$crate::prelude::EntryDefsCallbackResult> {
+        pub fn entry_defs(_: ()) -> $crate::prelude::ExternResult<$crate::prelude::EntryDefsCallbackResult> {
             Ok($crate::prelude::EntryDefsCallbackResult::from(vec![ $( $def ),* ]))
         }
     };

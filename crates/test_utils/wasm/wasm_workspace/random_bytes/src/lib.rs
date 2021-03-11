@@ -21,7 +21,7 @@ pub mod tests {
             .times(1)
             .return_once(move |_| Ok(output_closure));
 
-        let _mock_lock = hdk::prelude::set_global_hdk(mock_hdk).unwrap();
+        hdk::prelude::set_hdk(mock_hdk);
 
         let result = super::random_bytes(input);
 

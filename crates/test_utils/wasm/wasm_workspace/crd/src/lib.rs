@@ -39,7 +39,7 @@ pub mod test {
             .times(1)
             .return_once(move |_| Ok(closure_header_hash));
 
-        let _mock_lock = hdk::prelude::set_global_hdk(mock_hdk).unwrap();
+        hdk::prelude::set_hdk(mock_hdk);
 
         let result = super::create(());
 
@@ -63,7 +63,7 @@ pub mod test {
             .times(1)
             .return_once(move |_| Ok(None));
 
-        let _mock_lock = hdk::prelude::set_global_hdk(mock_hdk).unwrap();
+        hdk::prelude::set_hdk(mock_hdk);
 
         let result = super::reed(input_header_hash);
 
@@ -89,7 +89,7 @@ pub mod test {
             .times(1)
             .return_once(move |_| Ok(output_header_hash_closure));
 
-        let _mock_lock = hdk::prelude::set_global_hdk(mock_hdk).unwrap();
+        hdk::prelude::set_hdk(mock_hdk);
 
         let result = super::delete(input_header_hash);
 

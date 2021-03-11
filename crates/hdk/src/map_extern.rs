@@ -30,10 +30,7 @@ macro_rules! map_extern {
         map_extern!($name, $f, $input, $output, init = {};);
     };
     ( $name:tt, $f:ident, $input:ty, $output:ty, not_mock ) => {
-        map_extern!($name, $f, $input, $output, init = match $crate::prelude::set_global_hdk($crate::prelude::HostHdk) {
-            Ok(_) => {},
-            Err(_) => return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Guest("Failed to set the global HDK".to_string())),
-        };);
+        map_extern!($name, $f, $input, $output, init = $crate::prelude::set_hdk($crate::prelude::HostHdk););
     };
     ( $name:tt, $f:ident, $input:ty, $output:ty, init = $init_hdk:expr; ) => {
         $crate::paste::paste! {
@@ -46,12 +43,9 @@ macro_rules! map_extern {
 
                     // Setup tracing.
                     // @TODO feature flag this?
-                    match $crate::prelude::tracing::subscriber::set_global_default(
+                    let _subscriber_guard = $crate::prelude::tracing::subscriber::set_default(
                         $crate::trace::WasmSubscriber::default()
-                    ) {
-                        Ok(_) => {},
-                        Err(e) => return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Guest(e.to_string())),
-                    }
+                    );
 
                     // Deserialize the input from the host.
                     let extern_io: $crate::prelude::ExternIO = match $crate::prelude::host_args(guest_ptr) {

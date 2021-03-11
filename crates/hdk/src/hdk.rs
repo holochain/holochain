@@ -5,12 +5,14 @@ use mockall::*;
 
 pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 
-use once_cell::sync::Lazy;
+// use once_cell::sync::Lazy;
 /// This is a cell so it can be set many times.
 /// Every test needs its own mock so each test needs to set it.
 // pub static mut HDK: std::cell::Cell<Box<dyn HdkT>> = std::cell::Cell::new(Box::new(ErrHdk));
-use parking_lot::RwLock;
-pub static HDK: Lazy<RwLock<Box<dyn HdkT>>> = Lazy::new(|| RwLock::new(Box::new(ErrHdk)));
+// use parking_lot::RwLock;
+// pub static HDK: Lazy<RwLock<Box<dyn HdkT>>> = Lazy::new(|| RwLock::new(Box::new(ErrHdk)));
+use core::cell::RefCell;
+thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(ErrHdk)));
 
 #[cfg_attr(feature = "mock", automock)]
 pub trait HdkT: Send + Sync {
@@ -348,19 +350,13 @@ impl HdkT for HostHdk {
     }
 }
 
-pub fn set_global_hdk<'lock, H: 'static>(
+pub fn set_hdk<'lock, H: 'static>(
     hdk: H,
-) -> ExternResult<parking_lot::lock_api::RwLockWriteGuard<'lock, parking_lot::RawRwLock, ()>>
+)
 where
     H: HdkT,
 {
-    // The SET_LOCK allows us to return a write guard to prevent concurrent mocking
-    // without preventing the code being tested from aquiring a read lock on the HDK
-    static SET_LOCK: Lazy<RwLock<()>> = Lazy::new(|| RwLock::new(()));
-    let set_lock = SET_LOCK.write();
-
-    let mut hdk_lock = HDK.write();
-    *hdk_lock = Box::new(hdk);
-
-    Ok(set_lock)
+    HDK.with(|h| {
+        *h.borrow_mut() = Box::new(hdk);
+    });
 }
