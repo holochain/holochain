@@ -83,7 +83,7 @@ mod tests {
                 api.emit_signal(AppSignal::new(signal)).map_err(Into::into)
             })
             .callback("init", move |api, ()| {
-                let mut functions: GrantedFunctions = HashSet::new();
+                let mut functions: GrantedFunctions = BTreeSet::new();
                 functions.insert((
                     api.zome_info(()).unwrap().zome_name,
                     "recv_remote_signal".into(),

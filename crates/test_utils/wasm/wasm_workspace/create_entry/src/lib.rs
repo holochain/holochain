@@ -1,6 +1,13 @@
 use hdk::prelude::*;
 
 #[hdk_entry(
+    id = "setup",
+    required_validations = 5,
+    required_validation_type = "element"
+)]
+struct Setup(String);
+
+#[hdk_entry(
     id = "post",
     required_validations = 5,
     required_validation_type = "full"
@@ -22,7 +29,7 @@ struct Msg(String);
 )]
 struct PrivMsg(String);
 
-entry_defs![Post::entry_def(), Msg::entry_def(), PrivMsg::entry_def()];
+entry_defs![Post::entry_def(), Msg::entry_def(), PrivMsg::entry_def(), Setup::entry_def()];
 
 fn post() -> Post {
     Post("foo".into())
@@ -99,8 +106,8 @@ fn get_activity(
 
 #[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
-    // grant unrestricted access to accept_cap_claim so other agents can send us claims
-    let mut functions: GrantedFunctions = HashSet::new();
+    // grant unrestricted access to create_entry Zome API so other agents can create entries
+    let mut functions: GrantedFunctions = BTreeSet::new();
     functions.insert((zome_info()?.zome_name, "create_entry".into()));
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
@@ -108,7 +115,8 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
         access: ().into(),
         functions,
     })?;
-
+    // Test that the init function can also successfully commit multiple entries to the source-chain
+    hdk::prelude::create_entry(&Setup(String::from("Hello, world!")))?;
     Ok(InitCallbackResult::Pass)
 }
 
@@ -117,6 +125,8 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 /// call
 #[hdk_extern]
 fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
+    // Creating multiple entries in a Zome function should also be fine.
+    hdk::prelude::create_entry(&Setup(String::from("Hello, before Post...")))?;
     // Create an entry directly via. the hdk.
     hdk::prelude::create_entry(&post())?;
     // Create an entry via a `call`.
