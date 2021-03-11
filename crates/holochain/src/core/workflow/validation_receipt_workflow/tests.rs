@@ -76,7 +76,7 @@ async fn test_validation_receipt() {
             }
             counts
         },
-        |counts| counts == &vec![2, 2],
+        |counts| counts == &vec![2, 2, 2],
         |_| ()
     );
 
