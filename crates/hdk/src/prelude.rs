@@ -23,6 +23,7 @@ pub use crate::entry::EntryDefRegistration;
 pub use crate::entry_def;
 pub use crate::entry_def_index;
 pub use crate::entry_defs;
+pub use crate::entry_type;
 pub use crate::hash_path::anchor::anchor;
 pub use crate::hash_path::anchor::get_anchor;
 pub use crate::hash_path::anchor::list_anchor_addresses;
@@ -30,6 +31,7 @@ pub use crate::hash_path::anchor::list_anchor_tags;
 pub use crate::hash_path::anchor::list_anchor_type_addresses;
 pub use crate::hash_path::anchor::Anchor;
 pub use crate::hash_path::path::Path;
+pub use crate::hdk::*;
 pub use crate::info::agent_info;
 pub use crate::info::zome_info;
 pub use crate::link::create_link;
@@ -55,6 +57,7 @@ pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_encrypt;
 pub use hdk_derive::hdk_entry;
 pub use hdk_derive::hdk_extern;
+pub use holo_hash;
 pub use holo_hash::AgentPubKey;
 pub use holo_hash::AnyDhtHash;
 pub use holo_hash::EntryHash;
@@ -73,6 +76,9 @@ pub use tracing;
 pub use tracing::{debug, error, info, instrument, trace, warn};
 pub use tracing_subscriber;
 
+#[cfg(feature = "mock")]
+pub use mockall;
+
 // This needs to be called at least once _somewhere_ and is idempotent.
 #[macro_export]
 macro_rules! holochain_externs {
@@ -84,8 +90,6 @@ macro_rules! holochain_externs {
             __unreachable,
             __verify_signature,
             __sign,
-            __decrypt,
-            __encrypt,
             __zome_info,
             __call_info,
             __dna_info,
@@ -122,4 +126,5 @@ macro_rules! holochain_externs {
     };
 }
 
+#[cfg(not(feature = "mock"))]
 holochain_externs!();

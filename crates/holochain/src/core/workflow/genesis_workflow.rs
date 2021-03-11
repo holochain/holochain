@@ -55,6 +55,10 @@ async fn genesis_workflow_inner<Api: CellConductorApiT>(
         membrane_proof,
     } = args;
 
+    if workspace.source_chain.has_genesis() {
+        return Ok(());
+    }
+
     // TODO: this is a placeholder for a real DPKI request to show intent
     if api
         .dpki_request("is_agent_pubkey_valid".into(), agent_pubkey.to_string())
