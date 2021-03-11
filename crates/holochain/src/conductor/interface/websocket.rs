@@ -708,17 +708,18 @@ pub mod test {
         let p2p_store = AgentKv::new(env.clone().into()).unwrap();
 
         // - Give time for the agents to join the network.
-        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
-
-        // - Check no extra data in the store to start
-        let count = fresh_reader_test!(env, |r| p2p_store
-            .as_store_ref()
-            .iter(&r)
-            .unwrap()
-            .count()
-            .unwrap());
-
-        assert_eq!(count, 4);
+        crate::wait_for_any_10s!(
+            {
+                fresh_reader_test!(env, |r| p2p_store
+                    .as_store_ref()
+                    .iter(&r)
+                    .unwrap()
+                    .count()
+                    .unwrap())
+            },
+            |&count| count == 4,
+            |count| assert_eq!(count, 4)
+        );
 
         // - Get agents and space
         let agent_infos = AgentInfoSignedFixturator::new(Unpredictable)
