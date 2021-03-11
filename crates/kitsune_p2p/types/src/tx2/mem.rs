@@ -6,6 +6,7 @@ use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
 use crate::*;
 use futures::{
+    sink::SinkExt,
     future::{BoxFuture, FutureExt},
     stream::{BoxStream, StreamExt},
 };
@@ -16,10 +17,10 @@ use std::sync::atomic;
 
 static NEXT_MEM_ID: atomic::AtomicU64 = atomic::AtomicU64::new(1);
 
-type ChanSend = tokio::sync::mpsc::Sender<InChan>;
-type ChanRecv = tokio::sync::mpsc::Receiver<InChan>;
-type ConSend = tokio::sync::mpsc::Sender<Con>;
-type ConRecv = tokio::sync::mpsc::Receiver<Con>;
+type ChanSend = futures::channel::mpsc::Sender<InChan>;
+type ChanRecv = futures::channel::mpsc::Receiver<InChan>;
+type ConSend = futures::channel::mpsc::Sender<Con>;
+type ConRecv = futures::channel::mpsc::Receiver<Con>;
 
 static MEM_ENDPOINTS: Lazy<Mutex<HashMap<u64, (ConSend, Active)>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -118,6 +119,7 @@ impl ConAdapt for MemConAdapt {
 
     fn close(&self, _code: u32, _reason: &str) -> BoxFuture<'static, ()> {
         self.0.con_active.kill();
+        self.0.chan_send.clone().close_channel();
         async move {}.boxed()
     }
 }
@@ -164,6 +166,7 @@ struct MemEndpointAdaptInner {
     id: u64,
     url: TxUrl,
     ep_active: Active,
+    c_send: ConSend,
 }
 
 impl Drop for MemEndpointAdaptInner {
@@ -175,7 +178,7 @@ impl Drop for MemEndpointAdaptInner {
 struct MemEndpointAdapt(Mutex<MemEndpointAdaptInner>, Uniq);
 
 impl MemEndpointAdapt {
-    pub fn new(id: u64) -> (Self, Active) {
+    pub fn new(c_send: ConSend, id: u64) -> (Self, Active) {
         let url = format!("kitsune-mem://{}", id);
         let ep_active = Active::new();
         (
@@ -184,6 +187,7 @@ impl MemEndpointAdapt {
                     id,
                     url: url.into(),
                     ep_active: ep_active.clone(),
+                    c_send,
                 }),
                 Uniq::default(),
             ),
@@ -238,8 +242,8 @@ impl EndpointAdapt for MemEndpointAdapt {
             let mix_ep_active = this_ep_active.mix(&oth_ep_active);
             let mix_active = con_active.mix(&mix_ep_active);
 
-            let (send, oth_recv) = tokio::sync::mpsc::channel(1);
-            let (oth_send, recv) = tokio::sync::mpsc::channel(1);
+            let (send, oth_recv) = futures::channel::mpsc::channel(1);
+            let (oth_send, recv) = futures::channel::mpsc::channel(1);
 
             let oth_con = MemConAdapt::new(
                 format!("{}/{}", this_url, con_id).into(),
@@ -277,7 +281,9 @@ impl EndpointAdapt for MemEndpointAdapt {
     }
 
     fn close(&self, _code: u32, _reason: &str) -> BoxFuture<'static, ()> {
-        self.0.lock().ep_active.kill();
+        let mut lock = self.0.lock();
+        lock.ep_active.kill();
+        lock.c_send.close_channel();
         async move {}.boxed()
     }
 }
@@ -297,8 +303,8 @@ impl BackendAdapt for MemBackendAdapt {
     fn bind(&self, _url: TxUrl, _timeout: KitsuneTimeout) -> EndpointFut {
         async move {
             let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
-            let (c_send, c_recv) = tokio::sync::mpsc::channel(1);
-            let (ep, ep_active) = MemEndpointAdapt::new(id);
+            let (c_send, c_recv) = futures::channel::mpsc::channel(32);
+            let (ep, ep_active) = MemEndpointAdapt::new(c_send.clone(), id);
             MEM_ENDPOINTS.lock().insert(id, (c_send, ep_active.clone()));
             let ep: Arc<dyn EndpointAdapt> = Arc::new(ep);
             let rc: Box<dyn ConRecvAdapt> = Box::new(MemConRecvAdapt::new(c_recv, ep_active));
