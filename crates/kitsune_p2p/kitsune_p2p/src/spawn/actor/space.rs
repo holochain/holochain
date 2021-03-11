@@ -550,44 +550,47 @@ impl KitsuneP2pHandler for Space {
                 // Listen to MDNS service that has that space as service type
                 let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
                 //println!("(MDNS) - Agent {:?} ({}) joined space {:?} ({} ; {})", agent, agent.get_bytes().len(), space, space.get_bytes().len(), dna_str.len());
-                tokio::task::spawn(async move {
-                    let stream = mdns_listen(space_b64);
-                    tokio::pin!(stream);
-                    while let Some(maybe_response) = stream.next().await {
-                        match maybe_response {
-                            Ok(response) => {
-                                tracing::debug!(msg = "Peer found via MDNS", ?response);
-                                // Decode response
-                                let remote_agent_vec = base64::decode_config(
-                                    &response.service_name[..],
-                                    base64::URL_SAFE_NO_PAD,
-                                )
-                                .expect("Agent base64 decode failed");
-                                let remote_agent = Arc::new(KitsuneAgent(remote_agent_vec));
-                                //println!("(MDNS) - Peer found via MDNS: {:?})", *remote_agent);
-                                let maybe_agent_info_signed =
-                                    kitsune_p2p_types::codec::rmp_decode(&mut &*response.buffer);
-                                if let Err(e) = maybe_agent_info_signed {
-                                    tracing::error!(msg = "Failed to decode peer from MDNS", ?e);
-                                    continue;
+                if !self.mdns_listened_spaces.contains(&space_b64) {
+                    self.mdns_listened_spaces.insert(space_b64.clone());
+                    tokio::task::spawn(async move {
+                        let stream = mdns_listen(space_b64);
+                        tokio::pin!(stream);
+                        while let Some(maybe_response) = stream.next().await {
+                            match maybe_response {
+                                Ok(response) => {
+                                    tracing::trace!(msg = "Peer found via MDNS", ?response);
+                                    // Decode response
+                                    let remote_agent_vec = base64::decode_config(
+                                        &response.service_name[..],
+                                        base64::URL_SAFE_NO_PAD,
+                                    )
+                                    .expect("Agent base64 decode failed");
+                                    let remote_agent = Arc::new(KitsuneAgent(remote_agent_vec));
+                                    //println!("(MDNS) - Peer found via MDNS: {:?})", *remote_agent);
+                                    let maybe_agent_info_signed =
+                                        kitsune_p2p_types::codec::rmp_decode(&mut &*response.buffer);
+                                    if let Err(e) = maybe_agent_info_signed {
+                                        tracing::error!(msg = "Failed to decode peer from MDNS", ?e);
+                                        continue;
+                                    }
+                                    let remote_agent_info_signed = maybe_agent_info_signed.unwrap();
+                                    //println!("(MDNS) - Found agent_info_signed: {:?})", remote_agent_info_signed);
+                                    // Add to local storage
+                                    let _result = evt_sender
+                                        .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                            space: space.clone(),
+                                            agent: remote_agent,
+                                            agent_info_signed: remote_agent_info_signed,
+                                        })
+                                        .await;
                                 }
-                                let remote_agent_info_signed = maybe_agent_info_signed.unwrap();
-                                //println!("(MDNS) - Found agent_info_signed: {:?})", remote_agent_info_signed);
-                                // Add to local storage
-                                let _result = evt_sender
-                                    .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                        space: space.clone(),
-                                        agent: remote_agent,
-                                        agent_info_signed: remote_agent_info_signed,
-                                    })
-                                    .await;
-                            }
-                            Err(e) => {
-                                tracing::error!(msg = "Failed to get peers from MDNS", ?e);
+                                Err(e) => {
+                                    tracing::error!(msg = "Failed to get peers from MDNS", ?e);
+                                }
                             }
                         }
-                    }
-                });
+                    });
+                }
             }
             NetworkType::QuicBootstrap => {
                 let bootstrap_service = self.config.bootstrap_service.clone();
@@ -776,6 +779,7 @@ pub(crate) struct Space {
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
+    mdns_listened_spaces: HashSet<String>,
 }
 
 impl Space {
@@ -805,6 +809,7 @@ impl Space {
             local_joined_agents: HashSet::new(),
             config,
             mdns_handles: HashMap::new(),
+            mdns_listened_spaces: HashSet::new(),
         }
     }
 
