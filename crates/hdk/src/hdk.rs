@@ -8,7 +8,12 @@ pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 /// This is a cell so it can be set many times.
 /// Every test needs its own mock so each test needs to set it.
 use core::cell::RefCell;
+
+#[cfg(feature = "mock")]
 thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(ErrHdk)));
+
+#[cfg(not(feature = "mock"))]
+thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(HostHdk)));
 
 #[cfg_attr(feature = "mock", automock)]
 pub trait HdkT: Send + Sync {
