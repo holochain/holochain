@@ -516,7 +516,7 @@ impl KitsuneP2pHandler for Space {
                 let mut delay_len = START_DELAY;
 
                 loop {
-                    tokio::time::delay_for(delay_len).await;
+                    tokio::time::sleep(delay_len).await;
                     if delay_len <= MAX_DELAY {
                         delay_len *= 2;
                     }
@@ -702,7 +702,7 @@ impl Space {
         let i_s_c = i_s.clone();
         tokio::task::spawn(async move {
             loop {
-                tokio::time::delay_for(std::time::Duration::from_secs(5 * 60)).await;
+                tokio::time::sleep(std::time::Duration::from_secs(5 * 60)).await;
                 if i_s_c.update_agent_info().await.is_err() {
                     break;
                 }

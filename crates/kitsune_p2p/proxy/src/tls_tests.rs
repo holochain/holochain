@@ -10,7 +10,7 @@ fn init_tracing() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn tls_server_and_client() {
     init_tracing();
     if let Err(e) = tls_server_and_client_inner().await {

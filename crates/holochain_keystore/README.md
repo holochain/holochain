@@ -20,7 +20,7 @@ use holo_hash::AgentPubKey;
 use crate::*;
 use holochain_serialized_bytes::prelude::*;
 
-#[tokio::main(threaded_scheduler)]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     tokio::task::spawn(async move {
         let _ = holochain_crypto::crypto_init_sodium();

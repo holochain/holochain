@@ -171,7 +171,7 @@ mod tests {
     use holochain_lmdb::test_utils::test_cell_env;
     use pretty_assertions::assert_eq;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query() {
         let test_env = test_cell_env();
         let env = test_env.env();

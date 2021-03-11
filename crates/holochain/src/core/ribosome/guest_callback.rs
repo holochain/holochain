@@ -83,7 +83,7 @@ mod tests {
     use mockall::predicate::*;
     use mockall::Sequence;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn call_iterator_iterates() {
         // stuff we need to test with
         let mut sequence = Sequence::new();

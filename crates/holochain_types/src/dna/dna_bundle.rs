@@ -173,7 +173,7 @@ mod tests {
     use super::*;
     use crate::prelude::ZomeManifest;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn dna_bundle_to_dna_file() {
         let path1 = PathBuf::from("1");
         let path2 = PathBuf::from("2");

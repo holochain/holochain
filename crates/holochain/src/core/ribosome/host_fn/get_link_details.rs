@@ -1,10 +1,10 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_state::metadata::LinkMetaKey;
 use holochain_p2p::actor::GetLinksOptions;
+use holochain_state::metadata::LinkMetaKey;
 use holochain_types::prelude::*;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_link_details<'a>(
@@ -12,15 +12,20 @@ pub fn get_link_details<'a>(
     call_context: Arc<CallContext>,
     input: GetLinksInput,
 ) -> Result<LinkDetails, WasmError> {
-    let GetLinksInput { base_address, tag_prefix } = input;
+    let GetLinksInput {
+        base_address,
+        tag_prefix,
+    } = input;
 
     // Get zome id
-    let zome_id = ribosome.zome_to_id(&call_context.zome).expect("Failed to get ID for current zome.");
+    let zome_id = ribosome
+        .zome_to_id(&call_context.zome)
+        .expect("Failed to get ID for current zome.");
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
 
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         // Create the key
         let key = match tag_prefix.as_ref() {
             Some(tag_prefix) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag_prefix),
@@ -53,7 +58,7 @@ pub mod slow_tests {
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::Header;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {
         let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
