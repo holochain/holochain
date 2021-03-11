@@ -494,7 +494,7 @@ impl SpaceInternalHandler for Space {
                             // Broadcast rmp encoded agent_info_signed
                             let mut buffer = Vec::new();
                             kitsune_p2p_types::codec::rmp_encode(&mut buffer, &agent_info_signed)?;
-                            tracing::debug!(?space_b64, ?agent_b64);
+                            tracing::trace!(?space_b64, ?agent_b64);
                             let handle =
                                 mdns_create_broadcast_thread(space_b64, agent_b64, &buffer);
                             // store handle in self
