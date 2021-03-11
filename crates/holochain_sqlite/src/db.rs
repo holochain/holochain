@@ -8,11 +8,8 @@ use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
-use std::{collections::HashMap, time::Duration};
-use std::{
-    collections::{hash_map, HashSet},
-    marker::PhantomData,
-};
+use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::{collections::HashSet, marker::PhantomData};
 use std::{path::Path, sync::atomic::Ordering};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
 
@@ -148,10 +145,11 @@ impl DbWrite {
 /// Wrapper around Connection with a phantom lifetime.
 /// Needed to allow borrowing transactions in the same fashion as our LMDB
 /// lifetime model
-#[derive(Shrinkwrap)]
+// #[derive(Shrinkwrap)]
+#[derive(Clone)]
 pub struct Conn<'e> {
-    #[shrinkwrap(main_field)]
-    conn: Connection,
+    // #[shrinkwrap(main_field)]
+    conn: Rc<RefCell<Connection>>,
     lt: PhantomData<&'e ()>,
 }
 
@@ -196,13 +194,14 @@ impl<'e> Conn<'e> {
         }
 
         Ok(Self {
-            conn,
+            conn: Rc::new(RefCell::new(conn)),
             lt: PhantomData,
         })
     }
 
-    pub fn into_raw(self) -> Connection {
-        self.conn
+    pub fn transaction(&'e mut self) -> DatabaseResult<Transaction<'e>> {
+        let mut b = self.conn.borrow_mut();
+        Ok(b.transaction()?)
     }
 
     #[deprecated = "remove this identity"]
@@ -212,7 +211,11 @@ impl<'e> Conn<'e> {
 
     #[cfg(feature = "test_utils")]
     pub fn open_single(&mut self, name: &str) -> Result<SingleTable, DatabaseError> {
-        crate::table::initialize_table_single(&mut self.conn, name.to_string(), name.to_string())?;
+        crate::table::initialize_table_single(
+            self.conn.get_mut(),
+            name.to_string(),
+            name.to_string(),
+        )?;
         Ok(Table {
             name: TableName::TestSingle(name.to_string()),
         })
@@ -225,7 +228,11 @@ impl<'e> Conn<'e> {
 
     #[cfg(feature = "test_utils")]
     pub fn open_multi(&mut self, name: &str) -> Result<MultiTable, DatabaseError> {
-        crate::table::initialize_table_multi(&mut self.conn, name.to_string(), name.to_string())?;
+        crate::table::initialize_table_multi(
+            self.conn.get_mut(),
+            name.to_string(),
+            name.to_string(),
+        )?;
         Ok(Table {
             name: TableName::TestMulti(name.to_string()),
         })
@@ -306,15 +313,15 @@ pub trait WriteManager<'e> {
         E: From<DatabaseError>,
         F: 'e + FnOnce(&mut Writer) -> Result<R, E>;
 
-    /// Get a raw read-write transaction for this environment.
-    /// It is preferable to use WriterManager::with_commit for database writes,
-    /// which can properly recover from and manage write failures
-    fn writer_unmanaged(&'e mut self) -> DatabaseResult<Writer<'e>>;
+    // /// Get a raw read-write transaction for this environment.
+    // /// It is preferable to use WriterManager::with_commit for database writes,
+    // /// which can properly recover from and manage write failures
+    // fn writer_unmanaged(&'e mut self) -> DatabaseResult<Writer<'e>>;
 }
 
 impl<'e> ReadManager<'e> for Conn<'e> {
     fn reader(&'e mut self) -> DatabaseResult<Reader<'e>> {
-        let txn = self.conn.transaction()?;
+        let txn = self.conn.get_mut().transaction()?;
         let reader = Reader::from(txn);
         Ok(reader)
     }
@@ -351,18 +358,20 @@ impl<'e> WriteManager<'e> for Conn<'e> {
         E: From<DatabaseError>,
         F: 'e + FnOnce(&mut Writer) -> Result<R, E>,
     {
-        let txn = self.conn.transaction().map_err(DatabaseError::from)?;
+        let mut b = self.conn.borrow_mut();
+        let txn = b.transaction().map_err(DatabaseError::from)?;
         let mut writer = Writer::from(txn);
         let result = f(&mut writer)?;
         writer.commit().map_err(DatabaseError::from)?;
         Ok(result)
     }
 
-    fn writer_unmanaged(&'e mut self) -> DatabaseResult<Writer<'e>> {
-        let txn = self.conn.transaction()?;
-        let writer = Writer::from(txn);
-        Ok(writer)
-    }
+    // fn writer_unmanaged(&'e mut self) -> DatabaseResult<Writer<'e>> {
+    //     let mut b = self.conn.borrow_mut();
+    //     let txn = b.transaction()?;
+    //     let writer = Writer::from(txn);
+    //     Ok(writer)
+    // }
 }
 
 // impl<'e> WriteManager<'e> for DbWrite {
