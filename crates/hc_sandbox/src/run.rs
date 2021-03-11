@@ -35,13 +35,14 @@ pub async fn run(
     for app_port in app_ports {
         msg!("Attaching app port {}", app_port);
         let mut cmd = CmdRunner::try_new(port).await?;
-        attach_app_interface(
+        let port = attach_app_interface(
             &mut cmd,
             AddAppWs {
                 port: Some(app_port),
             },
         )
         .await?;
+        msg!("App port attached at {}", port);
     }
     crate::save::lock_live(std::env::current_dir()?, &sandbox_path, port).await?;
     msg!("Connected successfully to a running holochain");

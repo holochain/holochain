@@ -2,19 +2,14 @@ use crate::*;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dependencies::serde_json;
 use std::collections::HashMap;
-
-/// How often should NAT nodes refresh their proxy contract?
-/// Note - ProxyTo entries will be expired at double this time.
-const PROXY_KEEPALIVE_MS: u64 = 15000;
-/// How much longer the proxy should wait to remove the contract
-/// if no keep alive is received.
-const KEEPALIVE_MULTIPLIER: u64 = 3;
 
 /// Wrap a transport listener sender/receiver in kitsune proxy logic.
 pub async fn spawn_kitsune_proxy_listener(
     proxy_config: Arc<ProxyConfig>,
+    tuning_params: Arc<KitsuneP2pTuningParams>,
     sub_sender: ghost_actor::GhostSender<TransportListener>,
     mut sub_receiver: TransportEventReceiver,
 ) -> TransportResult<(
@@ -57,6 +52,7 @@ pub async fn spawn_kitsune_proxy_listener(
         builder.spawn(
             InnerListen::new(
                 i_s.clone(),
+                tuning_params.clone(),
                 this_url,
                 tls,
                 accept_proxy_cb,
@@ -80,9 +76,10 @@ pub async fn spawn_kitsune_proxy_listener(
 
         // Set up a timer to refresh our proxy contract at keepalive interval
         let i_s_c = i_s.clone();
+        let proxy_keepalive_ms = tuning_params.proxy_keepalive_ms as u64;
         metric_task(async move {
             loop {
-                tokio::time::delay_for(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS)).await;
+                tokio::time::delay_for(std::time::Duration::from_millis(proxy_keepalive_ms)).await;
 
                 if let Err(e) = i_s_c.req_proxy(proxy_url.clone()).await {
                     tracing::error!(msg = "renewing proxy failed", ?proxy_url, ?e);
@@ -140,6 +137,8 @@ struct ProxyTo {
 
 struct InnerListen {
     i_s: ghost_actor::GhostSender<Internal>,
+    #[allow(dead_code)]
+    tuning_params: Arc<KitsuneP2pTuningParams>,
     this_url: ProxyUrl,
     accept_proxy_cb: AcceptProxyCallback,
     sub_sender: ghost_actor::GhostSender<TransportListener>,
@@ -153,6 +152,7 @@ struct InnerListen {
 impl InnerListen {
     pub async fn new(
         i_s: ghost_actor::GhostSender<Internal>,
+        tuning_params: Arc<KitsuneP2pTuningParams>,
         this_url: ProxyUrl,
         tls: TlsConfig,
         accept_proxy_cb: AcceptProxyCallback,
@@ -165,10 +165,11 @@ impl InnerListen {
             this_url
         );
 
-        let (tls_server_config, tls_client_config) = gen_tls_configs(&tls)?;
+        let (tls_server_config, tls_client_config) = gen_tls_configs(&tls, tuning_params.clone())?;
 
         Ok(Self {
             i_s,
+            tuning_params,
             this_url,
             accept_proxy_cb,
             sub_sender,
@@ -462,10 +463,9 @@ impl InternalHandler for InnerListen {
         proxy_url: ProxyUrl,
         base_url: url2::Url2,
     ) -> InternalHandlerResult<()> {
-        // expire ProxyTo entries at double the proxy keepalive timeframe.
         let expires_at = std::time::Instant::now()
             .checked_add(std::time::Duration::from_millis(
-                PROXY_KEEPALIVE_MS * KEEPALIVE_MULTIPLIER,
+                self.tuning_params.proxy_to_expire_ms as u64,
             ))
             .unwrap();
         self.proxy_list.insert(

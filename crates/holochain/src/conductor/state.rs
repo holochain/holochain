@@ -28,23 +28,17 @@ pub struct ConductorState {
 }
 
 /// A unique identifier used to refer to an App Interface internally.
-#[derive(
-    Clone,
-    Deserialize,
-    Serialize,
-    Default,
-    Debug,
-    Hash,
-    PartialEq,
-    Eq,
-    derive_more::From,
-    derive_more::Display,
-)]
-pub struct AppInterfaceId(String);
+#[derive(Clone, Deserialize, Serialize, Default, Debug, Hash, PartialEq, Eq)]
+pub struct AppInterfaceId(u16);
 
-impl From<&str> for AppInterfaceId {
-    fn from(s: &str) -> Self {
-        Self(s.into())
+impl AppInterfaceId {
+    /// Create an id from the port
+    pub fn new(port: u16) -> Self {
+        Self(port)
+    }
+    /// Get the port intended for this interface
+    pub fn port(&self) -> u16 {
+        self.0
     }
 }
 

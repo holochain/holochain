@@ -173,6 +173,8 @@ pub enum AdminRequest {
         /// OS choose a free port
         port: Option<u16>,
     },
+    /// List all the app interfaces currently attached with [`AttachAppInterface`].
+    ListAppInterfaces,
     /// Dump the full state of the `Cell` specified by argument `cell_id`,
     /// including its chain, as a string containing JSON.
     ///
@@ -317,6 +319,9 @@ pub enum AdminResponse {
         /// Networking port of the new `AppInterfaceApi`
         port: u16,
     },
+
+    /// The list of attached app interfaces.
+    AppInterfacesListed(Vec<u16>),
 
     /// The succesful response to an [`AdminRequest::ActivateApp`].
     ///

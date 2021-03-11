@@ -3,11 +3,13 @@ use ghost_actor::dependencies::tracing;
 use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
 use kitsune_p2p_types::{
+    config::KitsuneP2pTuningParams,
     dependencies::{ghost_actor, url2},
     metrics::metric_task,
     transport::*,
     transport_mem::*,
 };
+use std::sync::Arc;
 use structopt::StructOpt;
 
 /// Proxy transport selector
@@ -87,7 +89,13 @@ async fn gen_proxy_con(
         TlsConfig::new_ephemeral().await?,
         AcceptProxyCallback::accept_all(),
     );
-    spawn_kitsune_proxy_listener(proxy_config, listener, events).await
+    spawn_kitsune_proxy_listener(
+        proxy_config,
+        Arc::new(KitsuneP2pTuningParams::default()),
+        listener,
+        events,
+    )
+    .await
 }
 
 async fn gen_cli_con(
@@ -100,7 +108,13 @@ async fn gen_cli_con(
     let (listener, events) = gen_base_con(t).await?;
     let proxy_config =
         ProxyConfig::remote_proxy_client(TlsConfig::new_ephemeral().await?, proxy_url.into());
-    spawn_kitsune_proxy_listener(proxy_config, listener, events).await
+    spawn_kitsune_proxy_listener(
+        proxy_config,
+        Arc::new(KitsuneP2pTuningParams::default()),
+        listener,
+        events,
+    )
+    .await
 }
 
 #[derive(Debug)]
