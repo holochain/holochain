@@ -311,6 +311,109 @@ impl BackendAdapt for MemBackendAdapt {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::sink::SinkExt;
+
+    async fn hnd_con(
+        c: Con,
+        r_send: futures::channel::mpsc::Sender<()>,
+        mut w_send: futures::channel::mpsc::Sender<tokio::task::JoinHandle<()>>,
+    ) -> Arc<dyn ConAdapt> {
+        let t = KitsuneTimeout::from_millis(5000);
+
+        let (con, chan_recv) = c;
+        let con2 = con.clone();
+        w_send
+            .send(tokio::task::spawn(async move {
+                let con2 = &con2;
+                let r_send = &r_send;
+                chan_recv
+                    .for_each_concurrent(8, |recv| async move {
+                        let mut recv = recv.await.unwrap();
+                        while let Ok((_, mut buf)) = recv.read(t).await {
+                            if &*buf == b"hello" {
+                                let mut out_chan = con2.out_chan(t).await.unwrap();
+                                buf.clear();
+                                buf.extend_from_slice(b"world");
+                                out_chan.write(0.into(), buf, t).await.unwrap();
+                            } else if &*buf == b"world" {
+                                if r_send.clone().send(()).await.is_err() {
+                                    return;
+                                }
+                            } else {
+                                panic!("unexpected {}", String::from_utf8_lossy(&*buf));
+                            }
+                        }
+                    })
+                    .await;
+                println!("chan recv done");
+            }))
+            .await
+            .unwrap();
+        con
+    }
+
+    async fn mk_node(
+        f: &BackendFactory,
+        r_send: futures::channel::mpsc::Sender<()>,
+        mut w_send: futures::channel::mpsc::Sender<tokio::task::JoinHandle<()>>,
+    ) -> (TxUrl, Arc<dyn EndpointAdapt>) {
+        let t = KitsuneTimeout::from_millis(5000);
+
+        let (ep, con_recv) = f.bind("none:".into(), t).await.unwrap();
+        let w_send2 = w_send.clone();
+        w_send
+            .send(tokio::task::spawn(async move {
+                let r_send = &r_send;
+                let w_send2 = &w_send2;
+                con_recv
+                    .for_each_concurrent(8, |c| async move {
+                        hnd_con(c.await.unwrap(), r_send.clone(), w_send2.clone()).await;
+                    })
+                    .await;
+                println!("con recv done");
+            }))
+            .await
+            .unwrap();
+
+        let addr = ep.local_addr().unwrap();
+
+        (addr, ep)
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_tx2_mem_backend_stress() {
+        let t = KitsuneTimeout::from_millis(5000);
+
+        let f = MemBackendAdapt::new();
+        let (r_send, mut r_recv) = futures::channel::mpsc::channel(32);
+        let (mut w_send, w_recv) = futures::channel::mpsc::channel(32);
+
+        let (addr, ep1) = mk_node(&f, r_send.clone(), w_send.clone()).await;
+        let (_, ep2) = mk_node(&f, r_send.clone(), w_send.clone()).await;
+
+        let con = hnd_con(ep1.connect(addr, t).await.unwrap(), r_send, w_send.clone()).await;
+
+        let mut out_chan = con.out_chan(t).await.unwrap();
+        let mut buf = PoolBuf::new();
+        buf.extend_from_slice(b"hello");
+        out_chan.write(0.into(), buf, t).await.unwrap();
+
+        for _ in 0..1 {
+            let _ = r_recv.next().await;
+        }
+
+        ep1.close(0, "").await;
+        ep2.close(0, "").await;
+
+        println!("1");
+        w_send.close().await.unwrap();
+        println!("2");
+
+        futures::future::try_join_all(w_recv.collect::<Vec<_>>().await)
+            .await
+            .unwrap();
+        println!("3");
+    }
 
     #[tokio::test(threaded_scheduler)]
     async fn test_tx2_mem_backend() {

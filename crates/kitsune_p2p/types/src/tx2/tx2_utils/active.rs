@@ -1,40 +1,39 @@
+use crate::tx2::tx2_utils::*;
 use crate::*;
 use futures::future::FutureExt;
-use std::sync::atomic;
-use std::sync::Arc;
 
-/// Represents a single active bool...
-/// See Active below, which can be mixed to contain up to 4 of these.
-struct ActiveInner {
-    /// the actual active boolean value
-    act: Arc<atomic::AtomicBool>,
-
-    // below is a temp workaround until tokio 1
-
-    // NOTE - with tokio 1 we'll be able to use Notify
-    //        becasue notify_waiters will exist.
-    w_send: tokio::sync::broadcast::Sender<bool>,
-    // need to capture this receiver just so the sender doesn't close.
-    _w_recv: tokio::sync::broadcast::Receiver<bool>,
-}
+#[derive(Clone)]
+struct ActiveInner(NotifyAll);
 
 impl ActiveInner {
     pub fn new() -> Self {
-        let (w_send, _w_recv) = tokio::sync::broadcast::channel(1);
-        Self {
-            act: Arc::new(atomic::AtomicBool::new(true)),
-            w_send,
-            _w_recv,
-        }
+        Self(NotifyAll::new())
     }
 
     pub fn kill(&self) {
-        self.act.store(false, atomic::Ordering::SeqCst);
-        let _ = self.w_send.send(false);
+        self.0.notify();
     }
 
     pub fn is_active(&self) -> bool {
-        self.act.load(atomic::Ordering::SeqCst)
+        !self.0.did_notify()
+    }
+
+    pub fn fut<'a, 'b, R, F>(
+        &'a self,
+        f: F,
+    ) -> impl std::future::Future<Output = KitsuneResult<R>> + 'b + Send
+    where
+        R: 'static + Send,
+        F: std::future::Future<Output = KitsuneResult<R>> + 'b + Send,
+    {
+        let f = f.boxed();
+        let not = self.0.wait();
+        async move {
+            match futures::future::select(f, not).await {
+                futures::future::Either::Left((v, _)) => v,
+                futures::future::Either::Right(_) => Err(KitsuneErrorKind::Closed.into()),
+            }
+        }
     }
 }
 
@@ -43,7 +42,7 @@ impl ActiveInner {
 /// The endpoint can close, closing all connections.
 /// Or, individual connections can close, without closing the endpoint.
 #[derive(Clone)]
-pub struct Active([Option<Arc<ActiveInner>>; 4]);
+pub struct Active(Box<[ActiveInner]>);
 
 impl Default for Active {
     fn default() -> Self {
@@ -54,50 +53,36 @@ impl Default for Active {
 impl Active {
     /// Create a new active tracker set to "active".
     pub fn new() -> Self {
-        Self([Some(Arc::new(ActiveInner::new())), None, None, None])
+        Self(Box::new([ActiveInner::new()]))
     }
 
     /// Mix two active trackers to gether.
     /// The result will be inactive if either parent is inactive.
     pub fn mix(&self, oth: &Self) -> Self {
-        let mut inner = self.0.clone();
-        'top: for o in oth.0.iter() {
-            if let Some(o) = o {
-                for i in inner.iter_mut() {
-                    if i.is_none() {
-                        *i = Some(o.clone());
-                        continue 'top;
-                    }
-                }
-                panic!("No remaining Active slots");
-            }
-        }
-        Self(inner)
+        let mut out = self.0.to_vec();
+        out.extend_from_slice(&oth.0);
+        Self(out.into_boxed_slice())
     }
 
     /// Kill this active tracker (all trackers if mixed).
     pub fn kill(&self) {
-        for a in self.0.iter() {
-            if let Some(a) = a {
-                a.kill();
-            }
+        for i in self.0.iter() {
+            i.kill();
         }
     }
 
     /// If any of the mixed trackers in this instance are not active,
     /// this fn will return false.
     pub fn is_active(&self) -> bool {
-        for a in self.0.iter() {
-            if let Some(a) = a {
-                if !a.is_active() {
-                    return false;
-                }
+        for i in self.0.iter() {
+            if !i.is_active() {
+                return false;
             }
         }
         true
     }
 
-    /// Mutate a future such that if any of the sub-trackers
+    /// Wrap a future such that if any of the sub-trackers
     /// within this active tracker instance become inactive
     /// before the future resolve, resolve with a Err::Closed result.
     pub fn fut<'a, 'b, R, F>(
@@ -108,32 +93,11 @@ impl Active {
         R: 'static + Send,
         F: std::future::Future<Output = KitsuneResult<R>> + 'b + Send,
     {
-        let mut act_list = Vec::new();
-        let mut recv_list = Vec::new();
-        for a in self.0.iter() {
-            if let Some(a) = a {
-                act_list.push(a.act.clone());
-                recv_list.push(a.w_send.subscribe());
-            }
+        let mut f = f.boxed();
+        for i in self.0.iter() {
+            f = i.fut(f).boxed();
         }
-        async move {
-            let w_fut = futures::future::select_all(recv_list.iter_mut().map(|r| r.recv().boxed()));
-
-            // make sure to check this *after* we've registered the
-            // watch receive futures.
-            for act in act_list.into_iter() {
-                if !act.load(atomic::Ordering::SeqCst) {
-                    return Err(KitsuneErrorKind::Closed.into());
-                }
-            }
-
-            let f = f.boxed();
-            use futures::future::Either;
-            match futures::future::select(w_fut, f).await {
-                Either::Left(_) => Err(KitsuneErrorKind::Closed.into()),
-                Either::Right((v, _)) => v,
-            }
-        }
+        async move { f.await }
     }
 }
 
@@ -159,6 +123,7 @@ mod tests {
         let t1 = tokio::task::spawn(async move {
             assert!(f1.await.is_ok());
         });
+
         let f2 = mix.fut(async move {
             tokio::time::delay_for(std::time::Duration::from_millis(200)).await;
             Ok(())

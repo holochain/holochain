@@ -13,6 +13,9 @@ pub use logic_chan::*;
 mod mem_chan;
 pub use mem_chan::*;
 
+mod notify_all;
+pub use notify_all::*;
+
 mod pool_buf;
 pub use pool_buf::*;
 
