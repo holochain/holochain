@@ -604,6 +604,7 @@ impl KitsuneP2pHandler for Space {
                                 delay_len *= 2;
                             }
 
+                            // TODO - this will make redundant requests to bootstrap server if multiple local agents have joined the same space.
                             if let Err(e) = super::discover::add_5_or_less_non_local_agents(
                                 space.clone(),
                                 agent.clone(),
