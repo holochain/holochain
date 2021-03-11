@@ -24,23 +24,12 @@ use crate::prelude::*;
 #[macro_export]
 macro_rules! map_extern {
     ( $name:tt, $f:ident, $input:ty, $output:ty ) => {
-        map_extern!($name, $f, $input, $output, not_mock);
-    };
-    ( $name:tt, $f:ident, $input:ty, $output:ty, mock ) => {
-        map_extern!($name, $f, $input, $output, init = {};);
-    };
-    ( $name:tt, $f:ident, $input:ty, $output:ty, not_mock ) => {
-        map_extern!($name, $f, $input, $output, init = $crate::prelude::set_hdk($crate::prelude::HostHdk););
-    };
-    ( $name:tt, $f:ident, $input:ty, $output:ty, init = $init_hdk:expr; ) => {
         $crate::paste::paste! {
             mod [< __ $name _extern >] {
                 use super::*;
 
                 #[no_mangle]
                 pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr) -> $crate::prelude::GuestPtr {
-                    $init_hdk;
-
                     // Setup tracing.
                     // @TODO feature flag this?
                     let _subscriber_guard = $crate::prelude::tracing::subscriber::set_default(
