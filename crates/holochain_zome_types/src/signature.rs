@@ -1,7 +1,7 @@
 //! Signature for authenticity of data
+use crate::Bytes;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
-use crate::Bytes;
 
 /// Ed25519 signatures are always the same length, 64 bytes.
 pub const SIGNATURE_BYTES: usize = 64;
@@ -23,12 +23,18 @@ impl Sign {
     where
         S: Serialize + std::fmt::Debug,
     {
-        Ok(Self::new_raw(key, holochain_serialized_bytes::encode(&input)?))
+        Ok(Self::new_raw(
+            key,
+            holochain_serialized_bytes::encode(&input)?,
+        ))
     }
 
     /// construct a new Sign struct from raw bytes.
     pub fn new_raw(key: holo_hash::AgentPubKey, data: Vec<u8>) -> Self {
-        Self { key, data: Bytes::from(data) }
+        Self {
+            key,
+            data: Bytes::from(data),
+        }
     }
 
     /// key getter
@@ -66,15 +72,23 @@ impl SignEphemeral {
     /// The signing key will be generated and discarded by the host.
     pub fn new<S>(inputs: Vec<S>) -> Result<Self, SerializedBytesError>
     where
-        S: Serialize + std::fmt::Debug
-        {
-            let datas: Result<Vec<_>, _> = inputs.into_iter().map(|s| holochain_serialized_bytes::encode(&s)).collect();
-            Ok(Self::new_raw(datas?))
-        }
+        S: Serialize + std::fmt::Debug,
+    {
+        let datas: Result<Vec<_>, _> = inputs
+            .into_iter()
+            .map(|s| holochain_serialized_bytes::encode(&s))
+            .collect();
+        Ok(Self::new_raw(datas?))
+    }
 
     /// Construct a SignEphemeral from a vector of bytes.
     pub fn new_raw(datas: Vec<Vec<u8>>) -> Self {
         Self(datas.into_iter().map(|d| Bytes::from(d)).collect())
+    }
+
+    /// Consumes self.
+    pub fn into_inner(self) -> Vec<Bytes> {
+        self.0
     }
 }
 

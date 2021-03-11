@@ -49,7 +49,12 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         let key = self.clone();
         async move {
             let data = maybe_data?;
-            keystore.sign(Sign { key, data: serde_bytes::ByteBuf::from(data) }).await
+            keystore
+                .sign(Sign {
+                    key,
+                    data: serde_bytes::ByteBuf::from(data),
+                })
+                .await
         }
         .boxed()
         .into()

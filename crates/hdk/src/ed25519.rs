@@ -23,16 +23,15 @@ where
 }
 
 pub fn sign_ephemeral<D>(datas: Vec<D>) -> ExternResult<EphemeralSignatures>
-    where
-    D: serde::Serialize + std::fmt::Debug
-    {
-        HDK.with(|h| h.borrow().sign_ephemeral(SignEphemeral::new(datas)?))
-    }
+where
+    D: serde::Serialize + std::fmt::Debug,
+{
+    HDK.with(|h| h.borrow().sign_ephemeral(SignEphemeral::new(datas)?))
+}
 
-pub fn sign_ephemeral_raw(datas: Vec<Vec<u8>>) -> ExternResult<EphemeralSignatures>
-    {
-        HDK.with(|h| h.borrow().sign_ephemeral(SignEphemeral::new_raw(datas)))
-    }
+pub fn sign_ephemeral_raw(datas: Vec<Vec<u8>>) -> ExternResult<EphemeralSignatures> {
+    HDK.with(|h| h.borrow().sign_ephemeral(SignEphemeral::new_raw(datas)))
+}
 
 /// Verify the passed signature and public key against the passed serializable input.
 ///

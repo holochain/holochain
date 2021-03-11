@@ -51,6 +51,7 @@ use crate::core::ribosome::host_fn::random_bytes::random_bytes;
 use crate::core::ribosome::host_fn::remote_signal::remote_signal;
 use crate::core::ribosome::host_fn::schedule::schedule;
 use crate::core::ribosome::host_fn::sign::sign;
+use crate::core::ribosome::host_fn::sign_ephemeral::sign_ephemeral;
 use crate::core::ribosome::host_fn::sleep::sleep;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::trace::trace;
@@ -188,6 +189,10 @@ impl RealRibosome {
             );
             ns.insert("__sign", func!(invoke_host_function!(sign)));
             ns.insert(
+                "__sign_ephemeral",
+                func!(invoke_host_function!(sign_ephemeral)),
+            );
+            ns.insert(
                 "__create_x25519_keypair",
                 func!(invoke_host_function!(create_x25519_keypair)),
             );
@@ -213,6 +218,10 @@ impl RealRibosome {
                 func!(invoke_host_function!(unreachable)),
             );
             ns.insert("__sign", func!(invoke_host_function!(unreachable)));
+            ns.insert(
+                "__sign_ephemeral",
+                func!(invoke_host_function!(unreachable)),
+            );
             ns.insert(
                 "__create_x25519_keypair",
                 func!(invoke_host_function!(unreachable)),

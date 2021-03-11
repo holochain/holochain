@@ -169,6 +169,8 @@ wasm_io_types! {
     // The pubkey in the input needs to be found in the keystore for this to work
     fn sign (zt::signature::Sign) -> zt::signature::Signature;
 
+    fn sign_ephemeral (zt::signature::SignEphemeral) -> zt::signature::EphemeralSignatures;
+
     // Current system time, in the opinion of the host, as a `Duration`.
     fn sys_time (()) -> core::time::Duration;
 
