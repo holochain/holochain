@@ -96,6 +96,7 @@ pub type KitsuneResult<T> = Result<T, KitsuneError>;
 
 mod timeout;
 pub use timeout::*;
+
 pub mod async_lazy;
 mod auto_stream_select;
 pub use auto_stream_select::*;
