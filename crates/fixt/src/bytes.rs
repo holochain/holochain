@@ -11,9 +11,9 @@ pub type BytesNotEmpty = Vec<u8>;
 // likely the most interesting is the Unpredictable curve that throws out random bytes in a vec
 // of random length between 0 and 32 bytes long
 fixturator!(
-    Bytes,
-    vec![],
-    {
+    Bytes;
+    curve Empty vec![];
+    curve Unpredictable {
         let mut rng = crate::rng();
         let len = rng.gen_range(UNPREDICTABLE_MIN_LEN, UNPREDICTABLE_MAX_LEN);
         let mut u8_fixturator = U8Fixturator::new(Unpredictable);
@@ -22,8 +22,8 @@ fixturator!(
             bytes.push(u8_fixturator.next().unwrap());
         }
         bytes
-    },
-    {
+    };
+    curve Predictable {
         let mut index = get_fixt_index!();
         let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, index);
         let mut bytes = vec![];
@@ -33,7 +33,7 @@ fixturator!(
         index += 1;
         set_fixt_index!(index);
         bytes
-    }
+    };
 );
 
 // Simply generate "bytes" which is a Vec<u8>

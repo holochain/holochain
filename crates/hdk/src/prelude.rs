@@ -7,6 +7,8 @@ pub use crate::capability::update_cap_grant;
 pub use crate::chain::get_agent_activity;
 pub use crate::chain::query;
 pub use crate::ed25519::sign;
+pub use crate::ed25519::sign_ephemeral;
+pub use crate::ed25519::sign_ephemeral_raw;
 pub use crate::ed25519::sign_raw;
 pub use crate::ed25519::verify_signature;
 pub use crate::ed25519::verify_signature_raw;

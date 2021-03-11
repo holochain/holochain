@@ -6,6 +6,25 @@ fn sign(sign_input: Sign) -> ExternResult<Signature> {
 }
 
 #[hdk_extern]
+fn sign_ephemeral(_: ()) -> ExternResult<Vec<EphemeralSignatures>> {
+    #[derive(Serialize, Deserialize, Debug)]
+    struct One([u8; 2]);
+    #[derive(Serialize, Deserialize, Debug)]
+    struct Two([u8; 2]);
+    Ok(vec![
+        // Can use normal sign_ephemeral if all the types are the same.
+        hdk::prelude::sign_ephemeral(vec![One([1, 2]), One([3, 4])])?,
+        // Need to use raw if the types are different.
+        hdk::prelude::sign_ephemeral_raw(
+            vec![
+                holochain_serialized_bytes::encode(&One([1, 2]))?,
+                holochain_serialized_bytes::encode(&Two([2, 3]))?,
+            ]
+        )?
+    ])
+}
+
+#[hdk_extern]
 fn verify_signature_raw(
     verify_signature_input: VerifySignature,
 ) -> ExternResult<bool> {
@@ -71,4 +90,43 @@ fn verify_signature(
     assert!(!not_verify);
 
     Ok(())
+}
+
+#[cfg(test)]
+pub mod tests {
+    use hdk::prelude::*;
+    use ::fixt::prelude::{paste, fixt, Unpredictable, Predictable};
+
+    #[test]
+    fn sign_ephemeral_smoke() {
+        let mut mock_hdk = hdk::prelude::MockHdkT::new();
+
+        let pubkey = fixt!(AgentPubKey);
+        let signatures: Vec<Signature> = SignatureFixturator::new(Predictable).take(2).collect();
+
+        mock_hdk.expect_sign_ephemeral()
+            .times(2)
+            .return_const(Ok(EphemeralSignatures {
+                key: pubkey.clone(),
+                signatures: signatures.clone(),
+            }));
+
+        hdk::prelude::set_hdk(mock_hdk);
+
+        let output = super::sign_ephemeral(()).unwrap();
+
+        assert_eq!(
+            output,
+            vec![
+                EphemeralSignatures {
+                    key: pubkey.clone(),
+                    signatures: signatures.clone(),
+                },
+                EphemeralSignatures {
+                    key: pubkey.clone(),
+                    signatures: signatures.clone(),
+                }
+            ]
+        )
+    }
 }

@@ -64,8 +64,9 @@ crate::secure_primitive!(Signature, SIGNATURE_BYTES);
 /// The public key for the ephemeral operation will be returned in the output.
 /// Structurally mirrors/complements the `Signature` struct as a new type.
 /// There we know the key on the input side, here we receive the key on the output.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct SignEphemeral(Vec<Bytes>);
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(transparent)]
+pub struct SignEphemeral(pub Vec<Bytes>);
 
 impl SignEphemeral {
     /// Construct a new SignEphemeral from a vector of Serialize inputs.
@@ -98,7 +99,7 @@ impl SignEphemeral {
 /// or forged because the private key no longer exists.
 /// The signatures match the input items positionally in the vector,
 /// it is up to the caller to reconstruct/align/zip them back together.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct EphemeralSignatures {
     /// The public key associated with the now-discarded private key used to sign.
     pub key: holo_hash::AgentPubKey,
