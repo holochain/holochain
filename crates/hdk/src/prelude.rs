@@ -88,6 +88,7 @@ macro_rules! holochain_externs {
             __unreachable,
             __verify_signature,
             __sign,
+            __sign_ephemeral,
             __zome_info,
             __call_info,
             __dna_info,

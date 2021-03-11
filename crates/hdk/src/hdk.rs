@@ -20,6 +20,7 @@ pub trait HdkT: Send + Sync {
     fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Element>>;
     // Ed25519
     fn sign(&self, sign: Sign) -> ExternResult<Signature>;
+    fn sign_ephemeral(&self, sign_ephemeral: SignEphemeral) -> ExternResult<EphemeralSignatures>;
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
     // Entry
     fn create(&self, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash>;
@@ -89,6 +90,9 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     fn sign(&self, _: Sign) -> ExternResult<Signature> {
+        Self::err()
+    }
+    fn sign_ephemeral(&self, _: SignEphemeral) -> ExternResult<EphemeralSignatures> {
         Self::err()
     }
     fn verify_signature(&self, _: VerifySignature) -> ExternResult<bool> {
@@ -221,6 +225,9 @@ impl HdkT for HostHdk {
 
     fn sign(&self, sign: Sign) -> ExternResult<Signature> {
         host_call::<Sign, Signature>(__sign, sign)
+    }
+    fn sign_ephemeral(&self, sign_ephemeral: SignEphemeral) -> ExternResult<EphemeralSignatures> {
+        host_call::<SignEphemeral, EphemeralSignatures>(__sign_ephemeral, sign_ephemeral)
     }
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {
         host_call::<VerifySignature, bool>(__verify_signature, verify_signature)
