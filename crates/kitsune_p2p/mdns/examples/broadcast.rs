@@ -1,4 +1,4 @@
-use kitsune_mdns::*;
+use kitsune_p2p_mdns::*;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {

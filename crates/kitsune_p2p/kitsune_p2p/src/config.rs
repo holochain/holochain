@@ -21,6 +21,8 @@ pub struct KitsuneP2pConfig {
     /// a warning will be printed in the tracing log.
     #[serde(default)]
     pub tuning_params: Arc<KitsuneP2pTuningParams>,
+    /// The network used for connecting to other peers
+    pub network_type: NetworkType,
 }
 
 impl Default for KitsuneP2pConfig {
@@ -29,6 +31,7 @@ impl Default for KitsuneP2pConfig {
             transport_pool: Vec::new(),
             bootstrap_service: None,
             tuning_params: Arc::new(KitsuneP2pTuningParams::default()),
+            network_type: NetworkType::QuicBootstrap,
         }
     }
 }
@@ -99,4 +102,14 @@ pub enum ProxyAcceptConfig {
 
     /// We will reject all requests to proxy for remotes
     RejectAll,
+}
+
+/// Method for connecting to other peers and broadcasting our AgentInfo
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum NetworkType {
+    /// Via bootstrap server to the WAN
+    QuicBootstrap,
+    /// Via MDNS to the LAN
+    QuicMdns,
 }

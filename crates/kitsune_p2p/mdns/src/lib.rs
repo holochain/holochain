@@ -37,9 +37,16 @@ pub fn mdns_create_broadcast_thread(
     buffer: &[u8],
 ) -> ::std::sync::Arc<AtomicBool> {
     let svc_type = format!("_{}{}", service_type, HC_SERVICE_PROTOCOL);
-    assert!(svc_type.len() < 63); // constraint in libmdns
-    assert!(service_name.len() < 63); // constraint in libmdns
-                                      // Create Termination command variable
+    // Constraints in libmdns
+    assert!(
+        svc_type.len() < 63,
+        "len = {} ({}) ; {}",
+        svc_type.len(),
+        service_type.len(),
+        service_type
+    );
+    assert!(service_name.len() < 63);
+    // Create Termination command variable
     let can_run = ::std::sync::Arc::new(AtomicBool::new(true));
     let can_run_clone = can_run.clone();
     // Change buffer to base64 string
@@ -47,12 +54,12 @@ pub fn mdns_create_broadcast_thread(
         "u{}",
         base64::encode_config(buffer, base64::URL_SAFE_NO_PAD)
     );
-    println!(
-        "Broadcasting service type '{}', named '{}' over mdns ({})",
-        svc_type,
-        service_name,
-        b64.len()
-    );
+    //println!(
+    //    "Broadcasting service type '{}', named '{}' over mdns ({})",
+    //    svc_type,
+    //    service_name,
+    //    b64.len()
+    //);
     // Create thread
     let _handle = tokio::task::spawn(async move {
         // Split buffer to fix TXT max size
@@ -63,7 +70,7 @@ pub fn mdns_create_broadcast_thread(
         }
         substrs.push(b64);
         let txts: Vec<_> = substrs.iter().map(AsRef::as_ref).collect();
-        println!("Entering mdns broadcasting thread...");
+        //println!("Entering mdns broadcasting thread...");
         // Create mdns responder
 
         let responder = libmdns::Responder::new().unwrap();
@@ -72,7 +79,7 @@ pub fn mdns_create_broadcast_thread(
         loop {
             tokio::time::sleep(::std::time::Duration::from_secs(BROADCAST_INTERVAL_SEC)).await;
             if !can_run_clone.load(Ordering::Relaxed) {
-                println!("Terminating.");
+                //println!("Terminating.");
                 break;
             }
         }
@@ -100,7 +107,7 @@ pub struct MdnsResponse {
 pub fn mdns_listen(service_type: String) -> impl Stream<Item = Result<MdnsResponse, MdnsError>> {
     //let service_name = format!("{}.local", HC_SERVICE_TYPE);
     let svc_type = format!("_{}{}.local", service_type, HC_SERVICE_PROTOCOL);
-    println!("MDNS query for service type '{}'", svc_type);
+    //println!("MDNS query for service type '{}'", svc_type);
     let query = mdns::discover::all(svc_type, Duration::from_secs(QUERY_INTERVAL_SEC))
         .expect("mdns Discover failed");
     // Get Mdns Response stream
@@ -125,7 +132,7 @@ pub fn mdns_listen(service_type: String) -> impl Stream<Item = Result<MdnsRespon
             let mut buffer = Vec::new();
             let mut service_name = String::new();
             let mut service_type = String::new();
-            println!("Response Answer count = {}", response.answers.len());
+            //println!("Response Answer count = {}", response.answers.len());
             for answer in response.answers {
                 match answer.kind {
                     RecordKind::TXT(txts) => {
