@@ -1,8 +1,8 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get<'a>(
@@ -10,13 +10,16 @@ pub fn get<'a>(
     call_context: Arc<CallContext>,
     input: GetInput,
 ) -> Result<Option<Element>, WasmError> {
-    let GetInput{ any_dht_hash, get_options } = input;
+    let GetInput {
+        any_dht_hash,
+        get_options,
+    } = input;
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
 
     // timeouts must be handled by the network
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         let maybe_element = call_context
             .host_access
             .workspace()

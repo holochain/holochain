@@ -67,7 +67,7 @@ fn conductors_call_remote(num_conductors: usize) {
         }
 
         // Let the remote messages be dropped
-        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
         let mut envs = Vec::with_capacity(handles.len());
         for h in &handles {
@@ -83,7 +83,7 @@ fn conductors_call_remote(num_conductors: usize) {
         }
         shutdown(handles).await;
     };
-    crate::conductor::tokio_runtime().block_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -110,7 +110,7 @@ fn conductors_local_gossip(num_committers: usize, num_conductors: usize, new_con
         network,
         true,
     );
-    crate::conductor::tokio_runtime().block_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -138,7 +138,7 @@ fn conductors_boot_gossip(num_committers: usize, num_conductors: usize, new_cond
         network,
         false,
     );
-    crate::conductor::tokio_runtime().block_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -170,7 +170,7 @@ fn conductors_local_boot_gossip(
         network,
         false,
     );
-    crate::conductor::tokio_runtime().block_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -217,7 +217,7 @@ fn conductors_remote_gossip(num_committers: usize, num_conductors: usize, new_co
         network,
         true,
     );
-    crate::conductor::tokio_runtime().block_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -256,7 +256,7 @@ fn conductors_remote_boot_gossip(
         network,
         false,
     );
-    crate::conductor::tokio_runtime().block_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 async fn conductors_gossip_inner(
@@ -299,7 +299,7 @@ async fn conductors_gossip_inner(
 
     // for _ in 0..600 {
     //     check_peers(envs.clone());
-    //     tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+    //     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     // }
 
     let all_handles = handles

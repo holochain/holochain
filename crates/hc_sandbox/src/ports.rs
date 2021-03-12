@@ -22,7 +22,7 @@ pub fn force_admin_port(path: PathBuf, port: u16) -> anyhow::Result<()> {
 
 /// List the admin ports for each sandbox.
 pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
-    let live_ports = crate::save::load_ports(std::env::current_dir()?)?;
+    let live_ports = crate::save::find_ports(std::env::current_dir()?, &paths[..])?;
     let mut ports = Vec::new();
     for (p, port) in paths.into_iter().zip(live_ports) {
         if let Some(port) = port {

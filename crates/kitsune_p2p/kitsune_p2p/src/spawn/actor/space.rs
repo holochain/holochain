@@ -3,9 +3,11 @@ use crate::types::metrics::KitsuneMetrics;
 use super::*;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
-use kitsune_p2p_types::codec::Codec;
-use std::collections::HashSet;
+use kitsune_p2p_mdns::*;
+use kitsune_p2p_types::codec::{rmp_decode, rmp_encode, Codec};
+use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
+use std::sync::atomic::AtomicBool;
 
 /// if the user specifies None or zero (0) for race_timeout_ms
 /// (david.b) this is not currently used
@@ -428,6 +430,8 @@ impl SpaceInternalHandler for Space {
 
     fn handle_update_agent_info(&mut self) -> SpaceInternalHandlerResult<()> {
         let space = self.space.clone();
+        let mut mdns_handles = self.mdns_handles.clone();
+        let network_type = self.config.network_type.clone();
         let agent_list: Vec<Arc<KitsuneAgent>> = self.local_joined_agents.iter().cloned().collect();
         let bound_url = self.transport.bound_url();
         let evt_sender = self.evt_sender.clone();
@@ -448,7 +452,7 @@ impl SpaceInternalHandler for Space {
                     expires_after,
                 );
                 let mut data = Vec::new();
-                kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info)?;
+                rmp_encode(&mut data, &agent_info)?;
                 let sign_req = SignNetworkDataEvt {
                     space: space.clone(),
                     agent: agent.clone(),
@@ -464,14 +468,45 @@ impl SpaceInternalHandler for Space {
                 evt_sender
                     .put_agent_info_signed(PutAgentInfoSignedEvt {
                         space: space.clone(),
-                        agent,
+                        agent: agent.clone(),
                         agent_info_signed: agent_info_signed.clone(),
                     })
                     .await?;
-
-                // Push to the bootstrap as well.
-                crate::spawn::actor::bootstrap::put(bootstrap_service.clone(), agent_info_signed)
-                    .await?;
+                // Push to the network as well
+                match network_type {
+                    NetworkType::QuicMdns => {
+                        // Broadcast only valid AgentInfo
+                        if !urls.is_empty() {
+                            // Kill previous broadcast for this space + agent
+                            let key = [space.get_bytes(), agent.get_bytes()].concat();
+                            if let Some(current_handle) = mdns_handles.get(&key) {
+                                mdns_kill_thread(current_handle.to_owned());
+                            }
+                            // Broadcast by using Space as service type and Agent as service name
+                            let space_b64 =
+                                base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
+                            let agent_b64 =
+                                base64::encode_config(&agent[..], base64::URL_SAFE_NO_PAD);
+                            //println!("(MDNS) - Broadcasting of Agent {:?} ({}) in space {:?} ({} ; {})",
+                            // agent, agent.get_bytes().len(), space, space.get_bytes().len(), space_b64.len());
+                            // Broadcast rmp encoded agent_info_signed
+                            let mut buffer = Vec::new();
+                            rmp_encode(&mut buffer, &agent_info_signed)?;
+                            tracing::trace!(?space_b64, ?agent_b64);
+                            let handle =
+                                mdns_create_broadcast_thread(space_b64, agent_b64, &buffer);
+                            // store handle in self
+                            mdns_handles.insert(key, handle);
+                        }
+                    }
+                    NetworkType::QuicBootstrap => {
+                        crate::spawn::actor::bootstrap::put(
+                            bootstrap_service.clone(),
+                            agent_info_signed,
+                        )
+                        .await?;
+                    }
+                }
             }
             Ok(())
         }
@@ -508,33 +543,86 @@ impl KitsuneP2pHandler for Space {
         let fut = self.i_s.update_agent_info();
         let i_s = self.i_s.clone();
         let evt_sender = self.evt_sender.clone();
-        let bootstrap_service = self.config.bootstrap_service.clone();
-        if let Some(bootstrap_service) = bootstrap_service {
-            tokio::task::spawn(async move {
-                const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
-                const MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(60 * 60);
-                let mut delay_len = START_DELAY;
-
-                loop {
-                    tokio::time::delay_for(delay_len).await;
-                    if delay_len <= MAX_DELAY {
-                        delay_len *= 2;
-                    }
-
-                    if let Err(e) = super::discover::add_5_or_less_non_local_agents(
-                        space.clone(),
-                        agent.clone(),
-                        i_s.clone(),
-                        evt_sender.clone(),
-                        bootstrap_service.clone(),
-                    )
-                    .await
-                    {
-                        tracing::error!(msg = "Failed to get peers from bootstrap", ?e);
-                    }
+        match self.config.network_type {
+            NetworkType::QuicMdns => {
+                // Listen to MDNS service that has that space as service type
+                let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
+                //println!("(MDNS) - Agent {:?} ({}) joined space {:?} ({} ; {})", agent, agent.get_bytes().len(), space, space.get_bytes().len(), dna_str.len());
+                if !self.mdns_listened_spaces.contains(&space_b64) {
+                    self.mdns_listened_spaces.insert(space_b64.clone());
+                    tokio::task::spawn(async move {
+                        let stream = mdns_listen(space_b64);
+                        tokio::pin!(stream);
+                        while let Some(maybe_response) = stream.next().await {
+                            match maybe_response {
+                                Ok(response) => {
+                                    tracing::trace!(msg = "Peer found via MDNS", ?response);
+                                    // Decode response
+                                    let remote_agent_vec = base64::decode_config(
+                                        &response.service_name[..],
+                                        base64::URL_SAFE_NO_PAD,
+                                    )
+                                    .expect("Agent base64 decode failed");
+                                    let remote_agent = Arc::new(KitsuneAgent(remote_agent_vec));
+                                    //println!("(MDNS) - Peer found via MDNS: {:?})", *remote_agent);
+                                    let maybe_agent_info_signed =
+                                        rmp_decode(&mut &*response.buffer);
+                                    if let Err(e) = maybe_agent_info_signed {
+                                        tracing::error!(msg = "Failed to decode MDNS peer", ?e);
+                                        continue;
+                                    }
+                                    let remote_agent_info_signed = maybe_agent_info_signed.unwrap();
+                                    //println!("(MDNS) - Found agent_info_signed: {:?})", remote_agent_info_signed);
+                                    // Add to local storage
+                                    let _result = evt_sender
+                                        .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                            space: space.clone(),
+                                            agent: remote_agent,
+                                            agent_info_signed: remote_agent_info_signed,
+                                        })
+                                        .await;
+                                }
+                                Err(e) => {
+                                    tracing::error!(msg = "Failed to get peers from MDNS", ?e);
+                                }
+                            }
+                        }
+                    });
                 }
-            });
+            }
+            NetworkType::QuicBootstrap => {
+                let bootstrap_service = self.config.bootstrap_service.clone();
+                if let Some(bootstrap_service) = bootstrap_service {
+                    tokio::task::spawn(async move {
+                        const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
+                        const MAX_DELAY: std::time::Duration =
+                            std::time::Duration::from_secs(60 * 60);
+                        let mut delay_len = START_DELAY;
+
+                        loop {
+                            tokio::time::sleep(delay_len).await;
+                            if delay_len <= MAX_DELAY {
+                                delay_len *= 2;
+                            }
+
+                            // TODO - this will make redundant requests to bootstrap server if multiple local agents have joined the same space.
+                            if let Err(e) = super::discover::add_5_or_less_non_local_agents(
+                                space.clone(),
+                                agent.clone(),
+                                i_s.clone(),
+                                evt_sender.clone(),
+                                bootstrap_service.clone(),
+                            )
+                            .await
+                            {
+                                tracing::error!(msg = "Failed to get peers from bootstrap", ?e);
+                            }
+                        }
+                    });
+                }
+            }
         }
+
         Ok(async move { fut.await }.boxed().into())
     }
 
@@ -688,6 +776,8 @@ pub(crate) struct Space {
     pub(crate) transport: ghost_actor::GhostSender<TransportListener>,
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
+    mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
+    mdns_listened_spaces: HashSet<String>,
 }
 
 impl Space {
@@ -702,7 +792,7 @@ impl Space {
         let i_s_c = i_s.clone();
         tokio::task::spawn(async move {
             loop {
-                tokio::time::delay_for(std::time::Duration::from_secs(5 * 60)).await;
+                tokio::time::sleep(std::time::Duration::from_secs(5 * 60)).await;
                 if i_s_c.update_agent_info().await.is_err() {
                     break;
                 }
@@ -716,6 +806,8 @@ impl Space {
             transport,
             local_joined_agents: HashSet::new(),
             config,
+            mdns_handles: HashMap::new(),
+            mdns_listened_spaces: HashSet::new(),
         }
     }
 

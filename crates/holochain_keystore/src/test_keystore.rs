@@ -85,7 +85,7 @@ pub async fn spawn_test_keystore() -> KeystoreApiResult<KeystoreSender> {
 mod tests {
     use super::*;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_test_keystore() {
         tokio::task::spawn(async move {
             let keystore = spawn_test_keystore().await.unwrap();

@@ -16,7 +16,7 @@ use holochain_state::source_chain::SourceChain;
 /// - Bob doesn't have the entry in their authored store
 /// - Bob does have the entry in their integrated store
 /// - Bob commits the entry and it is now in their authored store
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn authored_test() {
     observability::test_run().ok();
     // Check if the correct number of ops are integrated
