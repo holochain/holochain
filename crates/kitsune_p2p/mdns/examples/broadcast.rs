@@ -1,6 +1,6 @@
 use kitsune_mdns::*;
 
-#[tokio::main(threaded_scheduler)]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     println!("Starting broadcast");
     // Create buffer
@@ -15,6 +15,6 @@ async fn main() {
     let service_name = (0..62).map(|_| "X").collect::<String>();
     let tx = mdns_create_broadcast_thread(service_type, service_name, &buffer);
     // Kill thread after a minute
-    tokio::time::delay_for(::std::time::Duration::from_secs(60)).await;
+    tokio::time::sleep(::std::time::Duration::from_secs(60)).await;
     mdns_kill_thread(tx);
 }

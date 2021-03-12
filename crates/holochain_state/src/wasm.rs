@@ -40,7 +40,7 @@ mod tests {
     use holo_hash::HasHash;
     use holochain_types::dna::wasm::DnaWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn wasm_store_round_trip() -> DatabaseResult<()> {
         use holochain_lmdb::prelude::*;
         observability::test_run().ok();

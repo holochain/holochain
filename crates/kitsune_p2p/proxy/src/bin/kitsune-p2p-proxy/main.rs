@@ -106,7 +106,7 @@ async fn inner() -> TransportResult<()> {
     let listener_clone = listener.clone();
     metric_task(async move {
         loop {
-            tokio::time::delay_for(std::time::Duration::from_secs(60)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 
             let debug_dump = listener_clone.debug().await.unwrap();
 

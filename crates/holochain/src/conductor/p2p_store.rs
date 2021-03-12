@@ -459,7 +459,7 @@ mod tests {
         assert_eq!(&bytes[32..], agent_info.as_agent_ref().get_bytes(),);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_store_agent_info_signed() {
         observability::test_run().ok();
 
@@ -491,7 +491,7 @@ mod tests {
         assert_eq!(ret, &Some(agent_info_signed),);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_to_peer_env() {
         observability::test_run().ok();
         let t_env = test_p2p_env();

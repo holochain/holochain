@@ -200,7 +200,7 @@ where
     .unwrap();
     let respond_task = tokio::task::spawn(async move {
         use futures::future::FutureExt;
-        use tokio::stream::StreamExt;
+        use tokio_stream::StreamExt;
         while let Some(evt) = recv.next().await {
             if let Some((filter, tx)) = &mut events {
                 if filter(&evt) {
@@ -464,7 +464,7 @@ impl WaitForAny {
         }
         self.attempt += 1;
         tracing::debug!(attempt = ?self.attempt, out_of = ?self.num_attempts, delaying_for = ?self.delay);
-        tokio::time::delay_for(self.delay).await;
+        tokio::time::sleep(self.delay).await;
         true
     }
 }
@@ -494,7 +494,7 @@ pub async fn wait_for_integration(
             let total_time_waited = delay * i as u32;
             tracing::debug!(?count, ?total_time_waited);
         }
-        tokio::time::delay_for(delay).await;
+        tokio::time::sleep(delay).await;
     }
 }
 
@@ -541,7 +541,7 @@ pub async fn wait_for_integration_with_others(
                 change,
             );
         }
-        tokio::time::delay_for(delay).await;
+        tokio::time::sleep(delay).await;
     }
 }
 

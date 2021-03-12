@@ -77,7 +77,7 @@ async fn inner() -> TransportResult<()> {
         match &opt.time_interval_ms {
             None => break,
             Some(ms) => {
-                tokio::time::delay_for(std::time::Duration::from_millis(*ms)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(*ms)).await;
             }
         }
     }
