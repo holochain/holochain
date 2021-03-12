@@ -24,7 +24,7 @@ async fn get_peers(num: usize, half_lens: &[u32], keystore: KeystoreSender) -> V
     out
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "Too unstable"]
 // Unfortunately I can't get nodes to "settle".
 // As a node shrinks their arc they may drop below the redundancy
@@ -75,7 +75,7 @@ async fn test_arc_coverage() {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 // This test shows that we can handle maintaining our [`MINIMUM_REDUNDANCY`]
 // through 1000 trials. If this test ever fails it's not flakey. Instead that means
 // we can't actually maintain the [`MIN_REDUNDANCY`] and will need raise the [`REDUNDANCY_TARGET`].
@@ -127,7 +127,7 @@ async fn test_arc_redundancy() {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "Slow test that must check lots of combinations of values"]
 async fn test_arc_redundancy_all() {
     let conductor = SweetConductor::from_config(Default::default()).await;
@@ -190,7 +190,7 @@ async fn test_arc_redundancy_all() {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 // Can survive 50% of the nodes changing per update without
 // dropping below [`MIN_REDUNDANCY`]
 async fn test_join_leave() {
