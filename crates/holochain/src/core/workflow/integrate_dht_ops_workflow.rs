@@ -180,7 +180,7 @@ async fn integrate_single_dht_op(
                     validation_status: iv.validation_status,
                     op: iv.op,
                     when_integrated: timestamp::now(),
-                    receipt_acknowledged: false,
+                    send_receipt: iv.send_receipt,
                 };
                 Ok(Outcome::Integrated(integrated))
             }
@@ -203,7 +203,7 @@ fn integrate_data_and_meta<P: PrefixType>(
         validation_status: iv.validation_status,
         op: iv.op,
         when_integrated: timestamp::now(),
-        receipt_acknowledged: false,
+        send_receipt: iv.send_receipt,
     };
     debug!("integrating");
     Ok(Outcome::Integrated(integrated))
@@ -220,7 +220,7 @@ fn integrate_data<P: PrefixType>(
         validation_status: iv.validation_status,
         op: iv.op,
         when_integrated: timestamp::now(),
-        receipt_acknowledged: false,
+        send_receipt: iv.send_receipt,
     };
     debug!("integrating");
     Ok(Outcome::Integrated(integrated))

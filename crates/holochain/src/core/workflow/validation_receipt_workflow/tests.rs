@@ -29,7 +29,7 @@ fn simple_crud_zome() -> InlineZome {
         })
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_validation_receipt() {
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;

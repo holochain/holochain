@@ -91,8 +91,8 @@ pub struct IntegratedDhtOpsValue {
     pub op: DhtOpLight,
     /// Time when the op was integrated
     pub when_integrated: Timestamp,
-    /// The receipt has been received by the author.
-    pub receipt_acknowledged: bool,
+    /// Send a receipt to this author.
+    pub send_receipt: bool,
 }
 
 /// A type for storing in databases that only need the hashes.
@@ -102,6 +102,8 @@ pub struct IntegrationLimboValue {
     pub validation_status: ValidationStatus,
     /// The op
     pub op: DhtOpLight,
+    /// Send a receipt to this author.
+    pub send_receipt: bool,
 }
 
 impl IntegratedDhtOpsBuf {
@@ -195,7 +197,7 @@ mod tests {
                 validation_status: ValidationStatus::Valid,
                 op: DhtOpLight::RegisterAgentActivity(fixt!(HeaderHash), basis.next().unwrap()),
                 when_integrated: when_integrated.into(),
-                receipt_acknowledged: false,
+                send_receipt: false,
             });
 
         // Put them in the db

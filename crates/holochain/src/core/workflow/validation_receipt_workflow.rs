@@ -25,19 +25,10 @@ use super::error::WorkflowResult;
 mod tests;
 
 #[instrument(skip(workspace, writer, network))]
-/// Send validation receipts to their authors in serial and wait for
-/// responses. Might not be fast but only requires a single outgoing
-/// connection at any moment.
-/// TODO: If we want faster and better feedback on when our data
-/// has "hit" the network (it's safe to close the laptop lid) then
-/// we could batch this function to the amount of outgoing connections
-/// we are happy with.
-/// Also we could retry on some schedule rather then waiting for a
-/// future op to trigger this workflow.
-/// TODO: We have a bool [`holochain_p2p::HolochainP2pCellT::publish`]
-/// in publishing ops that specifies whether or not
-/// we want a receipt. It is currently ignored here because it can't be set
-/// anywhere. If we do choose to use that bool then we need to use it here.
+/// Send validation receipts to their authors in serial and without waiting for
+/// responses.
+/// TODO: Currently still waiting for responses because we don't have a network call
+/// that doesn't.
 pub async fn validation_receipt_workflow(
     mut workspace: ValidationReceiptWorkspace,
     writer: OneshotWriter,
@@ -47,11 +38,11 @@ pub async fn validation_receipt_workflow(
     let env = workspace.elements.headers().env().clone();
     let keystore = workspace.keystore.clone();
 
-    // Get out all ops that we have not received acknowledgments from the author yet.
+    // Get out all ops that are marked for sending receipt.
     let ops: Vec<(DhtOpHash, IntegratedDhtOpsValue)> = fresh_reader!(env, |r| workspace
         .integrated_dht_ops
         .iter(&r)?
-        .filter(|(_, v)| Ok(!v.receipt_acknowledged))
+        .filter(|(_, v)| Ok(v.send_receipt))
         .map_err(WorkflowError::from)
         .map(|(k, v)| Ok((DhtOpHash::from_raw_39(k.to_vec())?, v)))
         .collect())?;
@@ -95,21 +86,19 @@ pub async fn validation_receipt_workflow(
         // Sign on the dotted line.
         let receipt = receipt.sign(&keystore).await?;
 
-        // Send it and wait for a response.
+        // Send it and don't wait for response.
+        // TODO: When networking has a send without response we can use that
+        // instead of waiting for response.
         if let Err(e) = network
             .send_validation_receipt(to_agent, receipt.try_into()?)
             .await
         {
-            // No one home, better luck next time.
-            // Next time will be the next time an op is integrated.
-            // TODO: Could this be too long a wait if we are in an app with
-            // a slow creation rate??
+            // No one home, they will need to publish again.
             info!(failed_send_receipt = ?e);
-            continue;
         }
-        // Got a response so mark it acknowledged so we stop
-        // spamming the author.
-        op.receipt_acknowledged = true;
+        // Attempted to send the receipt so we now mark
+        // it to not send in the future.
+        op.send_receipt = false;
         workspace.integrated_dht_ops.put(dht_op_hash, op)?;
     }
 

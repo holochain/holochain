@@ -196,7 +196,7 @@ impl Db {
                         validation_status: ValidationStatus::Valid,
                         op: op.to_light(),
                         when_integrated: timestamp::now().into(),
-                        receipt_acknowledged: false,
+                        send_receipt: false,
                     };
                     let mut r = workspace
                         .integrated_dht_ops
@@ -210,6 +210,7 @@ impl Db {
                     let value = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
                         op: op.to_light(),
+                        send_receipt: false,
                     };
                     let res = workspace
                         .integration_limbo
@@ -466,6 +467,7 @@ impl Db {
                     let val = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
                         op: op.to_light(),
+                        send_receipt: false,
                     };
                     workspace
                         .integration_limbo

@@ -417,12 +417,12 @@ impl Cell {
         Ok(())
     }
 
-    #[instrument(skip(self, _request_validation_receipt, _dht_hash, ops))]
+    #[instrument(skip(self, request_validation_receipt, _dht_hash, ops))]
     /// we are receiving a "publish" event from the network
     async fn handle_publish(
         &self,
         from_agent: AgentPubKey,
-        _request_validation_receipt: bool,
+        request_validation_receipt: bool,
         _dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
@@ -431,6 +431,7 @@ impl Cell {
             self.queue_triggers.sys_validation.clone(),
             ops,
             Some(from_agent),
+            request_validation_receipt,
         )
         .await
         .map_err(Box::new)
