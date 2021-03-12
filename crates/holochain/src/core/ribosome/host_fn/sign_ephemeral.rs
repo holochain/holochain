@@ -42,7 +42,7 @@ pub mod wasm_test {
     use holochain_keystore::AgentPubKeyExt;
     use hdk::prelude::*;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_sign_ephemeral_test() {
         let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
