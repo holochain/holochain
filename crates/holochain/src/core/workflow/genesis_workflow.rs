@@ -55,6 +55,10 @@ async fn genesis_workflow_inner<Api: CellConductorApiT>(
         membrane_proof,
     } = args;
 
+    if workspace.source_chain.has_genesis() {
+        return Ok(());
+    }
+
     // TODO: this is a placeholder for a real DPKI request to show intent
     if api
         .dpki_request("is_agent_pubkey_valid".into(), agent_pubkey.to_string())
@@ -122,7 +126,7 @@ pub mod tests {
         source_chain.genesis(dna_hash, agent_pubkey, None).await
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn genesis_initializes_source_chain() -> Result<(), anyhow::Error> {
         observability::test_run()?;
         let test_env = test_cell_env();

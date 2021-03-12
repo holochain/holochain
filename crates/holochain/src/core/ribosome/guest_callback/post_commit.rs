@@ -143,7 +143,7 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn post_commit_invocation_access() {
         let post_commit_host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
@@ -202,7 +202,7 @@ mod slow_tests {
     use holo_hash::fixt::HeaderHashFixturator;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_post_commit_unimplemented() {
         let host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
@@ -221,7 +221,7 @@ mod slow_tests {
         assert_eq!(result, PostCommitResult::Success,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_post_commit_implemented_success() {
         let host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
@@ -240,7 +240,7 @@ mod slow_tests {
         assert_eq!(result, PostCommitResult::Success,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_post_commit_implemented_fail() {
         let host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use holochain_types::prelude::InstalledAppId;
 
-use crate::calls::InstallApp;
+use crate::calls::InstallAppBundle;
 use crate::cmds::*;
 use crate::run::run_async;
 use crate::CmdRunner;
@@ -16,19 +16,19 @@ pub async fn default_with_network(
     holochain_path: &Path,
     create: Create,
     directory: Option<PathBuf>,
-    dnas: Vec<PathBuf>,
+    happ: PathBuf,
     app_id: InstalledAppId,
 ) -> anyhow::Result<PathBuf> {
     let Create { network, root, .. } = create;
     let path = crate::generate::generate(network.map(|n| n.into_inner().into()), root, directory)?;
     let conductor = run_async(holochain_path, path.clone(), None).await?;
     let mut cmd = CmdRunner::new(conductor.0).await;
-    let install_app = InstallApp {
-        app_id,
+    let install_bundle = InstallAppBundle {
+        app_id: Some(app_id),
         agent_key: None,
-        dnas,
+        path: happ,
     };
-    crate::calls::install_app(&mut cmd, install_app).await?;
+    crate::calls::install_app_bundle(&mut cmd, install_bundle).await?;
     Ok(path)
 }
 
@@ -37,7 +37,7 @@ pub async fn default_with_network(
 pub async fn default_n(
     holochain_path: &Path,
     create: Create,
-    dnas: Vec<PathBuf>,
+    happ: PathBuf,
     app_id: InstalledAppId,
 ) -> anyhow::Result<Vec<PathBuf>> {
     let num_sandboxes = create.num_sandboxes;
@@ -51,7 +51,7 @@ pub async fn default_n(
             holochain_path,
             create.clone(),
             create.directories.get(i).cloned(),
-            dnas.clone(),
+            happ.clone(),
             app_id.clone(),
         )
         .await?;

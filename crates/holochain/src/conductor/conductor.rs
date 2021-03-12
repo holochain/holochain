@@ -311,10 +311,15 @@ where
 
     pub(super) async fn add_app_interface_via_handle(
         &mut self,
-        port: u16,
+        port: either::Either<u16, AppInterfaceId>,
         handle: ConductorHandle,
     ) -> ConductorResult<u16> {
-        let interface_id: AppInterfaceId = format!("interface-{}", port).into();
+        let interface_id = match port {
+            either::Either::Left(port) => AppInterfaceId::new(port),
+            either::Either::Right(id) => id,
+        };
+        let port = interface_id.port();
+        tracing::debug!("Attaching interface {}", port);
         let app_api = RealAppInterfaceApi::new(handle, interface_id.clone());
         // This receiver is thrown away because we can produce infinite new
         // receivers from the Sender
@@ -338,7 +343,18 @@ where
             Ok(state)
         })
         .await?;
+        tracing::debug!("App interface added at port: {}", port);
         Ok(port)
+    }
+
+    pub(super) async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>> {
+        Ok(self
+            .get_state()
+            .await?
+            .app_interfaces
+            .values()
+            .map(|config| config.driver.port())
+            .collect())
     }
 
     pub(super) async fn register_dna_wasm(
@@ -379,15 +395,10 @@ where
         &mut self,
         handle: ConductorHandle,
     ) -> ConductorResult<()> {
-        for i in self.get_state().await?.app_interfaces.values() {
-            tracing::debug!("Starting up app interface: {:?}", i);
-            let port = if let InterfaceDriver::Websocket { port } = i.driver {
-                port
-            } else {
-                unreachable!()
-            };
+        for id in self.get_state().await?.app_interfaces.keys().cloned() {
+            tracing::debug!("Starting up app interface: {:?}", id);
             let _ = self
-                .add_app_interface_via_handle(port, handle.clone())
+                .add_app_interface_via_handle(either::Right(id), handle.clone())
                 .await?;
         }
         Ok(())

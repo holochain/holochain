@@ -25,7 +25,7 @@ pub fn get_links<'a>(
     // Get the network from the context
     let network = call_context.host_access.network().clone();
 
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         // Create the key
         let key = match tag_prefix.as_ref() {
             Some(tag_prefix) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag_prefix),
@@ -61,7 +61,7 @@ pub mod slow_tests {
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children() {
         let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
@@ -136,7 +136,7 @@ pub mod slow_tests {
         assert_eq!(links[1].target, foo_baz,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn hash_path_anchor_get_anchor() {
         let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
@@ -252,7 +252,7 @@ pub mod slow_tests {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn dup_path_test() {
         observability::test_run().ok();
         let zomes = vec![TestWasm::Link];

@@ -174,7 +174,7 @@ pub(crate) fn peer_discover(
                 interval_ms = timeout_ms - elapsed_ms;
             }
 
-            tokio::time::delay_for(std::time::Duration::from_millis(interval_ms)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(interval_ms)).await;
         }
     }
     .boxed()
@@ -296,7 +296,7 @@ where
                 interval_ms = stage_2_timeout_even_if_none_ms - elapsed_ms;
             }
 
-            tokio::time::delay_for(std::time::Duration::from_millis(interval_ms)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(interval_ms)).await;
         }
 
         let mut lock = out.lock().await;

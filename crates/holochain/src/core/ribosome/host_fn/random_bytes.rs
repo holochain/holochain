@@ -1,9 +1,9 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::WasmError;
 use ring::rand::SecureRandom;
 use std::sync::Arc;
-use holochain_wasmer_host::prelude::WasmError;
 
 /// return n crypto secure random bytes from the standard holochain crypto lib
 pub fn random_bytes(
@@ -13,9 +13,9 @@ pub fn random_bytes(
 ) -> Result<Bytes, WasmError> {
     let system_random = ring::rand::SystemRandom::new();
     let mut bytes = vec![0; input as _];
-    system_random.fill(&mut bytes).map_err(|ring_unspecified_error|
-        WasmError::Host(ring_unspecified_error.to_string())
-    )?;
+    system_random
+        .fill(&mut bytes)
+        .map_err(|ring_unspecified_error| WasmError::Host(ring_unspecified_error.to_string()))?;
 
     Ok(Bytes::from(bytes))
 }
@@ -32,7 +32,7 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn directly
     async fn random_bytes_test() {
         let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
@@ -51,7 +51,7 @@ pub mod wasm_test {
         assert_ne!(&[0; LEN as usize], output.as_ref(),);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn via. a wasm call
     async fn ribosome_random_bytes_test() {
         let test_env = holochain_lmdb::test_utils::test_cell_env();
@@ -66,12 +66,8 @@ pub mod wasm_test {
         const LEN: u32 = 5;
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        let output: hdk::prelude::Bytes = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::RandomBytes,
-            "random_bytes",
-            LEN
-        );
+        let output: hdk::prelude::Bytes =
+            crate::call_test_ribosome!(host_access, TestWasm::RandomBytes, "random_bytes", LEN);
 
         assert_ne!(&vec![0; LEN as usize], &output.to_vec());
     }

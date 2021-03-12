@@ -29,25 +29,26 @@ pub async fn run(
     app_ports: Vec<u16>,
     force_admin_port: Option<u16>,
 ) -> anyhow::Result<()> {
-    let (port, holochain) =
+    let (port, mut holochain) =
         run_async(holochain_path, sandbox_path.clone(), force_admin_port).await?;
     msg!("Running conductor on admin port {}", port);
     for app_port in app_ports {
         msg!("Attaching app port {}", app_port);
         let mut cmd = CmdRunner::try_new(port).await?;
-        attach_app_interface(
+        let port = attach_app_interface(
             &mut cmd,
             AddAppWs {
                 port: Some(app_port),
             },
         )
         .await?;
+        msg!("App port attached at {}", port);
     }
     crate::save::lock_live(std::env::current_dir()?, &sandbox_path, port).await?;
     msg!("Connected successfully to a running holochain");
     let e = format!("Failed to run holochain at {}", sandbox_path.display());
 
-    holochain.await.expect(&e);
+    holochain.wait().await.expect(&e);
     Ok(())
 }
 
@@ -106,7 +107,8 @@ async fn start_holochain(
 
 // TODO: Find a better way to confirm the child is running.
 async fn check_started(holochain: &mut Child) {
-    let started = tokio::time::timeout(std::time::Duration::from_millis(20), holochain).await;
+    let started =
+        tokio::time::timeout(std::time::Duration::from_millis(20), holochain.wait()).await;
     if let Ok(status) = started {
         panic!("Holochain failed to start. status: {:?}", status);
     }
