@@ -84,7 +84,7 @@ pub mod tests {
     use holochain_zome_types::Header;
     use matches::assert_matches;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn adds_init_marker() {
         let test_env = test_cell_env();
         let env = test_env.env();

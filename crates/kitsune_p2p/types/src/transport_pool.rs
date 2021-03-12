@@ -216,7 +216,7 @@ mod tests {
         });
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn it_can_pool_transport() -> TransportResult<()> {
         let _ = ghost_actor::dependencies::tracing::subscriber::set_global_default(
             tracing_subscriber::FmtSubscriber::builder()

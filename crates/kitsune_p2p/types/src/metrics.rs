@@ -113,7 +113,7 @@ pub fn init_sys_info_poll() {
                 TX_BYTES_PER_SEC.store(tx_avg.avg(), Ordering::Relaxed);
                 RX_BYTES_PER_SEC.store(rx_avg.avg(), Ordering::Relaxed);
 
-                tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             }
 
             // this is needed for type-ing the block, but will never return
@@ -161,25 +161,25 @@ pub fn metric_task_count() -> usize {
     TASK_COUNT.load(Ordering::Relaxed)
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_metric_task() {
     for _ in 0..20 {
         metric_task(async move {
-            tokio::time::delay_for(std::time::Duration::from_millis(3)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(3)).await;
             <Result<(), ()>>::Ok(())
         });
     }
     let gt_task_count = metric_task_count();
-    tokio::time::delay_for(std::time::Duration::from_millis(5)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
     let lt_task_count = metric_task_count();
     assert!(lt_task_count < gt_task_count);
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_sys_info() {
     observability::test_run().ok();
     init_sys_info_poll();
-    tokio::time::delay_for(std::time::Duration::from_millis(200)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     let sys_info = get_sys_info();
     ghost_actor::dependencies::tracing::info!(?sys_info);
 }

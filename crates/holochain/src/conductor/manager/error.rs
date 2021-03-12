@@ -15,7 +15,7 @@ pub enum ManagedTaskError {
     Join(#[from] tokio::task::JoinError),
 
     #[error(transparent)]
-    Recv(#[from] tokio::sync::broadcast::RecvError),
+    Recv(#[from] tokio::sync::broadcast::error::RecvError),
 }
 
 pub type ManagedTaskResult = Result<(), ManagedTaskError>;

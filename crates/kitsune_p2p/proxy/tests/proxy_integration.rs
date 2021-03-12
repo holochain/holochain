@@ -14,7 +14,7 @@ fn init_tracing() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_proxy_integration() {
     if let Err(e) = test_inner().await {
         panic!("{:?}", e);

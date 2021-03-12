@@ -328,7 +328,7 @@ pub mod tests {
 
     use std::collections::BTreeSet;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let env = test_env.env();
@@ -486,7 +486,7 @@ pub mod tests {
     }
 
     // @todo bring all this back when we want to administer cap claims better
-    // #[tokio::test(threaded_scheduler)]
+    // #[tokio::test(flavor = "multi_thread")]
     // async fn test_get_cap_claim() -> SourceChainResult<()> {
     //     let test_env = test_cell_env();
     //     let env = test_env.env();

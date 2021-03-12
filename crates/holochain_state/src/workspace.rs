@@ -77,7 +77,7 @@ pub mod tests {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn workspace_sanity_check() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();

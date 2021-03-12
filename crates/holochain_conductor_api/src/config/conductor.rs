@@ -198,7 +198,7 @@ pub mod tests {
         tls_in_mem_session_storage: 42
         proxy_keepalive_ms: 42
         proxy_to_expire_ms: 42
-
+      network_type: quic_bootstrap
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         use holochain_p2p::kitsune_p2p::*;

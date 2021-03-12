@@ -12,7 +12,6 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use thiserror::Error;
 use tokio::task::JoinError;
-use tokio_safe_block_on::BlockOnError;
 
 /// Errors occurring during a [Ribosome] call
 #[derive(Error, Debug)]
@@ -75,10 +74,6 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     InterfaceError(#[from] InterfaceError),
-
-    /// ident
-    #[error(transparent)]
-    BlockOnError(#[from] BlockOnError),
 
     /// ident
     #[error(transparent)]

@@ -10,7 +10,7 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
 use std::convert::TryInto;
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 use url2::prelude::*;
 
 criterion_group!(benches, simple_bench);
@@ -23,7 +23,7 @@ struct TestMessage(pub String);
 fn simple_bench(bench: &mut Criterion) {
     let _g = observability::test_run().ok();
 
-    let mut runtime = rt();
+    let runtime = rt();
 
     let (listener, listener_address, jh) = runtime.block_on(setup());
     let (mut send, mut recv) = runtime.block_on(setup_client(listener_address));
@@ -133,9 +133,5 @@ async fn setup_client(binding: Url2) -> (WebsocketSender, WebsocketReceiver) {
 }
 
 pub fn rt() -> Runtime {
-    Builder::new()
-        .threaded_scheduler()
-        .enable_all()
-        .build()
-        .unwrap()
+    Builder::new_multi_thread().enable_all().build().unwrap()
 }

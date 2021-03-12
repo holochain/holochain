@@ -11,19 +11,18 @@ pub fn call_remote(
     input: CallRemote,
 ) -> Result<ZomeCallResponse, WasmError> {
     // it is the network's responsibility to handle timeouts and return an Err result in that case
-    let result: Result<SerializedBytes, _> =
-        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            let mut network = call_context.host_access().network().clone();
-            network
-                .call_remote(
-                    input.target_agent_as_ref().to_owned(),
-                    input.zome_name_as_ref().to_owned(),
-                    input.fn_name_as_ref().to_owned(),
-                    input.cap_as_ref().to_owned(),
-                    input.payload_as_ref().to_owned(),
-                )
-                .await
-        });
+    let result: Result<SerializedBytes, _> = tokio_helper::block_forever_on(async move {
+        let mut network = call_context.host_access().network().clone();
+        network
+            .call_remote(
+                input.target_agent_as_ref().to_owned(),
+                input.zome_name_as_ref().to_owned(),
+                input.fn_name_as_ref().to_owned(),
+                input.cap_as_ref().to_owned(),
+                input.payload_as_ref().to_owned(),
+            )
+            .await
+    });
     let result = match result {
         Ok(r) => ZomeCallResponse::try_from(r)?,
         Err(e) => ZomeCallResponse::NetworkError(e.to_string()),
@@ -47,7 +46,7 @@ pub mod wasm_test {
     use holochain_zome_types::cell::CellId;
     use holochain_zome_types::ExternIO;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can call a fn on a remote
     async fn call_remote_test() {
         // ////////////
