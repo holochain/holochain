@@ -8,7 +8,6 @@ use kitsune_p2p_types::codec::{rmp_decode, rmp_encode, Codec};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::sync::atomic::AtomicBool;
-use tokio::stream::StreamExt;
 
 /// if the user specifies None or zero (0) for race_timeout_ms
 /// (david.b) this is not currently used
@@ -380,7 +379,6 @@ pub fn local_gossip_ops(
         })
         .collect::<Vec<_>>();
     async move {
-        use futures::stream::StreamExt; // for `try_for_each_concurrent`
         let to_agent = &to_agent;
         let from_agent = &from_agent;
         futures::stream::iter(all)
@@ -602,7 +600,7 @@ impl KitsuneP2pHandler for Space {
                         let mut delay_len = START_DELAY;
 
                         loop {
-                            tokio::time::delay_for(delay_len).await;
+                            tokio::time::sleep(delay_len).await;
                             if delay_len <= MAX_DELAY {
                                 delay_len *= 2;
                             }
@@ -794,7 +792,7 @@ impl Space {
         let i_s_c = i_s.clone();
         tokio::task::spawn(async move {
             loop {
-                tokio::time::delay_for(std::time::Duration::from_secs(5 * 60)).await;
+                tokio::time::sleep(std::time::Duration::from_secs(5 * 60)).await;
                 if i_s_c.update_agent_info().await.is_err() {
                     break;
                 }

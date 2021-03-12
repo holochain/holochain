@@ -7,7 +7,7 @@ mod tests {
     use ghost_actor::GhostControlSender;
     use std::sync::Arc;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_transport_coms() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
         let (harness, _evt) = spawn_test_harness_mem().await?;
@@ -32,7 +32,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_transport_multi_coms() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
         let (harness, _evt) = spawn_test_harness_mem().await?;
@@ -71,7 +71,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_transport_notify_coms() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
         let (harness, evt) = spawn_test_harness_mem().await?;
@@ -99,7 +99,7 @@ mod tests {
         harness.ghost_actor_shutdown().await?;
 
         let mut recv_count = 0_usize;
-        while let Some(evt) = tokio::stream::StreamExt::next(&mut rcv).await {
+        while let Some(evt) = tokio_stream::StreamExt::next(&mut rcv).await {
             if let test_util::HarnessEventType::Notify { payload, .. } = &evt.ty {
                 assert_eq!(&**payload, "test-broadcast");
                 recv_count += 1;
@@ -111,7 +111,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_peer_info_store() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -125,7 +125,7 @@ mod tests {
 
         let mut agent_info_signed = None;
 
-        use tokio::stream::StreamExt;
+        use tokio_stream::StreamExt;
         while let Some(item) = recv.next().await {
             if let HarnessEventType::StoreAgentInfo { agent, .. } = item.ty {
                 agent_info_signed = Some((agent,));
@@ -140,7 +140,7 @@ mod tests {
         panic!("Failed to receive agent_info_signed");
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_transport_binding() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -168,7 +168,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_request_workflow() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -189,7 +189,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_broadcast_workflow() -> Result<(), KitsuneP2pError> {
         observability::test_run_open().ok();
         let span = tracing::debug_span!("test");
@@ -222,7 +222,7 @@ mod tests {
         harness.ghost_actor_shutdown().await?;
 
         let mut recv_count = 0_usize;
-        while let Some(evt) = tokio::stream::StreamExt::next(&mut rcv).await {
+        while let Some(evt) = tokio_stream::StreamExt::next(&mut rcv).await {
             if &**evt.nick != "DIRECT" {
                 continue;
             }
@@ -238,7 +238,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_multi_request_workflow() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -280,7 +280,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_single_agent_multi_request_workflow() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -315,7 +315,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_gossip_workflow() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -336,7 +336,7 @@ mod tests {
         //        we need to actually add_*_agent to do this
         //let op2 = harness.inject_gossip_data(a2, "agent-2-data".to_string()).await?;
 
-        tokio::time::delay_for(std::time::Duration::from_millis(200)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
         let res = harness.dump_local_gossip_data(a1).await?;
         let (op_hash, data) = res.into_iter().next().unwrap();
@@ -354,7 +354,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_peer_data_workflow() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -372,7 +372,7 @@ mod tests {
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
         p2p.join(space.clone(), a2.clone()).await?;
 
-        tokio::time::delay_for(std::time::Duration::from_millis(200)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
         let res = harness.dump_local_peer_data(a1.clone()).await?;
         let num_agent_info = res.len();
@@ -386,7 +386,7 @@ mod tests {
     }
 
     /// Test that we can gossip across a in memory transport layer.
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_gossip_transport() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
         let (harness, _evt) = spawn_test_harness_mem().await?;
@@ -427,7 +427,7 @@ mod tests {
         // needed until we have some way of bootstrapping
         harness.magic_peer_info_exchange().await?;
 
-        tokio::time::delay_for(std::time::Duration::from_millis(200)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
         // - Check agent one now has all the data
         let res = harness.dump_local_gossip_data(a1.clone()).await?;

@@ -34,7 +34,7 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::Child;
 use tokio::process::Command;
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 use tracing::*;
 use url2::prelude::*;
 
@@ -64,7 +64,7 @@ pub fn spawn_output(holochain: &mut Child) {
 }
 
 pub async fn check_started(holochain: &mut Child) {
-    let started = tokio::time::timeout(std::time::Duration::from_secs(1), holochain).await;
+    let started = tokio::time::timeout(std::time::Duration::from_secs(1), holochain.wait()).await;
     if let Ok(status) = started {
         panic!("Holochain failed to start. status: {:?}", status);
     }
@@ -104,14 +104,14 @@ async fn check_timeout<T>(
     match tokio::time::timeout(std::time::Duration::from_millis(timeout_millis), response).await {
         Ok(response) => response.unwrap(),
         Err(_) => {
-            holochain.kill().unwrap();
+            holochain.kill().await.unwrap();
             error!("Timeout");
             panic!("Timed out on request after {}", timeout_millis);
         }
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn call_admin() {
     observability::test_run().ok();
@@ -192,7 +192,7 @@ how_many: 42
     let expects = vec![dna.dna_hash().clone()];
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
 
-    holochain.kill().expect("Failed to kill holochain");
+    holochain.kill().await.expect("Failed to kill holochain");
 }
 
 pub async fn start_holochain(config_path: PathBuf) -> Child {
@@ -284,7 +284,7 @@ pub async fn retry_admin_interface(
                     "Failed with {:?} to open admin interface, trying {} more times",
                     e, attempts
                 );
-                tokio::time::delay_for(delay).await;
+                tokio::time::sleep(delay).await;
             }
         }
     }
@@ -331,7 +331,7 @@ async fn register_and_install_dna(
     dna_hash
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn call_zome() {
     observability::test_run().ok();
@@ -398,32 +398,30 @@ async fn call_zome() {
     // Ensure that the other client does not receive any messages, i.e. that
     // responses are not broadcast to all connected clients, only the one
     // that made the request.
-    assert!(
-        receiver2
-            .timeout(Duration::from_millis(500))
-            .next()
-            .await
-            .unwrap()
-            .is_err() // Err means the timeout elapsed
-    );
+    // Err means the timeout elapsed
+    assert!(Box::pin(receiver2.timeout(Duration::from_millis(500)))
+        .next()
+        .await
+        .unwrap()
+        .is_err());
 
     // Shutdown holochain
-    holochain.kill().expect("Failed to kill holochain");
+    holochain.kill().await.expect("Failed to kill holochain");
     std::mem::drop(client);
 
     // Call zome after resart
     let mut holochain = start_holochain(config_path).await;
 
-    tokio::time::delay_for(std::time::Duration::from_millis(1000)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
     // Call Zome again on the existing app interface port
     call_foo_fn(app_port, original_dna_hash, &mut holochain).await;
 
     // Shutdown holochain
-    holochain.kill().expect("Failed to kill holochain");
+    holochain.kill().await.expect("Failed to kill holochain");
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn remote_signals() -> anyhow::Result<()> {
     observability::test_run().ok();
@@ -467,7 +465,7 @@ async fn remote_signals() -> anyhow::Result<()> {
         )
         .await;
 
-    tokio::time::delay_for(std::time::Duration::from_millis(2000)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
 
     let signal = AppSignal::new(signal);
     for mut rx in rxs {
@@ -479,7 +477,7 @@ async fn remote_signals() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn emit_signals() {
     observability::test_run().ok();
@@ -547,16 +545,14 @@ async fn emit_signals() {
     )
     .await;
 
-    let (sig1, msg1) = app_rx_1
-        .timeout(Duration::from_secs(1))
+    let (sig1, msg1) = Box::pin(app_rx_1.timeout(Duration::from_secs(1)))
         .next()
         .await
         .unwrap()
         .unwrap();
     assert!(!msg1.is_request());
 
-    let (sig2, msg2) = app_rx_2
-        .timeout(Duration::from_secs(1))
+    let (sig2, msg2) = Box::pin(app_rx_2.timeout(Duration::from_secs(1)))
         .next()
         .await
         .unwrap()
@@ -572,10 +568,10 @@ async fn emit_signals() {
     ///////////////////////////////////////////////////////
 
     // Shutdown holochain
-    holochain.kill().expect("Failed to kill holochain");
+    holochain.kill().await.expect("Failed to kill holochain");
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     observability::test_run().ok();
     let tmp_dir = TempDir::new("conductor_cfg").unwrap();
@@ -603,7 +599,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     if let Err(e) = conductor_admin_interface_ends_with_shutdown_inner().await {
         panic!("{:#?}", e);
@@ -658,7 +654,9 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     let request = AdminRequest::RegisterDna(Box::new(register_payload));
 
     // send a request after the conductor has shutdown
-    let response: Result<Result<AdminResponse, _>, tokio::time::Elapsed> =
+    // let response: Result<Result<AdminResponse, _>, tokio::time::Elapsed> =
+    //     tokio::time::timeout(Duration::from_secs(1), client.request(request)).await;
+    let response: Result<Result<AdminResponse, _>, tokio::time::error::Elapsed> =
         tokio::time::timeout(Duration::from_secs(1), client.request(request)).await;
 
     // request should have encountered an error since the conductor shut down,
@@ -668,7 +666,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn too_many_open() {
     observability::test_run().ok();
 

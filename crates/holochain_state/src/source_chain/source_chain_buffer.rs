@@ -349,7 +349,7 @@ pub mod tests {
 
         let agent_entry = Entry::Agent(agent_pubkey.clone().into());
 
-        let (dna_header, agent_header) = tokio_safe_block_on::tokio_safe_block_on(
+        let (dna_header, agent_header) = tokio_helper::block_on(
             async {
                 let dna_header = Header::Dna(header::Dna {
                     author: agent_pubkey.clone(),
@@ -372,7 +372,7 @@ pub mod tests {
             },
             std::time::Duration::from_secs(1),
         )
-        .unwrap();
+        .expect("timeout elapsed");
 
         (
             agent_pubkey,
@@ -383,7 +383,7 @@ pub mod tests {
         )
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
@@ -450,7 +450,7 @@ pub mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
@@ -491,7 +491,7 @@ pub mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_header_cas_roundtrip() {
         let test_env = test_cell_env();
         let arc = test_env.env();

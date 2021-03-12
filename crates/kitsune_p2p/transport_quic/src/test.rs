@@ -4,7 +4,7 @@ mod tests {
     use futures::stream::StreamExt;
     use kitsune_p2p_types::transport::*;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_message() {
         let (listener1, _events1) = spawn_transport_listener_quic(
             ConfigListenerQuic::default().set_override_host(Some("127.0.0.1")),
@@ -45,7 +45,7 @@ mod tests {
         assert_eq!("echo: hello", &String::from_utf8_lossy(&resp));
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_large_message() {
         let (listener1, _events1) = spawn_transport_listener_quic(
             ConfigListenerQuic::default().set_override_host(Some("127.0.0.1")),

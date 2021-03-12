@@ -805,7 +805,7 @@ fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
 }
 
 // This runs the above tests
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_ops_state() {
     observability::test_run().ok();
     let test_env = test_cell_env();
@@ -1058,7 +1058,7 @@ async fn get_links(
 // This test is designed to run like the
 // register_add_link test except all the
 // pre-state is added through real host fn calls
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_metadata_from_wasm_api() {
     // test workspace boilerplate
     observability::test_run().ok();
@@ -1124,7 +1124,7 @@ async fn test_metadata_from_wasm_api() {
 }
 
 // This doesn't work without inline integration
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_wasm_api_without_integration_links() {
     // test workspace boilerplate
     observability::test_run().ok();
@@ -1176,7 +1176,7 @@ async fn test_wasm_api_without_integration_links() {
 }
 
 #[ignore = "Evaluate if this test adds any value or remove"]
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_wasm_api_without_integration_delete() {
     // test workspace boilerplate
     observability::test_run().ok();
@@ -1243,7 +1243,7 @@ async fn test_wasm_api_without_integration_delete() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "write this test"]
 async fn test_integrate_single_register_replaced_by_for_header() {
     // For RegisterUpdatedContent with intended_for Header
@@ -1251,7 +1251,7 @@ async fn test_integrate_single_register_replaced_by_for_header() {
     todo!("write this test")
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "write this test"]
 async fn test_integrate_single_register_replaced_by_for_entry() {
     // For RegisterUpdatedContent with intended_for Entry
@@ -1259,7 +1259,7 @@ async fn test_integrate_single_register_replaced_by_for_entry() {
     todo!("write this test")
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "write this test"]
 async fn test_integrate_single_register_delete_on_headerd_by() {
     // For RegisterDeletedBy
@@ -1267,7 +1267,7 @@ async fn test_integrate_single_register_delete_on_headerd_by() {
     todo!("write this test")
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "write this test"]
 async fn test_integrate_single_register_add_link() {
     // For RegisterAddLink
@@ -1275,7 +1275,7 @@ async fn test_integrate_single_register_add_link() {
     todo!("write this test")
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "write this test"]
 async fn test_integrate_single_register_delete_link() {
     // For RegisterAddLink
@@ -1307,7 +1307,7 @@ mod slow_tests {
 
     /// The aim of this test is to show from a high level that committing
     /// data on one agent results in integrated data on another agent
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "flaky"]
     async fn commit_entry_add_link() {
         //////////////

@@ -177,7 +177,7 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn entry_defs_invocation_zomes() {
         let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Unpredictable)
             .next()
@@ -185,7 +185,7 @@ mod test {
         assert_eq!(ZomesToInvoke::All, entry_defs_invocation.zomes(),);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn entry_defs_invocation_fn_components() {
         let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Unpredictable)
             .next()
@@ -197,7 +197,7 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn entry_defs_invocation_host_input() {
         let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Unpredictable)
             .next()
@@ -225,7 +225,7 @@ mod slow_tests {
     pub use holochain_zome_types::entry_def::EntryVisibility;
     use std::collections::BTreeMap;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_entry_defs_unimplemented() {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
@@ -240,7 +240,7 @@ mod slow_tests {
         assert_eq!(result, EntryDefsResult::Defs(BTreeMap::new()),);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_entry_defs_index_lookup() {
         let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
@@ -259,7 +259,7 @@ mod slow_tests {
         assert_eq!(&(), &output);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_entry_defs_implemented_defs() {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::EntryDefs]))
             .next()

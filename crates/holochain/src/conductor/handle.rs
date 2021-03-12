@@ -289,7 +289,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16> {
         let mut lock = self.conductor.write().await;
-        lock.add_app_interface_via_handle(port, self.clone()).await
+        lock.add_app_interface_via_handle(either::Left(port), self.clone())
+            .await
     }
 
     async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>> {

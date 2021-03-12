@@ -1,7 +1,7 @@
 use holochain_serialized_bytes::prelude::*;
 use holochain_websocket::*;
 use std::convert::TryInto;
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 use url2::prelude::*;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -10,7 +10,7 @@ struct BroadcastMessage(pub String);
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 struct ResponseMessage(pub String);
 
-#[tokio::main(threaded_scheduler)]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     let (mut send_socket, mut recv_socket) = connect(
         url2!("ws://127.0.0.1:12345"),
@@ -60,7 +60,7 @@ async fn main() {
                     eprintln!("\nSignal: {:?}", s);
                     recv_handle.close();
                     eprintln!("\nShutting down...");
-                    tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                     break;
                 }
             },
