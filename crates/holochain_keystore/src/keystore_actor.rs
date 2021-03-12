@@ -78,11 +78,11 @@ impl KeystoreSenderExt for KeystoreSender {
             input.key.as_ref()[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN]
                 .to_vec()
                 .into(),
-            <Vec<u8>>::from(UnsafeBytes::from(input.data)).into(),
+            <Vec<u8>>::from(UnsafeBytes::from(input.data.to_vec())).into(),
         );
         async move {
             let res = fut.await?;
-            Ok(Signature(res.to_vec()))
+            Ok(Signature::try_from(res.to_vec().as_ref())?)
         }
         .boxed()
         .into()

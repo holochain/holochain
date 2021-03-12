@@ -13,7 +13,6 @@ pub use paste;
 
 pub use rng::rng;
 
-#[derive(Clone)]
 /// the Fixturator is the struct that we wrap in our FooFixturator newtypes to impl Iterator over
 /// each combination of Item and Curve needs its own Iterator implementation for Fixturator
 /// Item is the Foo type of FooFixturator, i.e. the type of thing we are generating examples of
@@ -543,7 +542,7 @@ macro_rules! fixt {
 ///
 /// unpredictable curves are a great way to knock off some low hanging fruit, especially around
 /// numeric calculations and utf-8 handling, but are no replacement for stringent approaches.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Unpredictable;
 
 /// represents a predictable curve
@@ -562,7 +561,7 @@ pub struct Unpredictable;
 ///
 /// this curve is provided as a standard option because there is a real, common tradeoff between
 /// test fragility (accuracy) and specificity (precision).
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Predictable;
 
 /// represents a curve over the empty value(s)
@@ -572,7 +571,7 @@ pub struct Predictable;
 ///
 /// regardless, collections with no items, numbers with no magnitude, strings with no chars are all
 /// common sources of bugs, so feel free to manifest as much emptiness as you like from this curve.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Empty;
 
 #[macro_export]
