@@ -6,8 +6,8 @@ use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
 use crate::*;
 use futures::{
-    sink::SinkExt,
     future::{BoxFuture, FutureExt},
+    sink::SinkExt,
     stream::{BoxStream, StreamExt},
 };
 use once_cell::sync::Lazy;

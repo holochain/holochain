@@ -78,13 +78,10 @@ async fn build_node() -> (TxUrl, EpHnd) {
     (addr, ephnd)
 }
 
-static PROXY: Lazy<parking_lot::Mutex<(TxUrl, EpHnd)>> =
-    Lazy::new(|| {
-        let _g = RUNTIME.enter();
-        RUNTIME.block_on(async move {
-            parking_lot::Mutex::new(build_node().await)
-        })
-    });
+static PROXY: Lazy<parking_lot::Mutex<(TxUrl, EpHnd)>> = Lazy::new(|| {
+    let _g = RUNTIME.enter();
+    RUNTIME.block_on(async move { parking_lot::Mutex::new(build_node().await) })
+});
 
 fn proxify_addr(purl: &TxUrl, nurl: &TxUrl) -> TxUrl {
     let digest = ProxyUrl::from(nurl.as_str());
