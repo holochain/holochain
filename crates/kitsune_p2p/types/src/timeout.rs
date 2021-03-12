@@ -67,7 +67,7 @@ mod tests {
     #[tokio::test]
     async fn expired_kitsune_timeout() {
         let t = KitsuneTimeout::new(std::time::Duration::from_millis(1));
-        tokio::time::delay_for(std::time::Duration::from_millis(2)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(2)).await;
         assert!(t.time_remaining().as_micros() == 0);
         assert!(t.is_expired());
     }

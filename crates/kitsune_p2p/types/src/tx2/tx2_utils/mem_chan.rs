@@ -233,17 +233,17 @@ mod tests {
         rt.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_async_bound_mem_channel_sm_buf() {
         _inner_test_async_bound_mem_channel(15, 4096).await;
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_async_bound_mem_channel_lg_buf() {
         _inner_test_async_bound_mem_channel(4096 * 3, 4096 * 4).await;
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_async_bound_mem_channel_disparity() {
         _inner_test_async_bound_mem_channel(4096, 1024 * 1024 * 8).await;
     }

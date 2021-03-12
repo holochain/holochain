@@ -4,17 +4,11 @@ use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
 use once_cell::sync::{Lazy, OnceCell};
 
-static RUNTIME: Lazy<tokio::runtime::Handle> = Lazy::new(|| {
-    let mut rt = tokio::runtime::Builder::new()
+static RUNTIME: Lazy<tokio::runtime::Runtime> = Lazy::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .threaded_scheduler()
         .build()
-        .unwrap();
-    let handle = rt.handle().clone();
-    std::thread::spawn(move || {
-        rt.block_on(futures::future::pending::<()>());
-    });
-    handle
+        .unwrap()
 });
 
 kitsune_p2p_types::write_codec_enum! {
@@ -33,6 +27,38 @@ static T: OnceCell<tokio::sync::Mutex<Option<(CodecWriter<Test>, CodecReader<Tes
 static NEXT_MESSAGE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 fn codec() {
+    let _g = RUNTIME.enter();
+
+    RUNTIME.block_on(async move {
+        let (mut send, mut recv) = T.get().unwrap().lock().await.take().unwrap();
+
+        let wt = tokio::task::spawn(async move {
+            let mut buf = PoolBuf::new();
+            buf.extend_from_slice(DATA);
+            let msg = Test::one(buf);
+            send.write_request(
+                NEXT_MESSAGE.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+                &msg,
+                KitsuneTimeout::from_millis(1000 * 30),
+            )
+            .await
+            .unwrap();
+
+            send
+        });
+
+        let _data = recv
+            .read(KitsuneTimeout::from_millis(1000 * 30))
+            .await
+            .unwrap();
+
+        let send = wt.await.unwrap();
+
+        (*T.get().unwrap().lock().await) = Some((send, recv));
+    });
+}
+
+fn criterion_benchmark(c: &mut Criterion) {
     T.get_or_init(|| {
         let (send, recv) = tx2_utils::bound_async_mem_channel(4096);
         tokio::sync::Mutex::new(Some((
@@ -41,39 +67,6 @@ fn codec() {
         )))
     });
 
-    futures::executor::block_on(RUNTIME.enter(|| {
-        tokio::task::spawn(async move {
-            let (mut send, mut recv) = T.get().unwrap().lock().await.take().unwrap();
-
-            let wt = tokio::task::spawn(async move {
-                let mut buf = PoolBuf::new();
-                buf.extend_from_slice(DATA);
-                let msg = Test::one(buf);
-                send.write_request(
-                    NEXT_MESSAGE.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-                    &msg,
-                    KitsuneTimeout::from_millis(1000 * 30),
-                )
-                .await
-                .unwrap();
-
-                send
-            });
-
-            let _data = recv
-                .read(KitsuneTimeout::from_millis(1000 * 30))
-                .await
-                .unwrap();
-
-            let send = wt.await.unwrap();
-
-            (*T.get().unwrap().lock().await) = Some((send, recv));
-        })
-    }))
-    .unwrap();
-}
-
-fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("codec", |b| b.iter(|| codec()));
 }
 

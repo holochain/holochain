@@ -100,7 +100,11 @@ async fn in_chan_recv_logic(
         loop {
             // TODO - FIXME - this loop may leak
             // would be nice if we had tokio 1.0 kill-able Semaphore.
-            let permit = limit.clone().acquire_owned().await;
+            let permit = match limit.clone().acquire_owned().await {
+                // TODO - FIXME
+                Err(e) => panic!("{:?}", e),
+                Ok(p) => p,
+            };
             let writer = match raw_con
                 .out_chan(KitsuneTimeout::from_millis(MAX_READ_TIMEOUT))
                 .await
@@ -338,7 +342,7 @@ impl AsEpHnd for PromoteEpHnd {
         let inner = self.0.clone();
         async move {
             let (limit, ep) = r?;
-            let permit = limit.acquire_owned().await;
+            let permit = limit.acquire_owned().await.map_err(KitsuneError::other)?;
             let (con, in_chan_recv) = ep.connect(remote, timeout).await?;
 
             let con = reg_con_hnd_inner(&inner, permit, con, in_chan_recv)?;
@@ -377,7 +381,10 @@ async fn con_recv_logic(
     // This maintains backpressure at the kernel level,
     // while allowing parallelism / high throughput.
     let pend_stream = futures::stream::unfold(state, move |mut state| async move {
-        let permit = state.con_limit.clone().acquire_owned().await;
+        let permit = match state.con_limit.clone().acquire_owned().await {
+            Err(_) => return None,
+            Ok(p) => p,
+        };
         match state.con_recv.next().await {
             Some(pending) => Some(((permit, pending), state)),
             None => None,
@@ -486,7 +493,7 @@ impl AsEpFactory for PromoteFactory {
 mod tests {
     use super::*;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_backend_frontend_promote() {
         let t = KitsuneTimeout::from_millis(5000);
 

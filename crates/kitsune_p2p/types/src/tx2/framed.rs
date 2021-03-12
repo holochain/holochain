@@ -315,7 +315,7 @@ mod tests {
         assert_eq!(0, not.as_id());
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_framed() {
         let t = KitsuneTimeout::from_millis(5000);
 

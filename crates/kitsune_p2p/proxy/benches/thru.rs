@@ -9,17 +9,11 @@ use kitsune_p2p_types::*;
 use once_cell::sync::Lazy;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-static RUNTIME: Lazy<tokio::runtime::Handle> = Lazy::new(|| {
-    let mut rt = tokio::runtime::Builder::new()
+static RUNTIME: Lazy<tokio::runtime::Runtime> = Lazy::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .threaded_scheduler()
         .build()
-        .unwrap();
-    let handle = rt.handle().clone();
-    std::thread::spawn(move || {
-        rt.block_on(futures::future::pending::<()>());
-    });
-    handle
+        .unwrap()
 });
 
 const SIZE: usize = 2048;
@@ -63,7 +57,7 @@ async fn build_node() -> (TxUrl, EpHnd) {
                         println!("req_count: {}", c);
                     }
                 } else if data.as_ref() == RES {
-                    let mut s = CHAN.0.lock().clone();
+                    let s = CHAN.0.lock().clone();
                     let _ = s.send(()).await.unwrap();
 
                     let c = RES_CNT.fetch_add(1, Ordering::Relaxed);
@@ -86,10 +80,10 @@ async fn build_node() -> (TxUrl, EpHnd) {
 
 static PROXY: Lazy<parking_lot::Mutex<(TxUrl, EpHnd)>> =
     Lazy::new(|| {
-        futures::executor::block_on(RUNTIME.enter(|| {
-            tokio::task::spawn(async move { parking_lot::Mutex::new(build_node().await) })
-        }))
-        .unwrap()
+        let _g = RUNTIME.enter();
+        RUNTIME.block_on(async move {
+            parking_lot::Mutex::new(build_node().await)
+        })
     });
 
 fn proxify_addr(purl: &TxUrl, nurl: &TxUrl) -> TxUrl {
@@ -103,64 +97,58 @@ fn proxify_addr(purl: &TxUrl, nurl: &TxUrl) -> TxUrl {
 }
 
 static TARGET: Lazy<parking_lot::Mutex<(TxUrl, EpHnd, ConHnd)>> = Lazy::new(|| {
-    futures::executor::block_on(RUNTIME.enter(|| {
-        tokio::task::spawn(async move {
-            let t = KitsuneTimeout::from_millis(5000);
-            let proxy_url = PROXY.lock().0.clone();
-            //println!("proxy_url: {}", proxy_url);
-            let (t_url, ep) = build_node().await;
-            //println!("t_url: {}", t_url);
-            let con = ep.connect(proxy_url.clone(), t).await.unwrap();
-            let pt_url = proxify_addr(&proxy_url, &t_url);
-            //println!("pt_url: {}", pt_url);
-            parking_lot::Mutex::new((pt_url, ep, con))
-        })
-    }))
-    .unwrap()
+    let _g = RUNTIME.enter();
+    RUNTIME.block_on(async move {
+        let t = KitsuneTimeout::from_millis(5000);
+        let proxy_url = PROXY.lock().0.clone();
+        //println!("proxy_url: {}", proxy_url);
+        let (t_url, ep) = build_node().await;
+        //println!("t_url: {}", t_url);
+        let con = ep.connect(proxy_url.clone(), t).await.unwrap();
+        let pt_url = proxify_addr(&proxy_url, &t_url);
+        //println!("pt_url: {}", pt_url);
+        parking_lot::Mutex::new((pt_url, ep, con))
+    })
 });
 
 static N: Lazy<parking_lot::Mutex<Vec<(EpHnd, ConHnd)>>> = Lazy::new(|| {
-    futures::executor::block_on(RUNTIME.enter(|| {
-        tokio::task::spawn(async move {
-            let t = KitsuneTimeout::from_millis(5000);
-            let pt_url = TARGET.lock().0.clone();
-            let mut out = Vec::with_capacity(NODE_COUNT);
-            for _ in 0..NODE_COUNT {
-                let (_, ep) = build_node().await;
-                let con = ep.connect(pt_url.clone(), t).await.unwrap();
-                out.push((ep, con));
-            }
-            parking_lot::Mutex::new(out)
-        })
-    }))
-    .unwrap()
+    let _g = RUNTIME.enter();
+    RUNTIME.block_on(async move {
+        let t = KitsuneTimeout::from_millis(5000);
+        let pt_url = TARGET.lock().0.clone();
+        let mut out = Vec::with_capacity(NODE_COUNT);
+        for _ in 0..NODE_COUNT {
+            let (_, ep) = build_node().await;
+            let con = ep.connect(pt_url.clone(), t).await.unwrap();
+            out.push((ep, con));
+        }
+        parking_lot::Mutex::new(out)
+    })
 });
 
 static TCNT: AtomicUsize = AtomicUsize::new(0);
 
 fn thru() {
-    futures::executor::block_on(RUNTIME.enter(|| {
-        tokio::task::spawn(async move {
-            let t = KitsuneTimeout::from_millis(5000);
-            let mut all = Vec::with_capacity(NODE_COUNT);
-            for (_, c) in N.lock().iter() {
-                let mut data = PoolBuf::new();
-                data.extend_from_slice(REQ);
-                all.push(c.write(0.into(), data, t));
-            }
-            futures::future::try_join_all(all).await.unwrap();
-            let mut r = CHAN.1.lock().take().unwrap();
-            for _ in 0..NODE_COUNT {
-                let _ = r.next().await;
-            }
-            (*CHAN.1.lock()) = Some(r);
-            let c = TCNT.fetch_add(1, Ordering::Relaxed);
-            if c % 100 == 0 {
-                println!("total_count: {}", c);
-            }
-        })
-    }))
-    .unwrap();
+    let _g = RUNTIME.enter();
+    RUNTIME.block_on(async move {
+        let t = KitsuneTimeout::from_millis(5000);
+        let mut all = Vec::with_capacity(NODE_COUNT);
+        for (_, c) in N.lock().iter() {
+            let mut data = PoolBuf::new();
+            data.extend_from_slice(REQ);
+            all.push(c.write(0.into(), data, t));
+        }
+        futures::future::try_join_all(all).await.unwrap();
+        let mut r = CHAN.1.lock().take().unwrap();
+        for _ in 0..NODE_COUNT {
+            let _ = r.recv().await;
+        }
+        (*CHAN.1.lock()) = Some(r);
+        let c = TCNT.fetch_add(1, Ordering::Relaxed);
+        if c % 100 == 0 {
+            println!("total_count: {}", c);
+        }
+    });
 }
 
 fn criterion_benchmark(c: &mut Criterion) {

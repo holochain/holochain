@@ -386,7 +386,7 @@ mod tests {
         (addr, ep)
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_mem_backend_stress() {
         let t = KitsuneTimeout::from_millis(5000);
 
@@ -421,7 +421,7 @@ mod tests {
         println!("3");
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_mem_backend() {
         let t = KitsuneTimeout::from_millis(5000);
 

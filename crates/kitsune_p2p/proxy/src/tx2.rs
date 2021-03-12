@@ -488,7 +488,7 @@ mod tests {
             .into()
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_proxy() {
         let t = KitsuneTimeout::from_millis(5000);
 
@@ -515,7 +515,7 @@ mod tests {
         data.extend_from_slice(b"proxy-test");
         n1_con.write(0.into(), data, t).await.unwrap();
 
-        tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
         // attempt to establish a connection THROUGH the proxy
         let con = n1.connect(n2_addr_proxy, t).await.unwrap();
@@ -525,7 +525,7 @@ mod tests {
         data.extend_from_slice(b"hello");
         con.write(0.into(), data, t).await.unwrap();
 
-        tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
         p.close(0, "").await;
         n1.close(0, "").await;

@@ -166,7 +166,7 @@ struct CodecWriterInner<C: Codec> {
 mod tests {
     use super::*;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[allow(dead_code)]
     async fn test_codec() {
         crate::write_codec_enum! {

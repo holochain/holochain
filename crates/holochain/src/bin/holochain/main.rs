@@ -45,9 +45,8 @@ struct Opt {
 }
 
 fn main() {
-    holochain::conductor::tokio_runtime()
-        // the async_main function should only end if our program is done
-        .block_on(async_main())
+    // the async_main function should only end if our program is done
+    tokio_helper::block_forever_on(async_main())
 }
 
 async fn async_main() {

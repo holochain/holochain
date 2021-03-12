@@ -10,7 +10,7 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
 use std::convert::TryInto;
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 use url2::prelude::*;
 
 criterion_group!(benches, simple_bench);

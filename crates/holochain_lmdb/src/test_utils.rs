@@ -34,7 +34,7 @@ pub fn test_p2p_env() -> TestEnvironment {
 pub fn test_keystore() -> holochain_keystore::KeystoreSender {
     use holochain_keystore::KeystoreSenderExt;
 
-    tokio_safe_block_on::tokio_safe_block_on(
+    tokio_helper::block_on(
         async move {
             let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
                 .await
@@ -54,7 +54,7 @@ pub fn test_keystore() -> holochain_keystore::KeystoreSender {
         },
         std::time::Duration::from_secs(1),
     )
-    .unwrap()
+    .expect("timeout elapsed")
 }
 
 fn test_env(kind: EnvironmentKind) -> TestEnvironment {

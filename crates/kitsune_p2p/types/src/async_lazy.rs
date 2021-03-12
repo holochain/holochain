@@ -33,10 +33,10 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn async_lazy() {
         let s = AsyncLazy::new(async move {
-            tokio::time::delay_for(std::time::Duration::from_millis(20)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
             Arc::new(42)
         });
         assert_eq!(

@@ -105,7 +105,7 @@ impl Active {
 mod tests {
     use super::*;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_active() {
         let a1 = Active::new();
         let a2 = Active::new();
@@ -117,7 +117,7 @@ mod tests {
         assert!(mix.is_active());
 
         let f1 = mix.fut(async move {
-            tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             Ok(())
         });
         let t1 = tokio::task::spawn(async move {
@@ -125,14 +125,14 @@ mod tests {
         });
 
         let f2 = mix.fut(async move {
-            tokio::time::delay_for(std::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             Ok(())
         });
         let t2 = tokio::task::spawn(async move {
             assert!(f2.await.is_err());
         });
 
-        tokio::time::delay_for(std::time::Duration::from_millis(120)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(120)).await;
         a3.kill();
 
         t1.await.unwrap();
