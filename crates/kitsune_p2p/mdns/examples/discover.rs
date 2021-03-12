@@ -1,5 +1,5 @@
 use futures_util::{self, pin_mut, stream::StreamExt};
-use kitsune_mdns::*;
+use kitsune_p2p_mdns::*;
 
 #[tokio::main]
 async fn main() {
