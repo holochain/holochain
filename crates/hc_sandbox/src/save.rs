@@ -164,6 +164,30 @@ pub fn load_ports(hc_dir: PathBuf) -> anyhow::Result<Vec<Option<u16>>> {
     Ok(ports)
 }
 
+/// Same as load ports but only returns ports for paths passed in.
+pub fn find_ports(hc_dir: PathBuf, paths: &[PathBuf]) -> anyhow::Result<Vec<Option<u16>>> {
+    let mut ports = Vec::new();
+    let all_paths = load(hc_dir.clone())?;
+    for path in paths {
+        let index = all_paths.iter().position(|p| p == path);
+        match index {
+            Some(i) => {
+                let mut hc = hc_dir.clone();
+                hc.push(format!(".hc_live_{}", i));
+                if hc.exists() {
+                    let live = std::fs::read_to_string(hc)?;
+                    let p = live.lines().next().and_then(|l| l.parse::<u16>().ok());
+                    ports.push(p)
+                } else {
+                    ports.push(None);
+                }
+            }
+            None => ports.push(None),
+        }
+    }
+    Ok(ports)
+}
+
 /// Remove all lockfiles, releasing all locked ports
 pub async fn release_ports(hc_dir: PathBuf) -> anyhow::Result<()> {
     let files = FILE_LOCKS.lock().await;

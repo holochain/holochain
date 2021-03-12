@@ -1,5 +1,5 @@
 [package]
-name = "kitsune_mdns"
+name = "kitsune_p2p_mdns"
 version = "0.0.1"
 description = "p2p / mdns discovery framework"
 license = "Apache-2.0"
