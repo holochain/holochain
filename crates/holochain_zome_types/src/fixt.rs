@@ -187,7 +187,7 @@ fixturator!(
     constructor fn new(String, AgentPubKey, CapSecret);
 );
 
-newtype_fixturator!(Signature<Bytes>);
+newtype_fixturator!(Signature<SixtyFourBytes>);
 
 fixturator!(
     MigrateAgent;

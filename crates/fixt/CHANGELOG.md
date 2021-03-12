@@ -4,8 +4,5 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-- Added `sign_ephemeral` and `sign_ephemeral_raw`
-
-### Added
-* holochain 0.0.100 (RSM) compatibility
-* Extensive doc comments
+- Named bytes fixturators like `SixtyFourBytes` are now fixed length arrays
+- Added `SixtyFourBytesVec` to work like the old `Vec<u8>` implementation
