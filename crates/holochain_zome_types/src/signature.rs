@@ -49,7 +49,11 @@ impl Sign {
 }
 
 /// The raw bytes of a signature.
-#[derive(Clone, Hash, PartialOrd, Ord)]
+#[derive(Clone, PartialOrd, Hash, Ord)]
+/// The equality is not different, it's just constant time, so we can derive a hash.
+/// For an actually secure thing we wouldn't want to just assume a safe default hashing
+/// But that is not what clippy is complaining about here.
+#[allow(clippy::derive_hash_xor_eq)]
 pub struct Signature(pub [u8; SIGNATURE_BYTES]);
 
 // This is more for convenience/convention that being worried
@@ -84,7 +88,7 @@ impl SignEphemeral {
 
     /// Construct a SignEphemeral from a vector of bytes.
     pub fn new_raw(datas: Vec<Vec<u8>>) -> Self {
-        Self(datas.into_iter().map(|d| Bytes::from(d)).collect())
+        Self(datas.into_iter().map(Bytes::from).collect())
     }
 
     /// Consumes self.
