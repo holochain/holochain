@@ -214,7 +214,7 @@ impl ElementTest {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_all_ops() {
     observability::test_run().ok();
     let builder = ElementTest::new();
@@ -246,7 +246,7 @@ async fn test_all_ops() {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_dht_basis() {
     let test_env = test_cell_env();
     let env = test_env.env();

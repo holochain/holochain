@@ -7,7 +7,7 @@ use holochain_lmdb::test_utils::test_environments;
 use holochain_types::test_utils::fake_cell_id;
 use matches::assert_matches;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn can_update_state() {
     let envs = test_environments();
     let dna_store = MockDnaStore::new();
@@ -48,7 +48,7 @@ async fn can_update_state() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn can_add_clone_cell_to_app() {
     let envs = test_environments();
     let keystore = envs.conductor().keystore().clone();
@@ -114,7 +114,7 @@ async fn can_add_clone_cell_to_app() {
 
 /// App can't be installed if another app is already installed under the
 /// same InstalledAppId
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn app_ids_are_unique() {
     let environments = test_environments();
     let dna_store = MockDnaStore::new();
@@ -157,7 +157,7 @@ async fn app_ids_are_unique() {
 }
 
 /// App can't be installed if it contains duplicate CellNicks
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn cell_nicks_are_unique() {
     let cells = vec![
         InstalledCell::new(fixt!(CellId), "1".into()),
@@ -171,7 +171,7 @@ async fn cell_nicks_are_unique() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn can_set_fake_state() {
     let envs = test_environments();
     let state = ConductorState::default();
@@ -183,7 +183,7 @@ async fn can_set_fake_state() {
     assert_eq!(state, conductor.get_state_from_handle().await.unwrap());
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn proxy_tls_with_test_keystore() {
     use ghost_actor::GhostControlSender;
 

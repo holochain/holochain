@@ -29,7 +29,7 @@ fn links_zome() -> InlineZome {
 
 /// A single link with an AgentPubKey for the base and target is committed by
 /// one agent, and after a delay, all agents can get the link
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn many_agents_can_reach_consistency_agent_links() {
     observability::test_run().ok();
@@ -80,7 +80,7 @@ async fn many_agents_can_reach_consistency_agent_links() {
 
 /// A single link with a Path for the base and target is committed by one
 /// agent, and after a delay, all agents can get the link
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn many_agents_can_reach_consistency_normal_links() {
     observability::test_run().ok();
@@ -116,7 +116,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
     assert_eq!(num_seen, NUM_AGENTS);
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 #[ignore = "Slow test for CI that is only useful for timing"]
 async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {

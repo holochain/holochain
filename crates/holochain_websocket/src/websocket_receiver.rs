@@ -87,10 +87,10 @@ impl WebsocketReceiver {
         remote_addr: Url2,
         pair_shutdown: Arc<PairShutdown>,
     ) -> Self {
-        let (shutdown, rx_from_websocket) = Valved::new(rx_from_websocket);
+        let (shutdown, rx_from_websocket_valved) = Valved::new(rx_from_websocket);
         let handle = Some(ReceiverHandle { shutdown });
         Self {
-            rx_from_websocket,
+            rx_from_websocket: rx_from_websocket_valved,
             remote_addr,
             handle,
             __pair_shutdown: pair_shutdown,
@@ -181,7 +181,7 @@ impl Drop for CancelResponse {
     fn drop(&mut self) {
         // If this response hasn't been sent then send a None response.
         if self.0 {
-            let mut tx = self.1.clone();
+            let tx = self.1.clone();
             let id = self.2;
             tokio::spawn(async move {
                 if let Err(e) = tx.send(OutgoingMessage::Response(None, id)).await {

@@ -78,8 +78,8 @@ impl<E: 'static + Send> LogicChanHandle<E> {
             .0
             .share_mut(|i, _| Ok((i.logic_limit.clone(), i.send.clone())));
         async move {
-            let (limit, mut send) = r?;
-            let permit = limit.acquire_owned().await;
+            let (limit, send) = r?;
+            let permit = limit.acquire_owned().await.map_err(KitsuneError::other)?;
             let l = LType::Logic(permit, l);
             send.send(l)
                 .await
@@ -169,9 +169,7 @@ impl<E: 'static + Send> futures::stream::Stream for LogicChan<E> {
             //   - new incoming logic (queued to be polled as we continue loop)
             //   - new events to emit (emitted right away)
             let (permit, new_logic) = {
-                let r = &mut self.recv;
-                futures::pin_mut!(r);
-                match Stream::poll_next(r, cx) {
+                match self.recv.poll_recv(cx) {
                     std::task::Poll::Ready(Some(t)) => match t {
                         LType::Event(e) => return std::task::Poll::Ready(Some(e)),
                         LType::Logic(permit, logic) => (permit, logic),
@@ -200,7 +198,7 @@ mod tests {
     use super::*;
     use std::sync::atomic;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_util_logic_chan() {
         let mut logic_chan = <LogicChan<&'static str>>::new(32);
         let h = logic_chan.handle().clone();
@@ -220,16 +218,16 @@ mod tests {
             let b = a.clone();
             a.capture_logic(async move {
                 b.emit("b1").await.unwrap();
-                tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                 b.emit("b2").await.unwrap();
             })
             .await
             .unwrap();
-            tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
             a.emit("a2").await.unwrap();
         });
 
-        tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         h.close();
 
         wt.await.unwrap();

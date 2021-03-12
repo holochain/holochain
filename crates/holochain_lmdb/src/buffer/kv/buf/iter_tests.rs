@@ -18,7 +18,7 @@ use tracing::*;
 
 pub(super) type Store = KvBufUsed<DbString, V>;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn kv_iter_from_partial() {
     let test_env = test_cell_env();
     let arc = test_env.env();
@@ -239,7 +239,7 @@ fn re_do_test<R: Readable>(
 // but I couldn't easily figure out how to generate
 // expected values and integrate with our need to
 // test scratch and db
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn kv_single_iter() {
     observability::test_run().ok();
     let mut rng = rand::thread_rng();
@@ -364,7 +364,7 @@ async fn kv_single_iter() {
     .unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn kv_single_iter_found_1() {
     observability::test_run().ok();
     let in_scratch = vec![
@@ -411,7 +411,7 @@ async fn kv_single_iter_found_1() {
     .await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[should_panic]
 async fn kv_single_iter_found_2() {
     observability::test_run().ok();
@@ -430,7 +430,7 @@ async fn kv_single_iter_found_2() {
     .await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn kv_single_iter_found_3() {
     observability::test_run().ok();
     let in_scratch = vec![
@@ -462,7 +462,7 @@ async fn kv_single_iter_found_3() {
     .await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn kv_single_iter_found_4() {
     observability::test_run().ok();
     let in_scratch = vec![TestData::Put((".".into(), V(0)))];
@@ -486,7 +486,7 @@ async fn kv_single_iter_found_4() {
     .await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn exhaust_both_ends() {
     let test_env = test_cell_env();
     let arc = test_env.env();

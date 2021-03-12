@@ -79,7 +79,7 @@ pub async fn spawn_kitsune_proxy_listener(
         let proxy_keepalive_ms = tuning_params.proxy_keepalive_ms as u64;
         metric_task(async move {
             loop {
-                tokio::time::delay_for(std::time::Duration::from_millis(proxy_keepalive_ms)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(proxy_keepalive_ms)).await;
 
                 if let Err(e) = i_s_c.req_proxy(proxy_url.clone()).await {
                     tracing::error!(msg = "renewing proxy failed", ?proxy_url, ?e);

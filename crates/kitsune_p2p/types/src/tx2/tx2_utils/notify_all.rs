@@ -81,7 +81,7 @@ mod tests {
     use super::*;
     use std::sync::atomic;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_notify_all() {
         let count = Arc::new(atomic::AtomicUsize::new(0));
 
@@ -97,7 +97,7 @@ mod tests {
             }));
         }
 
-        tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
 
         assert_eq!(0, count.load(atomic::Ordering::Relaxed));
 

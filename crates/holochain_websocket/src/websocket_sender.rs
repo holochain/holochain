@@ -227,7 +227,7 @@ impl Drop for StaleRequest {
     fn drop(&mut self) {
         // If this response hasn't been received then remove the registered response.
         if self.0 {
-            let mut tx = self.1.clone();
+            let tx = self.1.clone();
             let id = self.2;
             tokio::spawn(async move {
                 if let Err(e) = tx.send(OutgoingMessage::StaleRequest(id)).await {

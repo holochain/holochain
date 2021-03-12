@@ -35,7 +35,7 @@ impl<T: 'static + Send> ResourceBucket<T> {
     pub fn release(&self, t: T) {
         let _ = self.0.share_mut(move |i, _| {
             i.bucket.push(t);
-            i.notify.notify();
+            i.notify.notify_one();
             Ok(())
         });
     }
@@ -118,7 +118,7 @@ impl<T: 'static + Send> ResourceBucket<T> {
 mod tests {
     use super::*;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_async_bucket_timeout() {
         let t = Some(KitsuneTimeout::from_millis(10));
         let bucket = <ResourceBucket<&'static str>>::new();
@@ -128,7 +128,7 @@ mod tests {
         assert!(j2.await.unwrap().is_err());
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_async_bucket() {
         let bucket = <ResourceBucket<&'static str>>::new();
         let j1 = tokio::task::spawn(bucket.acquire(None));
@@ -140,7 +140,7 @@ mod tests {
         assert!((j1 == "1" && j2 == "2") || (j2 == "1" && j1 == "2"));
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_async_bucket_acquire_or_else() {
         let bucket = <ResourceBucket<&'static str>>::new();
         let j1 = tokio::task::spawn(bucket.acquire(None));

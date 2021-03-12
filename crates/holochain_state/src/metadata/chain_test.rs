@@ -24,7 +24,7 @@ fn setup() -> (TestEnvironment, MetadataBuf, Create, Create, AgentPubKey) {
     (test_env, meta_buf, h1, h2, agent_pubkey)
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_different_seq_num_on_separate_queries() {
     let (_te, mut meta_buf, mut h1, mut h2, agent_pubkey) = setup();
     h1.header_seq = 1;
@@ -61,7 +61,7 @@ async fn check_different_seq_num_on_separate_queries() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_equal_seq_num_on_same_query() {
     let (_te, mut meta_buf, mut h1, mut h2, agent_pubkey) = setup();
     h1.header_seq = 1;
@@ -105,7 +105,7 @@ async fn check_equal_seq_num_on_same_query() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn chain_item_keys_ser() {
     let (_te, mut meta_buf, mut h, _, agent_pubkey) = setup();
     h.header_seq = 1;
@@ -135,7 +135,7 @@ async fn chain_item_keys_ser() {
     assert_eq!(headers.pop().unwrap().header_hash, expect_hash);
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_large_seq_queries() {
     let (_te, mut meta_buf, mut h1, mut h2, agent_pubkey) = setup();
     h1.header_seq = 256;
