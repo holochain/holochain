@@ -425,7 +425,12 @@ impl DhtArcBucket {
             .fold((0u64, 0usize), |(total, count), arc| {
                 (total + arc.half_length as u64, count + 1)
             });
-        PeerDensity::new(self.filter, total as f64 / count as f64, count)
+        let average = if count > 0 {
+            (total as f64 / count as f64) / MAX_HALF_LENGTH as f64
+        } else {
+            0.0
+        };
+        PeerDensity::new(self.filter, average, count)
     }
 }
 
