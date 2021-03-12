@@ -278,10 +278,8 @@ pub fn query_agent_info_signed(
                         let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
                         if is_expired(now, &info) {
                             expired.push(AgentKvKey::from(k));
-                        } else {
-                            if info.as_space_ref() == kitsune_space.as_ref() {
-                                out.push(v);
-                            }
+                        } else if info.as_space_ref() == kitsune_space.as_ref() {
+                            out.push(v);
                         }
                     }
                     Ok(None) => break,
