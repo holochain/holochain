@@ -27,7 +27,7 @@ use std::convert::TryInto;
 use std::time::Duration;
 use tracing::*;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn app_validation_workflow_test() {
     observability::test_run_open().ok();
 

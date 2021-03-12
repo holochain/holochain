@@ -12,7 +12,7 @@ use holochain_zome_types::HeaderHashed;
 use std::sync::Arc;
 use tokio::sync;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
     let cell_env = test_cell_env();
     let env = cell_env.env();
