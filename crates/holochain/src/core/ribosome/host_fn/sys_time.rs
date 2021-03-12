@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
 
 pub fn sys_time(
     _ribosome: Arc<impl RibosomeT>,
@@ -22,7 +22,7 @@ pub mod wasm_test {
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn invoke_import_sys_time_test() {
         let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();

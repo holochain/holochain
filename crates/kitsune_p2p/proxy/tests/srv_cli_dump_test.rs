@@ -39,7 +39,7 @@ fn run_cli(proxy: &str) -> (String, std::process::Child) {
     (out_str, cmd)
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn srv_cli_dump_test() {
     let (proxy, mut srv) = run_srv();
     let (dump, mut cli) = run_cli(&proxy);

@@ -2,10 +2,12 @@ use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dependencies::ghost_actor;
 use kitsune_p2p_types::dependencies::serde_json;
 use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::transport::*;
+use std::sync::Arc;
 use structopt::StructOpt;
 
 mod opt;
@@ -93,13 +95,18 @@ async fn inner() -> TransportResult<()> {
 
     let proxy_config = ProxyConfig::local_proxy_server(tls_conf, AcceptProxyCallback::accept_all());
 
-    let (listener, mut events) =
-        spawn_kitsune_proxy_listener(proxy_config, listener, events).await?;
+    let (listener, mut events) = spawn_kitsune_proxy_listener(
+        proxy_config,
+        Arc::new(KitsuneP2pTuningParams::default()),
+        listener,
+        events,
+    )
+    .await?;
 
     let listener_clone = listener.clone();
     metric_task(async move {
         loop {
-            tokio::time::delay_for(std::time::Duration::from_secs(60)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 
             let debug_dump = listener_clone.debug().await.unwrap();
 

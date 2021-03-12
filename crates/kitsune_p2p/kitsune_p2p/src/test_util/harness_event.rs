@@ -99,18 +99,16 @@ impl HarnessEventChannel {
 
         // we need an active dummy recv or the sends will error
         tokio::task::spawn(async move {
-            while let Some(evt) = trace_recv.next().await {
-                if let Ok(evt) = evt {
-                    let HarnessEvent { nick, ty } = evt;
-                    const T: &str = "HARNESS_EVENT";
-                    tracing::debug!(
-                        %T,
-                        %nick,
-                        ?ty,
-                    );
-                    if let HarnessEventType::Close = ty {
-                        return;
-                    }
+            while let Ok(evt) = trace_recv.recv().await {
+                let HarnessEvent { nick, ty } = evt;
+                const T: &str = "HARNESS_EVENT";
+                tracing::debug!(
+                    %T,
+                    %nick,
+                    ?ty,
+                );
+                if let HarnessEventType::Close = ty {
+                    return;
                 }
             }
         });
@@ -141,11 +139,11 @@ impl HarnessEventChannel {
 
     /// break off a broadcast receiver. this receiver will not get historical
     /// messages... only those that are emitted going forward
-    pub fn receive(&self) -> impl tokio::stream::Stream<Item = HarnessEvent> {
+    pub fn receive(&self) -> impl tokio_stream::Stream<Item = HarnessEvent> {
         let (mut s, r) = futures::channel::mpsc::channel(10);
         let mut chan = self.chan.subscribe();
         tokio::task::spawn(async move {
-            while let Some(Ok(msg)) = chan.next().await {
+            while let Ok(msg) = chan.recv().await {
                 let is_close = if let HarnessEventType::Close = &msg.ty {
                     true
                 } else {

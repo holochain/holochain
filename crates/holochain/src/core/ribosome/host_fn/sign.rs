@@ -2,36 +2,31 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_types::prelude::*;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
 
 pub fn sign(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: Sign,
 ) -> Result<Signature, WasmError> {
-    Ok(
-        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            call_context
-                .host_access
-                .keystore()
-                .sign(input)
-                .await
-        }).map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))?,
-    )
+    Ok(tokio_helper::block_forever_on(async move {
+        call_context.host_access.keystore().sign(input).await
+    })
+    .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))?)
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
     use hdk::prelude::test_utils::fake_agent_pubkey_1;
     use hdk::prelude::test_utils::fake_agent_pubkey_2;
     use hdk::prelude::*;
+    use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_sign_test() {
         let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
@@ -40,8 +35,7 @@ pub mod wasm_test {
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
-        let workspace_lock =
-            crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
         host_access.workspace = workspace_lock;
@@ -94,10 +88,7 @@ pub mod wasm_test {
                     host_access,
                     TestWasm::Sign,
                     "sign",
-                    Sign::new_raw(
-                        k.clone(),
-                        data.clone()
-                    )
+                    Sign::new_raw(k.clone(), data.clone())
                 );
 
                 assert_eq!(expect, output.as_ref().to_vec());

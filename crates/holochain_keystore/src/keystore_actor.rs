@@ -204,7 +204,7 @@ mod tests {
     use super::*;
     use crate::test_keystore::*;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_tls_cert_get_or_create() {
         let keystore = spawn_test_keystore().await.unwrap();
         let (dig1, cert1, priv1) = keystore.get_or_create_first_tls_cert().await.unwrap();

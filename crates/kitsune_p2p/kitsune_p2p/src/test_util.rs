@@ -8,7 +8,6 @@ use futures::future::FutureExt;
 use ghost_actor::dependencies::tracing;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::stream::StreamExt;
 
 /// Utility trait for test values
 pub trait TestVal: Sized {
