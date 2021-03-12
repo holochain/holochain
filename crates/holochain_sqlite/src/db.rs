@@ -1,27 +1,28 @@
 //! Functions dealing with obtaining and referencing singleton LMDB environments
 
-use crate::prelude::*;
+use crate::{prelude::*, swansong::SwanSong};
 use derive_more::Into;
 use holochain_keystore::KeystoreSender;
 use holochain_zome_types::cell::CellId;
 use lazy_static::lazy_static;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, MutexGuard, RwLock};
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
+use std::time::Duration;
 use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap},
+    sync::Arc,
 };
 use std::{path::Path, sync::atomic::Ordering};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
-use std::{rc::Rc, time::Duration};
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
 static GLOBAL_CONNECTION_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 lazy_static! {
-    static ref INITIALIZED_DBS: Mutex<HashSet<PathBuf>> = {
+
+    static ref CONNECTIONS: RwLock<HashMap<PathBuf, Conn>> = {
         // This is just a convenient place that we know gets initialized
         // both in the final binary holochain && in all relevant tests
         //
@@ -43,12 +44,8 @@ lazy_static! {
             // std::process::abort();
         }));
 
-        Mutex::new(HashSet::new())
+        RwLock::new(HashMap::new())
     };
-}
-
-thread_local! {
-    static CONNECTIONS: RefCell<HashMap<PathBuf, Conn>> = RefCell::new(HashMap::new());
 }
 
 /// A read-only version of [DbWrite].
@@ -155,8 +152,8 @@ impl DbWrite {
 // #[derive(Shrinkwrap)]
 #[derive(Clone)]
 pub struct Conn {
-    // #[shrinkwrap(main_field)]
-    conn: Rc<Mutex<Connection>>,
+    inner: Arc<Mutex<Connection>>,
+    kind: DbKind,
 }
 
 fn initialize_connection(
@@ -197,41 +194,45 @@ fn initialize_connection(
 impl Conn {
     /// Create a new connection with decryption key set
     pub fn open(path: &Path, kind: &DbKind) -> DatabaseResult<Self> {
-        let mut map = INITIALIZED_DBS.lock();
-        let is_first = map.insert(path.to_owned());
-
-        let conn = CONNECTIONS.with(|connections| {
-            connections
-                .borrow_mut()
-                .get(path)
-                .map(|c| Ok(c.to_owned()))
-                .unwrap_or_else(|| {
-                    DatabaseResult::Ok(Self::new(initialize_connection(
-                        Connection::open(path)?,
-                        kind,
-                        is_first,
-                    )?))
-                })
-        })?;
+        let mut map = CONNECTIONS.write();
+        let conn = match map.entry(path.to_owned()) {
+            Entry::Vacant(e) => {
+                let conn = Self::new(
+                    initialize_connection(Connection::open(path)?, kind, true)?,
+                    kind.clone(),
+                );
+                e.insert(conn).clone()
+            }
+            Entry::Occupied(e) => e.get().clone(),
+        };
 
         Ok(conn)
     }
 
-    fn new(inner: Connection) -> Self {
+    fn new(inner: Connection, kind: DbKind) -> Self {
         Self {
-            conn: Rc::new(Mutex::new(inner)),
+            inner: Arc::new(Mutex::new(inner)),
+            kind,
         }
     }
 
-    #[deprecated = "remove this identity"]
-    pub fn inner(&mut self) -> &mut Self {
-        self
+    pub fn inner(&mut self) -> SwanSong<MutexGuard<Connection>> {
+        let kind = self.kind.clone();
+        dbg!("lock inner", &kind);
+        SwanSong::new(
+            self.inner
+                .try_lock_for(std::time::Duration::from_secs(30))
+                .expect(&format!("Couldn't unlock connection. Kind: {:?}", kind)),
+            |_| {
+                dbg!("lock drop", kind);
+            },
+        )
     }
 
     #[cfg(feature = "test_utils")]
     pub fn open_single(&mut self, name: &str) -> Result<SingleTable, DatabaseError> {
         crate::table::initialize_table_single(
-            &mut self.conn.lock(),
+            &mut self.inner(),
             name.to_string(),
             name.to_string(),
         )?;
@@ -248,7 +249,7 @@ impl Conn {
     #[cfg(feature = "test_utils")]
     pub fn open_multi(&mut self, name: &str) -> Result<MultiTable, DatabaseError> {
         crate::table::initialize_table_multi(
-            &mut self.conn.lock(),
+            &mut self.inner(),
             name.to_string(),
             name.to_string(),
         )?;
@@ -282,7 +283,7 @@ pub struct ConnInner;
 impl ConnInner {}
 
 /// The various types of LMDB environment, used to specify the list of databases to initialize
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum DbKind {
     /// Specifies the environment used by each Cell
     Cell(CellId),
@@ -346,7 +347,7 @@ impl<'e> ReadManager<'e> for Conn {
         E: From<DatabaseError>,
         F: 'e + FnOnce(Reader) -> Result<R, E>,
     {
-        let mut g = self.conn.lock();
+        let mut g = self.inner();
         let txn = g.transaction().map_err(DatabaseError::from)?;
         let reader = Reader::from(txn);
         f(reader)
@@ -384,7 +385,7 @@ impl<'e> WriteManager<'e> for Conn {
         E: From<DatabaseError>,
         F: 'e + FnOnce(&mut Writer) -> Result<R, E>,
     {
-        let mut b = self.conn.lock();
+        let mut b = self.inner();
         let txn = b.transaction().map_err(DatabaseError::from)?;
         let mut writer = Writer::from(txn);
         let result = f(&mut writer)?;

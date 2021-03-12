@@ -510,6 +510,7 @@ where
                                 conductor_handle.clone(),
                             )
                         });
+                    dbg!(app.all_cells().count());
 
                     use holochain_p2p::actor::HolochainP2pRefToCell;
 
@@ -522,7 +523,7 @@ where
                             );
 
                             let env = DbWrite::new_cell(&dir, cell_id.clone(), keystore.clone())?;
-                            Cell::create(
+                            let cell = Cell::create(
                                 cell_id.clone(),
                                 conductor_handle.clone(),
                                 env,
@@ -530,7 +531,9 @@ where
                                 self.managed_task_add_sender.clone(),
                                 self.managed_task_stop_broadcaster.clone(),
                             )
-                            .await
+                            .await;
+                            dbg!("CREATE CELL TASK");
+                            cell
                         },
                     );
 
