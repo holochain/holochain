@@ -1,8 +1,8 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_details<'a>(
@@ -10,13 +10,16 @@ pub fn get_details<'a>(
     call_context: Arc<CallContext>,
     input: GetInput,
 ) -> Result<Option<Details>, WasmError> {
-    let GetInput{ any_dht_hash, get_options } = input;
+    let GetInput {
+        any_dht_hash,
+        get_options,
+    } = input;
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
 
     // timeouts must be handled by the network
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         let maybe_details = call_context
             .host_access
             .workspace()
@@ -33,13 +36,13 @@ pub fn get_details<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use hdk::prelude::*;
     use crate::core::workflow::CallZomeWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
+    use hdk::prelude::*;
+    use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_get_details_test<'a>() {
         observability::test_run().ok();
 
@@ -51,8 +54,7 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let workspace_lock =
-            crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
@@ -72,8 +74,7 @@ pub mod wasm_test {
             _ => panic!("no element"),
         };
 
-        let check_entry = |details: Option<Details>, count, update, delete, line| match details
-        {
+        let check_entry = |details: Option<Details>, count, update, delete, line| match details {
             Some(Details::Entry(ref entry_details)) => {
                 match entry_details.entry {
                     Entry::App(ref eb) => {

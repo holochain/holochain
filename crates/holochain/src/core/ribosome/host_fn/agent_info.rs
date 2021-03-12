@@ -1,8 +1,8 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn agent_info<'a>(
@@ -10,7 +10,7 @@ pub fn agent_info<'a>(
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<AgentInfo, WasmError> {
-    let agent_pubkey = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    let agent_pubkey = tokio_helper::block_forever_on(async move {
         let lock = call_context.host_access.workspace().read().await;
         lock.source_chain.agent_pubkey()
     })
@@ -31,7 +31,7 @@ pub mod test {
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn invoke_import_agent_info_test() {
         let test_env = holochain_sqlite::test_utils::test_cell_env();
         let env = test_env.env();
@@ -47,19 +47,9 @@ pub mod test {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
 
-        let agent_info: AgentInfo = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::AgentInfo,
-            "agent_info",
-            ()
-        );
-        assert_eq!(
-            agent_info.agent_initial_pubkey,
-            fake_agent_pubkey_1(),
-        );
-        assert_eq!(
-            agent_info.agent_latest_pubkey,
-            fake_agent_pubkey_1(),
-        );
+        let agent_info: AgentInfo =
+            crate::call_test_ribosome!(host_access, TestWasm::AgentInfo, "agent_info", ());
+        assert_eq!(agent_info.agent_initial_pubkey, fake_agent_pubkey_1(),);
+        assert_eq!(agent_info.agent_latest_pubkey, fake_agent_pubkey_1(),);
     }
 }

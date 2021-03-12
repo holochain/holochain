@@ -358,7 +358,7 @@ impl TestData {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn can_add_and_delete_link() {
     let test_env = test_cell_env();
     let arc = test_env.env();
@@ -452,7 +452,7 @@ async fn can_add_and_delete_link() {
     td.only_on_half_tag(here!("db"), &meta_buf).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn multiple_links() {
     let test_env = test_cell_env();
     let arc = test_env.env();
@@ -533,7 +533,7 @@ async fn multiple_links() {
         .not_on_full_key(here!("removed in db"), &meta_buf)
         .await;
 }
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn duplicate_links() {
     observability::test_run().ok();
     let test_env = test_cell_env();
@@ -608,7 +608,7 @@ async fn duplicate_links() {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_base() {
     observability::test_run().ok();
     let test_env = test_cell_env();
@@ -689,7 +689,7 @@ async fn links_on_same_base() {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_zome_id() {
     observability::test_run().ok();
     let test_env = test_cell_env();
@@ -785,7 +785,7 @@ async fn links_on_same_zome_id() {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_tag() {
     observability::test_run().ok();
     let test_env = test_cell_env();

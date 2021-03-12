@@ -7,7 +7,7 @@ use crate::{
     test_utils::test_cell_env,
 };
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
@@ -95,7 +95,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 
 // fixturator!(V; from u32;);
 
-// #[tokio::test(threaded_scheduler)]
+// #[tokio::test(flavor = "multi_thread")]
 // async fn kv_iterators() -> DatabaseResult<()> {
 //     let test_env = test_cell_env();
 //     let arc = test_env.env();
@@ -131,7 +131,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 //     })
 // }
 
-// #[tokio::test(threaded_scheduler)]
+// #[tokio::test(flavor = "multi_thread")]
 // async fn kv_empty_iterators() -> DatabaseResult<()> {
 //     let test_env = test_cell_env();
 //     let arc = test_env.env();

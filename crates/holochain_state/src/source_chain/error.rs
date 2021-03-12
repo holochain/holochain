@@ -54,9 +54,6 @@ pub enum SourceChainError {
     KeystoreError(#[from] holochain_keystore::KeystoreError),
 
     #[error(transparent)]
-    BlockOnError(#[from] tokio_safe_block_on::BlockOnError),
-
-    #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
 
     #[error("Required the scratch space to be empty but contained values")]

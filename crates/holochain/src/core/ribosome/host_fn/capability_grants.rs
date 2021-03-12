@@ -31,7 +31,7 @@ pub mod wasm_test {
 
     use matches::assert_matches;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_capability_secret_test<'a>() {
         observability::test_run().ok();
         // test workspace boilerplate
@@ -50,7 +50,7 @@ pub mod wasm_test {
             crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ());
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_transferable_cap_grant<'a>() {
         observability::test_run().ok();
         // test workspace boilerplate
@@ -90,7 +90,7 @@ pub mod wasm_test {
     }
 
     // TODO: [ B-03669 ] can move this to an integration test (may need to switch to using a RealDnaStore)
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_authorized_call() -> anyhow::Result<()> {
         observability::test_run().ok();
         let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Capability])

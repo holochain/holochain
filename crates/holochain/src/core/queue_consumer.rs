@@ -60,7 +60,7 @@ pub async fn spawn_queue_consumer_tasks(
     env: &DbWrite,
     cell_network: HolochainP2pCell,
     conductor_api: impl CellConductorApiT + 'static,
-    mut task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
+    task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
     stop: sync::broadcast::Sender<()>,
 ) -> (QueueTriggers, InitialQueueTriggers) {
     // Publish
@@ -185,7 +185,10 @@ impl InitialQueueTriggers {
 pub struct TriggerSender(mpsc::Sender<()>);
 
 /// The receiving end of a queue trigger channel
-pub struct TriggerReceiver(mpsc::Receiver<()>);
+pub struct TriggerReceiver {
+    rx: mpsc::Receiver<()>,
+    waker: core::task::Waker,
+}
 
 impl TriggerSender {
     /// Create a new channel for waking a consumer
@@ -194,7 +197,8 @@ impl TriggerSender {
     /// inconsistency from the perspective of any particular CPU thread
     pub fn new() -> (TriggerSender, TriggerReceiver) {
         let (tx, rx) = mpsc::channel(num_cpus::get());
-        (TriggerSender(tx), TriggerReceiver(rx))
+        let waker = futures::task::noop_waker();
+        (TriggerSender(tx), TriggerReceiver { rx, waker })
     }
 
     /// Lazily nudge the consumer task, ignoring the case where the consumer
@@ -216,16 +220,17 @@ impl TriggerReceiver {
     /// Listen for one or more items to come through, draining the channel
     /// each time. Bubble up errors on empty channel.
     pub async fn listen(&mut self) -> Result<(), QueueTriggerClosedError> {
-        use tokio::sync::mpsc::error::TryRecvError;
+        use core::task::Poll;
 
         // wait for next item
-        if self.0.recv().await.is_some() {
+        if self.rx.recv().await.is_some() {
             // drain the channel
+            let mut ctx = core::task::Context::from_waker(&self.waker);
             loop {
-                match self.0.try_recv() {
-                    Err(TryRecvError::Closed) => return Err(QueueTriggerClosedError),
-                    Err(TryRecvError::Empty) => return Ok(()),
-                    Ok(()) => {}
+                match self.rx.poll_recv(&mut ctx) {
+                    Poll::Ready(None) => return Err(QueueTriggerClosedError),
+                    Poll::Pending => return Ok(()),
+                    Poll::Ready(Some(())) => {}
                 }
             }
         } else {

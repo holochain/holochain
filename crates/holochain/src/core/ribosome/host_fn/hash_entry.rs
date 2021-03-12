@@ -2,8 +2,8 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
 
 pub fn hash_entry(
     _ribosome: Arc<impl RibosomeT>,
@@ -31,7 +31,7 @@ pub mod wasm_test {
     use std::convert::TryInto;
     use std::sync::Arc;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
     async fn hash_entry_test() {
         let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
@@ -45,13 +45,10 @@ pub mod wasm_test {
         let output: EntryHash =
             hash_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
-        assert_eq!(
-            *output.hash_type(),
-            holo_hash::hash_type::Entry
-        );
+        assert_eq!(*output.hash_type(), holo_hash::hash_type::Entry);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn via. a wasm call
     async fn ribosome_hash_entry_test() {
         let test_env = holochain_sqlite::test_utils::test_cell_env();
@@ -69,19 +66,26 @@ pub mod wasm_test {
         host_access.workspace = workspace_lock;
         let output: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::HashEntry, "hash_entry", input);
-        assert_eq!(
-            *output.hash_type(),
-            holo_hash::hash_type::Entry
+        assert_eq!(*output.hash_type(), holo_hash::hash_type::Entry);
+
+        let entry_hash_output: EntryHash = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::HashEntry,
+            "twenty_three_degrees_entry_hash",
+            ()
         );
 
-        let entry_hash_output: EntryHash = crate::call_test_ribosome!(host_access, TestWasm::HashEntry, "twenty_three_degrees_entry_hash", ());
-
-        let hash_output: EntryHash = crate::call_test_ribosome!(host_access, TestWasm::HashEntry, "twenty_three_degrees_hash", ());
+        let hash_output: EntryHash = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::HashEntry,
+            "twenty_three_degrees_hash",
+            ()
+        );
 
         assert_eq!(entry_hash_output, hash_output);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// the hash path underlying anchors wraps entry_hash
     async fn ribosome_hash_path_pwd_test() {
         let test_env = holochain_sqlite::test_utils::test_cell_env();

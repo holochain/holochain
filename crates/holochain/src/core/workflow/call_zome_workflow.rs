@@ -522,7 +522,7 @@ pub mod tests {
     // 4.3. Write output results via SC gatekeeper (wrap in transaction): (MVI)
     // This is handled by the workflow runner however I should test that
     // we can create outputs
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn creates_outputs() {
         let test_env = test_cell_env();
         let env = test_env.env();

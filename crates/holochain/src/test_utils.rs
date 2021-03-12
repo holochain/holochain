@@ -200,7 +200,7 @@ where
     .unwrap();
     let respond_task = tokio::task::spawn(async move {
         use futures::future::FutureExt;
-        use tokio::stream::StreamExt;
+        use tokio_stream::StreamExt;
         while let Some(evt) = recv.next().await {
             if let Some((filter, tx)) = &mut events {
                 if filter(&evt) {
@@ -389,6 +389,82 @@ pub async fn consistency_envs(all_cell_envs: &[&DbWrite], num_attempts: usize, d
     }
 }
 
+#[macro_export]
+macro_rules! wait_for_any {
+    ($wait:expr, $test:expr, $check:expr, $assert:expr) => {{
+        loop {
+            let o = $test;
+            if !$wait.wait_any().await || $check(&o) {
+                $assert(o);
+                break;
+            }
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! wait_for_any_10s {
+    ($test:expr, $check:expr, $assert:expr) => {
+        let mut wait_for = $crate::test_utils::WaitForAny::ten_s();
+        $crate::wait_for_any!(wait_for, $test, $check, $assert)
+    };
+}
+
+#[macro_export]
+macro_rules! wait_for_any_1m {
+    ($test:expr, $check:expr, $assert:expr) => {
+        let mut wait_for = $crate::test_utils::WaitForAny::one_m();
+        $crate::wait_for_any!(wait_for, $test, $check, $assert)
+    };
+}
+
+#[derive(Debug, Clone)]
+/// Generic waiting for some test property to
+/// be true. This allows early exit from waiting when
+/// the condition becomes true but will wait up to a
+/// maximum if the condition is not true.
+pub struct WaitForAny {
+    num_attempts: usize,
+    attempt: usize,
+    delay: Duration,
+}
+
+impl WaitForAny {
+    /// Create a new wait for from a number of attempts and delay in between attempts
+    pub fn new(num_attempts: usize, delay: Duration) -> Self {
+        Self {
+            num_attempts,
+            attempt: 0,
+            delay,
+        }
+    }
+
+    /// Wait for 10s checking every 100ms.
+    pub fn ten_s() -> Self {
+        const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
+        Self::new(100, DELAY_PER_ATTEMPT)
+    }
+
+    /// Wait for 1 minute checking every 500ms.
+    pub fn one_m() -> Self {
+        const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(500);
+        Self::new(120, DELAY_PER_ATTEMPT)
+    }
+
+    /// Wait for some time before trying again.
+    /// Will return false when you should stop waiting.
+    #[tracing::instrument(skip(self))]
+    pub async fn wait_any(&mut self) -> bool {
+        if self.attempt >= self.num_attempts {
+            return false;
+        }
+        self.attempt += 1;
+        tracing::debug!(attempt = ?self.attempt, out_of = ?self.num_attempts, delaying_for = ?self.delay);
+        tokio::time::sleep(self.delay).await;
+        true
+    }
+}
+
 /// Same as wait_for_integration but with a default wait time of 60 seconds
 #[tracing::instrument(skip(env))]
 pub async fn wait_for_integration_1m(env: &DbWrite, expected_count: usize) {
@@ -414,7 +490,7 @@ pub async fn wait_for_integration(
             let total_time_waited = delay * i as u32;
             tracing::debug!(?count, ?total_time_waited);
         }
-        tokio::time::delay_for(delay).await;
+        tokio::time::sleep(delay).await;
     }
 }
 
@@ -461,7 +537,7 @@ pub async fn wait_for_integration_with_others(
                 change,
             );
         }
-        tokio::time::delay_for(delay).await;
+        tokio::time::sleep(delay).await;
     }
 }
 

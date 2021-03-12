@@ -104,7 +104,7 @@ mod tests {
             })
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
     async fn remote_signal_test() -> anyhow::Result<()> {
         observability::test_run().ok();
@@ -141,8 +141,11 @@ mod tests {
             .call(&cells[0].zome("zome1"), "signal_others", ())
             .await;
 
-        tokio::time::delay_for(std::time::Duration::from_millis(1000)).await;
-        assert_eq!(num_signals.load(Ordering::SeqCst), NUM_CONDUCTORS);
+        crate::wait_for_any_10s!(
+            num_signals.load(Ordering::SeqCst),
+            |&n| n == NUM_CONDUCTORS,
+            |n| assert_eq!(n, NUM_CONDUCTORS)
+        );
 
         for mut signal in signals {
             let r = signal.try_recv();

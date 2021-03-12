@@ -279,9 +279,9 @@ mod tests {
         // Receive events and increment count
         let recv_task = tokio::task::spawn({
             async move {
-                use tokio::stream::StreamExt;
+                // use tokio_stream::StreamExt;
                 let mut tx_complete = Some(tx_complete);
-                while let Some(evt) = recv.next().await {
+                while let Some(evt) = recv.recv().await {
                     use holochain_p2p::event::HolochainP2pEvent::*;
                     match evt {
                         Publish { respond, .. } => {
@@ -332,7 +332,7 @@ mod tests {
     #[test_case(100, 10)]
     #[test_case(100, 100)]
     fn test_sent_to_r_nodes(num_agents: u32, num_hash: u32) {
-        crate::conductor::tokio_runtime().block_on(async {
+        tokio_helper::block_forever_on(async {
             observability::test_run().ok();
 
             // Create test env
@@ -348,7 +348,7 @@ mod tests {
             // Wait for expected # of responses, or timeout
             tokio::select! {
                 _ = rx_complete => {}
-                _ = tokio::time::delay_for(RECV_TIMEOUT) => {
+                _ = tokio::time::sleep(RECV_TIMEOUT) => {
                     panic!("Timed out while waiting for expected responses.")
                 }
             };
@@ -383,7 +383,7 @@ mod tests {
     #[test_case(100, 10)]
     #[test_case(100, 100)]
     fn test_no_republish(num_agents: u32, num_hash: u32) {
-        crate::conductor::tokio_runtime().block_on(async {
+        tokio_helper::block_forever_on(async {
             observability::test_run().ok();
 
             // Create test env
@@ -427,7 +427,7 @@ mod tests {
             call_workflow(env.clone().into(), cell_network).await;
 
             // If we can wait a while without receiving any publish, we have succeeded
-            tokio::time::delay_for(Duration::from_millis(
+            tokio::time::sleep(Duration::from_millis(
                 std::cmp::min(50, std::cmp::max(2000, 10 * num_agents * num_hash)).into(),
             ))
             .await;
@@ -459,7 +459,7 @@ mod tests {
     #[test_case(10)]
     #[test_case(100)]
     fn test_private_entries(num_agents: u32) {
-        crate::conductor::tokio_runtime().block_on(
+        tokio_helper::block_forever_on(
             async {
                 observability::test_run().ok();
 
@@ -668,9 +668,9 @@ mod tests {
                 // Receive events and increment count
                 let recv_task = tokio::task::spawn({
                     async move {
-                        use tokio::stream::StreamExt;
+                        // use tokio_stream::StreamExt;
                         let mut tx_complete = Some(tx_complete);
-                        while let Some(evt) = recv.next().await {
+                        while let Some(evt) = recv.recv().await {
                             use holochain_p2p::event::HolochainP2pEvent::*;
                             match evt {
                                 Publish {
@@ -724,7 +724,7 @@ mod tests {
                 // Wait for expected # of responses, or timeout
                 tokio::select! {
                     _ = rx_complete => {}
-                    _ = tokio::time::delay_for(RECV_TIMEOUT) => {
+                    _ = tokio::time::sleep(RECV_TIMEOUT) => {
                         panic!("Timed out while waiting for expected responses.")
                     }
                 };

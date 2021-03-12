@@ -1,24 +1,23 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
-use std::sync::Arc;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
 
 pub fn x_25519_x_salsa20_poly1305_encrypt(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: X25519XSalsa20Poly1305Encrypt,
 ) -> Result<XSalsa20Poly1305EncryptedData, WasmError> {
-    Ok(
-        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            call_context
-                .host_access
-                .keystore()
-                .x_25519_x_salsa20_poly1305_encrypt(input)
-                .await
-        }).map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))?,
-    )
+    Ok(tokio_helper::block_forever_on(async move {
+        call_context
+            .host_access
+            .keystore()
+            .x_25519_x_salsa20_poly1305_encrypt(input)
+            .await
+    })
+    .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))?)
 }
 
 #[cfg(test)]
@@ -30,7 +29,7 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn invoke_import_x_25519_x_salsa20_poly1305_encrypt_test() {
         let test_env = holochain_sqlite::test_utils::test_cell_env();
         let env = test_env.env();
@@ -101,7 +100,7 @@ pub mod wasm_test {
                 bob.clone(),
                 alice.clone(),
                 encrypt_output.clone(),
-        );
+            );
 
         let decrypt_output: Option<XSalsa20Poly1305Data> = crate::call_test_ribosome!(
             host_access,
@@ -117,7 +116,7 @@ pub mod wasm_test {
                 carol.clone(),
                 alice.clone(),
                 encrypt_output,
-        );
+            );
         let bad_decrypt_output: Option<XSalsa20Poly1305Data> = crate::call_test_ribosome!(
             host_access,
             TestWasm::XSalsa20Poly1305,

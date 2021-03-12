@@ -2,15 +2,19 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_types::prelude::*;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
 
 pub fn get_agent_activity(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: GetAgentActivityInput,
 ) -> Result<AgentActivity, WasmError> {
-    let GetAgentActivityInput{ agent_pubkey, chain_query_filter, activity_request } = input;
+    let GetAgentActivityInput {
+        agent_pubkey,
+        chain_query_filter,
+        activity_request,
+    } = input;
     let options = match activity_request {
         ActivityRequest::Status => GetActivityOptions {
             include_valid_activity: false,
@@ -28,7 +32,7 @@ pub fn get_agent_activity(
     let network = call_context.host_access.network().clone();
 
     // timeouts must be handled by the network
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         let activity = call_context
             .host_access
             .workspace()

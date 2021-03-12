@@ -309,11 +309,15 @@ where
 
     pub(super) async fn add_app_interface_via_handle(
         &mut self,
-        port: u16,
+        port: either::Either<u16, AppInterfaceId>,
         handle: ConductorHandle,
     ) -> ConductorResult<u16> {
+        let interface_id = match port {
+            either::Either::Left(port) => AppInterfaceId::new(port),
+            either::Either::Right(id) => id,
+        };
+        let port = interface_id.port();
         tracing::debug!("Attaching interface {}", port);
-        let interface_id = AppInterfaceId::new(port);
         let app_api = RealAppInterfaceApi::new(handle, interface_id.clone());
         // This receiver is thrown away because we can produce infinite new
         // receivers from the Sender
@@ -389,19 +393,10 @@ where
         &mut self,
         handle: ConductorHandle,
     ) -> ConductorResult<()> {
-        for (id, i) in self.get_state().await?.app_interfaces.iter() {
+        for id in self.get_state().await?.app_interfaces.keys().cloned() {
             tracing::debug!("Starting up app interface: {:?}", id);
-            let port = if let InterfaceDriver::Websocket { port } = i.driver {
-                if id.port() == port {
-                    port
-                } else {
-                    id.port()
-                }
-            } else {
-                unreachable!()
-            };
             let _ = self
-                .add_app_interface_via_handle(port, handle.clone())
+                .add_app_interface_via_handle(either::Right(id), handle.clone())
                 .await?;
         }
         Ok(())

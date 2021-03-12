@@ -200,13 +200,14 @@ async fn websocket_bind(
     .bind(addr)?
     .listen(config.max_pending_connections as i32)?;
     socket.set_nonblocking(true)?;
-    let socket = tokio::net::TcpListener::from_std(socket)?;
+    let local_addr = addr_to_url(socket.local_addr()?, config.scheme);
+    let listener = tokio::net::TcpListener::from_std(socket)?;
+    let listener_stream = tokio_stream::wrappers::TcpListenerStream::new(listener);
 
     // Setup proper shutdown
     let (shutdown, valve) = Valve::new();
 
-    let local_addr = addr_to_url(socket.local_addr()?, config.scheme);
-    let socket = socket
+    let buffered_listener = listener_stream
         .map_err(WebsocketError::from)
         .map_ok({
             let config = config.clone();
@@ -216,14 +217,14 @@ async fn websocket_bind(
         .try_buffer_unordered(config.max_pending_connections);
     tracing::debug!(sever_listening_on = ?local_addr);
 
-    let stream = valve.wrap(socket);
+    let stream = valve.wrap(buffered_listener);
 
-    let listener = ListenerHandle {
+    let listener_handle = ListenerHandle {
         shutdown,
         config,
         local_addr,
     };
-    Ok((listener, stream))
+    Ok((listener_handle, stream))
 }
 
 #[instrument(skip(config, socket, valve))]
@@ -232,9 +233,10 @@ async fn connect(
     socket: tokio::net::TcpStream,
     valve: Valve,
 ) -> WebsocketResult<Pair> {
-    socket.set_keepalive(Some(std::time::Duration::from_secs(
-        config.tcp_keepalive_s as u64,
-    )))?;
+    // TODO: find alternative to set the keepalive
+    // socket.set_keepalive(Some(std::time::Duration::from_secs(
+    //     config.tcp_keepalive_s as u64,
+    // )))?;
     tracing::debug!(
         message = "accepted incoming raw socket",
         remote_addr = %socket.peer_addr()?,
@@ -245,6 +247,7 @@ async fn connect(
             max_send_queue: Some(config.max_send_queue),
             max_message_size: Some(config.max_message_size),
             max_frame_size: Some(config.max_frame_size),
+            ..Default::default()
         }),
     )
     .await

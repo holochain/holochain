@@ -139,7 +139,7 @@ mod tests {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn elements_produce_ops() {
         observability::test_run().ok();
         let test_env = test_cell_env();

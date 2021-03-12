@@ -2,7 +2,7 @@ use super::*;
 use ::fixt::prelude::*;
 use holochain_keystore::AgentPubKeyExt;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_to_limbo() {
     let test_env = holochain_sqlite::test_utils::test_cell_env();
     let env = test_env.env();

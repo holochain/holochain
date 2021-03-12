@@ -49,7 +49,7 @@ fn collect_sorted<T: Ord, E, I: IntoIterator<Item = Result<T, E>>>(
     Ok(vec)
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn kvvbuf_basics() {
     let test_env = test_cell_env();
     let arc = test_env.env();
@@ -150,7 +150,7 @@ async fn kvvbuf_basics() {
         .unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn delete_all() {
     observability::test_run().ok();
     let test_env = test_cell_env();
@@ -256,7 +256,7 @@ async fn delete_all() {
 /// before and after our idempotent operation
 /// both in the actual persistence and in our scratch
 /// that duplicates are not returned on get
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn idempotent_inserts() {
     let test_env = test_cell_env();
     let arc = test_env.env();
@@ -323,7 +323,7 @@ async fn idempotent_inserts() {
         .unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn kvv_indicate_value_appends() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
@@ -347,7 +347,7 @@ async fn kvv_indicate_value_appends() -> DatabaseResult<()> {
     })
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn kvv_indicate_value_overwritten() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
@@ -378,7 +378,7 @@ async fn kvv_indicate_value_overwritten() -> DatabaseResult<()> {
     })
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn kvv_deleted_persisted() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
@@ -417,7 +417,7 @@ async fn kvv_deleted_persisted() -> DatabaseResult<()> {
     })
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn kvv_deleted_buffer() -> DatabaseResult<()> {
     use KvvOp::*;
     observability::test_run().ok();
@@ -470,7 +470,7 @@ async fn kvv_deleted_buffer() -> DatabaseResult<()> {
     })
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn kvv_get_buffer() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
@@ -491,7 +491,7 @@ async fn kvv_get_buffer() -> DatabaseResult<()> {
     })
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn kvv_get_persisted() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
@@ -519,7 +519,7 @@ async fn kvv_get_persisted() -> DatabaseResult<()> {
     })
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn kvv_get_del_buffer() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
@@ -540,7 +540,7 @@ async fn kvv_get_del_buffer() -> DatabaseResult<()> {
     })
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn kvv_get_del_persisted() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();

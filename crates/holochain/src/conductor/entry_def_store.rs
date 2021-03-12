@@ -209,7 +209,7 @@ mod tests {
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_store_entry_defs() {
         observability::test_run().ok();
 

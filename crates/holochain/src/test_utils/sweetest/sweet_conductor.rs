@@ -126,7 +126,7 @@ pub struct SweetConductor {
     envs: TestDbs,
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
-    signal_stream: Option<Box<dyn tokio::stream::Stream<Item = Signal> + Send + Sync + Unpin>>,
+    signal_stream: Option<Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>>,
 }
 
 fn standard_config() -> ConductorConfig {
@@ -364,7 +364,7 @@ impl SweetConductor {
     /// This is designed to crash if called more than once, because as currently
     /// implemented, creating multiple signal streams would simply cause multiple
     /// consumers of the same underlying streams, not a fresh subscription
-    pub async fn signals(&mut self) -> impl tokio::stream::Stream<Item = Signal> {
+    pub async fn signals(&mut self) -> impl tokio_stream::Stream<Item = Signal> {
         self.signal_stream
             .take()
             .expect("Can't take the SweetConductor signal stream twice")
@@ -498,7 +498,7 @@ impl SweetConductorHandle {
     }
 
     // /// Get a stream of all Signals emitted since the time of this function call.
-    // pub async fn signal_stream(&self) -> impl tokio::stream::Stream<Item = Signal> {
+    // pub async fn signal_stream(&self) -> impl tokio_stream::Stream<Item = Signal> {
     //     self.0.signal_broadcaster().await.subscribe_merged()
     // }
 
