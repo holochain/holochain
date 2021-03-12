@@ -28,3 +28,6 @@ url2 = "0.0.6"
 
 [dev-dependencies]
 tracing-subscriber = "0.2"
+
+[features]
+test_utils = []

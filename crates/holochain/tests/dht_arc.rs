@@ -1,14 +1,14 @@
 use holochain::test_utils::sweetest::SweetAgents;
 use holochain::test_utils::sweetest::SweetConductor;
 use holochain_keystore::KeystoreSender;
-use holochain_p2p::dht_arc::check_for_gaps;
-use holochain_p2p::dht_arc::check_redundancy;
 use holochain_p2p::dht_arc::MAX_HALF_LENGTH;
 use holochain_p2p::dht_arc::MIN_PEERS;
 use holochain_p2p::dht_arc::MIN_REDUNDANCY;
 use kitsune_p2p::dht_arc::DhtArc;
 use kitsune_p2p::dht_arc::DhtArcBucket;
 use kitsune_p2p::*;
+use kitsune_p2p_types::dht_arc::check_for_gaps;
+use kitsune_p2p_types::dht_arc::check_redundancy;
 
 async fn get_peers(num: usize, half_lens: &[u32], keystore: KeystoreSender) -> Vec<DhtArc> {
     let mut hl = half_lens.iter();

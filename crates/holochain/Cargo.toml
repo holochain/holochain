@@ -86,6 +86,7 @@ maplit = "1"
 pretty_assertions = "0.6.1"
 serial_test = "0.4.0"
 test-case = "1.0.0"
+kitsune_p2p_types = { version = "0.0.1", path = "../kitsune_p2p/types" }
 
 # Dependencies for test_utils: keep in sync with above
 hdk = { path = "../hdk", optional = false }
@@ -117,6 +118,7 @@ test_utils = [
   "holochain_state/test_utils",
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",
+  "kitsune_p2p_types/test_utils",
   "itertools",
   "matches",
   "holochain_test_wasm_common",

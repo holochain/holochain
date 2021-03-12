@@ -2,7 +2,6 @@
 
 use derive_more::From;
 use derive_more::Into;
-use std::collections::HashSet;
 use std::num::Wrapping;
 use std::ops::Bound;
 use std::ops::RangeBounds;
@@ -63,6 +62,7 @@ const DELTA_THRESHOLD: f64 = 0.01;
 /// is calculated.
 const NOISE_THRESHOLD: f64 = 0.01;
 
+#[cfg(any(test, feature = "test_utils"))]
 /// Margin of error for floating point comparisons
 const ERROR_MARGIN: f64 = 0.0000000001;
 
@@ -91,7 +91,7 @@ fn coverage_target(est_total_peers: usize) -> f64 {
 fn target(density: PeerDensity) -> f64 {
     // Get the estimated coverage gap based on our observed peer density.
     let est_gap = density.est_gap();
-    // If we haven't observed  at least our redundancy target number
+    // If we haven't observed at least our redundancy target number
     // of peers (adjusted for expected uptime) then we know that the data
     // in our arc is under replicated and we should start aiming for full coverage.
     if density.expected_count() < REDUNDANCY_TARGET {
@@ -419,14 +419,13 @@ impl DhtArcBucket {
 
     /// Get the density of this bucket.
     pub fn density(&self) -> PeerDensity {
-        self.arcs
+        let (total, count) = self
+            .arcs
             .iter()
-            .fold(PeerDensity::new(self.filter, 0.0, 0), |mut d, arc| {
-                d.average_coverage =
-                    (d.average_coverage * d.count as f64 + arc.coverage()) / (d.count as f64 + 1.0);
-                d.count += 1;
-                d
-            })
+            .fold((0u64, 0usize), |(total, count), arc| {
+                (total + arc.half_length as u64, count + 1)
+            });
+        PeerDensity::new(self.filter, total as f64 / count as f64, count)
     }
 }
 
@@ -460,6 +459,7 @@ impl std::fmt::Display for DhtArc {
     }
 }
 
+#[cfg(any(test, feature = "test_utils"))]
 /// Check a set of peers for a gap in coverage.
 /// Note this function is only used for verification in tests at this time.
 pub fn check_for_gaps(peers: Vec<DhtArc>) -> bool {
@@ -504,10 +504,12 @@ pub fn check_for_gaps(peers: Vec<DhtArc>) -> bool {
     true
 }
 
+#[cfg(any(test, feature = "test_utils"))]
 /// Check a set of peers the actual redundancy across all peers.
 /// This can tell if there is bad distribution.
 /// Note this function is only used for verification in tests at this time.
 pub fn check_redundancy(peers: Vec<DhtArc>) -> usize {
+    use std::collections::HashSet;
     #[derive(Clone, Copy, Debug)]
     enum Side {
         Left,

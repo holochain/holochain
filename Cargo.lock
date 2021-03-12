@@ -1693,6 +1693,7 @@ dependencies = [
  "human-panic",
  "itertools 0.10.0",
  "kitsune_p2p",
+ "kitsune_p2p_types",
  "lazy_static",
  "maplit",
  "matches",
