@@ -53,6 +53,7 @@
 #![allow(deprecated)]
 
 pub mod buffer;
+pub mod conn;
 pub mod db;
 pub mod error;
 pub mod exports;

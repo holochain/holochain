@@ -134,7 +134,7 @@ pub(crate) fn initialize_table_single(
     conn: &mut Connection,
     table_name: String,
     index_name: String,
-) -> DatabaseResult<()> {
+) -> rusqlite::Result<()> {
     // create table
     conn.execute(
         &format!(
@@ -162,7 +162,7 @@ pub(crate) fn initialize_table_multi(
     conn: &mut Connection,
     table_name: String,
     index_name: String,
-) -> DatabaseResult<()> {
+) -> rusqlite::Result<()> {
     // create table
     conn.execute(
         &format!(
@@ -186,7 +186,7 @@ pub(crate) fn initialize_table_multi(
     Ok(())
 }
 
-fn initialize_table(conn: &mut Connection, name: TableName) -> DatabaseResult<()> {
+fn initialize_table(conn: &mut Connection, name: TableName) -> rusqlite::Result<()> {
     let table_name = format!("{}", name);
     let index_name = format!("{}_idx", table_name);
 
@@ -196,7 +196,7 @@ fn initialize_table(conn: &mut Connection, name: TableName) -> DatabaseResult<()
     }
 }
 
-pub(super) fn initialize_database(conn: &mut Connection, db_kind: &DbKind) -> DatabaseResult<()> {
+pub(super) fn initialize_database(conn: &mut Connection, db_kind: &DbKind) -> rusqlite::Result<()> {
     match db_kind {
         DbKind::Cell(_) => {
             initialize_table(conn, TableName::ElementVaultPublicEntries)?;

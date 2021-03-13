@@ -43,10 +43,13 @@ pub enum DatabaseError {
     Other(#[from] anyhow::Error),
 
     #[error(transparent)]
-    SqlLiteError(#[from] rusqlite::Error),
+    SqliteError(#[from] rusqlite::Error),
 
-    #[error("Failue to remove directory")]
+    #[error("Failure to remove directory")]
     DirectoryError(#[from] std::io::Error),
+
+    #[error(transparent)]
+    DbConnectionPoolError(#[from] r2d2::Error),
 
     #[error(transparent)]
     KeystoreError(#[from] holochain_keystore::KeystoreError),
