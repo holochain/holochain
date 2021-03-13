@@ -8,17 +8,15 @@ use lazy_static::lazy_static;
 use parking_lot::{Mutex, MutexGuard, RwLock};
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
+use std::path::Path;
+use std::path::PathBuf;
 use std::time::Duration;
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::Arc,
 };
-use std::{path::Path, sync::atomic::Ordering};
-use std::{path::PathBuf, sync::atomic::AtomicUsize};
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
-
-static GLOBAL_CONNECTION_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 lazy_static! {
 
@@ -184,10 +182,6 @@ fn initialize_connection(
         initialize_database(&mut conn, &kind)?;
     }
 
-    let count = GLOBAL_CONNECTION_COUNT.fetch_add(1, Ordering::SeqCst);
-    if count % 100 == 0 {
-        dbg!(count);
-    }
     Ok(conn)
 }
 
@@ -218,15 +212,15 @@ impl Conn {
 
     pub fn inner(&mut self) -> SwanSong<MutexGuard<Connection>> {
         let kind = self.kind.clone();
-        dbg!("lock inner", &kind);
-        SwanSong::new(
-            self.inner
-                .try_lock_for(std::time::Duration::from_secs(30))
-                .expect(&format!("Couldn't unlock connection. Kind: {:?}", kind)),
-            |_| {
-                dbg!("lock drop", kind);
-            },
-        )
+        tracing::trace!("lock attempt {}", &kind);
+        let guard = self
+            .inner
+            .try_lock_for(std::time::Duration::from_secs(30))
+            .expect(&format!("Couldn't unlock connection. Kind: {}", &kind));
+        tracing::trace!("lock success {}", &kind);
+        SwanSong::new(guard, move |_| {
+            tracing::trace!("lock drop {}", &kind);
+        })
     }
 
     #[cfg(feature = "test_utils")]
@@ -259,16 +253,6 @@ impl Conn {
     }
 }
 
-// TODO: rewrite fresh_reader! to pass mutable reference, not owned reader,
-// so that this will be possible
-//
-// impl<'e> Drop for Conn<'e> {
-//     fn drop(&mut self) {
-//         GLOBAL_CONNECTION_COUNT.fetch_sub(1, Ordering::SeqCst);
-//         dbg!("drop");
-//     }
-// }
-
 /// Simulate getting an encryption key from Lair.
 fn get_encryption_key_shim() -> [u8; 32] {
     [
@@ -283,7 +267,7 @@ pub struct ConnInner;
 impl ConnInner {}
 
 /// The various types of LMDB environment, used to specify the list of databases to initialize
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_more::Display)]
 pub enum DbKind {
     /// Specifies the environment used by each Cell
     Cell(CellId),

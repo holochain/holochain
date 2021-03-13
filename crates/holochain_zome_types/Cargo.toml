@@ -27,9 +27,15 @@ fixt = { version = "^0.0.2-alpha.1", path = "../fixt", optional = true }
 strum = { version = "0.18.0", optional = true }
 rand = {version = "0.7", optional = true}
 
+# tinyid dependencies
+byteorder = { version = "1.4", optional = true }
+itertools = { version = "0.10", optional = true }
+
 [features]
-default = ["fixturators", "test_utils"]
+default = ["fixturators", "test_utils", "tinyid"]
 
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
 
 test_utils = ["holo_hash/hashing"]
+
+tinyid = ["byteorder", "itertools"]
