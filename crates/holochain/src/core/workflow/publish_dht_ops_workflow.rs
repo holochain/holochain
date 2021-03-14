@@ -57,14 +57,24 @@ pub async fn publish_dht_ops_workflow(
 ) -> WorkflowResult<WorkComplete> {
     let to_publish = publish_dht_ops_workflow_inner(&mut workspace).await?;
 
+    // commit the workspace
+    //
+    // FIXME: the local commit should happen only AFTER successfully publishing.
+    //        I moved this because when switching from LMDB to SQLite, in the
+    //        case of self-publishing, the transaction held here would block
+    //        the attempt to get a transaction for the integration workflow
+    //        (part of handling the self-publish)
+    //
+    //        so, TODO: make publishing come before this, after self-publishing
+    //        is abolished [ B-04053 ]
+    tracing::warn!("Committing local state before publishing to network! TODO: circle back ");
+    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
+
     // Commit to the network
     for (basis, ops) in to_publish {
         network.publish(true, basis, ops, None).await?;
     }
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
-
-    // commit the workspace
-    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     Ok(WorkComplete::Complete)
 }
