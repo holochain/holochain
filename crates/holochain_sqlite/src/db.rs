@@ -99,7 +99,7 @@ impl DbWrite {
         keystore: KeystoreSender,
     ) -> DatabaseResult<DbWrite> {
         if !path_prefix.is_dir() {
-            std::fs::create_dir(path_prefix.clone())
+            std::fs::create_dir(path_prefix)
                 .map_err(|_e| DatabaseError::EnvironmentMissing(path_prefix.to_owned()))?;
         }
         let path = path_prefix.join(kind.filename());
@@ -220,7 +220,7 @@ impl<'e> WriteManager<'e> for SConn {
     {
         let mut b = self.inner();
         let txn = b.transaction().map_err(DatabaseError::from)?;
-        let mut writer = Writer::from(txn);
+        let mut writer = txn;
         let result = f(&mut writer)?;
         writer.commit().map_err(DatabaseError::from)?;
         Ok(result)
@@ -254,7 +254,7 @@ impl<'e> WriteManager<'e> for PConn {
         F: 'e + FnOnce(&mut Writer) -> Result<R, E>,
     {
         let txn = self.transaction().map_err(DatabaseError::from)?;
-        let mut writer = Writer::from(txn);
+        let mut writer = txn;
         let result = f(&mut writer)?;
         writer.commit().map_err(DatabaseError::from)?;
         Ok(result)

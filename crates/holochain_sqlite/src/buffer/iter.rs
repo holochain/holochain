@@ -11,7 +11,7 @@ type IterItem<V> = (Vec<u8>, V);
 type IterItemRef<'a, V> = (&'a [u8], V);
 type IterError = DatabaseError;
 
-fn item_owned<'a, V>(item_ref: IterItemRef<'a, V>) -> IterItem<V> {
+fn item_owned<V>(item_ref: IterItemRef<V>) -> IterItem<V> {
     (item_ref.0.to_owned(), item_ref.1)
 }
 
@@ -352,7 +352,7 @@ where
             // TODO: Should this panic aswell?
             Some(Ok(_)) => Err(DatabaseError::InvalidValue),
             // This could be a IO error so returning it makes sense
-            Some(Err(e)) => Err(DatabaseError::from(e)),
+            Some(Err(e)) => Err(e),
         }
     }
 }

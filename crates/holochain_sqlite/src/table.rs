@@ -114,19 +114,11 @@ pub enum TableKind {
 
 impl TableKind {
     pub fn is_single(&self) -> bool {
-        if let Self::Single = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Self::Single)
     }
 
     pub fn is_multi(&self) -> bool {
-        if let Self::Multi = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Self::Multi)
     }
 }
 

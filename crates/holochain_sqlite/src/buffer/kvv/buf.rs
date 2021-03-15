@@ -116,7 +116,7 @@ where
             .clone()
             .into_iter()
             .filter(|(_v, op)| *op == KvvOp::Insert)
-            .map(|(v, _op)| Ok(v.clone()));
+            .map(|(v, _op)| Ok(v));
 
         let iter = if delete_all {
             // If delete_all is set, return only scratch content,

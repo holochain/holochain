@@ -49,12 +49,11 @@ pub(crate) fn new_connection_pool(path: &Path, kind: DbKind) -> ConnectionPool {
     use r2d2_sqlite::SqliteConnectionManager;
     let manager = SqliteConnectionManager::file(path);
     let customizer = Box::new(ConnCustomizer { kind });
-    let pool = r2d2::Pool::builder()
+    r2d2::Pool::builder()
         .max_size(20)
         .connection_customizer(customizer)
         .build(manager)
-        .unwrap();
-    pool
+        .unwrap()
 }
 
 #[derive(Debug)]
@@ -138,7 +137,7 @@ impl SConn {
         let guard = self
             .inner
             .try_lock_for(std::time::Duration::from_secs(30))
-            .expect(&format!("Couldn't unlock connection. Kind: {}", &kind));
+            .unwrap_or_else(|| panic!(format!("Couldn't unlock connection. Kind: {}", &kind)));
         tracing::trace!("lock success {}", &kind);
         SwanSong::new(guard, move |_| {
             tracing::trace!("lock drop {}", &kind);
