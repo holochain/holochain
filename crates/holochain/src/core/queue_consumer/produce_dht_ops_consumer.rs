@@ -1,9 +1,9 @@
 //! The workflow and queue consumer for DhtOp production
 
 use super::*;
-use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::produce_dht_ops_workflow::produce_dht_ops_workflow;
 use crate::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
+use crate::{conductor::manager::ManagedTaskResult, core::workflow::error::WorkflowResult};
 use holochain_sqlite::db::DbWrite;
 
 use tokio::task::JoinHandle;
@@ -26,18 +26,31 @@ pub fn spawn_produce_dht_ops_consumer(
                 );
                 break;
             }
-
-            let workspace = ProduceDhtOpsWorkspace::new(env.clone().into())
-                .expect("Could not create Workspace");
-            if let WorkComplete::Incomplete =
-                produce_dht_ops_workflow(workspace, env.clone().into(), &mut trigger_publish)
+            if let Err(err) =
+                produce_dht_ops_consumer_loop(env.clone(), &mut trigger_self, &mut trigger_publish)
                     .await
-                    .expect("Error running Workflow")
             {
-                trigger_self.trigger()
-            };
+                tracing::error!(
+                    "Error in produce_dht_ops_consumer_loop, restarting loop: {:?}",
+                    err
+                )
+            }
         }
         Ok(())
     });
     (tx, handle)
+}
+
+async fn produce_dht_ops_consumer_loop(
+    env: DbWrite,
+    trigger_self: &mut TriggerSender,
+    trigger_publish: &mut TriggerSender,
+) -> WorkflowResult<()> {
+    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into())?;
+    if let WorkComplete::Incomplete =
+        produce_dht_ops_workflow(workspace, env.clone().into(), trigger_publish).await?
+    {
+        trigger_self.trigger()
+    };
+    Ok(())
 }

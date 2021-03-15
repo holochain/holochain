@@ -181,12 +181,12 @@ impl SConn {
 pub struct PConn {
     #[shrinkwrap(main_field)]
     inner: PConnInner,
-    kind: DbKind,
+    _kind: DbKind,
 }
 
 impl PConn {
-    pub(crate) fn new(inner: PConnInner, kind: DbKind) -> Self {
-        Self { inner, kind }
+    pub(crate) fn new(inner: PConnInner, _kind: DbKind) -> Self {
+        Self { inner, _kind }
     }
 
     #[cfg(feature = "test_utils")]

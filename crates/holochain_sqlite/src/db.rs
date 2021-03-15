@@ -9,12 +9,9 @@ use holochain_keystore::KeystoreSender;
 use holochain_zome_types::cell::CellId;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
+use std::collections::hash_map::Entry;
 use std::path::Path;
 use std::path::PathBuf;
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    sync::Arc,
-};
 
 /// A read-only version of [DbWrite].
 /// This environment can only generate read-only transactions, never read-write.
@@ -52,12 +49,12 @@ impl DbRead {
     }
 
     #[deprecated = "TODO: use `connection`"]
-    fn connection_naive(&self) -> DatabaseResult<SConn> {
+    fn _connection_naive(&self) -> DatabaseResult<SConn> {
         Ok(SConn::open(&self.path, &self.kind)?)
     }
 
     #[deprecated = "TODO: use `connection`"]
-    fn connection_singleton(&self) -> DatabaseResult<SConn> {
+    fn _connection_singleton(&self) -> DatabaseResult<SConn> {
         let mut map = CONNECTIONS.write();
         let conn = match map.entry(self.path.to_owned()) {
             Entry::Vacant(e) => {

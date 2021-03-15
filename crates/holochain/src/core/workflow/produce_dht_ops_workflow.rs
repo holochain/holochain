@@ -21,7 +21,6 @@ pub async fn produce_dht_ops_workflow(
     trigger_publish: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let complete = produce_dht_ops_workflow_inner(&mut workspace).await?;
-
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
