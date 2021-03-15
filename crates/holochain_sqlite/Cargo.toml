@@ -48,7 +48,6 @@ rusqlite = { version = "0.24.1", features = [
   "functions",   # rust scalar / agg / window functions
   "hooks",       # sqlite notification callbacks
   "serde_json",  # integration with serde_json crate
-  "sqlcipher",   # enable at-rest encryption
   "url",         # integration with url crate
   "uuid",        # integration with uuid crate
 ] }
@@ -58,4 +57,8 @@ observability = { version = "0.1.3" }
 
 [features]
 default = [ "test_utils" ]
+
 test_utils = [ ]
+
+# Use at-rest encryption of databases
+db-encryption = ["rusqlite/sqlcipher"]

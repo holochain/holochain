@@ -69,14 +69,6 @@ impl r2d2::CustomizeConnection<Connection, rusqlite::Error> for ConnCustomizer {
     }
 }
 
-/// Simulate getting an encryption key from Lair.
-fn get_encryption_key_shim() -> [u8; 32] {
-    [
-        26, 111, 7, 31, 52, 204, 156, 103, 203, 171, 156, 89, 98, 51, 158, 143, 57, 134, 93, 56,
-        199, 225, 53, 141, 39, 77, 145, 130, 136, 108, 96, 201,
-    ]
-}
-
 #[deprecated = "Shim for `Rkv`, just because we have methods that call these"]
 pub struct ConnInner;
 
@@ -89,6 +81,15 @@ pub struct SConn {
     kind: DbKind,
 }
 
+#[cfg(feature = "db-encryption")]
+/// Simulate getting an encryption key from Lair.
+fn get_encryption_key_shim() -> [u8; 32] {
+    [
+        26, 111, 7, 31, 52, 204, 156, 103, 203, 171, 156, 89, 98, 51, 158, 143, 57, 134, 93, 56,
+        199, 225, 53, 141, 39, 77, 145, 130, 136, 108, 96, 201,
+    ]
+}
+
 fn initialize_connection(
     conn: &mut Connection,
     _kind: &DbKind,
@@ -97,18 +98,19 @@ fn initialize_connection(
     // tell SQLite to wait this long during write contention
     conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
 
-    let key = get_encryption_key_shim();
-    let mut cmd =
-        *br#"PRAGMA key = "x'0000000000000000000000000000000000000000000000000000000000000000'";"#;
+    #[cfg(feature = "db-encryption")]
     {
         use std::io::Write;
+        let key = get_encryption_key_shim();
+        let mut cmd =
+            *br#"PRAGMA key = "x'0000000000000000000000000000000000000000000000000000000000000000'";"#;
         let mut c = std::io::Cursor::new(&mut cmd[16..80]);
         for b in &key {
             write!(c, "{:02X}", b)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
         }
+        conn.execute(std::str::from_utf8(&cmd).unwrap(), NO_PARAMS)?;
     }
-    conn.execute(std::str::from_utf8(&cmd).unwrap(), NO_PARAMS)?;
 
     // set to faster write-ahead-log mode
     conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;

@@ -17,9 +17,14 @@ impl AsRef<[u8]> for BytesKey {
     }
 }
 
-impl rusqlite::ToSql for BytesKey {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-        Ok(rusqlite::types::ToSqlOutput::Borrowed(self.as_ref().into()))
+impl holochain_sqlite::rusqlite::ToSql for BytesKey {
+    fn to_sql(
+        &self,
+    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput<'_>>
+    {
+        Ok(holochain_sqlite::rusqlite::types::ToSqlOutput::Borrowed(
+            self.as_ref().into(),
+        ))
     }
 }
 
