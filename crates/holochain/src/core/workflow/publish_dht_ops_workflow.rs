@@ -53,7 +53,7 @@ pub struct PublishDhtOpsWorkspace {
 pub async fn publish_dht_ops_workflow(
     mut workspace: PublishDhtOpsWorkspace,
     writer: OneshotWriter,
-    network: &mut HolochainP2pCell,
+    mut network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
     let to_publish = publish_dht_ops_workflow_inner(&mut workspace).await?;
 
@@ -324,9 +324,9 @@ mod tests {
     }
 
     /// Call the workflow
-    async fn call_workflow(env: DbWrite, mut cell_network: HolochainP2pCell) {
+    async fn call_workflow(env: DbWrite, cell_network: HolochainP2pCell) {
         let workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
-        publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)
+        publish_dht_ops_workflow(workspace, env.clone().into(), cell_network)
             .await
             .unwrap();
     }
@@ -503,8 +503,8 @@ mod tests {
                 }
                 {
                     let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
-                    let (mut qt, _rx) = TriggerSender::new();
-                    let complete = produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
+                    let (qt, _rx) = TriggerSender::new();
+                    let complete = produce_dht_ops_workflow(workspace, env.clone().into(), qt)
                         .await
                         .unwrap();
                     assert_matches!(complete, WorkComplete::Complete);
@@ -642,8 +642,8 @@ mod tests {
                 // Create and fill authored ops db in the workspace
                 {
                     let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
-                    let (mut qt, _rx) = TriggerSender::new();
-                    let complete = produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
+                    let (qt, _rx) = TriggerSender::new();
+                    let complete = produce_dht_ops_workflow(workspace, env.clone().into(), qt)
                         .await
                         .unwrap();
                     assert_matches!(complete, WorkComplete::Complete);

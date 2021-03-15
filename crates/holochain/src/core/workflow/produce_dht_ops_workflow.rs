@@ -18,7 +18,7 @@ pub mod dht_op_light;
 pub async fn produce_dht_ops_workflow(
     mut workspace: ProduceDhtOpsWorkspace,
     writer: OneshotWriter,
-    trigger_publish: &mut TriggerSender,
+    mut trigger_publish: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let complete = produce_dht_ops_workflow_inner(&mut workspace).await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---

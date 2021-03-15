@@ -529,8 +529,8 @@ impl Db {
 
 async fn call_workflow<'env>(env: DbWrite) {
     let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
-    let (mut qt, _rx) = TriggerSender::new();
-    integrate_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
+    let (qt, _rx) = TriggerSender::new();
+    integrate_dht_ops_workflow(workspace, env.clone().into(), qt)
         .await
         .unwrap();
 }
@@ -836,9 +836,9 @@ async fn test_ops_state() {
 
 /// Call the produce dht ops workflow
 async fn produce_dht_ops<'env>(env: DbWrite) {
-    let (mut qt, _rx) = TriggerSender::new();
+    let (qt, _rx) = TriggerSender::new();
     let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
-    produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
+    produce_dht_ops_workflow(workspace, env.clone().into(), qt)
         .await
         .unwrap();
 }

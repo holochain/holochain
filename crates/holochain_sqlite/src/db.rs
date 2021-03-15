@@ -5,6 +5,7 @@ use crate::{
     prelude::*,
 };
 use derive_more::Into;
+use futures::Future;
 use holochain_keystore::KeystoreSender;
 use holochain_zome_types::cell::CellId;
 use rusqlite::*;
@@ -257,5 +258,39 @@ impl<'e> WriteManager<'e> for PConn {
         let result = f(&mut writer)?;
         writer.commit().map_err(DatabaseError::from)?;
         Ok(result)
+    }
+}
+
+#[derive(Debug)]
+pub struct OptimisticRetryError<E: std::error::Error>(Vec<E>);
+
+pub async fn optimistic_retry_async<Func, Fut, T, E>(
+    ctx: &str,
+    mut f: Func,
+) -> Result<T, OptimisticRetryError<E>>
+where
+    Func: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, E>>,
+    E: std::error::Error,
+{
+    const NUM_CONSECUTIVE_FAILURES: usize = 10;
+    let mut errors = Vec::new();
+    loop {
+        match f().await {
+            Ok(x) => return Ok(x),
+            Err(err) => {
+                tracing::error!(
+                    "Error during optimistic_retry. Failures: {}/{}. Context: {}. Error: {:?}",
+                    errors.len() + 1,
+                    NUM_CONSECUTIVE_FAILURES,
+                    ctx,
+                    err
+                );
+                errors.push(err);
+                if errors.len() >= NUM_CONSECUTIVE_FAILURES {
+                    return Err(OptimisticRetryError(errors));
+                }
+            }
+        }
     }
 }

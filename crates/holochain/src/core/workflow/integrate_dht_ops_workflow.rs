@@ -45,7 +45,7 @@ mod tests;
 pub async fn integrate_dht_ops_workflow(
     mut workspace: IntegrateDhtOpsWorkspace,
     writer: OneshotWriter,
-    trigger_sys: &mut TriggerSender,
+    mut trigger_sys: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // one of many possible ways to access the env
     let env = workspace.elements.headers().env().clone();

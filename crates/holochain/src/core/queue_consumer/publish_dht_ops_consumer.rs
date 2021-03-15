@@ -2,9 +2,9 @@
 
 use super::*;
 
-use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
 use crate::core::workflow::publish_dht_ops_workflow::PublishDhtOpsWorkspace;
+use crate::{conductor::manager::ManagedTaskResult, core::workflow::error::WorkflowResult};
 use holochain_sqlite::db::DbWrite;
 
 use tokio::task::JoinHandle;
@@ -15,10 +15,10 @@ use tracing::*;
 pub fn spawn_publish_dht_ops_consumer(
     env: DbWrite,
     mut stop: sync::broadcast::Receiver<()>,
-    mut cell_network: HolochainP2pCell,
+    cell_network: HolochainP2pCell,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
-    let mut trigger_self = tx.clone();
+    let trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
         loop {
             // Wait for next job
@@ -29,16 +29,19 @@ pub fn spawn_publish_dht_ops_consumer(
                 break;
             }
 
-            // Run the workflow
-            let workspace = PublishDhtOpsWorkspace::new(env.clone().into())
-                .expect("Could not create Workspace");
-            if let WorkComplete::Incomplete =
-                publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)
-                    .await
-                    .expect("Error running Workflow")
-            {
-                trigger_self.trigger()
-            };
+            holochain_sqlite::db::optimistic_retry_async("produce_dht_ops_consumer", || async {
+                // Run the workflow
+                let workspace = PublishDhtOpsWorkspace::new(env.clone().into())?;
+                if let WorkComplete::Incomplete =
+                    publish_dht_ops_workflow(workspace, env.clone().into(), cell_network.clone())
+                        .await?
+                {
+                    trigger_self.clone().trigger()
+                };
+                WorkflowResult::Ok(())
+            })
+            .await
+            .expect("Too many consecutive errors. Shutting down loop. TODO: make Holochain crash");
         }
         Ok(())
     });

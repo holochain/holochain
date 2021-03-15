@@ -54,7 +54,7 @@ mod tests;
 pub async fn sys_validation_workflow(
     mut workspace: SysValidationWorkspace,
     writer: OneshotWriter,
-    trigger_app_validation: &mut TriggerSender,
+    mut trigger_app_validation: TriggerSender,
     sys_validation_trigger: TriggerSender,
     network: HolochainP2pCell,
     conductor_api: impl CellConductorApiT,

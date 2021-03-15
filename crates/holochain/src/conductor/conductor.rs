@@ -505,7 +505,6 @@ where
                                 conductor_handle.clone(),
                             )
                         });
-                    dbg!(app.all_cells().count());
 
                     use holochain_p2p::actor::HolochainP2pRefToCell;
 
@@ -527,7 +526,6 @@ where
                                 self.managed_task_stop_broadcaster.clone(),
                             )
                             .await;
-                            dbg!("CREATE CELL TASK");
                             cell
                         },
                     );

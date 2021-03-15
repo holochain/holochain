@@ -1,9 +1,9 @@
 //! The workflow and queue consumer for sys validation
 
 use super::*;
-use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::app_validation_workflow::app_validation_workflow;
 use crate::core::workflow::app_validation_workflow::AppValidationWorkspace;
+use crate::{conductor::manager::ManagedTaskResult, core::workflow::error::WorkflowResult};
 use holochain_sqlite::db::DbWrite;
 
 use tokio::task::JoinHandle;
@@ -14,12 +14,12 @@ use tracing::*;
 pub fn spawn_app_validation_consumer(
     env: DbWrite,
     mut stop: sync::broadcast::Receiver<()>,
-    mut trigger_integration: TriggerSender,
+    trigger_integration: TriggerSender,
     conductor_api: impl CellConductorApiT + 'static,
     network: HolochainP2pCell,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
-    let mut trigger_self = tx.clone();
+    let trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
         loop {
             // Wait for next job
@@ -30,21 +30,24 @@ pub fn spawn_app_validation_consumer(
                 break;
             }
 
-            // Run the workflow
-            let workspace = AppValidationWorkspace::new(env.clone().into())
-                .expect("Could not create Workspace");
-            if let WorkComplete::Incomplete = app_validation_workflow(
-                workspace,
-                env.clone().into(),
-                &mut trigger_integration,
-                conductor_api.clone(),
-                network.clone(),
-            )
+            holochain_sqlite::db::optimistic_retry_async("produce_dht_ops_consumer", || async {
+                // Run the workflow
+                let workspace = AppValidationWorkspace::new(env.clone().into())?;
+                if let WorkComplete::Incomplete = app_validation_workflow(
+                    workspace,
+                    env.clone().into(),
+                    trigger_integration.clone(),
+                    conductor_api.clone(),
+                    network.clone(),
+                )
+                .await?
+                {
+                    trigger_self.clone().trigger()
+                };
+                WorkflowResult::Ok(())
+            })
             .await
-            .expect("Error running Workflow")
-            {
-                trigger_self.trigger()
-            };
+            .expect("Too many consecutive errors. Shutting down loop. TODO: make Holochain crash");
         }
         Ok(())
     });

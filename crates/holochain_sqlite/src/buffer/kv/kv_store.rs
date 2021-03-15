@@ -4,7 +4,6 @@ use crate::buffer::iter::SingleIterRaw;
 use crate::error::DatabaseError;
 use crate::error::DatabaseResult;
 use crate::prelude::*;
-use SingleTable;
 
 /// Wrapper around an rkv SingleTable which provides strongly typed values
 pub struct KvStore<K, V>

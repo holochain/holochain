@@ -4,7 +4,7 @@
 pub struct SwanSong<'a, T> {
     #[shrinkwrap(main_field)]
     inner: T,
-    song: Option<Box<dyn FnOnce(&mut T) -> () + 'a>>,
+    song: Option<Box<dyn FnOnce(&mut T) + 'a>>,
 }
 
 impl<'a, T> Drop for SwanSong<'a, T> {
@@ -14,7 +14,7 @@ impl<'a, T> Drop for SwanSong<'a, T> {
 }
 
 impl<'a, T> SwanSong<'a, T> {
-    pub fn new<F: FnOnce(&mut T) -> () + 'a>(inner: T, song: F) -> Self {
+    pub fn new<F: FnOnce(&mut T) + 'a>(inner: T, song: F) -> Self {
         Self {
             inner,
             song: Some(Box::new(song)),
