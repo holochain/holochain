@@ -107,6 +107,29 @@ impl<E: 'static + Send> LogicChanHandle<E> {
 /// Fill the LogicChan with async logic.
 /// Report events to the handle in the async logic.
 /// Treat the LogicChan as a stream, collecting the events.
+///
+/// # Example
+///
+/// ```
+/// # #[tokio::main(flavor = "multi_thread")]
+/// # async fn main() {
+/// # use kitsune_p2p_types::tx2::tx2_utils::*;
+/// # use futures::stream::StreamExt;
+/// let chan = <LogicChan<&'static str>>::new(32);
+/// let hnd = chan.handle().clone();
+/// hnd.clone().capture_logic(async move {
+///     hnd.emit("apple").await.unwrap();
+///     hnd.emit("banana").await.unwrap();
+///     hnd.close();
+/// }).await.unwrap();
+///
+/// let res = chan.collect::<Vec<_>>().await;
+/// assert_eq!(
+///     &["apple", "banana"][..],
+///     res.as_slice(),
+/// );
+/// # }
+/// ```
 pub struct LogicChan<E: 'static + Send> {
     recv: LTypeRecv<E>,
     hnd: LogicChanHandle<E>,
@@ -197,6 +220,25 @@ impl<E: 'static + Send> futures::stream::Stream for LogicChan<E> {
 mod tests {
     use super::*;
     use std::sync::atomic;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn doc_example() {
+        use futures::stream::StreamExt;
+
+        let chan = <LogicChan<&'static str>>::new(32);
+        let hnd = chan.handle().clone();
+        hnd.clone()
+            .capture_logic(async move {
+                hnd.emit("apple").await.unwrap();
+                hnd.emit("banana").await.unwrap();
+                hnd.close();
+            })
+            .await
+            .unwrap();
+
+        let res = chan.collect::<Vec<_>>().await;
+        assert_eq!(&["apple", "banana"][..], res.as_slice(),);
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_util_logic_chan() {
