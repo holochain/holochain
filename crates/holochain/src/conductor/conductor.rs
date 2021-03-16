@@ -652,8 +652,8 @@ where
     }
 
     /// Add fully constructed cells to the cell map in the Conductor
-    pub(super) fn add_cells(&mut self, cells: Vec<(Cell, InitialQueueTriggers)>) {
-        for (cell, trigger) in cells {
+    pub(super) fn add_cells(&mut self, cells: Vec<Cell>) {
+        for cell in cells {
             let cell_id = cell.id().clone();
             tracing::info!(?cell_id, "ADD CELL");
             self.cells.insert(
@@ -663,8 +663,6 @@ where
                     _state: CellState { _active: false },
                 },
             );
-
-            trigger.initialize_workflows();
         }
     }
 
