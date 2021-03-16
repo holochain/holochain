@@ -92,8 +92,8 @@ async fn speed_test_normal() {
     speed_test(None).await;
 }
 
-/// Run this test to execute the speed test, but then keep the LMDB env files
-/// around in temp dirs for inspection by e.g. `mdb_stat`
+/// Run this test to execute the speed test, but then keep the database files
+/// around in temp dirs for inspection
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_persisted() {

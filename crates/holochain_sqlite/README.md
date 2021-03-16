@@ -11,15 +11,19 @@ Current version: 0.0.1
 
 ## Building blocks for persisted Holochain state
 
-### Backend: LMDB
+### History
 
-Persistence is not generalized for different backends: it is targeted specifically for LMDB. In the future, if we have to change backends, or if we have to support something like IndexedDb, we will generalize the interface just enough to cover both. The interface provided by `rkv` is already somewhat generalized, with the abstract notions of Readers, Writers, and Stores.
+Originally, this crate was written to target LMDB. After it had already stabilized, we completely refactored it to naively use SQLite as a key-value store, instead. This is in preparation for using more intelligently and fully, using carefully chosen indexes and queries. However, for now, the structure of this crate can only be understood in the context of this major recent refactor.
+
+### Backend: SQLite
+
+Persistence is not generalized for different backends: it is targeted specifically for SQLite. In the future, if we have to change backends (again), or if we have to support something like IndexedDb, we will generalize the interface just enough to cover both.
 
 ### Buffered Stores
 
 The unit of persisted Holochain state is the [BufferedStore]. This interface groups three things together:
 
-- A reference to an LMDB database
+- A reference to a SQLite database
 - A reference to a read-only transaction (shared by other stores)
 - A "scratch space", which is a HashMap into which write operations get staged (the buffer)
 
@@ -43,18 +47,12 @@ Workspaces themselves are implemented in the `holochain` crate
 
 ### Building blocks
 
-The rkv crate provides a few abstractions for working with LMDB stores. The ones we use are:
+The `holochain_sqlite` crate provides three buffered KV store abstractions as well as a simple CAS abstraction:
 
-- SingleTable: a key-value store with arbitrary key and one value per key
-- IntegerTable: a key-value store with integer key and one value per key
-- MultiTable: a key-value store with arbitrary key and multiple values per key
-
-On top of these abstractions, the `holochain_sqlite` crate provides three buffered store abstractions to wrap each of the rkv store types, as well as a simple CAS abstraction:
-
-- [KvBuffer]: a SingleTable with a scratch space
-- [KvIntBuffer]: an IntegerTable with a scratch space
-- [KvvBuffer]: a MultiTable with a scratch space
-- [CasBuffer]: a [KvBuffer] which enforces that keys must be the "address" of the values (content)
+- [KvBuf]: a normal KV store
+- [KvIntBuf]: a KV store where keys must be integers (this was significant when using LMDB, but not any more)
+- [KvvBuf]: a KV store with multiple values per key, with per-key iteration
+- [CasBuf]: a [KvBuf] which enforces that keys must be the "address" of the values (content)
 
 The `holochain` crate composes these building blocks together to build more purpose-specific BufferedStore implementations
 

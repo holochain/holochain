@@ -213,7 +213,7 @@ pub fn get_single_agent_info(
     })
 }
 
-/// Interconnect every provided pair of conductors via their peer store lmdb environments
+/// Interconnect every provided pair of conductors via their peer store databases
 #[cfg(any(test, feature = "test_utils"))]
 pub fn exchange_peer_info(envs: Vec<DbWrite>) {
     for (i, a) in envs.iter().enumerate() {

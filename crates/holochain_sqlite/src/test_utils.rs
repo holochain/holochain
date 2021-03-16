@@ -61,7 +61,7 @@ fn test_env(kind: DbKind) -> TestDb {
     let tmpdir = Arc::new(TempDir::new("holochain-test-environments").unwrap());
     TestDb {
         env: DbWrite::new(tmpdir.path(), kind, test_keystore())
-            .expect("Couldn't create test LMDB environment"),
+            .expect("Couldn't create test database"),
         tmpdir,
     }
 }
@@ -72,11 +72,11 @@ pub fn test_environments() -> TestDbs {
     TestDbs::new(tempdir)
 }
 
-/// A test lmdb environment with test directory
+/// A test database in a temp directory
 #[derive(Clone, Shrinkwrap)]
 pub struct TestDb {
     #[shrinkwrap(main_field)]
-    /// lmdb environment
+    /// sqlite database
     env: DbWrite,
     /// temp directory for this environment
     tmpdir: Arc<TempDir>,

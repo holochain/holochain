@@ -109,13 +109,13 @@ where
     /// The collection of cells associated with this Conductor
     cells: HashMap<CellId, CellItem<CA>>,
 
-    /// The LMDB environment for persisting state related to this Conductor
+    /// The database for persisting state related to this Conductor
     env: DbWrite,
 
-    /// An LMDB environment for storing wasm
+    /// A database for storing wasm
     wasm_env: DbWrite,
 
-    /// The LMDB environment for storing AgentInfoSigned
+    /// The database for storing AgentInfoSigned
     p2p_env: DbWrite,
 
     /// The database for persisting [ConductorState]

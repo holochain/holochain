@@ -89,7 +89,7 @@ where
         } else {
             // Only do the persisted call if it's not in the scratch
             trace!(?k);
-            let persisted = Self::check_not_found(self.get_persisted(r, k.borrow()))?;
+            let persisted = self.get_persisted(r, k.borrow())?;
 
             return Ok(persisted.collect::<Vec<_>>().into_iter());
         };
@@ -106,7 +106,7 @@ where
             // skipping persisted content (as it will all be deleted)
             Either::Left(from_scratch_space)
         } else {
-            let persisted = Self::check_not_found(self.get_persisted(r, k.borrow()))?;
+            let persisted = self.get_persisted(r, k.borrow())?;
             Either::Right(
                 from_scratch_space
                     // Otherwise, chain it with the persisted content,
@@ -170,25 +170,6 @@ where
         }))
     }
 
-    fn check_not_found(
-        persisted: DatabaseResult<impl Iterator<Item = DatabaseResult<V>>>,
-    ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>>> {
-        let empty = std::iter::empty::<DatabaseResult<V>>();
-        trace!("{:?}", line!());
-
-        match persisted {
-            Ok(persisted) => {
-                trace!("{:?}", line!());
-                Ok(Either::Left(persisted))
-            }
-            Err(err) => {
-                trace!("{:?}", line!());
-                err.ok_if_not_found()?;
-                Ok(Either::Right(empty))
-            }
-        }
-    }
-
     // TODO: This should be cfg test but can't because it's in a different crate
     /// Clear all scratch and table, useful for tests
     pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
@@ -236,9 +217,7 @@ where
                     Delete => {
                         let buf = holochain_serialized_bytes::encode(&v)?;
                         let encoded = rusqlite::types::Value::Blob(buf);
-                        self.table
-                            .delete_kv(writer, &k, &encoded)
-                            .or_else(DatabaseError::ok_if_not_found)?;
+                        self.table.delete_kv(writer, &k, &encoded)?;
                     }
                 }
             }

@@ -703,8 +703,8 @@ async fn check_cascade(
 ///
 /// This may not turn out to be a real issue, but this illustrates a way to reproduce this behavior,
 /// and may be something we want to investigate more in the future.
-async fn slow_lmdb_reads_test() {
-    let num_commits = std::env::var_os("SLOW_LMDB_COMMITS")
+async fn slow_db_reads_test() {
+    let num_commits = std::env::var_os("SLOW_DB_COMMITS")
         .and_then(|s| s.into_string().ok()?.parse::<usize>().ok())
         .unwrap_or(10);
     observability::test_run().ok();

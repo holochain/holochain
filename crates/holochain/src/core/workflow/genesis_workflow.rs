@@ -205,7 +205,7 @@ Functions / Workflows:
 
 - retrieve DNA from file path [in the future from HCHC]
 
-- initialize lmdb environment and dbs, save to conductor runtime config.
+- initialize databases, save to conductor runtime config.
 
 - commit DNA entry (w/ special enum header with NULL  prev_header)
 

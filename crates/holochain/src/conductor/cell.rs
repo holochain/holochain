@@ -743,7 +743,7 @@ impl Cell {
     }
 
     /// Delete all data associated with this Cell by deleting the associated
-    /// LMDB environment. Completely reverses Cell creation.
+    /// database. Completely reverses Cell creation.
     #[tracing::instrument(skip(self))]
     pub async fn destroy(self) -> CellResult<()> {
         let path = self.env.path().clone();
@@ -765,7 +765,7 @@ impl Cell {
         }
     }
 
-    /// Accessor for the LMDB environment backing this Cell
+    /// Accessor for the database backing this Cell
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) fn env(&self) -> &DbWrite {
         &self.env

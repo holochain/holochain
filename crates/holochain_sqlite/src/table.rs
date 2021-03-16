@@ -1,4 +1,4 @@
-//! Functionality for safely accessing LMDB database references.
+//! Functionality for safely accessing databases.
 
 use crate::prelude::*;
 use crate::{buffer::iter::SqlIter, error::DatabaseResult};

@@ -52,7 +52,7 @@ pub fn create<'a>(
 
     // return the hash of the committed entry
     // note that validation is handled by the workflow
-    // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
+    // if the validation fails this commit will be rolled back by virtue of the DB transaction
     // being atomic
     let entry = AsRef::<Entry>::as_ref(&input).to_owned();
     tokio_helper::block_forever_on(async move {

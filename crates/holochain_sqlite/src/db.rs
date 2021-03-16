@@ -1,4 +1,4 @@
-//! Functions dealing with obtaining and referencing singleton LMDB environments
+//! Functions dealing with obtaining and referencing singleton databases
 
 use crate::{
     conn::{new_connection_pool, PConn, CONNECTION_POOLS},
@@ -64,7 +64,7 @@ impl DbRead {
 impl GetTable for DbRead {}
 impl GetTable for DbWrite {}
 
-/// The canonical representation of a (singleton) LMDB environment.
+/// The canonical representation of a (singleton) database.
 /// The wrapper contains methods for managing transactions
 /// and database connections,
 #[derive(Clone, Shrinkwrap, Into, derive_more::From)]
@@ -106,7 +106,7 @@ impl DbWrite {
     }
 }
 
-/// The various types of LMDB environment, used to specify the list of databases to initialize
+/// The various types of database, used to specify the list of databases to initialize
 #[derive(Clone, Debug, derive_more::Display)]
 pub enum DbKind {
     /// Specifies the environment used by each Cell
@@ -133,7 +133,7 @@ impl DbKind {
     }
 }
 
-/// Implementors are able to create a new read-only LMDB transaction
+/// Implementors are able to create a new read-only DB transaction
 pub trait ReadManager<'e> {
     /// Run a closure, passing in a new read-only transaction
     fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
@@ -148,11 +148,11 @@ pub trait ReadManager<'e> {
         F: 'e + FnOnce(Reader) -> R;
 }
 
-/// Implementors are able to create a new read-write LMDB transaction
+/// Implementors are able to create a new read-write DB transaction
 pub trait WriteManager<'e> {
     /// Run a closure, passing in a mutable reference to a read-write
     /// transaction, and commit the transaction after the closure has run.
-    /// If there is a LMDB error, recover from it and re-run the closure.
+    /// If there is a SQLite error, recover from it and re-run the closure.
     // FIXME: B-01566: implement write failure detection
     fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where

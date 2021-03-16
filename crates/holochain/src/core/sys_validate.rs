@@ -33,10 +33,10 @@ mod tests;
 /// Consider splitting large entries up.
 pub const MAX_ENTRY_SIZE: usize = 16_000_000;
 
-/// 400b limit on LinkTags.
+/// 1kb limit on LinkTags.
 /// Tags are used as keys to the database to allow
-/// fast lookup so they need to be small.
-pub const MAX_TAG_SIZE: usize = 400;
+/// fast lookup so they should be small.
+pub const MAX_TAG_SIZE: usize = 1000;
 
 /// Verify the signature for this header
 pub async fn verify_header_signature(

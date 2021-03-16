@@ -57,10 +57,11 @@ impl<T> BufVal for T where T: Clone + Serialize + DeserializeOwned + std::fmt::D
 pub trait BufMultiVal: Ord + Eq + Clone + Serialize + DeserializeOwned + Send + Sync {}
 impl<T> BufMultiVal for T where T: Ord + Eq + Clone + Serialize + DeserializeOwned + Send + Sync {}
 
-/// Used for keys into integer-keyed LMDB stores.
+/// Used for keys into integer-keyed databases.
 ///
 /// This strange type is constrained by both rkv's interface, and our own
-/// database abstractions
+/// database abstractions. (`rkv` was the LMDB abstraction we used, but no
+/// longer do, which makes this type all the stranger.)
 #[derive(Copy, PartialOrd, Ord, PartialEq, Eq, Clone, Serialize, serde::Deserialize)]
 pub struct IntKey([u8; 4]);
 

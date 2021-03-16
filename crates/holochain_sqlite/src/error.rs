@@ -1,4 +1,4 @@
-//! All possible errors when working with LMDB databases
+//! All possible errors when working with SQLite databases
 
 // missing_docs allowed here since the errors already have self-descriptive strings
 #![allow(missing_docs)]
@@ -13,16 +13,16 @@ pub enum DatabaseError {
     #[error("A store which was expected not to be empty turned out to be empty: {0}")]
     EmptyStore(TableName),
 
-    #[error("An LMDB store was not created/initialized: {0}, path: {1}")]
+    #[error("A database was not created/initialized: {0}, path: {1}")]
     StoreNotInitialized(TableName, PathBuf),
 
-    #[error("An LMDB environment's database map was initialized more than once: {0}")]
+    #[error("A database's database map was initialized more than once: {0}")]
     EnvironmentDoubleInitialized(PathBuf),
 
-    #[error("LMDB environment directory does not exist at configured path: {0}")]
+    #[error("database directory does not exist at configured path: {0}")]
     EnvironmentMissing(PathBuf),
 
-    #[error("There is an unexpected value in an LMDB database (TODO: more info)")]
+    #[error("There is an unexpected value in a database (TODO: more info)")]
     InvalidValue,
 
     #[error(
@@ -36,7 +36,7 @@ pub enum DatabaseError {
     #[error("Error decoding to MsgPack: {0}")]
     MsgPackDecodeError(#[from] rmp_serde::decode::Error),
 
-    #[error("SerializedBytes error when attempting to interact with LMDB: {0}")]
+    #[error("SerializedBytes error when attempting to interact with SQLite: {0}")]
     SerializedBytes(#[from] SerializedBytesError),
 
     #[error(transparent)]
@@ -54,7 +54,7 @@ pub enum DatabaseError {
     #[error(transparent)]
     KeystoreError(#[from] holochain_keystore::KeystoreError),
 
-    #[error("Empty keys cannot be used with lmdb")]
+    #[error("Empty keys cannot be used with SQLite")]
     EmptyKey,
 
     #[error("Key range must be not empty and start < end")]
@@ -67,19 +67,6 @@ pub enum DatabaseError {
 impl PartialEq for DatabaseError {
     fn eq(&self, other: &Self) -> bool {
         self.to_string() == other.to_string()
-    }
-}
-
-impl DatabaseError {
-    pub fn ok_if_not_found(self) -> DatabaseResult<()> {
-        todo!("implement for rusqlite errors")
-        // match self {
-        //     DatabaseError::LmdbStoreError(err) => match err.into_inner() {
-        //         rkv::TableError::LmdbError(rkv::LmdbError::NotFound) => Ok(()),
-        //         err => Err(err.into()),
-        //     },
-        //     err => Err(err),
-        // }
     }
 }
 

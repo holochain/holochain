@@ -86,7 +86,7 @@ impl SourceChain {
     /// Else the secret and assignees of a grant will be checked and may be returned.
     ///
     /// @todo this is not particularly fast, there are several ways to speed this up in the future
-    /// such as indexing secrets and prefixing cap grants in lmdb for direct lookup
+    /// such as indexing secrets and prefixing cap grants in the database for direct lookup
     ///
     /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
     /// proper capability index DB, OR a proper iterator that respects the

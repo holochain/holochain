@@ -357,7 +357,7 @@ where
     }
 }
 
-/// Iterate over key, value pairs in this store using low-level LMDB iterators
+/// Iterate over key, value pairs in this store using low-level iterators
 /// NOTE: While the value is deserialized to the proper type, the key is returned as raw bytes.
 /// This is to enable a wider range of keys, such as String, because there is no uniform trait which
 /// enables conversion from a byte slice to a given type.

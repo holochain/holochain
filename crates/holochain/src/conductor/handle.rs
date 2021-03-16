@@ -225,11 +225,11 @@ pub trait ConductorHandleT: Send + Sync {
     /// Print the current setup in a machine readable way.
     async fn print_setup(&self);
 
-    /// Retrieve the LMDB environment for this cell. FOR TESTING ONLY.
+    /// Retrieve the database for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<DbWrite>;
 
-    /// Retrieve the LMDB environment for networking. FOR TESTING ONLY.
+    /// Retrieve the database for networking. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_p2p_env(&self) -> DbWrite;
 
