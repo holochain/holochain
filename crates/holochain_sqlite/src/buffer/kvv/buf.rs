@@ -54,7 +54,6 @@ where
 {
     table: MultiTable,
     scratch: BTreeMap<K, ValuesDelta<V>>,
-    no_dup_data: bool,
 }
 
 impl<K, V> KvvBufUsed<K, V>
@@ -64,27 +63,11 @@ where
 {
     /// Create a new KvvBufUsed
     pub fn new(table: MultiTable) -> Self {
-        Self::new_opts(table, false)
-    }
-
-    /// Create a new KvvBufUsed
-    /// also allow switching to no_dup_data mode.
-    pub fn new_opts(table: MultiTable, no_dup_data: bool) -> Self {
         Self {
             table,
             scratch: BTreeMap::new(),
-            no_dup_data,
         }
     }
-
-    // /// Get a set of values, taking the scratch space into account,
-    // /// or from persistence if needed
-    // #[instrument(skip(self, r))]
-    // pub fn get<'r, R: Readable, KK: 'r + Debug + AsRef<K>>(
-    //     &'r self,
-    //     r: &'r mut R,
-    //     k: KK,
-    // ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>> + 'r> {
 
     /// Get a set of values, taking the scratch space into account,
     /// or from persistence if needed
@@ -244,16 +227,8 @@ where
                     Insert => {
                         let buf = holochain_serialized_bytes::encode(&v)?;
                         let encoded = rusqlite::types::Value::Blob(buf);
-                        if self.no_dup_data {
-                            self.table.put_with_flags(
-                                writer,
-                                &k,
-                                &encoded,
-                                (), //rkv::WriteFlags::NO_DUP_DATA,
-                            )?;
-                        } else {
-                            self.table.put(writer, &k, &encoded)?;
-                        }
+
+                        self.table.put(writer, &k, &encoded)?;
                     }
                     // Skip deleting unnecessarily if we have already deleted
                     // everything
@@ -283,7 +258,6 @@ where
         Self {
             table: other.table.clone(),
             scratch: other.scratch.clone(),
-            no_dup_data: other.no_dup_data,
         }
     }
 }

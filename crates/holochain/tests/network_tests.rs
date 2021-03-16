@@ -138,7 +138,7 @@ async fn get_meta_updates_meta_cache() {
     assert_eq!(returned.headers.len(), 1);
     assert_eq!(returned.headers.into_iter().next().unwrap(), expected.1);
     let result = {
-        let mut g = env.guard();
+        let mut g = env.conn();
 let mut reader = g.reader().unwrap();
 
         // Check the cache has been updated
@@ -606,7 +606,7 @@ async fn fake_authority(hash: AnyDhtHash, call_data: &HostFnCaller) {
 
     call_data
         .env
-        .guard()
+        .conn()
         .with_commit(|writer| {
             element_vault.flush_to_txn(writer)?;
             meta_vault.flush_to_txn(writer)

@@ -91,7 +91,8 @@ pub mod tests {
             workspace.two.put(addr2.clone(), true).unwrap();
             assert_eq!(workspace.one.get(&addr1)?, Some(1));
             assert_eq!(workspace.two.get(&addr2)?, Some(true));
-            arc.guard()
+            arc.conn()
+                .unwrap()
                 .with_commit(|mut writer| workspace.flush_to_txn(&mut writer))?;
         }
 

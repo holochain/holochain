@@ -6,7 +6,14 @@ use rusqlite::types::{ToSql, Value};
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
 
-#[deprecated = "no need for read/write distinction with SQLite"]
+/// Abstraction over readable transactions. This is a vestigal trait left over
+/// from the LMDB days, where we had strict read-only transactions. While we
+/// currently do have `Reader` and `Writer`, the read-only behavior is not
+/// strictly enforced, and is only true by virtue of the fact that we never
+/// perform write operations with a `Reader` transaction.
+///
+/// As we write more intricate queries this may change and we may do away with
+/// our attempt at keeping read-only transactions.
 pub trait Readable {
     fn get<K: ToSql>(&mut self, table: &Table, k: K) -> DatabaseResult<Option<Value>>;
 

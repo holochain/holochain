@@ -5,13 +5,8 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_sqlite::db::DbWrite;
-use holochain_sqlite::db::ReadManager;
-use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::fresh_reader;
-use holochain_sqlite::prelude::PrefixType;
-use holochain_sqlite::prelude::Readable;
-use holochain_sqlite::{db::DbRead, prelude::Reader};
+use holochain_sqlite::prelude::*;
 use holochain_state::element_buf::ElementBuf;
 use holochain_state::metadata::ChainItemKey;
 use holochain_state::metadata::LinkMetaKey;
@@ -187,8 +182,8 @@ pub fn handle_get_element(env: DbWrite, hash: HeaderHash) -> CascadeResult<GetEl
     if !meta_vault.has_any_registered_store_element(&hash)? {
         return Ok(GetElementResponse::GetHeader(None));
     }
-    let mut g = env.guard();
-    g.with_reader(|mut reader| {
+    let mut conn = env.conn()?;
+    conn.with_reader(|mut reader| {
         // Look for a deletes on the header and collect them
         let deletes = meta_vault
             .get_deletes_on_header(&mut reader, hash.clone())?
@@ -349,11 +344,11 @@ pub fn handle_get_links(
     _options: holochain_p2p::event::GetLinksOptions,
 ) -> CascadeResult<GetLinksResponse> {
     // Get the vaults
-    let mut g = env.guard();
+    let mut conn = env.conn()?;
     let element_vault = ElementBuf::vault(env.clone(), false)?;
     let meta_vault = MetadataBuf::vault(env.clone())?;
 
-    let links = g.with_reader(|mut reader| {
+    let links = conn.with_reader(|mut reader| {
         meta_vault
             .get_links_all(&mut reader, &LinkMetaKey::from(&link_key))?
             .map(|link_add| {

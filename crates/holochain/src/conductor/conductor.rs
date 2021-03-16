@@ -808,17 +808,17 @@ where
         {
             // write the wasm db
             environ
-                .guard()
+                .conn()?
                 .with_commit(|writer| wasm_buf.flush_to_txn(writer))?;
 
             // write the dna_def db
             environ
-                .guard()
+                .conn()?
                 .with_commit(|writer| dna_def_buf.flush_to_txn(writer))?;
 
             // write the entry_def db
             environ
-                .guard()
+                .conn()?
                 .with_commit(|writer| entry_def_buf.flush_to_txn(writer))?;
         }
         Ok(zome_defs)
@@ -952,7 +952,7 @@ where
         F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)>,
     {
         self.check_running()?;
-        let mut guard = self.env.guard();
+        let mut guard = self.env.conn()?;
         let output = guard.with_commit(|txn| {
             let state: ConductorState = self.state_db.get(txn, &UnitDbKey)?.unwrap_or_default();
             let (new_state, output) = f(state)?;

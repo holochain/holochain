@@ -346,7 +346,7 @@ pub mod tests {
         {
             let mut store = SourceChainBuf::new(env.clone().into())?;
             store.genesis(fake_dna_hash(1), alice.clone(), None).await?;
-            env.guard()
+            env.conn()
                 .with_commit(|writer| store.flush_to_txn(writer))?;
         }
 
@@ -374,7 +374,7 @@ pub mod tests {
             };
             let header = chain.put(header_builder, Some(entry)).await?;
 
-            env.guard()
+            env.conn()
                 .with_commit(|writer| chain.flush_to_txn(writer))?;
 
             (header, entry_hash)
@@ -416,7 +416,7 @@ pub mod tests {
             };
             let header = chain.put(header_builder, Some(entry)).await?;
 
-            env.guard()
+            env.conn()
                 .with_commit(|writer| chain.flush_to_txn(writer))?;
 
             (header, entry_hash)
@@ -454,7 +454,7 @@ pub mod tests {
             };
             chain.put(header_builder, None).await?;
 
-            env.guard()
+            env.conn()
                 .with_commit(|writer| chain.flush_to_txn(writer))?;
         }
 
@@ -489,7 +489,7 @@ pub mod tests {
     // async fn test_get_cap_claim() -> SourceChainResult<()> {
     //     let test_env = test_cell_env();
     //     let env = test_env.env();
-    //     let env = env.guard().await;
+    //     let env = env.conn().await;
     //     let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
     //     let agent_pubkey = fake_agent_pubkey_1().into();
     //     let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
@@ -498,7 +498,7 @@ pub mod tests {
     //         store
     //             .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
     //             .await?;
-    //         arc.guard().with_commit(|writer| store.flush_to_txn(writer))?;
+    //         arc.conn().unwrap().with_commit(|writer| store.flush_to_txn(writer))?;
     //     }
     //
     //     {
@@ -514,7 +514,7 @@ pub mod tests {
     // //     Some(claim.clone())
     // // );
     //
-    //         arc.guard().with_commit(|writer| chain.flush_to_txn(writer))?;
+    //         arc.conn().unwrap().with_commit(|writer| chain.flush_to_txn(writer))?;
     //     }
     //
     //     {

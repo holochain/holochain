@@ -43,8 +43,7 @@ pub struct ChainSequenceBuf {
 impl ChainSequenceBuf {
     /// Create a new instance
     pub fn new(env: DbRead) -> DatabaseResult<Self> {
-        let buf: Store =
-            KvIntBufFresh::new(env.clone(), env.get_table_i(TableName::ChainSequence)?);
+        let buf: Store = KvIntBufFresh::new(env.clone(), env.get_table(TableName::ChainSequence)?);
         let (next_index, tx_seq, current_head) =
             fresh_reader!(env, |mut r| { Self::head_info(buf.store(), &mut r) })?;
         let persisted_head = current_head.clone();
@@ -178,7 +177,7 @@ impl BufferedStore for ChainSequenceBuf {
 
         // Writing a chain move
         let env = self.buf.env().clone();
-        let db = env.get_table_i(TableName::ChainSequence)?;
+        let db = env.get_table(TableName::ChainSequence)?;
         let (_, _, persisted_head) = ChainSequenceBuf::head_info(&KvIntStore::new(db), writer)?;
         let persisted_head_moved = self.persisted_head != persisted_head;
         if persisted_head_moved && self.chain_moved_in_this_transaction() {
@@ -308,10 +307,11 @@ pub mod tests {
                 ])
                 .into(),
             )?;
-            arc.guard()
+            arc.conn()
+                .unwrap()
                 .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
         }
-        let mut g = arc.guard();
+        let mut g = arc.conn().unwrap();
         g.with_reader(|mut reader| {
             let buf = ChainSequenceBuf::new(arc.clone().into())?;
             assert_eq!(
@@ -357,10 +357,11 @@ pub mod tests {
                 ])
                 .into(),
             )?;
-            arc.guard()
+            arc.conn()
+                .unwrap()
                 .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
         }
-        let mut g = arc.guard();
+        let mut g = arc.conn().unwrap();
         g.with_reader(|mut reader| {
             let buf = ChainSequenceBuf::new(arc.clone().into())?;
             assert_eq!(
@@ -424,7 +425,7 @@ pub mod tests {
             tx1.send(()).unwrap();
             rx2.await.unwrap();
 
-            arc1.guard()
+            arc1.conn()
                 .with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         });
 
@@ -454,7 +455,7 @@ pub mod tests {
                 .into(),
             )?;
 
-            arc2.guard()
+            arc2.conn()
                 .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             tx2.send(()).unwrap();
             Result::<_, SourceChainError>::Ok(())
@@ -508,7 +509,7 @@ pub mod tests {
             ])
             .into(),
         )?;
-        arc1.guard()
+        arc1.conn()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
 
         // Modify the chain without adding a header -- this succeeds
@@ -521,7 +522,7 @@ pub mod tests {
             tx1.send(()).unwrap();
             rx2.await.unwrap();
 
-            arc1.guard()
+            arc1.conn()
                 .with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         });
 
@@ -537,7 +538,7 @@ pub mod tests {
                 .into(),
             )?;
 
-            arc2.guard()
+            arc2.conn()
                 .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             tx2.send(()).unwrap();
             Result::<_, SourceChainError>::Ok(())

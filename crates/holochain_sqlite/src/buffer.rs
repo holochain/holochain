@@ -1,4 +1,3 @@
-#![allow(missing_docs)]
 use crate::error::DatabaseError;
 use crate::error::DatabaseResult;
 use crate::transaction::Writer;
@@ -19,7 +18,7 @@ pub use kv::KvStore;
 pub use kv::KvStoreT;
 pub use kvv::KvvBufUsed;
 
-// Empty keys break lmdb
+// Empty keys are bad mmmk
 pub(super) fn check_empty_key<K: AsRef<[u8]>>(k: &K) -> DatabaseResult<()> {
     if k.as_ref().is_empty() {
         Err(DatabaseError::EmptyKey)
@@ -55,7 +54,7 @@ pub trait BufferedStore: Sized {
 /// Macro to generate a fresh reader from an DbRead with less boilerplate
 macro_rules! fresh_reader {
     ($env: expr, $f: expr) => {{
-        let mut conn = $env.guard();
+        let mut conn = $env.conn()?;
         $crate::db::ReadManager::with_reader(&mut conn, $f)
     }};
 }
@@ -65,7 +64,7 @@ macro_rules! fresh_reader {
 /// Use this in tests, where everything gets unwrapped anyway
 macro_rules! fresh_reader_test {
     ($env: expr, $f: expr) => {{
-        let mut conn = $env.guard();
+        let mut conn = $env.conn().unwrap();
         $crate::db::ReadManager::with_reader(&mut conn, |r| {
             $crate::error::DatabaseResult::Ok($f(r))
         })

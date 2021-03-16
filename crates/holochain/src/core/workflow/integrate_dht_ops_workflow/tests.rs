@@ -518,7 +518,7 @@ impl Db {
             }
         }
         // Commit workspace
-        env.guard()
+        env.conn()
             .with_commit::<WorkspaceError, _, _>(|writer| {
                 workspace.flush_to_txn(writer)?;
                 Ok(())
@@ -538,7 +538,7 @@ async fn call_workflow<'env>(env: DbWrite) {
 // Need to clear the data from the previous test
 fn clear_dbs(env: DbWrite) {
     let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
-    env.guard()
+    env.conn()
         .with_commit::<DatabaseError, _, _>(|writer| {
             workspace.integration_limbo.clear_all(writer)?;
             workspace.integrated_dht_ops.clear_all(writer)?;
@@ -848,7 +848,7 @@ async fn genesis<'env>(env: DbWrite) {
     let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     fake_genesis(&mut workspace.source_chain).await.unwrap();
     {
-        env.guard()
+        env.conn()
             .with_commit(|writer| workspace.flush_to_txn(writer))
             .unwrap();
     }
@@ -925,7 +925,7 @@ async fn commit_entry<'env>(
     // Write
     {
         let mut workspace = workspace_lock.write().await;
-        env.guard()
+        env.conn()
             .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
     }
@@ -1003,7 +1003,7 @@ async fn create_link(
     // Write the changes
     {
         let mut workspace = workspace_lock.write().await;
-        env.guard()
+        env.conn()
             .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
     }
@@ -1115,7 +1115,7 @@ async fn test_metadata_from_wasm_api() {
     // TODO: create the expect from the result of the commit and link entries
     // Db::check(
     //     expect,
-    //     &env.guard(),
+    //     &env.conn(),
     //     &dbs,
     //     format!("{}: {}", "metadata from wasm", here!("")),
     // )
@@ -1221,7 +1221,7 @@ async fn test_wasm_api_without_integration_delete() {
             deletes_entry_address: base_address.clone(),
         };
         workspace.source_chain.put(delete, None).await.unwrap();
-        env.guard()
+        env.conn()
             .with_commit(|writer| workspace.flush_to_txn(writer))
             .unwrap();
     }

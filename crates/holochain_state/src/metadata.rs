@@ -370,7 +370,7 @@ impl MetadataBuf<IntegratedPrefix> {
 
     /// Create a [MetadataBuf] with the cache databases
     pub fn cache(env: DbRead) -> DatabaseResult<Self> {
-        let system_meta = env.get_table_m(TableName::MetaCacheSys)?;
+        let system_meta = env.get_table(TableName::MetaCacheSys)?;
         let links_meta = env.get_table(TableName::MetaCacheLinks)?;
         let misc_meta = env.get_table(TableName::MetaCacheStatus)?;
         Self::new(env, system_meta, links_meta, misc_meta)
@@ -423,7 +423,7 @@ where
     }
 
     fn new_vault(env: DbRead) -> DatabaseResult<Self> {
-        let system_meta = env.get_table_m(TableName::MetaVaultSys)?;
+        let system_meta = env.get_table(TableName::MetaVaultSys)?;
         let links_meta = env.get_table(TableName::MetaVaultLinks)?;
         let misc_meta = env.get_table(TableName::MetaVaultMisc)?;
         Self::new(env, system_meta, links_meta, misc_meta)

@@ -226,30 +226,19 @@ pub(super) fn initialize_database(conn: &mut Connection, db_kind: &DbKind) -> ru
     Ok(())
 }
 
-/// TODO
-#[deprecated = "sqlite: placeholder"]
+/// This trait used to make sense when we were using LMDB.
+/// Now it's kind of silly. TODO: remove.
 pub trait GetTable {
-    /// Placeholder
+    /// Get a reference to a table by name.
+    // This doesn't need to be a method at all.
     fn get_table(&self, name: TableName) -> DatabaseResult<Table> {
         Ok(Table { name })
-    }
-
-    /// Placeholder
-    #[deprecated = "use get_table"]
-    fn get_table_i(&self, name: TableName) -> DatabaseResult<Table> {
-        self.get_table(name)
-    }
-
-    /// Placeholder
-    #[deprecated = "use get_table"]
-    fn get_table_m(&self, name: TableName) -> DatabaseResult<Table> {
-        self.get_table(name)
     }
 }
 
 /// A reference to a SQLite table.
 /// This patten only exists as part of the naive LMDB refactor.
-#[deprecated = "lmdb: naive"]
+/// It directly replaces LMDB's Database.
 #[derive(Clone, Debug)]
 pub struct Table {
     pub(crate) name: TableName,
@@ -286,17 +275,6 @@ impl Table {
     }
 
     pub fn put<K: ToSql>(&self, txn: &mut Writer, k: &K, v: &Value) -> DatabaseResult<()> {
-        crate::transaction::put_kv(txn, self, k, v)
-    }
-
-    #[deprecated = "remove if this is identical to `put`"]
-    pub fn put_with_flags<K: ToSql>(
-        &self,
-        txn: &mut Writer,
-        k: &K,
-        v: &Value,
-        _flags: (),
-    ) -> DatabaseResult<()> {
         crate::transaction::put_kv(txn, self, k, v)
     }
 

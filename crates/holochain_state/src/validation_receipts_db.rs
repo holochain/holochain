@@ -91,9 +91,8 @@ pub struct ValidationReceiptsBuf(KvvBufUsed<DhtOpHash, SignedValidationReceipt>)
 impl ValidationReceiptsBuf {
     /// Constructor given read-only transaction and db ref.
     pub fn new(dbs: &impl GetTable) -> DatabaseResult<ValidationReceiptsBuf> {
-        Ok(Self(KvvBufUsed::new_opts(
-            dbs.get_table_m(TableName::ValidationReceipts)?,
-            true, // set to no_dup_data mode
+        Ok(Self(KvvBufUsed::new(
+            dbs.get_table(TableName::ValidationReceipts)?,
         )))
     }
 
@@ -194,16 +193,16 @@ mod tests {
 
             vr_buf1.add_if_unique(vr2.clone())?;
 
-            env.guard()
+            env.conn()
                 .with_commit(|writer| vr_buf1.flush_to_txn(writer))?;
 
             vr_buf2.add_if_unique(vr1.clone())?;
 
-            env.guard()
+            env.conn()
                 .with_commit(|writer| vr_buf2.flush_to_txn(writer))?;
         }
 
-        let mut g = env.guard();
+        let mut g = env.conn();
         g.with_reader_test(|mut reader| {
             let vr_buf = ValidationReceiptsBuf::new(&env).unwrap();
 

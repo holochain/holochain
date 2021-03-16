@@ -52,7 +52,7 @@ fn test_buf(a: &BTreeMap<Vec<u8>, KvOp<V>>, b: impl Iterator<Item = (&'static st
 async fn kv_iterators() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let mut env = arc.conn().unwrap();
     let db = env.open_single("kv")?;
 
     {
@@ -64,11 +64,12 @@ async fn kv_iterators() -> DatabaseResult<()> {
         buf.put("d".into(), V(4)).unwrap();
         buf.put("e".into(), V(5)).unwrap();
 
-        arc.guard()
+        arc.conn()
+            .unwrap()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
 
-    arc.guard().with_reader(|mut reader| {
+    arc.conn().unwrap().with_reader(|mut reader| {
         let buf = Store::new(db.clone());
 
         let forward: Vec<_> = buf
@@ -96,10 +97,10 @@ async fn kv_iterators() -> DatabaseResult<()> {
 async fn kv_empty_iterators() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let mut env = arc.conn().unwrap();
     let db = env.open_single("kv").unwrap();
 
-    arc.guard().with_reader(|mut reader| {
+    arc.conn().unwrap().with_reader(|mut reader| {
         let buf = Store::new(db.clone());
 
         let forward: Vec<_> = buf.store().iter(&mut reader).unwrap().collect().unwrap();
@@ -122,7 +123,7 @@ async fn kv_empty_iterators() -> DatabaseResult<()> {
 async fn kv_store_sanity_check() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let mut env = arc.conn().unwrap();
     let db1 = env.open_single("kv1")?;
     let db2 = env.open_single("kv1")?;
 
@@ -131,7 +132,7 @@ async fn kv_store_sanity_check() -> DatabaseResult<()> {
     let mut kv1: KvBufUsed<DbString, TestVal> = KvBufUsed::new(db1.clone());
     let mut kv2: KvBufUsed<DbString, DbString> = KvBufUsed::new(db2.clone());
 
-    arc.guard().with_commit(|txn| {
+    arc.conn().unwrap().with_commit(|txn| {
         kv1.put("hi".into(), testval.clone()).unwrap();
         kv2.put("salutations".into(), "folks".into()).unwrap();
         // Check that the underlying store contains no changes yet
@@ -142,9 +143,11 @@ async fn kv_store_sanity_check() -> DatabaseResult<()> {
 
     assert_eq!(kv2.scratch().len(), 1);
 
-    arc.guard().with_commit(|txn| kv2.flush_to_txn(txn))?;
+    arc.conn()
+        .unwrap()
+        .with_commit(|txn| kv2.flush_to_txn(txn))?;
 
-    arc.guard().with_reader(|mut reader| {
+    arc.conn().unwrap().with_reader(|mut reader| {
         // Now open some fresh Readers to see that our data was persisted
         let kv1b: KvBufUsed<DbString, TestVal> = KvBufUsed::new(db1.clone());
         let kv2b: KvBufUsed<DbString, DbString> = KvBufUsed::new(db2.clone());
@@ -163,9 +166,9 @@ async fn kv_indicate_value_overwritten() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let mut env = arc.conn().unwrap();
     let db = env.open_single("kv")?;
-    arc.guard().with_reader(|mut reader| {
+    arc.conn().unwrap().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
 
         buf.put("a".into(), V(1)).unwrap();
@@ -182,10 +185,10 @@ async fn kv_deleted_persisted() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let mut env = arc.conn().unwrap();
     let db = env.open_single("kv")?;
 
-    arc.guard().with_reader(|mut reader| {
+    arc.conn().unwrap().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
 
         buf.put("a".into(), V(1)).unwrap();
@@ -193,19 +196,21 @@ async fn kv_deleted_persisted() -> DatabaseResult<()> {
         buf.put("c".into(), V(3)).unwrap();
         assert!(buf.contains(&mut reader, &"b".into())?);
 
-        arc.guard()
+        arc.conn()
+            .unwrap()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))
     })?;
-    arc.guard().with_reader(|mut reader| {
+    arc.conn().unwrap().with_reader(|mut reader| {
         let mut buf: KvBufUsed<DbString, V> = KvBufUsed::new(db.clone());
 
         buf.delete("b".into()).unwrap();
         assert!(!buf.contains(&mut reader, &"b".into())?);
 
-        arc.guard()
+        arc.conn()
+            .unwrap()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))
     })?;
-    arc.guard().with_reader(|mut reader| {
+    arc.conn().unwrap().with_reader(|mut reader| {
         let buf: KvBufUsed<DbString, _> = KvBufUsed::new(db.clone());
 
         let forward = buf
@@ -226,7 +231,7 @@ async fn kv_deleted_buffer() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let mut env = arc.conn().unwrap();
     let db = env.open_single("kv")?;
 
     {
@@ -249,10 +254,11 @@ async fn kv_deleted_buffer() -> DatabaseResult<()> {
                 .cloned(),
         );
 
-        arc.guard()
+        arc.conn()
+            .unwrap()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
-    arc.guard().with_reader(|mut reader| {
+    arc.conn().unwrap().with_reader(|mut reader| {
         let buf: KvBufUsed<DbString, _> = KvBufUsed::new(db.clone());
 
         let forward: Vec<_> = buf.store().iter(&mut reader).unwrap().collect().unwrap();
@@ -266,10 +272,10 @@ async fn kv_get_buffer() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let mut env = arc.conn().unwrap();
     let db = env.open_single("kv")?;
 
-    arc.guard().with_reader(|mut reader| {
+    arc.conn().unwrap().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
 
         buf.put("a".into(), V(5)).unwrap();
@@ -287,7 +293,7 @@ async fn kv_get_persisted() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let mut env = arc.conn().unwrap();
     let db = env.open_single("kv")?;
 
     {
@@ -297,11 +303,12 @@ async fn kv_get_persisted() -> DatabaseResult<()> {
         buf.put("b".into(), V(2)).unwrap();
         buf.put("c".into(), V(3)).unwrap();
 
-        arc.guard()
+        arc.conn()
+            .unwrap()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
 
-    arc.guard().with_reader(|mut reader| {
+    arc.conn().unwrap().with_reader(|mut reader| {
         let buf = Store::new(db.clone());
 
         let n = buf.get(&mut reader, &"b".into())?;
@@ -316,10 +323,10 @@ async fn kv_get_del_buffer() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let mut env = arc.conn().unwrap();
     let db = env.open_single("kv")?;
 
-    arc.guard().with_reader(|mut reader| {
+    arc.conn().unwrap().with_reader(|mut reader| {
         let mut buf = Store::new(db.clone());
 
         buf.put("a".into(), V(5)).unwrap();
@@ -338,7 +345,7 @@ async fn kv_get_del_persisted() -> DatabaseResult<()> {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let mut env = arc.guard();
+    let mut env = arc.conn().unwrap();
     let db = env.open_single("kv")?;
 
     {
@@ -348,22 +355,24 @@ async fn kv_get_del_persisted() -> DatabaseResult<()> {
         buf.put("b".into(), V(2)).unwrap();
         buf.put("c".into(), V(3)).unwrap();
 
-        arc.guard()
+        arc.conn()
+            .unwrap()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
 
-    arc.guard().with_reader(|mut reader| {
+    arc.conn().unwrap().with_reader(|mut reader| {
         let mut buf: KvBufUsed<DbString, V> = KvBufUsed::new(db.clone());
 
         buf.delete("b".into()).unwrap();
         let n = buf.get(&mut reader, &"b".into())?;
         assert_eq!(n, None);
 
-        arc.guard()
+        arc.conn()
+            .unwrap()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))
     })?;
 
-    arc.guard().with_reader(|mut reader| {
+    arc.conn().unwrap().with_reader(|mut reader| {
         let buf: KvBufUsed<DbString, V> = KvBufUsed::new(db.clone());
 
         let n = buf.get(&mut reader, &"b".into())?;

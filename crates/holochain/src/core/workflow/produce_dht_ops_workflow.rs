@@ -186,7 +186,7 @@ mod tests {
                 );
             }
 
-            env.guard()
+            env.conn()
                 .with_commit(|writer| source_chain.flush_to_txn(writer))
                 .unwrap();
 
@@ -204,7 +204,7 @@ mod tests {
                 .await
                 .unwrap();
             assert_matches!(complete, WorkComplete::Complete);
-            env.guard()
+            env.conn()
                 .with_commit(|writer| workspace.flush_to_txn(writer))
                 .unwrap();
         }
@@ -250,7 +250,7 @@ mod tests {
                 .await
                 .unwrap();
             assert_matches!(complete, WorkComplete::Complete);
-            env.guard()
+            env.conn()
                 .with_commit(|writer| workspace.flush_to_txn(writer))
                 .unwrap();
         }

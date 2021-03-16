@@ -181,7 +181,7 @@ pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
     iter: I,
 ) -> DatabaseResult<()> {
     let p2p_store = AgentKv::new(env.clone().into())?;
-    Ok(env.guard().with_commit(|writer| {
+    Ok(env.conn()?.with_commit(|writer| {
         for agent_info_signed in iter {
             p2p_store.as_store_ref().put(
                 writer,
@@ -235,7 +235,7 @@ pub fn get_agent_info_signed(
 ) -> ConductorResult<Option<AgentInfoSigned>> {
     let p2p_kv = AgentKv::new(environ.clone().into())?;
 
-    environ.guard().with_commit(|writer| {
+    environ.conn()?.with_commit(|writer| {
         let res = p2p_kv
             .as_store_ref()
             .get(writer, &(&*kitsune_space, &*kitsune_agent).into())?;
@@ -270,7 +270,7 @@ pub fn query_agent_info_signed(
     let p2p_kv = AgentKv::new(environ.clone().into())?;
 
     let mut out = Vec::new();
-    environ.guard().with_commit(|writer| {
+    environ.conn()?.with_commit(|writer| {
         let mut expired = Vec::new();
 
         {
@@ -319,7 +319,7 @@ pub fn put_agent_info_signed(
     agent_info_signed: kitsune_p2p::agent_store::AgentInfoSigned,
 ) -> ConductorResult<()> {
     let p2p_kv = AgentKv::new(environ.clone().into())?;
-    Ok(environ.guard().with_commit(|writer| {
+    Ok(environ.conn()?.with_commit(|writer| {
         p2p_kv.as_store_ref().put(
             writer,
             &(&agent_info_signed).try_into()?,
@@ -439,7 +439,8 @@ mod tests {
         let agent_info_signed = fixt!(AgentInfoSigned);
 
         environ
-            .guard()
+            .conn()
+            .unwrap()
             .with_commit(|writer| {
                 store_buf.as_store_ref().put(
                     writer,
@@ -449,7 +450,7 @@ mod tests {
             })
             .unwrap();
 
-        environ.guard().with_reader_test(|mut reader| {
+        environ.conn().unwrap().with_reader_test(|mut reader| {
             let ret = &store_buf
                 .as_store_ref()
                 .get(&mut reader, &(&agent_info_signed).try_into().unwrap())

@@ -373,7 +373,7 @@ mod tests {
             fake_unique_element(&keystore, agent_key.clone(), EntryVisibility::Private).await?;
 
         // write one public-entry header and one private-entry header
-        arc.guard().with_commit(|txn| {
+        arc.conn().unwrap().with_commit(|txn| {
             let mut store = ElementBuf::vault(arc.clone().into(), true)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;
@@ -419,7 +419,7 @@ mod tests {
             fake_unique_element(&keystore, agent_key.clone(), EntryVisibility::Private).await?;
 
         // write one public-entry header and one private-entry header (which will be a noop)
-        arc.guard().with_commit(|txn| {
+        arc.conn().unwrap().with_commit(|txn| {
             let mut store = ElementBuf::vault(arc.clone().into(), false)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;

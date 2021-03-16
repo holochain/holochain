@@ -336,7 +336,7 @@ mod tests {
                     .unwrap();
                 headers.sort_by_key(|h| h.header_hash.clone());
                 assert_eq!(headers, expected);
-                arc.guard()
+                arc.conn().unwrap()
                     .with_commit(|writer| meta_buf.flush_to_txn(writer))
                     .unwrap();
             })
@@ -395,7 +395,7 @@ mod tests {
                 headers.sort_by_key(|h| h.header_hash.clone());
                 assert_eq!(headers, expected);
             });
-            arc.guard()
+            arc.conn().unwrap()
                 .with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
@@ -453,7 +453,7 @@ mod tests {
                 headers.sort_by_key(|h| h.header_hash.clone());
                 assert_eq!(headers, expected);
             });
-            arc.guard()
+            arc.conn().unwrap()
                 .with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
@@ -501,7 +501,7 @@ mod tests {
                 headers.sort_by_key(|h| h.header_hash.clone());
                 assert_eq!(headers, expected);
             });
-            arc.guard()
+            arc.conn().unwrap()
                 .with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }

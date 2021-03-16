@@ -252,8 +252,8 @@ impl OneshotWriter {
     where
         F: FnOnce(&mut Writer) -> Result<(), WorkspaceError> + Send,
     {
-        let mut env_ref = self.0.guard();
-        env_ref.with_commit::<WorkspaceError, (), _>(|w| {
+        let mut conn = self.0.conn()?;
+        conn.with_commit::<WorkspaceError, (), _>(|w| {
             f(w)?;
             Ok(())
         })?;

@@ -1,20 +1,19 @@
-use crate::{prelude::*, swansong::SwanSong};
+use crate::prelude::*;
 use chashmap::CHashMap;
 use lazy_static::lazy_static;
-use parking_lot::{Mutex, MutexGuard, RwLock};
 use rusqlite::*;
 use std::{
-    collections::HashMap,
     path::{Path, PathBuf},
-    sync::Arc,
     time::Duration,
 };
+
+mod singleton_conn;
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
 lazy_static! {
 
-    pub(crate) static ref CONNECTIONS: RwLock<HashMap<PathBuf, SConn>> = {
+    pub(crate) static ref CONNECTION_POOLS: CHashMap<PathBuf, ConnectionPool> = {
         // This is just a convenient place that we know gets initialized
         // both in the final binary holochain && in all relevant tests
         //
@@ -36,10 +35,8 @@ lazy_static! {
             // std::process::abort();
         }));
 
-        RwLock::new(HashMap::new())
+        CHashMap::new()
     };
-
-    pub(crate) static ref CONNECTION_POOLS: CHashMap<PathBuf, ConnectionPool> = CHashMap::new();
 }
 
 pub type ConnectionPool = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
@@ -67,27 +64,6 @@ impl r2d2::CustomizeConnection<Connection, rusqlite::Error> for ConnCustomizer {
         initialize_connection(conn, &self.kind, true)?;
         Ok(())
     }
-}
-
-#[deprecated = "Shim for `Rkv`, just because we have methods that call these"]
-pub struct ConnInner;
-
-impl ConnInner {}
-
-/// Singleton Connection.
-#[derive(Clone)]
-pub struct SConn {
-    inner: Arc<Mutex<Connection>>,
-    kind: DbKind,
-}
-
-#[cfg(feature = "db-encryption")]
-/// Simulate getting an encryption key from Lair.
-fn get_encryption_key_shim() -> [u8; 32] {
-    [
-        26, 111, 7, 31, 52, 204, 156, 103, 203, 171, 156, 89, 98, 51, 158, 143, 57, 134, 93, 56,
-        199, 225, 53, 141, 39, 77, 145, 130, 136, 108, 96, 201,
-    ]
 }
 
 fn initialize_connection(
@@ -118,62 +94,13 @@ fn initialize_connection(
     Ok(())
 }
 
-impl SConn {
-    /// Create a new connection with decryption key set
-    pub fn open(path: &Path, kind: &DbKind) -> DatabaseResult<Self> {
-        let mut conn = Connection::open(path)?;
-        initialize_connection(&mut conn, kind, true)?;
-        Ok(Self::new(conn, kind.clone()))
-    }
-
-    fn new(inner: Connection, kind: DbKind) -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(inner)),
-            kind,
-        }
-    }
-
-    pub fn inner(&mut self) -> SwanSong<MutexGuard<Connection>> {
-        let kind = self.kind.clone();
-        tracing::trace!("lock attempt {}", &kind);
-        let guard = self
-            .inner
-            .try_lock_for(std::time::Duration::from_secs(30))
-            .unwrap_or_else(|| panic!(format!("Couldn't unlock connection. Kind: {}", &kind)));
-        tracing::trace!("lock success {}", &kind);
-        SwanSong::new(guard, move |_| {
-            tracing::trace!("lock drop {}", &kind);
-        })
-    }
-
-    #[cfg(feature = "test_utils")]
-    pub fn open_single(&mut self, name: &str) -> Result<SingleTable, DatabaseError> {
-        crate::table::initialize_table_single(
-            &mut self.inner(),
-            name.to_string(),
-            name.to_string(),
-        )?;
-        Ok(Table {
-            name: TableName::TestSingle(name.to_string()),
-        })
-    }
-
-    #[cfg(feature = "test_utils")]
-    pub fn open_integer(&mut self, name: &str) -> Result<IntegerTable, DatabaseError> {
-        self.open_single(name)
-    }
-
-    #[cfg(feature = "test_utils")]
-    pub fn open_multi(&mut self, name: &str) -> Result<MultiTable, DatabaseError> {
-        crate::table::initialize_table_multi(
-            &mut self.inner(),
-            name.to_string(),
-            name.to_string(),
-        )?;
-        Ok(Table {
-            name: TableName::TestMulti(name.to_string()),
-        })
-    }
+#[cfg(feature = "db-encryption")]
+/// Simulate getting an encryption key from Lair.
+fn get_encryption_key_shim() -> [u8; 32] {
+    [
+        26, 111, 7, 31, 52, 204, 156, 103, 203, 171, 156, 89, 98, 51, 158, 143, 57, 134, 93, 56,
+        199, 225, 53, 141, 39, 77, 145, 130, 136, 108, 96, 201,
+    ]
 }
 
 /// Singleton Connection.

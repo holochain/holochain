@@ -205,14 +205,14 @@ mod tests {
                 buf.put(dht_hash.next().unwrap(), value.clone()).unwrap();
                 expected.push(value.clone());
             }
-            env.guard()
+            env.conn()
                 .with_commit(|writer| buf.flush_to_txn(writer))
                 .unwrap();
         }
 
         // Check queries
 
-        let mut g = env.guard();
+        let mut g = env.conn();
         g.with_reader_test(|mut reader| {
             let buf = IntegratedDhtOpsBuf::new(env.clone().into()).unwrap();
             // No filter

@@ -49,9 +49,6 @@
 //!
 //! See [this hackmd](https://holo.hackmd.io/@holochain/SkuVLpqEL) for a diagram explaining the relationships between these building blocks and the higher abstractions
 
-#![allow(missing_docs)]
-#![allow(deprecated)]
-
 pub mod buffer;
 pub mod conn;
 pub mod db;

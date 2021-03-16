@@ -1,7 +1,7 @@
 //! Functions dealing with obtaining and referencing singleton LMDB environments
 
 use crate::{
-    conn::{new_connection_pool, PConn, SConn, CONNECTIONS, CONNECTION_POOLS},
+    conn::{new_connection_pool, PConn, CONNECTION_POOLS},
     prelude::*,
 };
 use derive_more::Into;
@@ -10,7 +10,6 @@ use holochain_keystore::KeystoreSender;
 use holochain_zome_types::cell::CellId;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
-use std::collections::hash_map::Entry;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -24,9 +23,8 @@ pub struct DbRead {
 }
 
 impl DbRead {
-    #[deprecated = "rename to `conn`"]
-    pub fn guard(&self) -> PConn {
-        self.connection_pooled().expect("TODO: Can't fail")
+    pub fn conn(&self) -> DatabaseResult<PConn> {
+        self.connection_pooled()
     }
 
     #[deprecated = "remove this identity function"]
@@ -47,25 +45,6 @@ impl DbRead {
     /// The environment's path
     pub fn path(&self) -> &PathBuf {
         &self.path
-    }
-
-    #[deprecated = "TODO: use `connection`"]
-    fn _connection_naive(&self) -> DatabaseResult<SConn> {
-        Ok(SConn::open(&self.path, &self.kind)?)
-    }
-
-    #[deprecated = "TODO: use `connection`"]
-    fn _connection_singleton(&self) -> DatabaseResult<SConn> {
-        let mut map = CONNECTIONS.write();
-        let conn = match map.entry(self.path.to_owned()) {
-            Entry::Vacant(e) => {
-                let conn = SConn::open(&self.path, &self.kind)?;
-                e.insert(conn).clone()
-            }
-            Entry::Occupied(e) => e.get().clone(),
-        };
-
-        Ok(conn)
     }
 
     fn connection_pooled(&self) -> DatabaseResult<PConn> {
@@ -118,11 +97,6 @@ impl DbWrite {
         keystore: KeystoreSender,
     ) -> DatabaseResult<Self> {
         Self::new(path_prefix, DbKind::Cell(cell_id), keystore)
-    }
-
-    #[deprecated = "remove this identity function"]
-    pub fn guard(&self) -> PConn {
-        self.0.guard()
     }
 
     /// Remove the db and directory
@@ -189,42 +163,6 @@ pub trait WriteManager<'e> {
     // /// It is preferable to use WriterManager::with_commit for database writes,
     // /// which can properly recover from and manage write failures
     // fn writer_unmanaged(&'e mut self) -> DatabaseResult<Writer<'e>>;
-}
-
-impl<'e> ReadManager<'e> for SConn {
-    fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError>,
-        F: 'e + FnOnce(Reader) -> Result<R, E>,
-    {
-        let mut g = self.inner();
-        let txn = g.transaction().map_err(DatabaseError::from)?;
-        let reader = Reader::from(txn);
-        f(reader)
-    }
-
-    #[cfg(feature = "test_utils")]
-    fn with_reader_test<R, F>(&'e mut self, f: F) -> R
-    where
-        F: 'e + FnOnce(Reader) -> R,
-    {
-        self.with_reader(|r| DatabaseResult::Ok(f(r))).unwrap()
-    }
-}
-
-impl<'e> WriteManager<'e> for SConn {
-    fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError>,
-        F: 'e + FnOnce(&mut Writer) -> Result<R, E>,
-    {
-        let mut b = self.inner();
-        let txn = b.transaction().map_err(DatabaseError::from)?;
-        let mut writer = txn;
-        let result = f(&mut writer)?;
-        writer.commit().map_err(DatabaseError::from)?;
-        Ok(result)
-    }
 }
 
 impl<'e> ReadManager<'e> for PConn {
@@ -294,3 +232,39 @@ where
         }
     }
 }
+
+// impl<'e> ReadManager<'e> for SConn {
+//     fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
+//     where
+//         E: From<DatabaseError>,
+//         F: 'e + FnOnce(Reader) -> Result<R, E>,
+//     {
+//         let mut g = self.inner();
+//         let txn = g.transaction().map_err(DatabaseError::from)?;
+//         let reader = Reader::from(txn);
+//         f(reader)
+//     }
+
+//     #[cfg(feature = "test_utils")]
+//     fn with_reader_test<R, F>(&'e mut self, f: F) -> R
+//     where
+//         F: 'e + FnOnce(Reader) -> R,
+//     {
+//         self.with_reader(|r| DatabaseResult::Ok(f(r))).unwrap()
+//     }
+// }
+
+// impl<'e> WriteManager<'e> for SConn {
+//     fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
+//     where
+//         E: From<DatabaseError>,
+//         F: 'e + FnOnce(&mut Writer) -> Result<R, E>,
+//     {
+//         let mut b = self.inner();
+//         let txn = b.transaction().map_err(DatabaseError::from)?;
+//         let mut writer = txn;
+//         let result = f(&mut writer)?;
+//         writer.commit().map_err(DatabaseError::from)?;
+//         Ok(result)
+//     }
+// }

@@ -399,7 +399,8 @@ pub mod tests {
             store
                 .put_raw(agent_header.as_content().clone(), agent_entry.clone())
                 .await?;
-            arc.guard()
+            arc.conn()
+                .unwrap()
                 .with_commit(|writer| store.flush_to_txn(writer))?;
         };
 
@@ -466,7 +467,8 @@ pub mod tests {
                 .put_raw(agent_header.as_content().clone(), agent_entry)
                 .await?;
 
-            arc.guard()
+            arc.conn()
+                .unwrap()
                 .with_commit(|writer| store.flush_to_txn(writer))?;
         }
 
