@@ -138,9 +138,10 @@ impl Cell {
                 async move {
                     if let Err(e) = network.join().await {
                         tracing::info!(failed_to_join_network = ?e);
-                    }
-                    if let Err(e) = signal.send(Signal::Test(TestSignal::NetworkJoined(id))) {
-                        tracing::warn!(failed_to_send_joined_network = ?e);
+                    } else {
+                        if let Err(e) = signal.send(Signal::Test(TestSignal::NetworkJoined(id))) {
+                            tracing::warn!(failed_to_send_joined_network = ?e);
+                        }
                     }
                 }
             });
