@@ -121,17 +121,15 @@ pub async fn wait_join_10s(
 ) {
     use tokio_stream::StreamExt;
     let timeout = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
-    let mut complete = false;
     while let Ok(Some(s)) = tokio::time::timeout_at(timeout, signals.next()).await {
         if let Signal::Test(TestSignal::NetworkJoined(id)) = s {
             cell_ids.remove(&id);
             if cell_ids.is_empty() {
-                complete = true;
-                break;
+                return;
             }
         }
     }
-    assert!(complete);
+    unreachable!("Didn't join the network in time")
 }
 
 /// A stream of signals.
