@@ -195,21 +195,9 @@ impl SweetConductor {
 
     /// Create a SweetConductor with a new set of TestEnvironments from the given config
     pub async fn from_config(config: ConductorConfig) -> SweetConductor {
-        use tokio_stream::StreamExt;
         let envs = test_environments();
-        let (tx, rx) = tokio::sync::broadcast::channel(1000);
-        let rx = tokio_stream::wrappers::BroadcastStream::new(rx)
-            .map(|v| v.expect("Failed to recv test signal"));
-        let signal_stream = Box::new(rx);
-
+        let (tx, _) = tokio::sync::broadcast::channel(1000);
         let handle = Self::from_existing(&envs, &config, tx).await;
-
-        let _ = Self::wait_for_join(
-            signal_stream,
-            handle.list_cell_ids().await.unwrap().into_iter().collect(),
-        )
-        .await
-        .expect("Failed to join network");
 
         Self::new(handle, envs, config).await
     }
