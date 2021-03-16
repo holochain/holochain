@@ -195,8 +195,22 @@ impl SweetConductor {
 
     /// Create a SweetConductor with a new set of TestEnvironments from the given config
     pub async fn from_config(config: ConductorConfig) -> SweetConductor {
+        use tokio_stream::StreamExt;
         let envs = test_environments();
-        let handle = Self::from_existing(&envs, &config).await;
+        let (tx, rx) = tokio::sync::broadcast::channel(1000);
+        let rx = tokio_stream::wrappers::BroadcastStream::new(rx)
+            .map(|v| v.expect("Failed to recv test signal"));
+        let signal_stream = Box::new(rx);
+
+        let handle = Self::from_existing(&envs, &config, tx).await;
+
+        let _ = Self::wait_for_join(
+            signal_stream,
+            handle.list_cell_ids().await.unwrap().into_iter().collect(),
+        )
+        .await
+        .expect("Failed to join network");
+
         Self::new(handle, envs, config).await
     }
 
@@ -211,8 +225,13 @@ impl SweetConductor {
     }
 
     /// Create a handle from an existing environment and config
-    async fn from_existing(envs: &TestEnvironments, config: &ConductorConfig) -> ConductorHandle {
+    async fn from_existing(
+        envs: &TestEnvironments,
+        config: &ConductorConfig,
+        test_interface: tokio::sync::broadcast::Sender<Signal>,
+    ) -> ConductorHandle {
         Conductor::builder()
+            .with_test_interface(test_interface)
             .config(config.clone())
             .test(envs)
             .await
@@ -438,10 +457,39 @@ impl SweetConductor {
 
     /// Start up this conductor if it's not already running.
     pub async fn startup(&mut self) {
+        use tokio_stream::StreamExt;
         if self.handle.is_none() {
+            let (tx, rx) = tokio::sync::broadcast::channel(1000);
+            let rx = tokio_stream::wrappers::BroadcastStream::new(rx)
+                .map(|v| v.expect("Failed to recv test signal"));
+            let signal_stream = Box::new(rx);
             self.handle = Some(Arc::new(SweetConductorHandle(
-                Self::from_existing(&self.envs, &self.config).await,
+                Self::from_existing(&self.envs, &self.config, tx).await,
             )));
+
+            let _ = Self::wait_for_join(
+                signal_stream,
+                self.handle
+                    .as_ref()
+                    .unwrap()
+                    .list_cell_ids()
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .collect(),
+            )
+            .await
+            .expect("Failed to join network");
+
+            // Get a stream of all signals since conductor startup
+            let signal_stream = self
+                .handle
+                .as_ref()
+                .unwrap()
+                .signal_broadcaster()
+                .await
+                .subscribe_merged();
+            self.signal_stream = Some(Box::new(signal_stream));
 
             // MD: this feels wrong, why should we have to reinstall DNAs on restart?
 
