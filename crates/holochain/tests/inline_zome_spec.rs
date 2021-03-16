@@ -294,7 +294,7 @@ async fn signal_subscription() {
     let app = conductor.setup_app("app", &[dna_file]).await;
     let zome = &app.cells()[0].zome("zome1");
 
-    let signals = conductor.signals().await.take(N);
+    let signals = conductor.signals().take(N);
 
     // Emit N signals
     for _ in 0..N {

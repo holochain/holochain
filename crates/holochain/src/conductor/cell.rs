@@ -129,10 +129,20 @@ impl Cell {
             SourceChainBuf::new(env.clone().into())?.has_genesis()
         };
 
+        let mut signal = conductor_api.signal_broadcaster().await;
+
         if has_genesis {
             tokio::spawn({
                 let mut network = holochain_p2p_cell.clone();
-                async move { network.join().await }
+                let id = id.clone();
+                async move {
+                    if let Err(e) = network.join().await {
+                        tracing::info!(failed_to_join_network = ?e);
+                    }
+                    if let Err(e) = signal.send(Signal::Test(TestSignal::NetworkJoined(id))) {
+                        tracing::warn!(failed_to_send_joined_network = ?e);
+                    }
+                }
             });
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 &env,

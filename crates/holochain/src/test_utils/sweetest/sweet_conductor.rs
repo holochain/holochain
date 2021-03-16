@@ -114,6 +114,29 @@ impl SweetConductorBatch {
     }
 }
 
+/// Wait for all cells to join the network or timeout after 10 seconds
+pub async fn wait_join_10s(
+    signals: &mut SignalStream,
+    mut cell_ids: std::collections::HashSet<CellId>,
+) {
+    use tokio_stream::StreamExt;
+    let timeout = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+    let mut complete = false;
+    while let Ok(Some(s)) = tokio::time::timeout_at(timeout, signals.next()).await {
+        if let Signal::Test(TestSignal::NetworkJoined(id)) = s {
+            cell_ids.remove(&id);
+            if cell_ids.is_empty() {
+                complete = true;
+                break;
+            }
+        }
+    }
+    assert!(complete);
+}
+
+/// A stream of signals.
+pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>;
+
 /// A useful Conductor abstraction for testing, allowing startup and shutdown as well
 /// as easy installation of apps across multiple Conductors and Agents.
 ///
@@ -126,7 +149,7 @@ pub struct SweetConductor {
     envs: TestEnvironments,
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
-    signal_stream: Option<Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>>,
+    signal_stream: Option<SignalStream>,
 }
 
 fn standard_config() -> ConductorConfig {
@@ -289,6 +312,13 @@ impl SweetConductor {
         agent: AgentPubKey,
         dna_files: &[DnaFile],
     ) -> SweetApp {
+        let signals = self.signal_stream.take();
+        let mut cell_ids = std::collections::HashSet::new();
+        for dna in dna_files {
+            let id = CellId::new(dna.dna_hash().clone(), agent.clone());
+            cell_ids.insert(id);
+        }
+        let jh = Self::wait_for_join(signals.unwrap(), cell_ids);
         self.setup_app_part_1(dna_files).await;
         self.setup_app_part_2(installed_app_id, agent.clone(), dna_files)
             .await;
@@ -301,8 +331,11 @@ impl SweetConductor {
             .expect("Could not setup cells");
 
         let dna_files = dna_files.iter().map(|d| d.dna_hash().clone());
-        self.setup_app_part_3(installed_app_id, agent, dna_files)
-            .await
+        let r = self
+            .setup_app_part_3(installed_app_id, agent, dna_files)
+            .await;
+        self.signal_stream = Some(jh.await.unwrap());
+        r
     }
 
     /// Opinionated app setup.
@@ -329,6 +362,15 @@ impl SweetConductor {
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
     ) -> SweetAppBatch {
+        let signals = self.signal_stream.take();
+        let mut cell_ids = std::collections::HashSet::new();
+        for agent in agents {
+            for dna in dna_files {
+                let id = CellId::new(dna.dna_hash().clone(), agent.clone());
+                cell_ids.insert(id);
+            }
+        }
+        let jh = Self::wait_for_join(signals.unwrap(), cell_ids);
         self.setup_app_part_1(dna_files).await;
         for agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
@@ -356,7 +398,18 @@ impl SweetConductor {
             );
         }
 
+        self.signal_stream = Some(jh.await.unwrap());
         SweetAppBatch(apps)
+    }
+
+    fn wait_for_join(
+        mut signals: SignalStream,
+        cell_ids: std::collections::HashSet<CellId>,
+    ) -> tokio::task::JoinHandle<SignalStream> {
+        tokio::spawn(async move {
+            wait_join_10s(&mut signals, cell_ids).await;
+            signals
+        })
     }
 
     /// Get a stream of all Signals emitted on the "sweet-interface" AppInterface.
@@ -364,7 +417,7 @@ impl SweetConductor {
     /// This is designed to crash if called more than once, because as currently
     /// implemented, creating multiple signal streams would simply cause multiple
     /// consumers of the same underlying streams, not a fresh subscription
-    pub async fn signals(&mut self) -> impl tokio_stream::Stream<Item = Signal> {
+    pub fn signals(&mut self) -> impl tokio_stream::Stream<Item = Signal> {
         self.signal_stream
             .take()
             .expect("Can't take the SweetConductor signal stream twice")
@@ -521,7 +574,9 @@ impl Drop for SweetConductor {
                 // Shutdown the conductor
                 if let Some(shutdown) = handle.take_shutdown_handle().await {
                     handle.shutdown().await;
-                    shutdown.await.expect("Failed to await shutdown handle");
+                    if let Err(e) = shutdown.await {
+                        tracing::warn!("Failed to join conductor shutdown task: {:?}", e);
+                    }
                 }
             });
         }
