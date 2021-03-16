@@ -12,6 +12,9 @@ crate-type = [ "cdylib", "rlib" ]
 hdk = { path = "../../../../hdk" }
 serde = "1.0"
 
+[dev-dependencies]
+fixt = { path = "../../../../fixt" }
+
 [features]
 default = []
 mock = ["hdk/mock"]

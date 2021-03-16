@@ -2305,28 +2305,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "kitsune_mdns"
-version = "0.0.1"
-dependencies = [
- "async-stream",
- "base64",
- "err-derive",
- "futures-core",
- "futures-util",
- "libmdns",
- "mdns",
- "tokio",
- "tokio-stream",
-]
-
-[[package]]
 name = "kitsune_p2p"
 version = "0.0.1"
 dependencies = [
+ "base64",
  "derive_more",
  "fixt",
  "futures",
  "ghost_actor 0.3.0-alpha.1",
+ "kitsune_p2p_mdns",
  "kitsune_p2p_proxy",
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
@@ -2344,6 +2331,21 @@ dependencies = [
  "tokio-stream",
  "tracing-subscriber",
  "url2",
+]
+
+[[package]]
+name = "kitsune_p2p_mdns"
+version = "0.0.1"
+dependencies = [
+ "async-stream",
+ "base64",
+ "err-derive",
+ "futures-core",
+ "futures-util",
+ "libmdns",
+ "mdns",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]
@@ -3874,7 +3876,7 @@ dependencies = [
 [[package]]
 name = "rkv"
 version = "0.10.4"
-source = "git+https://github.com/holochain/rkv.git?branch=master#6f6b4b5adc1eb6fe4a8f9587f3a3083cafadf0a1"
+source = "git+https://github.com/holochain/rkv.git#6f6b4b5adc1eb6fe4a8f9587f3a3083cafadf0a1"
 dependencies = [
  "arrayref",
  "bincode",
