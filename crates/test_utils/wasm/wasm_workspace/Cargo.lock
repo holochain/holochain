@@ -961,6 +961,7 @@ dependencies = [
 name = "test_wasm_sign"
 version = "0.0.1"
 dependencies = [
+ "fixt",
  "hdk",
  "serde",
 ]

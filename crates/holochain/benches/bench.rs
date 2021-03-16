@@ -68,9 +68,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
         group.bench_function(BenchmarkId::from_parameter(n), |b| {
             // bytes
             let bytes = vec![0; n];
-
             let _g = TOKIO_RUNTIME.lock().unwrap().enter();
-
             let ha = HOST_ACCESS_FIXTURATOR.lock().unwrap().next().unwrap();
 
             b.iter(|| {

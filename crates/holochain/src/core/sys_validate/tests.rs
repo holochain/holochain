@@ -23,7 +23,7 @@ async fn verify_header_signature_test() {
     header.author = author.clone();
     let header = Header::CreateLink(header);
     let real_signature = author.sign(&keystore, &header).await.unwrap();
-    let wrong_signature = Signature(vec![1; 64]);
+    let wrong_signature = Signature([1_u8; 64]);
 
     assert_matches!(
         verify_header_signature(&wrong_signature, &header).await,
