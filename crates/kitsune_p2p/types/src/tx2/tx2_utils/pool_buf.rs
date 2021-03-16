@@ -6,7 +6,7 @@ use std::cell::RefCell;
 pub(crate) const POOL_MAX_CAPACITY: usize = 1024;
 
 /// Returned PoolBufs will be shrunk to this capacity when returned.
-pub(crate) const POOL_BUF_MAX_CAPACITY: usize = 4096;
+pub(crate) const POOL_BUF_SHRINK_TO_CAPACITY: usize = 4096;
 
 /// PoolBufs will be allocated/reset with this byte count BEFORE
 /// the readable buffer to make prepending frame info more efficient.
