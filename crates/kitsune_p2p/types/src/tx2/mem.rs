@@ -101,8 +101,8 @@ impl ConAdapt for MemConAdapt {
 
     fn out_chan(&self, _timeout: KitsuneTimeout) -> OutChanFut {
         let mut sender = self.0.chan_send.clone();
+        let (send, recv) = bound_async_mem_channel(4096, Some(&self.0.mix_active));
         async move {
-            let (send, recv) = bound_async_mem_channel(4096);
             let send: OutChan = Box::new(FramedWriter::new(send));
             let recv: InChan = Box::new(FramedReader::new(recv));
             if sender.send(recv).await.is_err() {
@@ -233,7 +233,7 @@ impl EndpointAdapt for MemEndpointAdapt {
                 Ok(id) => id,
                 Err(_) => return Err(format!("invalid url: {}", url).into()),
             };
-            let (mut sender, oth_ep_active) = match MEM_ENDPOINTS.lock().get(&id) {
+            let (mut c_send, oth_ep_active) = match MEM_ENDPOINTS.lock().get(&id) {
                 None => return Err(format!("remote not found: {}", url).into()),
                 Some((s, a)) => (s.clone(), a.clone()),
             };
@@ -266,7 +266,7 @@ impl EndpointAdapt for MemEndpointAdapt {
             let chan_recv: Box<dyn InChanRecvAdapt> =
                 Box::new(MemInChanRecvAdapt::new(recv, mix_active));
 
-            if sender.send((oth_con, oth_chan_recv)).await.is_err() {
+            if c_send.send((oth_con, oth_chan_recv)).await.is_err() {
                 MEM_ENDPOINTS.lock().remove(&id);
                 return Err(format!("failed to establish connection: {}", url).into());
             }

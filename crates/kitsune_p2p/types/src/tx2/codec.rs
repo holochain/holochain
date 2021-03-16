@@ -177,7 +177,7 @@ mod tests {
             }
         }
 
-        let (send, recv) = tx2_utils::bound_async_mem_channel(4096);
+        let (send, recv) = tx2_utils::bound_async_mem_channel(4096, None);
         let mut send = <CodecWriter<Test>>::new(FramedWriter::new(send));
         let mut recv = <CodecReader<Test>>::new(FramedReader::new(recv));
 

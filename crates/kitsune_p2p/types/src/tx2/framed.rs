@@ -104,7 +104,7 @@ pub trait AsFramedReader: 'static + Send + Unpin {
 
 struct FramedReaderInner {
     sub: Box<dyn futures::io::AsyncRead + 'static + Send + Unpin>,
-    local_buf: [u8; POOL_BUF_MAX_CAPACITY],
+    local_buf: [u8; 4096],
 }
 
 /// Efficiently read framed data from a sub AsyncRead instance.
@@ -127,7 +127,7 @@ impl FramedReader {
     pub fn new(sub: Box<dyn futures::io::AsyncRead + 'static + Send + Unpin>) -> Self {
         Self(Some(FramedReaderInner {
             sub,
-            local_buf: [0; POOL_BUF_MAX_CAPACITY],
+            local_buf: [0; 4096],
         }))
     }
 }
@@ -319,7 +319,7 @@ mod tests {
     async fn test_framed() {
         let t = KitsuneTimeout::from_millis(5000);
 
-        let (send, recv) = bound_async_mem_channel(4096);
+        let (send, recv) = bound_async_mem_channel(4096, None);
         let mut send = FramedWriter::new(send);
         let mut recv = FramedReader::new(recv);
 
