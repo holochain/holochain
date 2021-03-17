@@ -301,7 +301,7 @@ pub fn query_agent_info_signed(
 }
 
 /// Get the peer density an agent is currently seeing within
-/// a given [`DhtArc`A.]
+/// a given [`DhtArc`]
 pub fn query_peer_density(
     env: EnvironmentWrite,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,

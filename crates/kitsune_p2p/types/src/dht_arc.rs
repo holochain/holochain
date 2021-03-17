@@ -168,8 +168,11 @@ pub struct PeerDensity {
     count: usize,
 }
 
-/// A list of arcs that are
-/// contained within the buckets arc.
+/// When sampling a section of the arc we can
+/// collect all the other peer [`DhtArc`]s into a
+/// DhtBucket.
+/// All the peer arcs arc contained within the buckets filter arc.
+/// The filter is this peer's "view" into their section of the dht arc.
 pub struct DhtArcBucket {
     /// The arc used to filter this bucket.
     filter: DhtArc,
