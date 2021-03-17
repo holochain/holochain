@@ -19,6 +19,8 @@ rec {
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
     cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture
+    # TODO: the above line should add 'db-encryption' once the nix env is set up properly, like so:
+    # cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms,db-encryption -- --nocapture
     # run all the remaining cargo tests
     cargo test --workspace --exclude holochain -- --nocapture
     # run all the wasm tests (within wasm) with the conductor mocked
@@ -48,7 +50,7 @@ rec {
     cargo test speed_test_prep --test speed_tests --release --manifest-path=crates/holochain/Cargo.toml --features "build_wasms" -- --ignored
     cargo test speed_test_all --test speed_tests --release --manifest-path=crates/holochain/Cargo.toml --features "build_wasms" -- --ignored --nocapture
   '';
-  
+
   hcFlakyTest = writeShellScriptBin "hc-flaky-test" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
