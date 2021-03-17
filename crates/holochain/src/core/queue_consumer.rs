@@ -17,7 +17,8 @@
 //! | CallZome       | *n/a*            | ChainSequence    | ProduceDhtOps  |
 //! | ProduceDhtOps  | ChainSequence    | Auth'd + IntQ †  | DhtOpIntegr.   |
 //! |                 **integration, common to both paths**                 |
-//! | DhtOpIntegr.   | IntegrationLimbo | IntegratedDhtOps | Publish        |
+//! | DhtOpIntegr.   | IntegrationLimbo | IntegratedDhtOps | SysVal + VR    |
+//! | ValReceipt.    | IntegratedDhtOps | IntegratedDhtOps | *n/a           |
 //! | Publish        | AuthoredDhtOps   | *n/a*            | *n/a*          |
 //!
 //! († Auth'd + IntQ is short for: AuthoredDhtOps + IntegrationLimbo)
@@ -45,6 +46,8 @@ use app_validation_consumer::*;
 mod produce_dht_ops_consumer;
 use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
+use validation_receipt_consumer::*;
+mod validation_receipt_consumer;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::manager::ManagedTaskAdd;
 use holochain_p2p::HolochainP2pCell;
@@ -71,11 +74,23 @@ pub async fn spawn_queue_consumer_tasks(
         .await
         .expect("Failed to manage workflow handle");
 
+    // Validation Receipt
+    let (tx_receipt, handle) =
+        spawn_validation_receipt_consumer(env.clone(), stop.subscribe(), cell_network.clone());
+    task_sender
+        .send(ManagedTaskAdd::dont_handle(handle))
+        .await
+        .expect("Failed to manage workflow handle");
+
     let (create_tx_sys, get_tx_sys) = tokio::sync::oneshot::channel();
 
     // Integration
-    let (tx_integration, handle) =
-        spawn_integrate_dht_ops_consumer(env.clone(), stop.subscribe(), get_tx_sys);
+    let (tx_integration, handle) = spawn_integrate_dht_ops_consumer(
+        env.clone(),
+        stop.subscribe(),
+        get_tx_sys,
+        tx_receipt.clone(),
+    );
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
@@ -120,7 +135,14 @@ pub async fn spawn_queue_consumer_tasks(
 
     (
         QueueTriggers::new(tx_sys.clone(), tx_produce.clone()),
-        InitialQueueTriggers::new(tx_sys, tx_produce, tx_publish, tx_app, tx_integration),
+        InitialQueueTriggers::new(
+            tx_sys,
+            tx_produce,
+            tx_publish,
+            tx_app,
+            tx_integration,
+            tx_receipt,
+        ),
     )
 }
 
@@ -142,6 +164,7 @@ pub struct InitialQueueTriggers {
     publish_dht_ops: TriggerSender,
     app_validation: TriggerSender,
     integrate_dht_ops: TriggerSender,
+    validation_receipt: TriggerSender,
 }
 
 impl QueueTriggers {
@@ -161,6 +184,7 @@ impl InitialQueueTriggers {
         publish_dht_ops: TriggerSender,
         app_validation: TriggerSender,
         integrate_dht_ops: TriggerSender,
+        validation_receipt: TriggerSender,
     ) -> Self {
         Self {
             sys_validation,
@@ -168,6 +192,7 @@ impl InitialQueueTriggers {
             publish_dht_ops,
             app_validation,
             integrate_dht_ops,
+            validation_receipt,
         }
     }
 
@@ -178,6 +203,7 @@ impl InitialQueueTriggers {
         self.publish_dht_ops.trigger();
         self.integrate_dht_ops.trigger();
         self.produce_dht_ops.trigger();
+        self.validation_receipt.trigger();
     }
 }
 /// The means of nudging a queue consumer to tell it to look for more work
