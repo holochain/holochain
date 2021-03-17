@@ -512,7 +512,7 @@ mod tests {
                     let complete = produce_dht_ops_workflow(workspace, env.clone().into(), qt)
                         .await
                         .unwrap();
-                    assert_matches!(complete, WorkComplete::Complete);
+                    self::assert_matches!(complete, WorkComplete::Complete);
                 }
                 {
                     let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
@@ -653,7 +653,7 @@ mod tests {
                     let complete = produce_dht_ops_workflow(workspace, env.clone().into(), qt)
                         .await
                         .unwrap();
-                    assert_matches!(complete, WorkComplete::Complete);
+                    self::assert_matches!(complete, WorkComplete::Complete);
                 }
 
                 // Create cell data

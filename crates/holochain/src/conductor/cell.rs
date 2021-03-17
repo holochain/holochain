@@ -38,7 +38,6 @@ use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
-use holochain_p2p::HolochainP2pCellT;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::{fresh_reader, prelude::*};
 use holochain_state::prelude::*;
@@ -127,10 +126,6 @@ impl Cell {
         };
 
         if has_genesis {
-            tokio::spawn({
-                let mut network = holochain_p2p_cell.clone();
-                async move { network.join().await }
-            });
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 &env,
                 holochain_p2p_cell.clone(),

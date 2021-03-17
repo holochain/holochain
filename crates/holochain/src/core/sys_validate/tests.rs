@@ -258,7 +258,10 @@ async fn check_update_reference_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn check_link_tag_size_test() {
     let tiny = LinkTag(vec![0; 1]);
-    let bytes = (0..1001).map(|_| 0u8).into_iter().collect::<Vec<_>>();
+    let bytes = (0..super::MAX_TAG_SIZE + 1)
+        .map(|_| 0u8)
+        .into_iter()
+        .collect::<Vec<_>>();
     let huge = LinkTag(bytes);
     assert_matches!(check_tag_size(&tiny), Ok(()));
 

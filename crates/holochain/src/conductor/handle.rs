@@ -53,12 +53,15 @@ use super::p2p_store::put_agent_info_signed;
 use super::p2p_store::query_agent_info_signed;
 use super::Cell;
 use super::Conductor;
+use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
+use futures::StreamExt;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_p2p::event::HolochainP2pEvent::*;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::sync::Arc;
@@ -553,7 +556,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let add_cells_tasks = cells.map(|result| async {
             match result {
                 Ok(cells) => {
-                    self.conductor.write().await.add_cells(cells);
+                    self.initializew_cells(cells).await;
                     None
                 }
                 Err(e) => Some(e),
@@ -676,5 +679,32 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
     async fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<Arc<Cell>> {
         let lock = self.conductor.read().await;
         Ok(lock.cell_by_id(cell_id)?)
+    }
+
+    /// Add cells to the map then join the network then initialize workflows.
+    async fn initializew_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
+        let (cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
+        let networks: Vec<_> = cells
+            .iter()
+            .map(|cell| cell.holochain_p2p_cell().clone())
+            .collect();
+        // Add the cells to the conductor map.
+        // This write lock can't be held while join is awaited as join calls the conductor.
+        // Cells need to be in the map before join is called so it can route the call.
+        self.conductor.write().await.add_cells(cells);
+        // Join the network but ignore errors because the
+        // space retries joining.
+        futures::stream::iter(networks)
+            .for_each_concurrent(100, |mut network| async move {
+                if let Err(e) = network.join().await {
+                    tracing::info!(failed_to_join_network = ?e);
+                }
+            })
+            .await;
+
+        // Now we can trigger the workflows.
+        for trigger in triggers {
+            trigger.initialize_workflows();
+        }
     }
 }

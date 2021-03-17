@@ -92,7 +92,7 @@ impl TestData {
             .collect::<Vec<_>>()
             .unwrap()
             .is_empty());
-        assert!(val, test);
+        assert!(val, "{}", test);
     }
 
     #[allow(dead_code)]

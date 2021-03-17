@@ -1,8 +1,8 @@
-use crate::conductor::ConductorHandle;
 use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
 use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::setup_app;
 use crate::test_utils::wait_for_integration;
+use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use hdk::prelude::LinkTag;
@@ -351,7 +351,10 @@ async fn bob_makes_a_large_link(
     let bad_update_entry_hash =
         EntryHash::with_data_sync(&Entry::try_from(bad_update.clone()).unwrap());
 
-    let bytes = (0..401).map(|_| 0u8).into_iter().collect::<Vec<_>>();
+    let bytes = (0..MAX_TAG_SIZE + 1)
+        .map(|_| 0u8)
+        .into_iter()
+        .collect::<Vec<_>>();
     let link_tag = LinkTag(bytes);
 
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
