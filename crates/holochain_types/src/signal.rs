@@ -15,8 +15,6 @@ pub enum Signal {
     App(CellId, AppSignal),
     /// System-defined signals
     System(SystemSignal),
-    /// Signal useful for testing
-    Test(TestSignal),
 }
 
 /// A Signal which originates from within the Holochain system, as opposed to
@@ -29,18 +27,6 @@ pub enum SystemSignal {
     /// Since we have no real system signals, we use a test signal for testing
     /// TODO: replace instances of this with something real
     Test(String),
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
-/// Signals useful for writing tests.
-/// These indicate events in holochain that may
-/// be useful for writing tests but are not
-/// useful for production apps.
-pub enum TestSignal {
-    /// Kitsune has added a cell on
-    /// this conductors agent info
-    /// to it's agent info store.
-    NetworkJoined(CellId),
 }
 
 /// Create a test signal

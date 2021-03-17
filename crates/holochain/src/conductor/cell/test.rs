@@ -1,4 +1,3 @@
-use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::manager::spawn_task_manager;
 use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
 use crate::fixt::DnaFileFixturator;
@@ -29,12 +28,6 @@ async fn test_cell_handle_publish() {
     mock_handler
         .expect_get_dna()
         .returning(|_| Some(fixt!(DnaFile)));
-
-    let (tx, _rx) = tokio::sync::broadcast::channel(1);
-    mock_handler.expect_signal_broadcaster().returning({
-        let tx = tx.clone();
-        move || SignalBroadcaster::new(vec![tx.clone()])
-    });
 
     let mock_handler: crate::conductor::handle::ConductorHandle = Arc::new(mock_handler);
 

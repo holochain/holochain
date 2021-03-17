@@ -886,22 +886,6 @@ where
             .insert(id, AppInterfaceRuntime::Test { signal_tx });
         Ok(())
     }
-
-    #[cfg(any(test, feature = "test_utils"))]
-    pub(super) async fn add_existing_test_app_interface<I: Into<AppInterfaceId>>(
-        &mut self,
-        signal_tx: tokio::sync::broadcast::Sender<Signal>,
-        id: I,
-    ) -> ConductorResult<()> {
-        let id = id.into();
-        if self.app_interfaces.contains_key(&id) {
-            return Err(ConductorError::AppInterfaceIdCollision(id));
-        }
-        let _ = self
-            .app_interfaces
-            .insert(id, AppInterfaceRuntime::Test { signal_tx });
-        Ok(())
-    }
 }
 
 //-----------------------------------------------------------------------------
@@ -1016,9 +1000,6 @@ mod builder {
         #[cfg(any(test, feature = "test_utils"))]
         /// Optional handle mock (for testing)
         pub mock_handle: Option<MockConductorHandleT>,
-        #[cfg(any(test, feature = "test_utils"))]
-        /// Optional test interface.
-        pub test_interface: Option<tokio::sync::broadcast::Sender<Signal>>,
     }
 
     impl ConductorBuilder {
@@ -1198,16 +1179,6 @@ mod builder {
         }
 
         #[cfg(any(test, feature = "test_utils"))]
-        /// Add an existing test app interface.
-        pub fn with_test_interface(
-            mut self,
-            signal_tx: tokio::sync::broadcast::Sender<Signal>,
-        ) -> Self {
-            self.test_interface = Some(signal_tx);
-            self
-        }
-
-        #[cfg(any(test, feature = "test_utils"))]
         async fn update_fake_state(
             state: Option<ConductorState>,
             conductor: Conductor<DS>,
@@ -1218,23 +1189,9 @@ mod builder {
             Ok(conductor)
         }
 
-        #[cfg(any(test, feature = "test_utils"))]
-        async fn add_test_interfaces(
-            test_interface: Option<tokio::sync::broadcast::Sender<Signal>>,
-            conductor: &mut Conductor<DS>,
-        ) {
-            if let Some(signal) = test_interface {
-                // Automatically add a test app interface
-                conductor
-                    .add_existing_test_app_interface::<AppInterfaceId>(signal, Default::default())
-                    .await
-                    .expect("Couldn't set up test app interface");
-            }
-        }
-
         /// Build a Conductor with a test environment
         #[cfg(any(test, feature = "test_utils"))]
-        pub async fn test(mut self, envs: &TestEnvironments) -> ConductorResult<ConductorHandle> {
+        pub async fn test(self, envs: &TestEnvironments) -> ConductorResult<ConductorHandle> {
             let keystore = envs.conductor().keystore();
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
@@ -1250,9 +1207,7 @@ mod builder {
             )
             .await?;
 
-            let test_interface = self.test_interface.take();
-            let mut conductor = Self::update_fake_state(self.state, conductor).await?;
-            Self::add_test_interfaces(test_interface, &mut conductor).await;
+            let conductor = Self::update_fake_state(self.state, conductor).await?;
 
             Self::finish(conductor, self.config, p2p_evt).await
         }

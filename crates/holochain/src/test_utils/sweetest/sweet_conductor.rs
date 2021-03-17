@@ -114,24 +114,6 @@ impl SweetConductorBatch {
     }
 }
 
-/// Wait for all cells to join the network or timeout after 10 seconds
-pub async fn wait_join_10s(
-    _signals: &mut SignalStream,
-    _cell_ids: std::collections::HashSet<CellId>,
-) {
-    // use tokio_stream::StreamExt;
-    // let timeout = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
-    // while let Ok(Some(s)) = tokio::time::timeout_at(timeout, signals.next()).await {
-    //     if let Signal::Test(TestSignal::NetworkJoined(id)) = s {
-    //         cell_ids.remove(&id);
-    //         if cell_ids.is_empty() {
-    //             return;
-    //         }
-    //     }
-    // }
-    // unreachable!("Didn't join the network in time")
-}
-
 /// A stream of signals.
 pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>;
 
@@ -194,9 +176,7 @@ impl SweetConductor {
     /// Create a SweetConductor with a new set of TestEnvironments from the given config
     pub async fn from_config(config: ConductorConfig) -> SweetConductor {
         let envs = test_environments();
-        let (tx, _) = tokio::sync::broadcast::channel(1000);
-        let handle = Self::from_existing(&envs, &config, tx).await;
-
+        let handle = Self::from_existing(&envs, &config).await;
         Self::new(handle, envs, config).await
     }
 
@@ -211,13 +191,8 @@ impl SweetConductor {
     }
 
     /// Create a handle from an existing environment and config
-    async fn from_existing(
-        envs: &TestEnvironments,
-        config: &ConductorConfig,
-        test_interface: tokio::sync::broadcast::Sender<Signal>,
-    ) -> ConductorHandle {
+    async fn from_existing(envs: &TestEnvironments, config: &ConductorConfig) -> ConductorHandle {
         Conductor::builder()
-            .with_test_interface(test_interface)
             .config(config.clone())
             .test(envs)
             .await
@@ -317,11 +292,6 @@ impl SweetConductor {
         agent: AgentPubKey,
         dna_files: &[DnaFile],
     ) -> SweetApp {
-        let cell_ids: std::collections::HashSet<_> = dna_files
-            .iter()
-            .map(|dna| CellId::new(dna.dna_hash().clone(), agent.clone()))
-            .collect();
-
         self.setup_app_part_1(dna_files).await;
         self.setup_app_part_2(installed_app_id, agent.clone(), dna_files)
             .await;
@@ -334,11 +304,8 @@ impl SweetConductor {
             .expect("Could not setup cells");
 
         let dna_files = dna_files.iter().map(|d| d.dna_hash().clone());
-        let r = self
-            .setup_app_part_3(installed_app_id, agent, dna_files)
-            .await;
-        wait_join_10s(self.signal_stream.as_mut().unwrap(), cell_ids).await;
-        r
+        self.setup_app_part_3(installed_app_id, agent, dna_files)
+            .await
     }
 
     /// Opinionated app setup.
@@ -365,14 +332,6 @@ impl SweetConductor {
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
     ) -> SweetAppBatch {
-        let cell_ids: std::collections::HashSet<_> = agents
-            .iter()
-            .flat_map(|agent| {
-                dna_files
-                    .iter()
-                    .map(move |dna| CellId::new(dna.dna_hash().clone(), agent.clone()))
-            })
-            .collect();
         self.setup_app_part_1(dna_files).await;
         for agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
@@ -400,7 +359,6 @@ impl SweetConductor {
             );
         }
 
-        wait_join_10s(self.signal_stream.as_mut().unwrap(), cell_ids).await;
         SweetAppBatch(apps)
     }
 
@@ -430,30 +388,10 @@ impl SweetConductor {
 
     /// Start up this conductor if it's not already running.
     pub async fn startup(&mut self) {
-        use tokio_stream::StreamExt;
         if self.handle.is_none() {
-            let (tx, rx) = tokio::sync::broadcast::channel(1000);
-            let rx = tokio_stream::wrappers::BroadcastStream::new(rx)
-                .map(|v| v.expect("Failed to recv test signal"));
-            let mut signal_stream: SignalStream = Box::new(rx);
             self.handle = Some(Arc::new(SweetConductorHandle(
-                Self::from_existing(&self.envs, &self.config, tx).await,
+                Self::from_existing(&self.envs, &self.config).await,
             )));
-
-            wait_join_10s(
-                &mut signal_stream,
-                self.handle
-                    .as_ref()
-                    .unwrap()
-                    .list_cell_ids()
-                    .await
-                    .unwrap()
-                    .into_iter()
-                    .collect(),
-            )
-            .await;
-
-            self.signal_stream = Some(Box::new(signal_stream));
 
             // MD: this feels wrong, why should we have to reinstall DNAs on restart?
 

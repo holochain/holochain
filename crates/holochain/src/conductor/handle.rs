@@ -556,7 +556,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let add_cells_tasks = cells.map(|result| async {
             match result {
                 Ok(cells) => {
-                    self.add_cells(cells).await;
+                    self.initializew_cells(cells).await;
                     None
                 }
                 Err(e) => Some(e),
@@ -681,7 +681,8 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         Ok(lock.cell_by_id(cell_id)?)
     }
 
-    async fn add_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
+    /// Add cells to the map then join the network then initialize workflows.
+    async fn initializew_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
         let (cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
         let networks: Vec<_> = cells
             .iter()
