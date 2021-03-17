@@ -512,7 +512,10 @@ impl SweetConductorHandle {
         let c = &self.0;
         if let Some(shutdown) = c.take_shutdown_handle().await {
             c.shutdown().await;
-            shutdown.await.expect("Failed to await shutdown handle");
+            shutdown
+                .await
+                .expect("Failed to await shutdown handle")
+                .expect("Conductor shutdown error");
         }
     }
 }
