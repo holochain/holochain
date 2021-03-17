@@ -125,21 +125,21 @@ impl TableKind {
 pub(crate) fn initialize_table_single(
     conn: &mut Connection,
     table_name: String,
-    index_name: String,
 ) -> rusqlite::Result<()> {
     // create table
     conn.execute(
         &format!(
             "CREATE TABLE IF NOT EXISTS {} (
-            key       BLOB PRIMARY KEY,
-            val       BLOB NOT NULL
-        );",
+                key       BLOB PRIMARY KEY,
+                val       BLOB NOT NULL
+            );",
             table_name
         ),
         NO_PARAMS,
     )?;
 
     // create index
+    let index_name = format!("{}_idx", table_name);
     conn.execute(
         &format!(
             "CREATE INDEX IF NOT EXISTS {} ON {} ( key );",
@@ -153,21 +153,21 @@ pub(crate) fn initialize_table_single(
 pub(crate) fn initialize_table_multi(
     conn: &mut Connection,
     table_name: String,
-    index_name: String,
 ) -> rusqlite::Result<()> {
     // create table
     conn.execute(
         &format!(
             "CREATE TABLE IF NOT EXISTS {} (
-            key       BLOB NOT NULL,
-            val       BLOB NOT NULL
-        );",
+                key       BLOB NOT NULL,
+                val       BLOB NOT NULL
+            );",
             table_name
         ),
         NO_PARAMS,
     )?;
 
     // create index
+    let index_name = format!("{}_idx", table_name);
     conn.execute(
         &format!(
             "CREATE INDEX IF NOT EXISTS {} ON {} ( key, val );",
@@ -180,11 +180,10 @@ pub(crate) fn initialize_table_multi(
 
 fn initialize_table(conn: &mut Connection, name: TableName) -> rusqlite::Result<()> {
     let table_name = format!("{}", name);
-    let index_name = format!("{}_idx", table_name);
 
     match name.kind() {
-        TableKind::Single => initialize_table_single(conn, table_name, index_name),
-        TableKind::Multi => initialize_table_multi(conn, table_name, index_name),
+        TableKind::Single => initialize_table_single(conn, table_name),
+        TableKind::Multi => initialize_table_multi(conn, table_name),
     }
 }
 

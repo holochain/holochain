@@ -58,11 +58,7 @@ impl SConn {
 
     #[cfg(feature = "test_utils")]
     pub fn open_single(&mut self, name: &str) -> Result<SingleTable, DatabaseError> {
-        crate::table::initialize_table_single(
-            &mut self.inner(),
-            name.to_string(),
-            name.to_string(),
-        )?;
+        crate::table::initialize_table_single(&mut self.inner(), name.to_string())?;
         Ok(Table {
             name: TableName::TestSingle(name.to_string()),
         })
@@ -75,11 +71,7 @@ impl SConn {
 
     #[cfg(feature = "test_utils")]
     pub fn open_multi(&mut self, name: &str) -> Result<MultiTable, DatabaseError> {
-        crate::table::initialize_table_multi(
-            &mut self.inner(),
-            name.to_string(),
-            name.to_string(),
-        )?;
+        crate::table::initialize_table_multi(&mut self.inner(), name.to_string())?;
         Ok(Table {
             name: TableName::TestMulti(name.to_string()),
         })
