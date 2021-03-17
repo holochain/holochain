@@ -14,12 +14,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 /// Promote a tx2 transport backend to a tx2 transport frontend.
 pub fn tx2_promote(backend: BackendFactory, max_cons: usize) -> EpFactory {
-    let con_limit = Arc::new(Semaphore::new(max_cons));
-    EpFactory(Arc::new(PromoteFactory {
-        max_cons,
-        con_limit,
-        backend,
-    }))
+    EpFactory(Arc::new(PromoteFactory { max_cons, backend }))
 }
 
 // -- private -- //
@@ -45,7 +40,7 @@ struct PromoteConInner {
     writer_bucket: ResourceBucket<WriteChan>,
 }
 
-struct PromoteConHnd(Share<PromoteConInner>, Uniq);
+struct PromoteConHnd(Arc<Share<PromoteConInner>>, Uniq);
 
 impl std::fmt::Debug for PromoteConHnd {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -58,6 +53,7 @@ impl std::fmt::Debug for PromoteConHnd {
 }
 
 async fn in_chan_recv_logic(
+    inner: Arc<Share<PromoteConInner>>,
     raw_con: Arc<dyn ConAdapt>,
     con: ConHnd,
     writer_bucket: ResourceBucket<WriteChan>,
@@ -66,22 +62,47 @@ async fn in_chan_recv_logic(
 ) {
     let con = &con;
     let logic_hnd = &logic_hnd;
+    let inner = &inner;
 
     let recv_fut = in_chan_recv
         .for_each_concurrent(CHANNELS_PER_CONNECTION, move |chan| async move {
             let mut chan = match chan.await {
+                Err(e) => {
+                    // unable to resolve incoming channel
+                    // shut down the connection
+
+                    let reason = format!("{:?}", e);
+
+                    // TODO - standardize codes?
+                    close_inner(inner, 500, &reason).await;
+
+                    // exit the loop
+                    return;
+                }
                 Ok(c) => c,
-                // TODO - FIXME
-                Err(e) => panic!("{:?}", e),
             };
             loop {
                 let r = chan
                     .read(KitsuneTimeout::from_millis(MAX_READ_TIMEOUT))
                     .await;
                 let (msg_id, data) = match r {
+                    Err(e) if *e.kind() == KitsuneErrorKind::Closed => {
+                        // this channel was closed - exit the loop
+                        // allowing another channel to be processed.
+                        return;
+                    }
+                    Err(e) => {
+                        // unrecoverable error - shut down the connection
+
+                        let reason = format!("{:?}", e);
+
+                        // TODO - standardize codes?
+                        close_inner(inner, 500, &reason).await;
+
+                        // exit the loop
+                        return;
+                    }
                     Ok(r) => r,
-                    // TODO - FIXME
-                    Err(e) => panic!("{:?}", e),
                 };
 
                 if logic_hnd
@@ -98,19 +119,30 @@ async fn in_chan_recv_logic(
     let write_fut = async move {
         let limit = Arc::new(Semaphore::new(CHANNELS_PER_CONNECTION));
         loop {
-            // TODO - FIXME - this loop may leak
-            // would be nice if we had tokio 1.0 kill-able Semaphore.
             let permit = match limit.clone().acquire_owned().await {
-                // TODO - FIXME
-                Err(e) => panic!("{:?}", e),
+                Err(_) => {
+                    // we only get errors here when our endpoint has closed
+                    // we can safely just exit this loop
+                    return;
+                }
                 Ok(p) => p,
             };
             let writer = match raw_con
                 .out_chan(KitsuneTimeout::from_millis(MAX_READ_TIMEOUT))
                 .await
             {
-                // TODO - FIXME
-                Err(e) => panic!("{:?}", e),
+                Err(e) => {
+                    // we were not able to create an outgoing channel
+                    // clean up the connection.
+
+                    let reason = format!("{:?}", e);
+
+                    // TODO - standardize codes?
+                    close_inner(inner, 500, &reason).await;
+
+                    // exit the loop
+                    return;
+                }
                 Ok(c) => c,
             };
             writer_bucket.release(WriteChan {
@@ -131,20 +163,21 @@ impl PromoteConHnd {
         in_chan_recv: Box<dyn InChanRecvAdapt>,
         close_con: CloseCon,
     ) -> ConHnd {
-        let standin = ConHnd(Arc::new(Self(Share::new_closed(), Uniq::default())));
+        let standin = ConHnd(Arc::new(Self(
+            Arc::new(Share::new_closed()),
+            Uniq::default(),
+        )));
 
         let uniq = raw_con.uniq();
         let writer_bucket = ResourceBucket::new();
-        let con = Self(
-            Share::new(PromoteConInner {
-                _permit: permit,
-                hnd: standin,
-                con: raw_con.clone(),
-                close_con: Some(close_con),
-                writer_bucket: writer_bucket.clone(),
-            }),
-            uniq,
-        );
+        let inner = Arc::new(Share::new(PromoteConInner {
+            _permit: permit,
+            hnd: standin,
+            con: raw_con.clone(),
+            close_con: Some(close_con),
+            writer_bucket: writer_bucket.clone(),
+        }));
+        let con = Self(inner.clone(), uniq);
 
         let a = Arc::new(con);
         let con = ConHnd(a.clone());
@@ -161,6 +194,7 @@ impl PromoteConHnd {
         // Instead, we spawn one task per connection, gathering
         // the incoming channel data to be processed.
         tokio::task::spawn(in_chan_recv_logic(
+            inner,
             raw_con,
             con.clone(),
             writer_bucket,
@@ -217,22 +251,23 @@ impl AsConHnd for PromoteConHnd {
 }
 
 fn close_inner(this: &Share<PromoteConInner>, code: u32, reason: &str) -> BoxFuture<'static, ()> {
-    match this.share_mut(move |i, c| {
+    let (close_con, hnd, con) = match this.share_mut(move |i, c| {
         *c = true;
-        let f1 = if let Some(close_con) = i.close_con.take() {
-            close_con(i.hnd.clone(), code, reason)
-        } else {
-            async move {}.boxed()
-        };
-        let f2 = i.con.close(code, reason);
-        Ok(async move {
-            futures::future::join(f1, f2).await;
-        }
-        .boxed())
+        Ok((i.close_con.take(), i.hnd.clone(), i.con.clone()))
     }) {
-        Ok(fut) => fut,
-        Err(_) => async move {}.boxed(),
+        Err(_) => return async move {}.boxed(),
+        Ok(r) => r,
+    };
+    let f1 = if let Some(close_con) = close_con {
+        close_con(hnd, code, reason)
+    } else {
+        async move {}.boxed()
+    };
+    let f2 = con.close(code, reason);
+    async move {
+        futures::future::join(f1, f2).await;
     }
+    .boxed()
 }
 
 struct PromoteEpInner {
@@ -311,6 +346,7 @@ impl AsEpHnd for PromoteEpHnd {
         async move {
             let (ep, cons, logic_hnd) = inner.share_mut(|i, c| {
                 *c = true;
+                i.con_limit.close();
                 Ok((
                     i.ep.clone(),
                     i.all_cons.iter().cloned().collect::<Vec<_>>(),
@@ -425,7 +461,7 @@ impl PromoteEp {
     ) -> KitsuneResult<Self> {
         let (ep, con_recv) = pair;
 
-        let logic_chan = LogicChan::new(32);
+        let logic_chan = LogicChan::new(max_cons);
         let logic_hnd = logic_chan.handle().clone();
         let hnd = PromoteEpHnd::new(con_limit.clone(), logic_hnd.clone(), ep);
 
@@ -466,7 +502,6 @@ impl AsEp for PromoteEp {
 
 struct PromoteFactory {
     max_cons: usize,
-    con_limit: Arc<Semaphore>,
     backend: BackendFactory,
 }
 
@@ -477,7 +512,7 @@ impl AsEpFactory for PromoteFactory {
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<Ep>> {
         let max_cons = self.max_cons;
-        let con_limit = self.con_limit.clone();
+        let con_limit = Arc::new(Semaphore::new(max_cons));
         let pair_fut = self.backend.bind(bind_spec, timeout);
         async move {
             let pair = pair_fut.await?;
@@ -492,9 +527,91 @@ impl AsEpFactory for PromoteFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::sink::SinkExt;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_tx2_backend_frontend_promote() {
+    async fn test_tx2_promote_stress() {
+        let t = KitsuneTimeout::from_millis(5000);
+
+        const COUNT: usize = 100;
+        let (mut w_send, w_recv) = futures::channel::mpsc::channel(COUNT * 3);
+
+        // we can set the max con count to half...
+        // as old connections complete, new ones will be accepted
+        let fact = tx2_promote(MemBackendAdapt::new(), COUNT / 2);
+
+        let mut tgt = fact.bind("none:", t).await.unwrap();
+        let tgt_hnd = tgt.handle().clone();
+        let tgt_addr = tgt_hnd.local_addr().unwrap();
+
+        w_send
+            .send(tokio::task::spawn(async move {
+                while let Some(evt) = tgt.next().await {
+                    match evt {
+                        EpEvent::IncomingData(con, _, mut data) => {
+                            assert_eq!(b"hello", data.as_ref());
+                            data.clear();
+                            data.extend_from_slice(b"world");
+                            con.write(0.into(), data, t).await.unwrap();
+                        }
+                        _ => (),
+                    }
+                }
+            }))
+            .await
+            .unwrap();
+
+        let mut all_fut = Vec::new();
+        for _ in 0..COUNT {
+            let ep_fut = fact.bind("none:", t);
+            let mut w_send = w_send.clone();
+            let tgt_addr = tgt_addr.clone();
+            all_fut.push(async move {
+                let mut ep = ep_fut.await.unwrap();
+                let ep_hnd = ep.handle().clone();
+
+                let (s_done, r_done) = tokio::sync::oneshot::channel();
+
+                w_send
+                    .send(tokio::task::spawn(async move {
+                        while let Some(evt) = ep.next().await {
+                            match evt {
+                                EpEvent::IncomingData(_, _, data) => {
+                                    assert_eq!(b"world", data.as_ref());
+                                    let _ = s_done.send(());
+                                    break;
+                                }
+                                _ => (),
+                            }
+                        }
+                    }))
+                    .await
+                    .unwrap();
+
+                let con = ep_hnd.connect(tgt_addr, t).await.unwrap();
+                let mut data = PoolBuf::new();
+                data.extend_from_slice(b"hello");
+                con.write(0.into(), data, t).await.unwrap();
+
+                let _ = r_done.await;
+
+                ep_hnd.close(0, "").await;
+            });
+        }
+
+        futures::future::join_all(all_fut).await;
+
+        tgt_hnd.close(0, "").await;
+
+        w_send.close().await.unwrap();
+
+        futures::future::try_join_all(w_recv.collect::<Vec<_>>().await)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_tx2_promote() {
         let t = KitsuneTimeout::from_millis(5000);
 
         let f = tx2_promote(MemBackendAdapt::new(), 32);
