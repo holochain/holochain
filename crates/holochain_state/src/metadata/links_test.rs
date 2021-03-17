@@ -394,7 +394,8 @@ async fn can_add_and_delete_link() {
         td.only_on_full_key(here!("Is still in the scratch"), &meta_buf)
             .await;
 
-        arc.conn().unwrap()
+        arc.conn()
+            .unwrap()
             .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -410,7 +411,8 @@ async fn can_add_and_delete_link() {
         td.delete_link(&mut meta_buf).await;
         // Is empty
         td.empty(here!("empty after remove"), &meta_buf).await;
-        arc.conn().unwrap()
+        arc.conn()
+            .unwrap()
             .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -436,7 +438,8 @@ async fn can_add_and_delete_link() {
         td.only_on_zome_id(here!("scratch"), &meta_buf).await;
         // Half the tag
         td.only_on_half_tag(here!("scratch"), &meta_buf).await;
-        arc.conn().unwrap()
+        arc.conn()
+            .unwrap()
             .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -500,7 +503,8 @@ async fn multiple_links() {
                 .await;
         }
 
-        arc.conn().unwrap()
+        arc.conn()
+            .unwrap()
             .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -520,7 +524,8 @@ async fn multiple_links() {
         td[0]
             .not_on_full_key(here!("removed in scratch"), &meta_buf)
             .await;
-        arc.conn().unwrap()
+        arc.conn()
+            .unwrap()
             .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -571,7 +576,8 @@ async fn duplicate_links() {
             // Half the tag
             d.is_on_half_tag(here!("re add"), &meta_buf).await;
         }
-        arc.conn().unwrap()
+        arc.conn()
+            .unwrap()
             .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -591,7 +597,8 @@ async fn duplicate_links() {
             // Half the tag
             d.is_on_half_tag(here!("re add"), &meta_buf).await;
         }
-        arc.conn().unwrap()
+        arc.conn()
+            .unwrap()
             .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -640,7 +647,8 @@ async fn links_on_same_base() {
             d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
         TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
-        arc.conn().unwrap()
+        arc.conn()
+            .unwrap()
             .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -671,7 +679,8 @@ async fn links_on_same_base() {
         td[0]
             .not_on_full_key(here!("removed in scratch"), &meta_buf)
             .await;
-        arc.conn().unwrap()
+        arc.conn()
+            .unwrap()
             .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -727,7 +736,8 @@ async fn links_on_same_zome_id() {
         }
         TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
         TestData::only_these_on_zome_id(&td, here!("check all return on same base"), &meta_buf);
-        arc.conn().unwrap()
+        arc.conn()
+            .unwrap()
             .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -762,7 +772,8 @@ async fn links_on_same_zome_id() {
         td[9]
             .not_on_full_key(here!("removed in scratch"), &meta_buf)
             .await;
-        arc.conn().unwrap()
+        arc.conn()
+            .unwrap()
             .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -830,7 +841,8 @@ async fn links_on_same_tag() {
             here!("check all return on same base"),
             &meta_buf,
         );
-        arc.conn().unwrap()
+        arc.conn()
+            .unwrap()
             .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -878,7 +890,8 @@ async fn links_on_same_tag() {
             here!("check all return on same base"),
             &meta_buf,
         );
-        arc.conn().unwrap()
+        arc.conn()
+            .unwrap()
             .with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
