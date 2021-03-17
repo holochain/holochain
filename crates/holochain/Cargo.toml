@@ -108,7 +108,7 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-default = ["slow_tests", "test_utils", "only_check_wasms"]
+default = ["slow_tests", "test_utils", "only_check_wasms", "db-encryption"]
 
 # Exposes additional functionality only needed for integration tests.
 # This feature should be turned off for production builds.
@@ -131,5 +131,10 @@ slow_tests = []
 build_wasms = ['holochain_wasm_test_utils/build']
 only_check_wasms = ['holochain_wasm_test_utils/only_check']
 
-# Enables at-rest encryption of the SQLite database
+# Enables at-rest encryption of the SQLite database.
+# Incompatible with "no-deps".
 db-encryption = ['holochain_sqlite/db-encryption']
+
+# Compile SQLite from source rather than depending on a library.
+# Incompatible with "db-encryption"
+no-deps = ['holochain_sqlite/no-deps']

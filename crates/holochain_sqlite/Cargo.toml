@@ -62,3 +62,6 @@ test_utils = [ ]
 
 # Use at-rest encryption of databases
 db-encryption = ["rusqlite/sqlcipher"]
+
+# Compile SQLite from source rather than depending on a library
+no-deps = ['rusqlite/bundled']
