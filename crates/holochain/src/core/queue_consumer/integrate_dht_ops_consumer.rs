@@ -8,11 +8,12 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
-#[instrument(skip(env, stop, trigger_sys))]
+#[instrument(skip(env, stop, trigger_sys, trigger_receipt))]
 pub fn spawn_integrate_dht_ops_consumer(
     env: DbWrite,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_sys: sync::oneshot::Receiver<TriggerSender>,
+    trigger_receipt: TriggerSender,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
     let trigger_self = tx.clone();
@@ -30,9 +31,13 @@ pub fn spawn_integrate_dht_ops_consumer(
             holochain_sqlite::db::optimistic_retry_async("integrate_dht_ops_consumer", || async {
                 // Run the workflow
                 let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into())?;
-                if let WorkComplete::Incomplete =
-                    integrate_dht_ops_workflow(workspace, env.clone().into(), trigger_sys.clone())
-                        .await?
+                if let WorkComplete::Incomplete = integrate_dht_ops_workflow(
+                    workspace,
+                    env.clone().into(),
+                    trigger_sys.clone(),
+                    trigger_receipt.clone(),
+                )
+                .await?
                 {
                     trigger_self.clone().trigger()
                 };

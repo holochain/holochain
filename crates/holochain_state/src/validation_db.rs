@@ -37,6 +37,8 @@ pub struct ValidationLimboValue {
     pub num_tries: u32,
     /// The agent that sent you this op
     pub from_agent: Option<AgentPubKey>,
+    /// Send a receipt to this author.
+    pub send_receipt: bool,
 }
 
 /// The status of a [DhtOp] in limbo

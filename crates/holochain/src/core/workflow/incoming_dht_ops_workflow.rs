@@ -27,6 +27,7 @@ pub async fn incoming_dht_ops_workflow(
     mut sys_validation_trigger: TriggerSender,
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     from_agent: Option<AgentPubKey>,
+    request_validation_receipt: bool,
 ) -> WorkflowResult<()> {
     // set up our workspace
     let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into())?;
@@ -36,12 +37,22 @@ pub async fn incoming_dht_ops_workflow(
         if !workspace.op_exists(&hash)? {
             tracing::debug!(?hash, ?op);
             if should_keep(&op).await? {
-                workspace.add_to_pending(hash, op, from_agent.clone())?;
+                workspace.add_to_pending(
+                    hash,
+                    op,
+                    from_agent.clone(),
+                    request_validation_receipt,
+                )?;
             } else {
                 tracing::warn!(
                     msg = "Dropping op because it failed counterfeit checks",
                     ?op
                 );
+            }
+        } else {
+            // Check if we should set receipt to send.
+            if needs_receipt(&op, &from_agent) && request_validation_receipt {
+                workspace.set_send_receipt(hash)?;
             }
         }
     }
@@ -55,6 +66,13 @@ pub async fn incoming_dht_ops_workflow(
     sys_validation_trigger.trigger();
 
     Ok(())
+}
+
+fn needs_receipt(op: &DhtOp, from_agent: &Option<AgentPubKey>) -> bool {
+    from_agent
+        .as_ref()
+        .map(|a| a == op.header().author())
+        .unwrap_or(false)
 }
 
 #[instrument(skip(op))]
@@ -115,7 +133,9 @@ impl IncomingDhtOpsWorkspace {
         hash: DhtOpHash,
         op: DhtOp,
         from_agent: Option<AgentPubKey>,
+        request_validation_receipt: bool,
     ) -> DhtOpConvertResult<()> {
+        let send_receipt = needs_receipt(&op, &from_agent) && request_validation_receipt;
         let basis = op.dht_basis();
         let op_light = op.to_light();
         tracing::debug!(?op_light);
@@ -145,6 +165,7 @@ impl IncomingDhtOpsWorkspace {
             last_try: None,
             num_tries: 0,
             from_agent,
+            send_receipt,
         };
         self.validation_limbo.put(hash, vlv)?;
         Ok(())
@@ -154,5 +175,19 @@ impl IncomingDhtOpsWorkspace {
         Ok(self.integrated_dht_ops.contains(&hash)?
             || self.integration_limbo.contains(&hash)?
             || self.validation_limbo.contains(&hash)?)
+    }
+
+    pub fn set_send_receipt(&mut self, hash: DhtOpHash) -> DatabaseResult<()> {
+        if let Some(mut v) = self.integrated_dht_ops.get(&hash)? {
+            v.send_receipt = true;
+            self.integrated_dht_ops.put(hash, v)?;
+        } else if let Some(mut v) = self.integration_limbo.get(&hash)? {
+            v.send_receipt = true;
+            self.integration_limbo.put(hash, v)?;
+        } else if let Some(mut v) = self.validation_limbo.get(&hash)? {
+            v.send_receipt = true;
+            self.validation_limbo.put(hash, v)?;
+        }
+        Ok(())
     }
 }

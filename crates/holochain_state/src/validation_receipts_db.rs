@@ -6,27 +6,10 @@ use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::prelude::*;
-use holochain_sqlite::buffer::BufferedStore;
-use holochain_sqlite::buffer::KvvBufUsed;
-use holochain_sqlite::error::DatabaseError;
-use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::prelude::Readable;
-use holochain_sqlite::prelude::Writer;
 use holochain_sqlite::prelude::*;
+use holochain_types::Timestamp;
 use holochain_zome_types::signature::Signature;
-
-/// The result of a DhtOp Validation.
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
-)]
-#[serde(tag = "type")]
-pub enum ValidationResult {
-    /// Successful validation.
-    Valid,
-    // TODO - fill out with additional options, which may (or may not) have content
-    // Abandoned { .. },
-    // Warrant { .. },
-}
+use holochain_zome_types::ValidationStatus;
 
 /// Validation receipt content - to be signed.
 #[derive(
@@ -46,10 +29,13 @@ pub struct ValidationReceipt {
     pub dht_op_hash: DhtOpHash,
 
     /// the result of this validation.
-    pub validation_result: ValidationResult,
+    pub validation_status: ValidationStatus,
 
     /// the remote validator which is signing this receipt.
     pub validator: AgentPubKey,
+
+    /// Time when the op was integrated
+    pub when_integrated: Timestamp,
 }
 
 impl ValidationReceipt {
@@ -120,7 +106,7 @@ impl ValidationReceiptsBuf {
 
         let mut iter = self.list_receipts(r, dht_op_hash)?;
         while let Some(v) = iter.next()? {
-            if v.receipt.validation_result == ValidationResult::Valid {
+            if v.receipt.validation_status == ValidationStatus::Valid {
                 count += 1;
             }
         }
@@ -154,6 +140,7 @@ mod tests {
     use holochain_keystore::KeystoreSenderExt;
     use holochain_sqlite::db::ReadManager;
     use holochain_types::test_utils::fake_dht_op_hash;
+    use holochain_types::timestamp;
 
     async fn fake_vr(
         dht_op_hash: &DhtOpHash,
@@ -166,8 +153,9 @@ mod tests {
             .unwrap();
         let receipt = ValidationReceipt {
             dht_op_hash: dht_op_hash.clone(),
-            validation_result: ValidationResult::Valid,
+            validation_status: ValidationStatus::Valid,
             validator: agent,
+            when_integrated: timestamp::now(),
         };
         receipt.sign(keystore).await.unwrap()
     }

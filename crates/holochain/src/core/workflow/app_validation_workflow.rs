@@ -158,6 +158,7 @@ async fn app_validation_workflow_inner(
                         let iv = IntegrationLimboValue {
                             validation_status: ValidationStatus::Valid,
                             op: vlv.op,
+                            send_receipt: vlv.send_receipt,
                         };
                         workspace.put_int_limbo(hash, iv, op)?;
                     }
@@ -169,6 +170,7 @@ async fn app_validation_workflow_inner(
                         let iv = IntegrationLimboValue {
                             op: vlv.op,
                             validation_status: ValidationStatus::Rejected,
+                            send_receipt: vlv.send_receipt,
                         };
                         workspace.put_int_limbo(hash, iv, op)?;
                     }

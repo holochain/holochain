@@ -193,6 +193,7 @@ impl Db {
                             validation_status: ValidationStatus::Valid,
                             op: op.to_light(),
                             when_integrated: timestamp::now().into(),
+                            send_receipt: todo!(),
                         };
                         let mut r = workspace
                             .integrated_dht_ops
@@ -206,6 +207,7 @@ impl Db {
                         let value = IntegrationLimboValue {
                             validation_status: ValidationStatus::Valid,
                             op: op.to_light(),
+                            send_receipt: todo!(),
                         };
                         let res = workspace
                             .integration_limbo
@@ -465,6 +467,7 @@ impl Db {
                     let val = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
                         op: op.to_light(),
+                        send_receipt: false,
                     };
                     workspace
                         .integration_limbo
@@ -531,7 +534,8 @@ impl Db {
 async fn call_workflow<'env>(env: DbWrite) {
     let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
     let (qt, _rx) = TriggerSender::new();
-    integrate_dht_ops_workflow(workspace, env.clone().into(), qt)
+    let (qt2, _rx) = TriggerSender::new();
+    integrate_dht_ops_workflow(workspace, env.clone().into(), qt, qt2)
         .await
         .unwrap();
 }
