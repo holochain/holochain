@@ -1,3 +1,6 @@
+use gaps::check_for_gaps;
+use gaps::check_redundancy;
+
 use super::*;
 
 // TODO: This is a really good place for prop testing

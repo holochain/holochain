@@ -7,18 +7,17 @@ use holochain_p2p::dht_arc::MIN_REDUNDANCY;
 use kitsune_p2p::dht_arc::DhtArc;
 use kitsune_p2p::dht_arc::DhtArcBucket;
 use kitsune_p2p::*;
-use kitsune_p2p_types::dht_arc::check_for_gaps;
-use kitsune_p2p_types::dht_arc::check_redundancy;
+use kitsune_p2p_types::dht_arc::gaps::check_for_gaps;
+use kitsune_p2p_types::dht_arc::gaps::check_redundancy;
 
 async fn get_peers(num: usize, half_lens: &[u32], keystore: KeystoreSender) -> Vec<DhtArc> {
-    let mut hl = half_lens.iter();
-    let mut iter = std::iter::repeat_with(|| hl.next().unwrap_or(&half_lens[0]));
+    let mut half_lens = half_lens.iter().cycle();
     let mut out = Vec::with_capacity(num);
 
     let agents = SweetAgents::get(keystore, num).await;
     for agent in agents {
         let agent = holochain_p2p::agent_holo_to_kit(agent);
-        let arc = DhtArc::new(agent.get_loc(), *iter.next().unwrap());
+        let arc = DhtArc::new(agent.get_loc(), *half_lens.next().unwrap());
         out.push(arc);
     }
     out
