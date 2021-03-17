@@ -42,7 +42,6 @@ use holochain_lmdb::db::GetDb;
 use holochain_lmdb::env::EnvironmentRead;
 use holochain_lmdb::env::EnvironmentWrite;
 use holochain_lmdb::env::ReadManager;
-use holochain_p2p::HolochainP2pCellT;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
@@ -130,10 +129,6 @@ impl Cell {
         };
 
         if has_genesis {
-            tokio::spawn({
-                let mut network = holochain_p2p_cell.clone();
-                async move { network.join().await }
-            });
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 &env,
                 holochain_p2p_cell.clone(),
