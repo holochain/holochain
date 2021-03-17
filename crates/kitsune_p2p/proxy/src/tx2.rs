@@ -50,26 +50,33 @@ impl ProxyConHnd {
     }
 }
 
+fn promote_addr(base_addr: &TxUrl, cert_digest: &CertDigest) -> KitsuneResult<TxUrl> {
+    Ok(ProxyUrl::new(base_addr.as_str(), cert_digest.clone())
+        .map_err(KitsuneError::other)?
+        .as_str()
+        .into())
+}
+
 impl AsConHnd for ProxyConHnd {
     fn uniq(&self) -> Uniq {
         self.uniq
     }
 
     fn is_closed(&self) -> bool {
-        unimplemented!()
+        self.sub_con.is_closed()
     }
 
     fn close(&self, _code: u32, _reason: &str) -> BoxFuture<'static, ()> {
-        unimplemented!()
+        // TODO - FIXME
+        // we don't want to close the underlying sub_con,
+        // it could be shared for proxying...
+        // do we want to do *anything*?
+        async move {}.boxed()
     }
 
     fn remote_addr(&self) -> KitsuneResult<TxUrl> {
         let remote_addr = self.sub_con.remote_addr()?;
-        let proxy_addr: TxUrl = ProxyUrl::new(remote_addr.as_str(), self.remote_digest.clone())
-            .map_err(KitsuneError::other)?
-            .as_str()
-            .into();
-        Ok(proxy_addr)
+        promote_addr(&remote_addr, &self.remote_digest)
     }
 
     fn write(
@@ -86,6 +93,8 @@ impl AsConHnd for ProxyConHnd {
     }
 }
 
+/// Represents either an unresolved (i.e. still pending) connection,
+/// or an already established connection.
 #[allow(dead_code)]
 #[derive(Clone)]
 enum ConRef {
@@ -98,9 +107,15 @@ struct ProxyEpInner {
     // this is the source of truth
     base_url_to_sub_con: HashMap<TxUrl, ConRef>,
 
-    // additional data
+    // allows us to remove the ConRef when a ConHnd close event is received
     sub_con_to_base_url: HashMap<ConHnd, TxUrl>,
+
+    // we only proxy over *incoming* connections
+    // therefore it is a 1-to-1 relationship to remote digest
     in_digest_to_sub_con: HashMap<CertDigest, ConHnd>,
+
+    // allows us to cleanup the digest to sub_con proxy mapping
+    // when a ConHnd close event is received
     in_sub_con_to_digest: HashMap<ConHnd, CertDigest>,
 }
 
@@ -188,7 +203,15 @@ async fn ingest_incoming_con(
         Ok(())
     });
     let out_con = ProxyConHnd::new(sub_con, local_digest, remote_digest);
-    let _ = logic_hnd.emit(EpEvent::IncomingConnection(out_con)).await;
+    let url = match out_con.remote_addr() {
+        Err(e) => {
+            let _ = logic_hnd.emit(EpEvent::Error(e)).await;
+            return;
+        }
+        Ok(url) => url,
+    };
+    let evt = EpEvent::IncomingConnection(EpIncomingConnection { con: out_con, url });
+    let _ = logic_hnd.emit(evt).await;
 }
 
 impl AsEpHnd for ProxyEpHnd {
@@ -285,7 +308,12 @@ async fn incoming_evt_logic(
         use EpEvent::*;
         if match evt {
             IncomingConnection(_) => Ok(()),
-            IncomingData(sub_con, msg_id, mut data) => {
+            IncomingData(EpIncomingData {
+                con: sub_con,
+                url: base_url,
+                msg_id,
+                mut data,
+            }) => {
                 if data.is_empty() {
                     // TODO - FIXME - kill connection
                     panic!("corrupt incoming data");
@@ -293,11 +321,6 @@ async fn incoming_evt_logic(
                 match data[0] {
                     PROXY_HELLO_DIGEST => {
                         let remote_digest = CertDigest(Arc::new(data[1..].to_vec()));
-                        let base_url = match sub_con.remote_addr() {
-                            // TODO - FIXME - kill connection
-                            Err(e) => panic!("{:?}", e),
-                            Ok(url) => url,
-                        };
                         ingest_incoming_con(
                             logic_hnd.clone(),
                             hnd.inner.clone(),
@@ -314,10 +337,19 @@ async fn incoming_evt_logic(
                         if dest_digest == hnd.cert_digest {
                             // this data is destined for US!
                             data.cheap_move_start(65);
+                            let url = match promote_addr(&base_url, &src_digest) {
+                                Ok(url) => url,
+                                // TODO - FIXME
+                                e => panic!("{:?}", e),
+                            };
                             let con = ProxyConHnd::new(sub_con, dest_digest, src_digest);
-                            let _ = logic_hnd
-                                .emit(EpEvent::IncomingData(con, msg_id, data))
-                                .await;
+                            let evt = EpEvent::IncomingData(EpIncomingData {
+                                con,
+                                url,
+                                msg_id,
+                                data,
+                            });
+                            let _ = logic_hnd.emit(evt).await;
                         } else {
                             let dest = hnd.inner.share_mut(|i, _| {
                                 Ok(i.in_digest_to_sub_con.get(&dest_digest).cloned())
@@ -339,19 +371,42 @@ async fn incoming_evt_logic(
                 }
                 Ok(())
             }
-            ConnectionClosed(con, code, reason) => {
+            ConnectionClosed(EpConnectionClosed {
+                con,
+                url,
+                code,
+                reason,
+            }) => {
                 let con2 = con.clone();
+                let mut remote_digest = None;
                 let _ = hnd.inner.share_mut(|i, _| {
                     if let Some(base_url) = i.sub_con_to_base_url.remove(&con2) {
                         i.base_url_to_sub_con.remove(&base_url);
                     }
                     if let Some(digest) = i.in_sub_con_to_digest.remove(&con2) {
                         i.in_digest_to_sub_con.remove(&digest);
+                        remote_digest = Some(digest);
                     }
                     Ok(())
                 });
-                let _ = logic_hnd.emit(ConnectionClosed(con, code, reason)).await;
-                Ok(())
+                // TODO - FIXME - better way to do this if we don't know??
+                let remote_digest = remote_digest.unwrap_or_else(|| vec![0; 32].into());
+                match promote_addr(&url, &remote_digest) {
+                    Err(e) => {
+                        let _ = logic_hnd.emit(Error(e));
+                        Ok(())
+                    }
+                    Ok(url) => {
+                        let evt = ConnectionClosed(EpConnectionClosed {
+                            con,
+                            url,
+                            code,
+                            reason,
+                        });
+                        let _ = logic_hnd.emit(evt).await;
+                        Ok(())
+                    }
+                }
             }
             Error(e) => logic_hnd.emit(Error(e)).await,
             EndpointClosed => {
@@ -453,7 +508,9 @@ impl AsEpFactory for ProxyEpFactory {
 mod tests {
     use super::*;
 
-    async fn build_node(tag: &'static str) -> (tokio::task::JoinHandle<()>, TxUrl, EpHnd) {
+    async fn build_node(
+        mut s_done: Option<tokio::sync::oneshot::Sender<()>>,
+    ) -> (tokio::task::JoinHandle<()>, TxUrl, EpHnd) {
         let t = KitsuneTimeout::from_millis(5000);
 
         let f = tx2_proxy(
@@ -467,10 +524,19 @@ mod tests {
 
         let join = tokio::task::spawn(async move {
             while let Some(evt) = ep.next().await {
-                if let EpEvent::IncomingData(_, _, data) = evt {
-                    println!("{} GOT DATA: {}", tag, String::from_utf8_lossy(&data));
-                } else {
-                    println!("{}: {:?}", tag, evt);
+                if let EpEvent::IncomingData(EpIncomingData { con, mut data, .. }) = evt {
+                    if data.as_ref() == b"hello" {
+                        data.clear();
+                        data.extend_from_slice(b"world");
+                        con.write(0.into(), data, t).await.unwrap();
+                    } else if data.as_ref() == b"world" {
+                        if let Some(s_done) = s_done.take() {
+                            let _ = s_done.send(());
+                            return;
+                        }
+                    } else {
+                        panic!("unexpected: {}", String::from_utf8_lossy(&data));
+                    }
                 }
             }
         });
@@ -492,47 +558,43 @@ mod tests {
     async fn test_tx2_proxy() {
         let t = KitsuneTimeout::from_millis(5000);
 
-        let (p_join, p_addr, p) = build_node("PROXY").await;
-        let (n1_join, n1_addr, n1) = build_node("NODE1").await;
-        let (n2_join, n2_addr, n2) = build_node("NODE2").await;
+        let mut all_tasks = Vec::new();
 
-        println!("-- PROXY ADDR = {}", p_addr);
-        println!("-- NODE1 ADDR = {}", n1_addr);
-        println!("-- NODE2 ADDR = {}", n2_addr);
+        let (p_join, p_addr, p_ep) = build_node(None).await;
+        all_tasks.push(p_join);
+        //println!("PROXY ADDR = {}", p_addr);
 
-        let n1_addr_proxy = proxify_addr(&p_addr, &n1_addr);
-        let n2_addr_proxy = proxify_addr(&p_addr, &n2_addr);
+        let (t_join, t_addr, t_ep) = build_node(None).await;
+        all_tasks.push(t_join);
+        let _t_con = t_ep.connect(p_addr.clone(), t).await.unwrap();
+        //println!("TGT ADDR = {}", t_addr);
 
-        println!("-- NODE1 PROXY ADDR = {}", n1_addr_proxy);
-        println!("-- NODE2 PROXY ADDR = {}", n2_addr_proxy);
+        let t_addr_proxy = proxify_addr(&p_addr, &t_addr);
+        //println!("TGT PROXY ADDR = {}", t_addr_proxy);
 
-        // establish proxy connections
-        let n1_con = n1.connect(p_addr.clone(), t).await.unwrap();
-        let _n2_con = n2.connect(p_addr, t).await.unwrap();
+        const COUNT: usize = 100;
 
-        // write data directly to the proxy
-        let mut data = PoolBuf::new();
-        data.extend_from_slice(b"proxy-test");
-        n1_con.write(0.into(), data, t).await.unwrap();
+        let mut all_futs = Vec::new();
+        for _ in 0..COUNT {
+            let (s_done, r_done) = tokio::sync::oneshot::channel();
+            let (n_join, _n_addr, n_ep) = build_node(Some(s_done)).await;
+            let t_addr_proxy = t_addr_proxy.clone();
+            all_futs.push(async move {
+                let con = n_ep.connect(t_addr_proxy, t).await.unwrap();
+                let mut data = PoolBuf::new();
+                data.extend_from_slice(b"hello");
+                con.write(0.into(), data, t).await.unwrap();
+                r_done.await.unwrap();
+                n_ep.close(0, "").await;
+                n_join.await.unwrap();
+            });
+        }
 
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        futures::future::join_all(all_futs).await;
 
-        // attempt to establish a connection THROUGH the proxy
-        let con = n1.connect(n2_addr_proxy, t).await.unwrap();
+        p_ep.close(0, "").await;
+        t_ep.close(0, "").await;
 
-        // write data through our proxy-routed connection
-        let mut data = PoolBuf::new();
-        data.extend_from_slice(b"hello");
-        con.write(0.into(), data, t).await.unwrap();
-
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-
-        p.close(0, "").await;
-        n1.close(0, "").await;
-        n2.close(0, "").await;
-
-        p_join.await.unwrap();
-        n1_join.await.unwrap();
-        n2_join.await.unwrap();
+        futures::future::try_join_all(all_tasks).await.unwrap();
     }
 }

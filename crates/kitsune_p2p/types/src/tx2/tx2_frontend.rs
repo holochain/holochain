@@ -226,17 +226,62 @@ impl AsEpHnd for EpHnd {
     }
 }
 
+/// Data associated with an IncomingConnection EpEvent
+#[derive(Debug)]
+pub struct EpIncomingConnection {
+    /// the remote connection handle (could be closed)
+    pub con: ConHnd,
+
+    /// the remote url from which this data originated
+    /// this is included incase the con is closed
+    pub url: TxUrl,
+}
+
+/// Data associated with an IncomingData EpEvent
+#[derive(Debug)]
+pub struct EpIncomingData {
+    /// the remote connection handle (could be closed)
+    pub con: ConHnd,
+
+    /// the remote url from which this data originated
+    /// this is included incase the con is closed
+    pub url: TxUrl,
+
+    /// message_id associated with this incoming data
+    pub msg_id: MsgId,
+
+    /// the actual bytes of incoming data
+    pub data: PoolBuf,
+}
+
+/// Data associated with a ConnectionClosed EpEvent
+#[derive(Debug)]
+pub struct EpConnectionClosed {
+    /// the closed remote connection handle
+    /// (can still use PartialEq/Hash)
+    pub con: ConHnd,
+
+    /// the remote url this used to be connected to
+    pub url: TxUrl,
+
+    /// the code # indicating why the connection was closed
+    pub code: u32,
+
+    /// the human string reason this connection was closed
+    pub reason: String,
+}
+
 /// Event emitted by a transport endpoint.
 #[derive(Debug)]
 pub enum EpEvent {
     /// We've accepted an incoming connection.
-    IncomingConnection(ConHnd),
+    IncomingConnection(EpIncomingConnection),
 
     /// We've received incoming data on an open connection.
-    IncomingData(ConHnd, MsgId, PoolBuf),
+    IncomingData(EpIncomingData),
 
     /// A connection has closed (Url, Code, Reason).
-    ConnectionClosed(ConHnd, u32, String),
+    ConnectionClosed(EpConnectionClosed),
 
     /// A non-fatal internal error.
     Error(KitsuneError),

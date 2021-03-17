@@ -60,6 +60,22 @@ async fn in_chan_recv_logic(
     logic_hnd: LogicChanHandle<EpEvent>,
     in_chan_recv: Box<dyn InChanRecvAdapt>,
 ) {
+    let url = match con.remote_addr() {
+        Err(e) => {
+            // unable to determine remote url for connection
+
+            let reason = format!("{:?}", e);
+
+            // TODO - standardize codes?
+            close_inner(&inner, 500, &reason).await;
+
+            // don't even start the loops
+            return;
+        }
+        Ok(url) => url,
+    };
+
+    let url = &url;
     let con = &con;
     let logic_hnd = &logic_hnd;
     let inner = &inner;
@@ -105,11 +121,13 @@ async fn in_chan_recv_logic(
                     Ok(r) => r,
                 };
 
-                if logic_hnd
-                    .emit(EpEvent::IncomingData(con.clone(), msg_id, data))
-                    .await
-                    .is_err()
-                {
+                let data = EpIncomingData {
+                    url: url.clone(),
+                    con: con.clone(),
+                    msg_id,
+                    data,
+                };
+                if logic_hnd.emit(EpEvent::IncomingData(data)).await.is_err() {
                     break;
                 }
             }
@@ -302,6 +320,7 @@ fn reg_con_hnd_inner(
     inner: &Share<PromoteEpInner>,
     permit: OwnedSemaphorePermit,
     raw_con: Arc<dyn ConAdapt>,
+    url: TxUrl,
     in_chan_recv: Box<dyn InChanRecvAdapt>,
 ) -> KitsuneResult<ConHnd> {
     let inner2 = inner.clone();
@@ -312,10 +331,13 @@ fn reg_con_hnd_inner(
                 i.all_cons.remove(&con);
                 Ok(())
             });
-            logic_hnd
-                .emit(EpEvent::ConnectionClosed(con, code, reason.to_string()))
-                .map(|_| ())
-                .boxed()
+            let evt = EpEvent::ConnectionClosed(EpConnectionClosed {
+                con,
+                url,
+                code,
+                reason: reason.to_string(),
+            });
+            logic_hnd.emit(evt).map(|_| ()).boxed()
         });
         let con = PromoteConHnd::new(
             i.logic_hnd.clone(),
@@ -381,7 +403,8 @@ impl AsEpHnd for PromoteEpHnd {
             let permit = limit.acquire_owned().await.map_err(KitsuneError::other)?;
             let (con, in_chan_recv) = ep.connect(remote, timeout).await?;
 
-            let con = reg_con_hnd_inner(&inner, permit, con, in_chan_recv)?;
+            let url = con.remote_addr()?;
+            let con = reg_con_hnd_inner(&inner, permit, con, url, in_chan_recv)?;
             Ok(con)
         }
         .boxed()
@@ -441,14 +464,22 @@ async fn con_recv_logic(
                 }
                 Ok(r) => r,
             };
-            let con = match reg_con_hnd_inner(&inner, permit, con, in_chan_recv) {
+            let url = match con.remote_addr() {
                 Err(e) => {
                     let _ = logic_hnd.emit(EpEvent::Error(e));
                     return;
                 }
                 Ok(r) => r,
             };
-            let _ = logic_hnd.emit(EpEvent::IncomingConnection(con));
+            let con = match reg_con_hnd_inner(&inner, permit, con, url.clone(), in_chan_recv) {
+                Err(e) => {
+                    let _ = logic_hnd.emit(EpEvent::Error(e));
+                    return;
+                }
+                Ok(r) => r,
+            };
+            let evt = EpEvent::IncomingConnection(EpIncomingConnection { con, url });
+            let _ = logic_hnd.emit(evt);
         })
         .await;
 }
@@ -548,7 +579,7 @@ mod tests {
             .send(tokio::task::spawn(async move {
                 while let Some(evt) = tgt.next().await {
                     match evt {
-                        EpEvent::IncomingData(con, _, mut data) => {
+                        EpEvent::IncomingData(EpIncomingData { con, mut data, .. }) => {
                             assert_eq!(b"hello", data.as_ref());
                             data.clear();
                             data.extend_from_slice(b"world");
@@ -576,7 +607,7 @@ mod tests {
                     .send(tokio::task::spawn(async move {
                         while let Some(evt) = ep.next().await {
                             match evt {
-                                EpEvent::IncomingData(_, _, data) => {
+                                EpEvent::IncomingData(EpIncomingData { data, .. }) => {
                                     assert_eq!(b"world", data.as_ref());
                                     let _ = s_done.send(());
                                     break;
@@ -625,7 +656,7 @@ mod tests {
             while let Some(evt) = e1.next().await {
                 println!("E1 GOT: {:?}", evt);
                 match evt {
-                    EpEvent::IncomingData(_, _, data) => {
+                    EpEvent::IncomingData(EpIncomingData { data, .. }) => {
                         assert_eq!(b"world", data.as_ref());
                         t_comp_s.take().unwrap().send(()).unwrap();
                     }
@@ -640,7 +671,7 @@ mod tests {
             while let Some(evt) = e2.next().await {
                 println!("E2 GOT: {:?}", evt);
                 match evt {
-                    EpEvent::IncomingData(con, _, mut data) => {
+                    EpEvent::IncomingData(EpIncomingData { con, mut data, .. }) => {
                         assert_eq!(b"hello", data.as_ref());
                         data.clear();
                         data.extend_from_slice(b"world");
