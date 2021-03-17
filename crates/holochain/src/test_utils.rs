@@ -211,7 +211,7 @@ where
             use holochain_p2p::event::HolochainP2pEvent::*;
             match evt {
                 SignNetworkData { respond, .. } => {
-                    respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                    respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                 }
                 PutAgentInfoSigned { respond, .. } => {
                     respond.r(Ok(async move { Ok(()) }.boxed().into()));

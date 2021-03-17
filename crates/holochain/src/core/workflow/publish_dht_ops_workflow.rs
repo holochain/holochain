@@ -60,7 +60,9 @@ pub async fn publish_dht_ops_workflow(
 
     // Commit to the network
     for (basis, ops) in to_publish {
-        network.publish(true, basis, ops, None).await?;
+        if let Err(e) = network.publish(true, basis, ops, None).await {
+            tracing::info!(failed_to_send_publish = ?e);
+        }
     }
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -497,7 +499,7 @@ mod tests {
                     let complete = produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
                         .await
                         .unwrap();
-                    assert_matches!(complete, WorkComplete::Complete);
+                    self::assert_matches!(complete, WorkComplete::Complete);
                 }
                 {
                     let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
@@ -636,7 +638,7 @@ mod tests {
                     let complete = produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
                         .await
                         .unwrap();
-                    assert_matches!(complete, WorkComplete::Complete);
+                    self::assert_matches!(complete, WorkComplete::Complete);
                 }
 
                 // Create cell data

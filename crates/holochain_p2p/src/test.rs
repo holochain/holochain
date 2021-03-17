@@ -198,7 +198,7 @@ mod tests {
                         ));
                     }
                     SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
@@ -255,7 +255,7 @@ mod tests {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
                     SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
@@ -305,7 +305,7 @@ mod tests {
                         recv_count_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
                     SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
@@ -392,7 +392,7 @@ mod tests {
                         respond.r(Ok(async move { Ok(resp) }.boxed().into()));
                     }
                     SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
@@ -452,7 +452,7 @@ mod tests {
                         respond.r(Ok(async move { Ok(test_1_clone) }.boxed().into()));
                     }
                     SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
