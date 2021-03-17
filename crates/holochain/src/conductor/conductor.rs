@@ -517,7 +517,7 @@ where
                             );
 
                             let env = DbWrite::open_cell(&dir, cell_id.clone(), keystore.clone())?;
-                            let cell = Cell::create(
+                            Cell::create(
                                 cell_id.clone(),
                                 conductor_handle.clone(),
                                 env,
@@ -525,8 +525,7 @@ where
                                 self.managed_task_add_sender.clone(),
                                 self.managed_task_stop_broadcaster.clone(),
                             )
-                            .await;
-                            cell
+                            .await
                         },
                     );
 

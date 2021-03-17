@@ -346,7 +346,7 @@ pub fn handle_get_links(
     // Get the vaults
     let mut conn = env.conn()?;
     let element_vault = ElementBuf::vault(env.clone(), false)?;
-    let meta_vault = MetadataBuf::vault(env.clone())?;
+    let meta_vault = MetadataBuf::vault(env)?;
 
     let links = conn.with_reader(|mut reader| {
         meta_vault
