@@ -185,273 +185,276 @@ impl Db {
     /// Checks that the database is in a state
     #[instrument(skip(expects, env))]
     async fn check(expects: Vec<Self>, env: EnvironmentWrite, here: String) {
-        let env_ref = env.guard();
-        let reader = env_ref.reader().unwrap();
-        let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
-        for expect in expects {
-            match expect {
-                Db::Integrated(op) => {
-                    let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
-                    let value = IntegratedDhtOpsValue {
-                        validation_status: ValidationStatus::Valid,
-                        op: op.to_light(),
-                        when_integrated: timestamp::now().into(),
-                        send_receipt: false,
-                    };
-                    let mut r = workspace
-                        .integrated_dht_ops
-                        .get(&op_hash)
-                        .unwrap()
-                        .expect(&format!("Should contain {:?}", op));
-                    r.when_integrated = value.when_integrated;
-                    assert_eq!(r, value, "{}", here);
-                }
-                Db::IntQueue(op) => {
-                    let value = IntegrationLimboValue {
-                        validation_status: ValidationStatus::Valid,
-                        op: op.to_light(),
-                        send_receipt: false,
-                    };
-                    let res = workspace
-                        .integration_limbo
-                        .iter(&reader)
-                        .unwrap()
-                        .filter_map(|(_, v)| if v == value { Ok(Some(v)) } else { Ok(None) })
-                        .collect::<Vec<_>>()
-                        .unwrap();
-                    let exp = [value];
-                    assert_eq!(&res[..], &exp[..], "{}", here,);
-                }
-                Db::CasHeader(header, _) => {
-                    let hash = HeaderHashed::from_content_sync(header.clone());
-                    assert_eq!(
-                        workspace
-                            .elements
-                            .get_header(hash.as_hash())
-                            .unwrap()
-                            .expect(&format!(
-                                "Header {:?} not in element vault for {}",
-                                header, here
-                            ))
-                            .header(),
-                        &header,
-                        "{}",
-                        here,
-                    );
-                }
-                Db::CasEntry(entry, _, _) => {
-                    let hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-                    assert_eq!(
-                        workspace
-                            .elements
-                            .get_entry(&hash)
-                            .unwrap()
-                            .expect(&format!(
-                                "Entry {:?} with hash {:?} not in element vault for {}",
-                                entry, hash, here
-                            ))
-                            .into_content(),
-                        entry,
-                        "{}",
-                        here,
-                    );
-                }
-                Db::PendingHeader(header, _) => {
-                    let hash = HeaderHashed::from_content_sync(header.clone());
-                    assert_eq!(
-                        workspace
-                            .element_pending
-                            .get_header(hash.as_hash())
-                            .unwrap()
-                            .expect(&format!(
-                                "Header {:?} not in element judged for {}",
-                                header, here
-                            ))
-                            .header(),
-                        &header,
-                        "{}",
-                        here,
-                    );
-                }
-                Db::PendingEntry(entry, _, _) => {
-                    let hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-                    assert_eq!(
-                        workspace
-                            .element_pending
-                            .get_entry(&hash)
-                            .unwrap()
-                            .expect(&format!(
-                                "Entry {:?} not in element judged for {}",
-                                entry, here
-                            ))
-                            .into_content(),
-                        entry,
-                        "{}",
-                        here,
-                    );
-                }
-                Db::MetaHeader(entry, header) => {
-                    let header_hash = HeaderHashed::from_content_sync(header.clone());
-                    let header_hash = TimedHeaderHash::from(header_hash);
-                    let entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-                    let res = workspace
-                        .meta
-                        .get_headers(&reader, entry_hash)
-                        .unwrap()
-                        .collect::<Vec<_>>()
-                        .unwrap();
-                    let exp = [header_hash];
-                    assert_eq!(&res[..], &exp[..], "{}", here,);
-                }
-                Db::MetaActivity(header) => {
-                    let header_hash = HeaderHashed::from_content_sync(header.clone());
-                    let header_hash = TimedHeaderHash::from(header_hash);
-                    let res = workspace
-                        .meta
-                        .get_activity(&reader, ChainItemKey::new(&header, ValidationStatus::Valid))
-                        .unwrap()
-                        .collect::<Vec<_>>()
-                        .unwrap();
-                    let exp = [header_hash];
-                    assert_eq!(&res[..], &exp[..], "{}", here,);
-                }
-                Db::MetaUpdate(base, header) => {
-                    let header_hash = HeaderHashed::from_content_sync(header.clone());
-                    let header_hash = TimedHeaderHash::from(header_hash);
-                    let res = workspace
-                        .meta
-                        .get_updates(&reader, base)
-                        .unwrap()
-                        .collect::<Vec<_>>()
-                        .unwrap();
-                    let exp = [header_hash];
-                    assert_eq!(&res[..], &exp[..], "{}", here,);
-                }
-                Db::MetaDelete(deleted_header_hash, header) => {
-                    let header_hash = HeaderHashed::from_content_sync(header.clone());
-                    let header_hash = TimedHeaderHash::from(header_hash);
-                    let res = workspace
-                        .meta
-                        .get_deletes_on_entry(
-                            &reader,
-                            Delete::try_from(header).unwrap().deletes_entry_address,
-                        )
-                        .unwrap()
-                        .collect::<Vec<_>>()
-                        .unwrap();
-                    let res2 = workspace
-                        .meta
-                        .get_deletes_on_header(&reader, deleted_header_hash)
-                        .unwrap()
-                        .collect::<Vec<_>>()
-                        .unwrap();
-                    let exp = [header_hash];
-                    assert_eq!(&res[..], &exp[..], "{}", here,);
-                    assert_eq!(&res2[..], &exp[..], "{}", here,);
-                }
-                Db::IntegratedEmpty => {
-                    assert_eq!(
-                        workspace
+        fresh_reader_test!(env, |mut r| {
+            let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
+            for expect in expects {
+                match expect {
+                    Db::Integrated(op) => {
+                        let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
+                        let value = IntegratedDhtOpsValue {
+                            validation_status: ValidationStatus::Valid,
+                            op: op.to_light(),
+                            when_integrated: timestamp::now().into(),
+                            send_receipt: false,
+                        };
+                        let mut r = workspace
                             .integrated_dht_ops
-                            .iter(&reader)
+                            .get(&op_hash)
                             .unwrap()
-                            .count()
-                            .unwrap(),
-                        0,
-                        "{}",
-                        here
-                    );
-                }
-                Db::IntQueueEmpty => {
-                    assert_eq!(
-                        workspace
+                            .expect(&format!("Should contain {:?}", op));
+                        r.when_integrated = value.when_integrated;
+                        assert_eq!(r, value, "{}", here);
+                    }
+                    Db::IntQueue(op) => {
+                        let value = IntegrationLimboValue {
+                            validation_status: ValidationStatus::Valid,
+                            op: op.to_light(),
+                            send_receipt: false,
+                        };
+                        let res = workspace
                             .integration_limbo
                             .iter(&reader)
                             .unwrap()
-                            .count()
-                            .unwrap(),
-                        0,
-                        "{}",
-                        here
-                    );
-                }
-                Db::MetaEmpty => {
-                    // TODO: Not currently possible because kvv bufs have no iterator over all keys
-                }
-                Db::MetaLink(link_add, target_hash) => {
-                    let link_add_hash =
-                        HeaderHashed::from_content_sync(link_add.clone().into()).into_hash();
-
-                    // LinkMetaKey
-                    let mut link_meta_keys = Vec::new();
-                    link_meta_keys.push(LinkMetaKey::Full(
-                        &link_add.base_address,
-                        link_add.zome_id,
-                        &link_add.tag,
-                        &link_add_hash,
-                    ));
-                    link_meta_keys.push(LinkMetaKey::BaseZomeTag(
-                        &link_add.base_address,
-                        link_add.zome_id,
-                        &link_add.tag,
-                    ));
-                    link_meta_keys.push(LinkMetaKey::BaseZome(
-                        &link_add.base_address,
-                        link_add.zome_id,
-                    ));
-                    link_meta_keys.push(LinkMetaKey::Base(&link_add.base_address));
-
-                    for link_meta_key in link_meta_keys {
-                        let res = workspace
-                            .meta
-                            .get_live_links(&reader, &link_meta_key)
-                            .unwrap()
+                            .filter_map(|(_, v)| if v == value { Ok(Some(v)) } else { Ok(None) })
                             .collect::<Vec<_>>()
                             .unwrap();
-
-                        assert_eq!(res.len(), 1, "{}", here);
-                        assert_eq!(res[0].link_add_hash, link_add_hash, "{}", here);
-                        assert_eq!(res[0].target, target_hash, "{}", here);
-                        assert_eq!(res[0].zome_id, link_add.zome_id, "{}", here);
-                        assert_eq!(res[0].tag, link_add.tag, "{}", here);
+                        let exp = [value];
+                        assert_eq!(&res[..], &exp[..], "{}", here,);
                     }
-                }
-                Db::MetaLinkEmpty(link_add) => {
-                    let link_add_hash =
-                        HeaderHashed::from_content_sync(link_add.clone().into()).into_hash();
-
-                    // LinkMetaKey
-                    let mut link_meta_keys = Vec::new();
-                    link_meta_keys.push(LinkMetaKey::Full(
-                        &link_add.base_address,
-                        link_add.zome_id,
-                        &link_add.tag,
-                        &link_add_hash,
-                    ));
-                    link_meta_keys.push(LinkMetaKey::BaseZomeTag(
-                        &link_add.base_address,
-                        link_add.zome_id,
-                        &link_add.tag,
-                    ));
-                    link_meta_keys.push(LinkMetaKey::BaseZome(
-                        &link_add.base_address,
-                        link_add.zome_id,
-                    ));
-                    link_meta_keys.push(LinkMetaKey::Base(&link_add.base_address));
-
-                    for link_meta_key in link_meta_keys {
+                    Db::CasHeader(header, _) => {
+                        let hash = HeaderHashed::from_content_sync(header.clone());
+                        assert_eq!(
+                            workspace
+                                .elements
+                                .get_header(hash.as_hash())
+                                .unwrap()
+                                .expect(&format!(
+                                    "Header {:?} not in element vault for {}",
+                                    header, here
+                                ))
+                                .header(),
+                            &header,
+                            "{}",
+                            here,
+                        );
+                    }
+                    Db::CasEntry(entry, _, _) => {
+                        let hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
+                        assert_eq!(
+                            workspace
+                                .elements
+                                .get_entry(&hash)
+                                .unwrap()
+                                .expect(&format!(
+                                    "Entry {:?} with hash {:?} not in element vault for {}",
+                                    entry, hash, here
+                                ))
+                                .into_content(),
+                            entry,
+                            "{}",
+                            here,
+                        );
+                    }
+                    Db::PendingHeader(header, _) => {
+                        let hash = HeaderHashed::from_content_sync(header.clone());
+                        assert_eq!(
+                            workspace
+                                .element_pending
+                                .get_header(hash.as_hash())
+                                .unwrap()
+                                .expect(&format!(
+                                    "Header {:?} not in element judged for {}",
+                                    header, here
+                                ))
+                                .header(),
+                            &header,
+                            "{}",
+                            here,
+                        );
+                    }
+                    Db::PendingEntry(entry, _, _) => {
+                        let hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
+                        assert_eq!(
+                            workspace
+                                .element_pending
+                                .get_entry(&hash)
+                                .unwrap()
+                                .expect(&format!(
+                                    "Entry {:?} not in element judged for {}",
+                                    entry, here
+                                ))
+                                .into_content(),
+                            entry,
+                            "{}",
+                            here,
+                        );
+                    }
+                    Db::MetaHeader(entry, header) => {
+                        let header_hash = HeaderHashed::from_content_sync(header.clone());
+                        let header_hash = TimedHeaderHash::from(header_hash);
+                        let entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
                         let res = workspace
                             .meta
-                            .get_live_links(&reader, &link_meta_key)
+                            .get_headers(&reader, entry_hash)
                             .unwrap()
                             .collect::<Vec<_>>()
                             .unwrap();
+                        let exp = [header_hash];
+                        assert_eq!(&res[..], &exp[..], "{}", here,);
+                    }
+                    Db::MetaActivity(header) => {
+                        let header_hash = HeaderHashed::from_content_sync(header.clone());
+                        let header_hash = TimedHeaderHash::from(header_hash);
+                        let res = workspace
+                            .meta
+                            .get_activity(
+                                &reader,
+                                ChainItemKey::new(&header, ValidationStatus::Valid),
+                            )
+                            .unwrap()
+                            .collect::<Vec<_>>()
+                            .unwrap();
+                        let exp = [header_hash];
+                        assert_eq!(&res[..], &exp[..], "{}", here,);
+                    }
+                    Db::MetaUpdate(base, header) => {
+                        let header_hash = HeaderHashed::from_content_sync(header.clone());
+                        let header_hash = TimedHeaderHash::from(header_hash);
+                        let res = workspace
+                            .meta
+                            .get_updates(&reader, base)
+                            .unwrap()
+                            .collect::<Vec<_>>()
+                            .unwrap();
+                        let exp = [header_hash];
+                        assert_eq!(&res[..], &exp[..], "{}", here,);
+                    }
+                    Db::MetaDelete(deleted_header_hash, header) => {
+                        let header_hash = HeaderHashed::from_content_sync(header.clone());
+                        let header_hash = TimedHeaderHash::from(header_hash);
+                        let res = workspace
+                            .meta
+                            .get_deletes_on_entry(
+                                &reader,
+                                Delete::try_from(header).unwrap().deletes_entry_address,
+                            )
+                            .unwrap()
+                            .collect::<Vec<_>>()
+                            .unwrap();
+                        let res2 = workspace
+                            .meta
+                            .get_deletes_on_header(&reader, deleted_header_hash)
+                            .unwrap()
+                            .collect::<Vec<_>>()
+                            .unwrap();
+                        let exp = [header_hash];
+                        assert_eq!(&res[..], &exp[..], "{}", here,);
+                        assert_eq!(&res2[..], &exp[..], "{}", here,);
+                    }
+                    Db::IntegratedEmpty => {
+                        assert_eq!(
+                            workspace
+                                .integrated_dht_ops
+                                .iter(&reader)
+                                .unwrap()
+                                .count()
+                                .unwrap(),
+                            0,
+                            "{}",
+                            here
+                        );
+                    }
+                    Db::IntQueueEmpty => {
+                        assert_eq!(
+                            workspace
+                                .integration_limbo
+                                .iter(&reader)
+                                .unwrap()
+                                .count()
+                                .unwrap(),
+                            0,
+                            "{}",
+                            here
+                        );
+                    }
+                    Db::MetaEmpty => {
+                        // TODO: Not currently possible because kvv bufs have no iterator over all keys
+                    }
+                    Db::MetaLink(link_add, target_hash) => {
+                        let link_add_hash =
+                            HeaderHashed::from_content_sync(link_add.clone().into()).into_hash();
 
-                        assert_eq!(res.len(), 0, "{}", here);
+                        // LinkMetaKey
+                        let mut link_meta_keys = Vec::new();
+                        link_meta_keys.push(LinkMetaKey::Full(
+                            &link_add.base_address,
+                            link_add.zome_id,
+                            &link_add.tag,
+                            &link_add_hash,
+                        ));
+                        link_meta_keys.push(LinkMetaKey::BaseZomeTag(
+                            &link_add.base_address,
+                            link_add.zome_id,
+                            &link_add.tag,
+                        ));
+                        link_meta_keys.push(LinkMetaKey::BaseZome(
+                            &link_add.base_address,
+                            link_add.zome_id,
+                        ));
+                        link_meta_keys.push(LinkMetaKey::Base(&link_add.base_address));
+
+                        for link_meta_key in link_meta_keys {
+                            let res = workspace
+                                .meta
+                                .get_live_links(&reader, &link_meta_key)
+                                .unwrap()
+                                .collect::<Vec<_>>()
+                                .unwrap();
+
+                            assert_eq!(res.len(), 1, "{}", here);
+                            assert_eq!(res[0].link_add_hash, link_add_hash, "{}", here);
+                            assert_eq!(res[0].target, target_hash, "{}", here);
+                            assert_eq!(res[0].zome_id, link_add.zome_id, "{}", here);
+                            assert_eq!(res[0].tag, link_add.tag, "{}", here);
+                        }
+                    }
+                    Db::MetaLinkEmpty(link_add) => {
+                        let link_add_hash =
+                            HeaderHashed::from_content_sync(link_add.clone().into()).into_hash();
+
+                        // LinkMetaKey
+                        let mut link_meta_keys = Vec::new();
+                        link_meta_keys.push(LinkMetaKey::Full(
+                            &link_add.base_address,
+                            link_add.zome_id,
+                            &link_add.tag,
+                            &link_add_hash,
+                        ));
+                        link_meta_keys.push(LinkMetaKey::BaseZomeTag(
+                            &link_add.base_address,
+                            link_add.zome_id,
+                            &link_add.tag,
+                        ));
+                        link_meta_keys.push(LinkMetaKey::BaseZome(
+                            &link_add.base_address,
+                            link_add.zome_id,
+                        ));
+                        link_meta_keys.push(LinkMetaKey::Base(&link_add.base_address));
+
+                        for link_meta_key in link_meta_keys {
+                            let res = workspace
+                                .meta
+                                .get_live_links(&reader, &link_meta_key)
+                                .unwrap()
+                                .collect::<Vec<_>>()
+                                .unwrap();
+
+                            assert_eq!(res.len(), 0, "{}", here);
+                        }
                     }
                 }
             }
-        }
+        })
     }
 
     // Sets the database to a certain state
