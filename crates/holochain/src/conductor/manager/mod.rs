@@ -57,7 +57,7 @@ impl ManagedTaskAdd {
                 // Normal shutdown.
                 Ok(_) => TaskOutcome::Ignore,
                 // Task failed.
-                Err(e) => TaskOutcome::ExitConductor(e),
+                Err(e) => TaskOutcome::ExitConductor(Box::new(e)),
             }
         });
         Self::new(handle, on_death)
@@ -92,7 +92,7 @@ pub enum TaskOutcome {
     /// Ignore the exit and do nothing.
     Ignore,
     /// Close the conductor down because this is an unrecoverable error.
-    ExitConductor(ManagedTaskError),
+    ExitConductor(Box<ManagedTaskError>),
 }
 
 struct TaskManager {
@@ -137,7 +137,7 @@ async fn run(mut new_task_channel: mpsc::Receiver<ManagedTaskAdd>) -> ShutdownRe
                 Some(TaskOutcome::NewTask(new_task)) => task_manager.stream.push(new_task),
                 Some(TaskOutcome::Ignore) => (),
                 Some(TaskOutcome::ExitConductor(error)) => {
-                    let error = match error {
+                    let error = match *error {
                         ManagedTaskError::Join(error) => {
                             match error.try_into_panic() {
                                 Ok(reason) => {
