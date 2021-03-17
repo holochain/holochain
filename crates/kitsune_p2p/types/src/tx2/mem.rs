@@ -351,7 +351,6 @@ mod tests {
                         }
                     })
                     .await;
-                println!("chan recv done");
             }))
             .await
             .unwrap();
@@ -376,7 +375,6 @@ mod tests {
                         hnd_con(c.await.unwrap(), r_send.clone(), w_send2.clone()).await;
                     })
                     .await;
-                println!("con recv done");
             }))
             .await
             .unwrap();
@@ -390,35 +388,57 @@ mod tests {
     async fn test_tx2_mem_backend_stress() {
         let t = KitsuneTimeout::from_millis(5000);
 
+        const COUNT: usize = 100;
+
         let f = MemBackendAdapt::new();
-        let (r_send, mut r_recv) = futures::channel::mpsc::channel(32);
-        let (mut w_send, w_recv) = futures::channel::mpsc::channel(32);
+        let (r_send, mut r_recv) = futures::channel::mpsc::channel(COUNT * 3);
+        let (mut w_send, w_recv) = futures::channel::mpsc::channel(COUNT * 3);
 
-        let (addr, ep1) = mk_node(&f, r_send.clone(), w_send.clone()).await;
-        let (_, ep2) = mk_node(&f, r_send.clone(), w_send.clone()).await;
+        let (addr, ep) = mk_node(&f, r_send.clone(), w_send.clone()).await;
 
-        let con = hnd_con(ep1.connect(addr, t).await.unwrap(), r_send, w_send.clone()).await;
+        let mut nodes = Vec::new();
 
-        let mut out_chan = con.out_chan(t).await.unwrap();
-        let mut buf = PoolBuf::new();
-        buf.extend_from_slice(b"hello");
-        out_chan.write(0.into(), buf, t).await.unwrap();
+        for _ in 0..COUNT {
+            let (_, ep) = mk_node(&f, r_send.clone(), w_send.clone()).await;
 
-        for _ in 0..1 {
+            let con = hnd_con(
+                ep.connect(addr.clone(), t).await.unwrap(),
+                r_send.clone(),
+                w_send.clone(),
+            )
+            .await;
+
+            nodes.push((ep, con));
+        }
+
+        let mut reqs = Vec::new();
+
+        for (_, con) in nodes.iter() {
+            let out_chan_fut = con.out_chan(t);
+            reqs.push(async move {
+                let mut out_chan = out_chan_fut.await.unwrap();
+                let mut buf = PoolBuf::new();
+                buf.extend_from_slice(b"hello");
+                out_chan.write(0.into(), buf, t).await.unwrap();
+            });
+        }
+
+        futures::future::join_all(reqs).await;
+
+        for _ in 0..COUNT {
             let _ = r_recv.next().await;
         }
 
-        ep1.close(0, "").await;
-        ep2.close(0, "").await;
+        ep.close(0, "").await;
+        for (ep, _) in nodes.iter() {
+            ep.close(0, "").await;
+        }
 
-        println!("1");
         w_send.close().await.unwrap();
-        println!("2");
 
         futures::future::try_join_all(w_recv.collect::<Vec<_>>().await)
             .await
             .unwrap();
-        println!("3");
     }
 
     #[tokio::test(flavor = "multi_thread")]
