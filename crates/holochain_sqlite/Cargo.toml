@@ -44,6 +44,7 @@ tracing-futures = "0.2"
 
 rusqlite = { version = "0.24.1", features = [
   "blob",        # better integration with blob types (Read, Write, etc)
+  "bundled",     # use bundled SQLite
   "chrono",      # integration with chrono crate
   "functions",   # rust scalar / agg / window functions
   "hooks",       # sqlite notification callbacks
