@@ -106,3 +106,39 @@ impl DbRead {
         Ok(conn)
     }
 }
+
+// impl<'e> ReadManager<'e> for SConn {
+//     fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
+//     where
+//         E: From<DatabaseError>,
+//         F: 'e + FnOnce(Reader) -> Result<R, E>,
+//     {
+//         let mut g = self.inner();
+//         let txn = g.transaction().map_err(DatabaseError::from)?;
+//         let reader = Reader::from(txn);
+//         f(reader)
+//     }
+
+//     #[cfg(feature = "test_utils")]
+//     fn with_reader_test<R, F>(&'e mut self, f: F) -> R
+//     where
+//         F: 'e + FnOnce(Reader) -> R,
+//     {
+//         self.with_reader(|r| DatabaseResult::Ok(f(r))).unwrap()
+//     }
+// }
+
+// impl<'e> WriteManager<'e> for SConn {
+//     fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
+//     where
+//         E: From<DatabaseError>,
+//         F: 'e + FnOnce(&mut Writer) -> Result<R, E>,
+//     {
+//         let mut b = self.inner();
+//         let txn = b.transaction().map_err(DatabaseError::from)?;
+//         let mut writer = txn;
+//         let result = f(&mut writer)?;
+//         writer.commit().map_err(DatabaseError::from)?;
+//         Ok(result)
+//     }
+// }

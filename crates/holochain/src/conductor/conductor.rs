@@ -430,7 +430,7 @@ where
             let conductor_handle = conductor_handle.clone();
             let cell_id_inner = cell_id.clone();
             tokio::spawn(async move {
-                let env = DbWrite::new(
+                let env = DbWrite::open(
                     &root_env_dir,
                     DbKind::Cell(cell_id_inner.clone()),
                     keystore.clone(),
@@ -451,7 +451,7 @@ where
         // If there were errors, cleanup and return the errors
         if !errors.is_empty() {
             for cell_id in success {
-                let env = DbWrite::new(&root_env_dir, DbKind::Cell(cell_id), keystore.clone())?;
+                let env = DbWrite::open(&root_env_dir, DbKind::Cell(cell_id), keystore.clone())?;
                 env.remove().await?;
             }
 
@@ -516,7 +516,7 @@ where
                                 cell_id.agent_pubkey().clone(),
                             );
 
-                            let env = DbWrite::new_cell(&dir, cell_id.clone(), keystore.clone())?;
+                            let env = DbWrite::open_cell(&dir, cell_id.clone(), keystore.clone())?;
                             let cell = Cell::create(
                                 cell_id.clone(),
                                 conductor_handle.clone(),
@@ -1063,11 +1063,13 @@ mod builder {
             };
             let env_path = self.config.environment_path.clone();
 
-            let environment = DbWrite::new(env_path.as_ref(), DbKind::Conductor, keystore.clone())?;
+            let environment =
+                DbWrite::open(env_path.as_ref(), DbKind::Conductor, keystore.clone())?;
 
-            let wasm_environment = DbWrite::new(env_path.as_ref(), DbKind::Wasm, keystore.clone())?;
+            let wasm_environment =
+                DbWrite::open(env_path.as_ref(), DbKind::Wasm, keystore.clone())?;
 
-            let p2p_environment = DbWrite::new(env_path.as_ref(), DbKind::P2p, keystore.clone())?;
+            let p2p_environment = DbWrite::open(env_path.as_ref(), DbKind::P2p, keystore.clone())?;
 
             #[cfg(any(test, feature = "test_utils"))]
             let state = self.state;

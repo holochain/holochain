@@ -194,15 +194,17 @@ mod tests {
             vr_buf1.add_if_unique(vr2.clone())?;
 
             env.conn()
+                .unwrap()
                 .with_commit(|writer| vr_buf1.flush_to_txn(writer))?;
 
             vr_buf2.add_if_unique(vr1.clone())?;
 
             env.conn()
+                .unwrap()
                 .with_commit(|writer| vr_buf2.flush_to_txn(writer))?;
         }
 
-        let mut g = env.conn();
+        let mut g = env.conn().unwrap();
         g.with_reader_test(|mut reader| {
             let vr_buf = ValidationReceiptsBuf::new(&env).unwrap();
 

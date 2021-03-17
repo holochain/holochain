@@ -206,14 +206,15 @@ mod tests {
                 expected.push(value.clone());
             }
             env.conn()
+                .unwrap()
                 .with_commit(|writer| buf.flush_to_txn(writer))
                 .unwrap();
         }
 
         // Check queries
 
-        let mut g = env.conn();
-        g.with_reader_test(|mut reader| {
+        let mut conn = env.conn().unwrap();
+        conn.with_reader_test(|mut reader| {
             let buf = IntegratedDhtOpsBuf::new(env.clone().into()).unwrap();
             // No filter
             let mut r = buf

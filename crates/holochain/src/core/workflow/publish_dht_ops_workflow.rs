@@ -255,6 +255,7 @@ mod tests {
             }
             // Manually commit because this workspace doesn't commit to all dbs
             env.conn()
+                .unwrap()
                 .with_commit::<DatabaseError, _, _>(|writer| {
                     workspace.authored_dht_ops.flush_to_txn(writer)?;
                     workspace.elements.flush_to_txn(writer)?;
@@ -428,6 +429,7 @@ mod tests {
 
                 // Manually commit because this workspace doesn't commit to all dbs
                 env.conn()
+                    .unwrap()
                     .with_commit::<DatabaseError, _, _>(|writer| {
                         workspace.authored_dht_ops.flush_to_txn(writer)?;
                         Ok(())
@@ -497,6 +499,7 @@ mod tests {
                     let mut source_chain = SourceChain::new(env.clone().into()).unwrap();
                     fake_genesis(&mut source_chain).await.unwrap();
                     env.conn()
+                        .unwrap()
                         .with_commit::<SourceChainError, _, _>(|writer| {
                             source_chain.flush_to_txn(writer)?;
                             Ok(())
@@ -514,6 +517,7 @@ mod tests {
                 {
                     let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
                     env.conn()
+                        .unwrap()
                         .with_commit::<SourceChainError, _, _>(|writer| {
                             workspace.authored_dht_ops.clear_all(writer)?;
                             Ok(())
@@ -561,6 +565,7 @@ mod tests {
                         .clone();
 
                     env.conn()
+                        .unwrap()
                         .with_commit::<SourceChainError, _, _>(|writer| {
                             source_chain.flush_to_txn(writer)?;
                             Ok(())

@@ -20,7 +20,7 @@ pub enum DatabaseError {
     EnvironmentDoubleInitialized(PathBuf),
 
     #[error("database directory does not exist at configured path: {0}")]
-    EnvironmentMissing(PathBuf),
+    DatabaseMissing(PathBuf),
 
     #[error("There is an unexpected value in a database (TODO: more info)")]
     InvalidValue,

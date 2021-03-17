@@ -1,7 +1,7 @@
 //! Functions dealing with obtaining and referencing singleton databases
 
 use crate::{
-    conn::{new_connection_pool, PConn, CONNECTION_POOLS},
+    conn::{new_connection_pool, ConnectionPool, PConn, DATABASE_HANDLES},
     prelude::*,
 };
 use derive_more::Into;
@@ -20,6 +20,7 @@ pub struct DbRead {
     kind: DbKind,
     path: PathBuf,
     keystore: KeystoreSender,
+    connection_pool: ConnectionPool,
 }
 
 impl DbRead {
@@ -47,17 +48,12 @@ impl DbRead {
         &self.path
     }
 
+    /// Get a connection from the pool.
+    /// NB: r2d2 is NOT ASYNC, so this is BLOCKING if there is no available
+    /// connection!
+    /// TODO: We need to swap this for an async solution.
     fn connection_pooled(&self) -> DatabaseResult<PConn> {
-        let conn = if let Some(v) = CONNECTION_POOLS.get(&self.path) {
-            v.get()?
-        } else {
-            let pool = new_connection_pool(&self.path, self.kind.clone());
-            let mut conn = pool.get()?;
-            initialize_database(&mut conn, &self.kind)?;
-            CONNECTION_POOLS.insert_new(self.path.clone(), pool);
-            conn
-        };
-        Ok(PConn::new(conn, self.kind.clone()))
+        Ok(PConn::new(self.connection_pool.get()?, self.kind.clone()))
     }
 }
 
@@ -71,35 +67,55 @@ impl GetTable for DbWrite {}
 pub struct DbWrite(DbRead);
 
 impl DbWrite {
-    /// Create an environment,
-    pub fn new(
+    /// Create or open an existing database reference,
+    pub fn open(
         path_prefix: &Path,
         kind: DbKind,
         keystore: KeystoreSender,
     ) -> DatabaseResult<DbWrite> {
-        if !path_prefix.is_dir() {
-            std::fs::create_dir(path_prefix)
-                .map_err(|_e| DatabaseError::EnvironmentMissing(path_prefix.to_owned()))?;
-        }
         let path = path_prefix.join(kind.filename());
-        let env: DbWrite = DbWrite(DbRead {
-            kind,
-            keystore,
-            path,
-        });
-        Ok(env)
+        if let Some(v) = DATABASE_HANDLES.get(&path) {
+            Ok(v.clone())
+        } else {
+            let db = Self::new(path_prefix, kind, keystore)?;
+            DATABASE_HANDLES.insert_new(path, db.clone());
+            Ok(db)
+        }
     }
 
     /// Create a Cell environment (slight shorthand)
-    pub fn new_cell(
+    pub fn open_cell(
         path_prefix: &Path,
         cell_id: CellId,
         keystore: KeystoreSender,
     ) -> DatabaseResult<Self> {
-        Self::new(path_prefix, DbKind::Cell(cell_id), keystore)
+        Self::open(path_prefix, DbKind::Cell(cell_id), keystore)
+    }
+
+    pub(crate) fn new(
+        path_prefix: &Path,
+        kind: DbKind,
+        keystore: KeystoreSender,
+    ) -> DatabaseResult<Self> {
+        if !path_prefix.is_dir() {
+            std::fs::create_dir(path_prefix)
+                .map_err(|_e| DatabaseError::DatabaseMissing(path_prefix.to_owned()))?;
+        }
+        let path = path_prefix.join(kind.filename());
+        let pool = new_connection_pool(&path, kind.clone());
+        let mut conn = pool.get()?;
+        initialize_database(&mut conn, &kind)?;
+
+        Ok(DbWrite(DbRead {
+            kind,
+            keystore,
+            path,
+            connection_pool: pool,
+        }))
     }
 
     /// Remove the db and directory
+    #[deprecated = "is this used?"]
     pub async fn remove(self) -> DatabaseResult<()> {
         std::fs::remove_dir_all(&self.0.path)?;
         Ok(())
@@ -211,7 +227,9 @@ where
     Fut: Future<Output = Result<T, E>>,
     E: std::error::Error,
 {
+    use tokio::time::Duration;
     const NUM_CONSECUTIVE_FAILURES: usize = 10;
+    const RETRY_INTERVAL: Duration = Duration::from_millis(500);
     let mut errors = Vec::new();
     loop {
         match f().await {
@@ -230,41 +248,6 @@ where
                 }
             }
         }
+        tokio::time::sleep(RETRY_INTERVAL).await;
     }
 }
-
-// impl<'e> ReadManager<'e> for SConn {
-//     fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
-//     where
-//         E: From<DatabaseError>,
-//         F: 'e + FnOnce(Reader) -> Result<R, E>,
-//     {
-//         let mut g = self.inner();
-//         let txn = g.transaction().map_err(DatabaseError::from)?;
-//         let reader = Reader::from(txn);
-//         f(reader)
-//     }
-
-//     #[cfg(feature = "test_utils")]
-//     fn with_reader_test<R, F>(&'e mut self, f: F) -> R
-//     where
-//         F: 'e + FnOnce(Reader) -> R,
-//     {
-//         self.with_reader(|r| DatabaseResult::Ok(f(r))).unwrap()
-//     }
-// }
-
-// impl<'e> WriteManager<'e> for SConn {
-//     fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
-//     where
-//         E: From<DatabaseError>,
-//         F: 'e + FnOnce(&mut Writer) -> Result<R, E>,
-//     {
-//         let mut b = self.inner();
-//         let txn = b.transaction().map_err(DatabaseError::from)?;
-//         let mut writer = txn;
-//         let result = f(&mut writer)?;
-//         writer.commit().map_err(DatabaseError::from)?;
-//         Ok(result)
-//     }
-// }

@@ -187,6 +187,7 @@ mod tests {
             }
 
             env.conn()
+                .unwrap()
                 .with_commit(|writer| source_chain.flush_to_txn(writer))
                 .unwrap();
 
@@ -205,6 +206,7 @@ mod tests {
                 .unwrap();
             assert_matches!(complete, WorkComplete::Complete);
             env.conn()
+                .unwrap()
                 .with_commit(|writer| workspace.flush_to_txn(writer))
                 .unwrap();
         }
@@ -251,6 +253,7 @@ mod tests {
                 .unwrap();
             assert_matches!(complete, WorkComplete::Complete);
             env.conn()
+                .unwrap()
                 .with_commit(|writer| workspace.flush_to_txn(writer))
                 .unwrap();
         }

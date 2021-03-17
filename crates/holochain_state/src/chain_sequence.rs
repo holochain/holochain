@@ -426,6 +426,7 @@ pub mod tests {
             rx2.await.unwrap();
 
             arc1.conn()
+                .unwrap()
                 .with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         });
 
@@ -456,6 +457,7 @@ pub mod tests {
             )?;
 
             arc2.conn()
+                .unwrap()
                 .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             tx2.send(()).unwrap();
             Result::<_, SourceChainError>::Ok(())
@@ -510,6 +512,7 @@ pub mod tests {
             .into(),
         )?;
         arc1.conn()
+            .unwrap()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
 
         // Modify the chain without adding a header -- this succeeds
@@ -523,6 +526,7 @@ pub mod tests {
             rx2.await.unwrap();
 
             arc1.conn()
+                .unwrap()
                 .with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         });
 
@@ -539,6 +543,7 @@ pub mod tests {
             )?;
 
             arc2.conn()
+                .unwrap()
                 .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             tx2.send(()).unwrap();
             Result::<_, SourceChainError>::Ok(())

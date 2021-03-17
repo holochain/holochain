@@ -36,8 +36,8 @@ async fn check_different_seq_num_on_separate_queries() {
         .register_activity(&h2.into(), ValidationStatus::Valid)
         .unwrap();
 
-    let mut g = meta_buf.env().conn();
-    g.with_reader_test(|mut reader| {
+    let mut conn = meta_buf.env().conn().unwrap();
+    conn.with_reader_test(|mut reader| {
         let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 1);
         assert_eq!(
             meta_buf
@@ -91,8 +91,8 @@ async fn check_equal_seq_num_on_same_query() {
         .register_activity(&h2, ValidationStatus::Valid)
         .unwrap();
 
-    let mut g = meta_buf.env().conn();
-    g.with_reader_test(|mut reader| {
+    let mut conn = meta_buf.env().conn().unwrap();
+    conn.with_reader_test(|mut reader| {
         let k = ChainItemKey::new(&h1, ValidationStatus::Valid);
         assert_eq!(
             meta_buf
@@ -151,8 +151,8 @@ async fn chain_item_keys_ser() {
         .register_activity(&h, ValidationStatus::Valid)
         .unwrap();
 
-    let mut g = meta_buf.env().conn();
-    g.with_reader_test(|mut reader| {
+    let mut conn = meta_buf.env().conn().unwrap();
+    conn.with_reader_test(|mut reader| {
         let k = ChainItemKey::new(&h, ValidationStatus::Valid);
         assert_eq!(
             meta_buf
@@ -190,8 +190,8 @@ async fn check_large_seq_queries() {
         .register_activity(&h2.into(), ValidationStatus::Valid)
         .unwrap();
 
-    let mut g = meta_buf.env().conn();
-    g.with_reader_test(|mut reader| {
+    let mut conn = meta_buf.env().conn().unwrap();
+    conn.with_reader_test(|mut reader| {
         let k = ChainItemKey::Agent(agent_pubkey.clone());
         assert_eq!(
             &meta_buf

@@ -607,6 +607,7 @@ async fn fake_authority(hash: AnyDhtHash, call_data: &HostFnCaller) {
     call_data
         .env
         .conn()
+        .unwrap()
         .with_commit(|writer| {
             element_vault.flush_to_txn(writer)?;
             meta_vault.flush_to_txn(writer)

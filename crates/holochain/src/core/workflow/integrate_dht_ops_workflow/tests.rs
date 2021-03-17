@@ -519,6 +519,7 @@ impl Db {
         }
         // Commit workspace
         env.conn()
+            .unwrap()
             .with_commit::<WorkspaceError, _, _>(|writer| {
                 workspace.flush_to_txn(writer)?;
                 Ok(())
@@ -539,6 +540,7 @@ async fn call_workflow<'env>(env: DbWrite) {
 fn clear_dbs(env: DbWrite) {
     let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
     env.conn()
+        .unwrap()
         .with_commit::<DatabaseError, _, _>(|writer| {
             workspace.integration_limbo.clear_all(writer)?;
             workspace.integrated_dht_ops.clear_all(writer)?;
@@ -849,6 +851,7 @@ async fn genesis<'env>(env: DbWrite) {
     fake_genesis(&mut workspace.source_chain).await.unwrap();
     {
         env.conn()
+            .unwrap()
             .with_commit(|writer| workspace.flush_to_txn(writer))
             .unwrap();
     }
@@ -926,6 +929,7 @@ async fn commit_entry<'env>(
     {
         let mut workspace = workspace_lock.write().await;
         env.conn()
+            .unwrap()
             .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
     }
@@ -1004,6 +1008,7 @@ async fn create_link(
     {
         let mut workspace = workspace_lock.write().await;
         env.conn()
+            .unwrap()
             .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
     }
@@ -1115,7 +1120,7 @@ async fn test_metadata_from_wasm_api() {
     // TODO: create the expect from the result of the commit and link entries
     // Db::check(
     //     expect,
-    //     &env.conn(),
+    //     &env.conn().unwrap(),
     //     &dbs,
     //     format!("{}: {}", "metadata from wasm", here!("")),
     // )
@@ -1222,6 +1227,7 @@ async fn test_wasm_api_without_integration_delete() {
         };
         workspace.source_chain.put(delete, None).await.unwrap();
         env.conn()
+            .unwrap()
             .with_commit(|writer| workspace.flush_to_txn(writer))
             .unwrap();
     }

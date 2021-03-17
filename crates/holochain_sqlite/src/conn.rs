@@ -13,7 +13,7 @@ const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
 lazy_static! {
 
-    pub(crate) static ref CONNECTION_POOLS: CHashMap<PathBuf, ConnectionPool> = {
+    pub(crate) static ref DATABASE_HANDLES: CHashMap<PathBuf, DbWrite> = {
         // This is just a convenient place that we know gets initialized
         // both in the final binary holochain && in all relevant tests
         //
