@@ -3,6 +3,7 @@
 use crate::conductor::error::ConductorError;
 use thiserror::Error;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Error, Debug)]
 pub enum ShutdownError {
     #[error("Conductor has exited due to an unrecoverable error {0}")]
