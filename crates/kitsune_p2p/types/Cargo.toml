@@ -45,3 +45,6 @@ harness = false
 [[bench]]
 name = "codec"
 harness = false
+
+[features]
+test_utils = []

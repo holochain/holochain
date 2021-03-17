@@ -61,10 +61,10 @@ fn main() {
         }
         let output = cmd.output().unwrap();
 
-        assert!(
-            output.status.success(),
-            std::io::stderr().write_all(&output.stderr)
-        );
+        if !output.status.success() {
+            std::io::stderr().write_all(&output.stderr).ok();
+            assert!(output.status.success());
+        }
     } else {
         let mut cmd = std::process::Command::new(cargo_command);
         cmd.arg("check")
@@ -79,10 +79,10 @@ fn main() {
             }
         }
         let output = cmd.output().unwrap();
-        assert!(
-            output.status.success(),
-            std::io::stderr().write_all(&output.stderr)
-        );
+        if !output.status.success() {
+            std::io::stderr().write_all(&output.stderr).ok();
+            assert!(output.status.success());
+        }
     }
 }
 
