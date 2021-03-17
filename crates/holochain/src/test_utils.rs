@@ -627,7 +627,7 @@ pub async fn wait_for_integration_with_others(
                 total as f64 / total_time_waited as f64
             };
             tracing::debug!(
-                "Count: {}, val: {}, int: {}\nTime waited: {}s Total {}s,\nCounts: {:?}\nTotal: {} out of {} {:.4}% change:{} {:.4}ops/s\n",
+                "Count: {}, val: {}, int: {}\nTime waited: {}s (total {}s),\nCounts: {:?}\nTotal: {} out of {} {:.4}% change:{} {:.4}ops/s\n",
                 count.integrated,
                 count.validation_limbo,
                 count.integration_limbo,

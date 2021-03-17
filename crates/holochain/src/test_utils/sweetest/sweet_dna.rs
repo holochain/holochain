@@ -1,4 +1,3 @@
-use std::path::Path;
 use holochain_types::{
     dna::{
         error::DnaResult,
@@ -9,6 +8,7 @@ use holochain_types::{
     prelude::DnaDef,
 };
 use holochain_zome_types::zome::ZomeName;
+use std::path::Path;
 
 /// Helpful constructors for DnaFiles used in tests
 #[derive(Clone, Debug, derive_more::From, derive_more::Into, shrinkwraprs::Shrinkwrap)]
