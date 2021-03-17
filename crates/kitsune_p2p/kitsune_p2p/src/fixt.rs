@@ -48,7 +48,7 @@ fixturator!(
 
 fixturator!(
     KitsuneSignature;
-    from SixtyFourBytes;
+    from SixtyFourBytesVec;
 );
 
 fixturator!(

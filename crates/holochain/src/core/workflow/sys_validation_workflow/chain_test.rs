@@ -120,6 +120,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
         sys_validation_trigger.clone(),
         ops,
         None,
+        false,
     )
     .await
     .unwrap();
@@ -176,6 +177,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
         sys_validation_trigger,
         ops,
         None,
+        false,
     )
     .await
     .unwrap();
