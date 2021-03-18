@@ -42,7 +42,7 @@ tokio_helper = { version = "0.0.1", path = "../tokio_helper" }
 tracing = "0.1.18"
 tracing-futures = "0.2"
 
-rusqlite = { version = "0.24.1", features = [
+rusqlite = { version = "0.24", features = [
   "blob",        # better integration with blob types (Read, Write, etc)
   "chrono",      # integration with chrono crate
   "functions",   # rust scalar / agg / window functions
@@ -56,7 +56,7 @@ rusqlite = { version = "0.24.1", features = [
 observability = { version = "0.1.3" }
 
 [features]
-default = [ "test_utils" ]
+default = [ "test_utils", "no-deps" ]
 
 test_utils = [ ]
 
