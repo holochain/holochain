@@ -1,5 +1,6 @@
 use anyhow::Result;
 use holochain::conductor::ConductorHandle;
+use holochain_sqlite::db::optimistic_retry_async;
 use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
@@ -21,9 +22,13 @@ pub async fn websocket_client(
 }
 
 pub async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, WebsocketReceiver)> {
-    Ok(holochain_websocket::connect(
-        url2!("ws://127.0.0.1:{}", port),
-        Arc::new(WebsocketConfig::default()),
-    )
-    .await?)
+    optimistic_retry_async("websocket_client_by_port", || async {
+        holochain_websocket::connect(
+            url2!("ws://127.0.0.1:{}", port),
+            Arc::new(WebsocketConfig::default()),
+        )
+        .await
+    })
+    .await
+    .map_err(Into::into)
 }

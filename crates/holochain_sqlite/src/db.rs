@@ -218,6 +218,18 @@ impl<'e> WriteManager<'e> for PConn {
 #[derive(Debug)]
 pub struct OptimisticRetryError<E: std::error::Error>(Vec<E>);
 
+impl<E: std::error::Error> std::fmt::Display for OptimisticRetryError<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "OptimisticRetryError had too many failures:\n{:#?}",
+            self.0
+        )
+    }
+}
+
+impl<E: std::error::Error> std::error::Error for OptimisticRetryError<E> {}
+
 pub async fn optimistic_retry_async<Func, Fut, T, E>(
     ctx: &str,
     mut f: Func,
