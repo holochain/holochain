@@ -50,6 +50,7 @@ impl Drop for ReaderSpanInfo {
     }
 }
 
+/// Get the value for a key (must be single table)
 fn get_k<K: ToSql>(txn: &mut Transaction, table: &Table, k: K) -> DatabaseResult<Option<Value>> {
     assert!(
         table.kind().is_single(),
@@ -72,6 +73,7 @@ fn get_k<K: ToSql>(txn: &mut Transaction, table: &Table, k: K) -> DatabaseResult
         .optional()?)
 }
 
+/// Iterate over all rows containing this key (must be multi table)
 fn get_multi<K: ToSql>(txn: &mut Transaction, table: &Table, k: K) -> DatabaseResult<SqlIter> {
     assert!(
         table.kind().is_multi(),
@@ -86,6 +88,14 @@ fn get_multi<K: ToSql>(txn: &mut Transaction, table: &Table, k: K) -> DatabaseRe
     Ok(Box::new(it))
 }
 
+/// Put a key-val pair into a database.
+/// The unique index constraints particular to that kind of table will ensure
+/// the proper behavior:
+/// - "single" tables have unique key constraints, so an insert with an existing
+///   key replaces the old value with the new
+/// - "multi" tables have unique (key, val) pairs, so you can insert different
+///   values under the same key, but inserting the exact same pair is a noop,
+///   rather than creating duplicates.
 pub(crate) fn put_kv<K: ToSql, V: ToSql>(
     txn: &mut Transaction,
     table: &Table,
@@ -100,17 +110,34 @@ pub(crate) fn put_kv<K: ToSql, V: ToSql>(
     Ok(())
 }
 
-pub fn delete_k<K: ToSql>(txn: &mut Transaction, table: &Table, k: &K) -> DatabaseResult<()> {
-    assert!(
-        table.kind().is_single(),
-        "table is not single: {}",
-        table.name()
-    );
+/// Delete all rows containing this key.
+fn delete_k<K: ToSql>(txn: &mut Transaction, table: &Table, k: &K) -> DatabaseResult<()> {
     let mut stmt = txn.prepare_cached(&format!("DELETE FROM {} WHERE key = ?1", table.name()))?;
     let _ = stmt.execute(params![k])?;
     Ok(())
 }
 
+/// Delete the key-val pair with this key (must be a single table)
+pub fn delete_single<K: ToSql>(txn: &mut Transaction, table: &Table, k: &K) -> DatabaseResult<()> {
+    assert!(
+        table.kind().is_single(),
+        "table is not single: {}",
+        table.name()
+    );
+    delete_k(txn, table, k)
+}
+
+/// Delete all items with this key (must be a multi table)
+pub fn delete_multi<K: ToSql>(txn: &mut Transaction, table: &Table, k: &K) -> DatabaseResult<()> {
+    assert!(
+        table.kind().is_multi(),
+        "table is not multi: {}",
+        table.name()
+    );
+    delete_k(txn, table, k)
+}
+
+/// Delete a specific key-val pair (particularly useful for multi tables)
 pub fn delete_kv<K: ToSql, V: ToSql>(
     txn: &mut Transaction,
     table: &Table,
@@ -127,17 +154,6 @@ pub fn delete_kv<K: ToSql, V: ToSql>(
         table.name()
     ))?;
     let _ = stmt.execute(params![k, v])?;
-    Ok(())
-}
-
-pub fn delete_multi<K: ToSql>(txn: &mut Transaction, table: &Table, k: &K) -> DatabaseResult<()> {
-    assert!(
-        table.kind().is_multi(),
-        "table is not multi: {}",
-        table.name()
-    );
-    let mut stmt = txn.prepare_cached(&format!("DELETE FROM {} WHERE key = ?1", table.name()))?;
-    let _ = stmt.execute(params![k])?;
     Ok(())
 }
 

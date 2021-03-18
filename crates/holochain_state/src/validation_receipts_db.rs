@@ -117,7 +117,6 @@ impl ValidationReceiptsBuf {
     pub fn add_if_unique(&mut self, receipt: SignedValidationReceipt) -> DatabaseResult<()> {
         // The underlying KvvBufUsed manages the uniqueness
         self.0.insert(receipt.receipt.dht_op_hash.clone(), receipt);
-
         Ok(())
     }
 }

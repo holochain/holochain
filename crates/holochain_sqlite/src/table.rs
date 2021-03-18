@@ -166,12 +166,20 @@ pub(crate) fn initialize_table_multi(
         NO_PARAMS,
     )?;
 
-    // create index
-    let index_name = format!("{}_idx", table_name);
+    // create two indexes, one unique
+    let key_index_name = format!("{}_idx_k", table_name);
+    let composite_index_name = format!("{}_idx_kv", table_name);
     conn.execute(
         &format!(
-            "CREATE INDEX IF NOT EXISTS {} ON {} ( key, val );",
-            index_name, table_name
+            "CREATE INDEX IF NOT EXISTS {} ON {} ( key );",
+            key_index_name, table_name
+        ),
+        NO_PARAMS,
+    )?;
+    conn.execute(
+        &format!(
+            "CREATE UNIQUE INDEX IF NOT EXISTS {} ON {} ( key, val );",
+            composite_index_name, table_name
         ),
         NO_PARAMS,
     )?;
@@ -278,7 +286,7 @@ impl Table {
     }
 
     pub fn delete<K: ToSql>(&self, txn: &mut Writer, k: &K) -> DatabaseResult<()> {
-        delete_k(txn, self, k)
+        delete_single(txn, self, k)
     }
 
     pub fn delete_all<K: ToSql>(&self, txn: &mut Writer, k: &K) -> DatabaseResult<()> {
