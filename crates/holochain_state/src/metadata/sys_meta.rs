@@ -529,14 +529,19 @@ mod tests {
         update_entries: &[NewEntryHeader],
         delete_updates: &[Delete],
         _entry_hash: &EntryHash,
-        meta_buf: &mut MetadataBuf,
+        env: DbWrite,
     ) {
+        let mut meta_buf = MetadataBuf::vault(env.clone().into()).unwrap();
         for e in new_entries.iter().chain(update_entries.iter()) {
             meta_buf.register_header(e.clone()).unwrap();
         }
         for delete in entry_deletes.iter().chain(delete_updates.iter()) {
             meta_buf.register_delete(delete.clone()).unwrap();
         }
+        env.conn()
+            .unwrap()
+            .with_commit(|writer| meta_buf.flush_to_txn(writer))
+            .unwrap();
     }
 
     async fn create_data(
@@ -588,7 +593,7 @@ mod tests {
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf(),
+            arc.clone(),
         )
         .await;
         fresh_reader_test!(arc, |mut reader| {
@@ -603,7 +608,7 @@ mod tests {
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf(),
+            arc.clone(),
         )
         .await;
         fresh_reader_test!(arc, |mut reader| {
@@ -619,7 +624,7 @@ mod tests {
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf(),
+            arc.clone(),
         )
         .await;
         fresh_reader_test!(arc, |mut reader| {
@@ -647,7 +652,7 @@ mod tests {
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf(),
+            arc.clone(),
         )
         .await;
         fresh_reader_test!(arc, |mut reader| {
@@ -664,7 +669,7 @@ mod tests {
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf(),
+            arc.clone(),
         )
         .await;
         fresh_reader_test!(arc, |mut reader| {
@@ -680,7 +685,7 @@ mod tests {
             &entry_updates[..10],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf(),
+            arc.clone(),
         )
         .await;
         fresh_reader_test!(arc, |mut reader| {
@@ -696,7 +701,7 @@ mod tests {
             &entry_updates[..0],
             &delete_updates[..10],
             &entry_hash,
-            &mut meta_buf(),
+            arc.clone(),
         )
         .await;
         fresh_reader_test!(arc, |mut reader| {
@@ -728,18 +733,18 @@ mod tests {
         )
         .await;
 
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
+        let meta_buf = || MetadataBuf::vault(arc.clone().into()).unwrap();
         update_dbs(
             &entry_creates[..],
             &entry_deletes[..0],
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf,
+            arc.clone(),
         )
         .await;
         fresh_reader_test!(arc, |mut reader| {
-            let status = meta_buf
+            let status = meta_buf()
                 .get_dht_status(&mut reader, &entry_hash.clone().into())
                 .unwrap();
             assert_eq!(status, EntryDhtStatus::Live);
@@ -750,11 +755,11 @@ mod tests {
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf,
+            arc.clone(),
         )
         .await;
         fresh_reader_test!(arc, |mut reader| {
-            let status = meta_buf
+            let status = meta_buf()
                 .get_dht_status(&mut reader, &entry_hash.clone().into())
                 .unwrap();
             assert_eq!(status, EntryDhtStatus::Live);
@@ -765,11 +770,11 @@ mod tests {
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf,
+            arc.clone(),
         )
         .await;
         fresh_reader_test!(arc, |mut reader| {
-            let status = meta_buf
+            let status = meta_buf()
                 .get_dht_status(&mut reader, &entry_hash.clone().into())
                 .unwrap();
             assert_eq!(status, EntryDhtStatus::Dead);
