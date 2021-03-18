@@ -22,6 +22,8 @@ use holochain_p2p::dht_arc::PeerDensity;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_zome_types::CellId;
+use kitsune_p2p::agent_store::AgentInfoResponse;
+use kitsune_p2p::agent_store::BasisInfoQuery;
 use kitsune_p2p::KitsuneBinType;
 use std::convert::TryFrom;
 use std::convert::TryInto;
@@ -298,6 +300,75 @@ pub fn query_agent_info_signed(
     })?;
 
     Ok(out)
+}
+
+/// Get agent info that contains or is closest to
+/// a basis in a single space
+pub fn agent_info_by_basis(
+    environ: EnvironmentWrite,
+    kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+    query: BasisInfoQuery,
+) -> ConductorResult<AgentInfoResponse> {
+    let p2p_kv = AgentKv::new(environ.clone().into())?;
+    let env = environ.guard();
+    let BasisInfoQuery { basis, max_results } = query;
+
+    let max_results = max_results as usize;
+
+    let mut response = AgentInfoResponse {
+        matches: Vec::with_capacity(max_results),
+        closest: Vec::with_capacity(max_results),
+    };
+    let mut others = Vec::new();
+    env.with_commit(|writer| {
+        let mut expired = Vec::new();
+
+        {
+            let mut iter = p2p_kv.as_store_ref().iter(writer)?;
+
+            let now = now();
+
+            while response.matches.len() < max_results {
+                match iter.next() {
+                    Ok(Some((k, v))) => {
+                        let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
+                        if is_expired(now, &info) {
+                            expired.push(AgentKvKey::from(k));
+                        } else if info.as_space_ref() == kitsune_space.as_ref() {
+                            let arc = info.dht_arc()?;
+                            let location = basis.get_loc();
+                            if arc.contains(location) {
+                                response.matches.push(v);
+                            } else {
+                                others.push((arc.absolute_distance(location), v));
+                            }
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(e) => return Err(e.into()),
+                }
+            }
+        }
+
+        if !expired.is_empty() {
+            for exp in expired {
+                p2p_kv.as_store_ref().delete(writer, &exp)?;
+            }
+        }
+
+        if response.matches.len() < max_results {
+            let num_missing = max_results - response.matches.len();
+            others.sort_by_key(|(k, _)| *k);
+            others.reverse();
+            response
+                .closest
+                .extend(others.into_iter().map(|(_, v)| v).take(num_missing));
+        }
+
+        ConductorResult::Ok(())
+    })?;
+
+    Ok(response)
 }
 
 /// Get the peer density an agent is currently seeing within

@@ -3,6 +3,7 @@ use crate::event::*;
 use crate::*;
 
 use futures::future::FutureExt;
+use kitsune_p2p::agent_store::AgentInfoResponse;
 
 use crate::types::AgentPubKeyExt;
 
@@ -286,6 +287,29 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         Ok(async move {
             Ok(evt_sender
                 .query_agent_info_signed(h_space, h_agent, space, agent)
+                .await?)
+        }
+        .boxed()
+        .into())
+    }
+
+    /// We need to get previously stored agent info.
+    #[tracing::instrument(skip(self), level = "trace")]
+    fn handle_agent_info_by_basis(
+        &mut self,
+        input: kitsune_p2p::event::BasisInfoQueryEvt,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<AgentInfoResponse> {
+        let kitsune_p2p::event::BasisInfoQueryEvt {
+            space,
+            agent,
+            query,
+        } = input;
+        let h_space = DnaHash::from_kitsune(&space);
+        let h_agent = AgentPubKey::from_kitsune(&agent);
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            Ok(evt_sender
+                .agent_info_by_basis(h_space, h_agent, space, query)
                 .await?)
         }
         .boxed()

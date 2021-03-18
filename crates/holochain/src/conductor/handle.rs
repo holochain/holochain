@@ -48,6 +48,7 @@ use super::error::ConductorResult;
 use super::error::CreateAppError;
 use super::interface::SignalBroadcaster;
 use super::manager::TaskManagerRunHandle;
+use super::p2p_store::agent_info_by_basis;
 use super::p2p_store::get_agent_info_signed;
 use super::p2p_store::put_agent_info_signed;
 use super::p2p_store::query_agent_info_signed;
@@ -377,6 +378,17 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             } => {
                 let env = { self.conductor.read().await.p2p_env() };
                 let res = query_agent_info_signed(env, kitsune_space)
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            AgentInfoByBasis {
+                kitsune_space,
+                query,
+                respond,
+                ..
+            } => {
+                let env = { self.conductor.read().await.p2p_env() };
+                let res = agent_info_by_basis(env, kitsune_space, query)
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }

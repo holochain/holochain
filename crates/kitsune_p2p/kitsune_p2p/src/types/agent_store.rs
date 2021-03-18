@@ -1,6 +1,7 @@
 //! Data structures to be stored in the agent/peer database.
 
 use std::convert::TryInto;
+use std::sync::Arc;
 
 use crate::types::KitsuneAgent;
 use crate::types::KitsuneP2pError;
@@ -92,6 +93,27 @@ pub struct AgentInfo {
     /// Extra info as encoded MessagePack data.
     #[serde(with = "serde_bytes")]
     meta_info: Vec<u8>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
+/// Query for [`AgentInfo`] that contains a basis.
+/// If there is no info that contains the basis then
+/// return the closest [`AgentInfo`]s.
+pub struct BasisInfoQuery {
+    /// The basis that the peer arcs need to
+    /// contain or be closest to.
+    pub basis: Arc<crate::KitsuneBasis>,
+    /// Maximum amount of results that should be returned.
+    pub max_results: u8,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Default)]
+/// Response to the agent info query wire call.
+pub struct AgentInfoResponse {
+    /// Agent info that matched the query.
+    pub matches: Vec<AgentInfoSigned>,
+    /// Agent info that was closest to the query.
+    pub closest: Vec<AgentInfoSigned>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Hash, Eq)]

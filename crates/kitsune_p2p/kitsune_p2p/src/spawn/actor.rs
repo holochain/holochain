@@ -2,6 +2,7 @@
 
 use crate::actor;
 use crate::actor::*;
+use crate::agent_store::AgentInfoResponse;
 use crate::event::*;
 use crate::gossip::*;
 use crate::metrics::KitsuneMetrics;
@@ -14,6 +15,7 @@ use kitsune_p2p_types::transport_pool::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
+use types::agent_store::BasisInfoQuery;
 
 /// The bootstrap service is much more thoroughly documented in the default service implementation.
 /// See https://github.com/holochain/bootstrap
@@ -360,10 +362,56 @@ impl KitsuneP2pActor {
     }
 }
 
+async fn remote_agent_query(
+    space: Arc<KitsuneSpace>,
+    from_agent: Arc<KitsuneAgent>,
+    basis: Arc<KitsuneBasis>,
+    max_results: u8,
+    evt_sender: &mut futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+) -> Result<Vec<crate::types::agent_store::AgentInfoSigned>, KitsuneP2pError> {
+    // Try ourself first.
+    if let Ok(response) = evt_sender
+        .agent_info_by_basis(BasisInfoQueryEvt {
+            space: space.clone(),
+            agent: from_agent.clone(),
+            query: BasisInfoQuery {
+                basis: basis.clone(),
+                max_results,
+            },
+        })
+        .await
+    {
+        if response.matches.len() == max_results as usize {
+            return Ok(response.matches);
+        } else if response.matches.len() > 0 {
+            // Check the matches first
+        } else {
+            // TODO: Should these calls concurrent?
+            for closer_peer in response.closest {
+                let response = evt_sender
+                    .agent_info_by_basis(BasisInfoQueryEvt {
+                        space: space.clone(),
+                        agent: Arc::new(closer_peer.as_agent_ref().clone()),
+                        query: BasisInfoQuery {
+                            basis: basis.clone(),
+                            max_results,
+                        },
+                    })
+                    .await?;
+
+                // TODO: Wire call to closest peer looking for
+                // agent_info_by_basis
+                // TODO: When to stop as there will always be a closest?
+            }
+        }
+    }
+    todo!()
+}
+
 async fn agent_info_query(
     q: wire::AgentInfoQuery,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-) -> Result<Vec<crate::types::agent_store::AgentInfoSigned>, KitsuneP2pError> {
+) -> Result<AgentInfoResponse, KitsuneP2pError> {
     let wire::AgentInfoQuery {
         space,
         to_agent,
@@ -379,15 +427,19 @@ async fn agent_info_query(
             })
             .await?
         {
-            Ok(vec![agent])
+            Ok(AgentInfoResponse {
+                matches: vec![agent],
+                ..Default::default()
+            })
         } else {
-            Ok(vec![])
+            Ok(AgentInfoResponse::default())
         }
-    } else if let Some(_by_basis_arc) = by_basis_arc {
+    } else if let Some(query) = by_basis_arc {
         Ok(evt_sender
-            .query_agent_info_signed(QueryAgentInfoSignedEvt {
+            .agent_info_by_basis(BasisInfoQueryEvt {
                 space,
                 agent: to_agent,
+                query,
             })
             .await?)
     } else {
@@ -436,6 +488,13 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         input: crate::event::QueryAgentInfoSignedEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
         Ok(self.evt_sender.query_agent_info_signed(input))
+    }
+
+    fn handle_agent_info_by_basis(
+        &mut self,
+        input: crate::event::BasisInfoQueryEvt,
+    ) -> KitsuneP2pEventHandlerResult<crate::types::agent_store::AgentInfoResponse> {
+        Ok(self.evt_sender.agent_info_by_basis(input))
     }
 
     fn handle_call(

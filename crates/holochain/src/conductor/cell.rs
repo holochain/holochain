@@ -216,7 +216,10 @@ impl Cell {
     ) -> CellResult<()> {
         use holochain_p2p::event::HolochainP2pEvent::*;
         match evt {
-            PutAgentInfoSigned { .. } | GetAgentInfoSigned { .. } | QueryAgentInfoSigned { .. } => {
+            PutAgentInfoSigned { .. }
+            | GetAgentInfoSigned { .. }
+            | QueryAgentInfoSigned { .. }
+            | AgentInfoByBasis { .. } => {
                 // PutAgentInfoSigned needs to be handled at the conductor level where the p2p
                 // store lives.
                 unreachable!()

@@ -158,6 +158,13 @@ impl KitsuneP2pEventHandler for AgentHarness {
         Ok(async move { Ok(out) }.boxed().into())
     }
 
+    fn handle_agent_info_by_basis(
+        &mut self,
+        _input: BasisInfoQueryEvt,
+    ) -> KitsuneP2pEventHandlerResult<crate::types::agent_store::AgentInfoResponse> {
+        todo!()
+    }
+
     fn handle_call(
         &mut self,
         space: Arc<super::KitsuneSpace>,

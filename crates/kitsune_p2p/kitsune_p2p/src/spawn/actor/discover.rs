@@ -115,11 +115,11 @@ pub(crate) fn peer_discover(
                         wire::Wire::AgentInfoQueryResp(wire::AgentInfoQueryResp {
                             mut agent_infos,
                         }) => {
-                            if agent_infos.is_empty() {
+                            if agent_infos.matches.is_empty() {
                                 Err("failed to connect".into())
                             } else {
                                 // if we have a result, return it
-                                Ok(agent_infos.remove(0))
+                                Ok(agent_infos.matches.remove(0))
                             }
                         }
                         _ => KitsuneP2pResult::Err("failed to connect".into()),
@@ -311,20 +311,23 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
     space: Arc<KitsuneSpace>,
     from_agent: Arc<KitsuneAgent>,
     // ignored while full-sync
-    _basis: Arc<KitsuneBasis>,
+    basis: Arc<KitsuneBasis>,
     i_s: ghost_actor::GhostSender<SpaceInternal>,
-    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    mut evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     bootstrap_service: Option<url2::Url2>,
 ) -> MustBoxFuture<'static, KitsuneP2pResult<HashSet<AgentInfo>>> {
     async move {
         let mut out = HashSet::new();
 
-        if let Ok(mut list) = evt_sender
-            .query_agent_info_signed(QueryAgentInfoSignedEvt {
-                space: space.clone(),
-                agent: from_agent.clone(),
-            })
-            .await
+        // if let Ok(mut list) = evt_sender
+        //     .query_agent_info_signed(QueryAgentInfoSignedEvt {
+        //         space: space.clone(),
+        //         agent: from_agent.clone(),
+        //     })
+        //     .await
+        // {
+        if let Ok(mut list) =
+            remote_agent_query(space.clone(), from_agent.clone(), basis, 5, &mut evt_sender).await
         {
             // randomize the results
             rand::seq::SliceRandom::shuffle(&mut list[..], &mut rand::thread_rng());

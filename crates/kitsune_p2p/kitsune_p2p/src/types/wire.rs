@@ -1,6 +1,8 @@
 //! KitsuneP2p Wire Protocol Encoding Decoding
 
+use crate::agent_store::AgentInfoResponse;
 use crate::agent_store::AgentInfoSigned;
+use crate::agent_store::BasisInfoQuery;
 use crate::types::gossip::{OpConsistency, OpCount};
 use crate::types::*;
 use derive_more::*;
@@ -83,12 +85,12 @@ kitsune_p2p_types::write_codec_enum! {
             space.0: Arc<KitsuneSpace>,
             to_agent.1: Arc<KitsuneAgent>,
             by_agent.2: Option<Arc<KitsuneAgent>>,
-            by_basis_arc.3: Option<(Arc<KitsuneBasis>, DhtArc)>,
+            by_basis_arc.3: Option<BasisInfoQuery>,
         },
 
         /// Response type for agent info query
         AgentInfoQueryResp(0x41) {
-            agent_infos.0: Vec<AgentInfoSigned>,
+            agent_infos.0: AgentInfoResponse,
         },
 
         /// Fetch DhtOp data and AgentInfo for hashes lists
