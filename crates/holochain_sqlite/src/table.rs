@@ -138,15 +138,6 @@ pub(crate) fn initialize_table_single(
         NO_PARAMS,
     )?;
 
-    // create index
-    let index_name = format!("{}_idx", table_name);
-    conn.execute(
-        &format!(
-            "CREATE INDEX IF NOT EXISTS {} ON {} ( key );",
-            index_name, table_name
-        ),
-        NO_PARAMS,
-    )?;
     Ok(())
 }
 
@@ -157,29 +148,22 @@ pub(crate) fn initialize_table_multi(
     // create table
     conn.execute(
         &format!(
-            "CREATE TABLE IF NOT EXISTS {} (
+            "CREATE TABLE IF NOT EXISTS {0} (
                 key       BLOB NOT NULL,
-                val       BLOB NOT NULL
+                val       BLOB NOT NULL,
+                CONSTRAINT {0}_pk PRIMARY KEY (key, val)
             );",
-            table_name
+            table_name,
         ),
         NO_PARAMS,
     )?;
 
     // create two indexes, one unique
     let key_index_name = format!("{}_idx_k", table_name);
-    let composite_index_name = format!("{}_idx_kv", table_name);
     conn.execute(
         &format!(
             "CREATE INDEX IF NOT EXISTS {} ON {} ( key );",
             key_index_name, table_name
-        ),
-        NO_PARAMS,
-    )?;
-    conn.execute(
-        &format!(
-            "CREATE UNIQUE INDEX IF NOT EXISTS {} ON {} ( key, val );",
-            composite_index_name, table_name
         ),
         NO_PARAMS,
     )?;
