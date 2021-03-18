@@ -30,7 +30,7 @@ pub fn spawn_app_validation_consumer(
                 break;
             }
 
-            holochain_sqlite::db::optimistic_retry_async("produce_dht_ops_consumer", || async {
+            holochain_sqlite::db::optimistic_retry_async("app_validation_consumer", || async {
                 // Run the workflow
                 let workspace = AppValidationWorkspace::new(env.clone().into())?;
                 if let WorkComplete::Incomplete = app_validation_workflow(

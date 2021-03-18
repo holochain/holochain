@@ -29,7 +29,7 @@ pub fn spawn_publish_dht_ops_consumer(
                 break;
             }
 
-            holochain_sqlite::db::optimistic_retry_async("produce_dht_ops_consumer", || async {
+            holochain_sqlite::db::optimistic_retry_async("publish_dht_ops_consumer", || async {
                 // Run the workflow
                 let workspace = PublishDhtOpsWorkspace::new(env.clone().into())?;
                 if let WorkComplete::Incomplete =
