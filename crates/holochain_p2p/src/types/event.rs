@@ -3,7 +3,9 @@
 
 use crate::*;
 use holochain_zome_types::signature::Signature;
+use kitsune_p2p::agent_store::AgentInfoResponse;
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p::agent_store::BasisInfoQuery;
 
 /// Get options help control how the get is processed at various levels.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -79,6 +81,9 @@ ghost_actor::ghost_chan! {
 
         /// We need to get previously stored agent info.
         fn query_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Vec<AgentInfoSigned>;
+
+        /// We need to get previously stored agent info.
+        fn agent_info_by_basis(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, query: BasisInfoQuery) -> AgentInfoResponse;
 
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(
@@ -196,6 +201,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::PutAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::QueryAgentInfoSigned { $i, .. } => { $($t)* }
+            HolochainP2pEvent::AgentInfoByBasis { $i, .. } => { $($t)* }
         }
     };
 }

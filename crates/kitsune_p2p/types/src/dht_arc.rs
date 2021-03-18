@@ -15,7 +15,19 @@ mod tests;
 #[cfg(any(test, feature = "test_utils"))]
 pub mod gaps;
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, From, Into)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    From,
+    Into,
+    Ord,
+    PartialOrd,
+)]
 /// Type for representing a location that can wrap around
 /// a u32 dht arc
 pub struct DhtLocation(pub Wrapping<u32>);
@@ -250,6 +262,12 @@ impl DhtArc {
     /// The absolute length that this arc will hold.
     pub fn absolute_length(&self) -> u64 {
         self.range().len()
+    }
+
+    /// The absolute distance to another from this arcs center.
+    pub fn absolute_distance<I: Into<DhtLocation>>(&self, other_location: I) -> u32 {
+        let other_location = other_location.into();
+        shortest_arc_distance(self.center_loc, other_location.0)
     }
 
     /// The percentage of the full circle that is covered
