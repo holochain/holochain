@@ -49,11 +49,13 @@ impl DbRead {
     }
 
     /// Get a connection from the pool.
-    /// NB: r2d2 is NOT ASYNC, so this is BLOCKING if there is no available
-    /// connection!
-    /// TODO: We need to swap this for an async solution.
+    /// TODO: We should eventually swap this for an async solution.
     fn connection_pooled(&self) -> DatabaseResult<PConn> {
-        Ok(PConn::new(self.connection_pool.get()?, self.kind.clone()))
+        tokio_helper::block_on(
+            async move { Ok(PConn::new(self.connection_pool.get()?, self.kind.clone())) },
+            std::time::Duration::from_secs(30),
+        )
+        .expect("Couldn't get a database connection")
     }
 }
 
