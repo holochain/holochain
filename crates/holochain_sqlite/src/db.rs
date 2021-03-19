@@ -51,11 +51,9 @@ impl DbRead {
     /// Get a connection from the pool.
     /// TODO: We should eventually swap this for an async solution.
     fn connection_pooled(&self) -> DatabaseResult<PConn> {
-        tokio_helper::block_on(
-            async move { Ok(PConn::new(self.connection_pool.get()?, self.kind.clone())) },
-            std::time::Duration::from_secs(30),
-        )
-        .expect("Couldn't get a database connection")
+        tokio::task::block_in_place(move || {
+            Ok(PConn::new(self.connection_pool.get()?, self.kind.clone()))
+        })
     }
 }
 
