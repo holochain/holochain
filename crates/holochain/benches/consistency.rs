@@ -90,7 +90,7 @@ impl Consumer {
 }
 
 async fn setup() -> (Producer, Consumer) {
-    let (tx, rx) = tokio::sync::mpsc::channel(1000);
+    let (tx, rx) = tokio::sync::mpsc::channel(1);
     let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor])
         .await
         .unwrap();
