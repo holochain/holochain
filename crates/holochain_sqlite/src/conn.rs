@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use chashmap::CHashMap;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use rusqlite::*;
 use std::{
     path::{Path, PathBuf},
@@ -11,33 +11,30 @@ mod singleton_conn;
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
-lazy_static! {
+pub(crate) static DATABASE_HANDLES: Lazy<CHashMap<PathBuf, DbWrite>> = Lazy::new(|| {
+    // This is just a convenient place that we know gets initialized
+    // both in the final binary holochain && in all relevant tests
+    //
+    // Holochain (and most binaries) are left in invalid states
+    // if a thread panic!s - switch to failing fast in that case.
+    //
+    // We tried putting `panic = "abort"` in the Cargo.toml,
+    // but somehow that breaks the wasmer / test_utils integration.
 
-    pub(crate) static ref DATABASE_HANDLES: CHashMap<PathBuf, DbWrite> = {
-        // This is just a convenient place that we know gets initialized
-        // both in the final binary holochain && in all relevant tests
-        //
-        // Holochain (and most binaries) are left in invalid states
-        // if a thread panic!s - switch to failing fast in that case.
-        //
-        // We tried putting `panic = "abort"` in the Cargo.toml,
-        // but somehow that breaks the wasmer / test_utils integration.
+    let orig_handler = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        // print the panic message
+        eprintln!("FATAL PANIC {:#?}", panic_info);
+        // invoke the original handler
+        orig_handler(panic_info);
+        // // Abort the process
+        // // TODO - we need a better solution than this, but if there is
+        // // no better solution, we can uncomment the following line:
+        // std::process::abort();
+    }));
 
-        let orig_handler = std::panic::take_hook();
-        std::panic::set_hook(Box::new(move |panic_info| {
-            // print the panic message
-            eprintln!("FATAL PANIC {:#?}", panic_info);
-            // invoke the original handler
-            orig_handler(panic_info);
-            // // Abort the process
-            // // TODO - we need a better solution than this, but if there is
-            // // no better solution, we can uncomment the following line:
-            // std::process::abort();
-        }));
-
-        CHashMap::new()
-    };
-}
+    CHashMap::new()
+});
 
 pub type ConnectionPool = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
 pub type PConnInner = r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>;
