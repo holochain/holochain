@@ -8,15 +8,14 @@ use futures::stream::{Stream, StreamExt};
 use kitsune_p2p_types::tx2::tx2_backend::*;
 use kitsune_p2p_types::tx2::tx2_frontend::tx2_frontend_traits::*;
 use kitsune_p2p_types::tx2::tx2_frontend::*;
-use kitsune_p2p_types::tx2::tx2_promote::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
 use std::collections::HashMap;
 
 /// Wrap a tx2 backend transport with proxy logic.
-pub fn tx2_proxy(sub_tx: BackendFactory, tls_config: TlsConfig, max_cons: usize) -> EpFactory {
-    ProxyEpFactory::new(sub_tx, tls_config, max_cons)
+pub fn tx2_proxy(sub_fact: EpFactory, tls_config: TlsConfig) -> EpFactory {
+    ProxyEpFactory::new(sub_fact, tls_config)
 }
 
 // -- private -- //
@@ -479,8 +478,7 @@ struct ProxyEpFactory {
 }
 
 impl ProxyEpFactory {
-    pub fn new(sub_fact: BackendFactory, tls_config: TlsConfig, max_cons: usize) -> EpFactory {
-        let sub_fact = tx2_promote(sub_fact, max_cons);
+    pub fn new(sub_fact: EpFactory, tls_config: TlsConfig) -> EpFactory {
         EpFactory(Arc::new(ProxyEpFactory {
             tls_config,
             sub_fact,
@@ -507,17 +505,17 @@ impl AsEpFactory for ProxyEpFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use kitsune_p2p_types::tx2::tx2_promote::*;
 
     async fn build_node(
         mut s_done: Option<tokio::sync::oneshot::Sender<()>>,
     ) -> (tokio::task::JoinHandle<()>, TxUrl, EpHnd) {
         let t = KitsuneTimeout::from_millis(5000);
 
-        let f = tx2_proxy(
-            MemBackendAdapt::new(),
-            TlsConfig::new_ephemeral().await.unwrap(),
-            32,
-        );
+        let f = tx2_promote(MemBackendAdapt::new(), 32);
+
+        let f = tx2_proxy(f, TlsConfig::new_ephemeral().await.unwrap());
+
         let mut ep = f.bind("none:", t).await.unwrap();
         let ephnd = ep.handle().clone();
         let addr = ephnd.local_addr().unwrap();

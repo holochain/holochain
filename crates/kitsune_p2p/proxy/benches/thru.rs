@@ -3,6 +3,7 @@ use futures::stream::StreamExt;
 use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_proxy::*;
 use kitsune_p2p_types::tx2::tx2_frontend::*;
+use kitsune_p2p_types::tx2::tx2_promote::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
@@ -124,11 +125,8 @@ impl Test {
 async fn mk_core() -> (TxUrl, Ep, EpHnd) {
     let t = KitsuneTimeout::from_millis(5000);
 
-    let f = tx2_proxy(
-        MemBackendAdapt::new(),
-        TlsConfig::new_ephemeral().await.unwrap(),
-        NODE_COUNT * 3,
-    );
+    let f = tx2_promote(MemBackendAdapt::new(), NODE_COUNT * 3);
+    let f = tx2_proxy(f, TlsConfig::new_ephemeral().await.unwrap());
 
     let ep = f.bind("none:", t).await.unwrap();
     let ep_hnd = ep.handle().clone();
