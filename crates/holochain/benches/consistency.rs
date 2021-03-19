@@ -21,7 +21,7 @@ criterion_main!(benches);
 
 fn consistency(bench: &mut Criterion) {
     let mut group = bench.benchmark_group("consistency");
-    group.sample_size(100);
+    group.sample_size(20);
     let runtime = rt();
 
     let (mut producer, mut consumer) = runtime.block_on(setup());
@@ -84,6 +84,7 @@ impl Consumer {
                 .await;
             num = hashes.0.len();
         }
+        self.last = num;
         self.tx.send(num).await.unwrap();
     }
 }
