@@ -1,12 +1,4 @@
 //! Next-gen performance kitsune transport abstractions
-//!
-mod framed;
-pub use framed::*;
-
-mod mem;
-pub use mem::*;
-
-pub mod tx2_backend;
 
 mod codec;
 pub use codec::*;
