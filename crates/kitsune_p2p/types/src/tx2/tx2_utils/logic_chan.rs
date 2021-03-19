@@ -1,4 +1,4 @@
-use crate::tx2::tx2_utils::Share;
+use crate::tx2::tx2_utils::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::futures_unordered::FuturesUnordered;
@@ -9,8 +9,8 @@ enum LType<E: 'static + Send> {
     Event(E),
     Logic(OwnedSemaphorePermit, BoxFuture<'static, ()>),
 }
-type LTypeSend<E> = tokio::sync::mpsc::Sender<LType<E>>;
-type LTypeRecv<E> = tokio::sync::mpsc::Receiver<LType<E>>;
+type LTypeSend<E> = TSender<LType<E>>;
+type LTypeRecv<E> = TReceiver<LType<E>>;
 
 struct LogicChanInner<E: 'static + Send> {
     send: LTypeSend<E>,
@@ -95,8 +95,9 @@ impl<E: 'static + Send> LogicChanHandle<E> {
 
     /// Close this logic_chan.
     pub fn close(&self) {
-        let _ = self.0.share_mut(|_, c| {
+        let _ = self.0.share_mut(|i, c| {
             *c = true;
+            i.send.close_channel();
             Ok(())
         });
     }
@@ -139,7 +140,7 @@ pub struct LogicChan<E: 'static + Send> {
 impl<E: 'static + Send> LogicChan<E> {
     /// Create a new LogicChan instance.
     pub fn new(capture_bound: usize) -> Self {
-        let (send, recv) = tokio::sync::mpsc::channel(capture_bound);
+        let (send, recv) = t_chan(capture_bound);
         let logic_limit = Arc::new(Semaphore::new(capture_bound));
         let inner = LogicChanInner { send, logic_limit };
         let hnd = LogicChanHandle(Share::new(inner));
