@@ -98,14 +98,18 @@ async fn test_validation_receipt() {
     // Check alice has 2 receipts in their authored dht ops table.
     let db = env.get_table(TableName::AuthoredDhtOps).unwrap();
     let authored_dht_ops: AuthoredDhtOpsStore = KvBufFresh::new(env.clone(), db);
-    let vals: Vec<_> = fresh_reader_test!(env, |mut r| authored_dht_ops
-        .iter(&mut r)
-        .unwrap()
-        .map(|(_, v)| Ok(v))
-        .collect()
-        .unwrap());
 
-    for AuthoredDhtOpsValue { receipt_count, .. } in vals {
-        assert_eq!(receipt_count, 2);
-    }
+    let expected_counts = vec![2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
+    crate::wait_for_any_10s!(
+        {
+            fresh_reader_test!(env, |mut r| authored_dht_ops
+                .iter(&mut r)
+                .unwrap()
+                .map(|(_, v)| Ok(v.receipt_count))
+                .collect::<Vec<_>>()
+                .unwrap())
+        },
+        |counts| counts == &expected_counts,
+        |counts| assert_eq!(counts, expected_counts)
+    );
 }
