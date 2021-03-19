@@ -7,7 +7,6 @@ use crate::tx2::*;
 use crate::*;
 use futures::{
     future::{BoxFuture, FutureExt},
-    sink::SinkExt,
     stream::{BoxStream, StreamExt},
 };
 use once_cell::sync::Lazy;
@@ -17,10 +16,10 @@ use std::sync::atomic;
 
 static NEXT_MEM_ID: atomic::AtomicU64 = atomic::AtomicU64::new(1);
 
-type ChanSend = futures::channel::mpsc::Sender<InChan>;
-type ChanRecv = futures::channel::mpsc::Receiver<InChan>;
-type ConSend = futures::channel::mpsc::Sender<Con>;
-type ConRecv = futures::channel::mpsc::Receiver<Con>;
+type ChanSend = TSender<InChan>;
+type ChanRecv = TReceiver<InChan>;
+type ConSend = TSender<Con>;
+type ConRecv = TReceiver<Con>;
 
 static MEM_ENDPOINTS: Lazy<Mutex<HashMap<u64, (ConSend, Active)>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -100,7 +99,7 @@ impl ConAdapt for MemConAdapt {
     }
 
     fn out_chan(&self, _timeout: KitsuneTimeout) -> OutChanFut {
-        let mut sender = self.0.chan_send.clone();
+        let sender = self.0.chan_send.clone();
         let (send, recv) = bound_async_mem_channel(4096, Some(&self.0.mix_active));
         async move {
             let send: OutChan = Box::new(FramedWriter::new(send));
@@ -233,7 +232,7 @@ impl EndpointAdapt for MemEndpointAdapt {
                 Ok(id) => id,
                 Err(_) => return Err(format!("invalid url: {}", url).into()),
             };
-            let (mut c_send, oth_ep_active) = match MEM_ENDPOINTS.lock().get(&id) {
+            let (c_send, oth_ep_active) = match MEM_ENDPOINTS.lock().get(&id) {
                 None => return Err(format!("remote not found: {}", url).into()),
                 Some((s, a)) => (s.clone(), a.clone()),
             };
@@ -242,8 +241,8 @@ impl EndpointAdapt for MemEndpointAdapt {
             let mix_ep_active = this_ep_active.mix(&oth_ep_active);
             let mix_active = con_active.mix(&mix_ep_active);
 
-            let (send, oth_recv) = futures::channel::mpsc::channel(1);
-            let (oth_send, recv) = futures::channel::mpsc::channel(1);
+            let (send, oth_recv) = t_chan(1);
+            let (oth_send, recv) = t_chan(1);
 
             let oth_con = MemConAdapt::new(
                 format!("{}/{}", this_url, con_id).into(),
@@ -281,7 +280,7 @@ impl EndpointAdapt for MemEndpointAdapt {
     }
 
     fn close(&self, _code: u32, _reason: &str) -> BoxFuture<'static, ()> {
-        let mut lock = self.0.lock();
+        let lock = self.0.lock();
         lock.ep_active.kill();
         lock.c_send.close_channel();
         async move {}.boxed()
@@ -303,7 +302,7 @@ impl BackendAdapt for MemBackendAdapt {
     fn bind(&self, _url: TxUrl, _timeout: KitsuneTimeout) -> EndpointFut {
         async move {
             let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
-            let (c_send, c_recv) = futures::channel::mpsc::channel(32);
+            let (c_send, c_recv) = t_chan(32);
             let (ep, ep_active) = MemEndpointAdapt::new(c_send.clone(), id);
             MEM_ENDPOINTS.lock().insert(id, (c_send, ep_active.clone()));
             let ep: Arc<dyn EndpointAdapt> = Arc::new(ep);
@@ -317,12 +316,11 @@ impl BackendAdapt for MemBackendAdapt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::sink::SinkExt;
 
     async fn hnd_con(
         c: Con,
-        r_send: futures::channel::mpsc::Sender<()>,
-        mut w_send: futures::channel::mpsc::Sender<tokio::task::JoinHandle<()>>,
+        r_send: TSender<()>,
+        w_send: TSender<tokio::task::JoinHandle<()>>,
     ) -> Arc<dyn ConAdapt> {
         let t = KitsuneTimeout::from_millis(5000);
 
@@ -359,8 +357,8 @@ mod tests {
 
     async fn mk_node(
         f: &BackendFactory,
-        r_send: futures::channel::mpsc::Sender<()>,
-        mut w_send: futures::channel::mpsc::Sender<tokio::task::JoinHandle<()>>,
+        r_send: TSender<()>,
+        w_send: TSender<tokio::task::JoinHandle<()>>,
     ) -> (TxUrl, Arc<dyn EndpointAdapt>) {
         let t = KitsuneTimeout::from_millis(5000);
 
@@ -391,8 +389,8 @@ mod tests {
         const COUNT: usize = 100;
 
         let f = MemBackendAdapt::new();
-        let (r_send, mut r_recv) = futures::channel::mpsc::channel(COUNT * 3);
-        let (mut w_send, w_recv) = futures::channel::mpsc::channel(COUNT * 3);
+        let (r_send, mut r_recv) = t_chan(COUNT * 3);
+        let (w_send, w_recv) = t_chan(COUNT * 3);
 
         let (addr, ep) = mk_node(&f, r_send.clone(), w_send.clone()).await;
 
@@ -434,7 +432,7 @@ mod tests {
             ep.close(0, "").await;
         }
 
-        w_send.close().await.unwrap();
+        w_send.close_channel();
 
         futures::future::try_join_all(w_recv.collect::<Vec<_>>().await)
             .await

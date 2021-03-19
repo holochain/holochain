@@ -558,14 +558,13 @@ impl AsEpFactory for PromoteFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::sink::SinkExt;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_promote_stress() {
         let t = KitsuneTimeout::from_millis(5000);
 
         const COUNT: usize = 100;
-        let (mut w_send, w_recv) = futures::channel::mpsc::channel(COUNT * 3);
+        let (w_send, w_recv) = t_chan(COUNT * 3);
 
         // we can set the max con count to half...
         // as old connections complete, new ones will be accepted
@@ -595,7 +594,7 @@ mod tests {
         let mut all_fut = Vec::new();
         for _ in 0..COUNT {
             let ep_fut = fact.bind("none:", t);
-            let mut w_send = w_send.clone();
+            let w_send = w_send.clone();
             let tgt_addr = tgt_addr.clone();
             all_fut.push(async move {
                 let mut ep = ep_fut.await.unwrap();
@@ -634,7 +633,7 @@ mod tests {
 
         tgt_hnd.close(0, "").await;
 
-        w_send.close().await.unwrap();
+        w_send.close_channel();
 
         futures::future::try_join_all(w_recv.collect::<Vec<_>>().await)
             .await

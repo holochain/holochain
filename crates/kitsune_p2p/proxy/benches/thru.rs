@@ -1,11 +1,11 @@
 use criterion::{/*black_box,*/ criterion_group, criterion_main, Criterion};
 use futures::stream::StreamExt;
-use kitsune_p2p_proxy::*;
 use kitsune_p2p_proxy::tx2::*;
-use kitsune_p2p_types::*;
-use kitsune_p2p_types::tx2::*;
-use kitsune_p2p_types::tx2::tx2_utils::*;
+use kitsune_p2p_proxy::*;
 use kitsune_p2p_types::tx2::tx2_frontend::*;
+use kitsune_p2p_types::tx2::tx2_utils::*;
+use kitsune_p2p_types::tx2::*;
+use kitsune_p2p_types::*;
 use once_cell::sync::Lazy;
 use std::sync::Arc;
 
@@ -88,10 +88,12 @@ impl Test {
     pub async fn test(&mut self) {
         let (d_send, mut d_recv) = tokio::sync::mpsc::channel(self.nodes.len());
 
-        self.d_send.share_mut(move |i, _| {
-            *i = Some(d_send);
-            Ok(())
-        }).unwrap();
+        self.d_send
+            .share_mut(move |i, _| {
+                *i = Some(d_send);
+                Ok(())
+            })
+            .unwrap();
 
         let mut futs = Vec::new();
         for (_, con) in self.nodes.iter() {
@@ -110,10 +112,12 @@ impl Test {
             d_recv.recv().await;
         }
 
-        self.d_send.share_mut(|i, _| {
-            *i = None;
-            Ok(())
-        }).unwrap();
+        self.d_send
+            .share_mut(|i, _| {
+                *i = None;
+                Ok(())
+            })
+            .unwrap();
     }
 }
 
@@ -136,10 +140,7 @@ async fn mk_core() -> (TxUrl, Ep, EpHnd) {
 async fn mk_proxy() -> (TxUrl, EpHnd) {
     let (addr, mut ep, ep_hnd) = mk_core().await;
 
-    tokio::task::spawn(async move {
-        while let Some(_evt) = ep.next().await {
-        }
-    });
+    tokio::task::spawn(async move { while let Some(_evt) = ep.next().await {} });
 
     (addr, ep_hnd)
 }
@@ -165,18 +166,16 @@ async fn mk_tgt() -> (TxUrl, EpHnd) {
     (addr, ep_hnd)
 }
 
-async fn mk_node(
-    d_send: Arc<Share<Option<tokio::sync::mpsc::Sender<()>>>>
-) -> (TxUrl, EpHnd) {
+async fn mk_node(d_send: Arc<Share<Option<tokio::sync::mpsc::Sender<()>>>>) -> (TxUrl, EpHnd) {
     let (addr, mut ep, ep_hnd) = mk_core().await;
 
     tokio::task::spawn(async move {
         while let Some(evt) = ep.next().await {
             if let EpEvent::IncomingData(EpIncomingData { data, .. }) = evt {
                 if data.as_ref() == RES {
-                    let d_send = d_send.share_mut(|i, _| {
-                        Ok(i.as_ref().unwrap().clone())
-                    }).unwrap();
+                    let d_send = d_send
+                        .share_mut(|i, _| Ok(i.as_ref().unwrap().clone()))
+                        .unwrap();
                     d_send.send(()).await.unwrap();
                 } else {
                     panic!("unexpected bytes");
@@ -194,7 +193,8 @@ async fn test(this: &Arc<Share<Option<Test>>>) {
     this.share_mut(move |i, _| {
         *i = Some(t);
         Ok(())
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 fn thru(t: &Arc<Share<Option<Test>>>) {
@@ -205,9 +205,7 @@ fn thru(t: &Arc<Share<Option<Test>>>) {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let t = RUNTIME.block_on(async {
-        Arc::new(Share::new(Some(Test::new().await)))
-    });
+    let t = RUNTIME.block_on(async { Arc::new(Share::new(Some(Test::new().await))) });
     c.bench_function("thru", |b| b.iter(|| thru(&t)));
 }
 
