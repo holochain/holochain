@@ -7,6 +7,19 @@ use futures::io::AsyncWriteExt;
 const R_MASK: u64 = 1 << 63;
 const R_FILT: u64 = !R_MASK;
 
+/// MsgId type
+#[derive(Debug)]
+pub enum MsgIdType {
+    /// Notify-type MsgId
+    Notify,
+
+    /// Req-type MsgId
+    Req,
+
+    /// Res-type MsgId
+    Res,
+}
+
 /// 64 bit MsgId - the top bit identifies if Request or Response.
 #[derive(Clone, Copy)]
 pub struct MsgId(u64);
@@ -62,6 +75,19 @@ impl MsgId {
         Self(self.0 | R_MASK)
     }
 
+    /// Get the MsgIdType of this MsgId.
+    pub fn get_type(&self) -> MsgIdType {
+        if self.is_notify() {
+            MsgIdType::Notify
+        } else if self.is_req() {
+            MsgIdType::Req
+        } else if self.is_res() {
+            MsgIdType::Res
+        } else {
+            unreachable!()
+        }
+    }
+
     /// Is this MsgId a notify-type?
     pub fn is_notify(&self) -> bool {
         self.0 == 0
@@ -80,14 +106,10 @@ impl MsgId {
 
 impl std::fmt::Debug for MsgId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let is_notify = self.is_notify();
-        let is_req = self.is_req();
-        let is_res = self.is_res();
+        let msg_id_type = self.get_type();
         let id = self.as_id();
         f.debug_struct("MsgId")
-            .field("is_notify", &is_notify)
-            .field("is_req", &is_req)
-            .field("is_res", &is_res)
+            .field("type", &msg_id_type)
             .field("id", &id)
             .finish()
     }
