@@ -6,9 +6,9 @@ use ::fixt::prelude::*;
 use error::SysValidationError;
 
 use holochain_keystore::AgentPubKeyExt;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::test_utils::test_cell_env;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_sqlite::db::DbRead;
+use holochain_sqlite::test_utils::test_cell_env;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
 use matches::assert_matches;
@@ -17,7 +17,7 @@ use std::convert::TryFrom;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn verify_header_signature_test() {
-    let keystore = holochain_lmdb::test_utils::test_keystore();
+    let keystore = holochain_sqlite::test_utils::test_keystore();
     let author = fake_agent_pubkey_1();
     let mut header = fixt!(CreateLink);
     header.author = author.clone();
@@ -56,7 +56,8 @@ async fn check_previous_header() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_valid_if_dna_test() {
-    let env: EnvironmentRead = test_cell_env().env().into();
+    let tmp = test_cell_env();
+    let env: DbRead = tmp.env().into();
     // Test data
     let activity_return = vec![fixt!(HeaderHash)];
 
@@ -257,7 +258,10 @@ async fn check_update_reference_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn check_link_tag_size_test() {
     let tiny = LinkTag(vec![0; 1]);
-    let bytes = (0..401).map(|_| 0u8).into_iter().collect::<Vec<_>>();
+    let bytes = (0..super::MAX_TAG_SIZE + 1)
+        .map(|_| 0u8)
+        .into_iter()
+        .collect::<Vec<_>>();
     let huge = LinkTag(bytes);
     assert_matches!(check_tag_size(&tiny), Ok(()));
 

@@ -8,17 +8,11 @@ use crate::core::queue_consumer::TriggerSender;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_cascade::integrate_single_metadata;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::db::INTEGRATED_DHT_OPS;
-use holochain_lmdb::db::INTEGRATION_LIMBO;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::prelude::EnvironmentRead;
-use holochain_lmdb::prelude::GetDb;
-use holochain_lmdb::prelude::IntegratedPrefix;
-use holochain_lmdb::prelude::PendingPrefix;
-use holochain_lmdb::prelude::Writer;
+use holochain_sqlite::buffer::BufferedStore;
+use holochain_sqlite::buffer::KvBufFresh;
+use holochain_sqlite::db::DbWrite;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::query::HighestObserved;
@@ -29,7 +23,7 @@ mod test;
 
 #[instrument(skip(state_env, sys_validation_trigger, ops))]
 pub async fn incoming_dht_ops_workflow(
-    state_env: &EnvironmentWrite,
+    state_env: &DbWrite,
     mut sys_validation_trigger: TriggerSender,
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     from_agent: Option<AgentPubKey>,
@@ -110,11 +104,11 @@ impl Workspace for IncomingDhtOpsWorkspace {
 }
 
 impl IncomingDhtOpsWorkspace {
-    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let db = env.get_db(&*INTEGRATED_DHT_OPS)?;
+    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+        let db = env.get_table(TableName::IntegratedDhtOps)?;
         let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
 
-        let db = env.get_db(&*INTEGRATION_LIMBO)?;
+        let db = env.get_table(TableName::IntegrationLimbo)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
         let validation_limbo = ValidationLimboStore::new(env.clone())?;

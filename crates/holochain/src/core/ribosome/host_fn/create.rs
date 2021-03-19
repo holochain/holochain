@@ -52,7 +52,7 @@ pub fn create<'a>(
 
     // return the hash of the committed entry
     // note that validation is handled by the workflow
-    // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
+    // if the validation fails this commit will be rolled back by virtue of the DB transaction
     // being atomic
     let entry = AsRef::<Entry>::as_ref(&input).to_owned();
     tokio_helper::block_forever_on(async move {
@@ -146,7 +146,7 @@ pub mod wasm_test {
     /// we cannot commit before genesis
     async fn create_pre_genesis_test() {
         // test workspace boilerplate
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_sqlite::test_utils::test_cell_env();
         let env = test_env.env();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
@@ -185,7 +185,7 @@ pub mod wasm_test {
     /// we can get an entry hash out of the fn directly
     async fn create_entry_test<'a>() {
         // test workspace boilerplate
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_sqlite::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
@@ -231,7 +231,7 @@ pub mod wasm_test {
     async fn ribosome_create_entry_test<'a>() {
         observability::test_run().ok();
         // test workspace boilerplate
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_sqlite::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 

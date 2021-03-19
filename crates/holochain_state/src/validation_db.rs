@@ -3,12 +3,12 @@
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::DhtOpHash;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::db::VALIDATION_LIMBO;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::prelude::EnvironmentRead;
-use holochain_lmdb::prelude::GetDb;
 use holochain_serialized_bytes::prelude::*;
+use holochain_sqlite::buffer::KvBufFresh;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::prelude::DbRead;
+use holochain_sqlite::prelude::GetTable;
+use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use shrinkwraprs::Shrinkwrap;
 
@@ -56,8 +56,8 @@ pub enum ValidationLimboStatus {
 
 impl ValidationLimboStore {
     /// Create a new Validation Limbo db
-    pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let db = env.get_db(&*VALIDATION_LIMBO)?;
+    pub fn new(env: DbRead) -> DatabaseResult<Self> {
+        let db = env.get_table(TableName::ValidationLimbo)?;
         Ok(Self(KvBufFresh::new(env, db)))
     }
 }

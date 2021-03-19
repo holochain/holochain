@@ -1,8 +1,8 @@
-use crate::conductor::ConductorHandle;
 use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
 use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::setup_app;
 use crate::test_utils::wait_for_integration;
+use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use hdk::prelude::LinkTag;
@@ -10,9 +10,8 @@ use holo_hash::AnyDhtHash;
 use holo_hash::DhtOpHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_lmdb::fresh_reader_test;
-use holochain_lmdb::prelude::ReadManager;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_sqlite::fresh_reader_test;
 use holochain_state::element_buf::ElementBuf;
 use holochain_state::validation_db::ValidationLimboStatus;
 use holochain_types::prelude::*;
@@ -97,10 +96,10 @@ async fn run_test(
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should be empty
-        let res: Vec<_> = fresh_reader_test!(alice_env, |r| {
+        let res: Vec<_> = fresh_reader_test!(alice_env, |mut r| {
             workspace
                 .validation_limbo
-                .iter(&r)
+                .iter(&mut r)
                 .unwrap()
                 .map(|(k, i)| Ok((k.to_vec(), i)))
                 .collect()
@@ -117,20 +116,20 @@ async fn run_test(
             }
         }
         assert_eq!(res.len(), 0, "{:?}", res);
-        let int_limbo: Vec<_> = fresh_reader_test!(alice_env, |r| {
+        let int_limbo: Vec<_> = fresh_reader_test!(alice_env, |mut r| {
             workspace
                 .integration_limbo
-                .iter(&r)
+                .iter(&mut r)
                 .unwrap()
                 .map(|(k, i)| Ok((k.to_vec(), i)))
                 .collect()
                 .unwrap()
         });
         assert_eq!(int_limbo.len(), 0, "{:?}", int_limbo);
-        let res: Vec<_> = fresh_reader_test!(alice_env, |r| {
+        let res: Vec<_> = fresh_reader_test!(alice_env, |mut r| {
             workspace
                 .integrated_dht_ops
-                .iter(&r)
+                .iter(&mut r)
                 .unwrap()
                 // Every op should be valid
                 .inspect(|(_, i)| {
@@ -176,9 +175,9 @@ async fn run_test(
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should be empty
         assert_eq!(
-            fresh_reader_test!(alice_env, |r| workspace
+            fresh_reader_test!(alice_env, |mut r| workspace
                 .validation_limbo
-                .iter(&r)
+                .iter(&mut r)
                 .unwrap()
                 .inspect(|(_, i)| {
                     let s = debug_span!("inspect_ops");
@@ -194,18 +193,18 @@ async fn run_test(
 
         let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
 
-        let int_limbo: Vec<_> = fresh_reader_test!(alice_env, |r| workspace
+        let int_limbo: Vec<_> = fresh_reader_test!(alice_env, |mut r| workspace
             .integration_limbo
-            .iter(&r)
+            .iter(&mut r)
             .unwrap()
             .map(|(_, v)| Ok(v.clone()))
             .collect()
             .unwrap());
 
         assert_eq!(
-            fresh_reader_test!(alice_env, |r| workspace
+            fresh_reader_test!(alice_env, |mut r| workspace
                 .integrated_dht_ops
-                .iter(&r)
+                .iter(&mut r)
                 .unwrap()
                 // Every op should be valid except register updated by
                 // Store entry for the update
@@ -261,45 +260,44 @@ async fn run_test(
             delay_per_attempt.clone(),
         )
         .await;
-        let env_ref = alice_env.guard();
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should still contain bobs link pending because the target was missing
-        assert_eq!(
-            {
-                let r = env_ref.reader().unwrap();
-                workspace
-                    .validation_limbo
-                    .iter(&r)
-                    .unwrap()
-                    .inspect(|(_, i)| {
-                        let s = debug_span!("inspect_ops");
-                        let _g = s.enter();
-                        debug!(?i.op);
-                        assert_matches!(
-                            i.status,
-                            ValidationLimboStatus::Pending
-                                | ValidationLimboStatus::AwaitingAppDeps(_)
-                        );
-                        Ok(())
-                    })
-                    .count()
-                    .unwrap()
-            },
-            2
-        );
-        assert_eq!(
-            {
-                let r = env_ref.reader().unwrap();
-                workspace
-                    .integrated_dht_ops
-                    .iter(&r)
-                    .unwrap()
-                    .count()
-                    .unwrap()
-            },
-            expected_count
-        );
+        fresh_reader_test!(alice_env, |mut reader| {
+            assert_eq!(
+                {
+                    workspace
+                        .validation_limbo
+                        .iter(&mut reader)
+                        .unwrap()
+                        .inspect(|(_, i)| {
+                            let s = debug_span!("inspect_ops");
+                            let _g = s.enter();
+                            debug!(?i.op);
+                            assert_matches!(
+                                i.status,
+                                ValidationLimboStatus::Pending
+                                    | ValidationLimboStatus::AwaitingAppDeps(_)
+                            );
+                            Ok(())
+                        })
+                        .count()
+                        .unwrap()
+                },
+                2
+            );
+            assert_eq!(
+                {
+                    workspace
+                        .integrated_dht_ops
+                        .iter(&mut reader)
+                        .unwrap()
+                        .count()
+                        .unwrap()
+                },
+                expected_count
+            );
+        });
     }
 }
 
@@ -353,7 +351,10 @@ async fn bob_makes_a_large_link(
     let bad_update_entry_hash =
         EntryHash::with_data_sync(&Entry::try_from(bad_update.clone()).unwrap());
 
-    let bytes = (0..401).map(|_| 0u8).into_iter().collect::<Vec<_>>();
+    let bytes = (0..MAX_TAG_SIZE + 1)
+        .map(|_| 0u8)
+        .into_iter()
+        .collect::<Vec<_>>();
     let link_tag = LinkTag(bytes);
 
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;

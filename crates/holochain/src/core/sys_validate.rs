@@ -8,10 +8,10 @@ use crate::conductor::api::CellConductorApiT;
 use crate::conductor::entry_def_store::get_entry_def;
 use fallible_iterator::FallibleIterator;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::fresh_reader;
 use holochain_p2p::HolochainP2pCell;
+use holochain_sqlite::db::DbWrite;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::fresh_reader;
 use holochain_state::metadata::ChainItemKey;
 use holochain_state::metadata::MetadataBufT;
 use holochain_types::prelude::*;
@@ -33,10 +33,10 @@ mod tests;
 /// Consider splitting large entries up.
 pub const MAX_ENTRY_SIZE: usize = 16_000_000;
 
-/// 400b limit on LinkTags.
+/// 1kb limit on LinkTags.
 /// Tags are used as keys to the database to allow
-/// fast lookup so they need to be small.
-pub const MAX_TAG_SIZE: usize = 400;
+/// fast lookup so they should be small.
+pub const MAX_TAG_SIZE: usize = 1000;
 
 /// Verify the signature for this header
 pub async fn verify_header_signature(
@@ -83,10 +83,10 @@ pub async fn check_valid_if_dna(
     header: &Header,
     meta_vault: &impl MetadataBufT,
 ) -> SysValidationResult<()> {
-    fresh_reader!(meta_vault.env(), |r| {
+    fresh_reader!(meta_vault.env(), |mut r| {
         match header {
             Header::Dna(_) => meta_vault
-                .get_activity(&r, ChainItemKey::Agent(header.author().clone()))?
+                .get_activity(&mut r, ChainItemKey::Agent(header.author().clone()))?
                 .next()?
                 .map_or(Ok(()), |_| {
                     Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
@@ -113,15 +113,15 @@ pub async fn check_chain_rollback(
     let env = workspace.meta_vault.env();
     // Check there are no conflicting chain items
     // at any valid or potentially valid stores.
-    let count = fresh_reader!(env, |r| {
+    let count = fresh_reader!(env, |mut r| {
         let vault_count = workspace
             .meta_vault
-            .get_activity(&r, k.clone())?
+            .get_activity(&mut r, k.clone())?
             .filter(|thh| Ok(thh.header_hash != header_hash))
             .count()?;
         let pending_count = workspace
             .meta_pending
-            .get_activity(&r, k.clone())?
+            .get_activity(&mut r, k.clone())?
             .filter(|thh| Ok(thh.header_hash != header_hash))
             .count()?;
         DatabaseResult::Ok(vault_count + pending_count)
@@ -161,7 +161,7 @@ pub fn check_prev_timestamp(header: &Header, prev_header: &Header) -> SysValidat
     }
 }
 
-/// Check the previous header is one less then the current
+/// Check the previous header is one less than the current
 pub fn check_prev_seq(header: &Header, prev_header: &Header) -> SysValidationResult<()> {
     let header_seq = header.header_seq();
     let prev_seq = prev_header.header_seq();
@@ -443,7 +443,7 @@ where
 /// to be holding it.
 #[derive(derive_more::Constructor)]
 pub struct IncomingDhtOpSender {
-    env: EnvironmentWrite,
+    env: DbWrite,
     sys_validation_trigger: TriggerSender,
 }
 

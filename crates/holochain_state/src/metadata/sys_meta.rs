@@ -16,8 +16,8 @@ mod tests {
     use header::Create;
     use holo_hash::fixt::*;
     use holo_hash::*;
-    use holochain_lmdb::prelude::*;
-    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_sqlite::test_utils::test_cell_env;
+    use holochain_sqlite::{fresh_reader_test, prelude::*};
     use holochain_types::fixt::AppEntryTypeFixturator;
     use holochain_types::fixt::HeaderBuilderCommonFixturator;
     use holochain_types::header::NewEntryHeader;
@@ -310,7 +310,6 @@ mod tests {
     async fn add_entry_get_headers() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut expected: Vec<TimedHeaderHash> = Vec::new();
@@ -323,33 +322,37 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
-            let reader = env.reader().unwrap();
-            let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
-            for create in entry_creates {
-                meta_buf
-                    .register_header(NewEntryHeader::Create(create))
+            fresh_reader_test!(arc, |mut reader| {
+                let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
+                for create in entry_creates {
+                    meta_buf
+                        .register_header(NewEntryHeader::Create(create))
+                        .unwrap();
+                }
+                let mut headers = meta_buf
+                    .get_headers(&mut reader, entry_hash.clone())
+                    .unwrap()
+                    .collect::<Vec<_>>()
                     .unwrap();
-            }
-            let mut headers = meta_buf
-                .get_headers(&reader, entry_hash.clone())
-                .unwrap()
-                .collect::<Vec<_>>()
-                .unwrap();
-            headers.sort_by_key(|h| h.header_hash.clone());
-            assert_eq!(headers, expected);
-            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
-                .unwrap();
+                headers.sort_by_key(|h| h.header_hash.clone());
+                assert_eq!(headers, expected);
+                arc.conn()
+                    .unwrap()
+                    .with_commit(|writer| meta_buf.flush_to_txn(writer))
+                    .unwrap();
+            })
         }
         {
-            let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
-            let mut headers = meta_buf
-                .get_headers(&reader, entry_hash.clone())
-                .unwrap()
-                .collect::<Vec<_>>()
-                .unwrap();
-            headers.sort_by_key(|h| h.header_hash.clone());
-            assert_eq!(headers, expected);
+            fresh_reader_test!(arc, |mut reader| {
+                let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
+                let mut headers = meta_buf
+                    .get_headers(&mut reader, entry_hash.clone())
+                    .unwrap()
+                    .collect::<Vec<_>>()
+                    .unwrap();
+                headers.sort_by_key(|h| h.header_hash.clone());
+                assert_eq!(headers, expected);
+            })
         }
     }
 
@@ -357,7 +360,6 @@ mod tests {
     async fn add_entry_get_updates() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let original_entry_hash = fx.entry_hash();
         let original_header_hash = test_create(original_entry_hash.clone(), &mut fx)
@@ -381,31 +383,35 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
-            let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
-            for update in entry_updates {
-                meta_buf.register_update(update).unwrap();
-            }
-            let mut headers = meta_buf
-                .get_updates(&reader, original_entry_hash.clone().into())
+            fresh_reader_test!(arc, |mut reader| {
+                for update in entry_updates {
+                    meta_buf.register_update(update).unwrap();
+                }
+                let mut headers = meta_buf
+                    .get_updates(&mut reader, original_entry_hash.clone().into())
+                    .unwrap()
+                    .collect::<Vec<_>>()
+                    .unwrap();
+                headers.sort_by_key(|h| h.header_hash.clone());
+                assert_eq!(headers, expected);
+            });
+            arc.conn()
                 .unwrap()
-                .collect::<Vec<_>>()
-                .unwrap();
-            headers.sort_by_key(|h| h.header_hash.clone());
-            assert_eq!(headers, expected);
-            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+                .with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
         {
-            let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
-            let mut headers = meta_buf
-                .get_updates(&reader, original_entry_hash.into())
-                .unwrap()
-                .collect::<Vec<_>>()
-                .unwrap();
-            headers.sort_by_key(|h| h.header_hash.clone());
-            assert_eq!(headers, expected);
+            fresh_reader_test!(arc, |mut reader| {
+                let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
+                let mut headers = meta_buf
+                    .get_updates(&mut reader, original_entry_hash.into())
+                    .unwrap()
+                    .collect::<Vec<_>>()
+                    .unwrap();
+                headers.sort_by_key(|h| h.header_hash.clone());
+                assert_eq!(headers, expected);
+            })
         }
     }
 
@@ -413,7 +419,6 @@ mod tests {
     async fn add_entry_get_updates_header() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let original_entry_hash = fx.entry_hash();
         let original_header_hash = test_create(original_entry_hash.clone(), &mut fx)
@@ -437,31 +442,35 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
-            let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
-            for update in entry_updates {
-                meta_buf.register_update(update).unwrap();
-            }
-            let mut headers = meta_buf
-                .get_updates(&reader, original_entry_hash.clone().into())
+            fresh_reader_test!(arc, |mut reader| {
+                for update in entry_updates {
+                    meta_buf.register_update(update).unwrap();
+                }
+                let mut headers = meta_buf
+                    .get_updates(&mut reader, original_entry_hash.clone().into())
+                    .unwrap()
+                    .collect::<Vec<_>>()
+                    .unwrap();
+                headers.sort_by_key(|h| h.header_hash.clone());
+                assert_eq!(headers, expected);
+            });
+            arc.conn()
                 .unwrap()
-                .collect::<Vec<_>>()
-                .unwrap();
-            headers.sort_by_key(|h| h.header_hash.clone());
-            assert_eq!(headers, expected);
-            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+                .with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
         {
-            let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
-            let mut headers = meta_buf
-                .get_updates(&reader, original_entry_hash.into())
-                .unwrap()
-                .collect::<Vec<_>>()
-                .unwrap();
-            headers.sort_by_key(|h| h.header_hash.clone());
-            assert_eq!(headers, expected);
+            fresh_reader_test!(arc, |mut reader| {
+                let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
+                let mut headers = meta_buf
+                    .get_updates(&mut reader, original_entry_hash.into())
+                    .unwrap()
+                    .collect::<Vec<_>>()
+                    .unwrap();
+                headers.sort_by_key(|h| h.header_hash.clone());
+                assert_eq!(headers, expected);
+            })
         }
     }
 
@@ -469,7 +478,6 @@ mod tests {
     async fn add_entry_get_deletes() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let header_hash = fx.header_hash();
         let entry_hash = fx.entry_hash();
@@ -483,31 +491,35 @@ mod tests {
 
         expected.sort_by_key(|h| h.header_hash.clone());
         {
-            let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
-            for delete in entry_deletes {
-                meta_buf.register_delete(delete).unwrap();
-            }
-            let mut headers = meta_buf
-                .get_deletes_on_header(&reader, header_hash.clone().into())
+            fresh_reader_test!(arc, |mut reader| {
+                for delete in entry_deletes {
+                    meta_buf.register_delete(delete).unwrap();
+                }
+                let mut headers = meta_buf
+                    .get_deletes_on_header(&mut reader, header_hash.clone().into())
+                    .unwrap()
+                    .collect::<Vec<_>>()
+                    .unwrap();
+                headers.sort_by_key(|h| h.header_hash.clone());
+                assert_eq!(headers, expected);
+            });
+            arc.conn()
                 .unwrap()
-                .collect::<Vec<_>>()
-                .unwrap();
-            headers.sort_by_key(|h| h.header_hash.clone());
-            assert_eq!(headers, expected);
-            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+                .with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
         {
-            let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
-            let mut headers = meta_buf
-                .get_deletes_on_header(&reader, header_hash.clone().into())
-                .unwrap()
-                .collect::<Vec<_>>()
-                .unwrap();
-            headers.sort_by_key(|h| h.header_hash.clone());
-            assert_eq!(headers, expected);
+            fresh_reader_test!(arc, |mut reader| {
+                let mut headers = meta_buf
+                    .get_deletes_on_header(&mut reader, header_hash.clone().into())
+                    .unwrap()
+                    .collect::<Vec<_>>()
+                    .unwrap();
+                headers.sort_by_key(|h| h.header_hash.clone());
+                assert_eq!(headers, expected);
+            })
         }
     }
 
@@ -517,14 +529,19 @@ mod tests {
         update_entries: &[NewEntryHeader],
         delete_updates: &[Delete],
         _entry_hash: &EntryHash,
-        meta_buf: &mut MetadataBuf,
+        env: DbWrite,
     ) {
+        let mut meta_buf = MetadataBuf::vault(env.clone().into()).unwrap();
         for e in new_entries.iter().chain(update_entries.iter()) {
             meta_buf.register_header(e.clone()).unwrap();
         }
         for delete in entry_deletes.iter().chain(delete_updates.iter()) {
             meta_buf.register_delete(delete.clone()).unwrap();
         }
+        env.conn()
+            .unwrap()
+            .with_commit(|writer| meta_buf.flush_to_txn(writer))
+            .unwrap();
     }
 
     async fn create_data(
@@ -551,7 +568,6 @@ mod tests {
     async fn test_entry_dht_status() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut entry_creates = Vec::new();
@@ -569,35 +585,38 @@ mod tests {
         )
         .await;
 
-        let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
+        let meta_buf = || MetadataBuf::vault(arc.clone().into()).unwrap();
+
         update_dbs(
             &entry_creates[..],
             &entry_deletes[..0],
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf,
+            arc.clone(),
         )
         .await;
-        let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
-            .unwrap();
-        assert_eq!(status, EntryDhtStatus::Live);
+        fresh_reader_test!(arc, |mut reader| {
+            let status = meta_buf()
+                .get_dht_status(&mut reader, &entry_hash.clone().into())
+                .unwrap();
+            assert_eq!(status, EntryDhtStatus::Live);
+        });
         update_dbs(
             &entry_creates[..0],
             &entry_deletes[..],
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf,
+            arc.clone(),
         )
         .await;
-        let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
-            .unwrap();
-        assert_eq!(status, EntryDhtStatus::Dead);
-
+        fresh_reader_test!(arc, |mut reader| {
+            let status = meta_buf()
+                .get_dht_status(&mut reader, &entry_hash.clone().into())
+                .unwrap();
+            assert_eq!(status, EntryDhtStatus::Dead);
+        });
         // Same headers don't reanimate entry
         update_dbs(
             &entry_creates[..],
@@ -605,13 +624,15 @@ mod tests {
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf,
+            arc.clone(),
         )
         .await;
-        let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
-            .unwrap();
-        assert_eq!(status, EntryDhtStatus::Dead);
+        fresh_reader_test!(arc, |mut reader| {
+            let status = meta_buf()
+                .get_dht_status(&mut reader, &entry_hash.clone().into())
+                .unwrap();
+            assert_eq!(status, EntryDhtStatus::Dead);
+        });
 
         // Check create bring entry back to life
         create_data(
@@ -631,13 +652,15 @@ mod tests {
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf,
+            arc.clone(),
         )
         .await;
-        let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
-            .unwrap();
-        assert_eq!(status, EntryDhtStatus::Live);
+        fresh_reader_test!(arc, |mut reader| {
+            let status = meta_buf()
+                .get_dht_status(&mut reader, &entry_hash.clone().into())
+                .unwrap();
+            assert_eq!(status, EntryDhtStatus::Live);
+        });
 
         // New deletes should be dead
         update_dbs(
@@ -646,14 +669,15 @@ mod tests {
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf,
+            arc.clone(),
         )
         .await;
-        let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
-            .unwrap();
-        assert_eq!(status, EntryDhtStatus::Dead);
-
+        fresh_reader_test!(arc, |mut reader| {
+            let status = meta_buf()
+                .get_dht_status(&mut reader, &entry_hash.clone().into())
+                .unwrap();
+            assert_eq!(status, EntryDhtStatus::Dead);
+        });
         // Check update bring entry back to life
         update_dbs(
             &entry_creates[..0],
@@ -661,14 +685,15 @@ mod tests {
             &entry_updates[..10],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf,
+            arc.clone(),
         )
         .await;
-        let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
-            .unwrap();
-        assert_eq!(status, EntryDhtStatus::Live);
-
+        fresh_reader_test!(arc, |mut reader| {
+            let status = meta_buf()
+                .get_dht_status(&mut reader, &entry_hash.clone().into())
+                .unwrap();
+            assert_eq!(status, EntryDhtStatus::Live);
+        });
         // Check deleting update kills entry
         update_dbs(
             &entry_creates[..0],
@@ -676,20 +701,21 @@ mod tests {
             &entry_updates[..0],
             &delete_updates[..10],
             &entry_hash,
-            &mut meta_buf,
+            arc.clone(),
         )
         .await;
-        let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
-            .unwrap();
-        assert_eq!(status, EntryDhtStatus::Dead);
+        fresh_reader_test!(arc, |mut reader| {
+            let status = meta_buf()
+                .get_dht_status(&mut reader, &entry_hash.clone().into())
+                .unwrap();
+            assert_eq!(status, EntryDhtStatus::Dead);
+        });
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_entry_dht_status_one_less() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut entry_creates = Vec::new();
@@ -707,46 +733,51 @@ mod tests {
         )
         .await;
 
-        let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
+        let meta_buf = || MetadataBuf::vault(arc.clone().into()).unwrap();
         update_dbs(
             &entry_creates[..],
             &entry_deletes[..0],
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf,
+            arc.clone(),
         )
         .await;
-        let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
-            .unwrap();
-        assert_eq!(status, EntryDhtStatus::Live);
+        fresh_reader_test!(arc, |mut reader| {
+            let status = meta_buf()
+                .get_dht_status(&mut reader, &entry_hash.clone().into())
+                .unwrap();
+            assert_eq!(status, EntryDhtStatus::Live);
+        });
         update_dbs(
             &entry_creates[..0],
             &entry_deletes[..9],
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf,
+            arc.clone(),
         )
         .await;
-        let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
-            .unwrap();
-        assert_eq!(status, EntryDhtStatus::Live);
+        fresh_reader_test!(arc, |mut reader| {
+            let status = meta_buf()
+                .get_dht_status(&mut reader, &entry_hash.clone().into())
+                .unwrap();
+            assert_eq!(status, EntryDhtStatus::Live);
+        });
         update_dbs(
             &entry_creates[..0],
             &entry_deletes[9..10],
             &entry_updates[..0],
             &delete_updates[..0],
             &entry_hash,
-            &mut meta_buf,
+            arc.clone(),
         )
         .await;
-        let status = meta_buf
-            .get_dht_status(&reader, &entry_hash.clone().into())
-            .unwrap();
-        assert_eq!(status, EntryDhtStatus::Dead);
+        fresh_reader_test!(arc, |mut reader| {
+            let status = meta_buf()
+                .get_dht_status(&mut reader, &entry_hash.clone().into())
+                .unwrap();
+            assert_eq!(status, EntryDhtStatus::Dead);
+        });
     }
 }

@@ -11,9 +11,9 @@ use holo_hash::AnyDhtHash;
 use holo_hash::DhtOpHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::fresh_reader_test;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_sqlite::db::DbWrite;
+use holochain_sqlite::fresh_reader_test;
 use holochain_state::dht_op_integration::IntegratedDhtOpsValue;
 use holochain_state::element_buf::ElementBuf;
 use holochain_state::validation_db::ValidationLimboValue;
@@ -497,15 +497,15 @@ async fn call_zome_directly(
 
 #[instrument(skip(env, workspace))]
 fn inspect_val_limbo(
-    env: &EnvironmentWrite,
+    env: &DbWrite,
     workspace: &IncomingDhtOpsWorkspace,
 ) -> Vec<(DhtOpHash, ValidationLimboValue, Option<Element>)> {
     debug!("start");
     let element_buf = ElementBuf::pending(env.clone().into()).unwrap();
-    fresh_reader_test!(env, |r| {
+    fresh_reader_test!(env, |mut r| {
         workspace
             .validation_limbo
-            .iter(&r)
+            .iter(&mut r)
             .unwrap()
             .map(|(k, i)| {
                 let hash = DhtOpHash::from_raw_39_panicky(k.to_vec());
@@ -520,16 +520,16 @@ fn inspect_val_limbo(
 
 #[instrument(skip(env, workspace))]
 fn inspect_integrated(
-    env: &EnvironmentWrite,
+    env: &DbWrite,
     workspace: &IncomingDhtOpsWorkspace,
 ) -> Vec<(DhtOpHash, IntegratedDhtOpsValue, Element)> {
     debug!("start");
     let element_buf = ElementBuf::vault(env.clone().into(), true).unwrap();
     let element_buf_reject = ElementBuf::rejected(env.clone().into()).unwrap();
-    fresh_reader_test!(env, |r| {
+    fresh_reader_test!(env, |mut r| {
         workspace
             .integrated_dht_ops
-            .iter(&r)
+            .iter(&mut r)
             .unwrap()
             .map(|(k, i)| {
                 let hash = DhtOpHash::from_raw_39_panicky(k.to_vec());

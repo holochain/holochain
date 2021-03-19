@@ -4,8 +4,8 @@
 //! Every Workflow has an associated Workspace type.
 
 use super::source_chain::SourceChainError;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::prelude::Writer;
+use holochain_sqlite::error::DatabaseError;
+use holochain_sqlite::prelude::Writer;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -44,14 +44,11 @@ pub trait Workspace: Send + Sized {
 pub mod tests {
     use super::Workspace;
     use crate::workspace::WorkspaceResult;
-    use holochain_lmdb::buffer::BufferedStore;
-    use holochain_lmdb::buffer::KvBufFresh;
-    use holochain_lmdb::db::GetDb;
-    use holochain_lmdb::db::ELEMENT_VAULT_HEADERS;
-    use holochain_lmdb::db::ELEMENT_VAULT_PUBLIC_ENTRIES;
-    use holochain_lmdb::prelude::*;
-    use holochain_lmdb::test_utils::test_cell_env;
-    use holochain_lmdb::test_utils::DbString;
+    use holochain_sqlite::buffer::BufferedStore;
+    use holochain_sqlite::buffer::KvBufFresh;
+    use holochain_sqlite::prelude::*;
+    use holochain_sqlite::test_utils::test_cell_env;
+    use holochain_sqlite::test_utils::DbString;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_header_hash;
 
@@ -61,10 +58,13 @@ pub mod tests {
     }
 
     impl TestWorkspace {
-        pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
+        pub fn new(env: DbRead) -> WorkspaceResult<Self> {
             Ok(Self {
-                one: KvBufFresh::new(env.clone(), env.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?),
-                two: KvBufFresh::new(env.clone(), env.get_db(&*ELEMENT_VAULT_HEADERS)?),
+                one: KvBufFresh::new(
+                    env.clone(),
+                    env.get_table(TableName::ElementVaultPublicEntries)?,
+                ),
+                two: KvBufFresh::new(env.clone(), env.get_table(TableName::ElementVaultHeaders)?),
             })
         }
     }
@@ -91,7 +91,8 @@ pub mod tests {
             workspace.two.put(addr2.clone(), true).unwrap();
             assert_eq!(workspace.one.get(&addr1)?, Some(1));
             assert_eq!(workspace.two.get(&addr2)?, Some(true));
-            arc.guard()
+            arc.conn()
+                .unwrap()
                 .with_commit(|mut writer| workspace.flush_to_txn(&mut writer))?;
         }
 

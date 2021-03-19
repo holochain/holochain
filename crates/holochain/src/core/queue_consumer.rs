@@ -30,9 +30,9 @@ use derive_more::Constructor;
 use derive_more::Display;
 use derive_more::From;
 use futures::future::Either;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::env::WriteManager;
-use holochain_lmdb::prelude::Writer;
+use holochain_sqlite::db::DbWrite;
+use holochain_sqlite::db::WriteManager;
+use holochain_sqlite::prelude::Writer;
 use tokio::sync;
 use tokio::sync::mpsc;
 
@@ -60,7 +60,7 @@ use publish_dht_ops_consumer::*;
 /// Waits for the initial loop to complete before returning, to prevent causing
 /// a race condition by trying to run a workflow too soon after cell creation.
 pub async fn spawn_queue_consumer_tasks(
-    env: &EnvironmentWrite,
+    env: &DbWrite,
     cell_network: HolochainP2pCell,
     conductor_api: impl CellConductorApiT + 'static,
     task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
@@ -267,10 +267,10 @@ impl TriggerReceiver {
 
 /// A lazy Writer factory which can only be used once.
 ///
-/// This is a way of encapsulating an EnvironmentWrite so that it can only be
+/// This is a way of encapsulating an DbWrite so that it can only be
 /// used to create a single Writer before being consumed.
 #[derive(Constructor, From)]
-pub struct OneshotWriter(EnvironmentWrite);
+pub struct OneshotWriter(DbWrite);
 
 impl OneshotWriter {
     /// Create the writer and pass it into a closure.
@@ -278,8 +278,8 @@ impl OneshotWriter {
     where
         F: FnOnce(&mut Writer) -> Result<(), WorkspaceError> + Send,
     {
-        let env_ref = self.0.guard();
-        env_ref.with_commit::<WorkspaceError, (), _>(|w| {
+        let mut conn = self.0.conn()?;
+        conn.with_commit::<WorkspaceError, (), _>(|w| {
             f(w)?;
             Ok(())
         })?;

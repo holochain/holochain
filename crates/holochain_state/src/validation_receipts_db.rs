@@ -5,14 +5,8 @@ use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::buffer::KvvBufUsed;
-use holochain_lmdb::db::GetDb;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::prelude::Readable;
-use holochain_lmdb::prelude::Writer;
 use holochain_serialized_bytes::prelude::*;
+use holochain_sqlite::prelude::*;
 use holochain_types::Timestamp;
 use holochain_zome_types::signature::Signature;
 use holochain_zome_types::ValidationStatus;
@@ -82,18 +76,17 @@ pub struct ValidationReceiptsBuf(KvvBufUsed<DhtOpHash, SignedValidationReceipt>)
 
 impl ValidationReceiptsBuf {
     /// Constructor given read-only transaction and db ref.
-    pub fn new(dbs: &impl GetDb) -> DatabaseResult<ValidationReceiptsBuf> {
-        Ok(Self(KvvBufUsed::new_opts(
-            dbs.get_db(&*holochain_lmdb::db::VALIDATION_RECEIPTS)?,
-            true, // set to no_dup_data mode
+    pub fn new(dbs: &impl GetTable) -> DatabaseResult<ValidationReceiptsBuf> {
+        Ok(Self(KvvBufUsed::new(
+            dbs.get_table(TableName::ValidationReceipts)?,
         )))
     }
 
     /// List all the validation receipts for a given hash.
     pub fn list_receipts<'r, R: Readable>(
         &'r self,
-        r: &'r R,
-        dht_op_hash: &DhtOpHash,
+        r: &'r mut R,
+        dht_op_hash: &'r DhtOpHash,
     ) -> DatabaseResult<
         impl fallible_iterator::FallibleIterator<
                 Item = SignedValidationReceipt,
@@ -106,7 +99,7 @@ impl ValidationReceiptsBuf {
     /// Get the current valid receipt count for a given hash.
     pub fn count_valid<'r, R: Readable>(
         &'r self,
-        r: &'r R,
+        r: &'r mut R,
         dht_op_hash: &DhtOpHash,
     ) -> DatabaseResult<usize> {
         let mut count = 0;
@@ -124,7 +117,6 @@ impl ValidationReceiptsBuf {
     pub fn add_if_unique(&mut self, receipt: SignedValidationReceipt) -> DatabaseResult<()> {
         // The underlying KvvBufUsed manages the uniqueness
         self.0.insert(receipt.receipt.dht_op_hash.clone(), receipt);
-
         Ok(())
     }
 }
@@ -145,8 +137,7 @@ impl BufferedStore for ValidationReceiptsBuf {
 mod tests {
     use super::*;
     use holochain_keystore::KeystoreSenderExt;
-    use holochain_lmdb::env::ReadManager;
-    use holochain_lmdb::prelude::*;
+    use holochain_sqlite::db::ReadManager;
     use holochain_types::test_utils::fake_dht_op_hash;
     use holochain_types::timestamp;
 
@@ -172,15 +163,14 @@ mod tests {
     async fn test_validation_receipts_db_populate_and_list() -> DatabaseResult<()> {
         observability::test_run().ok();
 
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_sqlite::test_utils::test_cell_env();
         let env = test_env.env();
-        let keystore = holochain_lmdb::test_utils::test_keystore();
+        let keystore = holochain_sqlite::test_utils::test_keystore();
 
         let test_op_hash = fake_dht_op_hash(1);
         let vr1 = fake_vr(&test_op_hash, &keystore).await;
         let vr2 = fake_vr(&test_op_hash, &keystore).await;
 
-        let env_ref = env.guard();
         {
             let mut vr_buf1 = ValidationReceiptsBuf::new(&env)?;
             let mut vr_buf2 = ValidationReceiptsBuf::new(&env)?;
@@ -190,38 +180,45 @@ mod tests {
 
             vr_buf1.add_if_unique(vr2.clone())?;
 
-            env_ref.with_commit(|writer| vr_buf1.flush_to_txn(writer))?;
+            env.conn()
+                .unwrap()
+                .with_commit(|writer| vr_buf1.flush_to_txn(writer))?;
 
             vr_buf2.add_if_unique(vr1.clone())?;
 
-            env_ref.with_commit(|writer| vr_buf2.flush_to_txn(writer))?;
+            env.conn()
+                .unwrap()
+                .with_commit(|writer| vr_buf2.flush_to_txn(writer))?;
         }
 
-        let reader = env_ref.reader()?;
-        let vr_buf = ValidationReceiptsBuf::new(&env)?;
+        let mut g = env.conn().unwrap();
+        g.with_reader_test(|mut reader| {
+            let vr_buf = ValidationReceiptsBuf::new(&env).unwrap();
 
-        assert_eq!(2, vr_buf.count_valid(&reader, &test_op_hash)?);
+            assert_eq!(2, vr_buf.count_valid(&mut reader, &test_op_hash).unwrap());
 
-        let mut list = vr_buf
-            .list_receipts(&reader, &test_op_hash)?
-            .collect::<Vec<_>>()?;
-        list.sort_by(|a, b| {
-            a.receipt
-                .validator
-                .partial_cmp(&b.receipt.validator)
+            let mut list = vr_buf
+                .list_receipts(&mut reader, &test_op_hash)
                 .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap();
+            list.sort_by(|a, b| {
+                a.receipt
+                    .validator
+                    .partial_cmp(&b.receipt.validator)
+                    .unwrap()
+            });
+
+            let mut expects = vec![vr1, vr2];
+            expects.sort_by(|a, b| {
+                a.receipt
+                    .validator
+                    .partial_cmp(&b.receipt.validator)
+                    .unwrap()
+            });
+
+            assert_eq!(expects, list);
         });
-
-        let mut expects = vec![vr1, vr2];
-        expects.sort_by(|a, b| {
-            a.receipt
-                .validator
-                .partial_cmp(&b.receipt.validator)
-                .unwrap()
-        });
-
-        assert_eq!(expects, list);
-
         Ok(())
     }
 }

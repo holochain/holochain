@@ -11,12 +11,12 @@ use error::EntryDefStoreError;
 use error::EntryDefStoreResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::prelude::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_sqlite::buffer::KvBufFresh;
+use holochain_sqlite::error::DatabaseError;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -34,6 +34,8 @@ impl AsRef<[u8]> for EntryDefStoreKey {
         self.0.bytes()
     }
 }
+
+holochain_sqlite::impl_to_sql!(EntryDefStoreKey);
 
 impl BufKey for EntryDefStoreKey {
     fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
@@ -65,7 +67,7 @@ impl From<EntryDefStoreKey> for EntryDefBufferKey {
 
 impl EntryDefBuf {
     /// Create a new buffer
-    pub fn new(env: EnvironmentRead, entry_def_store: SingleStore) -> DatabaseResult<Self> {
+    pub fn new(env: DbRead, entry_def_store: SingleTable) -> DatabaseResult<Self> {
         Ok(Self(KvBufFresh::new(env, entry_def_store)))
     }
 
@@ -82,16 +84,13 @@ impl EntryDefBuf {
     /// Get all the entry defs in the database
     pub fn get_all<'r, R: Readable>(
         &self,
-        r: &'r R,
+        r: &'r mut R,
     ) -> DatabaseResult<
         Box<dyn FallibleIterator<Item = (EntryDefBufferKey, EntryDef), Error = DatabaseError> + 'r>,
     > {
-        Ok(Box::new(
-            self.0
-                .store()
-                .iter(r)?
-                .map(|(k, v)| Ok((EntryDefStoreKey::from(k).into(), v))),
-        ))
+        Ok(Box::new(self.0.store().iter(r)?.map(|(k, v)| {
+            Ok((EntryDefStoreKey::from(k.as_slice()).into(), v))
+        })))
     }
 }
 
@@ -203,7 +202,7 @@ mod tests {
     use super::EntryDefBufferKey;
     use crate::conductor::Conductor;
     use holo_hash::HasHash;
-    use holochain_lmdb::test_utils::test_environments;
+    use holochain_sqlite::test_utils::test_environments;
     use holochain_types::dna::wasm::DnaWasmHashed;
     use holochain_types::dna::zome::ZomeDef;
     use holochain_types::prelude::*;

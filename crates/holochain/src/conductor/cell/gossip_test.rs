@@ -5,8 +5,8 @@ use crate::test_utils::new_zome_call;
 use crate::test_utils::wait_for_integration;
 use fallible_iterator::FallibleIterator;
 use hdk::prelude::*;
-use holochain_lmdb::buffer::KvStoreT;
-use holochain_lmdb::fresh_reader_test;
+use holochain_sqlite::buffer::KvStoreT;
+use holochain_sqlite::fresh_reader_test;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneBinType;
@@ -123,9 +123,9 @@ async fn agent_info_test() {
 
     let alice_key: AgentKvKey = (&dna_kit, &alice_kit).into();
 
-    let (agent_info, len) = fresh_reader_test!(p2p_env, |r| {
-        let agent_info = p2p_kv.as_store_ref().get(&r, &alice_key).unwrap();
-        let len = p2p_kv.as_store_ref().iter(&r).unwrap().count().unwrap();
+    let (agent_info, len) = fresh_reader_test!(p2p_env, |mut r| {
+        let agent_info = p2p_kv.as_store_ref().get(&mut r, &alice_key).unwrap();
+        let len = p2p_kv.as_store_ref().iter(&mut r).unwrap().count().unwrap();
         (agent_info, len)
     });
     tracing::debug!(?agent_info);
@@ -148,10 +148,10 @@ async fn agent_info_test() {
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     let p2p_kv = AgentKv::new(p2p_env.clone().into()).unwrap();
-    let (alice_agent_info, bob_agent_info, len) = fresh_reader_test!(p2p_env, |r| {
-        let alice_agent_info = p2p_kv.as_store_ref().get(&r, &alice_key).unwrap();
-        let bob_agent_info = p2p_kv.as_store_ref().get(&r, &bob_key).unwrap();
-        let len = p2p_kv.as_store_ref().iter(&r).unwrap().count().unwrap();
+    let (alice_agent_info, bob_agent_info, len) = fresh_reader_test!(p2p_env, |mut r| {
+        let alice_agent_info = p2p_kv.as_store_ref().get(&mut r, &alice_key).unwrap();
+        let bob_agent_info = p2p_kv.as_store_ref().get(&mut r, &bob_key).unwrap();
+        let len = p2p_kv.as_store_ref().iter(&mut r).unwrap().count().unwrap();
         (alice_agent_info, bob_agent_info, len)
     });
     tracing::debug!(?alice_agent_info);

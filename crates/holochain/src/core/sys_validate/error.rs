@@ -10,7 +10,7 @@ use holo_hash::AnyDhtHash;
 use holo_hash::HeaderHash;
 use holochain_cascade::error::CascadeError;
 use holochain_keystore::KeystoreError;
-use holochain_lmdb::error::DatabaseError;
+use holochain_sqlite::error::DatabaseError;
 use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
 use thiserror::Error;
@@ -139,7 +139,7 @@ impl ValidationOutcome {
 pub enum PrevHeaderError {
     #[error("Root of source chain must be Dna")]
     InvalidRoot,
-    #[error("Previous header sequence number {1} is not {0} - 1")]
+    #[error("Previous header sequence number {1} != ({0} - 1)")]
     InvalidSeq(u32, u32),
     #[error("Previous header was missing from the metadata store")]
     MissingMeta(HeaderHash),

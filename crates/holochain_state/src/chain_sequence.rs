@@ -10,15 +10,13 @@
 use crate::source_chain::{SourceChainError, SourceChainResult};
 use fallible_iterator::DoubleEndedFallibleIterator;
 use holo_hash::HeaderHash;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::buffer::KvIntBufFresh;
-use holochain_lmdb::buffer::KvIntStore;
-use holochain_lmdb::db::GetDb;
-use holochain_lmdb::db::CHAIN_SEQUENCE;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
+use holochain_sqlite::buffer::BufferedStore;
+use holochain_sqlite::buffer::KvIntBufFresh;
+use holochain_sqlite::buffer::KvIntStore;
+use holochain_sqlite::error::DatabaseError;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use tracing::*;
@@ -44,10 +42,10 @@ pub struct ChainSequenceBuf {
 
 impl ChainSequenceBuf {
     /// Create a new instance
-    pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let buf: Store = KvIntBufFresh::new(env.clone(), env.get_db(&*CHAIN_SEQUENCE)?);
+    pub fn new(env: DbRead) -> DatabaseResult<Self> {
+        let buf: Store = KvIntBufFresh::new(env.clone(), env.get_table(TableName::ChainSequence)?);
         let (next_index, tx_seq, current_head) =
-            fresh_reader!(env, |r| { Self::head_info(buf.store(), &r) })?;
+            fresh_reader!(env, |mut r| { Self::head_info(buf.store(), &mut r) })?;
         let persisted_head = current_head.clone();
 
         Ok(ChainSequenceBuf {
@@ -61,7 +59,7 @@ impl ChainSequenceBuf {
 
     fn head_info<R: Readable>(
         store: &KvIntStore<ChainSequenceItem>,
-        r: &R,
+        r: &mut R,
     ) -> DatabaseResult<(u32, u32, Option<HeaderHash>)> {
         let latest = store.iter(r)?.next_back()?;
         debug!("{:?}", latest);
@@ -71,7 +69,7 @@ impl ChainSequenceBuf {
                     (
                         // TODO: this is a bit ridiculous -- reevaluate whether the
                         //       IntKey is really needed (vs simple u32)
-                        u32::from(IntKey::from_key_bytes_or_friendly_panic(key)) + 1,
+                        u32::from(IntKey::from_key_bytes_or_friendly_panic(&key)) + 1,
                         item.tx_seq + 1,
                         Some(item.header_address),
                     )
@@ -122,7 +120,7 @@ impl ChainSequenceBuf {
 
     pub fn get_items_with_incomplete_dht_ops<'txn, R: Readable>(
         &self,
-        r: &'txn R,
+        r: &'txn mut R,
     ) -> SourceChainResult<
         Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + 'txn>,
     > {
@@ -134,7 +132,7 @@ impl ChainSequenceBuf {
         Ok(Box::new(self.buf.store().iter(r)?.filter_map(|(i, c)| {
             Ok(if !c.dht_transforms_complete {
                 Some((
-                    IntKey::from_key_bytes_or_friendly_panic(i).into(),
+                    IntKey::from_key_bytes_or_friendly_panic(i.as_slice()).into(),
                     c.header_address,
                 ))
             } else {
@@ -179,7 +177,7 @@ impl BufferedStore for ChainSequenceBuf {
 
         // Writing a chain move
         let env = self.buf.env().clone();
-        let db = env.get_db(&*CHAIN_SEQUENCE)?;
+        let db = env.get_table(TableName::ChainSequence)?;
         let (_, _, persisted_head) = ChainSequenceBuf::head_info(&KvIntStore::new(db), writer)?;
         let persisted_head_moved = self.persisted_head != persisted_head;
         if persisted_head_moved && self.chain_moved_in_this_transaction() {
@@ -200,11 +198,11 @@ pub mod tests {
     use super::SourceChainError;
     use crate::source_chain::SourceChainResult;
     use holo_hash::HeaderHash;
-    use holochain_lmdb::env::ReadManager;
-    use holochain_lmdb::env::WriteManager;
-    use holochain_lmdb::error::DatabaseResult;
-    use holochain_lmdb::prelude::*;
-    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_sqlite::db::ReadManager;
+    use holochain_sqlite::db::WriteManager;
+    use holochain_sqlite::error::DatabaseResult;
+    use holochain_sqlite::prelude::*;
+    use holochain_sqlite::test_utils::test_cell_env;
     use matches::assert_matches;
     use observability;
 
@@ -275,7 +273,6 @@ pub mod tests {
     async fn chain_sequence_functionality() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
 
         {
             let mut buf = ChainSequenceBuf::new(arc.clone().into())?;
@@ -310,11 +307,12 @@ pub mod tests {
                 ])
                 .into(),
             )?;
-            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
+            arc.conn()
+                .unwrap()
+                .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
         }
-
-        let reader = env.reader()?;
-        {
+        let mut g = arc.conn().unwrap();
+        g.with_reader(|mut reader| {
             let buf = ChainSequenceBuf::new(arc.clone().into())?;
             assert_eq!(
                 buf.chain_head(),
@@ -329,11 +327,12 @@ pub mod tests {
             let items: Vec<u32> = buf
                 .buf
                 .store()
-                .iter(&reader)?
-                .map(|(key, _)| Ok(IntKey::from_key_bytes_or_friendly_panic(key).into()))
+                .iter(&mut reader)?
+                .map(|(key, _)| Ok(IntKey::from_key_bytes_or_friendly_panic(&key).into()))
                 .collect()?;
             assert_eq!(items, vec![0, 1, 2]);
-        }
+            DatabaseResult::Ok(())
+        })?;
 
         {
             let mut buf = ChainSequenceBuf::new(arc.clone().into())?;
@@ -358,11 +357,12 @@ pub mod tests {
                 ])
                 .into(),
             )?;
-            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
+            arc.conn()
+                .unwrap()
+                .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
         }
-
-        let reader = env.reader()?;
-        {
+        let mut g = arc.conn().unwrap();
+        g.with_reader(|mut reader| {
             let buf = ChainSequenceBuf::new(arc.clone().into())?;
             assert_eq!(
                 buf.chain_head(),
@@ -377,13 +377,12 @@ pub mod tests {
             let items: Vec<u32> = buf
                 .buf
                 .store()
-                .iter(&reader)?
+                .iter(&mut reader)?
                 .map(|(_, i)| Ok(i.tx_seq))
                 .collect()?;
             assert_eq!(items, vec![0, 0, 0, 1, 1, 1]);
-        }
-
-        Ok(())
+            Ok(())
+        })
     }
 
     /// If we attempt to move the chain head, but it has already moved from
@@ -426,8 +425,9 @@ pub mod tests {
             tx1.send(()).unwrap();
             rx2.await.unwrap();
 
-            let env = arc1.guard();
-            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+            arc1.conn()
+                .unwrap()
+                .with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         });
 
         // Attempt to move the chain concurrently -- this one succeeds
@@ -456,8 +456,9 @@ pub mod tests {
                 .into(),
             )?;
 
-            let env = arc2.guard();
-            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
+            arc2.conn()
+                .unwrap()
+                .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             tx2.send(()).unwrap();
             Result::<_, SourceChainError>::Ok(())
         });
@@ -510,7 +511,8 @@ pub mod tests {
             ])
             .into(),
         )?;
-        arc1.guard()
+        arc1.conn()
+            .unwrap()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
 
         // Modify the chain without adding a header -- this succeeds
@@ -523,8 +525,9 @@ pub mod tests {
             tx1.send(()).unwrap();
             rx2.await.unwrap();
 
-            let env = arc1.guard();
-            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+            arc1.conn()
+                .unwrap()
+                .with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         });
 
         // Add a header to the chain -- there is no collision, so this succeeds
@@ -539,8 +542,9 @@ pub mod tests {
                 .into(),
             )?;
 
-            let env = arc2.guard();
-            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
+            arc2.conn()
+                .unwrap()
+                .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             tx2.send(()).unwrap();
             Result::<_, SourceChainError>::Ok(())
         });

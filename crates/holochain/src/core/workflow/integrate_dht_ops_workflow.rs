@@ -17,13 +17,11 @@ use holochain_cascade::Cascade;
 use holochain_cascade::DbPair;
 use holochain_cascade::{error::CascadeError, integrate_single_metadata};
 use holochain_conductor_api::IntegrationStateDump;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::db::INTEGRATED_DHT_OPS;
-use holochain_lmdb::db::INTEGRATION_LIMBO;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
+use holochain_sqlite::buffer::BufferedStore;
+use holochain_sqlite::buffer::KvBufFresh;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 
@@ -47,17 +45,17 @@ mod tests;
 pub async fn integrate_dht_ops_workflow(
     mut workspace: IntegrateDhtOpsWorkspace,
     writer: OneshotWriter,
-    trigger_sys: &mut TriggerSender,
-    trigger_receipt: &mut TriggerSender,
+    mut trigger_sys: TriggerSender,
+    mut trigger_receipt: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // one of many possible ways to access the env
     let env = workspace.elements.headers().env().clone();
     // Pull ops out of queue
     // TODO: PERF: Combine this collect with the sort when ElementBuf gets
     // aren't async
-    let ops: Vec<IntegrationLimboValue> = fresh_reader!(env, |r| workspace
+    let ops: Vec<IntegrationLimboValue> = fresh_reader!(env, |mut r| workspace
         .integration_limbo
-        .drain_iter(&r)?
+        .drain_iter(&mut r)?
         .collect())?;
 
     // Sort the ops
@@ -502,11 +500,11 @@ impl Workspace for IntegrateDhtOpsWorkspace {
 
 impl IntegrateDhtOpsWorkspace {
     /// Constructor
-    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let db = env.get_db(&*INTEGRATED_DHT_OPS)?;
+    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+        let db = env.get_table(TableName::IntegratedDhtOps)?;
         let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
 
-        let db = env.get_db(&*INTEGRATION_LIMBO)?;
+        let db = env.get_table(TableName::IntegrationLimbo)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
         let validation_limbo = ValidationLimboStore::new(env.clone())?;
@@ -582,12 +580,12 @@ impl IntegrateDhtOpsWorkspace {
     }
 }
 
-pub fn dump_state(env: EnvironmentRead) -> WorkspaceResult<IntegrationStateDump> {
+pub fn dump_state(env: DbRead) -> WorkspaceResult<IntegrationStateDump> {
     let workspace = IncomingDhtOpsWorkspace::new(env.clone())?;
-    let (validation_limbo, integration_limbo, integrated) = fresh_reader!(env, |r| {
-        let v = workspace.validation_limbo.iter(&r)?.count()?;
-        let il = workspace.integration_limbo.iter(&r)?.count()?;
-        let i = workspace.integrated_dht_ops.iter(&r)?.count()?;
+    let (validation_limbo, integration_limbo, integrated) = fresh_reader!(env, |mut r| {
+        let v = workspace.validation_limbo.iter(&mut r)?.count()?;
+        let il = workspace.integration_limbo.iter(&mut r)?.count()?;
+        let i = workspace.integrated_dht_ops.iter(&mut r)?.count()?;
         DatabaseResult::Ok((v, il, i))
     })?;
 

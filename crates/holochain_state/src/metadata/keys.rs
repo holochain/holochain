@@ -8,19 +8,25 @@ mod misc;
 /// Some keys do not store an array of bytes
 /// so can not impl AsRef<[u8]>.
 /// This is the key type for those keys to impl into
-#[derive(
-    Ord,
-    PartialOrd,
-    Eq,
-    PartialEq,
-    derive_more::Into,
-    derive_more::From,
-    derive_more::AsRef,
-    Clone,
-    Debug,
-)]
-#[as_ref(forward)]
+#[derive(Ord, PartialOrd, Eq, PartialEq, derive_more::Into, derive_more::From, Clone, Debug)]
 pub struct BytesKey(pub Vec<u8>);
+
+impl AsRef<[u8]> for BytesKey {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl holochain_sqlite::rusqlite::ToSql for BytesKey {
+    fn to_sql(
+        &self,
+    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput<'_>>
+    {
+        Ok(holochain_sqlite::rusqlite::types::ToSqlOutput::Borrowed(
+            self.as_ref().into(),
+        ))
+    }
+}
 
 /// The value stored in the links meta db
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]

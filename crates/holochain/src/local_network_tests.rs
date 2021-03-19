@@ -6,8 +6,8 @@ use hdk::prelude::WasmError;
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_lmdb::env::EnvironmentWrite;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_sqlite::db::DbWrite;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::ZomeCallResponse;
@@ -77,7 +77,7 @@ fn conductors_call_remote(num_conductors: usize) {
         exchange_peer_info(envs);
 
         // Give a little longer timeout here because they must find each other to pass the test
-        let results = call_each_other(&handles[..], 500).await;
+        let results = call_each_other(&handles[..], 1500).await;
         for (_, _, result) in results {
             self::assert_matches!(result, Some(Ok(ZomeCallResponse::Ok(_))));
         }
@@ -468,7 +468,7 @@ async fn check_gossip(
 }
 
 #[tracing::instrument(skip(envs))]
-fn check_peers(envs: Vec<EnvironmentWrite>) {
+fn check_peers(envs: Vec<DbWrite>) {
     for (i, a) in envs.iter().enumerate() {
         let peers = all_agent_infos(a.clone().into()).unwrap();
         let num_peers = peers.len();

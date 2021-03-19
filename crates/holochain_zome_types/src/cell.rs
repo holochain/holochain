@@ -15,8 +15,14 @@ use std::fmt;
 pub struct CellId(DnaHash, AgentPubKey);
 
 impl fmt::Display for CellId {
+    #[cfg(feature = "tinyid")]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "cell-{}-{}", self.dna_hash(), self.agent_pubkey())
+        write!(f, "Cell({})", self.tinyid())
+    }
+
+    #[cfg(not(feature = "tinyid"))]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Cell({}, {})", self.dna_hash(), self.agent_pubkey())
     }
 }
 
@@ -39,6 +45,19 @@ impl CellId {
     /// Into [DnaHash] and [AgentPubKey]
     pub fn into_dna_and_agent(self) -> (DnaHash, AgentPubKey) {
         (self.0, self.1)
+    }
+
+    #[cfg(feature = "tinyid")]
+    /// Create a much smaller ID for a CellId, throwing away a lot of bytes
+    pub fn tinyid(&self) -> u64 {
+        use byteorder::{BigEndian, ReadBytesExt};
+
+        itertools::interleave(&self.0.get_raw_32()[0..32], &self.1.get_raw_32()[0..32])
+            .copied()
+            .collect::<Vec<_>>()
+            .as_slice()
+            .read_u64::<BigEndian>()
+            .unwrap()
     }
 }
 

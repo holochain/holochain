@@ -6,8 +6,8 @@ use crate::core::workflow::error::WorkflowError;
 use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use crate::core::SourceChainError;
 use holochain_cascade::error::CascadeError;
-use holochain_lmdb::error::DatabaseError;
 use holochain_p2p::HolochainP2pError;
+use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 

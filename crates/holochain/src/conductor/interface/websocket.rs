@@ -145,9 +145,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
 ) {
     while let Some(msg) = rx_from_iface.next().await {
         match handle_incoming_message(msg, api.clone()).await {
-            Err(e) => {
-                error!(error = &e as &dyn std::error::Error)
-            }
+            Err(e) => error!(error = &e as &dyn std::error::Error),
             Ok(()) => {}
         }
     }
@@ -215,8 +213,8 @@ pub mod test_utils {
     use crate::conductor::api::RealAppInterfaceApi;
     use crate::conductor::conductor::ConductorBuilder;
     use crate::conductor::ConductorHandle;
-    use holochain_lmdb::test_utils::test_environments;
     use holochain_serialized_bytes::prelude::*;
+    use holochain_sqlite::test_utils::test_environments;
     use holochain_types::prelude::*;
     use std::sync::Arc;
     use tempdir::TempDir;
@@ -277,10 +275,10 @@ pub mod test {
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
     use futures::future::FutureExt;
-    use holochain_lmdb::buffer::KvStoreT;
-    use holochain_lmdb::fresh_reader_test;
-    use holochain_lmdb::test_utils::test_environments;
     use holochain_serialized_bytes::prelude::*;
+    use holochain_sqlite::buffer::KvStoreT;
+    use holochain_sqlite::fresh_reader_test;
+    use holochain_sqlite::test_utils::test_environments;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
@@ -711,9 +709,9 @@ pub mod test {
         // - Give time for the agents to join the network.
         crate::wait_for_any_10s!(
             {
-                fresh_reader_test!(env, |r| p2p_store
+                fresh_reader_test!(env, |mut r| p2p_store
                     .as_store_ref()
-                    .iter(&r)
+                    .iter(&mut r)
                     .unwrap()
                     .count()
                     .unwrap())

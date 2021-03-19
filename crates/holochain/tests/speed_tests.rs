@@ -31,8 +31,8 @@ use holochain::conductor::config::InterfaceDriver;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 
-use holochain_lmdb::test_utils::test_environments;
-use holochain_lmdb::test_utils::TestEnvironments;
+use holochain_sqlite::test_utils::test_environments;
+use holochain_sqlite::test_utils::TestDbs;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -92,8 +92,8 @@ async fn speed_test_normal() {
     speed_test(None).await;
 }
 
-/// Run this test to execute the speed test, but then keep the LMDB env files
-/// around in temp dirs for inspection by e.g. `mdb_stat`
+/// Run this test to execute the speed test, but then keep the database files
+/// around in temp dirs for inspection
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_persisted() {
@@ -122,7 +122,7 @@ fn speed_test_all(n: usize) {
 }
 
 #[instrument]
-async fn speed_test(n: Option<usize>) -> TestEnvironments {
+async fn speed_test(n: Option<usize>) -> TestDbs {
     let num = n.unwrap_or(DEFAULT_NUM);
 
     // ////////////
@@ -311,7 +311,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
 pub async fn setup_app(
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
     dna_store: MockDnaStore,
-) -> (TestEnvironments, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestDbs, RealAppInterfaceApi, ConductorHandle) {
     let envs = test_environments();
 
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)

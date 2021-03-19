@@ -38,11 +38,8 @@ use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
-use holochain_lmdb::db::GetDb;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::env::ReadManager;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_sqlite::{fresh_reader, prelude::*};
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use observability::OpenSpanExt;
@@ -98,7 +95,7 @@ where
 {
     id: CellId,
     conductor_api: Api,
-    env: EnvironmentWrite,
+    env: DbWrite,
     holochain_p2p_cell: P2pCell,
     queue_triggers: QueueTriggers,
 }
@@ -115,7 +112,7 @@ impl Cell {
     pub async fn create(
         id: CellId,
         conductor_handle: ConductorHandle,
-        env: EnvironmentWrite,
+        env: DbWrite,
         holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
@@ -159,7 +156,7 @@ impl Cell {
     pub async fn genesis(
         id: CellId,
         conductor_handle: ConductorHandle,
-        cell_env: EnvironmentWrite,
+        cell_env: DbWrite,
         membrane_proof: Option<SerializedBytes>,
     ) -> CellResult<()> {
         // get the dna
@@ -442,7 +439,7 @@ impl Cell {
         &self,
         header_hash: HeaderHash,
     ) -> CellResult<ValidationPackageResponse> {
-        let env: EnvironmentRead = self.env.clone().into();
+        let env: DbRead = self.env.clone().into();
 
         // Get the header
         let databases = ValidationPackageDb::create(env.clone())?;
@@ -490,11 +487,11 @@ impl Cell {
         // we can just have these defaults depending on whether or not
         // the hash is an entry or header.
         // In the future we should use GetOptions to choose which get to run.
-        let r = match *dht_hash.hash_type() {
+        let mut r = match *dht_hash.hash_type() {
             AnyDht::Entry => self.handle_get_entry(dht_hash.into(), options).await,
             AnyDht::Header => self.handle_get_element(dht_hash.into()).await,
         };
-        if let Err(e) = &r {
+        if let Err(e) = &mut r {
             error!(msg = "Error handling a get", ?e, agent = ?self.id.agent_pubkey());
         }
         r
@@ -558,7 +555,7 @@ impl Cell {
         let receipt: SignedValidationReceipt = receipt.try_into()?;
 
         // Add to authored
-        let db = self.env.get_db(&*AUTHORED_DHT_OPS)?;
+        let db = self.env.get_table(TableName::AuthoredDhtOps)?;
         let mut authored_dht_ops: AuthoredDhtOpsStore =
             KvBufFresh::new(self.env.clone().into(), db);
         match authored_dht_ops.get(&receipt.receipt.dht_op_hash)? {
@@ -580,7 +577,7 @@ impl Cell {
         receipts_db.add_if_unique(receipt)?;
 
         // Write to db
-        self.env.with_commit(|w| {
+        self.env.conn().unwrap().with_commit(|w| {
             authored_dht_ops.flush_to_txn_ref(w)?;
             receipts_db.flush_to_txn_ref(w)?;
             DatabaseResult::Ok(())
@@ -597,13 +594,11 @@ impl Cell {
         since: Timestamp,
         until: Timestamp,
     ) -> CellResult<Vec<DhtOpHash>> {
-        let env_ref = self.env.guard();
-        let reader = env_ref.reader()?;
         let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into())?;
-        let result: Vec<DhtOpHash> = integrated_dht_ops
-            .query(&reader, Some(since), Some(until), Some(dht_arc))?
+        let result: Vec<DhtOpHash> = fresh_reader!(self.env(), |mut reader| integrated_dht_ops
+            .query(&mut reader, Some(since), Some(until), Some(dht_arc))?
             .map(|(k, _)| Ok(k))
-            .collect()?;
+            .collect())?;
         Ok(result)
     }
 
@@ -775,7 +770,7 @@ impl Cell {
     }
 
     /// Delete all data associated with this Cell by deleting the associated
-    /// LMDB environment. Completely reverses Cell creation.
+    /// database. Completely reverses Cell creation.
     #[tracing::instrument(skip(self))]
     pub async fn destroy(self) -> CellResult<()> {
         let path = self.env.path().clone();
@@ -797,9 +792,9 @@ impl Cell {
         }
     }
 
-    /// Accessor for the LMDB environment backing this Cell
+    /// Accessor for the database backing this Cell
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
-    pub(crate) fn env(&self) -> &EnvironmentWrite {
+    pub(crate) fn env(&self) -> &DbWrite {
         &self.env
     }
 

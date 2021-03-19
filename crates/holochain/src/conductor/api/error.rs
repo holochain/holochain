@@ -7,7 +7,7 @@ use crate::conductor::CellError;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::workflow::error::WorkflowError;
 use holo_hash::DnaHash;
-use holochain_lmdb::error::DatabaseError;
+use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;

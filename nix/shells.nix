@@ -53,7 +53,9 @@ rec {
     inputsFrom = [
       (builtins.removeAttrs coreDev [ "shellHook" ])
     ];
-    nativeBuildInputs = builtins.attrValues pkgs.happ;
+    nativeBuildInputs = builtins.attrValues pkgs.happ
+      ++ [ pkgs.sqlcipher ]
+      ;
   };
 
   coreDevRustup = coreDev.overrideAttrs (attrs: {

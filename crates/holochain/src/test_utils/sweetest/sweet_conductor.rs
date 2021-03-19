@@ -12,7 +12,7 @@ use futures::future;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::test_utils::{test_environments, TestEnvironments};
+use holochain_sqlite::test_utils::{test_environments, TestDbs};
 use holochain_types::prelude::*;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::sync::Arc;
@@ -23,7 +23,7 @@ use unwrap_to::unwrap_to;
 pub struct SweetConductorBatch(Vec<SweetConductor>);
 
 impl SweetConductorBatch {
-    /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
+    /// Map the given ConductorConfigs into SweetConductors, each with its own new TestDbs
     pub async fn from_configs<I: IntoIterator<Item = ConductorConfig>>(
         configs: I,
     ) -> SweetConductorBatch {
@@ -32,12 +32,12 @@ impl SweetConductorBatch {
             .into()
     }
 
-    /// Create the given number of new SweetConductors, each with its own new TestEnvironments
+    /// Create the given number of new SweetConductors, each with its own new TestDbs
     pub async fn from_config(num: usize, config: ConductorConfig) -> SweetConductorBatch {
         Self::from_configs(std::iter::repeat(config).take(num)).await
     }
 
-    /// Create the given number of new SweetConductors, each with its own new TestEnvironments
+    /// Create the given number of new SweetConductors, each with its own new TestDbs
     pub async fn from_standard_config(num: usize) -> SweetConductorBatch {
         Self::from_configs(std::iter::repeat_with(standard_config).take(num)).await
     }
@@ -131,7 +131,7 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 #[derive(derive_more::From)]
 pub struct SweetConductor {
     handle: Option<Arc<SweetConductorHandle>>,
-    envs: TestEnvironments,
+    envs: TestDbs,
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
     signal_stream: Option<SignalStream>,
@@ -157,7 +157,7 @@ impl SweetConductor {
     /// "sweet-interface" so that signals may be emitted
     pub async fn new(
         handle: ConductorHandle,
-        envs: TestEnvironments,
+        envs: TestDbs,
         config: ConductorConfig,
     ) -> SweetConductor {
         // Automatically add a test app interface
@@ -178,7 +178,7 @@ impl SweetConductor {
         }
     }
 
-    /// Create a SweetConductor with a new set of TestEnvironments from the given config
+    /// Create a SweetConductor with a new set of TestDbs from the given config
     pub async fn from_config(config: ConductorConfig) -> SweetConductor {
         let envs = test_environments();
         let handle = Self::from_existing(&envs, &config).await;
@@ -196,7 +196,7 @@ impl SweetConductor {
     }
 
     /// Create a handle from an existing environment and config
-    async fn from_existing(envs: &TestEnvironments, config: &ConductorConfig) -> ConductorHandle {
+    async fn from_existing(envs: &TestDbs, config: &ConductorConfig) -> ConductorHandle {
         Conductor::builder()
             .config(config.clone())
             .test(envs)
@@ -204,13 +204,13 @@ impl SweetConductor {
             .unwrap()
     }
 
-    /// Create a SweetConductor with a new set of TestEnvironments from the given config
+    /// Create a SweetConductor with a new set of TestDbs from the given config
     pub async fn from_standard_config() -> SweetConductor {
         Self::from_config(standard_config()).await
     }
 
-    /// Access the TestEnvironments for this conductor
-    pub fn envs(&self) -> &TestEnvironments {
+    /// Access the TestDbs for this conductor
+    pub fn envs(&self) -> &TestDbs {
         &self.envs
     }
 

@@ -13,17 +13,11 @@ use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
-use holochain_lmdb::buffer::CasBufFreshSync;
-use holochain_lmdb::db::GetDb;
-use holochain_lmdb::db::ELEMENT_CACHE_ENTRIES;
-use holochain_lmdb::db::ELEMENT_CACHE_HEADERS;
-use holochain_lmdb::db::ELEMENT_VAULT_HEADERS;
-use holochain_lmdb::db::ELEMENT_VAULT_PRIVATE_ENTRIES;
-use holochain_lmdb::db::ELEMENT_VAULT_PUBLIC_ENTRIES;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::exports::SingleStore;
-use holochain_lmdb::prelude::*;
+use holochain_sqlite::buffer::CasBufFreshSync;
+use holochain_sqlite::error::DatabaseError;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::exports::SingleTable;
+use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use tracing::*;
 
@@ -48,15 +42,15 @@ impl ElementBuf<IntegratedPrefix> {
     /// The `allow_private` argument allows you to specify whether private
     /// entries should be readable or writeable with this reference.
     /// The vault is constructed with the IntegratedPrefix.
-    pub fn vault(env: EnvironmentRead, allow_private: bool) -> DatabaseResult<Self> {
+    pub fn vault(env: DbRead, allow_private: bool) -> DatabaseResult<Self> {
         ElementBuf::new_vault(env, allow_private)
     }
 
     /// Create a ElementBuf using the Cache databases.
     /// There is no cache for private entries, so private entries are disallowed
-    pub fn cache(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let entries = env.get_db(&*ELEMENT_CACHE_ENTRIES)?;
-        let headers = env.get_db(&*ELEMENT_CACHE_HEADERS)?;
+    pub fn cache(env: DbRead) -> DatabaseResult<Self> {
+        let entries = env.get_table(TableName::ElementCacheEntries)?;
+        let headers = env.get_table(TableName::ElementCacheHeaders)?;
         ElementBuf::new(env, entries, None, headers)
     }
 }
@@ -64,7 +58,7 @@ impl ElementBuf<IntegratedPrefix> {
 impl ElementBuf<PendingPrefix> {
     /// Create a element buf for all elements pending validation.
     /// This reuses the database but is the data is completely separate.
-    pub fn pending(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn pending(env: DbRead) -> DatabaseResult<Self> {
         ElementBuf::new_vault(env, true)
     }
 }
@@ -72,7 +66,7 @@ impl ElementBuf<PendingPrefix> {
 impl ElementBuf<RejectedPrefix> {
     /// Create a element buf for all elements that have been rejected.
     /// This reuses the database but is the data is completely separate.
-    pub fn rejected(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn rejected(env: DbRead) -> DatabaseResult<Self> {
         ElementBuf::new_vault(env, true)
     }
 }
@@ -80,7 +74,7 @@ impl ElementBuf<RejectedPrefix> {
 impl ElementBuf<AuthoredPrefix> {
     /// Create a element buf for all authored elements.
     /// This reuses the database but is the data is completely separate.
-    pub fn authored(env: EnvironmentRead, allow_private: bool) -> DatabaseResult<Self> {
+    pub fn authored(env: DbRead, allow_private: bool) -> DatabaseResult<Self> {
         ElementBuf::new_vault(env, allow_private)
     }
 }
@@ -90,10 +84,10 @@ where
     P: PrefixType,
 {
     fn new(
-        env: EnvironmentRead,
-        public_entries_store: SingleStore,
-        private_entries_store: Option<SingleStore>,
-        headers_store: SingleStore,
+        env: DbRead,
+        public_entries_store: SingleTable,
+        private_entries_store: Option<SingleTable>,
+        headers_store: SingleTable,
     ) -> DatabaseResult<Self> {
         let private_entries = if let Some(store) = private_entries_store {
             Some(CasBufFreshSync::new(env.clone(), store))
@@ -108,11 +102,11 @@ where
     }
 
     /// Construct a element buf using the vault databases
-    fn new_vault(env: EnvironmentRead, allow_private: bool) -> DatabaseResult<Self> {
-        let headers = env.get_db(&*ELEMENT_VAULT_HEADERS)?;
-        let entries = env.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?;
+    fn new_vault(env: DbRead, allow_private: bool) -> DatabaseResult<Self> {
+        let headers = env.get_table(TableName::ElementVaultHeaders)?;
+        let entries = env.get_table(TableName::ElementVaultPublicEntries)?;
         let private_entries = if allow_private {
-            Some(env.get_db(&*ELEMENT_VAULT_PRIVATE_ENTRIES)?)
+            Some(env.get_table(TableName::ElementVaultPrivateEntries)?)
         } else {
             None
         };
@@ -185,7 +179,7 @@ where
 
     pub fn get_header_with_reader<'r, 'a: 'r, R: Readable>(
         &'a self,
-        r: &'r R,
+        r: &'r mut R,
         header_address: &HeaderHash,
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
         Ok(self.headers.inner().get(r, header_address)?.map(Into::into))
@@ -361,8 +355,8 @@ mod tests {
     use holo_hash::*;
     use holochain_keystore::test_keystore::spawn_test_keystore;
     use holochain_keystore::AgentPubKeyExt;
-    use holochain_lmdb::prelude::*;
-    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_sqlite::prelude::*;
+    use holochain_sqlite::test_utils::test_cell_env;
     use holochain_types::test_utils::fake_unique_element;
     use holochain_zome_types::entry_def::EntryVisibility;
 
@@ -371,7 +365,6 @@ mod tests {
         let keystore = spawn_test_keystore().await?;
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
 
         let agent_key = AgentPubKey::new_from_pure_entropy(&keystore).await?;
         let (header_pub, entry_pub) =
@@ -380,7 +373,7 @@ mod tests {
             fake_unique_element(&keystore, agent_key.clone(), EntryVisibility::Private).await?;
 
         // write one public-entry header and one private-entry header
-        env.with_commit(|txn| {
+        arc.conn().unwrap().with_commit(|txn| {
             let mut store = ElementBuf::vault(arc.clone().into(), true)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;
@@ -418,7 +411,6 @@ mod tests {
         let keystore = spawn_test_keystore().await?;
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
 
         let agent_key = AgentPubKey::new_from_pure_entropy(&keystore).await?;
         let (header_pub, entry_pub) =
@@ -427,7 +419,7 @@ mod tests {
             fake_unique_element(&keystore, agent_key.clone(), EntryVisibility::Private).await?;
 
         // write one public-entry header and one private-entry header (which will be a noop)
-        env.with_commit(|txn| {
+        arc.conn().unwrap().with_commit(|txn| {
             let mut store = ElementBuf::vault(arc.clone().into(), false)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;

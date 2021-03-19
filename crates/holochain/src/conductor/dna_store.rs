@@ -1,11 +1,11 @@
 use fallible_iterator::FallibleIterator;
-use holochain_lmdb::buffer::CasBufFreshSync;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::exports::SingleStore;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
+use holochain_sqlite::buffer::CasBufFreshSync;
+use holochain_sqlite::db::DbRead;
+use holochain_sqlite::error::DatabaseError;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::exports::SingleTable;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::entry_def::EntryDef;
 use std::collections::HashMap;
@@ -62,7 +62,7 @@ impl RealDnaStore {
 }
 
 impl DnaDefBuf {
-    pub fn new(env: EnvironmentRead, dna_def_store: SingleStore) -> DatabaseResult<Self> {
+    pub fn new(env: DbRead, dna_def_store: SingleTable) -> DatabaseResult<Self> {
         Ok(Self {
             dna_defs: CasBufFreshSync::new(env, dna_def_store),
         })
@@ -78,9 +78,9 @@ impl DnaDefBuf {
     }
 
     pub fn get_all(&self) -> DatabaseResult<Vec<DnaDefHashed>> {
-        fresh_reader!(self.dna_defs.env(), |r| self
+        fresh_reader!(self.dna_defs.env(), |mut r| self
             .dna_defs
-            .iter_fail(&r)?
+            .iter_fail(&mut r)?
             .collect())
     }
 }

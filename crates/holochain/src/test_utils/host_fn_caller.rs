@@ -20,13 +20,12 @@ use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::prelude::GetDb;
-use holochain_lmdb::prelude::WriteManager;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
+use holochain_sqlite::db::DbWrite;
+use holochain_sqlite::prelude::*;
 use holochain_state::metadata::LinkMetaKey;
 use holochain_state::workspace::Workspace;
 use holochain_types::prelude::*;
@@ -89,7 +88,7 @@ pub enum MaybeLinkable {
 /// can be called from Rust instead of Wasm
 #[derive(Clone)]
 pub struct HostFnCaller {
-    pub env: EnvironmentWrite,
+    pub env: DbWrite,
     pub ribosome: RealRibosome,
     pub zome_path: ZomePath,
     pub network: HolochainP2pCell,
@@ -142,14 +141,14 @@ impl HostFnCaller {
         }
     }
 
-    pub fn env(&self) -> EnvironmentWrite {
+    pub fn env(&self) -> DbWrite {
         self.env.clone()
     }
 
     pub fn unpack(
         &self,
     ) -> (
-        EnvironmentWrite,
+        DbWrite,
         Arc<RealRibosome>,
         Arc<CallContext>,
         CallZomeWorkspaceLock,
@@ -196,7 +195,9 @@ impl HostFnCaller {
         // Write
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
+        env.conn()
+            .unwrap()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
         output
@@ -216,7 +217,9 @@ impl HostFnCaller {
         // Write
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
+        env.conn()
+            .unwrap()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
         output
@@ -238,7 +241,9 @@ impl HostFnCaller {
         // Write
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
+        env.conn()
+            .unwrap()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
         output
@@ -273,7 +278,9 @@ impl HostFnCaller {
         // Write
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
+        env.conn()
+            .unwrap()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
         output
@@ -287,7 +294,9 @@ impl HostFnCaller {
         // Write
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
+        env.conn()
+            .unwrap()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
         output
@@ -306,7 +315,9 @@ impl HostFnCaller {
         // Write
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
+        env.conn()
+            .unwrap()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
 
         output.into()
@@ -347,7 +358,9 @@ impl HostFnCaller {
         // Write
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
+        env.conn()
+            .unwrap()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
             .unwrap();
         unwrap_to!(output => ZomeCallResponse::Ok).to_owned()
     }

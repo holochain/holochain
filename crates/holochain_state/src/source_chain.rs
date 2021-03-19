@@ -6,10 +6,10 @@
 pub use error::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
+use holochain_sqlite::buffer::BufferedStore;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use shrinkwraprs::Shrinkwrap;
 pub use source_chain_buffer::*;
@@ -37,11 +37,11 @@ impl SourceChain {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
 
-    pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn new(env: DbRead) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::new(env)?.into())
     }
 
-    pub fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn public_only(env: DbRead) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::public_only(env)?.into())
     }
 
@@ -86,7 +86,7 @@ impl SourceChain {
     /// Else the secret and assignees of a grant will be checked and may be returned.
     ///
     /// @todo this is not particularly fast, there are several ways to speed this up in the future
-    /// such as indexing secrets and prefixing cap grants in lmdb for direct lookup
+    /// such as indexing secrets and prefixing cap grants in the database for direct lookup
     ///
     /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
     /// proper capability index DB, OR a proper iterator that respects the
@@ -107,14 +107,14 @@ impl SourceChain {
         // if we are here then the caller is not the current agent so we need to search the source
         // chain to see if there is a local grant that is valid for the provided secret/agent
         // combination
-        let committed_valid_grant = fresh_reader!(self.env(), |r| {
+        let committed_valid_grant = fresh_reader!(self.env(), |mut r| {
             let (references, headers): (
                 HashSet<HeaderHash>,
                 Vec<HoloHashed<holochain_zome_types::element::SignedHeader>>,
             ) = self
                 .0
                 .headers()
-                .iter_fail(&r)?
+                .iter_fail(&mut r)?
                 .filter(|header| {
                     Ok(match header.as_content().header() {
                         Header::Create(create) => {
@@ -177,7 +177,7 @@ impl SourceChain {
             .expect(
                 "SourceChainBuf must have access to private entries in order to access CapGrants",
             )
-            .iter_fail(&r)?
+            .iter_fail(&mut r)?
             // ensure we respect the header filtering we already did above
             .filter(|entry| {
                 Ok(live_cap_grants.contains(entry.as_hash()))
@@ -246,7 +246,7 @@ impl SourceChain {
     //             &self,
     //             query: &CapSecret,
     //         ) -> SourceChainResult<Option<CapClaim>> {
-    //             let hashes_n_claims: Vec<_> = fresh_reader!(self.env(), |r| {
+    //             let hashes_n_claims: Vec<_> = fresh_reader!(self.env(), |mut r| {
     //                 self
     //                 .0
     //                 .elements()
@@ -254,7 +254,7 @@ impl SourceChain {
     //                 .expect(
     //                     "SourceChainBuf must have access to private entries in order to access CapClaims",
     //                 )
-    //                 .iter_fail(&r)?
+    //                 .iter_fail(&mut r)?
     //                 .filter_map(|entry| {
     //                     if let (Entry::CapClaim(claim), entry_hash) = entry.into_inner() {
     //                         Ok(Some((entry_hash, claim)))
@@ -320,7 +320,7 @@ pub mod tests {
     use super::*;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
-    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_sqlite::test_utils::test_cell_env;
     use holochain_types::test_utils::fake_dna_hash;
     use holochain_zome_types::capability::CapAccess;
     use holochain_zome_types::capability::ZomeCallCapGrant;
@@ -346,7 +346,8 @@ pub mod tests {
         {
             let mut store = SourceChainBuf::new(env.clone().into())?;
             store.genesis(fake_dna_hash(1), alice.clone(), None).await?;
-            env.guard()
+            env.conn()
+                .unwrap()
                 .with_commit(|writer| store.flush_to_txn(writer))?;
         }
 
@@ -374,7 +375,8 @@ pub mod tests {
             };
             let header = chain.put(header_builder, Some(entry)).await?;
 
-            env.guard()
+            env.conn()
+                .unwrap()
                 .with_commit(|writer| chain.flush_to_txn(writer))?;
 
             (header, entry_hash)
@@ -416,7 +418,8 @@ pub mod tests {
             };
             let header = chain.put(header_builder, Some(entry)).await?;
 
-            env.guard()
+            env.conn()
+                .unwrap()
                 .with_commit(|writer| chain.flush_to_txn(writer))?;
 
             (header, entry_hash)
@@ -454,7 +457,8 @@ pub mod tests {
             };
             chain.put(header_builder, None).await?;
 
-            env.guard()
+            env.conn()
+                .unwrap()
                 .with_commit(|writer| chain.flush_to_txn(writer))?;
         }
 
@@ -489,7 +493,7 @@ pub mod tests {
     // async fn test_get_cap_claim() -> SourceChainResult<()> {
     //     let test_env = test_cell_env();
     //     let env = test_env.env();
-    //     let env = env.guard().await;
+    //     let env = env.conn().unwrap().await;
     //     let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
     //     let agent_pubkey = fake_agent_pubkey_1().into();
     //     let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
@@ -498,7 +502,7 @@ pub mod tests {
     //         store
     //             .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
     //             .await?;
-    //         env.with_commit(|writer| store.flush_to_txn(writer))?;
+    //         arc.conn().unwrap().with_commit(|writer| store.flush_to_txn(writer))?;
     //     }
     //
     //     {
@@ -514,7 +518,7 @@ pub mod tests {
     // //     Some(claim.clone())
     // // );
     //
-    //         env.with_commit(|writer| chain.flush_to_txn(writer))?;
+    //         arc.conn().unwrap().with_commit(|writer| chain.flush_to_txn(writer))?;
     //     }
     //
     //     {

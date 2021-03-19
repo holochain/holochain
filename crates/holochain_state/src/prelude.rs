@@ -9,4 +9,4 @@ pub use crate::wasm::*;
 pub use crate::workspace::*;
 pub use crate::*;
 
-pub use holochain_lmdb::prelude::*;
+pub use holochain_sqlite::prelude::*;

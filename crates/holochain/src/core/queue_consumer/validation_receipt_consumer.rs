@@ -1,19 +1,16 @@
 //! The workflow and queue consumer for validation receipt
 
 use super::*;
-
 use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
 use crate::core::workflow::validation_receipt_workflow::ValidationReceiptWorkspace;
-use holochain_lmdb::env::EnvironmentWrite;
-
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for validation receipt workflow
 #[instrument(skip(env, stop, cell_network))]
 pub fn spawn_validation_receipt_consumer(
-    env: EnvironmentWrite,
+    env: DbWrite,
     mut stop: sync::broadcast::Receiver<()>,
     mut cell_network: HolochainP2pCell,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {

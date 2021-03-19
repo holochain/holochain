@@ -4,11 +4,7 @@ use fallible_iterator::FallibleIterator;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::db::GetDb;
-use holochain_lmdb::db::AUTHORED_DHT_OPS;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::fresh_reader_test;
+use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::dht_op::produce_ops_from_element;
 use holochain_types::dna::zome::inline_zome::InlineZome;
@@ -51,7 +47,7 @@ async fn test_validation_receipt() {
     consistency_10s(&[&alice, &bobbo, &carol]).await;
 
     // Get op hashes
-    let env: EnvironmentRead = alice.env().clone().into();
+    let env: DbRead = alice.env().clone().into();
     let sc = SourceChain::new(env.clone()).unwrap();
     let element = sc.get_element(&hash).unwrap().unwrap();
     let ops = produce_ops_from_element(&element)
@@ -67,8 +63,8 @@ async fn test_validation_receipt() {
         {
             let mut counts = Vec::new();
             for hash in &ops {
-                let count = fresh_reader_test!(env, |r| db
-                    .list_receipts(&r, hash)
+                let count = fresh_reader_test!(env, |mut r| db
+                    .list_receipts(&mut r, hash)
                     .unwrap()
                     .count()
                     .unwrap());
@@ -82,8 +78,8 @@ async fn test_validation_receipt() {
 
     // Check alice has receipts from both bobbo and carol
     for hash in ops {
-        let receipts: Vec<_> = fresh_reader_test!(env, |r| db
-            .list_receipts(&r, &hash)
+        let receipts: Vec<_> = fresh_reader_test!(env, |mut r| db
+            .list_receipts(&mut r, &hash)
             .unwrap()
             .collect()
             .unwrap());
@@ -100,16 +96,20 @@ async fn test_validation_receipt() {
     }
 
     // Check alice has 2 receipts in their authored dht ops table.
-    let db = env.get_db(&*AUTHORED_DHT_OPS).unwrap();
+    let db = env.get_table(TableName::AuthoredDhtOps).unwrap();
     let authored_dht_ops: AuthoredDhtOpsStore = KvBufFresh::new(env.clone(), db);
-    let vals: Vec<_> = fresh_reader_test!(env, |r| authored_dht_ops
-        .iter(&r)
-        .unwrap()
-        .map(|(_, v)| Ok(v))
-        .collect()
-        .unwrap());
 
-    for AuthoredDhtOpsValue { receipt_count, .. } in vals {
-        assert_eq!(receipt_count, 2);
-    }
+    let expected_counts = vec![2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
+    crate::wait_for_any_10s!(
+        {
+            fresh_reader_test!(env, |mut r| authored_dht_ops
+                .iter(&mut r)
+                .unwrap()
+                .map(|(_, v)| Ok(v.receipt_count))
+                .collect::<Vec<_>>()
+                .unwrap())
+        },
+        |counts| counts == &expected_counts,
+        |counts| assert_eq!(counts, expected_counts)
+    );
 }

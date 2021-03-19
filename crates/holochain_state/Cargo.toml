@@ -12,12 +12,9 @@ edition = "2018"
 byteorder = "1.3.4"
 chrono = "0.4.6"
 derive_more = "0.99.3"
-holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }
+holochain_sqlite = { version = "0.0.1", path = "../holochain_sqlite" }
 holo_hash = { version = "^0.0.2-alpha.1", path = "../holo_hash", features = ["full"] }
 fallible-iterator = "0.2.0"
-serde = { version = "1.0", features = [ "derive" ] }
-tracing = "=0.1.21"
-tracing-futures = "0.2.4"
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.50"
 holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
@@ -26,10 +23,13 @@ holochain_wasm_test_utils = { path = "../test_utils/wasm", optional = true }
 holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
 mockall = "0.8"
 shrinkwraprs = "0.3.0"
+serde = { version = "1.0", features = [ "derive" ] }
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 thiserror = "1.0.22"
 tokio = { version = "1.3", features = [ "full" ] }
 tokio_helper = { version = "0.0.1", path = "../tokio_helper" }
+tracing = "=0.1.21"
+tracing-futures = "0.2.4"
 
 [dev-dependencies]
 anyhow = "1.0.26"

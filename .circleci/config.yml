@@ -52,7 +52,7 @@ jobs:
        name: Test on mac
        no_output_timeout: 30m
        command: |
-        # fix for "too many open files" that breaks tokio and lmdb
+        # fix for "too many open files" that breaks tokio
         ulimit -n 10240
         # catalina nixos install
         sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume

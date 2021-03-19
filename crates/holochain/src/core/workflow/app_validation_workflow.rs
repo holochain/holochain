@@ -43,15 +43,13 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::DbPair;
 use holochain_cascade::DbPairMut;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::db::INTEGRATED_DHT_OPS;
-use holochain_lmdb::db::INTEGRATION_LIMBO;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_sqlite::buffer::BufferedStore;
+use holochain_sqlite::buffer::KvBufFresh;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::Entry;
@@ -73,7 +71,7 @@ pub mod validation_package;
 pub async fn app_validation_workflow(
     mut workspace: AppValidationWorkspace,
     writer: OneshotWriter,
-    trigger_integration: &mut TriggerSender,
+    mut trigger_integration: TriggerSender,
     conductor_api: impl CellConductorApiT,
     network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
@@ -96,13 +94,13 @@ async fn app_validation_workflow_inner(
     let env = workspace.validation_limbo.env().clone();
 
     // Drain the ops into a sorted binary heap
-    let sorted_ops: BinaryHeap<OrderedOp<ValidationLimboValue>> = fresh_reader!(env, |r| {
+    let sorted_ops: BinaryHeap<OrderedOp<ValidationLimboValue>> = fresh_reader!(env, |mut r| {
         let validation_limbo = &mut workspace.validation_limbo;
         let element_pending = &workspace.element_pending;
 
         let sorted_ops: Result<BinaryHeap<OrderedOp<ValidationLimboValue>>, WorkflowError> =
             validation_limbo
-                .drain_iter_filter(&r, |(_, vlv)| {
+                .drain_iter_filter(&mut r, |(_, vlv)| {
                     match vlv.status {
                         // We only want sys validated or awaiting app dependency ops
                         ValidationLimboStatus::SysValidated
@@ -920,10 +918,10 @@ pub struct AppValidationWorkspace {
 }
 
 impl AppValidationWorkspace {
-    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let db = env.get_db(&*INTEGRATED_DHT_OPS)?;
+    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+        let db = env.get_table(TableName::IntegratedDhtOps)?;
         let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
-        let db = env.get_db(&*INTEGRATION_LIMBO)?;
+        let db = env.get_table(TableName::IntegrationLimbo)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
         let validation_limbo = ValidationLimboStore::new(env.clone())?;

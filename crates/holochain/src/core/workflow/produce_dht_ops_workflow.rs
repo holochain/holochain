@@ -2,12 +2,12 @@ use super::error::WorkflowResult;
 use crate::core::queue_consumer::OneshotWriter;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::db::AUTHORED_DHT_OPS;
-use holochain_lmdb::prelude::BufferedStore;
-use holochain_lmdb::prelude::EnvironmentRead;
-use holochain_lmdb::prelude::GetDb;
-use holochain_lmdb::prelude::Writer;
+use holochain_sqlite::buffer::KvBufFresh;
+use holochain_sqlite::prelude::BufferedStore;
+use holochain_sqlite::prelude::DbRead;
+use holochain_sqlite::prelude::GetTable;
+use holochain_sqlite::prelude::Writer;
+use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::dht_op::DhtOpHashed;
 use tracing::*;
@@ -18,10 +18,9 @@ pub mod dht_op_light;
 pub async fn produce_dht_ops_workflow(
     mut workspace: ProduceDhtOpsWorkspace,
     writer: OneshotWriter,
-    trigger_publish: &mut TriggerSender,
+    mut trigger_publish: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let complete = produce_dht_ops_workflow_inner(&mut workspace).await?;
-
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
@@ -63,8 +62,8 @@ pub struct ProduceDhtOpsWorkspace {
 }
 
 impl ProduceDhtOpsWorkspace {
-    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let authored_dht_ops = env.get_db(&*AUTHORED_DHT_OPS)?;
+    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+        let authored_dht_ops = env.get_table(TableName::AuthoredDhtOps)?;
         Ok(Self {
             source_chain: SourceChain::public_only(env.clone())?,
             authored_dht_ops: KvBufFresh::new(env, authored_dht_ops),
@@ -84,15 +83,10 @@ impl Workspace for ProduceDhtOpsWorkspace {
 mod tests {
     use super::super::genesis_workflow::tests::fake_genesis;
     use super::*;
-    use holochain_state::source_chain::SourceChain;
-
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
     use holo_hash::*;
-
-    use holochain_lmdb::env::ReadManager;
-    use holochain_lmdb::env::WriteManager;
-    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_state::source_chain::SourceChain;
     use holochain_types::dht_op::produce_ops_from_element;
     use holochain_types::dht_op::DhtOp;
     use holochain_types::fixt::*;
@@ -149,7 +143,6 @@ mod tests {
         observability::test_run().ok();
         let test_env = test_cell_env();
         let env = test_env.env();
-        let env_ref = env.guard();
 
         // Setup the database and expected data
         let expected_hashes: HashSet<_> = {
@@ -193,7 +186,8 @@ mod tests {
                 );
             }
 
-            env_ref
+            env.conn()
+                .unwrap()
                 .with_commit(|writer| source_chain.flush_to_txn(writer))
                 .unwrap();
 
@@ -211,20 +205,20 @@ mod tests {
                 .await
                 .unwrap();
             assert_matches!(complete, WorkComplete::Complete);
-            env_ref
+            env.conn()
+                .unwrap()
                 .with_commit(|writer| workspace.flush_to_txn(writer))
                 .unwrap();
         }
 
         // Pull out the results and check them
-        let last_count = {
-            let reader = env_ref.reader().unwrap();
+        let last_count = fresh_reader_test!(env, |mut reader| {
             let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
 
             // Get the authored ops
             let authored_results = workspace
                 .authored_dht_ops
-                .iter(&reader)
+                .iter(&mut reader)
                 .unwrap()
                 .map(|(k, v)| {
                     assert_matches!(
@@ -248,7 +242,7 @@ mod tests {
             assert_eq!(authored_results, expected_hashes);
 
             authored_results.len()
-        };
+        });
 
         // Call the workflow again now the queue should be the same length as last time
         // because no new ops should hav been added
@@ -258,24 +252,24 @@ mod tests {
                 .await
                 .unwrap();
             assert_matches!(complete, WorkComplete::Complete);
-            env_ref
+            env.conn()
+                .unwrap()
                 .with_commit(|writer| workspace.flush_to_txn(writer))
                 .unwrap();
         }
 
         // Check the lengths are unchanged
-        {
+        fresh_reader_test!(env, |mut reader| {
             let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
-            let env_ref = env.guard();
-            let reader = env_ref.reader().unwrap();
+
             let authored_count = workspace
                 .authored_dht_ops
-                .iter(&reader)
+                .iter(&mut reader)
                 .unwrap()
                 .count()
                 .unwrap();
 
             assert_eq!(last_count, authored_count);
-        }
+        });
     }
 }

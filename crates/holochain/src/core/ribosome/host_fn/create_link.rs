@@ -50,7 +50,7 @@ pub fn create_link<'a>(
 
     // return the hash of the committed link
     // note that validation is handled by the workflow
-    // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
+    // if the validation fails this commit will be rolled back by virtue of the DB transaction
     // being atomic
     Ok(header_hash)
 }

@@ -2,16 +2,16 @@
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::db::INTEGRATED_DHT_OPS;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::prelude::BufferedStore;
-use holochain_lmdb::prelude::EnvironmentRead;
-use holochain_lmdb::prelude::GetDb;
-use holochain_lmdb::prelude::Readable;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_serialized_bytes::prelude::*;
+use holochain_sqlite::buffer::KvBufFresh;
+use holochain_sqlite::error::DatabaseError;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::prelude::BufferedStore;
+use holochain_sqlite::prelude::DbRead;
+use holochain_sqlite::prelude::GetTable;
+use holochain_sqlite::prelude::Readable;
+use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::validate::ValidationStatus;
 
@@ -73,7 +73,7 @@ impl BufferedStore for IntegratedDhtOpsBuf {
     type Error = DatabaseError;
     fn flush_to_txn_ref(
         &mut self,
-        writer: &mut holochain_lmdb::prelude::Writer,
+        writer: &mut holochain_sqlite::prelude::Writer,
     ) -> Result<(), Self::Error> {
         self.store.flush_to_txn_ref(writer)
     }
@@ -108,8 +108,8 @@ pub struct IntegrationLimboValue {
 
 impl IntegratedDhtOpsBuf {
     /// Create a new buffer for the IntegratedDhtOpsStore
-    pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let db = env.get_db(&*INTEGRATED_DHT_OPS).unwrap();
+    pub fn new(env: DbRead) -> DatabaseResult<Self> {
+        let db = env.get_table(TableName::IntegratedDhtOps).unwrap();
         Ok(Self {
             store: IntegratedDhtOpsStore::new(env, db),
         })
@@ -126,7 +126,7 @@ impl IntegratedDhtOpsBuf {
     /// - match a dht location
     pub fn query<'r, R: Readable>(
         &'r self,
-        r: &'r R,
+        r: &'r mut R,
         from: Option<Timestamp>,
         to: Option<Timestamp>,
         dht_arc: Option<DhtArc>,
@@ -169,17 +169,16 @@ mod tests {
     use holo_hash::fixt::AnyDhtHashFixturator;
     use holo_hash::fixt::DhtOpHashFixturator;
     use holo_hash::fixt::HeaderHashFixturator;
-    use holochain_lmdb::buffer::BufferedStore;
-    use holochain_lmdb::env::ReadManager;
-    use holochain_lmdb::env::WriteManager;
-    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_sqlite::buffer::BufferedStore;
+    use holochain_sqlite::db::ReadManager;
+    use holochain_sqlite::db::WriteManager;
+    use holochain_sqlite::test_utils::test_cell_env;
     use pretty_assertions::assert_eq;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_query() {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let env_ref = env.guard();
 
         // Create some integration values
         let mut expected = Vec::new();
@@ -211,27 +210,29 @@ mod tests {
                 buf.put(dht_hash.next().unwrap(), value.clone()).unwrap();
                 expected.push(value.clone());
             }
-            env_ref
+            env.conn()
+                .unwrap()
                 .with_commit(|writer| buf.flush_to_txn(writer))
                 .unwrap();
         }
 
         // Check queries
-        {
-            let reader = env_ref.reader().unwrap();
+
+        let mut conn = env.conn().unwrap();
+        conn.with_reader_test(|mut reader| {
             let buf = IntegratedDhtOpsBuf::new(env.clone().into()).unwrap();
             // No filter
             let mut r = buf
-                .query(&reader, None, None, None)
+                .query(&mut reader, None, None, None)
                 .unwrap()
                 .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
                 .unwrap();
             r.sort_by_key(|v| v.when_integrated.clone());
-            assert_eq!(&r[..], &expected[..]);
+            assert_eq!(&mut r[..], &expected[..]);
             // From now
             let mut r = buf
-                .query(&reader, Some(times_exp[1].clone().into()), None, None)
+                .query(&mut reader, Some(times_exp[1].clone().into()), None, None)
                 .unwrap()
                 .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
@@ -246,7 +247,12 @@ mod tests {
             let ages_ago = times_exp[0] - Duration::weeks(5);
             let future = times_exp[1] + Duration::hours(1);
             let mut r = buf
-                .query(&reader, Some(ages_ago.into()), Some(future.into()), None)
+                .query(
+                    &mut reader,
+                    Some(ages_ago.into()),
+                    Some(future.into()),
+                    None,
+                )
                 .unwrap()
                 .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
@@ -263,7 +269,7 @@ mod tests {
             let future = times_exp[1] + Duration::hours(1);
             let mut r = buf
                 .query(
-                    &reader,
+                    &mut reader,
                     Some(ages_ago.into()),
                     Some(future.into()),
                     Some(DhtArc::new(same_basis.get_loc(), 1)),
@@ -279,7 +285,7 @@ mod tests {
             // Same basis all
             let mut r = buf
                 .query(
-                    &reader,
+                    &mut reader,
                     None,
                     None,
                     Some(DhtArc::new(same_basis.get_loc(), 1)),
@@ -293,6 +299,6 @@ mod tests {
             assert!(r.contains(&expected[3]));
             assert!(r.contains(&expected[5]));
             assert_eq!(r.len(), 3);
-        }
+        });
     }
 }

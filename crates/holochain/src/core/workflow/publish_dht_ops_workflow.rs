@@ -17,14 +17,13 @@ use crate::core::queue_consumer::OneshotWriter;
 use crate::core::queue_consumer::WorkComplete;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::db::AUTHORED_DHT_OPS;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
-use holochain_lmdb::transaction::Writer;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_sqlite::buffer::BufferedStore;
+use holochain_sqlite::buffer::KvBufFresh;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
+use holochain_sqlite::transaction::Writer;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use std::collections::HashMap;
@@ -54,9 +53,22 @@ pub struct PublishDhtOpsWorkspace {
 pub async fn publish_dht_ops_workflow(
     mut workspace: PublishDhtOpsWorkspace,
     writer: OneshotWriter,
-    network: &mut HolochainP2pCell,
+    mut network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
     let to_publish = publish_dht_ops_workflow_inner(&mut workspace).await?;
+
+    // commit the workspace
+    //
+    // FIXME: the local commit should happen only AFTER successfully publishing.
+    //        I moved this because when switching from LMDB to SQLite, in the
+    //        case of self-publishing, the transaction held here would block
+    //        the attempt to get a transaction for the integration workflow
+    //        (part of handling the self-publish)
+    //
+    //        so, TODO: make publishing come before this, after self-publishing
+    //        is abolished [ B-04053 ]
+    tracing::warn!("Committing local state before publishing to network! TODO: circle back ");
+    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     // Commit to the network
     for (basis, ops) in to_publish {
@@ -65,9 +77,6 @@ pub async fn publish_dht_ops_workflow(
         }
     }
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
-
-    // commit the workspace
-    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     Ok(WorkComplete::Complete)
 }
@@ -87,9 +96,9 @@ pub async fn publish_dht_ops_workflow_inner(
     // one of many ways to access the env
     let env = workspace.elements.headers().env().clone();
 
-    let values = fresh_reader!(env, |r| workspace
+    let values = fresh_reader!(env, |mut r| workspace
         .authored()
-        .iter(&r)?
+        .iter(&mut r)?
         .filter_map(|(k, mut r)| {
             Ok(if r.receipt_count < DEFAULT_RECEIPT_BUNDLE_SIZE {
                 let needs_publish = r
@@ -141,8 +150,8 @@ impl Workspace for PublishDhtOpsWorkspace {
 }
 
 impl PublishDhtOpsWorkspace {
-    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let db = env.get_db(&*AUTHORED_DHT_OPS)?;
+    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+        let db = env.get_table(TableName::AuthoredDhtOps)?;
         let authored_dht_ops = KvBufFresh::new(env.clone(), db);
         // Note that this must always be false as we don't want private entries being published
         let elements = ElementBuf::authored(env, false)?;
@@ -193,7 +202,7 @@ mod tests {
 
     /// publish ops setup
     async fn setup<'env>(
-        env: EnvironmentWrite,
+        env: DbWrite,
         num_agents: u32,
         num_hash: u32,
         panic_on_publish: bool,
@@ -203,7 +212,6 @@ mod tests {
         JoinHandle<()>,
         tokio::sync::oneshot::Receiver<()>,
     ) {
-        let env_ref = env.guard();
         // Create data fixts for op
         let mut sig_fixt = SignatureFixturator::new(Unpredictable);
         let mut link_add_fixt = CreateLinkFixturator::new(Unpredictable);
@@ -241,7 +249,8 @@ mod tests {
                 workspace.elements.put(signed_header, None).unwrap();
             }
             // Manually commit because this workspace doesn't commit to all dbs
-            env_ref
+            env.conn()
+                .unwrap()
                 .with_commit::<DatabaseError, _, _>(|writer| {
                     workspace.authored_dht_ops.flush_to_txn(writer)?;
                     workspace.elements.flush_to_txn(writer)?;
@@ -313,9 +322,9 @@ mod tests {
     }
 
     /// Call the workflow
-    async fn call_workflow(env: EnvironmentWrite, mut cell_network: HolochainP2pCell) {
+    async fn call_workflow(env: DbWrite, cell_network: HolochainP2pCell) {
         let workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
-        publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)
+        publish_dht_ops_workflow(workspace, env.clone().into(), cell_network)
             .await
             .unwrap();
     }
@@ -353,14 +362,14 @@ mod tests {
             };
 
             let check = async move {
-                let env_ref = env.guard();
                 recv_task.await.unwrap();
-                let reader = env_ref.reader().unwrap();
                 let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
-                for i in workspace.authored().iter(&reader).unwrap().iterator() {
-                    // Check that each item now has a publish time
-                    assert!(i.expect("can iterate").1.last_publish_time.is_some())
-                }
+                fresh_reader_test!(env, |mut reader| {
+                    for i in workspace.authored().iter(&mut reader).unwrap().iterator() {
+                        // Check that each item now has a publish time
+                        assert!(i.expect("can iterate").1.last_publish_time.is_some())
+                    }
+                })
             };
 
             // Shutdown
@@ -388,7 +397,6 @@ mod tests {
             // Create test env
             let test_env = test_cell_env();
             let env = test_env.env();
-            let env_ref = env.guard();
 
             // Setup
             let (_network, cell_network, recv_task, _) =
@@ -396,27 +404,27 @@ mod tests {
 
             // Update the authored to have > R counts
             {
-                let reader = env_ref.reader().unwrap();
                 let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
 
                 // Update authored to R
-                let values = workspace
+                let values = fresh_reader_test!(env, |mut reader| workspace
                     .authored_dht_ops
-                    .iter(&reader)
+                    .iter(&mut reader)
                     .unwrap()
                     .map(|(k, mut v)| {
                         v.receipt_count = DEFAULT_RECEIPT_BUNDLE_SIZE;
                         Ok((DhtOpHash::from_raw_39_panicky(k.to_vec()), v))
                     })
                     .collect::<Vec<_>>()
-                    .unwrap();
+                    .unwrap());
 
                 for (hash, v) in values.into_iter() {
                     workspace.authored_dht_ops.put(hash, v).unwrap();
                 }
 
                 // Manually commit because this workspace doesn't commit to all dbs
-                env_ref
+                env.conn()
+                    .unwrap()
                     .with_commit::<DatabaseError, _, _>(|writer| {
                         workspace.authored_dht_ops.flush_to_txn(writer)?;
                         Ok(())
@@ -467,7 +475,6 @@ mod tests {
                 // Create test env
                 let test_env = test_cell_env();
                 let env = test_env.env();
-                let env_ref = env.guard();
 
                 // Setup data
                 let original_entry = fixt!(Entry);
@@ -486,7 +493,8 @@ mod tests {
                 {
                     let mut source_chain = SourceChain::new(env.clone().into()).unwrap();
                     fake_genesis(&mut source_chain).await.unwrap();
-                    env_ref
+                    env.conn()
+                        .unwrap()
                         .with_commit::<SourceChainError, _, _>(|writer| {
                             source_chain.flush_to_txn(writer)?;
                             Ok(())
@@ -495,15 +503,16 @@ mod tests {
                 }
                 {
                     let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
-                    let (mut qt, _rx) = TriggerSender::new();
-                    let complete = produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
+                    let (qt, _rx) = TriggerSender::new();
+                    let complete = produce_dht_ops_workflow(workspace, env.clone().into(), qt)
                         .await
                         .unwrap();
                     self::assert_matches!(complete, WorkComplete::Complete);
                 }
                 {
                     let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
-                    env_ref
+                    env.conn()
+                        .unwrap()
                         .with_commit::<SourceChainError, _, _>(|writer| {
                             workspace.authored_dht_ops.clear_all(writer)?;
                             Ok(())
@@ -550,7 +559,8 @@ mod tests {
                         .unwrap()
                         .clone();
 
-                    env_ref
+                    env.conn()
+                        .unwrap()
                         .with_commit::<SourceChainError, _, _>(|writer| {
                             source_chain.flush_to_txn(writer)?;
                             Ok(())
@@ -634,8 +644,8 @@ mod tests {
                 // Create and fill authored ops db in the workspace
                 {
                     let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
-                    let (mut qt, _rx) = TriggerSender::new();
-                    let complete = produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
+                    let (qt, _rx) = TriggerSender::new();
+                    let complete = produce_dht_ops_workflow(workspace, env.clone().into(), qt)
                         .await
                         .unwrap();
                     self::assert_matches!(complete, WorkComplete::Complete);

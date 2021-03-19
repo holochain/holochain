@@ -7,7 +7,7 @@
 //!
 //! ```rust, no_run
 //! async fn async_main () {
-//! use holochain_lmdb::test_utils::{test_environments, TestEnvironment};
+//! use holochain_sqlite::test_utils::{test_environments, TestDb};
 //! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
 //! let envs = test_environments();
 //! let handle: ConductorHandle = ConductorBuilder::new()
@@ -73,7 +73,7 @@ use super::state::ConductorState;
 #[cfg(any(test, feature = "test_utils"))]
 use crate::core::queue_consumer::QueueTriggers;
 #[cfg(any(test, feature = "test_utils"))]
-use holochain_lmdb::env::EnvironmentWrite;
+use holochain_sqlite::db::DbWrite;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;
@@ -228,13 +228,13 @@ pub trait ConductorHandleT: Send + Sync {
     /// Print the current setup in a machine readable way.
     async fn print_setup(&self);
 
-    /// Retrieve the LMDB environment for this cell. FOR TESTING ONLY.
+    /// Retrieve the database for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
-    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
+    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<DbWrite>;
 
-    /// Retrieve the LMDB environment for networking. FOR TESTING ONLY.
+    /// Retrieve the database for networking. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
-    async fn get_p2p_env(&self) -> EnvironmentWrite;
+    async fn get_p2p_env(&self) -> DbWrite;
 
     /// Retrieve Senders for triggering workflows. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -642,13 +642,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
+    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<DbWrite> {
         let cell = self.cell_by_id(cell_id).await?;
         Ok(cell.env().clone())
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    async fn get_p2p_env(&self) -> EnvironmentWrite {
+    async fn get_p2p_env(&self) -> DbWrite {
         let lock = self.conductor.read().await;
         lock.p2p_env()
     }

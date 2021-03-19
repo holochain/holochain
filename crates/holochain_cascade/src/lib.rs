@@ -4,6 +4,8 @@
 //! where as retrieve only checks that where the data was found
 //! the appropriate validation has been run.
 
+#![allow(deprecated)]
+
 use either::Either;
 use error::{AuthorityDataError, CascadeResult};
 use fallible_iterator::FallibleIterator;
@@ -13,15 +15,15 @@ use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetMetaOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
+use holochain_sqlite::{error::DatabaseResult, rewrap_fallible_iter};
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use std::collections::BTreeMap;
@@ -132,7 +134,7 @@ pub struct Cascade<
     pending_data: Option<DbPair<'a, MetaPending, PendingPrefix>>,
     rejected_data: Option<DbPair<'a, MetaRejected, RejectedPrefix>>,
     cache_data: Option<DbPairMut<'a, MetaCache>>,
-    env: Option<EnvironmentRead>,
+    env: Option<DbRead>,
     network: Option<Network>,
 }
 
@@ -167,7 +169,7 @@ where
     // avoid refactoring
     #[allow(clippy::complexity)]
     pub fn new(
-        env: EnvironmentRead,
+        env: DbRead,
         element_authored: &'a ElementBuf<AuthoredPrefix>,
         meta_authored: &'a MetaAuthored,
         element_integrated: &'a ElementBuf,
@@ -715,8 +717,8 @@ where
             db: &DbPair<M, P>,
             hash: &EntryHash,
         ) -> CascadeResult<Option<Element>> {
-            fresh_reader!(db.meta.env(), |r| {
-                let mut iter = db.meta.get_all_headers(&r, hash.clone())?;
+            fresh_reader!(db.meta.env(), |mut r| {
+                let mut iter = db.meta.get_all_headers(&mut r, hash.clone())?;
                 while let Some(h) = iter.next()? {
                     return_if_ok!(db.element.get_element(&h.header_hash)?)
                 }
@@ -788,20 +790,20 @@ where
         headers: &BTreeSet<TimedHeaderHash>,
         cache_data: &DbPairMut<'a, MetaCache>,
         authored_data: &DbPair<'a, MetaAuthored, AuthoredPrefix>,
-        env: &EnvironmentRead,
+        env: &DbRead,
     ) -> CascadeResult<EntryDhtStatus> {
-        fresh_reader!(env, |r| {
+        fresh_reader!(env, |mut r| {
             for thh in headers {
                 // If we can find any header that has no
                 // deletes in either store then the entry is live
                 if cache_data
                     .meta
-                    .get_deletes_on_header(&r, thh.header_hash.clone())?
+                    .get_deletes_on_header(&mut r, thh.header_hash.clone())?
                     .next()?
                     .is_none()
                     && authored_data
                         .meta
-                        .get_deletes_on_header(&r, thh.header_hash.clone())?
+                        .get_deletes_on_header(&mut r, thh.header_hash.clone())?
                         .next()?
                         .is_none()
                 {
@@ -818,33 +820,41 @@ where
         let authored_data = ok_or_return!(self.authored_data.as_ref(), None);
         let env = ok_or_return!(self.env.as_ref(), None);
         match self.get_entry_local_raw(&hash)? {
-            Some(entry) => fresh_reader!(env, |r| {
+            Some(entry) => fresh_reader!(env, |mut r| {
                 // Get the "headers that created this entry" hashes
                 let headers = cache_data
                     .meta
-                    .get_headers(&r, hash.clone())?
-                    .chain(authored_data.meta.get_headers(&r, hash.clone())?)
+                    .get_headers(&mut r, hash.clone())?
+                    .chain(authored_data.meta.get_headers(&mut r, hash.clone())?)
                     .collect::<BTreeSet<_>>()?;
 
                 // Get the rejected "headers that created this entry" hashes
                 let rejected_headers = cache_data
                     .meta
-                    .get_rejected_headers(&r, hash.clone())?
-                    .chain(authored_data.meta.get_rejected_headers(&r, hash.clone())?)
+                    .get_rejected_headers(&mut r, hash.clone())?
+                    .chain(
+                        authored_data
+                            .meta
+                            .get_rejected_headers(&mut r, hash.clone())?,
+                    )
                     .collect::<BTreeSet<_>>()?;
 
                 // Get the delete hashes
                 let deletes = cache_data
                     .meta
-                    .get_deletes_on_entry(&r, hash.clone())?
-                    .chain(authored_data.meta.get_deletes_on_entry(&r, hash.clone())?)
+                    .get_deletes_on_entry(&mut r, hash.clone())?
+                    .chain(
+                        authored_data
+                            .meta
+                            .get_deletes_on_entry(&mut r, hash.clone())?,
+                    )
                     .collect::<BTreeSet<_>>()?;
 
                 // Get the update hashes
                 let updates = cache_data
                     .meta
-                    .get_updates(&r, hash.clone().into())?
-                    .chain(authored_data.meta.get_updates(&r, hash.into())?)
+                    .get_updates(&mut r, hash.clone().into())?
+                    .chain(authored_data.meta.get_updates(&mut r, hash.into())?)
                     .collect::<BTreeSet<_>>()?;
 
                 let entry_dht_status =
@@ -879,18 +889,26 @@ where
         match self.get_element_local_raw(&hash)? {
             Some(element) => {
                 let hash = element.header_address().clone();
-                let (deletes, updates, validation_status) = fresh_reader!(env, |r| {
+                let (deletes, updates, validation_status) = fresh_reader!(env, |mut r| {
                     let deletes = cache_data
                         .meta
-                        .get_deletes_on_header(&r, hash.clone())?
-                        .chain(authored_data.meta.get_deletes_on_header(&r, hash.clone())?)
+                        .get_deletes_on_header(&mut r, hash.clone())?
+                        .chain(
+                            authored_data
+                                .meta
+                                .get_deletes_on_header(&mut r, hash.clone())?,
+                        )
                         .collect::<BTreeSet<_>>()?;
                     let updates = cache_data
                         .meta
-                        .get_updates(&r, hash.clone().into())?
-                        .chain(authored_data.meta.get_updates(&r, hash.clone().into())?)
+                        .get_updates(&mut r, hash.clone().into())?
+                        .chain(
+                            authored_data
+                                .meta
+                                .get_updates(&mut r, hash.clone().into())?,
+                        )
                         .collect::<BTreeSet<_>>()?;
-                    let validation_status = cache_data.meta.get_validation_status(&r, &hash)?;
+                    let validation_status = cache_data.meta.get_validation_status(&mut r, &hash)?;
                     DatabaseResult::Ok((deletes, updates, validation_status))
                 })?;
                 let validation_status = validation_status
@@ -1051,22 +1069,22 @@ where
         entry_hash: &EntryHash,
         authored_data: &DbPair<MA, AuthoredPrefix>,
         cache_data: &DbPair<MC, AnyPrefix>,
-        env: &EnvironmentRead,
+        env: &DbRead,
     ) -> CascadeResult<Search> {
-        fresh_reader!(env, |r| {
+        fresh_reader!(env, |mut r| {
             let oldest_live_header = authored_data
                 .meta
-                .get_headers(&r, entry_hash.clone())?
-                .chain(cache_data.meta.get_headers(&r, entry_hash.clone())?)
+                .get_headers(&mut r, entry_hash.clone())?
+                .chain(cache_data.meta.get_headers(&mut r, entry_hash.clone())?)
                 .filter_map(|header| {
                     if authored_data
                         .meta
-                        .get_deletes_on_header(&r, header.header_hash.clone())?
+                        .get_deletes_on_header(&mut r, header.header_hash.clone())?
                         .next()?
                         .is_none()
                         && cache_data
                             .meta
-                            .get_deletes_on_header(&r, header.header_hash.clone())?
+                            .get_deletes_on_header(&mut r, header.header_hash.clone())?
                             .next()?
                             .is_none()
                     {
@@ -1082,7 +1100,7 @@ where
                     // Check we don't have evidence of an invalid header
                     if cache_data
                         .meta
-                        .get_validation_status(&r, &oldest_live_header.header_hash)?
+                        .get_validation_status(&mut r, &oldest_live_header.header_hash)?
                         .is_valid()
                     {
                         // We have an oldest live header now get the element
@@ -1201,35 +1219,35 @@ where
         let authored_data = ok_or_return!(self.authored_data.as_ref(), None);
         let env = ok_or_return!(self.env.as_ref(), None);
         debug!("in get header");
-        let found_local_delete = fresh_reader!(env, |r| {
-            let in_cache = || {
+        let found_local_delete = fresh_reader!(env, |mut r| {
+            let in_cache = {
                 DatabaseResult::Ok({
                     cache_data
                         .meta
-                        .get_deletes_on_header(&r, header_hash.clone())?
+                        .get_deletes_on_header(&mut r, header_hash.clone())?
                         .next()?
                         .is_some()
                 })
             };
-            let in_authored = || {
+            let in_authored = {
                 DatabaseResult::Ok({
                     authored_data
                         .meta
-                        .get_deletes_on_header(&r, header_hash.clone())?
+                        .get_deletes_on_header(&mut r, header_hash.clone())?
                         .next()?
                         .is_some()
                 })
             };
-            let in_vault = || {
+            let in_vault = {
                 DatabaseResult::Ok({
                     integrated_data
                         .meta
-                        .get_deletes_on_header(&r, header_hash.clone())?
+                        .get_deletes_on_header(&mut r, header_hash.clone())?
                         .next()?
                         .is_some()
                 })
             };
-            DatabaseResult::Ok(in_cache()? || in_authored()? || in_vault()?)
+            DatabaseResult::Ok(in_cache? || in_authored? || in_vault?)
         })?;
         if found_local_delete {
             return Ok(None);
@@ -1265,11 +1283,11 @@ where
     fn dht_get_header_inner(&self, header_hash: HeaderHash) -> CascadeResult<Option<Element>> {
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
         let env = ok_or_return!(self.env.as_ref(), None);
-        fresh_reader!(env, |r| {
+        fresh_reader!(env, |mut r| {
             // Check if header is alive after fetch
             let is_live = cache_data
                 .meta
-                .get_deletes_on_header(&r, header_hash.clone())?
+                .get_deletes_on_header(&mut r, header_hash.clone())?
                 .next()?
                 .is_none();
 
@@ -1277,7 +1295,7 @@ where
             let is_live = is_live
                 && cache_data
                     .meta
-                    .get_validation_status(&r, &header_hash)?
+                    .get_validation_status(&mut r, &header_hash)?
                     .is_valid();
 
             if is_live {
@@ -1547,17 +1565,17 @@ where
         let cache_data = ok_or_return!(self.cache_data.as_ref(), vec![]);
         let authored_data = ok_or_return!(self.authored_data.as_ref(), vec![]);
         let env = ok_or_return!(self.env.as_ref(), vec![]);
-        fresh_reader!(env, |r| {
+        fresh_reader!(env, |mut r| {
             // Meta Cache
             // Return any links from the meta cache that don't have removes.
             let mut links = cache_data
                 .meta
-                .get_live_links(&r, key)?
+                .get_live_links(&mut r, key)?
                 .map(|l| Ok(l.into_link()))
                 .chain(
                     authored_data
                         .meta
-                        .get_live_links(&r, key)?
+                        .get_live_links(&mut r, key)?
                         .map(|l| Ok(l.into_link())),
                 )
                 // Need to collect into a Set first to remove
@@ -1590,29 +1608,31 @@ where
         let env = ok_or_return!(self.env.as_ref(), vec![]);
         // Get the links and collect the CreateLink / DeleteLink hashes by time.
         // Search authored and combine with cache_data
-        let links = fresh_reader!(env, |r| {
-            cache_data
-                .meta
-                .get_links_all(&r, key)?
-                .map(|link_add| {
-                    // Collect the link removes on this link add
-                    let link_removes = cache_data
-                        .meta
-                        .get_link_removes_on_link_add(&r, link_add.link_add_hash.clone())?
-                        .collect::<BTreeSet<_>>()?;
-                    // Return all link removes with this link add
-                    Ok((link_add.link_add_hash, link_removes))
-                })
-                .chain(authored_data.meta.get_links_all(&r, key)?.map(|link_add| {
-                    // Collect the link removes on this link add
-                    let link_removes = authored_data
-                        .meta
-                        .get_link_removes_on_link_add(&r, link_add.link_add_hash.clone())?
-                        .collect::<BTreeSet<_>>()?;
-                    // Return all link removes with this link add
-                    Ok((link_add.link_add_hash, link_removes))
-                }))
-                .collect::<BTreeMap<_, _>>()
+        let links = fresh_reader!(env, |mut r| {
+            rewrap_fallible_iter!(cache_data.meta.get_links_all(&mut r, key)?.map(|link_add| {
+                // Collect the link removes on this link add
+                let link_removes = cache_data
+                    .meta
+                    .get_link_removes_on_link_add(&mut r, link_add.link_add_hash.clone())?
+                    .collect::<BTreeSet<_>>()?;
+                // Return all link removes with this link add
+                Ok((link_add.link_add_hash, link_removes))
+            }))
+            .chain(
+                authored_data
+                    .meta
+                    .get_links_all(&mut r, key)?
+                    .map(|link_add| {
+                        // Collect the link removes on this link add
+                        let link_removes = authored_data
+                            .meta
+                            .get_link_removes_on_link_add(&mut r, link_add.link_add_hash.clone())?
+                            .collect::<BTreeSet<_>>()?;
+                        // Return all link removes with this link add
+                        Ok((link_add.link_add_hash, link_removes))
+                    }),
+            )
+            .collect::<BTreeMap<_, _>>()
         })?;
         // Get the headers from the element stores
         fallible_iterator::convert(links.into_iter().map(Ok))
@@ -1670,18 +1690,18 @@ where
         agent: AgentPubKey,
         range: &Option<std::ops::Range<u32>>,
         cache_data: &DbPairMut<'a, MetaCache>,
-        env: &EnvironmentRead,
+        env: &DbRead,
     ) -> CascadeResult<Vec<(u32, HeaderHash)>> {
         match range {
             Some(range) => {
                 // One less than the end of an exclusive range is actually
                 // the last header we want in the chain.
-                fresh_reader!(env, |r| {
+                fresh_reader!(env, |mut r| {
                     // Check if we have up to that header in the metadata store.
                     if cache_data
                         .meta
                         .get_activity(
-                            &r,
+                            &mut r,
                             ChainItemKey::AgentStatusSequence(
                                 agent.clone(),
                                 ValidationStatus::Valid,
@@ -1696,7 +1716,7 @@ where
                         Ok(cache_data
                             .meta
                             .get_activity_sequence(
-                                &r,
+                                &mut r,
                                 ChainItemKey::AgentStatus(agent, ValidationStatus::Valid),
                             )?
                             // TODO: PERF: Use an iter from to start from the correct sequence
@@ -1710,11 +1730,11 @@ where
                 })
             }
             // Requesting full chain so return all everything we have
-            None => fresh_reader!(env, |r| {
+            None => fresh_reader!(env, |mut r| {
                 Ok(cache_data
                     .meta
                     .get_activity_sequence(
-                        &r,
+                        &mut r,
                         ChainItemKey::AgentStatus(agent, ValidationStatus::Valid),
                     )?
                     .collect()?)
@@ -1838,7 +1858,7 @@ where
     /// Get agent activity from agent activity authorities.
     /// Hashes are requested from the authority and cache for valid chains.
     /// Options:
-    /// - include_valid_activity will include the valid chain hashes.     
+    /// - include_valid_activity will include the valid chain hashes.
     /// - include_rejected_activity will include the valid chain hashes. (unimplemented)
     /// - include_full_headers will fetch the valid headers in parallel (requires include_valid_activity)
     /// Query:
@@ -2007,8 +2027,8 @@ where
     ) -> CascadeResult<Option<Vec<Element>>> {
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
         let env = ok_or_return!(self.env.as_ref(), None);
-        fresh_reader!(env, |r| {
-            let mut iter = cache_data.meta.get_validation_package(&r, hash)?;
+        fresh_reader!(env, |mut r| {
+            let mut iter = cache_data.meta.get_validation_package(&mut r, hash)?;
             let mut elements = Vec::with_capacity(iter.size_hint().0);
             while let Some(hash) = iter.next()? {
                 match self.get_element_local_raw(&hash)? {
@@ -2172,7 +2192,7 @@ pub fn get_header<P: PrefixType>(
 #[cfg(test)]
 /// Helper function for easily setting up cascades during tests
 pub fn test_dbs_and_mocks(
-    env: EnvironmentRead,
+    env: DbRead,
 ) -> (
     ElementBuf,
     holochain_state::metadata::MockMetadataBuf,

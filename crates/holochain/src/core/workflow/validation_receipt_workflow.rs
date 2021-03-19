@@ -4,14 +4,9 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::DbPair;
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::db::GetDb;
-use holochain_lmdb::db::INTEGRATED_DHT_OPS;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_zome_types::TryInto;
 use tracing::*;
@@ -39,9 +34,9 @@ pub async fn validation_receipt_workflow(
     let keystore = workspace.keystore.clone();
 
     // Get out all ops that are marked for sending receipt.
-    let ops: Vec<(DhtOpHash, IntegratedDhtOpsValue)> = fresh_reader!(env, |r| workspace
+    let ops: Vec<(DhtOpHash, IntegratedDhtOpsValue)> = fresh_reader!(env, |mut r| workspace
         .integrated_dht_ops
-        .iter(&r)?
+        .iter(&mut r)?
         .filter(|(_, v)| Ok(v.send_receipt))
         .map_err(WorkflowError::from)
         .map(|(k, v)| Ok((DhtOpHash::from_raw_39(k.to_vec())?, v)))
@@ -126,9 +121,9 @@ pub struct ValidationReceiptWorkspace {
 
 impl ValidationReceiptWorkspace {
     /// Make a new workspace.
-    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
+    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
         let keystore = env.keystore().clone();
-        let db = env.get_db(&*INTEGRATED_DHT_OPS)?;
+        let db = env.get_table(TableName::IntegratedDhtOps)?;
         let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
 
         let elements = ElementBuf::vault(env.clone(), true)?;

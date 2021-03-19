@@ -1,27 +1,24 @@
 //! The workflow and queue consumer for DhtOp integration
 
 use super::*;
-
-use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_dht_ops_workflow;
 use crate::core::workflow::integrate_dht_ops_workflow::IntegrateDhtOpsWorkspace;
-use holochain_lmdb::env::EnvironmentWrite;
-
+use crate::{conductor::manager::ManagedTaskResult, core::workflow::error::WorkflowResult};
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
 #[instrument(skip(env, stop, trigger_sys, trigger_receipt))]
 pub fn spawn_integrate_dht_ops_consumer(
-    env: EnvironmentWrite,
+    env: DbWrite,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_sys: sync::oneshot::Receiver<TriggerSender>,
-    mut trigger_receipt: TriggerSender,
+    trigger_receipt: TriggerSender,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
-    let mut trigger_self = tx.clone();
+    let trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
-        let mut trigger_sys = trigger_sys.await.expect("failed to get tx sys");
+        let trigger_sys = trigger_sys.await.expect("failed to get tx sys");
         loop {
             // Wait for next job
             if let Job::Shutdown = next_job_or_exit(&mut rx, &mut stop).await {
@@ -31,20 +28,23 @@ pub fn spawn_integrate_dht_ops_consumer(
                 break;
             }
 
-            // Run the workflow
-            let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into())
-                .expect("Could not create Workspace");
-            if let WorkComplete::Incomplete = integrate_dht_ops_workflow(
-                workspace,
-                env.clone().into(),
-                &mut trigger_sys,
-                &mut trigger_receipt,
-            )
+            holochain_sqlite::db::optimistic_retry_async("integrate_dht_ops_consumer", || async {
+                // Run the workflow
+                let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into())?;
+                if let WorkComplete::Incomplete = integrate_dht_ops_workflow(
+                    workspace,
+                    env.clone().into(),
+                    trigger_sys.clone(),
+                    trigger_receipt.clone(),
+                )
+                .await?
+                {
+                    trigger_self.clone().trigger()
+                };
+                WorkflowResult::Ok(())
+            })
             .await
-            .expect("Error running Workflow")
-            {
-                trigger_self.trigger()
-            };
+            .expect("Too many consecutive errors. Shutting down loop. TODO: make Holochain crash");
         }
         Ok(())
     });

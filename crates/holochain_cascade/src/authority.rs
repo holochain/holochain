@@ -5,13 +5,8 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::env::ReadManager;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::PrefixType;
-use holochain_lmdb::prelude::Readable;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
 use holochain_state::element_buf::ElementBuf;
 use holochain_state::metadata::ChainItemKey;
 use holochain_state::metadata::LinkMetaKey;
@@ -25,7 +20,7 @@ use tracing::*;
 
 #[instrument(skip(state_env))]
 pub fn handle_get_entry(
-    state_env: EnvironmentWrite,
+    state_env: DbWrite,
     hash: EntryHash,
     options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<GetElementResponse> {
@@ -72,11 +67,11 @@ pub fn handle_get_entry(
 
     // ### Gather headers closure
     // This gathers the headers and deletes we want
-    let gather_headers = |reader| {
+    let gather_headers = |mut reader: Reader| {
         let mut deletes = Vec::new();
         let mut updates = Vec::new();
         let headers = meta_vault
-            .get_all_headers(&reader, hash.clone())?
+            .get_all_headers(&mut reader, hash.clone())?
             .collect::<Vec<_>>()?;
         let mut live_headers = BTreeSet::new();
 
@@ -85,14 +80,14 @@ pub fn handle_get_entry(
             for hash in headers {
                 deletes.extend(
                     meta_vault
-                        .get_deletes_on_header(&reader, hash.header_hash.clone())?
+                        .get_deletes_on_header(&mut reader, hash.header_hash.clone())?
                         .iterator(),
                 );
                 let header_status = render_header_and_status(hash)?;
                 live_headers.insert(header_status.try_into()?);
             }
             let updates_returns = meta_vault
-                .get_updates(&reader, hash.clone().into())?
+                .get_updates(&mut reader, hash.clone().into())?
                 .collect::<Vec<_>>()?;
             let updates_returns = updates_returns.into_iter().map(|update| {
                 let update: WireHeaderStatus<WireUpdateRelationship> =
@@ -108,7 +103,7 @@ pub fn handle_get_entry(
             for hash in headers {
                 // Check for a delete
                 let is_deleted = meta_vault
-                    .get_deletes_on_header(&reader, hash.header_hash.clone())?
+                    .get_deletes_on_header(&mut reader, hash.header_hash.clone())?
                     .next()?
                     .is_some();
 
@@ -116,7 +111,7 @@ pub fn handle_get_entry(
                 if is_deleted {
                     deletes.extend(
                         meta_vault
-                            .get_deletes_on_header(&reader, hash.header_hash.clone())?
+                            .get_deletes_on_header(&mut reader, hash.header_hash.clone())?
                             .iterator(),
                     );
 
@@ -141,8 +136,10 @@ pub fn handle_get_entry(
     // ### Gather the entry
     // Get the entry from the first header
 
-    fresh_reader!(state_env, |reader| {
-        let first_header = meta_vault.get_all_headers(&reader, hash.clone())?.next()?;
+    let entry_data = fresh_reader!(state_env, |mut reader| {
+        let first_header = meta_vault
+            .get_all_headers(&mut reader, hash.clone())?
+            .next()?;
         let entry_data = match first_header {
             Some(first_header) => {
                 let header = render_header_and_status(first_header)?.0;
@@ -150,36 +147,32 @@ pub fn handle_get_entry(
             }
             None => None,
         };
+        CascadeResult::Ok(entry_data)
+    })?;
 
-        let r = match entry_data {
-            Some((entry, entry_type)) => {
-                // ### Gather headers
-                // There is at least one header with an entry so gather all the required data
-                let (live_headers, deletes, updates) = gather_headers(reader)?;
-                let r = RawGetEntryResponse {
-                    live_headers,
-                    deletes,
-                    updates,
-                    entry,
-                    entry_type,
-                };
-                Some(Box::new(r))
-            }
-            _ => None,
-        };
-        debug!(handle_get_details_return = ?r);
-        Ok(GetElementResponse::GetEntryFull(r))
-    })
+    let r = match entry_data {
+        Some((entry, entry_type)) => {
+            // ### Gather headers
+            // There is at least one header with an entry so gather all the required data
+            let (live_headers, deletes, updates) = fresh_reader!(state_env, gather_headers)?;
+            let r = RawGetEntryResponse {
+                live_headers,
+                deletes,
+                updates,
+                entry,
+                entry_type,
+            };
+            Some(Box::new(r))
+        }
+        _ => None,
+    };
+    debug!(handle_get_details_return = ?r);
+    Ok(GetElementResponse::GetEntryFull(r))
 }
 
 #[tracing::instrument(skip(env))]
-pub fn handle_get_element(
-    env: EnvironmentWrite,
-    hash: HeaderHash,
-) -> CascadeResult<GetElementResponse> {
+pub fn handle_get_element(env: DbWrite, hash: HeaderHash) -> CascadeResult<GetElementResponse> {
     // Get the vaults
-    let env_ref = env.guard();
-    let reader = env_ref.reader()?;
     let element_vault = ElementBuf::vault(env.clone().into(), false)?;
     let meta_vault = MetadataBuf::vault(env.clone().into())?;
     let element_rejected = ElementBuf::rejected(env.clone().into())?;
@@ -189,66 +182,68 @@ pub fn handle_get_element(
     if !meta_vault.has_any_registered_store_element(&hash)? {
         return Ok(GetElementResponse::GetHeader(None));
     }
+    let mut conn = env.conn()?;
+    conn.with_reader(|mut reader| {
+        // Look for a deletes on the header and collect them
+        let deletes = meta_vault
+            .get_deletes_on_header(&mut reader, hash.clone())?
+            .map_err(CascadeError::from)
+            .map(|delete_header| {
+                let delete_hash = delete_header.header_hash;
+                let mut status = ValidationStatus::Valid;
+                let mut delete = element_vault.get_header(&delete_hash)?;
+                if delete.is_none() {
+                    delete = element_rejected.get_header(&delete_hash)?;
+                    status = ValidationStatus::Rejected;
+                }
+                match delete {
+                    Some(delete) => Ok((delete, status)
+                        .try_into()
+                        .map_err(AuthorityDataError::from)?),
+                    None => Err(AuthorityDataError::missing_data(delete)),
+                }
+            })
+            .collect()?;
 
-    // Look for a deletes on the header and collect them
-    let deletes = meta_vault
-        .get_deletes_on_header(&reader, hash.clone())?
-        .map_err(CascadeError::from)
-        .map(|delete_header| {
-            let delete_hash = delete_header.header_hash;
-            let mut status = ValidationStatus::Valid;
-            let mut delete = element_vault.get_header(&delete_hash)?;
-            if delete.is_none() {
-                delete = element_rejected.get_header(&delete_hash)?;
-                status = ValidationStatus::Rejected;
-            }
-            match delete {
-                Some(delete) => Ok((delete, status)
-                    .try_into()
-                    .map_err(AuthorityDataError::from)?),
-                None => Err(AuthorityDataError::missing_data(delete)),
-            }
-        })
-        .collect()?;
+        // Look for a updates on the header and collect them
+        let updates = meta_vault
+            .get_updates(&mut reader, hash.clone().into())?
+            .map_err(CascadeError::from)
+            .map(|update_header| {
+                let update_hash = update_header.header_hash;
+                let mut status = ValidationStatus::Valid;
+                let mut update = element_vault.get_header(&update_hash)?;
+                if update.is_none() {
+                    update = element_rejected.get_header(&update_hash)?;
+                    status = ValidationStatus::Rejected;
+                }
+                match update {
+                    Some(update) => Ok((update, status)
+                        .try_into()
+                        .map_err(AuthorityDataError::from)?),
+                    None => Err(AuthorityDataError::missing_data(update)),
+                }
+            })
+            .collect()?;
 
-    // Look for a updates on the header and collect them
-    let updates = meta_vault
-        .get_updates(&reader, hash.clone().into())?
-        .map_err(CascadeError::from)
-        .map(|update_header| {
-            let update_hash = update_header.header_hash;
-            let mut status = ValidationStatus::Valid;
-            let mut update = element_vault.get_header(&update_hash)?;
-            if update.is_none() {
-                update = element_rejected.get_header(&update_hash)?;
-                status = ValidationStatus::Rejected;
-            }
-            match update {
-                Some(update) => Ok((update, status)
-                    .try_into()
-                    .map_err(AuthorityDataError::from)?),
-                None => Err(AuthorityDataError::missing_data(update)),
-            }
-        })
-        .collect()?;
+        // Get the actual header and return it with proof of deleted if there is any
+        let mut r = element_vault.get_element(&hash)?;
+        let mut status = ValidationStatus::Valid;
+        if r.is_none() {
+            r = element_rejected.get_element(&hash)?;
+            status = ValidationStatus::Rejected;
+        }
+        let r = r
+            .map(|e| WireElement::from_element(ElementStatus::new(e, status), deletes, updates))
+            .map(Box::new);
 
-    // Get the actual header and return it with proof of deleted if there is any
-    let mut r = element_vault.get_element(&hash)?;
-    let mut status = ValidationStatus::Valid;
-    if r.is_none() {
-        r = element_rejected.get_element(&hash)?;
-        status = ValidationStatus::Rejected;
-    }
-    let r = r
-        .map(|e| WireElement::from_element(ElementStatus::new(e, status), deletes, updates))
-        .map(Box::new);
-
-    Ok(GetElementResponse::GetHeader(r))
+        Ok(GetElementResponse::GetHeader(r))
+    })
 }
 
 #[instrument(skip(env))]
 pub fn handle_get_agent_activity(
-    env: EnvironmentRead,
+    env: DbRead,
     agent: AgentPubKey,
     query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
@@ -266,9 +261,9 @@ pub fn handle_get_agent_activity(
 
     // Valid headers
     let valid_activity = if options.include_valid_activity {
-        fresh_reader!(env, |r| {
+        fresh_reader!(env, |mut r| {
             let hashes = meta_integrated.get_activity_sequence(
-                &r,
+                &mut r,
                 ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Valid),
             )?;
             check_headers(
@@ -276,7 +271,7 @@ pub fn handle_get_agent_activity(
                 query.clone(),
                 options.clone(),
                 element_integrated,
-                &r,
+                &mut r,
             )
         })?
     } else {
@@ -285,12 +280,12 @@ pub fn handle_get_agent_activity(
 
     // Rejected hashes
     let rejected_activity = if options.include_rejected_activity {
-        fresh_reader!(env, |r| {
+        fresh_reader!(env, |mut r| {
             let hashes = meta_integrated.get_activity_sequence(
-                &r,
+                &mut r,
                 ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Rejected),
             )?;
-            check_headers(hashes, query, options, element_rejected, &r)
+            check_headers(hashes, query, options, element_rejected, &mut r)
         })?
     } else {
         ChainItems::NotRequested
@@ -309,7 +304,7 @@ fn get_full_headers<'a, P: PrefixType + 'a, R: Readable>(
     hashes: impl FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + 'a,
     query: ChainQueryFilter,
     database: ElementBuf<P>,
-    reader: &'a R,
+    reader: &'a mut R, // maybe not 'a
 ) -> impl FallibleIterator<Item = (u32, SignedHeaderHashed), Error = DatabaseError> + 'a {
     hashes
         .filter_map(move |(s, h)| {
@@ -325,7 +320,7 @@ fn check_headers<P: PrefixType, R: Readable>(
     query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
     database: ElementBuf<P>,
-    reader: &R,
+    reader: &mut R,
 ) -> CascadeResult<ChainItems> {
     if options.include_full_headers {
         CascadeResult::Ok(ChainItems::Full(
@@ -342,85 +337,35 @@ fn check_headers<P: PrefixType, R: Readable>(
     }
 }
 
-#[cfg(test)]
-#[instrument(skip(env))]
-// This is handy for testing performance as it shows the read times for get agent activity
-fn _show_agent_activity_read_times(env: EnvironmentRead, agent: AgentPubKey) {
-    {
-        let g = env.guard();
-        let rkv = g.rkv();
-        let stat = rkv.stat().unwrap();
-        let info = rkv.info().unwrap();
-        debug!(
-            map_size = info.map_size(),
-            last_pgno = info.last_pgno(),
-            last_txnid = info.last_txnid(),
-            max_readers = info.max_readers(),
-            num_readers = info.num_readers()
-        );
-        debug!(
-            page_size = stat.page_size(),
-            depth = stat.depth(),
-            branch_pages = stat.branch_pages(),
-            leaf_pages = stat.leaf_pages(),
-            overflow_pages = stat.overflow_pages(),
-            entries = stat.entries(),
-        );
-    }
-    let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
-    let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
-    holochain_lmdb::fresh_reader_test!(env, |r| {
-        let now = std::time::Instant::now();
-        let hashes = meta_integrated
-            .get_activity_sequence(
-                &r,
-                ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Valid),
-            )
-            .unwrap()
-            .collect::<Vec<_>>()
-            .unwrap();
-        let el = now.elapsed();
-        debug!(time_for_activity_sequence = %el.as_micros());
-        for hash in &hashes {
-            element_integrated.get_header(&hash.1).unwrap();
-        }
-        let el = now.elapsed();
-        debug!(
-            us_per_header = %el.as_micros() / hashes.len() as u128,
-            num_headers = %hashes.len(),
-            total = %el.as_millis()
-        );
-    });
-}
-
 #[instrument(skip(env, _options))]
 pub fn handle_get_links(
-    env: EnvironmentRead,
+    env: DbRead,
     link_key: WireLinkMetaKey,
     _options: holochain_p2p::event::GetLinksOptions,
 ) -> CascadeResult<GetLinksResponse> {
     // Get the vaults
-    let env_ref = env.guard();
-    let reader = env_ref.reader()?;
+    let mut conn = env.conn()?;
     let element_vault = ElementBuf::vault(env.clone(), false)?;
-    let meta_vault = MetadataBuf::vault(env.clone())?;
+    let meta_vault = MetadataBuf::vault(env)?;
 
-    let links = meta_vault
-        .get_links_all(&reader, &LinkMetaKey::from(&link_key))?
-        .map(|link_add| {
-            // Collect the link removes on this link add
-            let link_removes = meta_vault
-                .get_link_removes_on_link_add(&reader, link_add.link_add_hash.clone())?
-                .collect::<BTreeSet<_>>()?;
-            // Create timed header hash
-            let link_add = TimedHeaderHash {
-                timestamp: link_add.timestamp,
-                header_hash: link_add.link_add_hash,
-            };
-            // Return all link removes with this link add
-            Ok((link_add, link_removes))
-        })
-        .collect::<BTreeMap<_, _>>()?;
+    let links = conn.with_reader(|mut reader| {
+        meta_vault
+            .get_links_all(&mut reader, &LinkMetaKey::from(&link_key))?
+            .map(|link_add| {
+                // Collect the link removes on this link add
+                let link_removes = meta_vault
+                    .get_link_removes_on_link_add(&mut reader, link_add.link_add_hash.clone())?
+                    .collect::<BTreeSet<_>>()?;
+                // Create timed header hash
+                let link_add = TimedHeaderHash {
+                    timestamp: link_add.timestamp,
+                    header_hash: link_add.link_add_hash,
+                };
+                // Return all link removes with this link add
+                Ok((link_add, link_removes))
+            })
+            .collect::<BTreeMap<_, _>>()
+    })?;
 
     // Get the headers from the element stores
     let mut result_adds: Vec<(CreateLink, Signature)> = Vec::with_capacity(links.len());

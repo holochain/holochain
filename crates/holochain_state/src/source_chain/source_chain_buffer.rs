@@ -5,10 +5,10 @@ use crate::element_buf::HeaderCas;
 use crate::source_chain::SourceChainError;
 use crate::source_chain::SourceChainResult;
 use fallible_iterator::FallibleIterator;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
+use holochain_sqlite::buffer::BufferedStore;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use tracing::*;
 
@@ -17,7 +17,7 @@ pub struct SourceChainBuf {
     sequence: ChainSequenceBuf,
     keystore: KeystoreSender,
 
-    env: EnvironmentRead,
+    env: DbRead,
 }
 
 // TODO fix this.  We shouldn't really have nil values but this would
@@ -37,7 +37,7 @@ pub struct SourceChainJsonElement {
 }
 
 impl SourceChainBuf {
-    pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn new(env: DbRead) -> DatabaseResult<Self> {
         Ok(Self {
             elements: ElementBuf::authored(env.clone(), true)?,
             sequence: ChainSequenceBuf::new(env.clone())?,
@@ -46,7 +46,7 @@ impl SourceChainBuf {
         })
     }
 
-    pub fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn public_only(env: DbRead) -> DatabaseResult<Self> {
         Ok(Self {
             elements: ElementBuf::authored(env.clone(), false)?,
             sequence: ChainSequenceBuf::new(env.clone())?,
@@ -55,7 +55,7 @@ impl SourceChainBuf {
         })
     }
 
-    pub fn env(&self) -> &EnvironmentRead {
+    pub fn env(&self) -> &DbRead {
         &self.env
     }
 
@@ -101,10 +101,10 @@ impl SourceChainBuf {
 
     pub async fn get_incomplete_dht_ops(&self) -> SourceChainResult<Vec<(u32, Vec<DhtOp>)>> {
         let mut ops = Vec::new();
-        let ops_headers = fresh_reader!(self.env(), |r| {
+        let ops_headers = fresh_reader!(self.env(), |mut r| {
             SourceChainResult::Ok(
                 self.sequence
-                    .get_items_with_incomplete_dht_ops(&r)?
+                    .get_items_with_incomplete_dht_ops(&mut r)?
                     .collect::<Vec<_>>()?,
             )
         })?;
@@ -327,8 +327,8 @@ pub mod tests {
     use super::SourceChainBuf;
     use crate::source_chain::SourceChainResult;
     use fallible_iterator::FallibleIterator;
-    use holochain_lmdb::prelude::*;
-    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_sqlite::prelude::*;
+    use holochain_sqlite::test_utils::test_cell_env;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
@@ -399,7 +399,8 @@ pub mod tests {
             store
                 .put_raw(agent_header.as_content().clone(), agent_entry.clone())
                 .await?;
-            arc.guard()
+            arc.conn()
+                .unwrap()
                 .with_commit(|writer| store.flush_to_txn(writer))?;
         };
 
@@ -466,7 +467,8 @@ pub mod tests {
                 .put_raw(agent_header.as_content().clone(), agent_entry)
                 .await?;
 
-            arc.guard()
+            arc.conn()
+                .unwrap()
                 .with_commit(|writer| store.flush_to_txn(writer))?;
         }
 

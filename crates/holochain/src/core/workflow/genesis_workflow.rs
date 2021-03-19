@@ -12,7 +12,7 @@ use super::error::WorkflowResult;
 use crate::conductor::api::CellConductorApiT;
 use crate::core::queue_consumer::OneshotWriter;
 use derive_more::Constructor;
-use holochain_lmdb::prelude::*;
+use holochain_sqlite::prelude::*;
 use holochain_state::source_chain::SourceChainBuf;
 use holochain_state::workspace::Workspace;
 use holochain_state::workspace::WorkspaceResult;
@@ -89,7 +89,7 @@ pub struct GenesisWorkspace {
 
 impl GenesisWorkspace {
     /// Constructor
-    pub async fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
+    pub async fn new(env: DbRead) -> WorkspaceResult<Self> {
         Ok(Self {
             source_chain: SourceChainBuf::new(env)?,
         })
@@ -110,7 +110,7 @@ pub mod tests {
     use crate::conductor::api::MockCellConductorApi;
     use crate::core::SourceChainResult;
     use fallible_iterator::FallibleIterator;
-    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_sqlite::test_utils::test_cell_env;
     use holochain_state::source_chain::SourceChain;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
@@ -127,15 +127,15 @@ pub mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn genesis_initializes_source_chain() -> Result<(), anyhow::Error> {
-        observability::test_run()?;
+    async fn genesis_initializes_source_chain() {
+        observability::test_run().unwrap();
         let test_env = test_cell_env();
         let arc = test_env.env();
         let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
         {
-            let workspace = GenesisWorkspace::new(arc.clone().into()).await?;
+            let workspace = GenesisWorkspace::new(arc.clone().into()).await.unwrap();
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
@@ -144,12 +144,14 @@ pub mod tests {
                 agent_pubkey: agent_pubkey.clone(),
                 membrane_proof: None,
             };
-            let _: () = genesis_workflow(workspace, arc.clone().into(), api, args).await?;
+            let _: () = genesis_workflow(workspace, arc.clone().into(), api, args)
+                .await
+                .unwrap();
         }
 
         {
-            let source_chain = SourceChain::new(arc.clone().into())?;
-            assert_eq!(source_chain.agent_pubkey()?, agent_pubkey);
+            let source_chain = SourceChain::new(arc.clone().into()).unwrap();
+            assert_eq!(source_chain.agent_pubkey().unwrap(), agent_pubkey);
             source_chain.chain_head().expect("chain head should be set");
 
             let mut iter = source_chain.iter_back();
@@ -166,8 +168,6 @@ pub mod tests {
                 [Header::Create(_), Header::AgentValidationPkg(_), Header::Dna(_)]
             );
         }
-
-        Ok(())
     }
 }
 
@@ -205,7 +205,7 @@ Functions / Workflows:
 
 - retrieve DNA from file path [in the future from HCHC]
 
-- initialize lmdb environment and dbs, save to conductor runtime config.
+- initialize databases, save to conductor runtime config.
 
 - commit DNA entry (w/ special enum header with NULL  prev_header)
 

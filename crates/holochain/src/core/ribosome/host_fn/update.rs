@@ -63,7 +63,7 @@ pub fn update<'a>(
 
     // return the hash of the updated entry
     // note that validation is handled by the workflow
-    // if the validation fails this update will be rolled back by virtue of the lmdb transaction
+    // if the validation fails this update will be rolled back by virtue of the DB transaction
     // being atomic
     let entry = AsRef::<Entry>::as_ref(&entry_with_def_id).to_owned();
     tokio_helper::block_forever_on(async move {

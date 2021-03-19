@@ -58,16 +58,14 @@ use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::KeystoreSender;
 use holochain_keystore::KeystoreSenderExt;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::buffer::KvStore;
-use holochain_lmdb::buffer::KvStoreT;
-use holochain_lmdb::db;
-use holochain_lmdb::env::EnvironmentKind;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::env::ReadManager;
-use holochain_lmdb::exports::SingleStore;
-use holochain_lmdb::fresh_reader;
-use holochain_lmdb::prelude::*;
+use holochain_sqlite::buffer::BufferedStore;
+use holochain_sqlite::buffer::KvStore;
+use holochain_sqlite::buffer::KvStoreT;
+use holochain_sqlite::db::DbKind;
+use holochain_sqlite::db::DbWrite;
+use holochain_sqlite::exports::SingleTable;
+use holochain_sqlite::fresh_reader;
+use holochain_sqlite::prelude::*;
 use holochain_state::source_chain::SourceChainBuf;
 use holochain_state::wasm::WasmBuf;
 use holochain_types::prelude::*;
@@ -111,14 +109,14 @@ where
     /// The collection of cells associated with this Conductor
     cells: HashMap<CellId, CellItem<CA>>,
 
-    /// The LMDB environment for persisting state related to this Conductor
-    env: EnvironmentWrite,
+    /// The database for persisting state related to this Conductor
+    env: DbWrite,
 
-    /// An LMDB environment for storing wasm
-    wasm_env: EnvironmentWrite,
+    /// A database for storing wasm
+    wasm_env: DbWrite,
 
-    /// The LMDB environment for storing AgentInfoSigned
-    p2p_env: EnvironmentWrite,
+    /// The database for storing AgentInfoSigned
+    p2p_env: DbWrite,
 
     /// The database for persisting [ConductorState]
     state_db: ConductorStateDb,
@@ -432,9 +430,9 @@ where
             let conductor_handle = conductor_handle.clone();
             let cell_id_inner = cell_id.clone();
             tokio::spawn(async move {
-                let env = EnvironmentWrite::new(
+                let env = DbWrite::open(
                     &root_env_dir,
-                    EnvironmentKind::Cell(cell_id_inner.clone()),
+                    DbKind::Cell(cell_id_inner.clone()),
                     keystore.clone(),
                 )?;
                 Cell::genesis(cell_id_inner, conductor_handle, env, proof).await
@@ -453,11 +451,7 @@ where
         // If there were errors, cleanup and return the errors
         if !errors.is_empty() {
             for cell_id in success {
-                let env = EnvironmentWrite::new(
-                    &root_env_dir,
-                    EnvironmentKind::Cell(cell_id),
-                    keystore.clone(),
-                )?;
+                let env = DbWrite::open(&root_env_dir, DbKind::Cell(cell_id), keystore.clone())?;
                 env.remove().await?;
             }
 
@@ -522,11 +516,7 @@ where
                                 cell_id.agent_pubkey().clone(),
                             );
 
-                            let env = EnvironmentWrite::new_cell(
-                                &dir,
-                                cell_id.clone(),
-                                keystore.clone(),
-                            )?;
+                            let env = DbWrite::open_cell(&dir, cell_id.clone(), keystore.clone())?;
                             Cell::create(
                                 cell_id.clone(),
                                 conductor_handle.clone(),
@@ -716,9 +706,9 @@ where
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
         let environ = &self.wasm_env;
-        let wasm = environ.get_db(&*holochain_lmdb::db::WASM)?;
-        let dna_def_db = environ.get_db(&*holochain_lmdb::db::DNA_DEF)?;
-        let entry_def_db = environ.get_db(&*holochain_lmdb::db::ENTRY_DEF)?;
+        let wasm = environ.get_table(TableName::Wasm)?;
+        let dna_def_db = environ.get_table(TableName::DnaDef)?;
+        let entry_def_db = environ.get_table(TableName::EntryDef)?;
 
         let wasm_buf = Arc::new(WasmBuf::new(environ.clone().into(), wasm)?);
         let dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
@@ -749,7 +739,9 @@ where
             .collect::<Vec<_>>();
         // try to join all the tasks and return the list of dna files
         let dnas = futures::future::try_join_all(wasm_tasks).await?;
-        let defs = fresh_reader!(environ, |r| entry_def_buf.get_all(&r)?.collect::<Vec<_>>())?;
+        let defs = fresh_reader!(environ, |mut r| entry_def_buf
+            .get_all(&mut r)?
+            .collect::<Vec<_>>())?;
         Ok((dnas, defs))
     }
 
@@ -787,9 +779,9 @@ where
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
         let environ = self.wasm_env.clone();
-        let wasm = environ.get_db(&*holochain_lmdb::db::WASM)?;
-        let dna_def_db = environ.get_db(&*holochain_lmdb::db::DNA_DEF)?;
-        let entry_def_db = environ.get_db(&*holochain_lmdb::db::ENTRY_DEF)?;
+        let wasm = environ.get_table(TableName::Wasm)?;
+        let dna_def_db = environ.get_table(TableName::DnaDef)?;
+        let entry_def_db = environ.get_table(TableName::EntryDef)?;
 
         let zome_defs = get_entry_defs(dna.clone())?;
 
@@ -811,15 +803,20 @@ where
             dna_def_buf.put(dna.dna_def().clone()).await?;
         }
         {
-            let env = environ.guard();
             // write the wasm db
-            env.with_commit(|writer| wasm_buf.flush_to_txn(writer))?;
+            environ
+                .conn()?
+                .with_commit(|writer| wasm_buf.flush_to_txn(writer))?;
 
             // write the dna_def db
-            env.with_commit(|writer| dna_def_buf.flush_to_txn(writer))?;
+            environ
+                .conn()?
+                .with_commit(|writer| dna_def_buf.flush_to_txn(writer))?;
 
             // write the entry_def db
-            env.with_commit(|writer| entry_def_buf.flush_to_txn(writer))?;
+            environ
+                .conn()?
+                .with_commit(|writer| entry_def_buf.flush_to_txn(writer))?;
         }
         Ok(zome_defs)
     }
@@ -853,7 +850,7 @@ where
         Ok(serde_json::to_string_pretty(&out)?)
     }
 
-    pub(super) fn p2p_env(&self) -> EnvironmentWrite {
+    pub(super) fn p2p_env(&self) -> DbWrite {
         self.p2p_env.clone()
     }
 
@@ -897,15 +894,15 @@ where
     DS: DnaStore + 'static,
 {
     async fn new(
-        env: EnvironmentWrite,
-        wasm_env: EnvironmentWrite,
-        p2p_env: EnvironmentWrite,
+        env: DbWrite,
+        wasm_env: DbWrite,
+        p2p_env: DbWrite,
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
     ) -> ConductorResult<Self> {
-        let db: SingleStore = env.get_db(&db::CONDUCTOR_STATE)?;
+        let db: SingleTable = env.get_table(TableName::ConductorState)?;
         let (task_tx, task_manager_run_handle) = spawn_task_manager();
         let task_manager_run_handle = Some(task_manager_run_handle);
         let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);
@@ -929,9 +926,10 @@ where
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        let guard = self.env.guard();
-        let reader = guard.reader()?;
-        Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
+        fresh_reader!(self.env, |mut reader| Ok(self
+            .state_db
+            .get(&mut reader, &UnitDbKey)?
+            .unwrap_or_default()))
     }
 
     /// Update the internal state with a pure function mapping old state to new
@@ -951,7 +949,7 @@ where
         F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)>,
     {
         self.check_running()?;
-        let guard = self.env.guard();
+        let mut guard = self.env.conn()?;
         let output = guard.with_commit(|txn| {
             let state: ConductorState = self.state_db.get(txn, &UnitDbKey)?.unwrap_or_default();
             let (new_state, output) = f(state)?;
@@ -981,9 +979,9 @@ mod builder {
     use super::*;
     use crate::conductor::dna_store::RealDnaStore;
     use crate::conductor::ConductorHandle;
-    use holochain_lmdb::env::EnvironmentKind;
+    use holochain_sqlite::db::DbKind;
     #[cfg(any(test, feature = "test_utils"))]
-    use holochain_lmdb::test_utils::TestEnvironments;
+    use holochain_sqlite::test_utils::TestDbs;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
@@ -1062,17 +1060,13 @@ mod builder {
             };
             let env_path = self.config.environment_path.clone();
 
-            let environment = EnvironmentWrite::new(
-                env_path.as_ref(),
-                EnvironmentKind::Conductor,
-                keystore.clone(),
-            )?;
+            let environment =
+                DbWrite::open(env_path.as_ref(), DbKind::Conductor, keystore.clone())?;
 
             let wasm_environment =
-                EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::Wasm, keystore.clone())?;
+                DbWrite::open(env_path.as_ref(), DbKind::Wasm, keystore.clone())?;
 
-            let p2p_environment =
-                EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::P2p, keystore.clone())?;
+            let p2p_environment = DbWrite::open(env_path.as_ref(), DbKind::P2p, keystore.clone())?;
 
             #[cfg(any(test, feature = "test_utils"))]
             let state = self.state;
@@ -1191,8 +1185,8 @@ mod builder {
 
         /// Build a Conductor with a test environment
         #[cfg(any(test, feature = "test_utils"))]
-        pub async fn test(self, envs: &TestEnvironments) -> ConductorResult<ConductorHandle> {
-            let keystore = envs.conductor().keystore();
+        pub async fn test(self, envs: &TestDbs) -> ConductorResult<ConductorHandle> {
+            let keystore = envs.conductor().keystore().clone();
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
                     .await?;
