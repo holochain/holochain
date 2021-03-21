@@ -401,12 +401,11 @@ where
         let env = ok_or_return!(self.env.clone());
         match *hash.hash_type() {
             AnyDht::Entry => {
-                let response =
-                    authority::handle_get_entry(env.into(), hash.into(), (&options).into())?;
+                let response = authority::handle_get_entry(env, hash.into(), (&options).into())?;
                 self.put_entry_in_cache(response)?;
             }
             AnyDht::Header => {
-                let response = authority::handle_get_element(env.into(), hash.into())?;
+                let response = authority::handle_get_element(env, hash.into())?;
                 self.put_element_in_cache(response)?;
             }
         }

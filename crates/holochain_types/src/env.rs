@@ -16,8 +16,8 @@ pub struct EnvRead {
 
 impl EnvRead {
     /// Accessor
-    pub fn keystore(&self) -> KeystoreSender {
-        self.keystore.clone()
+    pub fn keystore(&self) -> &KeystoreSender {
+        &self.keystore
     }
 
     /// Construct from components

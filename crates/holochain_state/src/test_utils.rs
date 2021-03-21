@@ -112,7 +112,7 @@ impl TestEnvs {
         let keystore = test_keystore();
         let conductor = EnvWrite::test(&tempdir, Conductor, keystore.clone()).unwrap();
         let wasm = EnvWrite::test(&tempdir, Wasm, keystore.clone()).unwrap();
-        let p2p = EnvWrite::test(&tempdir, P2p, keystore.clone()).unwrap();
+        let p2p = EnvWrite::test(&tempdir, P2p, keystore).unwrap();
         Self {
             conductor,
             wasm,
