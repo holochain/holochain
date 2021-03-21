@@ -10,7 +10,7 @@ use tracing::*;
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
 #[instrument(skip(env, stop, trigger_sys, trigger_receipt))]
 pub fn spawn_integrate_dht_ops_consumer(
-    env: DbWrite,
+    env: EnvWrite,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_sys: sync::oneshot::Receiver<TriggerSender>,
     trigger_receipt: TriggerSender,

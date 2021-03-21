@@ -1,21 +1,17 @@
-use call_zome_workflow::CallZomeWorkspaceLock;
-use holochain_p2p::HolochainP2pCell;
-use holochain_sqlite::db::DbRead;
-use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::prelude::*;
-use holochain_types::dna::DnaFile;
-use holochain_zome_types::HeaderHashed;
-
+use super::*;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_custom;
 use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_full;
 use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_sub_chain;
+use call_zome_workflow::CallZomeWorkspaceLock;
 use holochain_cascade::Cascade;
 use holochain_cascade::DbPair;
 use holochain_cascade::DbPairMut;
-
-use super::*;
+use holochain_p2p::HolochainP2pCell;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_types::dna::DnaFile;
+use holochain_zome_types::HeaderHashed;
 
 /// Databases to search for validation package
 pub(super) struct ValidationPackageDb {
@@ -28,7 +24,7 @@ pub(super) struct ValidationPackageDb {
 }
 
 impl ValidationPackageDb {
-    pub(super) fn create(env: DbRead) -> DatabaseResult<Self> {
+    pub(super) fn create(env: EnvRead) -> DatabaseResult<Self> {
         Ok(Self {
             element_integrated: ElementBuf::vault(env.clone(), false)?,
             element_rejected: ElementBuf::rejected(env.clone())?,
@@ -50,7 +46,7 @@ impl ValidationPackageDb {
 #[instrument(skip(header_hashed, env, ribosome, conductor_api, network))]
 pub(super) async fn get_as_author(
     header_hashed: HeaderHashed,
-    env: DbRead,
+    env: EnvRead,
     ribosome: &impl RibosomeT,
     conductor_api: &impl CellConductorApiT,
     network: &HolochainP2pCell,
@@ -164,7 +160,7 @@ pub(super) async fn get_as_author(
 
 pub(super) async fn get_as_authority(
     header: HeaderHashed,
-    env: DbRead,
+    env: EnvRead,
     dna_file: &DnaFile,
     conductor_api: &impl CellConductorApiT,
 ) -> CellResult<ValidationPackageResponse> {

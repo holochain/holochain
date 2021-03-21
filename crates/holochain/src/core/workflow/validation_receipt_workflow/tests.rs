@@ -6,8 +6,8 @@ use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
-use holochain_types::dht_op::produce_ops_from_element;
 use holochain_types::dna::zome::inline_zome::InlineZome;
+use holochain_types::{dht_op::produce_ops_from_element, env::EnvRead};
 
 fn simple_crud_zome() -> InlineZome {
     let entry_def = EntryDef::default_with_id("entrydef");
@@ -47,7 +47,7 @@ async fn test_validation_receipt() {
     consistency_10s(&[&alice, &bobbo, &carol]).await;
 
     // Get op hashes
-    let env: DbRead = alice.env().clone().into();
+    let env: EnvRead = alice.env().clone().into();
     let sc = SourceChain::new(env.clone()).unwrap();
     let element = sc.get_element(&hash).unwrap().unwrap();
     let ops = produce_ops_from_element(&element)

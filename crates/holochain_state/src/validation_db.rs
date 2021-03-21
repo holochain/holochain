@@ -6,7 +6,6 @@ use holo_hash::DhtOpHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::buffer::KvBufFresh;
 use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::prelude::DbRead;
 use holochain_sqlite::prelude::GetTable;
 use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
@@ -56,7 +55,7 @@ pub enum ValidationLimboStatus {
 
 impl ValidationLimboStore {
     /// Create a new Validation Limbo db
-    pub fn new(env: DbRead) -> DatabaseResult<Self> {
+    pub fn new(env: EnvRead) -> DatabaseResult<Self> {
         let db = env.get_table(TableName::ValidationLimbo)?;
         Ok(Self(KvBufFresh::new(env, db)))
     }

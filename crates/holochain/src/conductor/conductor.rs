@@ -62,7 +62,6 @@ use holochain_sqlite::buffer::BufferedStore;
 use holochain_sqlite::buffer::KvStore;
 use holochain_sqlite::buffer::KvStoreT;
 use holochain_sqlite::db::DbKind;
-use holochain_sqlite::db::DbWrite;
 use holochain_sqlite::exports::SingleTable;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
@@ -110,13 +109,13 @@ where
     cells: HashMap<CellId, CellItem<CA>>,
 
     /// The database for persisting state related to this Conductor
-    env: DbWrite,
+    env: EnvWrite,
 
     /// A database for storing wasm
-    wasm_env: DbWrite,
+    wasm_env: EnvWrite,
 
     /// The database for storing AgentInfoSigned
-    p2p_env: DbWrite,
+    p2p_env: EnvWrite,
 
     /// The database for persisting [ConductorState]
     state_db: ConductorStateDb,
@@ -422,7 +421,6 @@ where
         conductor_handle: ConductorHandle,
     ) -> ConductorResult<()> {
         let root_env_dir = std::path::PathBuf::from(self.root_env_dir.clone());
-        let keystore = self.keystore.clone();
 
         let cells_tasks = cell_ids_with_proofs.into_iter().map(|(cell_id, proof)| {
             let root_env_dir = root_env_dir.clone();
@@ -430,7 +428,7 @@ where
             let conductor_handle = conductor_handle.clone();
             let cell_id_inner = cell_id.clone();
             tokio::spawn(async move {
-                let env = DbWrite::open(
+                let env = EnvWrite::open(
                     &root_env_dir,
                     DbKind::Cell(cell_id_inner.clone()),
                     keystore.clone(),
@@ -451,8 +449,8 @@ where
         // If there were errors, cleanup and return the errors
         if !errors.is_empty() {
             for cell_id in success {
-                let env = DbWrite::open(&root_env_dir, DbKind::Cell(cell_id), keystore.clone())?;
-                env.remove().await?;
+                let db = DbWrite::open(&root_env_dir, DbKind::Cell(cell_id))?;
+                db.remove().await?;
             }
 
             // match needed to avoid Debug requirement on unwrap_err
@@ -516,7 +514,11 @@ where
                                 cell_id.agent_pubkey().clone(),
                             );
 
-                            let env = DbWrite::open_cell(&dir, cell_id.clone(), keystore.clone())?;
+                            let env = EnvWrite::open(
+                                &dir,
+                                DbKind::Cell(cell_id.clone()),
+                                keystore.clone(),
+                            )?;
                             Cell::create(
                                 cell_id.clone(),
                                 conductor_handle.clone(),
@@ -850,7 +852,7 @@ where
         Ok(serde_json::to_string_pretty(&out)?)
     }
 
-    pub(super) fn p2p_env(&self) -> DbWrite {
+    pub(super) fn p2p_env(&self) -> EnvWrite {
         self.p2p_env.clone()
     }
 
@@ -894,9 +896,9 @@ where
     DS: DnaStore + 'static,
 {
     async fn new(
-        env: DbWrite,
-        wasm_env: DbWrite,
-        p2p_env: DbWrite,
+        env: EnvWrite,
+        wasm_env: EnvWrite,
+        p2p_env: EnvWrite,
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
@@ -981,7 +983,7 @@ mod builder {
     use crate::conductor::ConductorHandle;
     use holochain_sqlite::db::DbKind;
     #[cfg(any(test, feature = "test_utils"))]
-    use holochain_sqlite::test_utils::TestDbs;
+    use holochain_state::test_utils::TestEnvs;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
@@ -1061,12 +1063,12 @@ mod builder {
             let env_path = self.config.environment_path.clone();
 
             let environment =
-                DbWrite::open(env_path.as_ref(), DbKind::Conductor, keystore.clone())?;
+                EnvWrite::open(env_path.as_ref(), DbKind::Conductor, keystore.clone())?;
 
             let wasm_environment =
-                DbWrite::open(env_path.as_ref(), DbKind::Wasm, keystore.clone())?;
+                EnvWrite::open(env_path.as_ref(), DbKind::Wasm, keystore.clone())?;
 
-            let p2p_environment = DbWrite::open(env_path.as_ref(), DbKind::P2p, keystore.clone())?;
+            let p2p_environment = EnvWrite::open(env_path.as_ref(), DbKind::P2p, keystore.clone())?;
 
             #[cfg(any(test, feature = "test_utils"))]
             let state = self.state;
@@ -1185,7 +1187,7 @@ mod builder {
 
         /// Build a Conductor with a test environment
         #[cfg(any(test, feature = "test_utils"))]
-        pub async fn test(self, envs: &TestDbs) -> ConductorResult<ConductorHandle> {
+        pub async fn test(self, envs: &TestEnvs) -> ConductorResult<ConductorHandle> {
             let keystore = envs.conductor().keystore().clone();
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())

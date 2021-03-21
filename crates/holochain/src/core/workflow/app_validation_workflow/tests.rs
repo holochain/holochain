@@ -12,8 +12,7 @@ use holo_hash::DhtOpHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_sqlite::db::DbWrite;
-use holochain_sqlite::fresh_reader_test;
+use  holochain_sqlite::fresh_reader_test;
 use holochain_state::dht_op_integration::IntegratedDhtOpsValue;
 use holochain_state::element_buf::ElementBuf;
 use holochain_state::validation_db::ValidationLimboValue;
@@ -497,7 +496,7 @@ async fn call_zome_directly(
 
 #[instrument(skip(env, workspace))]
 fn inspect_val_limbo(
-    env: &DbWrite,
+    env: &EnvWrite,
     workspace: &IncomingDhtOpsWorkspace,
 ) -> Vec<(DhtOpHash, ValidationLimboValue, Option<Element>)> {
     debug!("start");
@@ -520,7 +519,7 @@ fn inspect_val_limbo(
 
 #[instrument(skip(env, workspace))]
 fn inspect_integrated(
-    env: &DbWrite,
+    env: &EnvWrite,
     workspace: &IncomingDhtOpsWorkspace,
 ) -> Vec<(DhtOpHash, IntegratedDhtOpsValue, Element)> {
     debug!("start");

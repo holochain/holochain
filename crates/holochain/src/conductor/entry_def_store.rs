@@ -67,7 +67,7 @@ impl From<EntryDefStoreKey> for EntryDefBufferKey {
 
 impl EntryDefBuf {
     /// Create a new buffer
-    pub fn new(env: DbRead, entry_def_store: SingleTable) -> DatabaseResult<Self> {
+    pub fn new(env: EnvRead, entry_def_store: SingleTable) -> DatabaseResult<Self> {
         Ok(Self(KvBufFresh::new(env, entry_def_store)))
     }
 
@@ -202,7 +202,7 @@ mod tests {
     use super::EntryDefBufferKey;
     use crate::conductor::Conductor;
     use holo_hash::HasHash;
-    use holochain_sqlite::test_utils::test_environments;
+    use holochain_state::prelude::test_environments;
     use holochain_types::dna::wasm::DnaWasmHashed;
     use holochain_types::dna::zome::ZomeDef;
     use holochain_types::prelude::*;
@@ -264,7 +264,7 @@ mod tests {
         std::mem::drop(handle);
 
         // Restart conductor and check defs are still here
-        let handle = Conductor::builder().test(&envs).await.unwrap();
+        let handle = Conductor::builder().test(&envs.into()).await.unwrap();
 
         assert_eq!(handle.get_entry_def(&post_def_key).await, Some(post_def));
         assert_eq!(

@@ -72,8 +72,6 @@ use tracing::*;
 use super::state::ConductorState;
 #[cfg(any(test, feature = "test_utils"))]
 use crate::core::queue_consumer::QueueTriggers;
-#[cfg(any(test, feature = "test_utils"))]
-use holochain_sqlite::db::DbWrite;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;
@@ -230,11 +228,11 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Retrieve the database for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
-    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<DbWrite>;
+    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite>;
 
     /// Retrieve the database for networking. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
-    async fn get_p2p_env(&self) -> DbWrite;
+    async fn get_p2p_env(&self) -> EnvWrite;
 
     /// Retrieve Senders for triggering workflows. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -642,13 +640,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<DbWrite> {
+    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite> {
         let cell = self.cell_by_id(cell_id).await?;
         Ok(cell.env().clone())
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    async fn get_p2p_env(&self) -> DbWrite {
+    async fn get_p2p_env(&self) -> EnvWrite {
         let lock = self.conductor.read().await;
         lock.p2p_env()
     }

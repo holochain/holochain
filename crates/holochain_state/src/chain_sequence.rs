@@ -17,6 +17,7 @@ use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
+use holochain_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use tracing::*;
@@ -42,7 +43,7 @@ pub struct ChainSequenceBuf {
 
 impl ChainSequenceBuf {
     /// Create a new instance
-    pub fn new(env: DbRead) -> DatabaseResult<Self> {
+    pub fn new(env: EnvRead) -> DatabaseResult<Self> {
         let buf: Store = KvIntBufFresh::new(env.clone(), env.get_table(TableName::ChainSequence)?);
         let (next_index, tx_seq, current_head) =
             fresh_reader!(env, |mut r| { Self::head_info(buf.store(), &mut r) })?;
@@ -196,13 +197,9 @@ pub mod tests {
     use super::BufferedStore;
     use super::ChainSequenceBuf;
     use super::SourceChainError;
-    use crate::source_chain::SourceChainResult;
+    use crate::{source_chain::SourceChainResult, test_utils::test_cell_env};
     use holo_hash::HeaderHash;
-    use holochain_sqlite::db::ReadManager;
-    use holochain_sqlite::db::WriteManager;
-    use holochain_sqlite::error::DatabaseResult;
     use holochain_sqlite::prelude::*;
-    use holochain_sqlite::test_utils::test_cell_env;
     use matches::assert_matches;
     use observability;
 

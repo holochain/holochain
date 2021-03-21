@@ -272,7 +272,7 @@ pub struct CallZomeWorkspace {
 }
 
 impl<'a> CallZomeWorkspace {
-    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+    pub fn new(env: EnvRead) -> WorkspaceResult<Self> {
         let source_chain = SourceChain::new(env.clone())?;
         let meta_authored = MetadataBuf::authored(env.clone())?;
         let element_integrated = ElementBuf::vault(env.clone(), true)?;
@@ -320,7 +320,7 @@ impl<'a> CallZomeWorkspace {
             .with_integrated(integrated_data)
     }
 
-    pub fn env(&self) -> &DbRead {
+    pub fn env(&self) -> &EnvRead {
         self.meta_authored.env()
     }
 }
@@ -347,7 +347,7 @@ pub mod tests {
     use ::fixt::prelude::*;
 
     use holochain_p2p::HolochainP2pCellFixturator;
-    use holochain_sqlite::test_utils::test_cell_env;
+    use holochain_state::prelude::test_cell_env;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::cell::CellId;

@@ -5,15 +5,13 @@ use super::*;
 use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
 use crate::core::workflow::publish_dht_ops_workflow::PublishDhtOpsWorkspace;
 use crate::{conductor::manager::ManagedTaskResult, core::workflow::error::WorkflowResult};
-use holochain_sqlite::db::DbWrite;
-
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for Publish workflow
 #[instrument(skip(env, stop, cell_network))]
 pub fn spawn_publish_dht_ops_consumer(
-    env: DbWrite,
+    env: EnvWrite,
     mut stop: sync::broadcast::Receiver<()>,
     cell_network: HolochainP2pCell,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {

@@ -10,7 +10,7 @@ use tracing::*;
 /// Spawn the QueueConsumer for validation receipt workflow
 #[instrument(skip(env, stop, cell_network))]
 pub fn spawn_validation_receipt_consumer(
-    env: DbWrite,
+    env: EnvWrite,
     mut stop: sync::broadcast::Receiver<()>,
     mut cell_network: HolochainP2pCell,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {

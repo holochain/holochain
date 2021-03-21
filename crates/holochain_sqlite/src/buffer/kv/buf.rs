@@ -270,9 +270,9 @@ where
     V: BufVal,
 {
     /// Create a new Fresh
-    pub fn new(env: DbRead, db: SingleTable) -> Self {
+    pub fn new<D: Into<DbRead>>(env: D, db: SingleTable) -> Self {
         Self {
-            env,
+            env: env.into(),
             inner: Used::new(db),
         }
     }
@@ -283,9 +283,9 @@ where
     V: BufVal,
 {
     /// Create a new Fresh
-    pub fn new(env: DbRead, db: IntegerTable) -> Self {
+    pub fn new<D: Into<DbRead>>(env: D, db: IntegerTable) -> Self {
         Self {
-            env,
+            env: env.into(),
             inner: Used::new_int(db),
         }
     }

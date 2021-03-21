@@ -25,6 +25,7 @@ pub use crate::dna::*;
 pub use crate::element::error::*;
 pub use crate::element::*;
 pub use crate::entry::*;
+pub use crate::env::*;
 pub use crate::header::error::*;
 pub use crate::header::*;
 pub use crate::link::*;

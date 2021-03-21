@@ -8,6 +8,7 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
+use holochain_types::prelude::*;
 use holochain_zome_types::TryInto;
 use tracing::*;
 
@@ -121,7 +122,7 @@ pub struct ValidationReceiptWorkspace {
 
 impl ValidationReceiptWorkspace {
     /// Make a new workspace.
-    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+    pub fn new(env: EnvRead) -> WorkspaceResult<Self> {
         let keystore = env.keystore().clone();
         let db = env.get_table(TableName::IntegratedDhtOps)?;
         let integrated_dht_ops = KvBufFresh::new(env.clone(), db);

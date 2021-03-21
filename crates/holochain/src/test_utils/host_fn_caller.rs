@@ -24,7 +24,6 @@ use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_sqlite::db::DbWrite;
 use holochain_sqlite::prelude::*;
 use holochain_state::metadata::LinkMetaKey;
 use holochain_state::workspace::Workspace;
@@ -88,7 +87,7 @@ pub enum MaybeLinkable {
 /// can be called from Rust instead of Wasm
 #[derive(Clone)]
 pub struct HostFnCaller {
-    pub env: DbWrite,
+    pub env: EnvWrite,
     pub ribosome: RealRibosome,
     pub zome_path: ZomePath,
     pub network: HolochainP2pCell,
@@ -141,14 +140,14 @@ impl HostFnCaller {
         }
     }
 
-    pub fn env(&self) -> DbWrite {
+    pub fn env(&self) -> EnvWrite {
         self.env.clone()
     }
 
     pub fn unpack(
         &self,
     ) -> (
-        DbWrite,
+        EnvWrite,
         Arc<RealRibosome>,
         Arc<CallContext>,
         CallZomeWorkspaceLock,

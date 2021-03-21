@@ -107,3 +107,30 @@ pub async fn fake_unique_element(
         entry,
     ))
 }
+
+/// Generate a test keystore pre-populated with a couple test keypairs.
+pub fn test_keystore() -> holochain_keystore::KeystoreSender {
+    use holochain_keystore::KeystoreSenderExt;
+
+    tokio_helper::block_on(
+        async move {
+            let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
+                .await
+                .unwrap();
+
+            // pre-populate with our two fixture agent keypairs
+            keystore
+                .generate_sign_keypair_from_pure_entropy()
+                .await
+                .unwrap();
+            keystore
+                .generate_sign_keypair_from_pure_entropy()
+                .await
+                .unwrap();
+
+            keystore
+        },
+        std::time::Duration::from_secs(1),
+    )
+    .expect("timeout elapsed")
+}

@@ -15,7 +15,7 @@ impl CallZomeWorkspaceLock {
         self.0
     }
 
-    pub async fn env(&self) -> DbRead {
+    pub async fn env(&self) -> EnvRead {
         self.0.read().await.env().clone()
     }
 }

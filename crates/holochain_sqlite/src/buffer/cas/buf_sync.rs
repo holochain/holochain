@@ -146,9 +146,9 @@ where
     P: PrefixType,
 {
     /// Create a new CasBufFreshSync
-    pub fn new(env: DbRead, db: SingleTable) -> Self {
+    pub fn new<D: Into<DbRead>>(env: D, db: SingleTable) -> Self {
         Self {
-            env,
+            env: env.into(),
             inner: CasBufUsedSync::new(db),
         }
     }

@@ -42,13 +42,13 @@ impl ElementBuf<IntegratedPrefix> {
     /// The `allow_private` argument allows you to specify whether private
     /// entries should be readable or writeable with this reference.
     /// The vault is constructed with the IntegratedPrefix.
-    pub fn vault(env: DbRead, allow_private: bool) -> DatabaseResult<Self> {
+    pub fn vault(env: EnvRead, allow_private: bool) -> DatabaseResult<Self> {
         ElementBuf::new_vault(env, allow_private)
     }
 
     /// Create a ElementBuf using the Cache databases.
     /// There is no cache for private entries, so private entries are disallowed
-    pub fn cache(env: DbRead) -> DatabaseResult<Self> {
+    pub fn cache(env: EnvRead) -> DatabaseResult<Self> {
         let entries = env.get_table(TableName::ElementCacheEntries)?;
         let headers = env.get_table(TableName::ElementCacheHeaders)?;
         ElementBuf::new(env, entries, None, headers)
@@ -58,7 +58,7 @@ impl ElementBuf<IntegratedPrefix> {
 impl ElementBuf<PendingPrefix> {
     /// Create a element buf for all elements pending validation.
     /// This reuses the database but is the data is completely separate.
-    pub fn pending(env: DbRead) -> DatabaseResult<Self> {
+    pub fn pending(env: EnvRead) -> DatabaseResult<Self> {
         ElementBuf::new_vault(env, true)
     }
 }
@@ -66,7 +66,7 @@ impl ElementBuf<PendingPrefix> {
 impl ElementBuf<RejectedPrefix> {
     /// Create a element buf for all elements that have been rejected.
     /// This reuses the database but is the data is completely separate.
-    pub fn rejected(env: DbRead) -> DatabaseResult<Self> {
+    pub fn rejected(env: EnvRead) -> DatabaseResult<Self> {
         ElementBuf::new_vault(env, true)
     }
 }
@@ -74,7 +74,7 @@ impl ElementBuf<RejectedPrefix> {
 impl ElementBuf<AuthoredPrefix> {
     /// Create a element buf for all authored elements.
     /// This reuses the database but is the data is completely separate.
-    pub fn authored(env: DbRead, allow_private: bool) -> DatabaseResult<Self> {
+    pub fn authored(env: EnvRead, allow_private: bool) -> DatabaseResult<Self> {
         ElementBuf::new_vault(env, allow_private)
     }
 }
@@ -84,7 +84,7 @@ where
     P: PrefixType,
 {
     fn new(
-        env: DbRead,
+        env: EnvRead,
         public_entries_store: SingleTable,
         private_entries_store: Option<SingleTable>,
         headers_store: SingleTable,
@@ -102,7 +102,7 @@ where
     }
 
     /// Construct a element buf using the vault databases
-    fn new_vault(env: DbRead, allow_private: bool) -> DatabaseResult<Self> {
+    fn new_vault(env: EnvRead, allow_private: bool) -> DatabaseResult<Self> {
         let headers = env.get_table(TableName::ElementVaultHeaders)?;
         let entries = env.get_table(TableName::ElementVaultPublicEntries)?;
         let private_entries = if allow_private {
@@ -351,12 +351,13 @@ impl<P: PrefixType> BufferedStore for ElementBuf<P> {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_utils::test_cell_env;
+
     use super::ElementBuf;
     use holo_hash::*;
     use holochain_keystore::test_keystore::spawn_test_keystore;
     use holochain_keystore::AgentPubKeyExt;
     use holochain_sqlite::prelude::*;
-    use holochain_sqlite::test_utils::test_cell_env;
     use holochain_types::test_utils::fake_unique_element;
     use holochain_zome_types::entry_def::EntryVisibility;
 
