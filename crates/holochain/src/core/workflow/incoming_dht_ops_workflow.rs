@@ -10,7 +10,7 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::integrate_single_metadata;
 use holochain_sqlite::buffer::BufferedStore;
 use holochain_sqlite::buffer::KvBufFresh;
-use  holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;

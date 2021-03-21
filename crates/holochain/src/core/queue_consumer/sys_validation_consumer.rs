@@ -4,7 +4,7 @@ use super::*;
 use crate::core::workflow::sys_validation_workflow::sys_validation_workflow;
 use crate::core::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::{conductor::manager::ManagedTaskResult, core::workflow::error::WorkflowResult};
-use  tokio::task::JoinHandle;
+use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for SysValidation workflow

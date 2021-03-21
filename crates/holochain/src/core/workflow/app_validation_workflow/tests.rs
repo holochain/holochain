@@ -12,7 +12,7 @@ use holo_hash::DhtOpHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytes;
-use  holochain_sqlite::fresh_reader_test;
+use holochain_sqlite::fresh_reader_test;
 use holochain_state::dht_op_integration::IntegratedDhtOpsValue;
 use holochain_state::element_buf::ElementBuf;
 use holochain_state::validation_db::ValidationLimboValue;
