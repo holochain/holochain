@@ -33,5 +33,3 @@ default = ["fixturators", "test_utils"]
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
 
 test_utils = ["holo_hash/hashing"]
-
-mut_element = []

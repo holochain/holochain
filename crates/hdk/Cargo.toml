@@ -17,7 +17,7 @@ path = "src/lib.rs"
 [features]
 default = []
 mock = ["hdk_derive/mock", "mockall"]
-mut_element = [ "holochain_zome_types/mut_element" ]
+test_utils = [ "holochain_zome_types/test_utils" ]
 
 [dependencies]
 hdk_derive = { version = "^0.0.2-alpha.1", path = "../hdk_derive" }
