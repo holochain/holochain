@@ -10,9 +10,9 @@ use holochain_serialized_bytes::prelude::*;
 #[derive(Serialize, Deserialize)]
 pub struct HoloHashed<C: HashableContent> {
     /// Whatever type C is as data.
-    pub content: C,
+    pub(crate) content: C,
     /// The hash of the content C.
-    pub hash: HoloHashOf<C>,
+    pub(crate) hash: HoloHashOf<C>,
 }
 
 impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {
