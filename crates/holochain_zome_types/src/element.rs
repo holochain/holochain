@@ -33,7 +33,7 @@ impl Element {
     /// Guaranteed to make hashes and signatures mismatch whatever the Header is mutated to (at least).
     /// This may be useful for tests that rely heavily on mocked and fixturated data.
     #[cfg(feature = "test_utils")]
-    pub fn as_header_mut_ref(&mut self) -> &mut Header {
+    pub fn as_header_mut(&mut self) -> &mut Header {
         &mut self.signed_header.header.content
     }
 
@@ -42,7 +42,7 @@ impl Element {
     /// Guaranteed to make hashes and signatures mismatch whatever the ElementEntry is mutated to (at least).
     /// This may be useful for tests that rely heavily on mocked and fixturated data.
     #[cfg(feature = "test_utils")]
-    pub fn as_entry_mut_ref(&mut self) -> &mut ElementEntry {
+    pub fn as_entry_mut(&mut self) -> &mut ElementEntry {
         &mut self.entry
     }
 
