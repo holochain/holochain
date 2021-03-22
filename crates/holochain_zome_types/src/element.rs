@@ -210,9 +210,9 @@ impl HashableContent for SignedHeader {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SignedHeaderHashed {
     /// The hashed but unsigned header.
-    pub header: HeaderHashed,
+    header: HeaderHashed,
     /// The signature of the header.
-    pub signature: Signature,
+    signature: Signature,
 }
 
 #[allow(missing_docs)]
