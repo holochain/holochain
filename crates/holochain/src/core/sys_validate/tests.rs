@@ -7,8 +7,7 @@ use error::SysValidationError;
 
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_sqlite::db::DbRead;
-use holochain_sqlite::test_utils::test_cell_env;
+use holochain_state::prelude::test_cell_env;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
 use matches::assert_matches;
@@ -17,7 +16,7 @@ use std::convert::TryFrom;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn verify_header_signature_test() {
-    let keystore = holochain_sqlite::test_utils::test_keystore();
+    let keystore = holochain_state::test_utils::test_keystore();
     let author = fake_agent_pubkey_1();
     let mut header = fixt!(CreateLink);
     header.author = author.clone();
@@ -57,7 +56,7 @@ async fn check_previous_header() {
 #[tokio::test(flavor = "multi_thread")]
 async fn check_valid_if_dna_test() {
     let tmp = test_cell_env();
-    let env: DbRead = tmp.env().into();
+    let env: EnvRead = tmp.env().into();
     // Test data
     let activity_return = vec![fixt!(HeaderHash)];
 

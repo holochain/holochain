@@ -20,7 +20,6 @@ failure = "0.1.6"
 fixt = { version = "^0.0.2-alpha.1", path = "../fixt" }
 futures = "0.3.1"
 holo_hash = { path = "../holo_hash" }
-holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.50"
 holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
 lazy_static = "1.4.0"
@@ -44,12 +43,12 @@ tracing-futures = "0.2"
 
 rusqlite = { version = "0.24", features = [
   "blob",        # better integration with blob types (Read, Write, etc)
-  "chrono",      # integration with chrono crate
-  "functions",   # rust scalar / agg / window functions
-  "hooks",       # sqlite notification callbacks
-  "serde_json",  # integration with serde_json crate
-  "url",         # integration with url crate
-  "uuid",        # integration with uuid crate
+  #"chrono",      # integration with chrono crate
+  #"functions",   # rust scalar / agg / window functions
+  #"hooks",       # sqlite notification callbacks
+  #"serde_json",  # integration with serde_json crate
+  #"url",         # integration with url crate
+  #"uuid",        # integration with uuid crate
 ] }
 
 [dev-dependencies]

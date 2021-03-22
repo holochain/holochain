@@ -1,18 +1,16 @@
+use super::ChainItemKey;
+use super::MetadataBuf;
+use super::MetadataBufT;
+use crate::test_utils::{test_cell_env, TestEnv};
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
 use holochain_sqlite::db::ReadManager;
-use holochain_sqlite::test_utils::test_cell_env;
-use holochain_sqlite::test_utils::TestDb;
 use holochain_types::prelude::*;
 use holochain_zome_types::test_utils::fake_agent_pubkey_1;
 
-use super::ChainItemKey;
-use super::MetadataBuf;
-use super::MetadataBufT;
-
-fn setup() -> (TestDb, MetadataBuf, Create, Create, AgentPubKey) {
+fn setup() -> (TestEnv, MetadataBuf, Create, Create, AgentPubKey) {
     observability::test_run().ok();
     let test_env = test_cell_env();
     let meta_buf = MetadataBuf::vault(test_env.env().into()).unwrap();

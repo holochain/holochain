@@ -1,12 +1,6 @@
-use crate::buffer::kvv::KvvBufUsed;
-use crate::buffer::kvv::KvvOp;
-use crate::buffer::kvv::ValuesDelta;
-use crate::buffer::BufferedStore;
-use crate::db::ReadManager;
-use crate::db::WriteManager;
-use crate::error::DatabaseError;
-use crate::error::DatabaseResult;
-use crate::test_utils::test_cell_env;
+use super::{KvvOp, ValuesDelta};
+use crate::prelude::*;
+use crate::test_utils::test_cell_db;
 use crate::test_utils::DbString;
 use crate::transaction::Readable;
 use serde_derive::Deserialize;
@@ -51,13 +45,13 @@ fn collect_sorted<T: Ord, E, I: IntoIterator<Item = Result<T, E>>>(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn kvvbuf_basics() {
-    let test_env = test_cell_env();
-    let arc = test_env.env();
-    let mut env = arc.conn().unwrap();
+    let test_db = test_cell_db();
+    let db = test_db.db();
+    let mut conn = db.conn().unwrap();
 
-    let multi_store = env.open_multi("kvv").unwrap();
+    let multi_store = conn.open_multi("kvv").unwrap();
 
-    arc.conn()
+    db.conn()
         .unwrap()
         .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut store: Store = Store::new(multi_store.clone());
@@ -87,7 +81,7 @@ async fn kvvbuf_basics() {
                 [Ok(V(0))]
             );
 
-            arc.conn()
+            db.conn()
                 .unwrap()
                 .with_commit(|mut writer| store.flush_to_txn(&mut writer))
                 .unwrap();
@@ -96,9 +90,9 @@ async fn kvvbuf_basics() {
         })
         .unwrap();
 
-    let multi_store = env.open_multi("kvv").unwrap();
+    let multi_store = conn.open_multi("kvv").unwrap();
 
-    arc.conn()
+    db.conn()
         .unwrap()
         .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut store: Store = Store::new(multi_store.clone());
@@ -128,7 +122,7 @@ async fn kvvbuf_basics() {
                 []
             );
 
-            arc.conn()
+            db.conn()
                 .unwrap()
                 .with_commit(|mut writer| store.flush_to_txn(&mut writer))
                 .unwrap();
@@ -137,9 +131,9 @@ async fn kvvbuf_basics() {
         })
         .unwrap();
 
-    let multi_store = env.open_multi("kvv").unwrap();
+    let multi_store = conn.open_multi("kvv").unwrap();
 
-    arc.conn()
+    db.conn()
         .unwrap()
         .with_reader::<DatabaseError, _, _>(|mut reader| {
             let store: Store = Store::new(multi_store.clone());
@@ -158,13 +152,13 @@ async fn kvvbuf_basics() {
 #[tokio::test(flavor = "multi_thread")]
 async fn delete_all() {
     observability::test_run().ok();
-    let test_env = test_cell_env();
-    let arc = test_env.env();
-    let mut env = arc.conn().unwrap();
+    let test_db = test_cell_db();
+    let db = test_db.db();
+    let mut conn = db.conn().unwrap();
 
-    let multi_store = env.open_multi("kvv").unwrap();
+    let multi_store = conn.open_multi("kvv").unwrap();
 
-    arc.conn()
+    db.conn()
         .unwrap()
         .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut store: Store = Store::new(multi_store.clone());
@@ -191,7 +185,7 @@ async fn delete_all() {
                 Ok(vec![V(0), V(1)])
             );
 
-            arc.conn()
+            db.conn()
                 .unwrap()
                 .with_commit(|mut writer| store.flush_to_txn(&mut writer))
                 .unwrap();
@@ -200,9 +194,9 @@ async fn delete_all() {
         })
         .unwrap();
 
-    let multi_store = env.open_multi("kvv").unwrap();
+    let multi_store = conn.open_multi("kvv").unwrap();
 
-    arc.conn()
+    db.conn()
         .unwrap()
         .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut store: Store = Store::new(multi_store.clone());
@@ -235,7 +229,7 @@ async fn delete_all() {
                 [Ok(V(3))]
             );
 
-            arc.conn()
+            db.conn()
                 .unwrap()
                 .with_commit(|mut writer| store.flush_to_txn(&mut writer))
                 .unwrap();
@@ -244,9 +238,9 @@ async fn delete_all() {
         })
         .unwrap();
 
-    let multi_store = env.open_multi("kvv").unwrap();
+    let multi_store = conn.open_multi("kvv").unwrap();
 
-    arc.conn()
+    db.conn()
         .unwrap()
         .with_reader::<DatabaseError, _, _>(|mut reader| {
             let store: Store = Store::new(multi_store.clone());
@@ -268,13 +262,13 @@ async fn delete_all() {
 /// that duplicates are not returned on get
 #[tokio::test(flavor = "multi_thread")]
 async fn idempotent_inserts() {
-    let test_env = test_cell_env();
-    let arc = test_env.env();
-    let mut env = arc.conn().unwrap();
+    let test_db = test_cell_db();
+    let db = test_db.db();
+    let mut conn = db.conn().unwrap();
 
-    let multi_store = env.open_multi("kvv").unwrap();
+    let multi_store = conn.open_multi("kvv").unwrap();
 
-    arc.conn()
+    db.conn()
         .unwrap()
         .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut store: Store = Store::new(multi_store.clone());
@@ -307,7 +301,7 @@ async fn idempotent_inserts() {
                 Ok(vec![V(0), V(1), V(2)])
             );
 
-            arc.conn()
+            db.conn()
                 .unwrap()
                 .with_commit(|mut writer| store.flush_to_txn(&mut writer))
                 .unwrap();
@@ -316,7 +310,7 @@ async fn idempotent_inserts() {
         })
         .unwrap();
 
-    arc.conn()
+    db.conn()
         .unwrap()
         .with_reader::<DatabaseError, _, _>(|mut reader| {
             let mut store: Store = Store::new(multi_store.clone());
@@ -339,12 +333,12 @@ async fn idempotent_inserts() {
 #[tokio::test(flavor = "multi_thread")]
 async fn kvv_indicate_value_appends() -> DatabaseResult<()> {
     observability::test_run().ok();
-    let test_env = test_cell_env();
-    let arc = test_env.env();
-    let mut env = arc.conn().unwrap();
-    let db = env.open_multi("kvv")?;
-    arc.conn().unwrap().with_reader(|mut reader| {
-        let mut buf = Store::new(db.clone());
+    let test_db = test_cell_db();
+    let db = test_db.db();
+    let mut conn = db.conn().unwrap();
+    let table = conn.open_multi("kvv")?;
+    db.conn().unwrap().with_reader(|mut reader| {
+        let mut buf = Store::new(table.clone());
 
         buf.insert("a".into(), V(1));
         assert_eq!(
@@ -363,12 +357,12 @@ async fn kvv_indicate_value_appends() -> DatabaseResult<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn kvv_indicate_value_overwritten() -> DatabaseResult<()> {
     observability::test_run().ok();
-    let test_env = test_cell_env();
-    let arc = test_env.env();
-    let mut env = arc.conn().unwrap();
-    let db = env.open_multi("kvv")?;
-    arc.conn().unwrap().with_reader(|mut reader| {
-        let mut buf = Store::new(db.clone());
+    let test_db = test_cell_db();
+    let db = test_db.db();
+    let mut conn = db.conn().unwrap();
+    let table = conn.open_multi("kvv")?;
+    db.conn().unwrap().with_reader(|mut reader| {
+        let mut buf = Store::new(table.clone());
 
         buf.insert("a".into(), V(1));
         assert_eq!(
@@ -394,33 +388,33 @@ async fn kvv_indicate_value_overwritten() -> DatabaseResult<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn kvv_deleted_persisted() -> DatabaseResult<()> {
     observability::test_run().ok();
-    let test_env = test_cell_env();
-    let arc = test_env.env();
-    let mut env = arc.conn().unwrap();
-    let db = env.open_multi("kv")?;
+    let test_db = test_cell_db();
+    let db = test_db.db();
+    let mut conn = db.conn().unwrap();
+    let table = conn.open_multi("kv")?;
 
     {
-        let mut buf = Store::new(db.clone());
+        let mut buf = Store::new(table.clone());
 
         buf.insert("a".into(), V(1));
         buf.insert("b".into(), V(2));
         buf.insert("c".into(), V(3));
 
-        arc.conn()
+        db.conn()
             .unwrap()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
     {
-        let mut buf: KvvBufUsed<_, V> = Store::new(db.clone());
+        let mut buf: KvvBufUsed<_, V> = Store::new(table.clone());
 
         buf.delete("b".into(), V(2));
 
-        arc.conn()
+        db.conn()
             .unwrap()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
-    arc.conn().unwrap().with_reader(|mut reader| {
-        let buf: KvvBufUsed<DbString, _> = Store::new(db.clone());
+    db.conn().unwrap().with_reader(|mut reader| {
+        let buf: KvvBufUsed<DbString, _> = Store::new(table.clone());
         test_persisted(
             &mut reader,
             &buf,
@@ -436,13 +430,13 @@ async fn kvv_deleted_persisted() -> DatabaseResult<()> {
 async fn kvv_deleted_buffer() -> DatabaseResult<()> {
     use KvvOp::*;
     observability::test_run().ok();
-    let test_env = test_cell_env();
-    let arc = test_env.env();
-    let mut env = arc.conn().unwrap();
-    let db = env.open_multi("kv")?;
+    let test_db = test_cell_db();
+    let db = test_db.db();
+    let mut conn = db.conn().unwrap();
+    let table = conn.open_multi("kv")?;
 
     {
-        let mut buf = Store::new(db.clone());
+        let mut buf = Store::new(table.clone());
 
         buf.insert("a".into(), V(5));
         buf.insert("b".into(), V(4));
@@ -469,12 +463,12 @@ async fn kvv_deleted_buffer() -> DatabaseResult<()> {
             .cloned(),
         );
 
-        arc.conn()
+        db.conn()
             .unwrap()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
-    arc.conn().unwrap().with_reader(|mut reader| {
-        let buf: KvvBufUsed<DbString, _> = Store::new(db.clone());
+    db.conn().unwrap().with_reader(|mut reader| {
+        let buf: KvvBufUsed<DbString, _> = Store::new(table.clone());
         test_persisted(
             &mut reader,
             &buf,
@@ -489,13 +483,13 @@ async fn kvv_deleted_buffer() -> DatabaseResult<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn kvv_get_buffer() -> DatabaseResult<()> {
     observability::test_run().ok();
-    let test_env = test_cell_env();
-    let arc = test_env.env();
-    let mut env = arc.conn().unwrap();
-    let db = env.open_multi("kv")?;
+    let test_db = test_cell_db();
+    let db = test_db.db();
+    let mut conn = db.conn().unwrap();
+    let table = conn.open_multi("kv")?;
 
-    arc.conn().unwrap().with_reader(|mut reader| {
-        let mut buf = Store::new(db.clone());
+    db.conn().unwrap().with_reader(|mut reader| {
+        let mut buf = Store::new(table.clone());
 
         buf.insert("a".into(), V(5));
         buf.insert("b".into(), V(4));
@@ -510,25 +504,25 @@ async fn kvv_get_buffer() -> DatabaseResult<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn kvv_get_persisted() -> DatabaseResult<()> {
     observability::test_run().ok();
-    let test_env = test_cell_env();
-    let arc = test_env.env();
-    let mut env = arc.conn().unwrap();
-    let db = env.open_multi("kv")?;
+    let test_db = test_cell_db();
+    let db = test_db.db();
+    let mut conn = db.conn().unwrap();
+    let table = conn.open_multi("kv")?;
 
     {
-        let mut buf = Store::new(db.clone());
+        let mut buf = Store::new(table.clone());
 
         buf.insert("a".into(), V(1));
         buf.insert("b".into(), V(2));
         buf.insert("c".into(), V(3));
 
-        arc.conn()
+        db.conn()
             .unwrap()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
 
-    arc.conn().unwrap().with_reader(|mut reader| {
-        let buf = Store::new(db.clone());
+    db.conn().unwrap().with_reader(|mut reader| {
+        let buf = Store::new(table.clone());
 
         let mut n = buf.get(&mut reader, DbString::from("b"))?;
         assert_eq!(n.next(), Some(Ok(V(2))));
@@ -539,13 +533,13 @@ async fn kvv_get_persisted() -> DatabaseResult<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn kvv_get_del_buffer() -> DatabaseResult<()> {
     observability::test_run().ok();
-    let test_env = test_cell_env();
-    let arc = test_env.env();
-    let mut env = arc.conn().unwrap();
-    let db = env.open_multi("kv")?;
+    let test_db = test_cell_db();
+    let db = test_db.db();
+    let mut conn = db.conn().unwrap();
+    let table = conn.open_multi("kv")?;
 
-    arc.conn().unwrap().with_reader(|mut reader| {
-        let mut buf = Store::new(db.clone());
+    db.conn().unwrap().with_reader(|mut reader| {
+        let mut buf = Store::new(table.clone());
 
         buf.insert("a".into(), V(5));
         buf.insert("b".into(), V(4));
@@ -560,25 +554,25 @@ async fn kvv_get_del_buffer() -> DatabaseResult<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn kvv_get_del_persisted() -> DatabaseResult<()> {
     observability::test_run().ok();
-    let test_env = test_cell_env();
-    let arc = test_env.env();
-    let mut env = arc.conn().unwrap();
-    let db = env.open_multi("kv")?;
+    let test_db = test_cell_db();
+    let db = test_db.db();
+    let mut conn = db.conn().unwrap();
+    let table = conn.open_multi("kv")?;
 
     {
-        let mut buf = Store::new(db.clone());
+        let mut buf = Store::new(table.clone());
 
         buf.insert("a".into(), V(1));
         buf.insert("b".into(), V(2));
         buf.insert("c".into(), V(3));
 
-        arc.conn()
+        db.conn()
             .unwrap()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
 
-    arc.conn().unwrap().with_reader(|mut reader| {
-        let mut buf: Store = Store::new(db.clone());
+    db.conn().unwrap().with_reader(|mut reader| {
+        let mut buf: Store = Store::new(table.clone());
 
         buf.delete("b".into(), V(2));
         {
@@ -586,13 +580,13 @@ async fn kvv_get_del_persisted() -> DatabaseResult<()> {
             assert_eq!(n.next(), None);
         }
 
-        arc.conn()
+        db.conn()
             .unwrap()
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))
     })?;
 
-    arc.conn().unwrap().with_reader(|mut reader| {
-        let buf: KvvBufUsed<_, V> = Store::new(db.clone());
+    db.conn().unwrap().with_reader(|mut reader| {
+        let buf: KvvBufUsed<_, V> = Store::new(table.clone());
 
         let mut n = buf.get(&mut reader, DbString::from("b"))?;
         assert_eq!(n.next(), None);

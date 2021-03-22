@@ -17,7 +17,7 @@ pub struct SourceChainBuf {
     sequence: ChainSequenceBuf,
     keystore: KeystoreSender,
 
-    env: DbRead,
+    env: EnvRead,
 }
 
 // TODO fix this.  We shouldn't really have nil values but this would
@@ -37,7 +37,7 @@ pub struct SourceChainJsonElement {
 }
 
 impl SourceChainBuf {
-    pub fn new(env: DbRead) -> DatabaseResult<Self> {
+    pub fn new(env: EnvRead) -> DatabaseResult<Self> {
         Ok(Self {
             elements: ElementBuf::authored(env.clone(), true)?,
             sequence: ChainSequenceBuf::new(env.clone())?,
@@ -46,7 +46,7 @@ impl SourceChainBuf {
         })
     }
 
-    pub fn public_only(env: DbRead) -> DatabaseResult<Self> {
+    pub fn public_only(env: EnvRead) -> DatabaseResult<Self> {
         Ok(Self {
             elements: ElementBuf::authored(env.clone(), false)?,
             sequence: ChainSequenceBuf::new(env.clone())?,
@@ -55,7 +55,7 @@ impl SourceChainBuf {
         })
     }
 
-    pub fn env(&self) -> &DbRead {
+    pub fn env(&self) -> &EnvRead {
         &self.env
     }
 
@@ -325,10 +325,9 @@ impl<'a> FallibleIterator for SourceChainBackwardIterator<'a> {
 #[cfg(test)]
 pub mod tests {
     use super::SourceChainBuf;
+    use crate::prelude::*;
     use crate::source_chain::SourceChainResult;
     use fallible_iterator::FallibleIterator;
-    use holochain_sqlite::prelude::*;
-    use holochain_sqlite::test_utils::test_cell_env;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;

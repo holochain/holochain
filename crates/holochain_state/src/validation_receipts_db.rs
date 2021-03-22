@@ -3,8 +3,8 @@
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
-use holochain_keystore::AgentPubKeyExt;
 use holochain_keystore::KeystoreSender;
+use holochain_keystore::{keystore_actor::KeystoreApiResult, AgentPubKeyExt};
 use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::prelude::*;
 use holochain_types::Timestamp;
@@ -40,7 +40,10 @@ pub struct ValidationReceipt {
 
 impl ValidationReceipt {
     /// Sign this validation receipt.
-    pub async fn sign(self, keystore: &KeystoreSender) -> DatabaseResult<SignedValidationReceipt> {
+    pub async fn sign(
+        self,
+        keystore: &KeystoreSender,
+    ) -> KeystoreApiResult<SignedValidationReceipt> {
         let signature = self.validator.sign(keystore, self.clone()).await?;
         Ok(SignedValidationReceipt {
             receipt: self,
@@ -163,9 +166,9 @@ mod tests {
     async fn test_validation_receipts_db_populate_and_list() -> DatabaseResult<()> {
         observability::test_run().ok();
 
-        let test_env = holochain_sqlite::test_utils::test_cell_env();
+        let test_env = crate::test_utils::test_cell_env();
         let env = test_env.env();
-        let keystore = holochain_sqlite::test_utils::test_keystore();
+        let keystore = crate::test_utils::test_keystore();
 
         let test_op_hash = fake_dht_op_hash(1);
         let vr1 = fake_vr(&test_op_hash, &keystore).await;

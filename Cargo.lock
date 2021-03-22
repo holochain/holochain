@@ -1885,7 +1885,6 @@ dependencies = [
  "fixt",
  "futures",
  "holo_hash",
- "holochain_keystore",
  "holochain_serialized_bytes",
  "holochain_zome_types",
  "lazy_static",
@@ -1936,6 +1935,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shrinkwraprs",
+ "tempdir",
  "thiserror",
  "tokio",
  "tokio_helper",
@@ -1974,6 +1974,7 @@ dependencies = [
  "holo_hash",
  "holochain_keystore",
  "holochain_serialized_bytes",
+ "holochain_sqlite",
  "holochain_zome_types",
  "itertools 0.10.0",
  "lazy_static",
@@ -3972,16 +3973,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d5f38ee71cbab2c827ec0ac24e76f82eca723cee92c509a65f67dee393c25112"
 dependencies = [
  "bitflags",
- "chrono",
  "fallible-iterator",
  "fallible-streaming-iterator",
  "hashlink",
  "libsqlite3-sys",
  "memchr",
- "serde_json",
  "smallvec 1.6.1",
- "url 2.2.1",
- "uuid 0.8.2",
 ]
 
 [[package]]

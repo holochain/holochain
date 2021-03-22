@@ -1,19 +1,13 @@
 use holo_hash::WasmHash;
-use holochain_sqlite::buffer::CasBufFreshAsync;
-use holochain_sqlite::error::DatabaseError;
-use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::exports::SingleTable;
-use holochain_sqlite::prelude::BufferedStore;
-use holochain_sqlite::prelude::DbRead;
-use holochain_sqlite::transaction::Writer;
+use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 
 /// This is where wasm lives
 pub struct WasmBuf(CasBufFreshAsync<DnaWasm>);
 
 impl WasmBuf {
-    pub fn new(env: DbRead, wasm_store: SingleTable) -> DatabaseResult<Self> {
-        Ok(Self(CasBufFreshAsync::new(env, wasm_store)))
+    pub fn new(env: EnvRead, wasm_store: SingleTable) -> DatabaseResult<Self> {
+        Ok(Self(CasBufFreshAsync::new(DbRead::from(env), wasm_store)))
     }
 
     pub async fn get(&self, wasm_hash: &WasmHash) -> DatabaseResult<Option<DnaWasmHashed>> {
@@ -46,7 +40,7 @@ mod tests {
         observability::test_run().ok();
 
         // all the stuff needed to have a WasmBuf
-        let env = holochain_sqlite::test_utils::test_wasm_env();
+        let env = crate::test_utils::test_wasm_env();
         let mut wasm_buf =
             WasmBuf::new(env.env().into(), env.get_table(TableName::Wasm).unwrap()).unwrap();
 

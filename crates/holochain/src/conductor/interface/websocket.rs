@@ -214,7 +214,7 @@ pub mod test_utils {
     use crate::conductor::conductor::ConductorBuilder;
     use crate::conductor::ConductorHandle;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_sqlite::test_utils::test_environments;
+    use holochain_state::prelude::*;
     use holochain_types::prelude::*;
     use std::sync::Arc;
     use tempdir::TempDir;
@@ -278,7 +278,7 @@ pub mod test {
     use holochain_serialized_bytes::prelude::*;
     use holochain_sqlite::buffer::KvStoreT;
     use holochain_sqlite::fresh_reader_test;
-    use holochain_sqlite::test_utils::test_environments;
+    use holochain_state::prelude::test_environments;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;

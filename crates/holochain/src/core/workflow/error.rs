@@ -9,6 +9,7 @@ use crate::core::queue_consumer::QueueTriggerClosedError;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::SysValidationError;
 use holochain_cascade::error::CascadeError;
+use holochain_keystore::KeystoreError;
 use holochain_p2p::HolochainP2pError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
@@ -71,6 +72,9 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     SysValidationError(#[from] SysValidationError),
+
+    #[error(transparent)]
+    KeystoreError(#[from] KeystoreError),
 }
 
 /// Internal type to handle running workflows

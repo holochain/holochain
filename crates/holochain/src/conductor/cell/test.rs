@@ -5,7 +5,7 @@ use crate::fixt::SignatureFixturator;
 use crate::test_utils::test_network;
 use ::fixt::prelude::*;
 use holo_hash::HasHash;
-use holochain_sqlite::test_utils::test_cell_env;
+use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::header;
 use holochain_zome_types::HeaderHashed;

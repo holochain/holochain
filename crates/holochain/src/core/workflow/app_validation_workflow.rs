@@ -918,7 +918,7 @@ pub struct AppValidationWorkspace {
 }
 
 impl AppValidationWorkspace {
-    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+    pub fn new(env: EnvRead) -> WorkspaceResult<Self> {
         let db = env.get_table(TableName::IntegratedDhtOps)?;
         let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
         let db = env.get_table(TableName::IntegrationLimbo)?;

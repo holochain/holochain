@@ -4,13 +4,6 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_serialized_bytes::prelude::*;
-use holochain_sqlite::buffer::KvBufFresh;
-use holochain_sqlite::error::DatabaseError;
-use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::prelude::BufferedStore;
-use holochain_sqlite::prelude::DbRead;
-use holochain_sqlite::prelude::GetTable;
-use holochain_sqlite::prelude::Readable;
 use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::validate::ValidationStatus;
@@ -108,7 +101,7 @@ pub struct IntegrationLimboValue {
 
 impl IntegratedDhtOpsBuf {
     /// Create a new buffer for the IntegratedDhtOpsStore
-    pub fn new(env: DbRead) -> DatabaseResult<Self> {
+    pub fn new(env: EnvRead) -> DatabaseResult<Self> {
         let db = env.get_table(TableName::IntegratedDhtOps).unwrap();
         Ok(Self {
             store: IntegratedDhtOpsStore::new(env, db),
@@ -163,16 +156,13 @@ impl IntegratedDhtOpsBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prelude::*;
     use ::fixt::prelude::*;
     use chrono::Duration;
     use chrono::Utc;
     use holo_hash::fixt::AnyDhtHashFixturator;
     use holo_hash::fixt::DhtOpHashFixturator;
     use holo_hash::fixt::HeaderHashFixturator;
-    use holochain_sqlite::buffer::BufferedStore;
-    use holochain_sqlite::db::ReadManager;
-    use holochain_sqlite::db::WriteManager;
-    use holochain_sqlite::test_utils::test_cell_env;
     use pretty_assertions::assert_eq;
 
     #[tokio::test(flavor = "multi_thread")]

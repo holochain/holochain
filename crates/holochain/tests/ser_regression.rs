@@ -11,7 +11,7 @@ use holochain::conductor::api::ZomeCall;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 
-use holochain_sqlite::test_utils::test_environments;
+use holochain_state::prelude::test_environments;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 pub use holochain_zome_types::capability::CapSecret;

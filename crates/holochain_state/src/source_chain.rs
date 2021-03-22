@@ -37,11 +37,11 @@ impl SourceChain {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
 
-    pub fn new(env: DbRead) -> DatabaseResult<Self> {
+    pub fn new(env: EnvRead) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::new(env)?.into())
     }
 
-    pub fn public_only(env: DbRead) -> DatabaseResult<Self> {
+    pub fn public_only(env: EnvRead) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::public_only(env)?.into())
     }
 
@@ -318,9 +318,9 @@ impl BufferedStore for SourceChain {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::prelude::*;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
-    use holochain_sqlite::test_utils::test_cell_env;
     use holochain_types::test_utils::fake_dna_hash;
     use holochain_zome_types::capability::CapAccess;
     use holochain_zome_types::capability::ZomeCallCapGrant;

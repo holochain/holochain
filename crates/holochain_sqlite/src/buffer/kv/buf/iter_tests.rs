@@ -7,7 +7,7 @@ use crate::db::ReadManager;
 use crate::db::WriteManager;
 use crate::error::DatabaseError;
 use crate::prelude::*;
-use crate::test_utils::test_cell_env;
+use crate::test_utils::test_cell_db;
 use crate::test_utils::DbString;
 use ::fixt::prelude::*;
 use fallible_iterator::DoubleEndedFallibleIterator;
@@ -19,8 +19,8 @@ pub(super) type Store = KvBufUsed<DbString, V>;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn kv_iter_from_partial() {
-    let test_env = test_cell_env();
-    let arc = test_env.env();
+    let test_db = test_cell_db();
+    let arc = test_db.db();
     let mut env = arc.conn().unwrap();
     let db = env.open_single("kv").unwrap();
 
@@ -246,8 +246,8 @@ fn re_do_test<R: Readable>(
 async fn kv_single_iter() {
     observability::test_run().ok();
     let mut rng = rand::thread_rng();
-    let test_env = test_cell_env();
-    let arc = test_env.env();
+    let test_db = test_cell_db();
+    let arc = test_db.db();
     let db = arc.conn().unwrap().open_single("kv").unwrap();
     let td = StringFixturator::new(Unpredictable)
         .zip(VFixturator::new(Unpredictable))
@@ -495,8 +495,8 @@ async fn kv_single_iter_found_4() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn exhaust_both_ends() {
-    let test_env = test_cell_env();
-    let arc = test_env.env();
+    let test_db = test_cell_db();
+    let arc = test_db.db();
     let mut env = arc.conn().unwrap();
     let db = env.open_single("kv").unwrap();
     let values = (b'a'..=b'z')
@@ -594,8 +594,8 @@ fn kv_single_iter_runner(
     in_db_second: impl Iterator<Item = TestData> + Send,
     from_key: DbString,
 ) {
-    let test_env = test_cell_env();
-    let arc = test_env.env();
+    let test_db = test_cell_db();
+    let arc = test_db.db();
     let mut env = arc.conn().unwrap();
     let db = env.open_single("kv").unwrap();
 

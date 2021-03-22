@@ -89,7 +89,7 @@ pub struct GenesisWorkspace {
 
 impl GenesisWorkspace {
     /// Constructor
-    pub async fn new(env: DbRead) -> WorkspaceResult<Self> {
+    pub async fn new(env: EnvRead) -> WorkspaceResult<Self> {
         Ok(Self {
             source_chain: SourceChainBuf::new(env)?,
         })
@@ -110,8 +110,7 @@ pub mod tests {
     use crate::conductor::api::MockCellConductorApi;
     use crate::core::SourceChainResult;
     use fallible_iterator::FallibleIterator;
-    use holochain_sqlite::test_utils::test_cell_env;
-    use holochain_state::source_chain::SourceChain;
+    use holochain_state::{prelude::test_cell_env, source_chain::SourceChain};
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::Header;
