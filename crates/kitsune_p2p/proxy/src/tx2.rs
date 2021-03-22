@@ -5,6 +5,7 @@
 use crate::*;
 use futures::future::BoxFuture;
 use futures::stream::{Stream, StreamExt};
+use ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::tx2::tx2_backend::*;
 use kitsune_p2p_types::tx2::tx2_frontend::tx2_frontend_traits::*;
 use kitsune_p2p_types::tx2::tx2_frontend::*;
@@ -20,6 +21,9 @@ pub fn tx2_proxy(sub_fact: EpFactory, tls_config: TlsConfig) -> EpFactory {
 
 // -- private -- //
 
+const PROXY_TYPE_BYTES: usize = 1;
+const DIGEST_BYTES: usize = 32;
+
 const PROXY_HELLO_DIGEST: u8 = 0x20;
 const PROXY_FWD_MSG: u8 = 0x30;
 
@@ -32,7 +36,7 @@ struct ProxyConHnd {
 
 impl std::fmt::Debug for ProxyConHnd {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("ConHnd").finish()
+        f.debug_tuple("ConHnd").field(&self.uniq).finish()
     }
 }
 
@@ -84,7 +88,7 @@ impl AsConHnd for ProxyConHnd {
         mut data: PoolBuf,
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<()>> {
-        data.reserve_front(1 + 32 + 32);
+        data.reserve_front(PROXY_TYPE_BYTES + DIGEST_BYTES + DIGEST_BYTES);
         data.prepend_from_slice(&self.local_digest);
         data.prepend_from_slice(&self.remote_digest);
         data.prepend_from_slice(&[PROXY_FWD_MSG]);
@@ -298,129 +302,149 @@ impl AsEpHnd for ProxyEpHnd {
 }
 
 async fn incoming_evt_logic(
-    mut sub_ep: Ep,
+    sub_ep: Ep,
     hnd: Arc<ProxyEpHnd>,
     local_digest: CertDigest,
     logic_hnd: LogicChanHandle<EpEvent>,
 ) {
-    while let Some(evt) = sub_ep.next().await {
-        use EpEvent::*;
-        if match evt {
-            IncomingConnection(_) => Ok(()),
-            IncomingData(EpIncomingData {
-                con: sub_con,
-                url: base_url,
-                msg_id,
-                mut data,
-            }) => {
-                if data.is_empty() {
-                    // TODO - FIXME - kill connection
-                    panic!("corrupt incoming data");
-                }
-                match data[0] {
-                    PROXY_HELLO_DIGEST => {
-                        let remote_digest = CertDigest(Arc::new(data[1..].to_vec()));
-                        ingest_incoming_con(
-                            logic_hnd.clone(),
-                            hnd.inner.clone(),
-                            local_digest.clone(),
-                            remote_digest,
-                            base_url,
-                            sub_con,
-                        )
-                        .await;
-                    }
-                    PROXY_FWD_MSG => {
-                        let src_digest = CertDigest(Arc::new(data[33..65].to_vec()));
-                        let dest_digest = CertDigest(Arc::new(data[1..33].to_vec()));
-                        if dest_digest == hnd.cert_digest {
-                            // this data is destined for US!
-                            data.cheap_move_start(65);
-                            let url = match promote_addr(&base_url, &src_digest) {
-                                Ok(url) => url,
-                                // TODO - FIXME
-                                e => panic!("{:?}", e),
-                            };
-                            let con = ProxyConHnd::new(sub_con, dest_digest, src_digest);
-                            let evt = EpEvent::IncomingData(EpIncomingData {
-                                con,
-                                url,
-                                msg_id,
-                                data,
-                            });
-                            let _ = logic_hnd.emit(evt).await;
-                        } else {
-                            let dest = hnd.inner.share_mut(|i, _| {
-                                Ok(i.in_digest_to_sub_con.get(&dest_digest).cloned())
-                            });
-                            match dest {
-                                Ok(Some(d_sub_con)) => {
-                                    let t = KitsuneTimeout::from_millis(1000 * 30);
-                                    // TODO - correct to await here / backpressure?
-                                    // TODO - respond with errors?
-                                    let _ = d_sub_con.write(msg_id, data, t).await;
-                                }
-                                // TODO - FIXME
-                                e => panic!("{:?}", e),
-                            }
-                        }
-                    }
-                    // TODO - FIXME - kill connection
-                    _ => panic!("corrupt incoming data"),
-                }
-                Ok(())
+    // erm - this const is not pub in types
+    const CHANNEL_COUNT: usize = 3;
+
+    // use CHANNEL_COUNT concurrents because that is how many channels
+    // we have for sending outgoing data... most everything else in here is sync
+    // and so will be processed serially anyways.
+    // Benchmarks showed a slight slowdown when using semaphore count tasks
+    // instead of for_each_concurrent... but maybe other problems caused that?
+    sub_ep
+        .for_each_concurrent(CHANNEL_COUNT, |evt| async {
+            incoming_evt_handle(evt, &hnd, &local_digest, &logic_hnd).await;
+        })
+        .await;
+}
+
+async fn incoming_evt_handle(
+    evt: EpEvent,
+    hnd: &Arc<ProxyEpHnd>,
+    local_digest: &CertDigest,
+    logic_hnd: &LogicChanHandle<EpEvent>,
+) {
+    use EpEvent::*;
+    match evt {
+        IncomingConnection(_) => (),
+        IncomingData(EpIncomingData {
+            con: sub_con,
+            url: base_url,
+            msg_id,
+            mut data,
+        }) => {
+            if data.is_empty() {
+                tracing::error!("Invalid EMPTY PROXY FRAME!");
+                return;
             }
-            ConnectionClosed(EpConnectionClosed {
-                con,
-                url,
-                code,
-                reason,
-            }) => {
-                let con2 = con.clone();
-                let mut remote_digest = None;
-                let _ = hnd.inner.share_mut(|i, _| {
-                    if let Some(base_url) = i.sub_con_to_base_url.remove(&con2) {
-                        i.base_url_to_sub_con.remove(&base_url);
-                    }
-                    if let Some(digest) = i.in_sub_con_to_digest.remove(&con2) {
-                        i.in_digest_to_sub_con.remove(&digest);
-                        remote_digest = Some(digest);
-                    }
-                    Ok(())
-                });
-                // TODO - FIXME - better way to do this if we don't know??
-                let remote_digest = remote_digest.unwrap_or_else(|| vec![0; 32].into());
-                match promote_addr(&url, &remote_digest) {
-                    Err(e) => {
-                        let _ = logic_hnd.emit(Error(e));
-                        Ok(())
-                    }
-                    Ok(url) => {
-                        let evt = ConnectionClosed(EpConnectionClosed {
+            match data[0] {
+                PROXY_HELLO_DIGEST => {
+                    let remote_digest = CertDigest(Arc::new(data[1..].to_vec()));
+                    ingest_incoming_con(
+                        logic_hnd.clone(),
+                        hnd.inner.clone(),
+                        local_digest.clone(),
+                        remote_digest,
+                        base_url,
+                        sub_con,
+                    )
+                    .await;
+                }
+                PROXY_FWD_MSG => {
+                    const SRC_START: usize = PROXY_TYPE_BYTES + DIGEST_BYTES;
+                    const SRC_END: usize = SRC_START + DIGEST_BYTES;
+
+                    const DEST_START: usize = PROXY_TYPE_BYTES;
+                    const DEST_END: usize = DEST_START + DIGEST_BYTES;
+                    let src_digest = CertDigest(Arc::new(data[SRC_START..SRC_END].to_vec()));
+                    let dest_digest = CertDigest(Arc::new(data[DEST_START..DEST_END].to_vec()));
+                    if dest_digest == hnd.cert_digest {
+                        // this data is destined for US!
+                        data.cheap_move_start(SRC_END);
+                        let url = promote_addr(&base_url, &src_digest).unwrap();
+                        let con = ProxyConHnd::new(sub_con, dest_digest, src_digest);
+                        let evt = EpEvent::IncomingData(EpIncomingData {
                             con,
                             url,
-                            code,
-                            reason,
+                            msg_id,
+                            data,
                         });
                         let _ = logic_hnd.emit(evt).await;
-                        Ok(())
+                    } else {
+                        let dest = hnd.inner.share_mut(|i, _| {
+                            Ok(i.in_digest_to_sub_con.get(&dest_digest).cloned())
+                        });
+                        if let Err(e) = match dest {
+                            Ok(Some(d_sub_con)) => {
+                                let t = KitsuneTimeout::from_millis(1000 * 30);
+                                d_sub_con.write(msg_id, data, t).await
+                            }
+                            Ok(None) => {
+                                Err(format!("Invalid Proxy Target: {:?}", dest_digest).into())
+                            }
+                            Err(e) => Err(e),
+                        } {
+                            // TODO - FIXME - also respond to requestor with
+                            //                an error type.
+                            tracing::error!("Proxy Fwd Error: {:?}", e);
+                        }
                     }
                 }
-            }
-            Error(e) => logic_hnd.emit(Error(e)).await,
-            EndpointClosed => {
-                let _ = hnd.inner.share_mut(|_, c| {
-                    *c = true;
-                    Ok(())
-                });
-                let _ = logic_hnd.emit(EndpointClosed).await;
-                logic_hnd.close();
-                Ok(())
+                b => {
+                    let reason = format!("Invalid Proxy Byte: {}", b);
+                    sub_con.close(500, &reason).await;
+                }
             }
         }
-        .is_err()
-        {
-            break;
+        ConnectionClosed(EpConnectionClosed {
+            con,
+            url,
+            code,
+            reason,
+        }) => {
+            let con2 = con.clone();
+            let mut remote_digest = None;
+            let _ = hnd.inner.share_mut(|i, _| {
+                if let Some(base_url) = i.sub_con_to_base_url.remove(&con2) {
+                    i.base_url_to_sub_con.remove(&base_url);
+                }
+                if let Some(digest) = i.in_sub_con_to_digest.remove(&con2) {
+                    i.in_digest_to_sub_con.remove(&digest);
+                    remote_digest = Some(digest);
+                }
+                Ok(())
+            });
+            // TODO - FIXME - better way to do this if we don't know??
+            let remote_digest = remote_digest.unwrap_or_else(|| vec![0; 32].into());
+            match promote_addr(&url, &remote_digest) {
+                Err(e) => {
+                    let _ = logic_hnd.emit(Error(e));
+                }
+                Ok(url) => {
+                    let evt = ConnectionClosed(EpConnectionClosed {
+                        con,
+                        url,
+                        code,
+                        reason,
+                    });
+                    let _ = logic_hnd.emit(evt).await;
+                }
+            }
+        }
+        Error(e) => {
+            let _ = logic_hnd.emit(Error(e)).await;
+        }
+        EndpointClosed => {
+            let _ = hnd.inner.share_mut(|_, c| {
+                *c = true;
+                Ok(())
+            });
+            let _ = logic_hnd.emit(EndpointClosed).await;
+            logic_hnd.close();
         }
     }
 }
