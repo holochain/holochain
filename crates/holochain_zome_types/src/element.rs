@@ -21,13 +21,31 @@ use holochain_serialized_bytes::prelude::*;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct Element {
     /// The signed header for this element
-    pub signed_header: SignedHeaderHashed,
+    signed_header: SignedHeaderHashed,
     /// If there is an entry associated with this header it will be here.
     /// If not, there will be an enum variant explaining the reason.
-    pub entry: ElementEntry,
+    entry: ElementEntry,
 }
 
 impl Element {
+    /// Mutable reference to the Header content.
+    /// This is useless and dangerous in production usage.
+    /// Guaranteed to make hashes and signatures mismatch whatever the Header is mutated to (at least).
+    /// This may be useful for tests that rely heavily on mocked and fixturated data.
+    #[cfg(feature = "mut_element")]
+    pub fn as_header_mut_ref(&mut self) -> &mut Header {
+        &mut self.signed_header.header.content
+    }
+
+    /// Mutable reference to the ElementEntry.
+    /// This is useless and dangerous in production usage.
+    /// Guaranteed to make hashes and signatures mismatch whatever the ElementEntry is mutated to (at least).
+    /// This may be useful for tests that rely heavily on mocked and fixturated data.
+    #[cfg(feature = "mut_element")]
+    pub fn as_entry_mut_ref(&mut self) -> &mut ElementEntry {
+        &mut self.entry
+    }
+
     /// Raw element constructor.  Used only when we know that the values are valid.
     pub fn new(signed_header: SignedHeaderHashed, maybe_entry: Option<Entry>) -> Self {
         let maybe_visibilty = signed_header
