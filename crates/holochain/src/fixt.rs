@@ -134,15 +134,15 @@ fixturator!(
 
 fixturator!(
     DnaFile,
-    {
+    curve Empty {
         DnaFile::from_parts(
             tokio_helper::block_forever_on(async move {
                 DnaDefHashed::from_content_sync(DnaDefFixturator::new(Empty).next().unwrap())
             }),
             WasmMapFixturator::new(Empty).next().unwrap(),
         )
-    },
-    {
+    };
+    curve Unpredictable {
         // align the wasm hashes across the file and def
         let mut zome_name_fixturator = ZomeNameFixturator::new(Unpredictable);
         let wasms = WasmMapFixturator::new(Unpredictable).next().unwrap();
@@ -161,8 +161,8 @@ fixturator!(
         let dna =
             tokio_helper::block_forever_on(async move { DnaDefHashed::from_content_sync(dna_def) });
         DnaFile::from_parts(dna, WasmMapFixturator::new(Unpredictable).next().unwrap())
-    },
-    {
+    };
+    curve Predictable {
         // align the wasm hashes across the file and def
         let mut zome_name_fixturator =
             ZomeNameFixturator::new_indexed(Predictable, get_fixt_index!());
@@ -191,7 +191,7 @@ fixturator!(
                 .next()
                 .unwrap(),
         )
-    }
+    };
 );
 
 fixturator!(

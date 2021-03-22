@@ -22,6 +22,7 @@ use holo_hash::*;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
+use ::fixt::rng;
 
 pub use holo_hash::fixt::*;
 
@@ -156,7 +157,7 @@ fixturator!(
     CapSecret;
     curve Empty [0; CAP_SECRET_BYTES].into();
     curve Unpredictable {
-        let mut rng = rand::thread_rng();
+        let mut rng = rng();
         let upper = rng.gen::<[u8; CAP_SECRET_BYTES / 2]>();
         let lower = rng.gen::<[u8; CAP_SECRET_BYTES / 2]>();
         let mut inner = [0; CAP_SECRET_BYTES];
@@ -189,6 +190,35 @@ fixturator!(
 
 newtype_fixturator!(Signature<SixtyFourBytes>);
 
+pub type SignatureVec = Vec<Signature>;
+fixturator!(
+    SignatureVec;
+    curve Empty vec![];
+    curve Unpredictable {
+        let min_len = 0;
+        let max_len = 5;
+        let mut rng = rng();
+        let len = rng.gen_range(min_len, max_len);
+        let mut signature_fixturator = SignatureFixturator::new(Unpredictable);
+        let mut signatures = vec![];
+        for _ in 0..len {
+            signatures.push(signature_fixturator.next().unwrap());
+        }
+        signatures
+    };
+    curve Predictable {
+        let mut index = get_fixt_index!();
+        let mut signature_fixturator = SignatureFixturator::new_indexed(Predictable, index);
+        let mut signatures = vec![];
+        for _ in 0..3 {
+            signatures.push(signature_fixturator.next().unwrap());
+        }
+        index += 1;
+        set_fixt_index!(index);
+        signatures
+    };
+);
+
 fixturator!(
     MigrateAgent;
     unit variants [ Open Close ] empty Close;
@@ -214,7 +244,7 @@ fixturator!(
     CurryPayloads;
     curve Empty CurryPayloads(BTreeMap::new());
     curve Unpredictable {
-        let mut rng = rand::thread_rng();
+        let mut rng = rng();
         let number_of_payloads = rng.gen_range(0, 5);
 
         let mut payloads: BTreeMap<GrantedFunction, SerializedBytes> = BTreeMap::new();
@@ -240,13 +270,13 @@ fixturator!(
 );
 
 fixturator!(
-    ZomeCallCapGrant,
-    {
+    ZomeCallCapGrant;
+    curve Empty {
         ZomeCallCapGrant::new(
             StringFixturator::new(Empty).next().unwrap(),
             CapAccessFixturator::new(Empty).next().unwrap(),
             {
-                let mut rng = rand::thread_rng();
+                let mut rng = rng();
                 let number_of_zomes = rng.gen_range(0, 5);
 
                 let mut granted_functions: GrantedFunctions = HashSet::new();
@@ -256,8 +286,8 @@ fixturator!(
                 granted_functions
             }, // CurryPayloadsFixturator::new(Empty).next().unwrap(),
         )
-    },
-    {
+    };
+    curve Unpredictable {
         ZomeCallCapGrant::new(
             StringFixturator::new(Unpredictable).next().unwrap(),
             CapAccessFixturator::new(Unpredictable).next().unwrap(),
@@ -277,8 +307,8 @@ fixturator!(
             },
             // CurryPayloadsFixturator::new(Unpredictable).next().unwrap(),
         )
-    },
-    {
+    };
+    curve Predictable {
         ZomeCallCapGrant::new(
             StringFixturator::new_indexed(Predictable, get_fixt_index!())
                 .next()
@@ -296,7 +326,7 @@ fixturator!(
             },
             // CurryPayloadsFixturator::new(Predictable).next().unwrap(),
         )
-    }
+    };
 );
 
 fixturator!(

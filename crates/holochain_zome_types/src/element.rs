@@ -21,10 +21,10 @@ use holochain_serialized_bytes::prelude::*;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct Element {
     /// The signed header for this element
-    signed_header: SignedHeaderHashed,
+    pub signed_header: SignedHeaderHashed,
     /// If there is an entry associated with this header it will be here.
     /// If not, there will be an enum variant explaining the reason.
-    entry: ElementEntry,
+    pub entry: ElementEntry,
 }
 
 impl Element {
@@ -191,8 +191,10 @@ impl HashableContent for SignedHeader {
 /// The header and the signature that signed it
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SignedHeaderHashed {
-    header: HeaderHashed,
-    signature: Signature,
+    /// The hashed but unsigned header.
+    pub header: HeaderHashed,
+    /// The signature of the header.
+    pub signature: Signature,
 }
 
 #[allow(missing_docs)]

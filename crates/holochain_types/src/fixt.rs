@@ -142,6 +142,11 @@ fixturator!(
 );
 
 fixturator!(
+    ValidateData;
+    constructor fn new_element_only (Element);
+);
+
+fixturator!(
     DnaDef;
     curve Empty DnaDef {
         name: StringFixturator::new_indexed(Empty, get_fixt_index!())

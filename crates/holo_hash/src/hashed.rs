@@ -9,8 +9,10 @@ use holochain_serialized_bytes::prelude::*;
 // TODO: consider making lazy with OnceCell
 #[derive(Serialize, Deserialize)]
 pub struct HoloHashed<C: HashableContent> {
-    pub(crate) content: C,
-    pub(crate) hash: HoloHashOf<C>,
+    /// Whatever type C is as data.
+    pub content: C,
+    /// The hash of the content C.
+    pub hash: HoloHashOf<C>,
 }
 
 impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {
