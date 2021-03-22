@@ -17,12 +17,12 @@ use crate::zome::FunctionName;
 use crate::zome::ZomeName;
 use crate::Entry;
 use ::fixt::prelude::*;
+use ::fixt::rng;
 use holo_hash::EntryHash;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
-use ::fixt::rng;
 
 pub use holo_hash::fixt::*;
 

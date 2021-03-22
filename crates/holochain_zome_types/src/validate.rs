@@ -29,11 +29,17 @@ pub struct ValidateData {
 
 impl ValidateData {
     pub fn new(element: Element, validation_package: Option<ValidationPackage>) -> Self {
-        Self { element, validation_package }
+        Self {
+            element,
+            validation_package,
+        }
     }
 
     pub fn new_element_only(element: Element) -> Self {
-        Self { element, validation_package: None }
+        Self {
+            element,
+            validation_package: None,
+        }
     }
 }
 
