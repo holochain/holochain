@@ -101,6 +101,7 @@ async fn in_chan_recv_logic(
                 let r = chan
                     .read(KitsuneTimeout::from_millis(MAX_READ_TIMEOUT))
                     .await;
+
                 let (msg_id, data) = match r {
                     Err(e) if *e.kind() == KitsuneErrorKind::Closed => {
                         // this channel was closed - exit the loop
@@ -127,7 +128,11 @@ async fn in_chan_recv_logic(
                     msg_id,
                     data,
                 };
+
                 if logic_hnd.emit(EpEvent::IncomingData(data)).await.is_err() {
+                    // the only reason this will error is if our
+                    // endpoint is shut down, in which case we
+                    // no longer care about the error.
                     break;
                 }
             }
@@ -145,6 +150,7 @@ async fn in_chan_recv_logic(
                 }
                 Ok(p) => p,
             };
+
             let writer = match raw_con
                 .out_chan(KitsuneTimeout::from_millis(MAX_READ_TIMEOUT))
                 .await
@@ -163,6 +169,7 @@ async fn in_chan_recv_logic(
                 }
                 Ok(c) => c,
             };
+
             writer_bucket.release(WriteChan {
                 _permit: permit,
                 writer,
@@ -170,6 +177,7 @@ async fn in_chan_recv_logic(
         }
     };
 
+    // We can ignore errors, as they only happen on shutdown of the endpoint.
     let _ = futures::future::join(recv_fut, write_fut).await;
 }
 
