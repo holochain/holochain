@@ -7,7 +7,7 @@
 //!
 //! ```rust, no_run
 //! async fn async_main () {
-//! use holochain_sqlite::test_utils::{test_environments, TestDb};
+//! use holochain_state::test_utils::test_environments;
 //! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
 //! let envs = test_environments();
 //! let handle: ConductorHandle = ConductorBuilder::new()
