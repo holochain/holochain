@@ -4,7 +4,10 @@ use futures::future::{BoxFuture, FutureExt};
 use futures::io::AsyncReadExt;
 use futures::io::AsyncWriteExt;
 
+/// Request/Response bit mask.
 const R_MASK: u64 = 1 << 63;
+
+/// Request/Response bit filter.
 const R_FILT: u64 = !R_MASK;
 
 /// MsgId type
