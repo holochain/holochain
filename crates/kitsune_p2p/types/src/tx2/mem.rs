@@ -208,7 +208,7 @@ impl EndpointAdapt for MemEndpointAdapt {
         Ok(inner.url.clone())
     }
 
-    fn connect(&self, url: TxUrl, _timeout: KitsuneTimeout) -> ConFut {
+    fn connect(&self, url: TxUrl, timeout: KitsuneTimeout) -> ConFut {
         let (this_url, this_ep_active) = {
             let inner = self.0.lock();
             if !inner.ep_active.is_active() {
@@ -218,20 +218,23 @@ impl EndpointAdapt for MemEndpointAdapt {
         };
         async move {
             let con_id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
-            let id: Result<u64, ()> = 'top: loop {
-                if url.scheme() == "kitsune-mem" {
-                    if let Some(id) = url.host_str() {
-                        if let Ok(id) = id.parse::<u64>() {
-                            break 'top Ok(id);
-                        }
-                    }
-                }
-                break 'top Err(());
+
+            let bad_url = || Err(format!("invalid url: {}", url).into());
+
+            if url.scheme() != "kitsune-mem" {
+                return bad_url();
+            }
+
+            let id = match url.host_str() {
+                None => return bad_url(),
+                Some(id) => id,
             };
-            let id = match id {
+
+            let id = match id.parse::<u64>() {
+                Err(_) => return bad_url(),
                 Ok(id) => id,
-                Err(_) => return Err(format!("invalid url: {}", url).into()),
             };
+
             let (c_send, oth_ep_active) = match MEM_ENDPOINTS.lock().get(&id) {
                 None => return Err(format!("remote not found: {}", url).into()),
                 Some((s, a)) => (s.clone(), a.clone()),
@@ -265,7 +268,16 @@ impl EndpointAdapt for MemEndpointAdapt {
             let chan_recv: Box<dyn InChanRecvAdapt> =
                 Box::new(MemInChanRecvAdapt::new(recv, mix_active));
 
-            if c_send.send((oth_con, oth_chan_recv)).await.is_err() {
+            use futures::future::TryFutureExt;
+            if timeout
+                .mix(
+                    c_send
+                        .send((oth_con, oth_chan_recv))
+                        .map_err(|_| KitsuneError::from(KitsuneErrorKind::Closed)),
+                )
+                .await
+                .is_err()
+            {
                 MEM_ENDPOINTS.lock().remove(&id);
                 return Err(format!("failed to establish connection: {}", url).into());
             }

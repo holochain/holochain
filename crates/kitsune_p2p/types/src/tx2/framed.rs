@@ -10,6 +10,12 @@ const R_MASK: u64 = 1 << 63;
 /// Request/Response bit filter.
 const R_FILT: u64 = !R_MASK;
 
+/// MsgSize Bytes
+const MSG_SIZE_BYTES: usize = 4;
+
+/// MsgId Bytes
+const MSG_ID_BYTES: usize = 8;
+
 /// MsgId type
 #[derive(Debug)]
 pub enum MsgIdType {
@@ -136,14 +142,14 @@ struct FramedReaderInner {
 pub struct FramedReader(Option<FramedReaderInner>);
 
 fn read_size(b: &[u8]) -> usize {
-    let mut bytes = [0_u8; 4];
-    bytes.copy_from_slice(&b[..4]);
+    let mut bytes = [0_u8; MSG_SIZE_BYTES];
+    bytes.copy_from_slice(&b[..MSG_SIZE_BYTES]);
     u32::from_le_bytes(bytes) as usize
 }
 
 fn read_msg_id(b: &[u8]) -> MsgId {
-    let mut bytes = [0_u8; 8];
-    bytes.copy_from_slice(&b[..8]);
+    let mut bytes = [0_u8; MSG_ID_BYTES];
+    bytes.copy_from_slice(&b[..MSG_ID_BYTES]);
     u64::from_le_bytes(bytes).into()
 }
 
@@ -169,16 +175,24 @@ impl AsFramedReader for FramedReader {
                 .mix(async {
                     let mut read = 0;
 
-                    while read < 4 + 8 {
-                        read += inner
+                    while read < MSG_SIZE_BYTES + MSG_ID_BYTES {
+                        let sub_read = inner
                             .sub
-                            .read(&mut inner.local_buf[read..4 + 8])
+                            .read(&mut inner.local_buf[read..MSG_SIZE_BYTES + MSG_ID_BYTES])
                             .await
                             .map_err(KitsuneError::other)?;
+                        if sub_read == 0 {
+                            return Err(KitsuneErrorKind::Closed.into());
+                        }
+                        read += sub_read;
                     }
 
-                    let want_size = read_size(&inner.local_buf[..4]) - 4 - 8;
-                    let msg_id = read_msg_id(&inner.local_buf[4..4 + 8]);
+                    let want_size = read_size(&inner.local_buf[..MSG_SIZE_BYTES])
+                        - MSG_SIZE_BYTES
+                        - MSG_ID_BYTES;
+                    let msg_id = read_msg_id(
+                        &inner.local_buf[MSG_SIZE_BYTES..MSG_SIZE_BYTES + MSG_ID_BYTES],
+                    );
 
                     let mut buf = PoolBuf::new();
                     buf.reserve(want_size);
@@ -194,6 +208,9 @@ impl AsFramedReader for FramedReader {
                             Err(e) => return Err(e),
                             Ok(read) => read,
                         };
+                        if read == 0 {
+                            return Err(KitsuneErrorKind::Closed.into());
+                        }
                         buf.extend_from_slice(&inner.local_buf[..read]);
                     }
 
@@ -259,9 +276,9 @@ impl AsFramedWriter for FramedWriter {
 
             if let Err(e) = timeout
                 .mix(async {
-                    let total = data.len() as u32 + 4 /* len */ + 8 /* msg_id */;
+                    let total = (data.len() + MSG_SIZE_BYTES + MSG_ID_BYTES) as u32;
 
-                    data.reserve_front(4 + 8);
+                    data.reserve_front(MSG_SIZE_BYTES + MSG_ID_BYTES);
                     data.prepend_from_slice(&msg_id.inner().to_le_bytes()[..]);
                     data.prepend_from_slice(&total.to_le_bytes()[..]);
 
