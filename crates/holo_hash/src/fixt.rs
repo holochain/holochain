@@ -90,34 +90,7 @@ fixturator!(
         agents[get_fixt_index!() % agents.len()].clone()
     };
 );
-// pub type AgentPubKeyVec = Vec<AgentPubKey>;
-// fixturator!(
-//     AgentPubKeyVec;
-//     curve Empty vec![];
-//     curve Unpredictable {
-//         let min_len = 0;
-//         let max_len = 5;
-//         let mut rng = fixt::rng();
-//         let len = rng.gen_range(min_len, max_len);
-//         let mut agent_pub_key_fixturator = AgentPubKeyFixturator::new(Unpredictable);
-//         let mut agent_pub_keys = vec![];
-//         for _ in 0..len {
-//             agent_pub_keys.push(agent_pub_key_fixturator.next().unwrap());
-//         }
-//         agent_pub_keys
-//     };
-//     curve Predictable {
-//         let mut index = get_fixt_index!();
-//         let mut agent_pub_key_fixturator = AgentPubKeyFixturator::new_indexed(Predictable, index);
-//         let mut agent_pub_keys = vec![];
-//         for _ in 0..3 {
-//             agent_pub_keys.push(agent_pub_key_fixturator.next().unwrap());
-//         }
-//         index += 1;
-//         set_fixt_index!(index);
-//         agent_pub_keys
-//     };
-// );
+
 fixturator!(
     AgentPubKeyB64;
     constructor fn new(AgentPubKey);
