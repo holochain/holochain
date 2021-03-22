@@ -5,6 +5,7 @@
 use crate::*;
 use futures::future::BoxFuture;
 use futures::stream::{Stream, StreamExt};
+use ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::tx2::tx2_backend::*;
 use kitsune_p2p_types::tx2::tx2_frontend::tx2_frontend_traits::*;
 use kitsune_p2p_types::tx2::tx2_frontend::*;
@@ -337,8 +338,8 @@ async fn incoming_evt_handle(
             mut data,
         }) => {
             if data.is_empty() {
-                // TODO - FIXME - kill connection
-                panic!("corrupt incoming data");
+                tracing::error!("Invalid EMPTY PROXY FRAME!");
+                return;
             }
             match data[0] {
                 PROXY_HELLO_DIGEST => {
@@ -364,11 +365,7 @@ async fn incoming_evt_handle(
                     if dest_digest == hnd.cert_digest {
                         // this data is destined for US!
                         data.cheap_move_start(SRC_END);
-                        let url = match promote_addr(&base_url, &src_digest) {
-                            Ok(url) => url,
-                            // TODO - FIXME
-                            e => panic!("{:?}", e),
-                        };
+                        let url = promote_addr(&base_url, &src_digest).unwrap();
                         let con = ProxyConHnd::new(sub_con, dest_digest, src_digest);
                         let evt = EpEvent::IncomingData(EpIncomingData {
                             con,
@@ -381,19 +378,26 @@ async fn incoming_evt_handle(
                         let dest = hnd.inner.share_mut(|i, _| {
                             Ok(i.in_digest_to_sub_con.get(&dest_digest).cloned())
                         });
-                        match dest {
+                        if let Err(e) = match dest {
                             Ok(Some(d_sub_con)) => {
                                 let t = KitsuneTimeout::from_millis(1000 * 30);
-                                // TODO - respond with errors?
-                                let _ = d_sub_con.write(msg_id, data, t).await;
+                                d_sub_con.write(msg_id, data, t).await
                             }
-                            // TODO - FIXME
-                            e => panic!("{:?}", e),
+                            Ok(None) => {
+                                Err(format!("Invalid Proxy Target: {:?}", dest_digest).into())
+                            }
+                            Err(e) => Err(e),
+                        } {
+                            // TODO - FIXME - also respond to requestor with
+                            //                an error type.
+                            tracing::error!("Proxy Fwd Error: {:?}", e);
                         }
                     }
                 }
-                // TODO - FIXME - kill connection
-                _ => panic!("corrupt incoming data"),
+                b => {
+                    let reason = format!("Invalid Proxy Byte: {}", b);
+                    sub_con.close(500, &reason).await;
+                }
             }
         }
         ConnectionClosed(EpConnectionClosed {
