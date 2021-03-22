@@ -51,5 +51,5 @@ pub mod wasm;
 pub mod workspace;
 
 #[allow(missing_docs)]
-#[cfg(test)]
-mod test_utils;
+#[cfg(any(test, feature = "test_utils"))]
+pub mod test_utils;

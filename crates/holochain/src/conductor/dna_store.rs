@@ -1,6 +1,5 @@
 use fallible_iterator::FallibleIterator;
 use holochain_sqlite::buffer::CasBufFreshSync;
-use holochain_sqlite::db::DbRead;
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::exports::SingleTable;
@@ -62,7 +61,7 @@ impl RealDnaStore {
 }
 
 impl DnaDefBuf {
-    pub fn new(env: DbRead, dna_def_store: SingleTable) -> DatabaseResult<Self> {
+    pub fn new(env: EnvRead, dna_def_store: SingleTable) -> DatabaseResult<Self> {
         Ok(Self {
             dna_defs: CasBufFreshSync::new(env, dna_def_store),
         })

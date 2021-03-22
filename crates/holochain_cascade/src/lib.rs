@@ -134,7 +134,7 @@ pub struct Cascade<
     pending_data: Option<DbPair<'a, MetaPending, PendingPrefix>>,
     rejected_data: Option<DbPair<'a, MetaRejected, RejectedPrefix>>,
     cache_data: Option<DbPairMut<'a, MetaCache>>,
-    env: Option<DbRead>,
+    env: Option<EnvRead>,
     network: Option<Network>,
 }
 
@@ -169,7 +169,7 @@ where
     // avoid refactoring
     #[allow(clippy::complexity)]
     pub fn new(
-        env: DbRead,
+        env: EnvRead,
         element_authored: &'a ElementBuf<AuthoredPrefix>,
         meta_authored: &'a MetaAuthored,
         element_integrated: &'a ElementBuf,
@@ -401,12 +401,11 @@ where
         let env = ok_or_return!(self.env.clone());
         match *hash.hash_type() {
             AnyDht::Entry => {
-                let response =
-                    authority::handle_get_entry(env.into(), hash.into(), (&options).into())?;
+                let response = authority::handle_get_entry(env, hash.into(), (&options).into())?;
                 self.put_entry_in_cache(response)?;
             }
             AnyDht::Header => {
-                let response = authority::handle_get_element(env.into(), hash.into())?;
+                let response = authority::handle_get_element(env, hash.into())?;
                 self.put_element_in_cache(response)?;
             }
         }
@@ -790,7 +789,7 @@ where
         headers: &BTreeSet<TimedHeaderHash>,
         cache_data: &DbPairMut<'a, MetaCache>,
         authored_data: &DbPair<'a, MetaAuthored, AuthoredPrefix>,
-        env: &DbRead,
+        env: &EnvRead,
     ) -> CascadeResult<EntryDhtStatus> {
         fresh_reader!(env, |mut r| {
             for thh in headers {
@@ -931,8 +930,7 @@ where
     /// Elements can end up in the cache or integrated table because
     /// they were gossiped to you or you authored them.
     /// If you care about the hash you are using being valid in the same
-    /// way as if you got it from the StoreElement authority you can use
-    /// this function to verify that constraint.
+    /// way as if you got it from the StoreElement authority you can     /// this function to verify that constraint.
     ///
     /// An example of how this could go wrong is you do a get for a HeaderHash
     /// where you are the authority for the RegisterAgentActivity for this header.
@@ -1069,7 +1067,7 @@ where
         entry_hash: &EntryHash,
         authored_data: &DbPair<MA, AuthoredPrefix>,
         cache_data: &DbPair<MC, AnyPrefix>,
-        env: &DbRead,
+        env: &EnvRead,
     ) -> CascadeResult<Search> {
         fresh_reader!(env, |mut r| {
             let oldest_live_header = authored_data
@@ -1690,7 +1688,7 @@ where
         agent: AgentPubKey,
         range: &Option<std::ops::Range<u32>>,
         cache_data: &DbPairMut<'a, MetaCache>,
-        env: &DbRead,
+        env: &EnvRead,
     ) -> CascadeResult<Vec<(u32, HeaderHash)>> {
         match range {
             Some(range) => {
@@ -2192,7 +2190,7 @@ pub fn get_header<P: PrefixType>(
 #[cfg(test)]
 /// Helper function for easily setting up cascades during tests
 pub fn test_dbs_and_mocks(
-    env: DbRead,
+    env: EnvRead,
 ) -> (
     ElementBuf,
     holochain_state::metadata::MockMetadataBuf,

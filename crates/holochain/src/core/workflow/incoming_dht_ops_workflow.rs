@@ -10,7 +10,6 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::integrate_single_metadata;
 use holochain_sqlite::buffer::BufferedStore;
 use holochain_sqlite::buffer::KvBufFresh;
-use holochain_sqlite::db::DbWrite;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
@@ -23,7 +22,7 @@ mod test;
 
 #[instrument(skip(state_env, sys_validation_trigger, ops))]
 pub async fn incoming_dht_ops_workflow(
-    state_env: &DbWrite,
+    state_env: &EnvWrite,
     mut sys_validation_trigger: TriggerSender,
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     from_agent: Option<AgentPubKey>,
@@ -104,7 +103,7 @@ impl Workspace for IncomingDhtOpsWorkspace {
 }
 
 impl IncomingDhtOpsWorkspace {
-    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+    pub fn new(env: EnvRead) -> WorkspaceResult<Self> {
         let db = env.get_table(TableName::IntegratedDhtOps)?;
         let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
 

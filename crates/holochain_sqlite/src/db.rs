@@ -6,7 +6,6 @@ use crate::{
 };
 use derive_more::Into;
 use futures::Future;
-use holochain_keystore::KeystoreSender;
 use holochain_zome_types::cell::CellId;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
@@ -19,7 +18,6 @@ use std::path::PathBuf;
 pub struct DbRead {
     kind: DbKind,
     path: PathBuf,
-    keystore: KeystoreSender,
     connection_pool: ConnectionPool,
 }
 
@@ -36,11 +34,6 @@ impl DbRead {
     /// Accessor for the [DbKind] of the DbWrite
     pub fn kind(&self) -> &DbKind {
         &self.kind
-    }
-
-    /// Request access to this conductor's keystore
-    pub fn keystore(&self) -> &KeystoreSender {
-        &self.keystore
     }
 
     /// The environment's path
@@ -63,40 +56,25 @@ impl GetTable for DbWrite {}
 /// The canonical representation of a (singleton) database.
 /// The wrapper contains methods for managing transactions
 /// and database connections,
+// FIXME: this `derive_more::From` impl shouldn't be here!!
+// But we have had this in the code for a long time...
 #[derive(Clone, Shrinkwrap, Into, derive_more::From)]
 pub struct DbWrite(DbRead);
 
 impl DbWrite {
     /// Create or open an existing database reference,
-    pub fn open(
-        path_prefix: &Path,
-        kind: DbKind,
-        keystore: KeystoreSender,
-    ) -> DatabaseResult<DbWrite> {
+    pub fn open(path_prefix: &Path, kind: DbKind) -> DatabaseResult<DbWrite> {
         let path = path_prefix.join(kind.filename());
         if let Some(v) = DATABASE_HANDLES.get(&path) {
             Ok(v.clone())
         } else {
-            let db = Self::new(path_prefix, kind, keystore)?;
+            let db = Self::new(path_prefix, kind)?;
             DATABASE_HANDLES.insert_new(path, db.clone());
             Ok(db)
         }
     }
 
-    /// Create a Cell environment (slight shorthand)
-    pub fn open_cell(
-        path_prefix: &Path,
-        cell_id: CellId,
-        keystore: KeystoreSender,
-    ) -> DatabaseResult<Self> {
-        Self::open(path_prefix, DbKind::Cell(cell_id), keystore)
-    }
-
-    pub(crate) fn new(
-        path_prefix: &Path,
-        kind: DbKind,
-        keystore: KeystoreSender,
-    ) -> DatabaseResult<Self> {
+    pub(crate) fn new(path_prefix: &Path, kind: DbKind) -> DatabaseResult<Self> {
         if !path_prefix.is_dir() {
             std::fs::create_dir(path_prefix)
                 .map_err(|_e| DatabaseError::DatabaseMissing(path_prefix.to_owned()))?;
@@ -108,10 +86,16 @@ impl DbWrite {
 
         Ok(DbWrite(DbRead {
             kind,
-            keystore,
             path,
             connection_pool: pool,
         }))
+    }
+
+    /// Create a unique db in a temp dir with no static management of the
+    /// connection pool, useful for testing.
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn test(tmpdir: &tempdir::TempDir, kind: DbKind) -> DatabaseResult<Self> {
+        Self::new(tmpdir.path(), kind)
     }
 
     /// Remove the db and directory

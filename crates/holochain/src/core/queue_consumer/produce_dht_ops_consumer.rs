@@ -4,15 +4,13 @@ use super::*;
 use crate::core::workflow::produce_dht_ops_workflow::produce_dht_ops_workflow;
 use crate::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
 use crate::{conductor::manager::ManagedTaskResult, core::workflow::error::WorkflowResult};
-use holochain_sqlite::db::DbWrite;
-
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for Produce_dht_ops workflow
 #[instrument(skip(env, stop, trigger_publish))]
 pub fn spawn_produce_dht_ops_consumer(
-    env: DbWrite,
+    env: EnvWrite,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_publish: TriggerSender,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {

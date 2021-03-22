@@ -20,14 +20,14 @@ use tracing::*;
 
 #[instrument(skip(state_env))]
 pub fn handle_get_entry(
-    state_env: DbWrite,
+    state_env: EnvRead,
     hash: EntryHash,
     options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<GetElementResponse> {
     // Get the vaults
-    let element_vault = ElementBuf::vault(state_env.clone().into(), false)?;
-    let element_rejected = ElementBuf::rejected(state_env.clone().into())?;
-    let meta_vault = MetadataBuf::vault(state_env.clone().into())?;
+    let element_vault = ElementBuf::vault(state_env.clone(), false)?;
+    let element_rejected = ElementBuf::rejected(state_env.clone())?;
+    let meta_vault = MetadataBuf::vault(state_env.clone())?;
 
     // ## Helper closures to DRY and make more readable
 
@@ -171,11 +171,11 @@ pub fn handle_get_entry(
 }
 
 #[tracing::instrument(skip(env))]
-pub fn handle_get_element(env: DbWrite, hash: HeaderHash) -> CascadeResult<GetElementResponse> {
+pub fn handle_get_element(env: EnvRead, hash: HeaderHash) -> CascadeResult<GetElementResponse> {
     // Get the vaults
-    let element_vault = ElementBuf::vault(env.clone().into(), false)?;
-    let meta_vault = MetadataBuf::vault(env.clone().into())?;
-    let element_rejected = ElementBuf::rejected(env.clone().into())?;
+    let element_vault = ElementBuf::vault(env.clone(), false)?;
+    let meta_vault = MetadataBuf::vault(env.clone())?;
+    let element_rejected = ElementBuf::rejected(env.clone())?;
 
     // Check that we have the authority to serve this request because we have
     // done the StoreElement validation
@@ -243,7 +243,7 @@ pub fn handle_get_element(env: DbWrite, hash: HeaderHash) -> CascadeResult<GetEl
 
 #[instrument(skip(env))]
 pub fn handle_get_agent_activity(
-    env: DbRead,
+    env: EnvRead,
     agent: AgentPubKey,
     query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
@@ -339,7 +339,7 @@ fn check_headers<P: PrefixType, R: Readable>(
 
 #[instrument(skip(env, _options))]
 pub fn handle_get_links(
-    env: DbRead,
+    env: EnvRead,
     link_key: WireLinkMetaKey,
     _options: holochain_p2p::event::GetLinksOptions,
 ) -> CascadeResult<GetLinksResponse> {

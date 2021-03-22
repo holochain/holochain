@@ -54,7 +54,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn via. a wasm call
     async fn ribosome_random_bytes_test() {
-        let test_env = holochain_sqlite::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();

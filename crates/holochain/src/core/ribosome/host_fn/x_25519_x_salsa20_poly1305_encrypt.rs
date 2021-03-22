@@ -31,7 +31,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn invoke_import_x_25519_x_salsa20_poly1305_encrypt_test() {
-        let test_env = holochain_sqlite::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();

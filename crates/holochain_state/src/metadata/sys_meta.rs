@@ -7,20 +7,19 @@ pub enum MetaGetStatus<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::metadata::EntryDhtStatus;
     use crate::metadata::MetadataBuf;
     use crate::metadata::MetadataBufT;
     use crate::metadata::TimedHeaderHash;
+    use crate::{metadata::EntryDhtStatus, prelude::test_cell_env};
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
     use header::Create;
     use holo_hash::fixt::*;
     use holo_hash::*;
-    use holochain_sqlite::test_utils::test_cell_env;
     use holochain_sqlite::{fresh_reader_test, prelude::*};
-    use holochain_types::fixt::AppEntryTypeFixturator;
     use holochain_types::fixt::HeaderBuilderCommonFixturator;
     use holochain_types::header::NewEntryHeader;
+    use holochain_types::{env::EnvWrite, fixt::AppEntryTypeFixturator};
     use holochain_zome_types::header;
     use holochain_zome_types::header::builder;
     use holochain_zome_types::header::Delete;
@@ -529,7 +528,7 @@ mod tests {
         update_entries: &[NewEntryHeader],
         delete_updates: &[Delete],
         _entry_hash: &EntryHash,
-        env: DbWrite,
+        env: EnvWrite,
     ) {
         let mut meta_buf = MetadataBuf::vault(env.clone().into()).unwrap();
         for e in new_entries.iter().chain(update_entries.iter()) {

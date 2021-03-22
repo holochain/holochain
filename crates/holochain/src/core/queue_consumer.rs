@@ -30,9 +30,9 @@ use derive_more::Constructor;
 use derive_more::Display;
 use derive_more::From;
 use futures::future::Either;
-use holochain_sqlite::db::DbWrite;
 use holochain_sqlite::db::WriteManager;
 use holochain_sqlite::prelude::Writer;
+use holochain_types::prelude::*;
 use tokio::sync;
 use tokio::sync::mpsc;
 
@@ -60,7 +60,7 @@ use publish_dht_ops_consumer::*;
 /// Waits for the initial loop to complete before returning, to prevent causing
 /// a race condition by trying to run a workflow too soon after cell creation.
 pub async fn spawn_queue_consumer_tasks(
-    env: &DbWrite,
+    env: &EnvWrite,
     cell_network: HolochainP2pCell,
     conductor_api: impl CellConductorApiT + 'static,
     task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
@@ -267,10 +267,10 @@ impl TriggerReceiver {
 
 /// A lazy Writer factory which can only be used once.
 ///
-/// This is a way of encapsulating an DbWrite so that it can only be
+/// This is a way of encapsulating an EnvWrite so that it can only be
 /// used to create a single Writer before being consumed.
 #[derive(Constructor, From)]
-pub struct OneshotWriter(DbWrite);
+pub struct OneshotWriter(EnvWrite);
 
 impl OneshotWriter {
     /// Create the writer and pass it into a closure.

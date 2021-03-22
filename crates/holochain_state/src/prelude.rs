@@ -10,3 +10,6 @@ pub use crate::workspace::*;
 pub use crate::*;
 
 pub use holochain_sqlite::prelude::*;
+
+#[cfg(any(test, feature = "test_utils"))]
+pub use crate::test_utils::*;

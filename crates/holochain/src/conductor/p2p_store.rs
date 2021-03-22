@@ -9,17 +9,8 @@ use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::dht_arc::DhtArcBucket;
 use holochain_p2p::dht_arc::PeerDensity;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
-use holochain_sqlite::buffer::KvStore;
-use holochain_sqlite::buffer::KvStoreT;
-use holochain_sqlite::db::DbRead;
-use holochain_sqlite::db::DbWrite;
-use holochain_sqlite::db::WriteManager;
-use holochain_sqlite::error::DatabaseError;
-use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::fresh_reader;
-use holochain_sqlite::key::BufKey;
-use holochain_sqlite::prelude::Readable;
 use holochain_sqlite::prelude::*;
+use holochain_types::prelude::*;
 use holochain_zome_types::CellId;
 use kitsune_p2p::{agent_store::AgentInfo, KitsuneBinType};
 use std::convert::TryFrom;
@@ -143,7 +134,7 @@ impl AsRef<KvStore<AgentKvKey, AgentInfoSigned>> for AgentKv {
 
 impl AgentKv {
     /// Constructor.
-    pub fn new(env: DbRead) -> DatabaseResult<Self> {
+    pub fn new(env: EnvRead) -> DatabaseResult<Self> {
         let db = env.get_table(TableName::Agent)?;
         Ok(Self(KvStore::new(db)))
     }
@@ -180,7 +171,7 @@ impl AgentKv {
 
 /// Inject multiple agent info entries into the peer store
 pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
-    env: DbWrite,
+    env: EnvWrite,
     iter: I,
 ) -> DatabaseResult<()> {
     let p2p_store = AgentKv::new(env.clone().into())?;
@@ -197,7 +188,7 @@ pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
 }
 
 /// Helper function to get all the peer data from this conductor
-pub fn all_agent_infos(env: DbRead) -> DatabaseResult<Vec<AgentInfoSigned>> {
+pub fn all_agent_infos(env: EnvRead) -> DatabaseResult<Vec<AgentInfoSigned>> {
     let p2p_store = AgentKv::new(env.clone())?;
     fresh_reader!(env, |mut r| {
         p2p_store.iter(&mut r)?.map(|(_, v)| Ok(v)).collect()
@@ -206,7 +197,7 @@ pub fn all_agent_infos(env: DbRead) -> DatabaseResult<Vec<AgentInfoSigned>> {
 
 /// Helper function to get a single agent info
 pub fn get_single_agent_info(
-    env: DbRead,
+    env: EnvRead,
     space: DnaHash,
     agent: AgentPubKey,
 ) -> DatabaseResult<Option<AgentInfoSigned>> {
@@ -218,7 +209,7 @@ pub fn get_single_agent_info(
 
 /// Interconnect every provided pair of conductors via their peer store databases
 #[cfg(any(test, feature = "test_utils"))]
-pub fn exchange_peer_info(envs: Vec<DbWrite>) {
+pub fn exchange_peer_info(envs: Vec<EnvWrite>) {
     for (i, a) in envs.iter().enumerate() {
         for (j, b) in envs.iter().enumerate() {
             if i == j {
@@ -232,7 +223,7 @@ pub fn exchange_peer_info(envs: Vec<DbWrite>) {
 
 /// Get agent info for a single agent
 pub fn get_agent_info_signed(
-    environ: DbWrite,
+    environ: EnvWrite,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
 ) -> ConductorResult<Option<AgentInfoSigned>> {
@@ -264,7 +255,7 @@ pub fn get_agent_info_signed(
 
 /// Get agent info for a single space
 pub fn query_agent_info_signed(
-    environ: DbWrite,
+    environ: EnvWrite,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
 ) -> ConductorResult<Vec<AgentInfoSigned>> {
     let p2p_kv = AgentKv::new(environ.clone().into())?;
@@ -309,7 +300,7 @@ pub fn query_agent_info_signed(
 /// Get the peer density an agent is currently seeing within
 /// a given [`DhtArc`]
 pub fn query_peer_density(
-    env: DbWrite,
+    env: EnvWrite,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     dht_arc: DhtArc,
 ) -> ConductorResult<PeerDensity> {
@@ -343,7 +334,7 @@ pub fn query_peer_density(
 
 /// Put single agent info into store
 pub fn put_agent_info_signed(
-    environ: DbWrite,
+    environ: EnvWrite,
     agent_info_signed: kitsune_p2p::agent_store::AgentInfoSigned,
 ) -> ConductorResult<()> {
     let p2p_kv = AgentKv::new(environ.clone().into())?;
@@ -371,7 +362,7 @@ fn is_expired(now: u64, info: &kitsune_p2p::agent_store::AgentInfo) -> bool {
 }
 
 /// Dump the agents currently in the peer store
-pub fn dump_state(env: DbRead, cell_id: Option<CellId>) -> DatabaseResult<P2pStateDump> {
+pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> DatabaseResult<P2pStateDump> {
     use std::fmt::Write;
     let cell_id = cell_id.map(|c| c.into_dna_and_agent()).map(|c| {
         (
@@ -450,7 +441,7 @@ mod tests {
     use holochain_sqlite::db::ReadManager;
     use holochain_sqlite::db::WriteManager;
     use holochain_sqlite::fresh_reader_test;
-    use holochain_sqlite::test_utils::test_p2p_env;
+    use holochain_state::test_utils::test_p2p_env;
     use kitsune_p2p::fixt::AgentInfoFixturator;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p::KitsuneBinType;

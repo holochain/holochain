@@ -95,7 +95,7 @@ where
 {
     id: CellId,
     conductor_api: Api,
-    env: DbWrite,
+    env: EnvWrite,
     holochain_p2p_cell: P2pCell,
     queue_triggers: QueueTriggers,
 }
@@ -112,7 +112,7 @@ impl Cell {
     pub async fn create(
         id: CellId,
         conductor_handle: ConductorHandle,
-        env: DbWrite,
+        env: EnvWrite,
         holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
@@ -156,7 +156,7 @@ impl Cell {
     pub async fn genesis(
         id: CellId,
         conductor_handle: ConductorHandle,
-        cell_env: DbWrite,
+        cell_env: EnvWrite,
         membrane_proof: Option<SerializedBytes>,
     ) -> CellResult<()> {
         // get the dna
@@ -439,7 +439,7 @@ impl Cell {
         &self,
         header_hash: HeaderHash,
     ) -> CellResult<ValidationPackageResponse> {
-        let env: DbRead = self.env.clone().into();
+        let env: EnvRead = self.env.clone().into();
 
         // Get the header
         let databases = ValidationPackageDb::create(env.clone())?;
@@ -504,13 +504,13 @@ impl Cell {
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<GetElementResponse> {
         let env = self.env.clone();
-        authority::handle_get_entry(env, hash, options).map_err(Into::into)
+        authority::handle_get_entry(env.into(), hash, options).map_err(Into::into)
     }
 
     #[tracing::instrument(skip(self))]
     async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
         let env = self.env.clone();
-        authority::handle_get_element(env, hash).map_err(Into::into)
+        authority::handle_get_element(env.into(), hash).map_err(Into::into)
     }
 
     #[instrument(skip(self, _dht_hash, _options))]
@@ -556,8 +556,7 @@ impl Cell {
 
         // Add to authored
         let db = self.env.get_table(TableName::AuthoredDhtOps)?;
-        let mut authored_dht_ops: AuthoredDhtOpsStore =
-            KvBufFresh::new(self.env.clone().into(), db);
+        let mut authored_dht_ops: AuthoredDhtOpsStore = KvBufFresh::new(self.env.clone(), db);
         match authored_dht_ops.get(&receipt.receipt.dht_op_hash)? {
             Some(mut auth) => {
                 auth.receipt_count += 1;
@@ -794,7 +793,7 @@ impl Cell {
 
     /// Accessor for the database backing this Cell
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
-    pub(crate) fn env(&self) -> &DbWrite {
+    pub(crate) fn env(&self) -> &EnvWrite {
         &self.env
     }
 

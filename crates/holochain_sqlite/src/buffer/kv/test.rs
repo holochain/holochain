@@ -4,12 +4,12 @@ use crate::{
     buffer::{kv::generic::KvStoreT, BufferedStore},
     env::{ReadManager, WriteManager},
     error::{DatabaseError, DatabaseResult},
-    test_utils::test_cell_env,
+    test_utils::test_cell_db,
 };
 
 #[tokio::test(flavor = "multi_thread")]
 async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
-    let test_env = test_cell_env();
+    let test_env = test_cell_db();
     let arc = test_env.env();
     let mut env = arc.conn().unwrap();;
     let db1 = env.open_single("kv1")?;
@@ -97,7 +97,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 
 // #[tokio::test(flavor = "multi_thread")]
 // async fn kv_iterators() -> DatabaseResult<()> {
-//     let test_env = test_cell_env();
+//     let test_env = test_cell_db();
 //     let arc = test_env.env();
 //     let mut env = arc.conn().unwrap();;
 //     let db = env.open_single("kv")?;
@@ -133,7 +133,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 
 // #[tokio::test(flavor = "multi_thread")]
 // async fn kv_empty_iterators() -> DatabaseResult<()> {
-//     let test_env = test_cell_env();
+//     let test_env = test_cell_db();
 //     let arc = test_env.env();
 //     let mut env = arc.conn().unwrap();;
 //     let db = env

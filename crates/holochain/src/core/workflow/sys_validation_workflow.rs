@@ -700,16 +700,17 @@ pub struct SysValidationWorkspace {
     /// Cached data
     pub element_cache: ElementBuf,
     pub meta_cache: MetadataBuf,
-    pub env: DbRead,
+    pub env: EnvRead,
 }
 
 impl<'a> SysValidationWorkspace {
     pub fn cascade<Network: HolochainP2pCellT + Clone + Send + 'static>(
         &'a mut self,
         network: Network,
+        keystore: KeystoreSender,
     ) -> Cascade<'a, Network> {
         Cascade::new(
-            self.validation_limbo.env().clone(),
+            EnvRead::from_parts(self.validation_limbo.env().clone(), keystore),
             &self.element_authored,
             &self.meta_authored,
             &self.element_vault,
@@ -724,7 +725,7 @@ impl<'a> SysValidationWorkspace {
 }
 
 impl SysValidationWorkspace {
-    pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+    pub fn new(env: EnvRead) -> WorkspaceResult<Self> {
         let db = env.get_table(TableName::IntegrationLimbo)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 

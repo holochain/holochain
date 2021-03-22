@@ -43,11 +43,10 @@ pub trait Workspace: Send + Sized {
 #[cfg(test)]
 pub mod tests {
     use super::Workspace;
-    use crate::workspace::WorkspaceResult;
+    use crate::{prelude::test_cell_env, workspace::WorkspaceResult};
     use holochain_sqlite::buffer::BufferedStore;
     use holochain_sqlite::buffer::KvBufFresh;
     use holochain_sqlite::prelude::*;
-    use holochain_sqlite::test_utils::test_cell_env;
     use holochain_sqlite::test_utils::DbString;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_header_hash;
@@ -58,7 +57,7 @@ pub mod tests {
     }
 
     impl TestWorkspace {
-        pub fn new(env: DbRead) -> WorkspaceResult<Self> {
+        pub fn new(env: EnvRead) -> WorkspaceResult<Self> {
             Ok(Self {
                 one: KvBufFresh::new(
                     env.clone(),

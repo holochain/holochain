@@ -321,7 +321,7 @@ mod test {
     use super::*;
     use crate::conductor::Conductor;
     use anyhow::Result;
-    use holochain_sqlite::test_utils::test_environments;
+    use holochain_state::prelude::*;
     use holochain_types::app::InstallAppDnaPayload;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_zomes;
@@ -335,7 +335,7 @@ mod test {
     async fn register_list_dna_app() -> Result<()> {
         observability::test_run().ok();
         let envs = test_environments();
-        let handle = Conductor::builder().test(&envs).await?;
+        let handle = Conductor::builder().test(&envs.into()).await?;
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uuid = Uuid::new_v4();
@@ -467,7 +467,7 @@ mod test {
     async fn install_list_dna_app() -> Result<()> {
         observability::test_run().ok();
         let envs = test_environments();
-        let handle = Conductor::builder().test(&envs).await?;
+        let handle = Conductor::builder().test(&envs.into()).await?;
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uuid = Uuid::new_v4();

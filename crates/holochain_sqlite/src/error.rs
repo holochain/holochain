@@ -51,9 +51,6 @@ pub enum DatabaseError {
     #[error(transparent)]
     DbConnectionPoolError(#[from] r2d2::Error),
 
-    #[error(transparent)]
-    KeystoreError(#[from] holochain_keystore::KeystoreError),
-
     #[error("Empty keys cannot be used with SQLite")]
     EmptyKey,
 
