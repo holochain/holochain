@@ -100,10 +100,14 @@ impl NotifyAll {
         F: FnOnce() + 'static + Send,
     {
         let mut maybe_sync_cb: Option<NotifySyncCb> = Some(Box::new(sync_cb));
+
+        // if we have not already notified, take it to be notified later
         let _ = self.0.share_mut(|i, _| {
             i.cbs.push(maybe_sync_cb.take().unwrap());
             Ok(())
         });
+
+        // if the cb was not taken, we have already notified, so call it now
         if let Some(sync_cb) = maybe_sync_cb {
             sync_cb();
         }
