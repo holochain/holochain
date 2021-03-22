@@ -7,15 +7,7 @@ use kitsune_p2p_types::tx2::tx2_promote::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
-use once_cell::sync::Lazy;
 use std::sync::Arc;
-
-static RUNTIME: Lazy<tokio::runtime::Runtime> = Lazy::new(|| {
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-});
 
 const SIZE: usize = 2048;
 const REQ: &[u8] = &[0xda; SIZE];
@@ -185,7 +177,7 @@ async fn mk_node(d_send: Arc<Share<Option<tokio::sync::mpsc::Sender<()>>>>) -> (
     (addr, ep_hnd)
 }
 
-async fn test(this: &Arc<Share<Option<Test>>>) {
+async fn test(this: &Share<Option<Test>>) {
     let mut t = this.share_mut(|i, _| Ok(i.take().unwrap())).unwrap();
     t.test().await;
     this.share_mut(move |i, _| {
@@ -195,16 +187,21 @@ async fn test(this: &Arc<Share<Option<Test>>>) {
     .unwrap();
 }
 
-fn thru(t: &Arc<Share<Option<Test>>>) {
-    let _g = RUNTIME.enter();
-    RUNTIME.block_on(async {
+fn thru(rt: &tokio::runtime::Runtime, t: &Share<Option<Test>>) {
+    rt.block_on(async {
         test(t).await;
     });
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let t = RUNTIME.block_on(async { Arc::new(Share::new(Some(Test::new().await))) });
-    c.bench_function("thru", |b| b.iter(|| thru(&t)));
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let t = rt.block_on(async { Share::new(Some(Test::new().await)) });
+
+    c.bench_function("thru", |b| b.iter(|| thru(&rt, &t)));
 }
 
 criterion_group!(benches, criterion_benchmark);

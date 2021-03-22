@@ -20,6 +20,9 @@ pub fn tx2_proxy(sub_fact: EpFactory, tls_config: TlsConfig) -> EpFactory {
 
 // -- private -- //
 
+const PROXY_TYPE_BYTES: usize = 1;
+const DIGEST_BYTES: usize = 32;
+
 const PROXY_HELLO_DIGEST: u8 = 0x20;
 const PROXY_FWD_MSG: u8 = 0x30;
 
@@ -32,7 +35,7 @@ struct ProxyConHnd {
 
 impl std::fmt::Debug for ProxyConHnd {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("ConHnd").finish()
+        f.debug_tuple("ConHnd").field(&self.uniq).finish()
     }
 }
 
@@ -84,7 +87,7 @@ impl AsConHnd for ProxyConHnd {
         mut data: PoolBuf,
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<()>> {
-        data.reserve_front(1 + 32 + 32);
+        data.reserve_front(PROXY_TYPE_BYTES + DIGEST_BYTES + DIGEST_BYTES);
         data.prepend_from_slice(&self.local_digest);
         data.prepend_from_slice(&self.remote_digest);
         data.prepend_from_slice(&[PROXY_FWD_MSG]);
@@ -331,11 +334,16 @@ async fn incoming_evt_logic(
                         .await;
                     }
                     PROXY_FWD_MSG => {
-                        let src_digest = CertDigest(Arc::new(data[33..65].to_vec()));
-                        let dest_digest = CertDigest(Arc::new(data[1..33].to_vec()));
+                        const SRC_START: usize = PROXY_TYPE_BYTES + DIGEST_BYTES;
+                        const SRC_END: usize = SRC_START + DIGEST_BYTES;
+
+                        const DEST_START: usize = PROXY_TYPE_BYTES;
+                        const DEST_END: usize = DEST_START + DIGEST_BYTES;
+                        let src_digest = CertDigest(Arc::new(data[SRC_START..SRC_END].to_vec()));
+                        let dest_digest = CertDigest(Arc::new(data[DEST_START..DEST_END].to_vec()));
                         if dest_digest == hnd.cert_digest {
                             // this data is destined for US!
-                            data.cheap_move_start(65);
+                            data.cheap_move_start(SRC_END);
                             let url = match promote_addr(&base_url, &src_digest) {
                                 Ok(url) => url,
                                 // TODO - FIXME

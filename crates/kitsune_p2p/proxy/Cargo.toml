@@ -32,7 +32,6 @@ webpki = "0.21.2"
 
 [dev-dependencies]
 criterion = "*"
-once_cell = "*"
 
 [[bench]]
 name = "thru"

@@ -10,7 +10,7 @@ use std::sync::atomic;
 static UNIQ: atomic::AtomicUsize = atomic::AtomicUsize::new(1);
 
 /// Opaque identifier, allows Eq/Hash through trait-object types.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Uniq(usize);
 
 impl Default for Uniq {
