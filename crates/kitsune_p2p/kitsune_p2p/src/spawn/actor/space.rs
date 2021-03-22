@@ -450,7 +450,10 @@ impl SpaceInternalHandler for Space {
                     urls.clone(),
                     crate::spawn::actor::bootstrap::now_once(None).await?,
                     expires_after,
-                );
+                )
+                .with_meta_info(crate::types::agent_store::AgentMetaInfo {
+                    dht_storage_arc_half_length: 0,
+                })?;
                 let mut data = Vec::new();
                 rmp_encode(&mut data, &agent_info)?;
                 let sign_req = SignNetworkDataEvt {
@@ -793,8 +796,8 @@ impl Space {
         tokio::task::spawn(async move {
             loop {
                 tokio::time::sleep(std::time::Duration::from_secs(5 * 60)).await;
-                if i_s_c.update_agent_info().await.is_err() {
-                    break;
+                if let Err(e) = i_s_c.update_agent_info().await {
+                    tracing::error!(failed_to_update_agent_info_for_space = ?e);
                 }
             }
         });

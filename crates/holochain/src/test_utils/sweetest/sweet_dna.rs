@@ -8,12 +8,18 @@ use holochain_types::{
     prelude::DnaDef,
 };
 use holochain_zome_types::zome::ZomeName;
+use std::path::Path;
 
 /// Helpful constructors for DnaFiles used in tests
 #[derive(Clone, Debug, derive_more::From, derive_more::Into, shrinkwraprs::Shrinkwrap)]
 pub struct SweetDnaFile(DnaFile);
 
 impl SweetDnaFile {
+    /// Create a DnaFile from a path to a *.dna.gz file
+    pub async fn from_file(path: &Path) -> DnaResult<DnaFile> {
+        DnaFile::from_file_content(&std::fs::read(path)?).await
+    }
+
     /// Create a DnaFile from a collection of Zomes
     pub async fn from_zomes(
         uuid: String,

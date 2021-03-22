@@ -14,6 +14,11 @@ impl AppSignal {
     pub fn new(extern_io: crate::ExternIO) -> Self {
         Self(extern_io)
     }
+
+    /// Access the inner type
+    pub fn into_inner(self) -> crate::ExternIO {
+        self.0
+    }
 }
 
 /// Remote signal many agents without waiting for responses.
