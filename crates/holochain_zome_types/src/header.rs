@@ -488,3 +488,10 @@ impl ZomeId {
         self.0 as usize
     }
 }
+
+#[cfg(feature = "rusqlite")]
+impl ToSql for ZomeId {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        Ok(rusqlite::types::ToSqlOutput::Owned(self.0))
+    }
+}

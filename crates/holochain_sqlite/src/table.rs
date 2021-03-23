@@ -56,6 +56,12 @@ pub enum TableName {
     /// Single store for all known agents on the network
     Agent,
 
+    /// Link add
+    LinkAdd,
+
+    /// Link delete
+    LinkDelete,
+
     #[cfg(feature = "test_utils")]
     TestSingle(String),
 
@@ -91,6 +97,9 @@ impl TableName {
             ValidationLimbo => Single,
             ValidationReceipts => Multi,
             Agent => Single,
+            LinkAdd => Schema,
+            LinkDelete => Schema,
+
             #[cfg(feature = "test_utils")]
             TestSingle(_) => Single,
             #[cfg(feature = "test_utils")]
@@ -110,6 +119,7 @@ impl ToSql for TableName {
 pub enum TableKind {
     Single,
     Multi,
+    Schema,
 }
 
 impl TableKind {
@@ -124,7 +134,7 @@ impl TableKind {
 
 pub(crate) fn initialize_table_single(
     conn: &mut Connection,
-    table_name: String,
+    table_name: TableName,
 ) -> rusqlite::Result<()> {
     // create table
     conn.execute(
@@ -143,7 +153,7 @@ pub(crate) fn initialize_table_single(
 
 pub(crate) fn initialize_table_multi(
     conn: &mut Connection,
-    table_name: String,
+    table_name: TableName,
 ) -> rusqlite::Result<()> {
     // create table
     conn.execute(
@@ -169,13 +179,51 @@ pub(crate) fn initialize_table_multi(
     )?;
     Ok(())
 }
+pub(crate) fn initialize_table_schema(
+    conn: &mut Connection,
+    table_name: TableName,
+) -> rusqlite::Result<()> {
+    match table_name {
+        TableName::LinkAdd => {
+            conn.execute(
+                &format!(
+                    "CREATE TABLE IF NOT EXISTS {} (
+                        hash        BLOB PRIMARY KEY,
+                        header_id   INTEGER NOT NULL,
+                        basis_hash  BLOB NOT NULL,
+                        zome_id     INTEGER NOT NULL,
+                        tag         STRING,
+                        FOREIGN KEY(header_id) REFERENCES ElementVaultHeaders(id)  -- won't work until we create Header table
+            );",
+                    table_name
+                ),
+                NO_PARAMS,
+            )?;
+        }
+        TableName::LinkDelete => {
+            conn.execute(
+                &format!(
+                    "CREATE TABLE IF NOT EXISTS {} (
+                        link_add_id  INTEGER NOT NULL,
+                        header_id    INTEGER NOT NULL,
+                        FOREIGN KEY(header_id) REFERENCES ElementVaultHeaders(id),
+                        FOREIGN KEY(link_add_id) REFERENCES LinkAdd(id)
+            );",
+                    table_name
+                ),
+                NO_PARAMS,
+            )?;
+        }
+        _ => unreachable!()
+    }
+    Ok(())
+}
 
 fn initialize_table(conn: &mut Connection, name: TableName) -> rusqlite::Result<()> {
-    let table_name = format!("{}", name);
-
     match name.kind() {
-        TableKind::Single => initialize_table_single(conn, table_name),
-        TableKind::Multi => initialize_table_multi(conn, table_name),
+        TableKind::Single => initialize_table_single(conn, name),
+        TableKind::Multi => initialize_table_multi(conn, name),
+        TableKind::Schema => initialize_table_schema(conn, name),
     }
 }
 
@@ -199,6 +247,8 @@ pub(super) fn initialize_database(conn: &mut Connection, db_kind: &DbKind) -> ru
             initialize_table(conn, TableName::IntegrationLimbo)?;
             initialize_table(conn, TableName::ValidationLimbo)?;
             initialize_table(conn, TableName::ValidationReceipts)?;
+            initialize_table(conn, TableName::LinkAdd)?;
+            initialize_table(conn, TableName::LinkDelete)?;
         }
         DbKind::Conductor => {
             initialize_table(conn, TableName::ConductorState)?;

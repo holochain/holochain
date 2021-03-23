@@ -7,6 +7,7 @@ use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
+use holochain_sqlite::rusqlite::params;
 use holochain_state::element_buf::ElementBuf;
 use holochain_state::metadata::ChainItemKey;
 use holochain_state::metadata::LinkMetaKey;
@@ -348,7 +349,84 @@ pub fn handle_get_links(
     let element_vault = ElementBuf::vault(env.clone(), false)?;
     let meta_vault = MetadataBuf::vault(env)?;
 
+    // Query
+    // 1. all valid link adds that match the key
+    //    SELECT * FROM LinkAdd WHERE basis_hash = ?
+    //    SELECT * FROM LinkAdd WHERE basis_hash = ? AND (zome_id = ?)
+    //
+    //    SELECT * FROM LinkAdd AS a
+    //    JOIN LinkDelete AS d
+    //    ON (d.link_add_id = a.id)
+    //    WHERE a.basis_hash = ? AND (a.zome_id = ?) AND (a.tag LIKE ?)
+
+    // 2. all valid link deletes that match the key
+    //    SELECT * FROM LinkDelete WHERE link_add_id
+
     let links = conn.with_reader(|mut reader| {
+        let mut txn = reader.transaction()?;
+
+        let where_clause = match link_key {
+            WireLinkMetaKey::Base(_) => "a.basis_hash = ?1",
+            WireLinkMetaKey::BaseZome(_, _) => "a.basis_hash = ?1 AND a.zome_id = ?2",
+            WireLinkMetaKey::BaseZomeTag(_, _, _) => {
+                "a.basis_hash = ?1 AND a.zome_id = ?2 AND a.tag = ?3"
+            }
+            WireLinkMetaKey::Full(_, _, _, _) => "a.link_add_id = ?1",
+        };
+        let sql_adds = format!(
+            "
+            SELECT a.id, h.blob, h.signature
+            FROM LinkAdd AS a
+            JOIN Header AS h ON( a.header_id = h.id)
+            {} AND h.type = 'link'
+        ",
+            where_clause
+        );
+
+        // type: HeaderType
+        /*
+        pub author: AgentPubKey,
+        pub timestamp: Timestamp,
+        pub header_seq: u32,
+        pub prev_header: HeaderHash,
+
+        pub base_address: EntryHash,
+        pub target_address: EntryHash,
+        pub zome_id: ZomeId,
+        pub tag: LinkTag,
+        */
+
+        fn map_row(row: &Row) -> DatabaseResult<(CreateLink, Signature)> {
+            let id = row.get(0)?;
+            let header: CreateLink = holochain_serialized_bytes::decode(row.get(1)?)?;
+            let header = CreateLink::from_row(row.get(1)?)?;
+        }
+
+        let mut stmt = txn.prepare_cached(&sql_adds)?;
+        let map_row = |row| Ok(());
+        let (add_ids, result_adds): (Vec<u32>, Vec<(CreateLink, Signature)>) = match link_key {
+            WireLinkMetaKey::Base(base) => stmt.query_map(params![base], |row| Ok(()))?.collect(),
+            WireLinkMetaKey::BaseZome(base, zome_id) => stmt
+                .query_map(params![base, zome_id], |row| Ok(()))?
+                .collect(),
+            WireLinkMetaKey::BaseZomeTag(base, zome_id, tag) => stmt
+                .query_map(params![base, zome_id, tag], |row| Ok(()))?
+                .collect(),
+            WireLinkMetaKey::Full(_, _, _, link_add_hash) => stmt
+                .query_map(params![link_add_hash], |row| Ok(()))?
+                .collect(),
+        };
+        let sql_removes = format!(
+            "
+            SELECT a.*, d.*, h.* 
+            FROM LinkDelete AS d
+            WHERE d.add_link_id IN ({})
+        ",
+            add_ids
+        );
+        dbg!(&sql_adds);
+        dbg!(&sql_removes);
+
         meta_vault
             .get_links_all(&mut reader, &LinkMetaKey::from(&link_key))?
             .map(|link_add| {
