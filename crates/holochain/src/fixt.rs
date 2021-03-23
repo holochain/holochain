@@ -133,7 +133,7 @@ fixturator!(
 );
 
 fixturator!(
-    DnaFile,
+    DnaFile;
     curve Empty {
         DnaFile::from_parts(
             tokio_helper::block_forever_on(async move {
