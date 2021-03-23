@@ -239,18 +239,8 @@ mod test {
             })))
             .await
             .unwrap();
-
-        main_task
-            .await
-            .map_err(|e| {
-                error!(
-                    error = &e as &dyn std::error::Error,
-                    "Failed to join the main task"
-                );
-                e
-            })
-            .expect("Error while joining threads during shutdown")
-            .expect("Conductor shutdown error");
+        
+        handle_shutdown(main_task.await);
     }
 
     #[tokio::test(flavor = "multi_thread")]
