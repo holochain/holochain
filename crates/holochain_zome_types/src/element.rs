@@ -34,7 +34,7 @@ impl Element {
     /// This may be useful for tests that rely heavily on mocked and fixturated data.
     #[cfg(feature = "test_utils")]
     pub fn as_header_mut(&mut self) -> &mut Header {
-        &mut self.signed_header.header.content
+        self.signed_header.header.as_content_mut()
     }
 
     /// Mutable reference to the ElementEntry.

@@ -41,6 +41,14 @@ where
         &self.content
     }
 
+    /// Mutable accessor for content.
+    /// Only useful for heavily mocked/fixturated data in testing.
+    /// Guaranteed the hash will no longer match the content if mutated.
+    #[cfg(feature = "test_utils")]
+    pub fn as_content_mut(&mut self) -> &mut C {
+        &mut self.content
+    }
+
     /// Convert to content
     pub fn into_content(self) -> C {
         self.content
