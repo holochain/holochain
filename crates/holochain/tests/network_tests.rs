@@ -303,7 +303,7 @@ async fn get_from_another_agent() {
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -441,7 +441,7 @@ async fn get_links_from_another_agent() {
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }
 
 struct Shutdown {
