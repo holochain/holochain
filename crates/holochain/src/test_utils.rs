@@ -38,6 +38,7 @@ use holochain_types::prelude::*;
 
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use tempdir::TempDir;
@@ -380,12 +381,8 @@ pub async fn consistency_envs(
     delay: Duration,
 ) {
     let mut expected_count = 0;
-    let query = ChainQueryFilter::new().include_entries(true);
     for &env in all_cell_envs.iter() {
-        let chain = SourceChain::new(env.clone().into()).unwrap();
-        let elements = chain.query(&query).unwrap();
-        let elements = elements.iter().collect::<Vec<_>>();
-        let count = produce_op_lights_from_elements(elements).unwrap().len();
+        let count = get_authored_ops(env).len();
         expected_count += count;
     }
     for &env in all_cell_envs.iter() {
@@ -470,6 +467,69 @@ impl WaitForAny {
 }
 
 /// Same as wait_for_integration but with a default wait time of 60 seconds
+/// Wait for all cells to reach consistency for 10 seconds
+pub async fn consistency_10s_others(all_cells: &[&SweetCell]) {
+    const NUM_ATTEMPTS: usize = 100;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
+    consistency_others(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
+}
+
+/// Wait for all cells to reach consistency
+#[tracing::instrument(skip(all_cells))]
+pub async fn consistency_others(all_cells: &[&SweetCell], num_attempts: usize, delay: Duration) {
+    let all_cell_envs: Vec<_> = all_cells.iter().map(|c| c.env()).collect();
+    consistency_envs_others(&all_cell_envs[..], num_attempts, delay).await
+}
+
+async fn consistency_envs_others(
+    all_cell_envs: &[&EnvironmentWrite],
+    num_attempts: usize,
+    delay: Duration,
+) {
+    let mut expected_count = 0;
+    for &env in all_cell_envs.iter() {
+        let count = get_authored_ops(env).len();
+        expected_count += count;
+    }
+    let start = Some(std::time::Instant::now());
+    for (i, &env) in all_cell_envs.iter().enumerate() {
+        let mut others = all_cell_envs.to_vec();
+        others.remove(i);
+        wait_for_integration_with_others(env, &others, expected_count, num_attempts, delay, start)
+            .await
+    }
+}
+
+fn get_authored_ops(env: &EnvironmentWrite) -> Vec<DhtOpLight> {
+    let query = ChainQueryFilter::new().include_entries(true);
+    let chain = SourceChain::new(env.clone().into()).unwrap();
+    let elements = chain.query(&query).unwrap();
+    let elements = elements.iter().collect::<Vec<_>>();
+    let private = elements
+        .iter()
+        .filter(|el| {
+            el.header()
+                .entry_type()
+                .map(|e| *e.visibility() == EntryVisibility::Private)
+                .unwrap_or(false)
+        })
+        .map(|el| el.header_address().clone())
+        .collect::<HashSet<_>>();
+    produce_op_lights_from_elements(elements)
+        .unwrap()
+        .into_iter()
+        .filter(|op| {
+            if let DhtOpLight::StoreEntry(_, _, _) = &op {
+                if private.contains(op.header_hash()) {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect()
+}
+
+/// Same as wait_for_integration but with a default wait time of 10 seconds
 #[tracing::instrument(skip(env))]
 pub async fn wait_for_integration_1m(env: &EnvironmentWrite, expected_count: usize) {
     const NUM_ATTEMPTS: usize = 120;
@@ -498,19 +558,40 @@ pub async fn wait_for_integration(
     }
 }
 
+fn int_ops(env: &EnvironmentWrite) -> Vec<DhtOpLight> {
+    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
+    fresh_reader_test!(env, |r| {
+        workspace
+            .integrated_dht_ops
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v.op))
+            .collect()
+            .unwrap()
+    })
+}
+
 /// Same as wait for integration but can print other states at the same time
 pub async fn wait_for_integration_with_others_10s(
     env: &EnvironmentWrite,
     others: &[&EnvironmentWrite],
     expected_count: usize,
+    start: Option<std::time::Instant>,
 ) {
     const NUM_ATTEMPTS: usize = 100;
     const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
-    wait_for_integration_with_others(env, others, expected_count, NUM_ATTEMPTS, DELAY_PER_ATTEMPT)
-        .await
+    wait_for_integration_with_others(
+        env,
+        others,
+        expected_count,
+        NUM_ATTEMPTS,
+        DELAY_PER_ATTEMPT,
+        start,
+    )
+    .await
 }
 
-#[tracing::instrument(skip(env, others))]
+#[tracing::instrument(skip(env, others, start))]
 /// Same as wait for integration but can print other states at the same time
 pub async fn wait_for_integration_with_others(
     env: &EnvironmentWrite,
@@ -518,27 +599,46 @@ pub async fn wait_for_integration_with_others(
     expected_count: usize,
     num_attempts: usize,
     delay: Duration,
+    start: Option<std::time::Instant>,
 ) {
     let mut last_total = 0;
-    for i in 0..num_attempts {
+    let this_start = std::time::Instant::now();
+    for _ in 0..num_attempts {
         let count = count_integration(env).await;
         let counts = get_counts(others).await;
         let total: usize = counts.0.clone().into_iter().map(|i| i.integrated).sum();
+        let num_conductors = counts.0.len() + 1;
+        let total_expected = num_conductors * expected_count;
+        let progress = if total_expected == 0 {
+            0.0
+        } else {
+            total as f64 / total_expected as f64 * 100.0
+        };
         let change = total.checked_sub(last_total).expect("LOST A VALUE");
         last_total = total;
         if count.integrated == expected_count {
             return;
         } else {
-            let total_time_waited = delay * i as u32;
+            let time_waited = this_start.elapsed().as_secs();
+            let total_time_waited = start.map(|s| s.elapsed().as_secs()).unwrap_or(0);
+            let ops_per_s = if total_time_waited == 0 {
+                0.0
+            } else {
+                total as f64 / total_time_waited as f64
+            };
             tracing::debug!(
-                "Count: {}, val: {}, int: {}\nTime waited: {:?},\nCounts: {}\nTotal: {} change:{}\n",
+                "Count: {}, val: {}, int: {}\nTime waited: {}s (total {}s),\nCounts: {:?}\nTotal: {} out of {} {:.4}% change:{} {:.4}ops/s\n",
                 count.integrated,
                 count.validation_limbo,
                 count.integration_limbo,
+                time_waited,
                 total_time_waited,
                 counts,
                 total,
+                total_expected,
+                progress,
                 change,
+                ops_per_s,
             );
         }
         tokio::time::sleep(delay).await;
@@ -561,6 +661,50 @@ pub fn show_authored(envs: &[&EnvironmentWrite]) {
                 .and_then(|e| chain.get_entry(e).unwrap());
             tracing::debug!(chain = %i, %seq_num, ?header_type, ?entry);
         }
+    }
+}
+
+#[tracing::instrument(skip(envs))]
+/// Show authored op data for each cell environment
+pub async fn show_authored_ops(envs: &[&EnvironmentWrite]) {
+    let mut all_auth = Vec::new();
+    for (i, env) in envs.iter().enumerate() {
+        let auth = get_authored_ops(env);
+        all_auth.extend(auth.clone());
+        for (j, op) in auth.iter().enumerate() {
+            tracing::debug!(chain = %i, op_num = %j, ?op);
+        }
+    }
+    for (i, env) in envs.iter().enumerate() {
+        let int = int_ops(env);
+        for op in &all_auth {
+            if int.iter().find(|&a| a == op).is_none() {
+                tracing::warn!(is_missing = ?op, for_env = %i);
+                show_data(env, op).await;
+            }
+        }
+    }
+}
+
+async fn show_data(env: &EnvironmentWrite, op: &DhtOpLight) {
+    let element_integrated = ElementBuf::vault(env.clone().into(), true).unwrap();
+    let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
+    let element_authored = ElementBuf::authored(env.clone().into(), true).unwrap();
+    let meta_authored = MetadataBuf::authored(env.clone().into()).unwrap();
+    let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
+    let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
+    let mut cascade = Cascade::empty()
+        .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
+        .with_authored(DbPair::new(&element_authored, &meta_authored))
+        .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
+    if let Some(el) = cascade
+        .retrieve(op.header_hash().clone().into(), Default::default())
+        .await
+        .unwrap()
+    {
+        let header = el.header();
+        let entry = format!("{:?}", el.entry());
+        tracing::debug!(seq_num = %header.header_seq(), header_type = ?header.header_type(), op_type = %op.to_string(), ?entry);
     }
 }
 

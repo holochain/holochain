@@ -79,7 +79,7 @@ fn conductors_call_remote(num_conductors: usize) {
         // Give a little longer timeout here because they must find each other to pass the test
         let results = call_each_other(&handles[..], 500).await;
         for (_, _, result) in results {
-            assert_matches!(result, Some(Ok(ZomeCallResponse::Ok(_))));
+            self::assert_matches!(result, Some(Ok(ZomeCallResponse::Ok(_))));
         }
         shutdown(handles).await;
     };
@@ -449,6 +449,7 @@ async fn check_gossip(
         expected_count,
         NUM_ATTEMPTS,
         DELAY_PER_ATTEMPT.clone(),
+        None,
     )
     .await;
     for hash in posts {
