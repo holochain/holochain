@@ -5,7 +5,9 @@
 pub mod dependencies {
     pub use ::futures;
     pub use ::ghost_actor;
+    pub use ::lair_keystore_api;
     pub use ::paste;
+    pub use ::rustls;
     pub use ::serde;
     pub use ::serde_json;
     pub use ::thiserror;
@@ -128,6 +130,7 @@ pub mod codec;
 pub mod config;
 pub mod dht_arc;
 pub mod metrics;
+pub mod tls;
 pub mod transport;
 pub mod transport_mem;
 pub mod transport_pool;

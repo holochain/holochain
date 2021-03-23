@@ -50,6 +50,12 @@ impl From<TransportError> for () {
     fn from(_: TransportError) {}
 }
 
+impl From<crate::KitsuneError> for TransportError {
+    fn from(k: crate::KitsuneError) -> Self {
+        TransportError::other(k)
+    }
+}
+
 /// Result type for remote communication.
 pub type TransportResult<T> = Result<T, TransportError>;
 
