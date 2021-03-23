@@ -239,7 +239,7 @@ mod test {
             })))
             .await
             .unwrap();
-        
+
         handle_shutdown(main_task.await);
     }
 
