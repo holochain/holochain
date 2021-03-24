@@ -88,6 +88,9 @@ fn initialize_connection(
     // set to faster write-ahead-log mode
     conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
 
+    // enable foreign key support
+    conn.pragma_update(None, "foreign_keys", &"ON".to_string())?;
+
     Ok(())
 }
 

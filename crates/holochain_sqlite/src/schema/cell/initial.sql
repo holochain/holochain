@@ -1,8 +1,31 @@
+-- Initial Holochain Cell schema
+
+CREATE TABLE Entry (
+    hash             BLOB           PRIMARY KEY,
+    type             VARCHAR(64)    NOT NULL,
+
+    blob             BLOB           NOT NULL,
+
+    -- CapClaim / CapGrant
+    tag              VARCHAR(64)           NULL,
+
+    -- CapClaim
+    grantor          BLOB           NULL,
+    cap_secret       BLOB           NULL,
+
+    -- CapGrant
+    functions        BLOB           NULL,
+    access_type      VARCHAR(64)    NULL,
+    access_secret    BLOB           NULL,
+    access_assignees BLOB           NULL
+);
+CREATE INDEX Entry_type_idx ON Entry ( type );
+
 
 -- TODO: some of the NULL fields can be collapsed,
 --       like between Update and Delete
 CREATE TABLE Header (
-    hash             BLOB           PRIMARY KEY
+    hash             BLOB           PRIMARY KEY,
     type             VARCHAR(64)    NOT NULL,
     seq              INTEGER        NOT NULL,
 
@@ -11,19 +34,14 @@ CREATE TABLE Header (
     -- Create / Update
     entry_hash       BLOB           NULL,
     entry_type       VARCHAR(64)    NULL,
-    FOREIGN KEY(entry_hash) REFERENCES Entry(hash)
 
     -- Update
     original_entry_hash   BLOB      NULL,
     original_header_hash  BLOB      NULL,
-    FOREIGN KEY(original_entry_hash) REFERENCES Entry(hash)
-    FOREIGN KEY(original_header_hash) REFERENCES Header(hash)
 
     -- Delete
     deletes_entry_hash    BLOB      NULL,
     deletes_header_hash   BLOB      NULL,
-    FOREIGN KEY(deletes_entry_hash) REFERENCES Entry(hash)
-    FOREIGN KEY(deletes_header_hash) REFERENCES Header(hash)
 
     -- CreateLink
     -- NB: basis_hash can't be foreign key, since it could map to either
@@ -34,43 +52,27 @@ CREATE TABLE Header (
 
     -- DeleteLink
     link_add_hash    BLOB           NULL,
-    FOREIGN KEY(link_add_hash) REFERENCES Header(hash)
 
     -- AgentValidationPkg
     membrane_proof   BLOB           NULL,
 
     -- OpenChain / CloseChain
     prev_dna_hash    BLOB           NULL,
+
+    FOREIGN KEY(entry_hash) REFERENCES Entry(hash),
+    FOREIGN KEY(original_entry_hash) REFERENCES Entry(hash),
+    -- FOREIGN KEY(original_header_hash) REFERENCES Header(hash),
+    FOREIGN KEY(deletes_entry_hash) REFERENCES Entry(hash),
+    -- FOREIGN KEY(deletes_header_hash) REFERENCES Header(hash),
+    FOREIGN KEY(link_add_hash) REFERENCES Header(hash)
 );
 CREATE INDEX Header_type_idx ON Header ( type );
-
-
-CREATE TABLE Entry (
-    hash             BLOB           PRIMARY KEY
-    type             VARCHAR(64)    NOT NULL,
-
-    blob             BLOB           NOT NULL,
-
-    -- CapClaim / CapGrant
-    tag              TEXT           NULL,
-
-    -- CapClaim
-    grantor          BLOB           NULL,
-    cap_secret       BLOB           NULL,
-
-    -- CapGrant
-    functions        BLOB           NULL,
-    access_type      VARCHAR(64)    NULL,
-    access_secret    BLOB           NULL,
-    access_assignees BLOB           NULL,
-);
-CREATE INDEX Entry_type_idx ON Entry ( type );
 
 
 -- NB: basis_hash, header_hash, and entry_hash, in general, will have
 --     duplication of data. Could rethink these a bit.
 CREATE TABLE DhtOp (
-    hash             BLOB           PRIMARY KEY
+    hash             BLOB           PRIMARY KEY,
     type             VARCHAR(64)    NOT NULL,
     basis_hash       BLOB           NOT NULL,
     header_hash      BLOB           NOT NULL,
@@ -82,7 +84,7 @@ CREATE TABLE DhtOp (
 
     blob             BLOB           NOT NULL,
 
-    FOREIGN KEY(header_hash) REFERENCES Header(hash)
+    FOREIGN KEY(header_hash) REFERENCES Header(hash),
     FOREIGN KEY(entry_hash) REFERENCES Entry(hash)
 );
-CREATE INDEX Entries_type_idx ON Entries ( type );
+CREATE INDEX DhtOp_type_idx ON DhtOp ( type );
