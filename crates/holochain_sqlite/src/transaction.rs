@@ -1,5 +1,5 @@
 use crate::rewrap_iter;
-use crate::{buffer::iter::SqlIter, prelude::DatabaseResult, table::Table};
+use crate::{buffer::iter::SqlIter, prelude::DatabaseResult, prelude::Table};
 use chrono::offset::Local;
 use chrono::DateTime;
 use rusqlite::types::{ToSql, Value};

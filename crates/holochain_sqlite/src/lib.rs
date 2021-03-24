@@ -13,8 +13,10 @@ pub mod fatal;
 pub mod key;
 pub mod prelude;
 pub mod swansong;
-pub mod table;
 pub mod transaction;
+
+mod naive;
+pub use naive::*;
 
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils;

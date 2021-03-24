@@ -82,7 +82,7 @@ impl DbWrite {
         let path = path_prefix.join(kind.filename());
         let pool = new_connection_pool(&path, kind.clone());
         let mut conn = pool.get()?;
-        initialize_database(&mut conn, &kind)?;
+        crate::naive::initialize_database(&mut conn, &kind)?;
 
         Ok(DbWrite(DbRead {
             kind,

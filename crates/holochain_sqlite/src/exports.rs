@@ -1,6 +1,6 @@
 //! A few imports from `rkv`, to avoid consumers needing to import `rkv` explicitly
 
-use crate::table::Table;
+use crate::naive::Table;
 
 /// Simple type alias for re-exporting
 pub type SingleTable = Table;

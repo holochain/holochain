@@ -179,7 +179,7 @@ fn initialize_table(conn: &mut Connection, name: TableName) -> rusqlite::Result<
     }
 }
 
-pub(super) fn initialize_database(conn: &mut Connection, db_kind: &DbKind) -> rusqlite::Result<()> {
+pub(crate) fn initialize_database(conn: &mut Connection, db_kind: &DbKind) -> rusqlite::Result<()> {
     match db_kind {
         DbKind::Cell(_) => {
             initialize_table(conn, TableName::ElementVaultPublicEntries)?;
