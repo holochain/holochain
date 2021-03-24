@@ -1,8 +1,5 @@
 //! Next-gen performance kitsune transport abstractions
 
-mod codec;
-pub use codec::*;
-
 mod framed;
 pub use framed::*;
 

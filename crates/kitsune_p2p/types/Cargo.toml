@@ -12,7 +12,7 @@ edition = "2018"
 
 [dependencies]
 derive_more = "0.99.7"
-futures = "0.3.12"
+futures = "0.3"
 ghost_actor = "0.3.0-alpha.1"
 lair_keystore_api = "=0.0.1-alpha.11"
 nanoid = "0.3"
@@ -34,20 +34,7 @@ url2 = "0.0.6"
 webpki = "0.21.2"
 
 [dev-dependencies]
-criterion = "0.3"
 tracing-subscriber = "0.2"
-
-[[bench]]
-name = "resource_bucket"
-harness = false
-
-[[bench]]
-name = "framed"
-harness = false
-
-[[bench]]
-name = "codec"
-harness = false
 
 [features]
 test_utils = []
