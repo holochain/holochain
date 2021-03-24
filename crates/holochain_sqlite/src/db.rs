@@ -111,6 +111,8 @@ impl DbWrite {
 pub enum DbKind {
     /// Specifies the environment used by each Cell
     Cell(CellId),
+    /// Specifies the environment used by each DNA for caching data
+    Cache(DnaHash),
     /// Specifies the environment used by a Conductor
     Conductor,
     /// Specifies the environment used to save wasm
@@ -124,6 +126,7 @@ impl DbKind {
     fn filename(&self) -> PathBuf {
         let mut path = match self {
             DbKind::Cell(cell_id) => PathBuf::from(cell_id.to_string()),
+            DbKind::Cache(_dna_hash) => unimplemented!(),
             DbKind::Conductor => PathBuf::from("conductor"),
             DbKind::Wasm => PathBuf::from("wasm"),
             DbKind::P2p => PathBuf::from("p2p"),

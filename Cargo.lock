@@ -2095,6 +2095,7 @@ dependencies = [
  "itertools 0.10.0",
  "paste 1.0.3",
  "rand 0.7.3",
+ "rusqlite",
  "serde",
  "serde_bytes",
  "strum",

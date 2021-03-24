@@ -1552,6 +1552,7 @@ where
         key: &'link LinkMetaKey<'link>,
         options: GetLinksOptions,
     ) -> CascadeResult<Vec<Link>> {
+        // am_i_an_authority is a db query
         if self.am_i_an_authority(key.base().clone().into()).await? {
             // Short circuit. This makes sense for full sharding.
             self.update_link_cache_from_integrated(key, options)?;
