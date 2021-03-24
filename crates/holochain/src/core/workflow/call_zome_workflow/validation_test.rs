@@ -41,7 +41,7 @@ async fn direct_validation_test() {
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }
 
 /// - Commit a valid update should pass
