@@ -1449,6 +1449,6 @@ mod slow_tests {
         // Shut everything down
         let shutdown = conductor.take_shutdown_handle().await.unwrap();
         conductor.shutdown().await;
-        shutdown.await.unwrap();
+        shutdown.await.unwrap().unwrap();
     }
 }
