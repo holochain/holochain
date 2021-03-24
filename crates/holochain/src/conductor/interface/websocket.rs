@@ -467,7 +467,7 @@ pub mod test {
         // the overhead of a websocket request locally is small
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
-        shutdown.await.unwrap();
+        shutdown.await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -600,7 +600,7 @@ pub mod test {
         }
 
         conductor_handle.shutdown().await;
-        shutdown.await.unwrap();
+        shutdown.await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -620,7 +620,7 @@ pub mod test {
         let msg = (msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
         conductor_handle.shutdown().await;
-        shutdown.await.unwrap();
+        shutdown.await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -668,7 +668,7 @@ pub mod test {
         let msg = (msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
         conductor_handle.shutdown().await;
-        shutdown.await.unwrap();
+        shutdown.await.unwrap().unwrap();
     }
 
     async fn make_dna(uuid: &str, zomes: Vec<TestWasm>) -> DnaFile {
