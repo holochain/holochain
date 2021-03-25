@@ -196,6 +196,22 @@ impl MemEndpointAdapt {
 }
 
 impl EndpointAdapt for MemEndpointAdapt {
+    fn debug(&self) -> serde_json::Value {
+        let inner = self.0.lock();
+        if inner.ep_active.is_active() {
+            serde_json::json!({
+                "type": "tx2_mem",
+                "state": "open",
+                "addr": &inner.url,
+            })
+        } else {
+            serde_json::json!({
+                "type": "tx2_mem",
+                "state": "closed",
+            })
+        }
+    }
+
     fn uniq(&self) -> Uniq {
         self.1
     }

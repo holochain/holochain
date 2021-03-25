@@ -66,6 +66,9 @@ pub trait ConRecvAdapt: 'static + Send + Unpin + Stream<Item = ConFut> {}
 
 /// Tx backend adapter represents a bound local endpoint.
 pub trait EndpointAdapt: 'static + Send + Sync + Unpin {
+    /// Capture a debugging internal state dump.
+    fn debug(&self) -> serde_json::Value;
+
     /// Get the opaque Uniq identifier for this endpoint.
     fn uniq(&self) -> Uniq;
 

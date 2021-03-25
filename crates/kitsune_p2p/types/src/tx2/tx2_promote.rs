@@ -360,6 +360,23 @@ fn reg_con_hnd_inner(
 }
 
 impl AsEpHnd for PromoteEpHnd {
+    fn debug(&self) -> serde_json::Value {
+        match self.0.share_mut(|i, _| {
+            Ok(serde_json::json!({
+                "type": "tx2_promote",
+                "state": "open",
+                "connection_count": i.all_cons.len(),
+                "backend": i.ep.debug(),
+            }))
+        }) {
+            Ok(j) => j,
+            Err(_) => serde_json::json!({
+                "type": "tx2_promote",
+                "state": "closed",
+            }),
+        }
+    }
+
     fn uniq(&self) -> Uniq {
         self.1
     }
@@ -699,6 +716,9 @@ mod tests {
         con.write(0.into(), data, t).await.unwrap();
 
         t_comp_r.await.unwrap();
+
+        let debug = e1_hnd.debug();
+        println!("{}", serde_json::to_string_pretty(&debug).unwrap());
 
         e1_hnd.close(0, "").await;
         e2_hnd.close(0, "").await;

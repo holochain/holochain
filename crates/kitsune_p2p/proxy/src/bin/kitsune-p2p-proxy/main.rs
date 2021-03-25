@@ -13,7 +13,7 @@ use structopt::StructOpt;
 mod opt;
 use opt::*;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     let _ = ghost_actor::dependencies::tracing::subscriber::set_global_default(
         tracing_subscriber::FmtSubscriber::builder()
