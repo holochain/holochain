@@ -28,6 +28,7 @@ use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::collections::HashMap;
 use tracing::*;
 use tracing_futures::Instrument;
 
@@ -681,6 +682,23 @@ where
         Ok(())
     }
 
+    async fn fetch_links_sql(
+        &mut self,
+        link_key: WireLinkMetaKey,
+        options: GetLinksOptions,
+    ) -> CascadeResult<()> {
+        debug!("in get links");
+        // let network = ok_or_return!(self.network.as_mut());
+        // let results = network.get_links(link_key, options).await?;
+        let results: Vec<DhtOp> = todo!("do get links network req");
+
+        todo!("
+        INSERT INTO CacheDhtOp (:dhtop_blob, :field_names_blablabla) VALUES bla bla --actually insert all fields
+        INSERT INTO CacheHeader (:header_blob, :field_names_blablabla) VALUES bla bla
+        ");
+        Ok(())
+    }
+
     #[instrument(skip(self, options))]
     async fn fetch_links(
         &mut self,
@@ -697,6 +715,10 @@ where
         Ok(())
     }
 
+    /// Get the element from any databases that the Cascade has been constructed with
+    fn get_element_local_raw_sql(&self, hash: &HeaderHash) -> CascadeResult<Option<Element>> {
+        todo!();
+    }
     /// Get the element from any databases that the Cascade has been constructed with
     fn get_element_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<Element>> {
         // It's a little tricky to call a function on every db.
@@ -879,6 +901,21 @@ where
             }),
             None => Ok(None),
         }
+    }
+
+    fn create_element_details_sql(
+        &self,
+        hash: HeaderHash,
+    ) -> CascadeResult<Option<ElementDetails>> {
+        todo!(
+            "
+            SELECT DhtOp.validation_status, Header.blob, Entry.blob From DhtOp
+            JOIN Header ON DhtOp.header_hash = Header.hash
+            JOIN Entry ON Header.entry_hash = Entry.hash
+            WHERE Header.hash = :hash
+            AND Header.type IN (???, ???)
+            "
+        )
     }
 
     fn create_element_details(&self, hash: HeaderHash) -> CascadeResult<Option<ElementDetails>> {
@@ -1162,6 +1199,22 @@ where
             }
             Search::NotInCascade => Ok(None),
         }
+    }
+
+    pub async fn get_header_details_sql(
+        &mut self,
+        header_hash: HeaderHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<ElementDetails>> {
+        let not_authority = !self.am_i_an_authority(header_hash.clone().into()).await?;
+        let not_authoring = !self.am_i_authoring(&header_hash.clone().into()).await?;
+
+        if not_authoring && not_authority {
+            // Network
+            self.fetch_element_via_header(header_hash.clone(), options.into())
+                .await?;
+        }
+        todo!()
     }
 
     #[instrument(skip(self, options))]
@@ -1541,6 +1594,61 @@ where
                 .await?
                 .map(Details::Element)),
         }
+    }
+
+    #[instrument(skip(self, key, options))]
+    /// Gets an links from the cas or cache depending on it's metadata
+    // The default behavior is to skip deleted or replaced entries.
+    // TODO: Implement customization of this behavior with an options/builder struct
+    pub async fn dht_get_links_sql<'link>(
+        &mut self,
+        key: &'link LinkMetaKey<'link>,
+        options: GetLinksOptions,
+    ) -> CascadeResult<Vec<Link>> {
+        if !self.am_i_an_authority(key.base().clone().into()).await? {
+            // Update the cache from the network
+            self.fetch_links(key.into(), options).await?;
+        }
+        let cell_env = ok_or_return!(self.env.clone(), vec![]);
+        let cache_env = ok_or_return!(todo!("get cache env"), vec![]);
+
+        let (integrated_creates, integrated_deletes) = Self::get_live_links(cell_env)?;
+        let (cached_creates, cached_deletes) = Self::get_live_links(cache_env)?;
+        let mut all_creates: HashMap<HeaderHash, CreateLink> = integrated_creates
+            .into_iter()
+            .chain(cached_creates.into_iter())
+            .collect();
+        for delete in integrated_deletes
+            .into_iter()
+            .chain(cached_deletes.into_iter())
+        {
+            all_creates.remove(&delete.link_add_address);
+        }
+
+        Ok(all_creates
+            .into_iter()
+            .map(|(_, v)| v)
+            .map(|_| todo!("Link::from"))
+            .collect())
+    }
+
+    fn get_live_links(
+        env: EnvRead,
+    ) -> CascadeResult<(Vec<(HeaderHash, CreateLink)>, Vec<DeleteLink>)> {
+        todo!(
+            "
+    SELECT Header.blob FROM DhtOp
+    INNER JOIN Header ON DhtOp.header_hash = Header.hash
+    WHERE
+    DhtOp.type IN ('RegisterAddLink', 'RegisterRemoveLink')
+    AND
+    Header.basis_hash = :basis_hash
+    AND
+    Header.zome_id = :zome_id
+    AND --Optional
+    Header.tag = :tag -- Optional
+        "
+        )
     }
 
     #[instrument(skip(self, key, options))]

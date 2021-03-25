@@ -18,6 +18,58 @@ use std::collections::BTreeSet;
 use std::convert::TryInto;
 use tracing::*;
 
+enum GetEntryFlavor {
+    /// Get everything
+    All,
+    // /// Get the Entry via the StoreEntry Op
+    // OneArbitrary,
+    // ///                    AppHeaders
+    // /// Difference of NewEntryHeaders and Deletes
+    // OneArbitraryValidLive,
+}
+
+/*
+do I care if any store entry is valid?
+do i want headers?
+do i want to follow updates, deletes, etc.?
+    - i care at all about updates
+
+
+1. return all StoreEntry, RegisterDeletedEntryHeader, and RegisterUpdatedContent DhtOps, sorted by validity
+2. just retrieve an arbitrary StoreEntry op
+3. return arbitrary valid StoreEntry DhtOp that isn't negated by some RegisterDeletedEntryHeader DhtOp.
+
+1 is EVERYTHING
+- everything
+- unfiltered
+- raw
+2 is pick one from EVERYTHING
+- one
+- arbitrary
+3 is pick one from live(valid(EVERYTHING))
+- arbitrary valid live
+- OneValidLive
+
+
+
+
+*/
+
+pub type MinimalDhtOpSet = Vec<DhtOp>;
+
+/// Return all CRUD ops that have this entry as the basis
+pub fn handle_get_entry_sql(state_env: EnvRead, hash: EntryHash) -> CascadeResult<MinimalDhtOpSet> {
+    todo!(
+        "
+    SELECT DhtOp.blob, Header.blob, Entry.blob FROM DhtOp
+    INNER JOIN Header ON DhtOp.header_hash = Header.hash
+    OUTER JOIN Entry ON Header.entry_hash = Entry.hash
+    WHERE DhtOp.basis_hash = ?1 
+    AND DhtOp.type IN ('StoreEntry', 'RegisterDeletedEntryHeader', 'RegisterUpdatedContent')
+    "
+    )
+}
+
 #[instrument(skip(state_env))]
 pub fn handle_get_entry(
     state_env: EnvRead,
@@ -168,6 +220,18 @@ pub fn handle_get_entry(
     };
     debug!(handle_get_details_return = ?r);
     Ok(GetElementResponse::GetEntryFull(r))
+}
+
+pub fn handle_get_element_sql(env: EnvRead, hash: HeaderHash) -> CascadeResult<MinimalDhtOpSet> {
+    todo!(
+        "
+    SELECT DhtOp.blob, Header.blob, Entry.blob FROM DhtOp
+    INNER JOIN Header ON DhtOp.header_hash = Header.hash
+    OUTER JOIN Entry ON Header.entry_hash = Entry.hash
+    WHERE DhtOp.basis_hash = ?1 
+    AND DhtOp.type IN ('StoreElement', 'RegisterDeletedBy', 'RegisterUpdatedElement')
+    "
+    )
 }
 
 #[tracing::instrument(skip(env))]
@@ -335,6 +399,33 @@ fn check_headers<P: PrefixType, R: Readable>(
                 .collect()?,
         ))
     }
+}
+
+pub struct WireLinkFilter {
+    _basis: EntryHash,
+    _zome_id: ZomeId,
+    _tag: Option<LinkTag>,
+}
+
+pub fn handle_get_links_sql(
+    _env: EnvRead,
+    _link_key: WireLinkFilter,
+    _options: holochain_p2p::event::GetLinksOptions,
+) -> CascadeResult<Vec<DhtOp>> {
+    let select = "
+    SELECT DhtOp.blob, Header.blob FROM DhtOp
+    INNER JOIN Header ON DhtOp.header_hash = Header.hash
+    WHERE
+    DhtOp.type IN ('RegisterAddLink', 'RegisterRemoveLink')
+    AND
+    Header.basis_hash = :basis_hash
+    AND
+    Header.zome_id = :zome_id
+    AND --Optional
+    Header.tag = :tag -- Optional
+    ";
+
+    todo!("{}", select);
 }
 
 #[instrument(skip(env, _options))]
