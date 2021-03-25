@@ -18,6 +18,10 @@ pub struct Schema {
 }
 
 impl Schema {
+    /// Determine if any database migrations need to run, and run them if so.
+    /// The decision is based on the difference between this Schema's
+    /// current_index and the user_version pragma value in the database itself.
+    /// NB: The current_index is 0-based, and the user_version is 1-based.
     pub fn initialize(&self, conn: &mut Connection, db_kind: &DbKind) -> rusqlite::Result<()> {
         let user_version: u16 =
             conn.pragma_query_value(None, "user_version", |row| Ok(row.get(0)?))?;
@@ -34,6 +38,10 @@ impl Schema {
                 for v in current_index..self.current_index + 1 {
                     self.migrations[v].run(conn)?;
                 }
+                // set the DB user_version so that next time we don't run
+                // the same migration
+                let new_user_version = (self.current_index + 1) as u16;
+                conn.pragma_update(None, "user_version", &new_user_version)?;
                 tracing::info!(
                     "database forward migrated: {} from {} to {}",
                     db_kind,
