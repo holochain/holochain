@@ -1,4 +1,7 @@
 use crate::element::SignedHeaderHashed;
+use crate::header::HeaderDetails;
+use crate::builder::HeaderDeterminism;
+use crate::timestamp::Timestamp;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
@@ -69,12 +72,13 @@ pub struct Link {
     pub create_link_hash: HeaderHash,
 }
 
-/// Zome IO inner type for link creation.
+/// Zome IO inner type for link creation, optionally with HeaderDetails.
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct CreateLinkInput {
     pub base_address: holo_hash::EntryHash,
     pub target_address: holo_hash::EntryHash,
     pub tag: LinkTag,
+    pub details: Option<HeaderDetails>,
 }
 
 impl CreateLinkInput {
@@ -87,6 +91,38 @@ impl CreateLinkInput {
             base_address,
             target_address,
             tag,
+	    details: None,
+        }
+    }
+}
+
+impl HeaderDeterminism for CreateLinkInput {
+    /// Specify a specific HeaderDetails Timestamp for CreateLinkInput
+    fn at(self, timestamp: Timestamp) -> Self {
+        Self {
+            details: Some(HeaderDetails {
+                timestamp: Some(timestamp),
+                ..self.details.unwrap_or(HeaderDetails::default())
+            }),
+            ..self
+        }
+    }
+    fn follows(self, prev_header: holo_hash::HeaderHash) -> Self {
+        Self {
+            details: Some(HeaderDetails {
+                prev_header: Some(prev_header),
+                ..self.details.unwrap_or(HeaderDetails::default())
+            }),
+            ..self
+        }
+    }
+    fn sequence(self, header_seq: u32) -> Self {
+        Self {
+            details: Some(HeaderDetails {
+                header_seq: Some(header_seq),
+                ..self.details.unwrap_or(HeaderDetails::default())
+            }),
+            ..self
         }
     }
 }

@@ -520,8 +520,8 @@ mod tests {
                                 entry_type: ec_entry_type,
                                 entry_hash: original_entry_hash.clone(),
                             },
+                            HeaderDetails::default(),
                             Some(original_entry),
-                            None,
                         )
                         .await
                         .unwrap();
@@ -540,8 +540,8 @@ mod tests {
                                 original_header_address: original_header_address.clone(),
                                 original_entry_address: original_entry_hash,
                             },
+                            HeaderDetails::default(),
                             Some(new_entry),
-                            None,
                         )
                         .await
                         .unwrap();

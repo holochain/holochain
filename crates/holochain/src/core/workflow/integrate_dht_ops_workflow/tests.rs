@@ -1229,7 +1229,7 @@ async fn test_wasm_api_without_integration_delete() {
         };
         workspace
             .source_chain
-            .put(delete, None, None)
+            .put(delete, HeaderDetails::default(), None)
             .await
             .unwrap();
         env_ref

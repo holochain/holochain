@@ -11,6 +11,13 @@ use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytes;
 
+/// Support determinism in Header construction, if desired, by explicitly including this trait
+pub trait HeaderDeterminism {
+    fn at(self, timestamp: Timestamp) -> Self;
+    fn follows(self, header_hash: HeaderHash) -> Self;
+    fn sequence(self, header_seq: u32) -> Self;
+}
+
 #[derive(Debug)]
 pub struct HeaderBuilderCommon {
     pub author: AgentPubKey,

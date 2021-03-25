@@ -488,3 +488,14 @@ impl ZomeId {
         self.0 as usize
     }
 }
+
+/// Creating a Header requires certain details, which may be deduced at creation time, or may be
+/// supplied by the caller.  For example, to reconstruct a source-chain from backup, or to commit a
+/// header with a specific Timestamp or at a known location or sequence in the source-chain to
+/// implement "atomic" read-modify-write algorithms.
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+pub struct HeaderDetails {
+    pub timestamp: Option<Timestamp>,
+    pub header_seq: Option<u32>,
+    pub prev_header: Option<HeaderHash>,
+}

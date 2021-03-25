@@ -12,6 +12,7 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_state::workspace::Workspace;
 use holochain_types::dna::DnaDef;
 use holochain_zome_types::header::builder;
+use holochain_zome_types::header::HeaderDetails;
 use tracing::*;
 
 #[derive(Constructor, Debug)]
@@ -64,7 +65,11 @@ async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
         .write()
         .await
         .source_chain
-        .put(builder::InitZomesComplete {}, None, None)
+        .put(
+            builder::InitZomesComplete {},
+            HeaderDetails::default(),
+            None,
+        )
         .await?;
 
     Ok(result)

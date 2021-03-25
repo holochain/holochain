@@ -31,7 +31,7 @@ pub fn delete<'a>(
             deletes_entry_address,
         };
         let header_hash = source_chain
-            .put(header_builder, None, None)
+            .put(header_builder, HeaderDetails::default(), None)
             .await
             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
         let element = source_chain

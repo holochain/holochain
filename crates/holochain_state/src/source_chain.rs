@@ -49,18 +49,28 @@ impl SourceChain {
         self.0
     }
 
-    /// Add a Element to the source chain, using a HeaderBuilder, and maybe a certain timestamp
+    /// Add a Element to the source chain, using a HeaderBuilder and maybe other HeaderDetails.  By
+    /// default, adds the header with the current Timestamp at the next available sequence number,
+    /// following the current chain_head.
     pub async fn put<H: HeaderInner, B: HeaderBuilder<H>>(
         &mut self,
         header_builder: B,
+        header_details: HeaderDetails,
         maybe_entry: Option<Entry>,
-        maybe_timestamp: Option<Timestamp>,
     ) -> SourceChainResult<HeaderHash> {
+        let author = self.agent_pubkey()?;
+        let timestamp = header_details.timestamp.unwrap_or_else(|| timestamp::now());
+        let header_seq = header_details
+            .header_seq
+            .unwrap_or_else(|| self.len() as u32);
+        let prev_header = header_details
+            .prev_header
+            .unwrap_or(self.chain_head()?.to_owned());
         let common = HeaderBuilderCommon {
-            author: self.agent_pubkey()?,
-            timestamp: maybe_timestamp.unwrap_or_else(|| timestamp::now()),
-            header_seq: self.len() as u32,
-            prev_header: self.chain_head()?.to_owned(),
+            author,
+            timestamp,
+            header_seq,
+            prev_header,
         };
         let header = header_builder.build(common).into();
         self.put_raw(header, maybe_entry).await
@@ -77,7 +87,8 @@ impl SourceChain {
             entry_type: EntryType::CapClaim,
             entry_hash,
         };
-        self.put(header_builder, Some(entry), None).await
+        self.put(header_builder, HeaderDetails::default(), Some(entry))
+            .await
     }
 
     /// Fetch a relevant CapGrant from the private entries.
@@ -373,7 +384,7 @@ pub mod tests {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
             };
-            let header = chain.put(header_builder, Some(entry), None).await?;
+            let header = chain.put(header_builder, HeaderDetails::default(), Some(entry)).await?;
 
             env.guard()
                 .with_commit(|writer| chain.flush_to_txn(writer))?;
@@ -415,7 +426,7 @@ pub mod tests {
                 original_header_address,
                 original_entry_address,
             };
-            let header = chain.put(header_builder, Some(entry), None).await?;
+            let header = chain.put(header_builder, HeaderDetails::default(), Some(entry)).await?;
 
             env.guard()
                 .with_commit(|writer| chain.flush_to_txn(writer))?;
@@ -453,7 +464,7 @@ pub mod tests {
                 deletes_address: updated_header_hash,
                 deletes_entry_address: updated_entry_hash,
             };
-            chain.put(header_builder, None, None).await?;
+            chain.put(header_builder, HeaderDetails::default(), None).await?;
 
             env.guard()
                 .with_commit(|writer| chain.flush_to_txn(writer))?;

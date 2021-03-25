@@ -20,6 +20,7 @@ pub fn update<'a>(
     let UpdateInput {
         original_header_address,
         entry_with_def_id,
+	details,
     } = input;
 
     // build the entry hash
@@ -51,15 +52,15 @@ pub fn update<'a>(
     let original_entry_address =
         get_original_address(call_context.clone(), original_header_address.clone())?;
 
-    // build a header for the entry being updated.  Either the EntryWithDefId supplies a desired
-    // Header timestamp, or we'll supply the current time when we put the Entry in the source_chain.
-    let maybe_timestamp: Option<Timestamp> = AsRef::<Option<Timestamp>>::as_ref(&entry_with_def_id).to_owned();
+    // Build a header for the entry being updated.  Either the EntryWithDefId supplies a desired
+    // HeaderDetails, or we'll supply the timestamp, etc. when we put the Entry in the source_chain.
     let header_builder = builder::Update {
         entry_type,
         entry_hash,
         original_header_address,
         original_entry_address,
     };
+    let header_details = details.unwrap_or(HeaderDetails::default());
 
     let workspace_lock = call_context.host_access.workspace();
 
@@ -74,7 +75,7 @@ pub fn update<'a>(
         let source_chain = &mut workspace.source_chain;
         // push the header and the entry into the source chain
         let header_hash = source_chain
-            .put(header_builder, Some(entry), maybe_timestamp)
+            .put(header_builder, header_details, Some(entry))
             .await
             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
         // fetch the element we just added so we can integrate its DhtOps

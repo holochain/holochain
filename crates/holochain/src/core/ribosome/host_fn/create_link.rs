@@ -18,6 +18,7 @@ pub fn create_link<'a>(
         base_address,
         target_address,
         tag,
+	details,
     } = input;
 
     // extract the zome position
@@ -27,12 +28,13 @@ pub fn create_link<'a>(
 
     // Construct the link add
     let header_builder = builder::CreateLink::new(base_address, target_address, zome_id, tag);
+    let header_details = details.unwrap_or(HeaderDetails::default());
 
     let header_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
         let mut guard = call_context.host_access.workspace().write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         // push the header into the source chain
-        let header_hash = workspace.source_chain.put(header_builder, None, None).await?;
+        let header_hash = workspace.source_chain.put(header_builder, header_details, None).await?;
         let element = workspace
             .source_chain
             .get_element(&header_hash)?

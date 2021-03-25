@@ -132,8 +132,8 @@ mod tests {
                         entry_type: EntryType::App(app_entry_type),
                         entry_hash,
                     },
+		    HeaderDetails::default(),
                     Some(app_entry),
-                    None,
                 )
                 .await
                 .unwrap();
