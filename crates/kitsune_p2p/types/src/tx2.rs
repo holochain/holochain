@@ -6,6 +6,8 @@ pub use framed::*;
 mod mem;
 pub use mem::*;
 
+pub mod tx2_api;
+
 pub mod tx2_backend;
 
 pub mod tx2_frontend;
