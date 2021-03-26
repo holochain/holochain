@@ -696,8 +696,15 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         // space retries joining all cells every 5 minutes.
         futures::stream::iter(networks)
             .for_each_concurrent(100, |mut network| async move {
-                if let Err(e) = network.join().await {
-                    tracing::info!(failed_to_join_network = ?e);
+                match tokio::time::timeout(std::time::Duration::from_secs(20), network.join()).await
+                {
+                    Ok(Err(e)) => {
+                        tracing::info!(failed_to_join_network = ?e);
+                    }
+                    Err(_) => {
+                        tracing::info!("Timed out trying to join the network");
+                    }
+                    Ok(Ok(_)) => (),
                 }
             })
             .await;
