@@ -41,28 +41,28 @@ async fn get_links() {
 
     let sig = fixt!(Signature);
     let create_link_op = DhtOp::RegisterAddLink(sig.clone(), create_link.clone());
-    let mut trans = conn
+    let mut txn = conn
         .transaction_with_behavior(TransactionBehavior::Exclusive)
         .unwrap();
 
     insert_header(
-        &mut trans,
+        &mut txn,
         HeaderHashed::from_content_sync(Header::CreateLink(create_link.clone())),
     );
-    insert_entry(&mut trans, EntryHashed::from_content_sync(base));
+    insert_entry(&mut txn, EntryHashed::from_content_sync(base));
     insert_header(
-        &mut trans,
+        &mut txn,
         HeaderHashed::from_content_sync(Header::Create(create_base.clone())),
     );
-    insert_entry(&mut trans, EntryHashed::from_content_sync(target));
+    insert_entry(&mut txn, EntryHashed::from_content_sync(target));
     insert_header(
-        &mut trans,
+        &mut txn,
         HeaderHashed::from_content_sync(Header::Create(create_target.clone())),
     );
 
-    insert_op(&mut trans, DhtOpHashed::from_content_sync(create_link_op));
+    insert_op(&mut txn, DhtOpHashed::from_content_sync(create_link_op));
 
-    let r = get_link_ops_on_entry(&mut trans, base_hash.clone());
+    let r = get_link_ops_on_entry(&mut txn, base_hash.clone());
     assert_eq!(
         r.creates[0],
         DhtOpLight::RegisterAddLink(
@@ -78,8 +78,20 @@ struct LinkOpsQuery {
     deletes: Vec<DhtOpLight>,
 }
 
-fn get_link_ops_on_entry(trans: &mut Transaction, entry: EntryHash) -> LinkOpsQuery {
-    let mut stmt = trans
+macro_rules! sql_insert {
+    ($txn:expr, $table:ident, { $($field:literal : $val:expr , )+ $(,)? }) => {{
+        let table = stringify!($table);
+        let fieldnames = &[ $( { $field } ,)+ ].join(",");
+        let fieldvars = &[ $( { format!(":{}", $field) } ,)+ ].join(",");
+        let sql = format!("INSERT INTO {} ({}) VALUES ({})", table, fieldnames, fieldvars);
+        $txn.execute_named(&sql, &[$(
+            (format!(":{}", $field).as_str(), &$val as &dyn holochain_sqlite::rusqlite::ToSql),
+        )+])
+    }};
+}
+
+fn get_link_ops_on_entry(txn: &mut Transaction, entry: EntryHash) -> LinkOpsQuery {
+    let mut stmt = txn
         .prepare(
             "
         SELECT DhtOp.Blob FROM DhtOp
@@ -113,7 +125,7 @@ fn get_link_ops_on_entry(trans: &mut Transaction, entry: EntryHash) -> LinkOpsQu
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
 struct OpLight(pub DhtOpLight);
 
-fn insert_op(trans: &mut Transaction, op: DhtOpHashed) {
+fn insert_op(txn: &mut Transaction, op: DhtOpHashed) {
     let (op, hash) = op.into_inner();
     let basis = op.dht_basis();
     let op_light = op.to_light();
@@ -122,74 +134,49 @@ fn insert_op(trans: &mut Transaction, op: DhtOpHashed) {
         DhtOp::StoreElement(_, _, _) => todo!(),
         DhtOp::StoreEntry(_, _, _) => todo!(),
         DhtOp::RegisterAddLink(_, _) => {
-            trans
-                .execute_named(
-                    "
-                    INSERT INTO DhtOp 
-                    (hash, type, basis_hash, header_hash, is_authored,
-                    is_integrated, require_receipt, blob)
-                    VALUES 
-                    (:hash, :type, :basis_hash, :header_hash, :is_authored,
-                    :is_integrated, :require_receipt, :blob)
-                    ",
-                    named_params! {
-                        ":hash": hash.into_inner(),
-                        // TODO: Get this from the enum.
-                        ":type": 7,
-                        ":basis_hash": basis.into_inner(),
-                        ":header_hash": header_hash.into_inner(),
-                        ":is_authored": 1,
-                        ":is_integrated": 1,
-                        ":require_receipt": 0,
-                        ":blob": to_blob(OpLight(op_light)),
-                    },
-                )
-                .unwrap();
+            sql_insert!(txn, DhtOp, {
+                "hash": hash.into_inner(),
+                // TODO: Get this from the enum.
+                "type": 7,
+                "basis_hash": basis.into_inner(),
+                "header_hash": header_hash.into_inner(),
+                "is_authored": 1,
+                "is_integrated": 1,
+                "require_receipt": 0,
+                "blob": to_blob(OpLight(op_light)),
+            })
+            .unwrap();
         }
         DhtOp::RegisterRemoveLink(_, _) => todo!(),
         _ => todo!(),
     }
 }
 
-fn insert_header(trans: &mut Transaction, header: HeaderHashed) {
+fn insert_header(txn: &mut Transaction, header: HeaderHashed) {
     let (header, hash) = header.into_inner();
     let header_type = header.header_type();
     let header_seq = header.header_seq();
     match header {
         Header::CreateLink(create_link) => {
-            trans
-                .execute_named(
-                    "
-                    INSERT INTO Header (hash, type, seq, blob, basis_hash)
-                    VALUES (:hash, :type, :seq, :blob, :basis_hash)
-                    ",
-                    named_params! {
-                        ":hash": hash.into_inner(),
-                        ":type": header_type as i32,
-                        ":seq": header_seq,
-                        ":basis_hash": create_link.base_address.clone().into_inner(),
-                        ":blob": to_blob(Header::CreateLink(create_link)),
-                    },
-                )
-                .unwrap();
+            sql_insert!(txn, Header, {
+                "hash": hash.into_inner(),
+                "type": header_type as i32,
+                "seq": header_seq,
+                "basis_hash": create_link.base_address.clone().into_inner(),
+                "blob": to_blob(Header::CreateLink(create_link)),
+            })
+            .unwrap();
         }
         Header::DeleteLink(_) => todo!(),
         Header::Create(create) => {
-            trans
-                .execute_named(
-                    "
-                    INSERT INTO Header (hash, type, seq, blob, entry_hash)
-                    VALUES (:hash, :type, :seq, :blob, :entry_hash)
-                    ",
-                    named_params! {
-                        ":hash": hash.into_inner(),
-                        ":type": header_type as i32,
-                        ":seq": header_seq,
-                        ":entry_hash": create.entry_hash.clone().into_inner(),
-                        ":blob": to_blob(Header::Create(create)),
-                    },
-                )
-                .unwrap();
+            sql_insert!(txn, Header, {
+                "hash": hash.into_inner(),
+                "type": header_type as i32,
+                "seq": header_seq,
+                "entry_hash": create.entry_hash.clone().into_inner(),
+                "blob": to_blob(Header::Create(create)),
+            })
+            .unwrap();
         }
         _ => todo!(),
     }
@@ -202,21 +189,14 @@ enum EntryTypeSql {
     CapGrant,
 }
 
-fn insert_entry(trans: &mut Transaction, entry: EntryHashed) {
+fn insert_entry(txn: &mut Transaction, entry: EntryHashed) {
     let (entry, hash) = entry.into_inner();
-    trans
-        .execute_named(
-            "
-        INSERT INTO Entry (hash, type, blob)
-        VALUES (:hash, :type, :blob)
-        ",
-            named_params! {
-                ":hash": hash.into_inner(),
-                ":type": EntryTypeSql::from(&entry) as i32,
-                ":blob": to_blob(entry),
-            },
-        )
-        .unwrap();
+    sql_insert!(txn, Entry, {
+        "hash": hash.into_inner(),
+        "type": EntryTypeSql::from(&entry) as i32,
+        "blob": to_blob(entry),
+    })
+    .unwrap();
 }
 
 fn to_blob<E: std::fmt::Debug, T: TryInto<SerializedBytes, Error = E>>(t: T) -> Vec<u8> {
