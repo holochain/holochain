@@ -39,6 +39,9 @@ mod activity;
 mod chain_test;
 mod keys;
 #[cfg(test)]
+mod query;
+
+#[cfg(test)]
 pub mod links_test;
 mod status;
 mod sys_meta;

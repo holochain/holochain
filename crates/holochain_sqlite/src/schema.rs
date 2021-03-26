@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use rusqlite::{Connection, NO_PARAMS};
+use rusqlite::Connection;
 
 use crate::db::DbKind;
 
@@ -70,7 +70,7 @@ impl Migration {
     }
 
     pub fn initialize(&self, conn: &mut Connection) -> rusqlite::Result<()> {
-        conn.execute(&self.schema, NO_PARAMS)?;
+        conn.execute_batch(&self.schema)?;
         Ok(())
     }
 
