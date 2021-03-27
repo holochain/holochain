@@ -11,6 +11,7 @@ use error::DhtOpError;
 use error::DhtOpResult;
 use holo_hash::hash_type;
 use holo_hash::HashableContentBytes;
+use holochain_sqlite::rusqlite::ToSql;
 use holochain_zome_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -126,6 +127,40 @@ pub enum DhtOpLight {
     RegisterAddLink(HeaderHash, DhtBasis),
     #[display(fmt = "RegisterRemoveLink")]
     RegisterRemoveLink(HeaderHash, DhtBasis),
+}
+
+/// This enum is used to
+#[allow(missing_docs)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, derive_more::Display)]
+pub enum DhtOpType {
+    #[display(fmt = "StoreElement")]
+    StoreElement,
+    #[display(fmt = "StoreEntry")]
+    StoreEntry,
+    #[display(fmt = "RegisterAgentActivity")]
+    RegisterAgentActivity,
+    #[display(fmt = "RegisterUpdatedContent")]
+    RegisterUpdatedContent,
+    #[display(fmt = "RegisterUpdatedElement")]
+    RegisterUpdatedElement,
+    #[display(fmt = "RegisterDeletedBy")]
+    RegisterDeletedBy,
+    #[display(fmt = "RegisterDeletedEntryHeader")]
+    RegisterDeletedEntryHeader,
+    #[display(fmt = "RegisterAddLink")]
+    RegisterAddLink,
+    #[display(fmt = "RegisterRemoveLink")]
+    RegisterRemoveLink,
+}
+
+impl ToSql for DhtOpType {
+    fn to_sql(
+        &self,
+    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput> {
+        Ok(holochain_sqlite::rusqlite::types::ToSqlOutput::Owned(
+            format!("{}", self).into(),
+        ))
+    }
 }
 
 impl DhtOp {
@@ -251,6 +286,36 @@ impl DhtOp {
             DhtOp::RegisterRemoveLink(_, h) => h.clone().into(),
         }
     }
+
+    /// Get the entry from this op, if one exists
+    pub fn entry(&self) -> Option<&Entry> {
+        match self {
+            DhtOp::StoreElement(_, _, e) => e.as_ref().map(|b| &**b),
+            DhtOp::StoreEntry(_, _, e) => Some(&*e),
+            DhtOp::RegisterUpdatedContent(_, _, e) => e.as_ref().map(|b| &**b),
+            DhtOp::RegisterUpdatedElement(_, _, e) => e.as_ref().map(|b| &**b),
+            DhtOp::RegisterAgentActivity(_, _) => None,
+            DhtOp::RegisterDeletedBy(_, _) => None,
+            DhtOp::RegisterDeletedEntryHeader(_, _) => None,
+            DhtOp::RegisterAddLink(_, _) => None,
+            DhtOp::RegisterRemoveLink(_, _) => None,
+        }
+    }
+
+    /// Get the type as a unit enum, for Display purposes
+    pub fn get_type(&self) -> DhtOpType {
+        match self {
+            DhtOp::StoreElement(_, _, _) => DhtOpType::StoreElement,
+            DhtOp::StoreEntry(_, _, _) => DhtOpType::StoreEntry,
+            DhtOp::RegisterUpdatedContent(_, _, _) => DhtOpType::RegisterUpdatedContent,
+            DhtOp::RegisterUpdatedElement(_, _, _) => DhtOpType::RegisterUpdatedElement,
+            DhtOp::RegisterAgentActivity(_, _) => DhtOpType::RegisterAgentActivity,
+            DhtOp::RegisterDeletedBy(_, _) => DhtOpType::RegisterDeletedBy,
+            DhtOp::RegisterDeletedEntryHeader(_, _) => DhtOpType::RegisterDeletedEntryHeader,
+            DhtOp::RegisterAddLink(_, _) => DhtOpType::RegisterAddLink,
+            DhtOp::RegisterRemoveLink(_, _) => DhtOpType::RegisterRemoveLink,
+        }
+    }
 }
 
 impl DhtOpLight {
@@ -280,6 +345,21 @@ impl DhtOpLight {
             | DhtOpLight::RegisterDeletedEntryHeader(h, _)
             | DhtOpLight::RegisterAddLink(h, _)
             | DhtOpLight::RegisterRemoveLink(h, _) => h,
+        }
+    }
+
+    /// Get the type as a unit enum, for Display purposes
+    pub fn get_type(&self) -> DhtOpType {
+        match self {
+            DhtOpLight::StoreElement(_, _, _) => DhtOpType::StoreElement,
+            DhtOpLight::StoreEntry(_, _, _) => DhtOpType::StoreEntry,
+            DhtOpLight::RegisterUpdatedContent(_, _, _) => DhtOpType::RegisterUpdatedContent,
+            DhtOpLight::RegisterUpdatedElement(_, _, _) => DhtOpType::RegisterUpdatedElement,
+            DhtOpLight::RegisterAgentActivity(_, _) => DhtOpType::RegisterAgentActivity,
+            DhtOpLight::RegisterDeletedBy(_, _) => DhtOpType::RegisterDeletedBy,
+            DhtOpLight::RegisterDeletedEntryHeader(_, _) => DhtOpType::RegisterDeletedEntryHeader,
+            DhtOpLight::RegisterAddLink(_, _) => DhtOpType::RegisterAddLink,
+            DhtOpLight::RegisterRemoveLink(_, _) => DhtOpType::RegisterRemoveLink,
         }
     }
 }

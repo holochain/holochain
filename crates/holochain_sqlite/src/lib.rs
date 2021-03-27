@@ -22,5 +22,5 @@ pub use naive::*;
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils;
 
-// Re-export rusqlite for use with `impl_to_sql!` macro
+// Re-export rusqlite for use with `impl_to_sql_via_as_ref!` macro
 pub use ::rusqlite;

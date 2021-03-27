@@ -3,7 +3,7 @@ use rusqlite::Connection;
 
 use crate::db::DbKind;
 
-pub(crate) static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| {
+pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| {
     let migration_0 = Migration::initial(include_str!("schema/cell/initial.sql"));
 
     Schema {
@@ -18,9 +18,16 @@ pub struct Schema {
 }
 
 impl Schema {
-    pub fn initialize(&self, conn: &mut Connection, db_kind: &DbKind) -> rusqlite::Result<()> {
+    pub fn initialize(
+        &self,
+        conn: &mut Connection,
+        db_kind: Option<&DbKind>,
+    ) -> rusqlite::Result<()> {
         let user_version: u16 =
             conn.pragma_query_value(None, "user_version", |row| Ok(row.get(0)?))?;
+        let db_kind = db_kind
+            .map(ToString::to_string)
+            .unwrap_or("<no name>".to_string());
 
         if user_version == 0 {
             // database just needs to be created / initialized

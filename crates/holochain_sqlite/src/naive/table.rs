@@ -200,24 +200,24 @@ pub(crate) fn initialize_database(conn: &mut Connection, db_kind: &DbKind) -> ru
             initialize_table(conn, TableName::ValidationLimbo)?;
             initialize_table(conn, TableName::ValidationReceipts)?;
 
-            crate::schema::SCHEMA_CELL.initialize(conn, db_kind)?;
+            crate::schema::SCHEMA_CELL.initialize(conn, Some(db_kind))?;
         }
         DbKind::Conductor => {
             initialize_table(conn, TableName::ConductorState)?;
 
-            // crate::schema::SCHEMA_CONDUCTOR.initialize(conn, db_kind)?;
+            // crate::schema::SCHEMA_CONDUCTOR.initialize(conn, Some(db_kind))?;
         }
         DbKind::Wasm => {
             initialize_table(conn, TableName::Wasm)?;
             initialize_table(conn, TableName::DnaDef)?;
             initialize_table(conn, TableName::EntryDef)?;
 
-            // crate::schema::SCHEMA_WASM.initialize(conn, db_kind)?;
+            // crate::schema::SCHEMA_WASM.initialize(conn, Some(db_kind))?;
         }
         DbKind::P2p => {
             initialize_table(conn, TableName::Agent)?;
 
-            // crate::schema::SCHEMA_P2P.initialize(conn, db_kind)?;
+            // crate::schema::SCHEMA_P2P.initialize(conn, Some(db_kind))?;
         }
     }
     Ok(())

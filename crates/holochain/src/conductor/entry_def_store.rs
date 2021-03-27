@@ -35,7 +35,7 @@ impl AsRef<[u8]> for EntryDefStoreKey {
     }
 }
 
-holochain_sqlite::impl_to_sql!(EntryDefStoreKey);
+holochain_sqlite::impl_to_sql_via_as_ref!(EntryDefStoreKey);
 
 impl BufKey for EntryDefStoreKey {
     fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {

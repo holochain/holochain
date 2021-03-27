@@ -106,7 +106,7 @@ impl AsRef<[u8]> for AgentKvKey {
     }
 }
 
-holochain_sqlite::impl_to_sql!(AgentKvKey);
+holochain_sqlite::impl_to_sql_via_as_ref!(AgentKvKey);
 
 impl BufKey for AgentKvKey {
     fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {

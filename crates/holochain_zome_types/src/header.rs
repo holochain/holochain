@@ -76,6 +76,18 @@ macro_rules! write_into_header {
             $($n,)*
         }
 
+        impl std::fmt::Display for HeaderType {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                writeln!(
+                    f,
+                    "{}",
+                    match self {
+                        $( HeaderType::$n => stringify!($n), )*
+                    }
+                )
+            }
+        }
+
         impl From<&Header> for HeaderType {
             fn from(header: &Header) -> HeaderType {
                 match header {
