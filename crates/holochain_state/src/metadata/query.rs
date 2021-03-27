@@ -211,25 +211,16 @@ fn insert_op(txn: &mut Transaction, op: DhtOpHashed) {
 fn insert_op_lite(txn: &mut Transaction, op_lite: DhtOpLight, hash: DhtOpHash) {
     let header_hash = op_lite.header_hash().clone();
     let basis = op_lite.dht_basis().to_owned();
-    match op_lite {
-        DhtOpLight::StoreElement(_, _, _) => todo!(),
-        DhtOpLight::StoreEntry(_, _, _) => todo!(),
-        DhtOpLight::RegisterAddLink(_, _) => {
-            sql_insert!(txn, DhtOp, {
-                "hash": hash.into_inner(),
-                "type": op_lite.get_type(),
-                "basis_hash": basis.into_inner(),
-                "header_hash": header_hash.into_inner(),
-                "is_authored": 1,
-                "is_integrated": 1,
-                "require_receipt": 0,
-                "blob": to_blob(op_lite),
-            })
-            .unwrap();
-        }
-        DhtOpLight::RegisterRemoveLink(_, _) => todo!(),
-        _ => todo!(),
-    }
+    sql_insert!(txn, DhtOp, {
+        "hash": hash.into_inner(),
+        "type": op_lite.get_type(),
+        "basis_hash": basis.into_inner(),
+        "header_hash": header_hash.into_inner(),
+        "is_authored": 1,
+        "require_receipt": 0,
+        "blob": to_blob(op_lite),
+    })
+    .unwrap();
 }
 
 fn insert_header(txn: &mut Transaction, header: HeaderHashed) {

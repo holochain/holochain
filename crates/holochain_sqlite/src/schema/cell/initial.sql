@@ -77,16 +77,18 @@ CREATE TABLE DhtOp (
     basis_hash       BLOB           NOT NULL,
     header_hash      BLOB           NOT NULL,
     is_authored      INTEGER        NOT NULL,      -- BOOLEAN
-    is_integrated    INTEGER        NOT NULL,      -- BOOLEAN
     require_receipt  INTEGER        NOT NULL,      -- BOOLEAN
 
     when_integrated  NUMERIC        NULL,          -- DATETIME
-    entry_hash       BLOB           NULL,
 
     blob             BLOB           NOT NULL,
 
+    -- NB: I removed this because when_integrated covers it
+    -- is_integrated    INTEGER        NOT NULL,      -- BOOLEAN
 
-    FOREIGN KEY(header_hash) REFERENCES Header(hash),
-    FOREIGN KEY(entry_hash) REFERENCES Entry(hash)
+    -- NB: I removed this because it's accessible via Header.entry_hash
+    -- entry_hash       BLOB           NULL,
+
+    FOREIGN KEY(header_hash) REFERENCES Header(hash)
 );
 CREATE INDEX DhtOp_type_idx ON DhtOp ( type );
