@@ -102,8 +102,8 @@ impl ChainSequenceBuf {
             .map(|seq_item| seq_item.map(|si| si.header_address))
     }
 
-    /// Add a header to the chain, setting all other values automatically.
-    /// This is intentionally the only way to modify this database.
+    /// Add a header to the chain, setting all other values automatically.  This is intentionally
+    /// the only way to modify this database.
     #[instrument(skip(self))]
     pub fn put_header(&mut self, header_address: HeaderHash) -> DatabaseResult<()> {
         self.buf.put(

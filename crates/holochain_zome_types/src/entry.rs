@@ -283,7 +283,7 @@ impl UpdateInput {
         Self {
             original_header_address,
             entry_with_def_id,
-	    details: None,
+            details: None,
         }
     }
 }

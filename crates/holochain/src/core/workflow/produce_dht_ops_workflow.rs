@@ -101,6 +101,7 @@ mod tests {
     use holochain_zome_types::header::builder;
     use holochain_zome_types::header::EntryType;
     use holochain_zome_types::Entry;
+    use holochain_zome_types::HeaderDetails;
     use matches::assert_matches;
     use observability;
     use std::collections::HashSet;
@@ -132,7 +133,7 @@ mod tests {
                         entry_type: EntryType::App(app_entry_type),
                         entry_hash,
                     },
-		    HeaderDetails::default(),
+                    HeaderDetails::default(),
                     Some(app_entry),
                 )
                 .await

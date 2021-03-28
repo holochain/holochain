@@ -138,7 +138,9 @@ impl SourceChainBuf {
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<HeaderHash> {
         let header = HeaderHashed::from_content_sync(header);
+        let header_seq = header.header_seq();
         let header_address = header.as_hash().to_owned();
+        let prev_header = header.prev_header().cloned();
         let signed_header = SignedHeaderHashed::new(&self.keystore, header).await?;
         let maybe_entry = match maybe_entry {
             None => None,
@@ -152,6 +154,42 @@ impl SourceChainBuf {
         }
         */
 
+        // Here is where we detect/prevent adding a Header that forks the source-chain: this Header
+        // *must* have a header.prev_header that matches the current self.chain_head!
+        //
+        // If an optional HeaderDetails.prev_header was supplied, it had better match the current
+        // source-chain head.  The DNA Header doesn't have a prev_header (None) and should only be
+        // committed at the Genesis, where the chain_header() is also None, so simply test !=.
+        let chain_head = self.chain_head().cloned();
+        if prev_header != chain_head {
+            return Err(SourceChainError::InvalidPreviousHeader(format!(
+                "{:?} does not match chain head {:?}",
+                prev_header, chain_head
+            )));
+        }
+        // Here we must also enforce sequence numbering -- but we would need to fetch the current
+        // chain_head() Header to do it.  This is also detected by validation during propagation to
+        // the DHT (after we commit), but we don't want to *allow* corruption of our source-chain!
+        if let Some(head_hash) = chain_head {
+            let head = self
+                .get_header(&head_hash)?
+                .ok_or(SourceChainError::InvalidPreviousHeader(
+                    "lost chain head".to_string(),
+                ))?
+                .header()
+                .to_owned();
+            // TODO: Return PrevHeaderError::InvalidSeq from holochain/core?
+            if header_seq != head.header_seq() + 1 {
+                return Err(SourceChainError::InvalidPreviousHeader(format!(
+                    "Chain header sequence number {1} is not {0} - 1",
+                    header_seq,
+                    head.header_seq()
+                )));
+            }
+        }
+        // TODO: How is this atomic/non-racy?  Couldn't multiple Zome threads be updating this, and
+        // both pass the tests above, and go on to commit different Headers (see: put_header)?  Put
+        // a random delay here and run a bunch of Zome API threads committing Entries to test?
         self.sequence.put_header(header_address.clone())?;
         self.elements.put(signed_header, maybe_entry)?;
         Ok(header_address)

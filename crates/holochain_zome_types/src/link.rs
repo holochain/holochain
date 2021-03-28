@@ -1,6 +1,6 @@
+use crate::builder::HeaderDeterminism;
 use crate::element::SignedHeaderHashed;
 use crate::header::HeaderDetails;
-use crate::builder::HeaderDeterminism;
 use crate::timestamp::Timestamp;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
@@ -91,7 +91,7 @@ impl CreateLinkInput {
             base_address,
             target_address,
             tag,
-	    details: None,
+            details: None,
         }
     }
 }

@@ -1,5 +1,5 @@
 use hdk::prelude::*;
-use hdk::prelude::builder::HeaderDeterminism; // 
+use hdk::prelude::builder::HeaderDeterminism;
 
 #[hdk_entry(
     id = "setup",
@@ -18,7 +18,7 @@ struct Setup(String);
 )]
 struct Secs(Timestamp);
 
-/// Construct an EntryDefWithId from Secs with the same Timestamp as the Header will have.
+/// Construct an EntryDefWithId from Secs containing the same Timestamp as the Header will have.
 fn secs_now() -> ExternResult<EntryWithDefId> {
     let now: Timestamp = (Timestamp::epoch() + hdk::prelude::sys_time()?)
 	.map_err(|e| WasmError::Guest(format!("Timestamp error: {}", e)))?;
@@ -160,19 +160,44 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
     Ok(InitCallbackResult::Pass)
 }
 
-/// Create a post entry then
-/// create another post through a
-/// call
+/// Create some entries (testing HeaderDeterminism), then create another post through a call
 #[hdk_extern]
 fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
     // Creating multiple entries in a Zome function should also be fine.
-    hdk::prelude::create_entry(&Setup(String::from("Hello, before Post...")))?;
-
-    // Creating an entry with a custom EntryWithDefId timestamp should pose no issues
-    hdk::prelude::create(secs_now()?)?;
+    let setup_hash = hdk::prelude::create_entry(&Setup(String::from("before Post...")))?;
 
     // Create an entry directly via. the hdk.
-    hdk::prelude::create_entry(&post())?;
+    let post_hash = hdk::prelude::create_entry(&post())?;
+    let post_hdr = hdk::prelude::get(post_hash.clone(), GetOptions::default())?.unwrap().header().to_owned();
+
+    // Creating an entry with a custom EntryWithDefId timestamp should pose no issues, as long as
+    // our HeaderDetails is valid; should fail if we say it follows the wrong header, or has the
+    // wrong sequence number in the source-chain.  Exercise those checks here.
+    let secs = secs_now()?;
+    // Attempt incorrect parent header hash; doesn't match the current chain head
+    match hdk::prelude::create(
+	secs.clone().follows(setup_hash.clone())) {
+	Err(e) => if ! format!("{}", e).contains("does not match chain head") {
+	    return Err(WasmError::Guest(format!("Wrong error on fork attempt 1: {}", e)))
+	},
+	Ok(created) => return Err(WasmError::Guest(format!(
+		"Unexpected success on fork attempt 1: {:?}", created))),
+    };
+    // Attempt incorrect sequence number; doesn't match next computed sequence number
+    match hdk::prelude::create(
+	secs.clone().follows(post_hash.clone()).sequence(post_hdr.header_seq())) {
+	Err(e) => if ! format!("{}", e).contains(format!(
+	    "header sequence number {} is not {} - 1",
+	    post_hdr.header_seq(), post_hdr.header_seq()).as_str()) {
+	    return Err(WasmError::Guest(format!("Wrong error on fork attempt 2: {}", e)))
+	},
+	Ok(created) => return Err(WasmError::Guest(format!(
+	    "Unexpected success on fork attempt 2: {:?}", created))),
+    };
+    // Finally, create the Secs commit with all the correct parent HeaderHash, sequence number
+    hdk::prelude::create(
+	secs.follows(post_hash).sequence(post_hdr.header_seq() + 1))?;
+
     // Create an entry via a `call`.
     let zome_call_response: ZomeCallResponse = call(
         None,
