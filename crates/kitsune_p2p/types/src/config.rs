@@ -45,6 +45,9 @@ pub struct KitsuneP2pTuningParams {
     pub proxy_to_expire_ms: u32,
 }
 
+/// How long kitsune should wait before timing out when joining the network.
+pub const JOIN_NETWORK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+
 impl Default for KitsuneP2pTuningParams {
     fn default() -> Self {
         Self {

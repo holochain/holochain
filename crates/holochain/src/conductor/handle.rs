@@ -64,6 +64,7 @@ use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
@@ -696,8 +697,7 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         // space retries joining all cells every 5 minutes.
         futures::stream::iter(networks)
             .for_each_concurrent(100, |mut network| async move {
-                match tokio::time::timeout(std::time::Duration::from_secs(20), network.join()).await
-                {
+                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
                     Ok(Err(e)) => {
                         tracing::info!(failed_to_join_network = ?e);
                     }
