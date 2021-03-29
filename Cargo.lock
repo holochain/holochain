@@ -2398,6 +2398,7 @@ dependencies = [
 name = "kitsune_p2p_types"
 version = "0.0.1"
 dependencies = [
+ "criterion",
  "derive_more",
  "futures",
  "ghost_actor 0.3.0-alpha.1",
