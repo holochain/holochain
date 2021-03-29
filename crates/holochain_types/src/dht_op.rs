@@ -107,7 +107,7 @@ type DhtBasis = AnyDhtHash;
 /// A type for storing in databases that don't need the actual
 /// data. Everything is a hash of the type except the signatures.
 #[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, derive_more::Display)]
+#[derive(Clone, Debug, Serialize, Deserialize, derive_more::Display)]
 pub enum DhtOpLight {
     #[display(fmt = "StoreElement")]
     StoreElement(HeaderHash, Option<EntryHash>, DhtBasis),
@@ -129,9 +129,27 @@ pub enum DhtOpLight {
     RegisterRemoveLink(HeaderHash, DhtBasis),
 }
 
+impl PartialEq for DhtOpLight {
+    fn eq(&self, other: &Self) -> bool {
+        // The ops are the same if they are the same type on the same header hash.
+        // We can't derive eq because `Option<EntryHash>` doesn't make the op different.
+        // We can ignore the basis because the basis is derived from the header and op type.
+        self.get_type() == other.get_type() && self.header_hash() == other.header_hash()
+    }
+}
+
+impl Eq for DhtOpLight {}
+
+impl std::hash::Hash for DhtOpLight {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.get_type().hash(state);
+        self.header_hash().hash(state);
+    }
+}
+
 /// This enum is used to
 #[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, derive_more::Display)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash, derive_more::Display)]
 pub enum DhtOpType {
     #[display(fmt = "StoreElement")]
     StoreElement,

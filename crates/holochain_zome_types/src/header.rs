@@ -384,7 +384,7 @@ pub struct Update {
 /// Via the associated [DhtOp], this also has an effect on Entries: namely,
 /// that a previously published Entry will become inaccessible if all of its
 /// Headers are marked deleted.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 pub struct Delete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,

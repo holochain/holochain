@@ -1,7 +1,7 @@
 -- Initial Holochain Cell schema
 
 CREATE TABLE Entry (
-    hash             BLOB           PRIMARY KEY,
+    hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             VARCHAR(64)    NOT NULL,
 
     blob             BLOB           NOT NULL,
@@ -25,7 +25,7 @@ CREATE INDEX Entry_type_idx ON Entry ( type );
 -- TODO: some of the NULL fields can be collapsed,
 --       like between Update and Delete
 CREATE TABLE Header (
-    hash             BLOB           PRIMARY KEY,
+    hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             VARCHAR(64)    NOT NULL,
     seq              INTEGER        NOT NULL,
 
@@ -46,12 +46,14 @@ CREATE TABLE Header (
     -- CreateLink
     -- NB: basis_hash can't be foreign key, since it could map to either
     --     Entry or Header
-    basis_hash       BLOB           NULL,
+    -- FIXME: @freesig Actually this can only be an EntryHash. 
+    -- Links can't be on headers.
+    base_hash       BLOB           NULL,
     zome_id          INTEGER        NULL,
     tag              BLOB           NULL,
 
     -- DeleteLink
-    link_add_hash    BLOB           NULL,
+    create_link_hash    BLOB           NULL,
 
     -- AgentValidationPkg
     membrane_proof   BLOB           NULL,
@@ -64,7 +66,7 @@ CREATE TABLE Header (
     -- FOREIGN KEY(original_header_hash) REFERENCES Header(hash),
     FOREIGN KEY(deletes_entry_hash) REFERENCES Entry(hash),
     -- FOREIGN KEY(deletes_header_hash) REFERENCES Header(hash),
-    FOREIGN KEY(link_add_hash) REFERENCES Header(hash)
+    FOREIGN KEY(create_link_hash) REFERENCES Header(hash)
 );
 CREATE INDEX Header_type_idx ON Header ( type );
 
@@ -72,7 +74,7 @@ CREATE INDEX Header_type_idx ON Header ( type );
 -- NB: basis_hash, header_hash, and entry_hash, in general, will have
 --     duplication of data. Could rethink these a bit.
 CREATE TABLE DhtOp (
-    hash             BLOB           PRIMARY KEY,
+    hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             VARCHAR(64)    NOT NULL,
     basis_hash       BLOB           NOT NULL,
     header_hash      BLOB           NOT NULL,
@@ -84,6 +86,7 @@ CREATE TABLE DhtOp (
     blob             BLOB           NOT NULL,
 
     -- NB: I removed this because when_integrated covers it
+    -- TODO: @freesig: Might be hard to index on various timestamps?
     -- is_integrated    INTEGER        NOT NULL,      -- BOOLEAN
 
     -- NB: I removed this because it's accessible via Header.entry_hash
