@@ -1,12 +1,12 @@
 use criterion::{/*black_box,*/ criterion_group, criterion_main, Criterion};
 
 use futures::stream::StreamExt;
-use kitsune_p2p_types::tx2::tx2_utils::*;
-use kitsune_p2p_types::dependencies::{url2::Url2, ghost_actor};
-use kitsune_p2p_types::transport::*;
-use kitsune_p2p_types::config::*;
 use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
+use kitsune_p2p_types::config::*;
+use kitsune_p2p_types::dependencies::{ghost_actor, url2::Url2};
+use kitsune_p2p_types::transport::*;
+use kitsune_p2p_types::tx2::tx2_utils::*;
 use std::sync::Arc;
 
 const SIZE: usize = 2048;
@@ -65,8 +65,10 @@ impl Test {
         let mut tgt_nodes = Vec::new();
         let mut tgt_addrs = Vec::new();
         for _ in 0..TGT_COUNT {
-            let proxy_config =
-                ProxyConfig::remote_proxy_client(TlsConfig::new_ephemeral().await.unwrap(), proxy_addr.clone().into());
+            let proxy_config = ProxyConfig::remote_proxy_client(
+                TlsConfig::new_ephemeral().await.unwrap(),
+                proxy_addr.clone().into(),
+            );
             let (tgt_addr, tgt) = connect(proxy_config).await.unwrap();
             tgt_nodes.push(tgt);
             tgt_addrs.push(tgt_addr);
@@ -74,8 +76,10 @@ impl Test {
 
         let mut nodes = Vec::new();
         for _ in 0..NODE_COUNT {
-            let proxy_config =
-                ProxyConfig::remote_proxy_client(TlsConfig::new_ephemeral().await.unwrap(), proxy_addr.clone().into());
+            let proxy_config = ProxyConfig::remote_proxy_client(
+                TlsConfig::new_ephemeral().await.unwrap(),
+                proxy_addr.clone().into(),
+            );
             let (_addr, node) = connect(proxy_config).await.unwrap();
             nodes.push(node);
         }
