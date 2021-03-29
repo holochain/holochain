@@ -690,7 +690,7 @@ fn insert_entry(txn: &mut Transaction, entry: EntryHashed) {
     let (entry, hash) = entry.into_inner();
     sql_insert!(txn, Entry, {
         "hash": hash.into_inner(),
-        "type": EntryTypeName::from(&entry) ,
+        "type": EntryTypeName::from(&entry),
         "blob": to_blob(entry),
     })
     .unwrap();
