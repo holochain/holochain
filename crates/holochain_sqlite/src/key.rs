@@ -39,9 +39,11 @@ macro_rules! impl_to_sql_via_display {
         }
     };
 }
+pub trait BufKeyConstraints: Sized + Ord + Eq + AsRef<[u8]> + ToSql + Send + Sync {}
+impl<T> BufKeyConstraints for T where T: Sized + Ord + Eq + AsRef<[u8]> + ToSql + Send + Sync {}
 
 /// Any key type used in a [KvStore] or [KvvStore] must implement this trait
-pub trait BufKey: Sized + Ord + Eq + AsRef<[u8]> + ToSql + Send + Sync {
+pub trait BufKey: BufKeyConstraints {
     /// Convert to the key bytes.
     ///
     /// This is provided by the AsRef impl by default, but can be overridden if
