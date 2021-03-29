@@ -44,7 +44,7 @@ pub fn parse_happ(happ: Option<PathBuf>) -> anyhow::Result<PathBuf> {
         happ.file_name()
             .map(|f| f.to_string_lossy().ends_with(".happ"))
             .unwrap_or(false),
-        "File {} is not a valid dna file name: (e.g. my-happ.happ)",
+        "File {} is not a valid happ file name: (e.g. my-happ.happ)",
         happ.display()
     );
     Ok(happ)
@@ -81,7 +81,7 @@ fn search_for_happ(happ: &Path) -> anyhow::Result<PathBuf> {
         Some(dir) => Ok(dir),
         None => {
             bail!(
-                "Could not find a DNA file (e.g. my-dna.dna) in directory {}",
+                "Could not find a happ file (e.g. my-happ.happ) in directory {}",
                 happ.display()
             )
         }
