@@ -7,8 +7,8 @@
 //! Each Cell maintains its own identity separate from any App.
 //! Access to Cells can be shared between different Apps.
 
-mod app_bundle;
-mod app_manifest;
+pub mod app_bundle;
+pub mod app_manifest;
 mod dna_gamut;
 pub mod error;
 use crate::dna::{DnaBundle, YamlProperties};
