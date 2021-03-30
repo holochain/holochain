@@ -1,4 +1,31 @@
-// when adding a header to scratch space, must entry from FK
+use std::convert::Infallible;
+
+use fallible_iterator::FallibleIterator;
+use holochain_zome_types::prelude::*;
+
+/// The "scratch" is an in-memory space to stage Headers to be committed at the
+/// end of the CallZome workflow.
+///
+/// This space must also be queryable: specifically, it needs to be combined
+/// into queries into the database which return Headers. This is done by
+/// a simple filter on the scratch space, and then chaining that iterator
+/// onto the iterators over the Headers in the database(s) produced by the
+/// Cascade.
+pub struct Scratch(Vec<SignedHeaderHashed>);
+
+impl Scratch {
+    pub fn filter<'a, F: Fn(&'a Header) -> bool + 'a>(
+        &'a self,
+        f: F,
+    ) -> impl FallibleIterator<Item = &'a SignedHeaderHashed, Error = Infallible> {
+        fallible_iterator::convert(
+            self.0
+                .iter()
+                .filter(move |shh| f(shh.header_hashed().as_content()))
+                .map(Ok),
+        )
+    }
+}
 
 #[test]
 fn test_multiple_in_memory() {

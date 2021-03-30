@@ -1,11 +1,12 @@
 use ::fixt::prelude::*;
+use either::Either;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::ToSql;
 use holochain_sqlite::rusqlite::{Transaction, NO_PARAMS};
 use holochain_sqlite::{impl_to_sql_via_display, rusqlite::TransactionBehavior};
+use holochain_sqlite::{rusqlite::Statement, scratch::Scratch};
 use holochain_sqlite::{
     rusqlite::{named_params, Connection},
     schema::SCHEMA_CELL,
@@ -171,7 +172,7 @@ async fn get_links() {
     insert_op(&mut txn, td.create_link_op.clone());
 
     // - Check we can get the link query back.
-    let r = get_link_query(&mut [&mut txn], td.tag_query.clone());
+    let r = get_link_query(&mut [&mut txn], None, td.tag_query.clone());
     assert_eq!(r[0], td.link);
 
     // - Add the same link to the cache.
@@ -183,17 +184,17 @@ async fn get_links() {
     insert_op(&mut cache_txn, td.create_link_op.clone());
 
     // - Check we can resolve this to a single link.
-    let r = get_link_query(&mut [&mut cache_txn], td.base_query.clone());
+    let r = get_link_query(&mut [&mut cache_txn], None, td.base_query.clone());
     assert_eq!(r[0], td.link);
     assert_eq!(r.len(), 1);
-    let r = get_link_query(&mut [&mut cache_txn, &mut txn], td.tag_query.clone());
+    let r = get_link_query(&mut [&mut cache_txn, &mut txn], None, td.tag_query.clone());
     assert_eq!(r[0], td.link);
     assert_eq!(r.len(), 1);
 
     // - Insert a delete op.
     insert_op(&mut txn, td.delete_link_op.clone());
 
-    let r = get_link_query(&mut [&mut cache_txn, &mut txn], td.tag_query.clone());
+    let r = get_link_query(&mut [&mut cache_txn, &mut txn], None, td.tag_query.clone());
     // - We should not have any links now.
     assert!(r.is_empty())
 }
@@ -221,7 +222,7 @@ async fn get_entry() {
     insert_op(&mut txn, td.store_entry_op.clone());
 
     // - Check we get that header back.
-    let r = get_entry_query(&mut [&mut txn], td.query.clone()).unwrap();
+    let r = get_entry_query(&mut [&mut txn], None, td.query.clone()).unwrap();
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);
 
     // - Create the same entry in the cache.
@@ -230,7 +231,7 @@ async fn get_entry() {
     insert_op(&mut cache_txn, td.store_entry_op.clone());
 
     // - Get the entry from both stores and union the query results.
-    let r = get_entry_query(&mut [&mut txn, &mut cache_txn], td.query.clone());
+    let r = get_entry_query(&mut [&mut txn, &mut cache_txn], None, td.query.clone());
     // - Check it's the correct entry and header.
     let r = r.unwrap();
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);
@@ -240,7 +241,7 @@ async fn get_entry() {
     insert_op(&mut cache_txn, td.delete_entry_header_op.clone());
 
     // - Get the entry from both stores and union the queries.
-    let r = get_entry_query(&mut [&mut txn, &mut cache_txn], td.query.clone());
+    let r = get_entry_query(&mut [&mut txn, &mut cache_txn], None, td.query.clone());
     // - There should be no live headers so resolving
     // returns no element.
     assert!(r.is_none());
@@ -407,6 +408,18 @@ impl GetQuery {
             entry_hash: self.0.into_inner(),
         }
     }
+
+    fn as_filter(&self) -> impl Fn(&Header) -> bool {
+        let entry_hash_filter = self.0.clone();
+        move |header| match header {
+            Header::Create(Create { entry_hash, .. }) => *entry_hash == entry_hash_filter,
+            Header::Delete(Delete {
+                deletes_entry_address,
+                ..
+            }) => *deletes_entry_address == entry_hash_filter,
+            _ => false,
+        }
+    }
 }
 
 impl LinkQuery {
@@ -434,16 +447,14 @@ impl LinkQuery {
     fn add_tag(&self, q: String) -> String {
         match self {
             LinkQuery::Base(_, _) => q,
-            LinkQuery::Tag(_, _, _) => {
-                format!(
-                    "
+            LinkQuery::Tag(_, _, _) => format!(
+                "
                     {}
                     AND
                     Header.tag = :tag
                     ",
-                    q
-                )
-            }
+                q
+            ),
         }
     }
     fn delete_query_string(&self) -> String {
@@ -480,6 +491,27 @@ impl LinkQuery {
                 zome_id: z.index() as u32,
                 tag: Some(to_blob(t)),
             },
+        }
+    }
+
+    fn as_filter(&self) -> impl Fn(&Header) -> bool {
+        let (base_filter, zome_id_filter, tag_filter) = match self {
+            Self::Base(hash, zome_id) => (hash.clone(), zome_id.clone(), None),
+            Self::Tag(hash, zome_id, tag) => (hash.clone(), zome_id.clone(), Some(tag.clone())),
+        };
+        move |header| match header {
+            Header::CreateLink(CreateLink {
+                base_address,
+                zome_id,
+                tag,
+                ..
+            }) => {
+                *base_address == base_filter
+                    && *zome_id == zome_id_filter
+                    && tag_filter.as_ref().map(|t| tag == t).unwrap_or(true)
+            }
+            Header::DeleteLink(DeleteLink { base_address, .. }) => *base_address == base_filter,
+            _ => false,
         }
     }
 }
@@ -649,7 +681,11 @@ impl<'stmt, 'iter> GetQueryStmt<'stmt> {
     }
 }
 
-fn get_link_query<'a, 'b: 'a>(txns: &mut [&'a mut Transaction<'b>], query: LinkQuery) -> Vec<Link> {
+fn get_link_query<'a, 'b: 'a>(
+    txns: &mut [&'a mut Transaction<'b>],
+    scratch: Option<&Scratch>,
+    query: LinkQuery,
+) -> Vec<Link> {
     let mut stmts: Vec<_> = txns
         .into_iter()
         .map(|txn| LinkQueryStmt::new(txn, query.clone()))
@@ -683,14 +719,28 @@ fn get_link_query<'a, 'b: 'a>(txns: &mut [&'a mut Transaction<'b>], query: LinkQ
 
 fn get_entry_query<'a, 'b: 'a>(
     txns: &mut [&'a mut Transaction<'b>],
+    scratch: Option<&Scratch>,
     query: GetQuery,
 ) -> Option<Element> {
     let mut stmts: Vec<_> = txns
         .into_iter()
         .map(|txn| GetQueryStmt::new(txn, query.clone()))
         .collect();
-    let iter = stmts.iter_mut().map(|stmt| Ok(stmt.iter()));
-    let iter = fallible_iterator::convert(iter).flatten();
+    let iters = stmts.iter_mut().map(|stmt| Ok(stmt.iter()));
+    let _ = scratch.map(|s| {
+        s.filter(query.as_filter());
+        todo!("chain scratch iterator onto others")
+    });
+    // let iters = iters.chain(fallible_iterator::convert(
+    //     scratch
+    //         .map(|s| {
+    //             Either::Right(Either::Left(std::iter::once(Ok(
+    //                 s.filter(query.as_filter())
+    //             ))))
+    //         })
+    //         .unwrap_or_else(|| Either::Right(Either::Right(std::iter::empty()))),
+    // ));
+    let iter = fallible_iterator::convert(iters).flatten();
 
     let (creates, _) = iter
         .fold(
