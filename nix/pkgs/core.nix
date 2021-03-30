@@ -21,6 +21,8 @@ rec {
     cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture
     # run all the remaining cargo tests
     cargo test --workspace --exclude holochain -- --nocapture
+    # run all the wasm tests (within wasm) with the conductor mocked
+    cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
   '';
 
   hcMergeTest = let
@@ -45,6 +47,24 @@ rec {
   hcSpeedTest = writeShellScriptBin "hc-speed-test" ''
     cargo test speed_test_prep --test speed_tests --release --manifest-path=crates/holochain/Cargo.toml --features "build_wasms" -- --ignored
     cargo test speed_test_all --test speed_tests --release --manifest-path=crates/holochain/Cargo.toml --features "build_wasms" -- --ignored --nocapture
+  '';
+  
+  hcFlakyTest = writeShellScriptBin "hc-flaky-test" ''
+    set -euxo pipefail
+    export RUST_BACKTRACE=1
+
+    for i in {0..100}
+    do
+      cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture
+    done
+    for i in {0..100}
+    do
+      cargo test --workspace --exclude holochain -- --nocapture
+    done
+    for i in {0..100}
+    do
+      cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
+    done
   '';
 
   hcDoctor = writeShellScriptBin "hc-doctor" ''

@@ -52,7 +52,7 @@ use unwrap_to::unwrap_to;
 use holochain::test_utils::host_fn_caller::*;
 
 /*
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky"]
 async fn get_updates_cache() {
     observability::test_run().ok();
@@ -96,7 +96,7 @@ async fn get_updates_cache() {
 */
 
 /*
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky!"]
 async fn get_meta_updates_meta_cache() {
     observability::test_run().ok();
@@ -162,7 +162,7 @@ async fn get_meta_updates_meta_cache() {
 }
 */
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky"]
 async fn get_from_another_agent() {
     observability::test_run().ok();
@@ -303,10 +303,10 @@ async fn get_from_another_agent() {
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky for some reason"]
 async fn get_links_from_another_agent() {
     observability::test_run().ok();
@@ -441,7 +441,7 @@ async fn get_links_from_another_agent() {
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }
 
 struct Shutdown {
@@ -488,7 +488,7 @@ async fn run_fixt_network(
     // Return fixt store data to gets
     let handle = tokio::task::spawn({
         async move {
-            use tokio::stream::StreamExt;
+            use tokio_stream::StreamExt;
             let mut killed = killed.into_stream();
             while let Either::Right((Some(evt), _)) =
                 futures::future::select(killed.next(), recv.next()).await

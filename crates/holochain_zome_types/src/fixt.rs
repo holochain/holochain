@@ -173,11 +173,21 @@ fixturator!(
 );
 
 fixturator!(
+    ZomeInfo;
+    constructor fn new(String, DnaHash, ZomeName, ZomeId, SerializedBytes);
+);
+
+fixturator!(
+    AgentInfo;
+    constructor fn new(AgentPubKey, AgentPubKey);
+);
+
+fixturator!(
     CapClaim;
     constructor fn new(String, AgentPubKey, CapSecret);
 );
 
-newtype_fixturator!(Signature<Bytes>);
+newtype_fixturator!(Signature<SixtyFourBytes>);
 
 fixturator!(
     MigrateAgent;

@@ -43,11 +43,12 @@ mod disintegrate;
 #[cfg(feature = "test_utils")]
 mod tests;
 
-#[instrument(skip(workspace, writer, trigger_sys))]
+#[instrument(skip(workspace, writer, trigger_sys, trigger_receipt))]
 pub async fn integrate_dht_ops_workflow(
     mut workspace: IntegrateDhtOpsWorkspace,
     writer: OneshotWriter,
     trigger_sys: &mut TriggerSender,
+    trigger_receipt: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // one of many possible ways to access the env
     let env = workspace.elements.headers().env().clone();
@@ -142,6 +143,7 @@ pub async fn integrate_dht_ops_workflow(
 
     if total_integrated > 0 {
         trigger_sys.trigger();
+        trigger_receipt.trigger();
     }
 
     Ok(result)
@@ -178,6 +180,7 @@ async fn integrate_single_dht_op(
                     validation_status: iv.validation_status,
                     op: iv.op,
                     when_integrated: timestamp::now(),
+                    send_receipt: iv.send_receipt,
                 };
                 Ok(Outcome::Integrated(integrated))
             }
@@ -200,6 +203,7 @@ fn integrate_data_and_meta<P: PrefixType>(
         validation_status: iv.validation_status,
         op: iv.op,
         when_integrated: timestamp::now(),
+        send_receipt: iv.send_receipt,
     };
     debug!("integrating");
     Ok(Outcome::Integrated(integrated))
@@ -216,6 +220,7 @@ fn integrate_data<P: PrefixType>(
         validation_status: iv.validation_status,
         op: iv.op,
         when_integrated: timestamp::now(),
+        send_receipt: iv.send_receipt,
     };
     debug!("integrating");
     Ok(Outcome::Integrated(integrated))
@@ -277,8 +282,8 @@ async fn op_dependencies_held(
                             let op_hash = DhtOpHash::with_data_sync(
                                 &UniqueForm::RegisterAgentActivity(prev_header.header()),
                             );
-                            if workspace.integration_limbo.contains(&op_hash)? {
-                                return Ok(true);
+                            if !workspace.integrated_dht_ops.contains(&op_hash)? {
+                                return Ok(false);
                             }
                         }
                         None => return Ok(false),

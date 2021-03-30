@@ -92,6 +92,7 @@ impl TungsteniteConfigExt for WebsocketConfig {
             max_send_queue: Some(self.max_send_queue),
             max_message_size: Some(self.max_message_size),
             max_frame_size: Some(self.max_frame_size),
+            ..Default::default()
         }
     }
 }

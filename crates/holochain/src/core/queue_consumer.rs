@@ -17,7 +17,8 @@
 //! | CallZome       | *n/a*            | ChainSequence    | ProduceDhtOps  |
 //! | ProduceDhtOps  | ChainSequence    | Auth'd + IntQ †  | DhtOpIntegr.   |
 //! |                 **integration, common to both paths**                 |
-//! | DhtOpIntegr.   | IntegrationLimbo | IntegratedDhtOps | Publish        |
+//! | DhtOpIntegr.   | IntegrationLimbo | IntegratedDhtOps | SysVal + VR    |
+//! | ValReceipt.    | IntegratedDhtOps | IntegratedDhtOps | *n/a           |
 //! | Publish        | AuthoredDhtOps   | *n/a*            | *n/a*          |
 //!
 //! († Auth'd + IntQ is short for: AuthoredDhtOps + IntegrationLimbo)
@@ -45,6 +46,8 @@ use app_validation_consumer::*;
 mod produce_dht_ops_consumer;
 use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
+use validation_receipt_consumer::*;
+mod validation_receipt_consumer;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::manager::ManagedTaskAdd;
 use holochain_p2p::HolochainP2pCell;
@@ -60,24 +63,36 @@ pub async fn spawn_queue_consumer_tasks(
     env: &EnvironmentWrite,
     cell_network: HolochainP2pCell,
     conductor_api: impl CellConductorApiT + 'static,
-    mut task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
+    task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
     stop: sync::broadcast::Sender<()>,
 ) -> (QueueTriggers, InitialQueueTriggers) {
     // Publish
     let (tx_publish, handle) =
         spawn_publish_dht_ops_consumer(env.clone(), stop.subscribe(), cell_network.clone());
     task_sender
-        .send(ManagedTaskAdd::dont_handle(handle))
+        .send(ManagedTaskAdd::unrecoverable(handle))
+        .await
+        .expect("Failed to manage workflow handle");
+
+    // Validation Receipt
+    let (tx_receipt, handle) =
+        spawn_validation_receipt_consumer(env.clone(), stop.subscribe(), cell_network.clone());
+    task_sender
+        .send(ManagedTaskAdd::unrecoverable(handle))
         .await
         .expect("Failed to manage workflow handle");
 
     let (create_tx_sys, get_tx_sys) = tokio::sync::oneshot::channel();
 
     // Integration
-    let (tx_integration, handle) =
-        spawn_integrate_dht_ops_consumer(env.clone(), stop.subscribe(), get_tx_sys);
+    let (tx_integration, handle) = spawn_integrate_dht_ops_consumer(
+        env.clone(),
+        stop.subscribe(),
+        get_tx_sys,
+        tx_receipt.clone(),
+    );
     task_sender
-        .send(ManagedTaskAdd::dont_handle(handle))
+        .send(ManagedTaskAdd::unrecoverable(handle))
         .await
         .expect("Failed to manage workflow handle");
 
@@ -90,7 +105,7 @@ pub async fn spawn_queue_consumer_tasks(
         cell_network.clone(),
     );
     task_sender
-        .send(ManagedTaskAdd::dont_handle(handle))
+        .send(ManagedTaskAdd::unrecoverable(handle))
         .await
         .expect("Failed to manage workflow handle");
 
@@ -103,7 +118,7 @@ pub async fn spawn_queue_consumer_tasks(
         conductor_api,
     );
     task_sender
-        .send(ManagedTaskAdd::dont_handle(handle))
+        .send(ManagedTaskAdd::unrecoverable(handle))
         .await
         .expect("Failed to manage workflow handle");
     if create_tx_sys.send(tx_sys.clone()).is_err() {
@@ -114,13 +129,20 @@ pub async fn spawn_queue_consumer_tasks(
     let (tx_produce, handle) =
         spawn_produce_dht_ops_consumer(env.clone(), stop.subscribe(), tx_publish.clone());
     task_sender
-        .send(ManagedTaskAdd::dont_handle(handle))
+        .send(ManagedTaskAdd::unrecoverable(handle))
         .await
         .expect("Failed to manage workflow handle");
 
     (
         QueueTriggers::new(tx_sys.clone(), tx_produce.clone()),
-        InitialQueueTriggers::new(tx_sys, tx_produce, tx_publish, tx_app, tx_integration),
+        InitialQueueTriggers::new(
+            tx_sys,
+            tx_produce,
+            tx_publish,
+            tx_app,
+            tx_integration,
+            tx_receipt,
+        ),
     )
 }
 
@@ -142,6 +164,7 @@ pub struct InitialQueueTriggers {
     publish_dht_ops: TriggerSender,
     app_validation: TriggerSender,
     integrate_dht_ops: TriggerSender,
+    validation_receipt: TriggerSender,
 }
 
 impl QueueTriggers {
@@ -161,6 +184,7 @@ impl InitialQueueTriggers {
         publish_dht_ops: TriggerSender,
         app_validation: TriggerSender,
         integrate_dht_ops: TriggerSender,
+        validation_receipt: TriggerSender,
     ) -> Self {
         Self {
             sys_validation,
@@ -168,6 +192,7 @@ impl InitialQueueTriggers {
             publish_dht_ops,
             app_validation,
             integrate_dht_ops,
+            validation_receipt,
         }
     }
 
@@ -178,6 +203,7 @@ impl InitialQueueTriggers {
         self.publish_dht_ops.trigger();
         self.integrate_dht_ops.trigger();
         self.produce_dht_ops.trigger();
+        self.validation_receipt.trigger();
     }
 }
 /// The means of nudging a queue consumer to tell it to look for more work
@@ -185,7 +211,10 @@ impl InitialQueueTriggers {
 pub struct TriggerSender(mpsc::Sender<()>);
 
 /// The receiving end of a queue trigger channel
-pub struct TriggerReceiver(mpsc::Receiver<()>);
+pub struct TriggerReceiver {
+    rx: mpsc::Receiver<()>,
+    waker: core::task::Waker,
+}
 
 impl TriggerSender {
     /// Create a new channel for waking a consumer
@@ -194,7 +223,8 @@ impl TriggerSender {
     /// inconsistency from the perspective of any particular CPU thread
     pub fn new() -> (TriggerSender, TriggerReceiver) {
         let (tx, rx) = mpsc::channel(num_cpus::get());
-        (TriggerSender(tx), TriggerReceiver(rx))
+        let waker = futures::task::noop_waker();
+        (TriggerSender(tx), TriggerReceiver { rx, waker })
     }
 
     /// Lazily nudge the consumer task, ignoring the case where the consumer
@@ -216,16 +246,17 @@ impl TriggerReceiver {
     /// Listen for one or more items to come through, draining the channel
     /// each time. Bubble up errors on empty channel.
     pub async fn listen(&mut self) -> Result<(), QueueTriggerClosedError> {
-        use tokio::sync::mpsc::error::TryRecvError;
+        use core::task::Poll;
 
         // wait for next item
-        if self.0.recv().await.is_some() {
+        if self.rx.recv().await.is_some() {
             // drain the channel
+            let mut ctx = core::task::Context::from_waker(&self.waker);
             loop {
-                match self.0.try_recv() {
-                    Err(TryRecvError::Closed) => return Err(QueueTriggerClosedError),
-                    Err(TryRecvError::Empty) => return Ok(()),
-                    Ok(()) => {}
+                match self.rx.poll_recv(&mut ctx) {
+                    Poll::Ready(None) => return Err(QueueTriggerClosedError),
+                    Poll::Pending => return Ok(()),
+                    Poll::Ready(Some(())) => {}
                 }
             }
         } else {

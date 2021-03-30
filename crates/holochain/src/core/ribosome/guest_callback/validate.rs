@@ -142,7 +142,7 @@ mod test {
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_callback_result_fold() {
         let mut rng = ::fixt::rng();
 
@@ -181,7 +181,7 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_invocation_allow_side_effects() {
         let validate_host_access = ValidateHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
@@ -193,7 +193,7 @@ mod test {
         assert_eq!(HostFnAccess::from(&validate_host_access), access);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_invocation_zomes() {
         let validate_invocation = ValidateInvocationFixturator::new(::fixt::Unpredictable)
             .next()
@@ -202,7 +202,7 @@ mod test {
         assert_eq!(zomes_to_invoke, validate_invocation.zomes(),);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_invocation_fn_components() {
         let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Unpredictable)
             .next()
@@ -261,7 +261,7 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_invocation_host_input() {
         let validate_invocation = ValidateInvocationFixturator::new(::fixt::Unpredictable)
             .next()
@@ -292,7 +292,7 @@ mod slow_tests {
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_unimplemented() {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
@@ -308,7 +308,7 @@ mod slow_tests {
         assert_eq!(result, ValidateResult::Valid,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_valid() {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
             .next()
@@ -324,7 +324,7 @@ mod slow_tests {
         assert_eq!(result, ValidateResult::Valid,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_invalid() {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
@@ -340,7 +340,7 @@ mod slow_tests {
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()),);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_multi() {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
@@ -366,7 +366,7 @@ mod slow_tests {
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()));
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn pass_validate_test<'a>() {
         // test workspace boilerplate
         let test_env = holochain_lmdb::test_utils::test_cell_env();
@@ -386,7 +386,7 @@ mod slow_tests {
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let chain_head = tokio_helper::block_forever_on(async move {
             SourceChainResult::Ok(
                 workspace_lock
                     .read()
@@ -401,7 +401,7 @@ mod slow_tests {
         assert_eq!(chain_head, output);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn fail_validate_test<'a>() {
         // test workspace boilerplate
         let test_env = holochain_lmdb::test_utils::test_cell_env();
@@ -422,7 +422,7 @@ mod slow_tests {
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ());
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let chain_head = tokio_helper::block_forever_on(async move {
             SourceChainResult::Ok(
                 workspace_lock
                     .read()

@@ -16,7 +16,7 @@ use holochain::{
 use holochain::{core::SourceChainError, test_utils::display_agent_infos};
 use holochain_types::{dna::zome::inline_zome::InlineZome, signal::Signal};
 use holochain_zome_types::element::ElementEntry;
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 
 #[derive(
     Debug,
@@ -77,7 +77,7 @@ fn simple_crud_zome() -> InlineZome {
 }
 
 /// Simple scenario involving two agents using the same DNA
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     // Bundle the single zome into a DnaFile
@@ -123,7 +123,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 }
 
 /// Simple scenario involving three agents using an app with two DNAs
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     observability::test_run().ok();
@@ -195,7 +195,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 #[ignore = "Needs to be completed when HolochainP2pEvents is accessible"]
 async fn invalid_cell() -> anyhow::Result<()> {
@@ -212,7 +212,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
     let _app_bar = conductor.setup_app("bar", &[dna_bar]).await;
 
     // Give small amount of time for cells to join the network
-    tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     tracing::debug!(dnas = ?conductor.list_dnas().await.unwrap());
     tracing::debug!(cell_ids = ?conductor.list_cell_ids().await.unwrap());
@@ -226,7 +226,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn get_deleted() -> anyhow::Result<()> {
     observability::test_run().ok();
@@ -281,7 +281,7 @@ async fn get_deleted() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn signal_subscription() {
     observability::test_run().ok();
@@ -294,7 +294,7 @@ async fn signal_subscription() {
     let app = conductor.setup_app("app", &[dna_file]).await;
     let zome = &app.cells()[0].zome("zome1");
 
-    let signals = conductor.signals().await.take(N);
+    let signals = conductor.signals().take(N);
 
     // Emit N signals
     for _ in 0..N {
@@ -331,7 +331,7 @@ fn simple_validation_zome() -> InlineZome {
         })
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn simple_validation() -> anyhow::Result<()> {
     let (dna_file, _) =
         SweetDnaFile::unique_from_inline_zome("zome", simple_validation_zome()).await?;

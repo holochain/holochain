@@ -13,7 +13,7 @@ fn signal_others(signal: RemoteSignal) -> ExternResult<()> {
 
 #[hdk_extern]
 fn recv_remote_signal(signal: ExternIO) -> ExternResult<()> {
-    host_call::<AppSignal, ()>(__emit_signal, AppSignal::new(signal))
+    HDK.with(|h| h.borrow().emit_signal(AppSignal::new(signal)))
 }
 
 #[hdk_extern]

@@ -48,44 +48,44 @@ mod test_utils;
 
 const DEFAULT_NUM: usize = 2000;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_prep() {
     holochain::test_utils::warm_wasm_tests();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed() {
     let _g = observability::test_run_timed().unwrap();
     speed_test(None).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_json() {
     let _g = observability::test_run_timed_json().unwrap();
     speed_test(None).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_flame() {
     let _g = observability::test_run_timed_flame(None).unwrap();
     speed_test(None).await;
-    tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_ice() {
     let _g = observability::test_run_timed_ice(None).unwrap();
     speed_test(None).await;
-    tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_normal() {
     observability::test_run().unwrap();
@@ -94,7 +94,7 @@ async fn speed_test_normal() {
 
 /// Run this test to execute the speed test, but then keep the LMDB env files
 /// around in temp dirs for inspection by e.g. `mdb_stat`
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_persisted() {
     observability::test_run().unwrap();
@@ -118,7 +118,7 @@ async fn speed_test_persisted() {
 #[ignore = "speed tests are ignored by default; unignore to run"]
 fn speed_test_all(n: usize) {
     observability::test_run().unwrap();
-    holochain::conductor::tokio_runtime().block_on(speed_test(Some(n)));
+    tokio_helper::block_forever_on(speed_test(Some(n)));
 }
 
 #[instrument]
@@ -304,7 +304,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
     }
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
     test_env
 }
 

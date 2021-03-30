@@ -285,7 +285,7 @@ pub async fn spawn_transport_listener_quic(
         .map_err(|e| TransportError::from(format!("cert error: {:?}", e)))?;
     let mut builder = quinn::Endpoint::builder();
     builder.listen(server_config);
-    builder.default_client_config(danger::configure_client());
+    builder.default_client_config(danger::configure_client()?);
     let (quinn_endpoint, incoming) = builder
         .bind(&crate::url_to_addr(&bind_to, crate::SCHEME).await?)
         .map_err(TransportError::other)?;
@@ -373,11 +373,14 @@ mod danger {
     use quinn::TransportConfig;
     use std::sync::Arc;
 
-    static TRANSPORT: Lazy<Arc<quinn::TransportConfig>> = Lazy::new(|| {
+    // TODO: make this a prop error type
+    static TRANSPORT: Lazy<Result<Arc<quinn::TransportConfig>, String>> = Lazy::new(|| {
         let mut transport = quinn::TransportConfig::default();
 
         // We don't use uni streams in kitsune - only bidi streams
-        transport.stream_window_uni(0);
+        transport
+            .max_concurrent_uni_streams(0)
+            .map_err(|e| e.to_string())?;
 
         // We don't use "Application" datagrams in kitsune -
         // only bidi streams.
@@ -394,7 +397,7 @@ mod danger {
             .max_idle_timeout(Some(std::time::Duration::from_millis(30_000)))
             .unwrap();
 
-        Arc::new(transport)
+        Ok(Arc::new(transport))
     });
 
     #[allow(dead_code)]
@@ -422,7 +425,9 @@ mod danger {
         let tcert_priv = PrivateKey::from_der(&cert_priv).map_err(TransportError::other)?;
 
         let mut transport_config = TransportConfig::default();
-        transport_config.stream_window_uni(0);
+        transport_config
+            .max_concurrent_uni_streams(0)
+            .map_err(TransportError::other)?;
         let mut server_config = ServerConfig::default();
         server_config.transport = Arc::new(transport_config);
         let mut cfg_builder = ServerConfigBuilder::new(server_config);
@@ -432,7 +437,7 @@ mod danger {
 
         let mut cfg = cfg_builder.build();
 
-        cfg.transport = TRANSPORT.clone();
+        cfg.transport = TRANSPORT.clone()?;
         Ok(cfg)
     }
 
@@ -458,7 +463,7 @@ mod danger {
         }
     }
 
-    pub(crate) fn configure_client() -> ClientConfig {
+    pub(crate) fn configure_client() -> Result<ClientConfig, String> {
         let mut cfg = ClientConfigBuilder::default().build();
         let tls_cfg: &mut rustls::ClientConfig = Arc::get_mut(&mut cfg.crypto).unwrap();
         // this is only available when compiled with "dangerous_configuration" feature
@@ -466,7 +471,7 @@ mod danger {
             .dangerous()
             .set_certificate_verifier(SkipServerVerification::new());
 
-        cfg.transport = TRANSPORT.clone();
-        cfg
+        cfg.transport = TRANSPORT.clone()?;
+        Ok(cfg)
     }
 }

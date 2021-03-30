@@ -103,7 +103,7 @@ fn server_signal(
     })
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn can_connect() {
     observability::test_run().ok();
     let (handle, mut listener) = server().await;
@@ -121,7 +121,7 @@ async fn can_connect() {
         .expect("Failed to connect to server");
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn can_send_signal() {
     observability::test_run().ok();
     let (handle, mut listener) = server().await;
@@ -179,7 +179,7 @@ async fn can_send_signal() {
     jh.await.unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn can_send_request() {
     observability::test_run().ok();
     let (handle, mut listener) = server().await;
@@ -248,7 +248,7 @@ async fn can_send_request() {
     jh.await.unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn shutdown_listener() {
     observability::test_run().ok();
     let (handle, mut listener) = server().await;
@@ -291,7 +291,7 @@ async fn shutdown_listener() {
     jh.await.unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn shutdown_receiver() {
     observability::test_run().ok();
     let (handle, listener) = server().await;
@@ -315,7 +315,7 @@ async fn shutdown_receiver() {
     s_jh.await.unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn listener_shuts_down_server() {
     observability::test_run().ok();
     let (handle, listener) = server().await;
@@ -339,7 +339,7 @@ async fn listener_shuts_down_server() {
     c_jh.await.unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn client_shutdown() {
     observability::test_run().ok();
     let (handle, listener) = server().await;
@@ -358,13 +358,13 @@ async fn client_shutdown() {
         {}
     });
 
-    tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     rh.close();
     c_jh.await.unwrap();
     s_jh.await.unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn drop_sender() {
     observability::test_run().ok();
     let (handle, listener) = server().await;
@@ -388,7 +388,7 @@ async fn drop_sender() {
     s_jh.await.unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn drop_receiver() {
     observability::test_run().ok();
     let (handle, listener) = server().await;
@@ -412,7 +412,7 @@ async fn drop_receiver() {
     s_jh.await.unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn cancel_response() {
     observability::test_run().ok();
     let (handle, mut listener) = server().await;

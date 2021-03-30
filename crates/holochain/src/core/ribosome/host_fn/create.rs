@@ -18,20 +18,24 @@ pub fn create<'a>(
     call_context: Arc<CallContext>,
     input: EntryWithDefId,
 ) -> Result<HeaderHash, WasmError> {
-
     // build the entry hash
     let async_entry = AsRef::<Entry>::as_ref(&input).to_owned();
     let entry_hash =
         holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
 
     // extract the zome position
-    let header_zome_id = ribosome.zome_to_id(&call_context.zome).expect("Failed to get ID for current zome");
+    let header_zome_id = ribosome
+        .zome_to_id(&call_context.zome)
+        .expect("Failed to get ID for current zome");
 
     // extract the entry defs for a zome
     let entry_type = match AsRef::<EntryDefId>::as_ref(&input) {
         EntryDefId::App(entry_def_id) => {
-            let (header_entry_def_id, entry_visibility) =
-                extract_entry_def(ribosome, call_context.clone(), entry_def_id.to_owned().into())?;
+            let (header_entry_def_id, entry_visibility) = extract_entry_def(
+                ribosome,
+                call_context.clone(),
+                entry_def_id.to_owned().into(),
+            )?;
             let app_entry_type =
                 AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
             EntryType::App(app_entry_type)
@@ -51,15 +55,19 @@ pub fn create<'a>(
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
     let entry = AsRef::<Entry>::as_ref(&input).to_owned();
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         let mut guard = call_context.host_access.workspace().write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
         // push the header and the entry into the source chain
-        let header_hash = source_chain.put(header_builder, Some(entry)).await.map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+        let header_hash = source_chain
+            .put(header_builder, Some(entry))
+            .await
+            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
         // fetch the element we just added so we can integrate its DhtOps
         let element = source_chain
-            .get_element(&header_hash).map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?
+            .get_element(&header_hash)
+            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?
             .expect("Element we just put in SourceChain must be gettable");
         integrate_to_authored(
             &element,
@@ -85,14 +93,13 @@ pub fn extract_entry_def(
             let maybe_entry_defs = defs.get(call_context.zome.zome_name());
             match maybe_entry_defs {
                 // convert the entry def id string into a numeric position in the defs
-                Some(entry_defs) => match entry_defs.entry_def_index_from_id(entry_def_id.clone()) {
-                    // build an app entry type from the entry def at the found position
-                    Some(index) => Some((
-                        index,
-                        entry_defs[index.0 as usize].visibility,
-                    )),
-                    None => None,
-                },
+                Some(entry_defs) => {
+                    match entry_defs.entry_def_index_from_id(entry_def_id.clone()) {
+                        // build an app entry type from the entry def at the found position
+                        Some(index) => Some((index, entry_defs[index.0 as usize].visibility)),
+                        None => None,
+                    }
+                }
                 None => None,
             }
         }
@@ -100,10 +107,13 @@ pub fn extract_entry_def(
     };
     match app_entry_type {
         Some(app_entry_type) => Ok(app_entry_type),
-        None => Err(WasmError::Host(RibosomeError::EntryDefs(
-            call_context.zome.zome_name().clone(),
-            format!("entry def not found for {:?}", entry_def_id),
-        ).to_string())),
+        None => Err(WasmError::Host(
+            RibosomeError::EntryDefs(
+                call_context.zome.zome_name().clone(),
+                format!("entry def not found for {:?}", entry_def_id),
+            )
+            .to_string(),
+        )),
     }
 }
 
@@ -132,7 +142,7 @@ pub mod wasm_test {
     use observability;
     use std::sync::Arc;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we cannot commit before genesis
     async fn create_pre_genesis_test() {
         // test workspace boilerplate
@@ -161,14 +171,17 @@ pub mod wasm_test {
             format!("{}", output.unwrap_err().to_string()),
             format!(
                 "{}",
-                WasmError::Host(RibosomeError::SourceChainError(SourceChainError::InvalidStructure(
-                    ChainInvalidReason::GenesisDataMissing
-                )).to_string())
+                WasmError::Host(
+                    RibosomeError::SourceChainError(SourceChainError::InvalidStructure(
+                        ChainInvalidReason::GenesisDataMissing
+                    ))
+                    .to_string()
+                )
             ),
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
     async fn create_entry_test<'a>() {
         // test workspace boilerplate
@@ -199,7 +212,7 @@ pub mod wasm_test {
         let output = create(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let chain_head = tokio_helper::block_forever_on(async move {
             SourceChainResult::Ok(
                 workspace_lock
                     .read()
@@ -214,7 +227,7 @@ pub mod wasm_test {
         assert_eq!(chain_head, output);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_create_entry_test<'a>() {
         observability::test_run().ok();
         // test workspace boilerplate
@@ -235,7 +248,7 @@ pub mod wasm_test {
             crate::call_test_ribosome!(host_access, TestWasm::Create, "create_entry", ());
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let chain_head = tokio_helper::block_forever_on(async move {
             SourceChainResult::Ok(
                 workspace_lock
                     .read()
@@ -253,14 +266,16 @@ pub mod wasm_test {
             crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry", ());
 
         let bytes: Vec<u8> = match round.and_then(|el| el.into()) {
-            Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => entry_bytes.bytes().to_vec(),
-            other => panic!(format!("unexpected output: {:?}", other)),
+            Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => {
+                entry_bytes.bytes().to_vec()
+            }
+            other => panic!("unexpected output: {:?}", other),
         };
         // this should be the content "foo" of the committed post
         assert_eq!(vec![163, 102, 111, 111], bytes);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "david.b (this test is flaky)"]
     // maackle: this consistently passes for me with n = 37
     //          but starts to randomly lock up at n = 38,
@@ -341,12 +356,7 @@ pub mod wasm_test {
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(
-            output,
-            ZomeCallResponse::Ok(
-                ExternIO::encode(()).unwrap()
-            )
-        );
+        assert_eq!(output, ZomeCallResponse::Ok(ExternIO::encode(()).unwrap()));
 
         // bob get the entries
         let output = handle
@@ -369,17 +379,15 @@ pub mod wasm_test {
         }
         assert_eq!(
             output,
-            ZomeCallResponse::Ok(
-                ExternIO::encode(expected).unwrap()
-            )
+            ZomeCallResponse::Ok(ExternIO::encode(expected).unwrap())
         );
 
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
-        shutdown.await.unwrap();
+        shutdown.await.unwrap().unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_serialize_bytes_hash() {
         observability::test_run().ok();
         #[derive(Default, SerializedBytes, Serialize, Deserialize, Debug)]

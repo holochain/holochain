@@ -13,20 +13,9 @@ use holochain_lmdb::error::DatabaseResult;
 use holochain_lmdb::prelude::Readable;
 use holochain_lmdb::prelude::Writer;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::Timestamp;
 use holochain_zome_types::signature::Signature;
-
-/// The result of a DhtOp Validation.
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
-)]
-#[serde(tag = "type")]
-pub enum ValidationResult {
-    /// Successful validation.
-    Valid,
-    // TODO - fill out with additional options, which may (or may not) have content
-    // Abandoned { .. },
-    // Warrant { .. },
-}
+use holochain_zome_types::ValidationStatus;
 
 /// Validation receipt content - to be signed.
 #[derive(
@@ -46,10 +35,13 @@ pub struct ValidationReceipt {
     pub dht_op_hash: DhtOpHash,
 
     /// the result of this validation.
-    pub validation_result: ValidationResult,
+    pub validation_status: ValidationStatus,
 
     /// the remote validator which is signing this receipt.
     pub validator: AgentPubKey,
+
+    /// Time when the op was integrated
+    pub when_integrated: Timestamp,
 }
 
 impl ValidationReceipt {
@@ -121,7 +113,7 @@ impl ValidationReceiptsBuf {
 
         let mut iter = self.list_receipts(r, dht_op_hash)?;
         while let Some(v) = iter.next()? {
-            if v.receipt.validation_result == ValidationResult::Valid {
+            if v.receipt.validation_status == ValidationStatus::Valid {
                 count += 1;
             }
         }
@@ -156,6 +148,7 @@ mod tests {
     use holochain_lmdb::env::ReadManager;
     use holochain_lmdb::prelude::*;
     use holochain_types::test_utils::fake_dht_op_hash;
+    use holochain_types::timestamp;
 
     async fn fake_vr(
         dht_op_hash: &DhtOpHash,
@@ -168,13 +161,14 @@ mod tests {
             .unwrap();
         let receipt = ValidationReceipt {
             dht_op_hash: dht_op_hash.clone(),
-            validation_result: ValidationResult::Valid,
+            validation_status: ValidationStatus::Valid,
             validator: agent,
+            when_integrated: timestamp::now(),
         };
         receipt.sign(keystore).await.unwrap()
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validation_receipts_db_populate_and_list() -> DatabaseResult<()> {
         observability::test_run().ok();
 

@@ -11,7 +11,7 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::cell::CellId;
 use std::convert::TryFrom;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn direct_validation_test() {
     observability::test_run().ok();
 
@@ -41,7 +41,7 @@ async fn direct_validation_test() {
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }
 
 /// - Commit a valid update should pass

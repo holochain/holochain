@@ -48,6 +48,11 @@ impl SweetConductorBatch {
     }
 
     /// Get the underlying data
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut SweetConductor> {
+        self.0.iter_mut()
+    }
+
+    /// Get the underlying data
     pub fn into_inner(self) -> Vec<SweetConductor> {
         self.0
     }
@@ -114,6 +119,9 @@ impl SweetConductorBatch {
     }
 }
 
+/// A stream of signals.
+pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>;
+
 /// A useful Conductor abstraction for testing, allowing startup and shutdown as well
 /// as easy installation of apps across multiple Conductors and Agents.
 ///
@@ -126,7 +134,7 @@ pub struct SweetConductor {
     envs: TestEnvironments,
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
-    signal_stream: Option<Box<dyn tokio::stream::Stream<Item = Signal> + Send + Sync + Unpin>>,
+    signal_stream: Option<SignalStream>,
 }
 
 fn standard_config() -> ConductorConfig {
@@ -364,7 +372,7 @@ impl SweetConductor {
     /// This is designed to crash if called more than once, because as currently
     /// implemented, creating multiple signal streams would simply cause multiple
     /// consumers of the same underlying streams, not a fresh subscription
-    pub async fn signals(&mut self) -> impl tokio::stream::Stream<Item = Signal> {
+    pub fn signals(&mut self) -> impl tokio_stream::Stream<Item = Signal> {
         self.signal_stream
             .take()
             .expect("Can't take the SweetConductor signal stream twice")
@@ -498,7 +506,7 @@ impl SweetConductorHandle {
     }
 
     // /// Get a stream of all Signals emitted since the time of this function call.
-    // pub async fn signal_stream(&self) -> impl tokio::stream::Stream<Item = Signal> {
+    // pub async fn signal_stream(&self) -> impl tokio_stream::Stream<Item = Signal> {
     //     self.0.signal_broadcaster().await.subscribe_merged()
     // }
 
@@ -509,7 +517,10 @@ impl SweetConductorHandle {
         let c = &self.0;
         if let Some(shutdown) = c.take_shutdown_handle().await {
             c.shutdown().await;
-            shutdown.await.expect("Failed to await shutdown handle");
+            shutdown
+                .await
+                .expect("Failed to await shutdown handle")
+                .expect("Conductor shutdown error");
         }
     }
 }
@@ -521,7 +532,9 @@ impl Drop for SweetConductor {
                 // Shutdown the conductor
                 if let Some(shutdown) = handle.take_shutdown_handle().await {
                     handle.shutdown().await;
-                    shutdown.await.expect("Failed to await shutdown handle");
+                    if let Err(e) = shutdown.await {
+                        tracing::warn!("Failed to join conductor shutdown task: {:?}", e);
+                    }
                 }
             });
         }

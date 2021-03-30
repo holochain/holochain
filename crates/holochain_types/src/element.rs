@@ -376,7 +376,7 @@ mod tests {
     use holo_hash::HasHash;
     use holo_hash::HoloHashed;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_signed_header_roundtrip() {
         let signature = SignatureFixturator::new(Unpredictable).next().unwrap();
         let header = HeaderFixturator::new(Unpredictable).next().unwrap();

@@ -504,7 +504,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             .sign_network_data(space, agent, input.data.to_vec());
         Ok(async move {
             let sig = fut.await?.0;
-            Ok(sig.into())
+            Ok(sig.to_vec().into())
         }
         .boxed()
         .into())

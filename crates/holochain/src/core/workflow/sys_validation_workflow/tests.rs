@@ -26,7 +26,7 @@ use std::convert::TryInto;
 use std::time::Duration;
 use tracing::*;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn sys_validation_workflow_test() {
     observability::test_run().ok();
 
@@ -63,7 +63,7 @@ async fn sys_validation_workflow_test() {
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }
 
 async fn run_test(

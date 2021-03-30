@@ -125,7 +125,7 @@ pub async fn stub_network() -> ghost_actor::GhostSender<HolochainP2p> {
 fixturator!(
     HolochainP2pCell;
     curve Empty {
-        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+        tokio_helper::block_forever_on(async {
             let holochain_p2p = crate::test::stub_network().await;
             holochain_p2p.to_cell(
                 DnaHashFixturator::new(Empty).next().unwrap(),
@@ -174,7 +174,7 @@ mod tests {
         )
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_call_remote_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
@@ -186,7 +186,7 @@ mod tests {
         .unwrap();
 
         let r_task = tokio::task::spawn(async move {
-            use tokio::stream::StreamExt;
+            use tokio_stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
@@ -198,7 +198,7 @@ mod tests {
                         ));
                     }
                     SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
@@ -231,7 +231,7 @@ mod tests {
         r_task.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_send_validation_receipt_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
@@ -243,7 +243,7 @@ mod tests {
         .unwrap();
 
         let r_task = tokio::task::spawn(async move {
-            use tokio::stream::StreamExt;
+            use tokio_stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
@@ -255,7 +255,7 @@ mod tests {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
                     SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
@@ -281,7 +281,7 @@ mod tests {
         r_task.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_publish_workflow() {
         let (dna, a1, a2, a3) = test_setup();
 
@@ -296,7 +296,7 @@ mod tests {
 
         let recv_count_clone = recv_count.clone();
         let r_task = tokio::task::spawn(async move {
-            use tokio::stream::StreamExt;
+            use tokio_stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
@@ -305,7 +305,7 @@ mod tests {
                         recv_count_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
                     SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
@@ -337,7 +337,7 @@ mod tests {
         r_task.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_get_workflow() {
         let (dna, a1, a2, _a3) = test_setup();
 
@@ -379,7 +379,7 @@ mod tests {
 
         let mut respond_queue = vec![test_1.clone(), test_2.clone()];
         let r_task = tokio::task::spawn(async move {
-            use tokio::stream::StreamExt;
+            use tokio_stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
@@ -392,7 +392,7 @@ mod tests {
                         respond.r(Ok(async move { Ok(resp) }.boxed().into()));
                     }
                     SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
@@ -425,7 +425,7 @@ mod tests {
         r_task.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_get_links_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
@@ -443,7 +443,7 @@ mod tests {
 
         let test_1_clone = test_1.clone();
         let r_task = tokio::task::spawn(async move {
-            use tokio::stream::StreamExt;
+            use tokio_stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 let test_1_clone = test_1_clone.clone();
                 use crate::types::event::HolochainP2pEvent::*;
@@ -452,7 +452,7 @@ mod tests {
                         respond.r(Ok(async move { Ok(test_1_clone) }.boxed().into()));
                     }
                     SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));

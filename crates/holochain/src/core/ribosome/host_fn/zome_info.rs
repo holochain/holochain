@@ -2,8 +2,8 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
 
 pub fn zome_info(
     ribosome: Arc<impl RibosomeT>,
@@ -14,7 +14,9 @@ pub fn zome_info(
         dna_name: ribosome.dna_def().name.clone(),
         zome_name: call_context.zome.zome_name().clone(),
         dna_hash: ribosome.dna_def().as_hash().clone(),
-        zome_id: ribosome.zome_to_id(&call_context.zome).expect("Failed to get ID for current zome"),
+        zome_id: ribosome
+            .zome_to_id(&call_context.zome)
+            .expect("Failed to get ID for current zome"),
         properties: ribosome.dna_def().properties.clone(),
         // @TODO
         // public_token: "".into(),
@@ -29,7 +31,7 @@ pub mod test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::prelude::*;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn invoke_import_zome_info_test() {
         let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();

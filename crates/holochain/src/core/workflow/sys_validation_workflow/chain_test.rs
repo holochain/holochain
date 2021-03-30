@@ -16,7 +16,7 @@ use std::time::Duration;
 /// failing a chain validation is just a log error so the only way to
 /// verify this works is to run this with logging and check it outputs
 /// use `RUST_LOG=[agent_activity]=warn`
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "TODO: complete when chain validation returns actual error"]
 async fn sys_validation_agent_activity_test() {
     observability::test_run().ok();
@@ -47,7 +47,7 @@ async fn sys_validation_agent_activity_test() {
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }
 
 async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
@@ -120,6 +120,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
         sys_validation_trigger.clone(),
         ops,
         None,
+        false,
     )
     .await
     .unwrap();
@@ -176,6 +177,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
         sys_validation_trigger,
         ops,
         None,
+        false,
     )
     .await
     .unwrap();

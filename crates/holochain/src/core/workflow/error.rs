@@ -64,6 +64,9 @@ pub enum WorkflowError {
     HolochainP2pError(#[from] HolochainP2pError),
 
     #[error(transparent)]
+    HoloHashError(#[from] holo_hash::error::HoloHashError),
+
+    #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
 
     #[error(transparent)]

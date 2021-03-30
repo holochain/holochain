@@ -91,6 +91,8 @@ pub struct IntegratedDhtOpsValue {
     pub op: DhtOpLight,
     /// Time when the op was integrated
     pub when_integrated: Timestamp,
+    /// Send a receipt to this author.
+    pub send_receipt: bool,
 }
 
 /// A type for storing in databases that only need the hashes.
@@ -100,6 +102,8 @@ pub struct IntegrationLimboValue {
     pub validation_status: ValidationStatus,
     /// The op
     pub op: DhtOpLight,
+    /// Send a receipt to this author.
+    pub send_receipt: bool,
 }
 
 impl IntegratedDhtOpsBuf {
@@ -171,7 +175,7 @@ mod tests {
     use holochain_lmdb::test_utils::test_cell_env;
     use pretty_assertions::assert_eq;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query() {
         let test_env = test_cell_env();
         let env = test_env.env();
@@ -193,6 +197,7 @@ mod tests {
                 validation_status: ValidationStatus::Valid,
                 op: DhtOpLight::RegisterAgentActivity(fixt!(HeaderHash), basis.next().unwrap()),
                 when_integrated: when_integrated.into(),
+                send_receipt: false,
             });
 
         // Put them in the db

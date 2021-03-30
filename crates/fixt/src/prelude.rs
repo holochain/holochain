@@ -5,6 +5,7 @@ pub use crate::bytes::BytesFixturator;
 pub use crate::bytes::BytesNotEmpty;
 pub use crate::bytes::BytesNotEmptyFixturator;
 pub use crate::bytes::SixtyFourBytesFixturator;
+pub use crate::bytes::SixtyFourBytesVecFixturator;
 pub use crate::bytes::ThirtySixBytesFixturator;
 pub use crate::bytes::ThirtyTwoBytesFixturator;
 pub use crate::curve;

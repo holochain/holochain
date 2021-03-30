@@ -66,7 +66,7 @@ async fn gossip_loop(
             Ok(_) => (),
         }
 
-        tokio::time::delay_for(std::time::Duration::from_millis(
+        tokio::time::sleep(std::time::Duration::from_millis(
             config.tuning_params.gossip_loop_iteration_delay_ms as u64,
         ))
         .await;

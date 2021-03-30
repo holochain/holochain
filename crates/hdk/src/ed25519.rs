@@ -1,12 +1,14 @@
 use crate::prelude::*;
 
 /// Sign something that is serializable using the private key for the passed public key.
+///
+/// Serde convenience for [ `sign_raw `].
 pub fn sign<K, D>(key: K, data: D) -> ExternResult<Signature>
 where
     K: Into<AgentPubKey>,
     D: serde::Serialize + std::fmt::Debug,
 {
-    host_call::<Sign, Signature>(__sign, Sign::new(key.into(), data)?)
+    HDK.with(|h| h.borrow().sign(Sign::new(key.into(), data)?))
 }
 
 /// Sign some data using the private key for the passed public key.
@@ -19,7 +21,28 @@ pub fn sign_raw<K>(key: K, data: Vec<u8>) -> ExternResult<Signature>
 where
     K: Into<AgentPubKey>,
 {
-    host_call::<Sign, Signature>(__sign, Sign::new_raw(key.into(), data))
+    HDK.with(|h| h.borrow().sign(Sign::new_raw(key.into(), data)))
+}
+
+/// Sign N serializable things using an ephemeral private key.
+///
+/// Serde convenience for [ `sign_ephemeral_raw` ].
+pub fn sign_ephemeral<D>(datas: Vec<D>) -> ExternResult<EphemeralSignatures>
+where
+    D: serde::Serialize + std::fmt::Debug,
+{
+    HDK.with(|h| h.borrow().sign_ephemeral(SignEphemeral::new(datas)?))
+}
+
+/// Sign N data using an ephemeral private key.
+///
+/// This is a complement to [ `sign_raw` ] in case we don't have a meaningful key for the input.
+/// __The generated private half of the key is discarded immediately upon signing__.
+///
+/// The signatures output are pairwise ordered the same as the input data.
+/// It is up to the caller to construct meaning for ephemeral signatures in some cryptographic system.
+pub fn sign_ephemeral_raw(datas: Vec<Vec<u8>>) -> ExternResult<EphemeralSignatures> {
+    HDK.with(|h| h.borrow().sign_ephemeral(SignEphemeral::new_raw(datas)))
 }
 
 /// Verify the passed signature and public key against the passed serializable input.
@@ -36,10 +59,10 @@ where
     S: Into<Signature>,
     D: serde::Serialize + std::fmt::Debug,
 {
-    host_call::<VerifySignature, bool>(
-        __verify_signature,
-        VerifySignature::new(key.into(), signature.into(), data)?,
-    )
+    HDK.with(|h| {
+        h.borrow()
+            .verify_signature(VerifySignature::new(key.into(), signature.into(), data)?)
+    })
 }
 
 /// Verify the passed signature and public key against the literal bytes input.
@@ -54,8 +77,8 @@ where
     K: Into<AgentPubKey>,
     S: Into<Signature>,
 {
-    host_call::<VerifySignature, bool>(
-        __verify_signature,
-        VerifySignature::new_raw(key.into(), signature.into(), data),
-    )
+    HDK.with(|h| {
+        h.borrow()
+            .verify_signature(VerifySignature::new_raw(key.into(), signature.into(), data))
+    })
 }

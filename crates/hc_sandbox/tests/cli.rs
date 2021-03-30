@@ -50,7 +50,7 @@ async fn check_timeout<T>(response: impl Future<Output = Result<T, ws::Websocket
 }
 
 /// Runs holochain and creates a temp directory
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "Figure out how to get holochain bin in CI"]
 async fn run_holochain() {
     observability::test_run().ok();
@@ -62,12 +62,12 @@ async fn run_holochain() {
         .arg("../../../elemental-chat/elemental-chat.dna")
         .kill_on_drop(true);
     let _hc_admin = cmd.spawn().expect("Failed to spawn holochain");
-    tokio::time::delay_for(std::time::Duration::from_secs(4)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(4)).await;
     // - Make a call to list app info to the port
     call_app_interface(port).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "Figure out how to get holochain bin in CI"]
 async fn run_multiple_on_same_port() {
     observability::test_run().ok();
@@ -81,7 +81,7 @@ async fn run_multiple_on_same_port() {
         .arg("../../../elemental-chat/elemental-chat.dna")
         .kill_on_drop(true);
     let _hc_admin = cmd.spawn().expect("Failed to spawn holochain");
-    tokio::time::delay_for(std::time::Duration::from_secs(4)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(4)).await;
     // - Make a call to list app info to the port
     call_app_interface(app_port).await;
 
@@ -92,5 +92,5 @@ async fn run_multiple_on_same_port() {
         .arg("list-dnas")
         .kill_on_drop(true);
     let _hc_admin2 = cmd.spawn().expect("Failed to spawn holochain");
-    tokio::time::delay_for(std::time::Duration::from_secs(4)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(4)).await;
 }
