@@ -1,6 +1,9 @@
 use ::fixt::prelude::*;
+use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
+use holochain_sqlite::rusqlite::Statement;
+use holochain_sqlite::rusqlite::ToSql;
 use holochain_sqlite::rusqlite::{Transaction, NO_PARAMS};
 use holochain_sqlite::{impl_to_sql_via_display, rusqlite::TransactionBehavior};
 use holochain_sqlite::{
@@ -22,16 +25,16 @@ struct LinkTestData {
     delete_link_op: DhtOpHashed,
     link: Link,
     base_op: DhtOpHashed,
-    base_hash: EntryHash,
     target_op: DhtOpHashed,
+    base_query: LinkQuery,
+    tag_query: LinkQuery,
 }
 
 struct EntryTestData {
     store_entry_op: DhtOpHashed,
     delete_entry_header_op: DhtOpHashed,
     entry: Entry,
-    entry_hash: EntryHash,
-    create_hash: HeaderHash,
+    query: GetQuery,
     header: SignedHeaderHashed,
 }
 
@@ -82,13 +85,21 @@ impl LinkTestData {
             create_link_hash: create_link_hash.clone(),
         };
 
+        let base_query = LinkQuery::Base(base_hash.clone(), create_link.zome_id.clone());
+        let tag_query = LinkQuery::Tag(
+            base_hash.clone(),
+            create_link.zome_id.clone(),
+            create_link.tag.clone(),
+        );
+
         Self {
             create_link_op: DhtOpHashed::from_content_sync(create_link_op),
             delete_link_op: DhtOpHashed::from_content_sync(delete_link_op),
             link,
             base_op: DhtOpHashed::from_content_sync(base_op),
-            base_hash,
             target_op: DhtOpHashed::from_content_sync(target_op),
+            base_query,
+            tag_query,
         }
     }
 }
@@ -123,12 +134,13 @@ impl EntryTestData {
             DhtOp::RegisterDeletedEntryHeader(signature.clone(), delete.clone()),
         );
 
+        let query = GetQuery(entry_hash.clone());
+
         Self {
             store_entry_op,
-            entry_hash,
-            create_hash,
             header,
             entry,
+            query,
             delete_entry_header_op,
         }
     }
@@ -159,11 +171,7 @@ async fn get_links() {
     insert_op(&mut txn, td.create_link_op.clone());
 
     // - Check we can get the link query back.
-    let link_ops_query = get_link_query(&mut txn, td.base_hash.clone());
-    assert_eq!(*link_ops_query.creates.values().next().unwrap(), td.link);
-
-    // - Check we can resolve this query to a link.
-    let r = resolve_links(link_ops_query.clone());
+    let r = get_link_query(&mut [&mut txn], td.tag_query.clone());
     assert_eq!(r[0], td.link);
 
     // - Add the same link to the cache.
@@ -174,27 +182,18 @@ async fn get_links() {
     // - Check duplicates don't cause issues.
     insert_op(&mut cache_txn, td.create_link_op.clone());
 
-    // - Check we can get this query back form the cache.
-    let r = get_link_query(&mut cache_txn, td.base_hash.clone());
-    assert_eq!(*link_ops_query.creates.values().next().unwrap(), td.link);
-
-    // - Union the both queries.
-    let r = r.union(link_ops_query);
-
     // - Check we can resolve this to a single link.
-    let r = resolve_links(r);
+    let r = get_link_query(&mut [&mut cache_txn], td.base_query.clone());
+    assert_eq!(r[0], td.link);
+    assert_eq!(r.len(), 1);
+    let r = get_link_query(&mut [&mut cache_txn, &mut txn], td.tag_query.clone());
     assert_eq!(r[0], td.link);
     assert_eq!(r.len(), 1);
 
     // - Insert a delete op.
     insert_op(&mut txn, td.delete_link_op.clone());
 
-    // - Get the links from first db.
-    let r = get_link_query(&mut txn, td.base_hash.clone());
-    // - Union with links from the cache.
-    let r = r.union(get_link_query(&mut cache_txn, td.base_hash.clone()));
-    // - Resolve the creates / deletes.
-    let r = resolve_links(r);
+    let r = get_link_query(&mut [&mut cache_txn, &mut txn], td.tag_query.clone());
     // - We should not have any links now.
     assert!(r.is_empty())
 }
@@ -222,15 +221,7 @@ async fn get_entry() {
     insert_op(&mut txn, td.store_entry_op.clone());
 
     // - Check we get that header back.
-    let r = get_entry_query(&mut txn, td.entry_hash.clone());
-    assert_eq!(*r.creates.keys().next().unwrap(), td.create_hash);
-
-    // - Resolve the query to live headers.
-    let r = resolve_entry(r);
-    // - Check we get the correct header.
-    assert_eq!(r[0], td.header);
-    // - Render the element from the live header.
-    let r = render_entry(&mut txn, r);
+    let r = get_entry_query(&mut [&mut txn], td.query.clone()).unwrap();
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);
 
     // - Create the same entry in the cache.
@@ -239,16 +230,9 @@ async fn get_entry() {
     insert_op(&mut cache_txn, td.store_entry_op.clone());
 
     // - Get the entry from both stores and union the query results.
-    let r = get_entry_query(&mut txn, td.entry_hash.clone());
-    let r = r.union(get_entry_query(&mut txn, td.entry_hash.clone()));
-    // - Resolve the query to a list of live headers.
-    let r = resolve_entry(r);
-    // - Check we got the correct header and only one.
-    assert_eq!(r[0], td.header);
-    assert_eq!(r.len(), 1);
-    // - Render the element from the live header.
-    let r = render_entry(&mut txn, r);
+    let r = get_entry_query(&mut [&mut txn, &mut cache_txn], td.query.clone());
     // - Check it's the correct entry and header.
+    let r = r.unwrap();
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);
     assert_eq!(*r.header(), *td.header.header());
 
@@ -256,43 +240,51 @@ async fn get_entry() {
     insert_op(&mut cache_txn, td.delete_entry_header_op.clone());
 
     // - Get the entry from both stores and union the queries.
-    let r = get_entry_query(&mut txn, td.entry_hash.clone());
-    let r = r.union(get_entry_query(&mut cache_txn, td.entry_hash.clone()));
-    // - Check we got create header.
-    assert_eq!(*r.creates.keys().next().unwrap(), td.create_hash);
-    // - Check we got the delete for this create header.
-    assert_eq!(*r.deletes.iter().next().unwrap(), td.create_hash);
-    // - Resolve the entry from the live headers.
-    let r = resolve_entry(r);
+    let r = get_entry_query(&mut [&mut txn, &mut cache_txn], td.query.clone());
     // - There should be no live headers so resolving
-    // returns an empty list.
-    assert!(r.is_empty());
+    // returns no element.
+    assert!(r.is_none());
 }
 
 // TODO: This could fail if we got the header from a different store.
 // Perhaps this should take `&mut [&mut Transaction]` so it can search all
 // stores for the entry. Short circuiting on the first place the entry is found.
-fn render_entry(txn: &mut Transaction, r: Vec<SignedHeaderHashed>) -> Element {
+fn render_entry<'a, 'b: 'a>(
+    txns: &mut [&'a mut Transaction<'b>],
+    headers: Vec<SignedHeaderHashed>,
+) -> Option<Element> {
     // Choose an arbitrary header
-    let header = r.into_iter().next().unwrap();
-    let entry_hash = header.header().entry_hash().unwrap();
-    let entry = txn
-        .query_row_named(
-            "
-            SELECT Entry.blob AS entry_blob FROM Entry
-            WHERE hash = :entry_hash
-            ",
-            named_params! {
-                ":entry_hash": entry_hash.clone().into_inner(),
-            },
-            |row| {
-                Ok(from_blob::<Entry>(
-                    row.get(row.column_index("entry_blob")?)?,
-                ))
-            },
-        )
-        .unwrap();
-    Element::new(header, Some(entry))
+    let header = headers.into_iter().next();
+    match header {
+        Some(header) => {
+            for txn in txns.into_iter() {
+                let entry_hash = header.header().entry_hash().unwrap();
+                let entry = txn.query_row_named(
+                    "
+                    SELECT Entry.blob AS entry_blob FROM Entry
+                    WHERE hash = :entry_hash
+                    ",
+                    named_params! {
+                        ":entry_hash": entry_hash.clone().into_inner(),
+                    },
+                    |row| {
+                        Ok(from_blob::<Entry>(
+                            row.get(row.column_index("entry_blob")?)?,
+                        ))
+                    },
+                );
+                if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &entry {
+                    continue;
+                } else {
+                    // TODO: Handle this error.
+                    let entry = entry.unwrap();
+                    return Some(Element::new(header, Some(entry)));
+                }
+            }
+            panic!("TODO: Handle case where entry wasn't found but we had headers")
+        }
+        None => None,
+    }
 }
 
 /// Test that `insert_op` also inserts a header and potentially an entry
@@ -369,53 +361,6 @@ async fn insert_op_equivalence() {
     assert_eq!(ops1, ops2);
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-struct LinksQuery {
-    creates: HashMap<HeaderHash, Link>,
-    deletes: HashSet<HeaderHash>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-struct EntryQuery {
-    creates: HashMap<HeaderHash, SignedHeaderHashed>,
-    deletes: HashSet<HeaderHash>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-struct EntryDetailsQuery {
-    creates: HashSet<SignedHeaderHashed>,
-    updates: HashSet<SignedHeaderHashed>,
-    deletes: HashSet<SignedHeaderHashed>,
-}
-
-impl LinksQuery {
-    fn union(self, other: Self) -> Self {
-        Self {
-            creates: self.creates.into_iter().chain(other.creates).collect(),
-            deletes: self.deletes.into_iter().chain(other.deletes).collect(),
-        }
-    }
-}
-
-impl EntryQuery {
-    fn union(self, other: Self) -> Self {
-        Self {
-            creates: self.creates.into_iter().chain(other.creates).collect(),
-            deletes: self.deletes.into_iter().chain(other.deletes).collect(),
-        }
-    }
-}
-
-impl EntryDetailsQuery {
-    fn union(self, other: Self) -> Self {
-        Self {
-            creates: self.creates.into_iter().chain(other.creates).collect(),
-            deletes: self.deletes.into_iter().chain(other.deletes).collect(),
-            updates: self.updates.into_iter().chain(other.updates).collect(),
-        }
-    }
-}
-
 macro_rules! sql_insert {
     ($txn:expr, $table:ident, { $($field:literal : $val:expr , )+ $(,)? }) => {{
         let table = stringify!($table);
@@ -428,131 +373,350 @@ macro_rules! sql_insert {
     }};
 }
 
-fn get_link_query(txn: &mut Transaction, entry_hash: EntryHash) -> LinksQuery {
-    // We have to make a decision here to either pull out the link data with each op
-    // before or after we union and resolve the ops.
-    // Doing this before (what we have chosen) may potentially lead to redundant and deleted links
-    // being pulled into memory.
-    // Doing it after requires a separate query per unique link without a delete.
-    let mut stmt = txn
-        .prepare(
-            "
+#[derive(Debug, Clone)]
+enum LinkQuery {
+    Base(EntryHash, ZomeId),
+    Tag(EntryHash, ZomeId, LinkTag),
+}
+#[derive(Debug, Clone)]
+struct GetQuery(EntryHash);
+
+impl GetQuery {
+    fn create_query_string() -> &'static str {
+        "
+            SELECT Header.blob AS header_blob FROM DhtOp
+            JOIN Header On DhtOp.header_hash = Header.hash
+            WHERE DhtOp.type = :store_entry
+            AND
+            DhtOp.basis_hash = :entry_hash
+        "
+    }
+
+    fn delete_query_string() -> &'static str {
+        "
         SELECT Header.blob AS header_blob FROM DhtOp
-        JOIN Header On DhtOp.header_hash = Header.hash
-        WHERE DhtOp.type = :create
-        AND
-        DhtOp.basis_hash = :entry_hash
-        ",
-        )
-        .unwrap();
-    let creates = stmt
-        .query_map_named(
-            named_params! {
-                ":create": DhtOpType::RegisterAddLink,
-                ":entry_hash": entry_hash.clone().into_inner(),
-            },
-            |row| {
-                let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
-                let hash = HeaderHash::with_data_sync(&header);
-                Ok((hash, header.0))
-            },
-        )
-        .unwrap()
-        // TODO: Handle these errors
-        .map(Result::unwrap)
-        .map(|(hash, header)| (hash, link_from_header(header)))
-        .collect();
-    let mut stmt = txn
-        .prepare(
-            "
-        SELECT Header.create_link_hash FROM DhtOp
         JOIN Header On DhtOp.header_hash = Header.hash
         WHERE DhtOp.type = :delete
         AND
         DhtOp.basis_hash = :entry_hash
-        ",
-        )
-        .unwrap();
-    let deletes = stmt
-        .query_map_named(
-            named_params! {
-                ":delete": DhtOpType::RegisterRemoveLink,
-                ":entry_hash": entry_hash.into_inner(),
-            },
-            |row| {
-                Ok(
-                    HeaderHash::from_raw_39(row.get(row.column_index("create_link_hash")?)?)
-                        .unwrap(),
-                )
-            },
-        )
-        .unwrap()
-        // TODO: Handle these errors
-        .map(Result::unwrap)
-        .collect();
-    LinksQuery { creates, deletes }
+        "
+    }
+
+    fn into_params(self) -> GetQueryParams {
+        GetQueryParams {
+            entry_hash: self.0.into_inner(),
+        }
+    }
 }
 
-fn get_entry_query(txn: &mut Transaction, entry_hash: EntryHash) -> EntryQuery {
-    let mut stmt = txn
-        .prepare(
+impl LinkQuery {
+    fn common_query_string() -> &'static str {
+        "
+            JOIN Header On DhtOp.header_hash = Header.hash
+            WHERE DhtOp.type = :create
+            AND
+            Header.base_hash = :base_hash
+            AND
+            Header.zome_id = :zome_id
+        "
+    }
+    // TODO: These could be made lazy to avoid allocating.
+    fn create_query_string(&self) -> String {
+        let s = format!(
             "
-        SELECT Header.blob AS header_blob FROM DhtOp
-        JOIN Header On DhtOp.header_hash = Header.hash
-        WHERE DhtOp.type = :store_entry
-        AND
-        DhtOp.basis_hash = :entry_hash
-        ",
-        )
-        .unwrap();
-    let creates = stmt
-        .query_map_named(
-            named_params! {
-                ":store_entry": DhtOpType::StoreEntry,
-                ":entry_hash": entry_hash.clone().into_inner(),
+            SELECT Header.blob AS header_blob FROM DhtOp
+            {}
+            ",
+            Self::common_query_string()
+        );
+        self.add_tag(s)
+    }
+    fn add_tag(&self, q: String) -> String {
+        match self {
+            LinkQuery::Base(_, _) => q,
+            LinkQuery::Tag(_, _, _) => {
+                format!(
+                    "
+                    {}
+                    AND
+                    Header.tag = :tag
+                    ",
+                    q
+                )
+            }
+        }
+    }
+    fn delete_query_string(&self) -> String {
+        let sub_create_query = format!(
+            "
+            SELECT Header.hash FROM DhtOp
+            {}
+            ",
+            Self::common_query_string()
+        );
+        let sub_create_query = self.add_tag(sub_create_query);
+        let delete_query = format!(
+            "
+            SELECT Header.blob AS header_blob FROM DhtOp
+            JOIN Header On DhtOp.header_hash = Header.hash
+            WHERE DhtOp.type = :delete
+            AND
+            Header.create_link_hash IN ({})
+            ",
+            sub_create_query
+        );
+        delete_query
+    }
+
+    fn into_params(self) -> LinkQueryParams {
+        match self {
+            LinkQuery::Base(e, z) => LinkQueryParams {
+                entry_hash: e.into_inner(),
+                zome_id: z.index() as u32,
+                tag: None,
             },
-            |row| {
+            LinkQuery::Tag(e, z, t) => LinkQueryParams {
+                entry_hash: e.into_inner(),
+                zome_id: z.index() as u32,
+                tag: Some(to_blob(t)),
+            },
+        }
+    }
+}
+
+struct LinkQueryParams {
+    entry_hash: Vec<u8>,
+    zome_id: u32,
+    tag: Option<Vec<u8>>,
+}
+
+struct GetQueryParams {
+    entry_hash: Vec<u8>,
+}
+
+impl LinkQueryParams {
+    fn create_link(&self) -> Vec<(&str, &dyn ToSql)> {
+        let mut params = named_params! {
+            ":create": DhtOpType::RegisterAddLink,
+            ":base_hash": self.entry_hash,
+            ":zome_id": self.zome_id,
+        }
+        .to_vec();
+        if self.tag.is_some() {
+            params.extend(named_params! {
+                ":tag": self.tag,
+            });
+        }
+        params
+    }
+
+    fn delete_link(&self) -> Vec<(&str, &dyn ToSql)> {
+        let mut params = named_params! {
+            ":create": DhtOpType::RegisterAddLink,
+            ":delete": DhtOpType::RegisterRemoveLink,
+            ":base_hash": self.entry_hash,
+            ":zome_id": self.zome_id,
+        }
+        .to_vec();
+        if self.tag.is_some() {
+            params.extend(named_params! {
+                ":tag": self.tag,
+            });
+        }
+        params
+    }
+}
+
+impl GetQueryParams {
+    fn create(&self) -> Vec<(&str, &dyn ToSql)> {
+        let params = named_params! {
+            ":store_entry": DhtOpType::StoreEntry,
+            ":entry_hash": self.entry_hash,
+        };
+        params.to_vec()
+    }
+
+    fn delete(&self) -> Vec<(&str, &dyn ToSql)> {
+        let params = named_params! {
+            ":delete": DhtOpType::RegisterDeletedEntryHeader,
+            ":entry_hash": self.entry_hash,
+        };
+        params.to_vec()
+    }
+}
+
+#[derive(Debug)]
+struct PlaceHolderError;
+
+impl From<holochain_sqlite::rusqlite::Error> for PlaceHolderError {
+    fn from(e: holochain_sqlite::rusqlite::Error) -> Self {
+        tracing::error!(?e);
+        todo!()
+    }
+}
+
+struct LinkQueryStmt<'stmt> {
+    create_stmt: Statement<'stmt>,
+    delete_stmt: Statement<'stmt>,
+    params: LinkQueryParams,
+}
+
+struct GetQueryStmt<'stmt> {
+    create_stmt: Statement<'stmt>,
+    delete_stmt: Statement<'stmt>,
+    params: GetQueryParams,
+}
+
+impl<'stmt, 'iter> LinkQueryStmt<'stmt> {
+    fn new(txn: &'stmt mut Transaction, query: LinkQuery) -> Self {
+        let create_stmt = txn.prepare(&query.create_query_string()).unwrap();
+        let delete_stmt = txn.prepare(&query.delete_query_string()).unwrap();
+        let params = query.into_params();
+        Self {
+            create_stmt,
+            delete_stmt,
+            params,
+        }
+    }
+    fn iter(
+        &'iter mut self,
+    ) -> impl FallibleIterator<Item = SignedHeaderHashed, Error = PlaceHolderError> + 'iter {
+        let creates = self
+            .create_stmt
+            .query_and_then_named(&self.params.create_link(), |row| {
                 let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
                 let SignedHeader(header, signature) = header;
                 let header = HeaderHashed::from_content_sync(header);
-                let hash = header.as_hash().clone();
                 let shh = SignedHeaderHashed::with_presigned(header, signature);
-                Ok((hash, shh))
-            },
-        )
-        .unwrap()
-        // TODO: Handle these errors
-        .map(Result::unwrap)
+                Result::<_, PlaceHolderError>::Ok(shh)
+            })
+            .unwrap();
+
+        let deletes = self
+            .delete_stmt
+            .query_and_then_named(&self.params.delete_link(), |row| {
+                let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+                let SignedHeader(header, signature) = header;
+                let header = HeaderHashed::from_content_sync(header);
+                let shh = SignedHeaderHashed::with_presigned(header, signature);
+                Result::<_, PlaceHolderError>::Ok(shh)
+            })
+            .unwrap();
+        let creates = fallible_iterator::convert(creates);
+        let deletes = fallible_iterator::convert(deletes);
+        creates.chain(deletes)
+    }
+}
+
+impl<'stmt, 'iter> GetQueryStmt<'stmt> {
+    fn new(txn: &'stmt mut Transaction, query: GetQuery) -> Self {
+        let create_stmt = txn.prepare(GetQuery::create_query_string()).unwrap();
+        let delete_stmt = txn.prepare(GetQuery::delete_query_string()).unwrap();
+        let params = query.into_params();
+        Self {
+            create_stmt,
+            delete_stmt,
+            params,
+        }
+    }
+    fn iter(
+        &'iter mut self,
+    ) -> impl FallibleIterator<Item = SignedHeaderHashed, Error = PlaceHolderError> + 'iter {
+        let creates = self
+            .create_stmt
+            .query_and_then_named(&self.params.create(), |row| {
+                let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+                let SignedHeader(header, signature) = header;
+                let header = HeaderHashed::from_content_sync(header);
+                let shh = SignedHeaderHashed::with_presigned(header, signature);
+                Result::<_, PlaceHolderError>::Ok(shh)
+            })
+            .unwrap();
+
+        let deletes = self
+            .delete_stmt
+            .query_and_then_named(&self.params.delete(), |row| {
+                let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+                let SignedHeader(header, signature) = header;
+                let header = HeaderHashed::from_content_sync(header);
+                let shh = SignedHeaderHashed::with_presigned(header, signature);
+                Result::<_, PlaceHolderError>::Ok(shh)
+            })
+            .unwrap();
+        let creates = fallible_iterator::convert(creates);
+        let deletes = fallible_iterator::convert(deletes);
+        creates.chain(deletes)
+    }
+}
+
+fn get_link_query<'a, 'b: 'a>(txns: &mut [&'a mut Transaction<'b>], query: LinkQuery) -> Vec<Link> {
+    let mut stmts: Vec<_> = txns
+        .into_iter()
+        .map(|txn| LinkQueryStmt::new(txn, query.clone()))
         .collect();
-    let mut stmt = txn
-        .prepare(
-            "
-        SELECT Header.deletes_header_hash FROM DhtOp
-        JOIN Header On DhtOp.header_hash = Header.hash
-        WHERE DhtOp.type = :delete
-        AND
-        DhtOp.basis_hash = :entry_hash
-        ",
+    let iter = stmts.iter_mut().map(|stmt| Ok(stmt.iter()));
+    let iter = fallible_iterator::convert(iter).flatten();
+    let (creates, _) = iter
+        .fold(
+            (HashMap::new(), HashSet::new()),
+            |(mut creates, mut deletes), shh| {
+                let (header, _) = shh.into_header_and_signature();
+                let (header, hash) = header.into_inner();
+                match header {
+                    Header::CreateLink(create_link) => {
+                        if !deletes.contains(&hash) {
+                            creates.insert(hash, link_from_header(Header::CreateLink(create_link)));
+                        }
+                    }
+                    Header::DeleteLink(delete_link) => {
+                        creates.remove(&delete_link.link_add_address);
+                        deletes.insert(delete_link.link_add_address);
+                    }
+                    _ => panic!("TODO: Turn this into an error"),
+                }
+                Ok((creates, deletes))
+            },
         )
         .unwrap();
-    let deletes = stmt
-        .query_map_named(
-            named_params! {
-                ":delete": DhtOpType::RegisterDeletedEntryHeader,
-                ":entry_hash": entry_hash.into_inner(),
-            },
-            |row| {
-                Ok(
-                    HeaderHash::from_raw_39(row.get(row.column_index("deletes_header_hash")?)?)
-                        .unwrap(),
-                )
+    creates.into_iter().map(|(_, v)| v).collect()
+}
+
+fn get_entry_query<'a, 'b: 'a>(
+    txns: &mut [&'a mut Transaction<'b>],
+    query: GetQuery,
+) -> Option<Element> {
+    let mut stmts: Vec<_> = txns
+        .into_iter()
+        .map(|txn| GetQueryStmt::new(txn, query.clone()))
+        .collect();
+    let iter = stmts.iter_mut().map(|stmt| Ok(stmt.iter()));
+    let iter = fallible_iterator::convert(iter).flatten();
+
+    let (creates, _) = iter
+        .fold(
+            (HashMap::new(), HashSet::new()),
+            |(mut creates, mut deletes), shh| {
+                let hash = shh.as_hash().clone();
+                match shh.header() {
+                    Header::Create(_) => {
+                        if !deletes.contains(&hash) {
+                            creates.insert(hash, shh);
+                        }
+                    }
+                    Header::Delete(delete) => {
+                        creates.remove(&delete.deletes_address);
+                        deletes.insert(delete.deletes_address.clone());
+                    }
+                    _ => panic!("TODO: Turn this into an error"),
+                }
+                Ok((creates, deletes))
             },
         )
-        .unwrap()
-        // TODO: Handle these errors
-        .map(Result::unwrap)
-        .collect();
-    EntryQuery { creates, deletes }
+        .unwrap();
+    drop(stmts);
+    // TODO: We really only need a single header here so we can probably avoid this collect.
+    let headers = creates.into_iter().map(|(_, v)| v).collect();
+    render_entry(txns, headers)
 }
 
 fn link_from_header(header: Header) -> Link {
@@ -566,24 +730,6 @@ fn link_from_header(header: Header) -> Link {
         },
         _ => panic!("TODO: handle this properly"),
     }
-}
-
-fn resolve_links(mut query: LinksQuery) -> Vec<Link> {
-    for create_link_address in query.deletes {
-        query.creates.remove(&create_link_address);
-    }
-    query.creates.into_iter().map(|(_, link)| link).collect()
-}
-
-fn resolve_entry(mut query: EntryQuery) -> Vec<SignedHeaderHashed> {
-    for deletes_header_hash in query.deletes {
-        query.creates.remove(&deletes_header_hash);
-    }
-    query
-        .creates
-        .into_iter()
-        .map(|(_, create)| create)
-        .collect()
 }
 
 fn insert_op(txn: &mut Transaction, op: DhtOpHashed) {
