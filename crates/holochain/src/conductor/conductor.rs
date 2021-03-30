@@ -30,6 +30,7 @@ use super::manager::spawn_task_manager;
 use super::manager::ManagedTaskAdd;
 use super::manager::ManagedTaskHandle;
 use super::manager::TaskManagerRunHandle;
+use super::manager::TaskOutcome;
 use super::p2p_store;
 use super::p2p_store::all_agent_infos;
 use super::p2p_store::get_single_agent_info;
@@ -283,7 +284,7 @@ where
 
             // First, register the keepalive task, to ensure the conductor doesn't shut down
             // in the absence of other "real" tasks
-            self.manage_task(ManagedTaskAdd::dont_handle(tokio::spawn(keep_alive_task(
+            self.manage_task(ManagedTaskAdd::ignore(tokio::spawn(keep_alive_task(
                 stop_tx.subscribe(),
             ))))
             .await?;
@@ -297,7 +298,7 @@ where
                         result.unwrap_or_else(|e| {
                             error!(error = &e as &dyn std::error::Error, "Interface died")
                         });
-                        None
+                        TaskOutcome::Ignore
                     }),
                 ))
                 .await?
@@ -329,7 +330,7 @@ where
             .await
             .map_err(Box::new)?;
         // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
-        self.manage_task(ManagedTaskAdd::dont_handle(task)).await?;
+        self.manage_task(ManagedTaskAdd::ignore(task)).await?;
         let interface = AppInterfaceRuntime::Websocket { signal_tx };
 
         if self.app_interfaces.contains_key(&interface_id) {
@@ -652,8 +653,8 @@ where
     }
 
     /// Add fully constructed cells to the cell map in the Conductor
-    pub(super) fn add_cells(&mut self, cells: Vec<(Cell, InitialQueueTriggers)>) {
-        for (cell, trigger) in cells {
+    pub(super) fn add_cells(&mut self, cells: Vec<Cell>) {
+        for cell in cells {
             let cell_id = cell.id().clone();
             tracing::info!(?cell_id, "ADD CELL");
             self.cells.insert(
@@ -663,8 +664,6 @@ where
                     _state: CellState { _active: false },
                 },
             );
-
-            trigger.initialize_workflows();
         }
     }
 
@@ -1209,7 +1208,6 @@ mod builder {
             )
             .await?;
 
-            #[cfg(any(test, feature = "test_utils"))]
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
             Self::finish(conductor, self.config, p2p_evt).await

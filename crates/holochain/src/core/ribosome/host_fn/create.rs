@@ -269,7 +269,7 @@ pub mod wasm_test {
             Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => {
                 entry_bytes.bytes().to_vec()
             }
-            other => panic!(format!("unexpected output: {:?}", other)),
+            other => panic!("unexpected output: {:?}", other),
         };
         // this should be the content "foo" of the committed post
         assert_eq!(vec![163, 102, 111, 111], bytes);
@@ -384,7 +384,7 @@ pub mod wasm_test {
 
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
-        shutdown.await.unwrap();
+        shutdown.await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
