@@ -1,6 +1,8 @@
 use ::fixt::prelude::*;
+use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
+use holochain_sqlite::rusqlite::ToSql;
 use holochain_sqlite::rusqlite::{Transaction, NO_PARAMS};
 use holochain_sqlite::{impl_to_sql_via_display, rusqlite::TransactionBehavior};
 use holochain_sqlite::{
@@ -24,6 +26,8 @@ struct LinkTestData {
     base_op: DhtOpHashed,
     base_hash: EntryHash,
     target_op: DhtOpHashed,
+    base_query: LinkQuery,
+    tag_query: LinkQuery,
 }
 
 struct EntryTestData {
@@ -82,6 +86,13 @@ impl LinkTestData {
             create_link_hash: create_link_hash.clone(),
         };
 
+        let base_query = LinkQuery::Base(base_hash.clone(), create_link.zome_id.clone());
+        let tag_query = LinkQuery::Tag(
+            base_hash.clone(),
+            create_link.zome_id.clone(),
+            create_link.tag.clone(),
+        );
+
         Self {
             create_link_op: DhtOpHashed::from_content_sync(create_link_op),
             delete_link_op: DhtOpHashed::from_content_sync(delete_link_op),
@@ -89,6 +100,8 @@ impl LinkTestData {
             base_op: DhtOpHashed::from_content_sync(base_op),
             base_hash,
             target_op: DhtOpHashed::from_content_sync(target_op),
+            base_query,
+            tag_query,
         }
     }
 }
@@ -185,6 +198,10 @@ async fn get_links() {
     let r = resolve_links(r);
     assert_eq!(r[0], td.link);
     assert_eq!(r.len(), 1);
+    let r2 = get_link_query2(&mut cache_txn, td.base_query.clone());
+    assert_eq!(r2, r);
+    let r2 = get_link_query2(&mut cache_txn, td.tag_query.clone());
+    assert_eq!(r2, r);
 
     // - Insert a delete op.
     insert_op(&mut txn, td.delete_link_op.clone());
@@ -426,6 +443,181 @@ macro_rules! sql_insert {
             (format!(":{}", $field).as_str(), &$val as &dyn holochain_sqlite::rusqlite::ToSql),
         )+])
     }};
+}
+
+#[derive(Debug, Clone)]
+enum LinkQuery {
+    Base(EntryHash, ZomeId),
+    Tag(EntryHash, ZomeId, LinkTag),
+}
+
+impl LinkQuery {
+    // TODO: These could be made lazy to avoid allocating.
+    fn common_query_string() -> &'static str {
+        "
+            JOIN Header On DhtOp.header_hash = Header.hash
+            WHERE DhtOp.type = :create
+            AND
+            Header.base_hash = :base_hash
+            AND
+            Header.zome_id = :zome_id
+        "
+    }
+    fn create_query_string(&self) -> String {
+        let s = format!(
+            "
+            SELECT Header.blob AS header_blob FROM DhtOp
+            {}
+            ",
+            Self::common_query_string()
+        );
+        self.add_tag(s)
+    }
+    fn add_tag(&self, q: String) -> String {
+        match self {
+            LinkQuery::Base(_, _) => q,
+            LinkQuery::Tag(_, _, _) => {
+                format!(
+                    "
+                    {}
+                    AND
+                    Header.tag = :tag
+                    ",
+                    q
+                )
+            }
+        }
+    }
+    fn delete_query_string(&self) -> String {
+        let sub_create_query = format!(
+            "
+            SELECT Header.hash FROM DhtOp
+            {}
+            ",
+            Self::common_query_string()
+        );
+        let sub_create_query = self.add_tag(sub_create_query);
+        let delete_query = format!(
+            "
+            SELECT Header.blob AS header_blob FROM DhtOp
+            JOIN Header On DhtOp.header_hash = Header.hash
+            WHERE DhtOp.type = :delete
+            AND
+            Header.create_link_hash IN ({})
+            ",
+            sub_create_query
+        );
+        delete_query
+    }
+
+    fn into_params(self) -> LinkQueryParams {
+        match self {
+            LinkQuery::Base(e, z) => LinkQueryParams {
+                entry_hash: e.into_inner(),
+                zome_id: z.index() as u32,
+                tag: None,
+            },
+            LinkQuery::Tag(e, z, t) => LinkQueryParams {
+                entry_hash: e.into_inner(),
+                zome_id: z.index() as u32,
+                tag: Some(to_blob(t)),
+            },
+        }
+    }
+}
+
+struct LinkQueryParams {
+    entry_hash: Vec<u8>,
+    zome_id: u32,
+    tag: Option<Vec<u8>>,
+}
+
+impl LinkQueryParams {
+    fn create_link(&self) -> Vec<(&str, &dyn ToSql)> {
+        let mut params = named_params! {
+            ":create": DhtOpType::RegisterAddLink,
+            ":base_hash": self.entry_hash,
+            ":zome_id": self.zome_id,
+        }
+        .to_vec();
+        if self.tag.is_some() {
+            params.extend(named_params! {
+                ":tag": self.tag,
+            });
+        }
+        params
+    }
+
+    fn delete_link(&self) -> Vec<(&str, &dyn ToSql)> {
+        let mut params = named_params! {
+            ":create": DhtOpType::RegisterAddLink,
+            ":delete": DhtOpType::RegisterRemoveLink,
+            ":base_hash": self.entry_hash,
+            ":zome_id": self.zome_id,
+        }
+        .to_vec();
+        if self.tag.is_some() {
+            params.extend(named_params! {
+                ":tag": self.tag,
+            });
+        }
+        params
+    }
+}
+
+#[derive(Debug)]
+struct PlaceHolderError;
+
+impl From<holochain_sqlite::rusqlite::Error> for PlaceHolderError {
+    fn from(_: holochain_sqlite::rusqlite::Error) -> Self {
+        todo!()
+    }
+}
+
+fn get_link_query2(txn: &mut Transaction, link_query: LinkQuery) -> Vec<Link> {
+    let mut create_stmt = txn.prepare(&link_query.create_query_string()).unwrap();
+    let mut delete_stmt = txn.prepare(&link_query.delete_query_string()).unwrap();
+
+    let params = link_query.into_params();
+    let creates = create_stmt
+        .query_and_then_named(&params.create_link(), |row| {
+            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+            let hash = HeaderHash::with_data_sync(&header);
+            Result::<_, PlaceHolderError>::Ok((hash, header.0))
+        })
+        .unwrap();
+
+    let deletes = delete_stmt
+        .query_and_then_named(&params.delete_link(), |row| {
+            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+            let hash = HeaderHash::with_data_sync(&header);
+            Result::<_, PlaceHolderError>::Ok((hash, header.0))
+        })
+        .unwrap();
+    let creates = fallible_iterator::convert(creates);
+    let deletes = fallible_iterator::convert(deletes);
+    let iter = creates.chain(deletes);
+    let (creates, _) = iter
+        .fold(
+            (HashMap::new(), HashSet::new()),
+            |(mut creates, mut deletes), (hash, header)| {
+                match &header {
+                    Header::CreateLink(_) => {
+                        if !deletes.contains(&hash) {
+                            creates.insert(hash, link_from_header(header));
+                        }
+                    }
+                    Header::DeleteLink(_) => {
+                        creates.remove(&hash);
+                        deletes.insert(hash);
+                    }
+                    _ => panic!("TODO: Turn this into an error"),
+                }
+                Ok((creates, deletes))
+            },
+        )
+        .unwrap();
+    creates.into_iter().map(|(_, v)| v).collect()
 }
 
 fn get_link_query(txn: &mut Transaction, entry_hash: EntryHash) -> LinksQuery {
