@@ -2357,6 +2357,7 @@ version = "0.0.1"
 dependencies = [
  "base64",
  "blake2b_simd",
+ "criterion",
  "derive_more",
  "futures",
  "kitsune_p2p_transport_quic",
