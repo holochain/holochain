@@ -40,6 +40,8 @@ pub mod dht_op_integration;
 #[allow(missing_docs)]
 pub mod element_buf;
 pub mod metadata;
+pub mod query;
+pub mod insert;
 #[allow(missing_docs)]
 pub mod prelude;
 #[allow(missing_docs)]

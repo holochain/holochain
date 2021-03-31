@@ -6,7 +6,7 @@ use holochain_zome_types::signature::Signature;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
 /// Get options help control how the get is processed at various levels.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct GetOptions {
     /// Whether the remote-end should follow redirects or just return the
     /// requested entry.

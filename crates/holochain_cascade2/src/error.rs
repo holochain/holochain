@@ -47,6 +47,9 @@ pub enum CascadeError {
 
     #[error("Cell is an authority for is missing or incorrect: {0}")]
     AuthorityDataError(#[from] AuthorityDataError),
+
+    #[error(transparent)]
+    QueryError(#[from] holochain_state::query::PlaceHolderError),
 }
 
 pub type CascadeResult<T> = Result<T, CascadeError>;
