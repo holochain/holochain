@@ -131,6 +131,7 @@ impl LinkQuery {
 impl Query for LinkQuery {
     type State = Maps<Link>;
     type Output = Vec<Link>;
+    type Data = SignedHeaderHashed;
     fn create_query(&self) -> &str {
         self.create_query()
     }
@@ -151,11 +152,11 @@ impl Query for LinkQuery {
         Ok(Maps::new())
     }
 
-    fn as_filter(&self) -> Box<dyn Fn(&Header) -> bool> {
+    fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {
         let base_filter = self.base.clone();
         let zome_id_filter = self.zome_id.clone();
         let tag_filter = self.tag.clone();
-        let f = move |header: &Header| match header {
+        let f = move |header: &SignedHeaderHashed| match header.header() {
             Header::CreateLink(CreateLink {
                 base_address,
                 zome_id,
@@ -202,6 +203,10 @@ impl Query for LinkQuery {
         _: &Transactions<'_, '_>,
     ) -> Result<Self::Output, PlaceHolderError> {
         Ok(state.creates.into_iter().map(|(_, v)| v).collect())
+    }
+
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> Result<Self::Data, PlaceHolderError>> {
+        Arc::new(|row| row_to_header(row))
     }
 }
 

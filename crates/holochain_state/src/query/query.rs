@@ -143,7 +143,7 @@ impl EntryTestData {
 #[tokio::test(flavor = "multi_thread")]
 async fn get_links() {
     observability::test_run().ok();
-    let mut scratch = Scratch::default();
+    let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
 
@@ -209,7 +209,7 @@ async fn get_links() {
 #[tokio::test(flavor = "multi_thread")]
 async fn get_entry() {
     observability::test_run().ok();
-    let mut scratch = Scratch::default();
+    let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
 
@@ -342,7 +342,7 @@ async fn insert_op_equivalence() {
 
 fn get_link_query<'a, 'b: 'a>(
     txns: &[&'a Transaction<'b>],
-    scratch: Option<&Scratch>,
+    scratch: Option<&Scratch<SignedHeaderHashed>>,
     mut query: LinkQuery,
 ) -> Vec<Link> {
     query.run(txns, scratch).unwrap()
@@ -350,7 +350,7 @@ fn get_link_query<'a, 'b: 'a>(
 
 fn get_entry_query<'a, 'b: 'a>(
     txns: &[&'a Transaction<'b>],
-    scratch: Option<&Scratch>,
+    scratch: Option<&Scratch<SignedHeaderHashed>>,
     mut query: GetQuery,
 ) -> Option<Element> {
     query.run(txns, scratch).unwrap()

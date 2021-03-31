@@ -16,6 +16,7 @@ impl GetQuery {
 }
 
 impl Query for GetQuery {
+    type Data = SignedHeaderHashed;
     type State = Maps<SignedHeaderHashed>;
     type Output = Option<Element>;
 
@@ -59,9 +60,9 @@ impl Query for GetQuery {
         Ok(Maps::new())
     }
 
-    fn as_filter(&self) -> Box<dyn Fn(&Header) -> bool> {
+    fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {
         let entry_filter = self.0.clone();
-        let f = move |header: &Header| match header {
+        let f = move |header: &SignedHeaderHashed| match header.header() {
             Header::Create(Create { entry_hash, .. }) => *entry_hash == entry_filter,
             Header::Delete(Delete {
                 deletes_entry_address,
@@ -130,5 +131,9 @@ impl Query for GetQuery {
             }
             None => Ok(None),
         }
+    }
+
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> Result<Self::Data, PlaceHolderError>> {
+        Arc::new(|row| row_to_header(row))
     }
 }

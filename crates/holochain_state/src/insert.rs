@@ -25,7 +25,7 @@ macro_rules! sql_insert {
     }};
 }
 
-pub fn insert_op_scratch(scratch: &mut Scratch, op: DhtOpHashed) {
+pub fn insert_op_scratch(scratch: &mut Scratch<SignedHeaderHashed>, op: DhtOpHashed) {
     let (op, _) = op.into_inner();
     let op_light = op.to_light();
     let header = op.header();
@@ -37,7 +37,7 @@ pub fn insert_op_scratch(scratch: &mut Scratch, op: DhtOpHashed) {
     }
     let header_hashed = HeaderHashed::with_pre_hashed(header, op_light.header_hash().to_owned());
     let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
-    scratch.add_header(header_hashed);
+    scratch.add_item(header_hashed);
 }
 
 pub fn insert_op(txn: &mut Transaction, op: DhtOpHashed) {

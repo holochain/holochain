@@ -1,7 +1,6 @@
 use std::convert::Infallible;
 
 use fallible_iterator::FallibleIterator;
-use holochain_zome_types::prelude::*;
 
 /// The "scratch" is an in-memory space to stage Headers to be committed at the
 /// end of the CallZome workflow.
@@ -11,22 +10,28 @@ use holochain_zome_types::prelude::*;
 /// a simple filter on the scratch space, and then chaining that iterator
 /// onto the iterators over the Headers in the database(s) produced by the
 /// Cascade.
-#[derive(Debug, Default, Clone)]
-pub struct Scratch(Vec<SignedHeaderHashed>);
+#[derive(Debug, Clone)]
+pub struct Scratch<T>(Vec<T>);
 
-impl Scratch {
-    pub fn add_header(&mut self, header: SignedHeaderHashed) {
-        self.0.push(header);
+impl<T> Scratch<T>
+where
+    T: Clone,
+{
+    pub fn new() -> Self {
+        Self(Vec::new())
     }
-    
-    pub fn filter<'a, F: Fn(&'a Header) -> bool + 'a>(
+    pub fn add_item(&mut self, item: T) {
+        self.0.push(item);
+    }
+
+    pub fn filter<'a, F: Fn(&'a T) -> bool + 'a>(
         &'a self,
         f: F,
-    ) -> impl FallibleIterator<Item = SignedHeaderHashed, Error = Infallible> + 'a {
+    ) -> impl FallibleIterator<Item = T, Error = Infallible> + 'a {
         fallible_iterator::convert(
             self.0
                 .iter()
-                .filter(move |shh| f(shh.header_hashed().as_content()))
+                .filter(move |t| f(t))
                 // TODO: @freesig Maybe this is a bad idea? Not sure yet.
                 .cloned()
                 .map(Ok),

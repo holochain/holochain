@@ -5,13 +5,13 @@ use holochain_sqlite::rusqlite::Row;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::scratch::Scratch;
-use holochain_zome_types::Header;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::sync::Arc;
 use thiserror::Error;
 
 #[cfg(test)]
@@ -66,7 +66,9 @@ pub type Transactions<'a, 'txn> = [&'a Transaction<'txn>];
 
 pub trait Query: Clone {
     type State;
+    type Data: Clone;
     type Output;
+
     fn create_query(&self) -> &str {
         ""
     }
@@ -87,13 +89,16 @@ pub trait Query: Clone {
     }
     fn init_fold(&self) -> Result<Self::State, PlaceHolderError>;
 
-    fn as_filter(&self) -> Box<dyn Fn(&Header) -> bool>;
+    fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool>;
+
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> Result<Self::Data, PlaceHolderError>>;
 
     fn fold(
         &mut self,
         state: Self::State,
-        header: SignedHeaderHashed,
+        header: Self::Data,
     ) -> Result<Self::State, PlaceHolderError>;
+
     fn render(
         &mut self,
         state: Self::State,
@@ -103,13 +108,14 @@ pub trait Query: Clone {
     fn run(
         &mut self,
         txns: &Transactions<'_, '_>,
-        scratch: Option<&Scratch>,
+        scratch: Option<&Scratch<Self::Data>>,
     ) -> Result<Self::Output, PlaceHolderError> {
         let mut stmts: Vec<_> = txns
             .into_iter()
             .map(|txn| QueryStmt::new(txn, self.clone()))
             .collect();
-        let iter = stmts.iter_mut().map(|stmt| Ok(stmt.iter()));
+        let map_fn = self.as_map();
+        let iter = stmts.iter_mut().map(|stmt| Ok(stmt.iter(map_fn.clone())));
         let iter = fallible_iterator::convert(iter).flatten();
         let scratch = scratch.map(|s| s.filter(self.as_filter()).map_err(PlaceHolderError::from));
         let result = match scratch {
@@ -140,17 +146,24 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
             query,
         }
     }
-    fn iter(
+    fn iter<T: 'iter>(
         &'iter mut self,
-    ) -> impl FallibleIterator<Item = SignedHeaderHashed, Error = PlaceHolderError> + 'iter {
+        map_fn: std::sync::Arc<dyn Fn(&Row) -> Result<T, PlaceHolderError>>,
+    ) -> impl FallibleIterator<Item = T, Error = PlaceHolderError> + 'iter
+// where
+    //     F: Fn(&Row) -> Result<T, PlaceHolderError> + 'iter,
+    {
         let creates = self
             .create_stmt
-            .query_and_then_named(&self.query.create_params(), row_to_header)
+            .query_and_then_named(&self.query.create_params(), {
+                let map_fn = map_fn.clone();
+                move |r| map_fn(r)
+            })
             .unwrap();
 
         let deletes = self
             .delete_stmt
-            .query_and_then_named(&self.query.delete_params(), row_to_header)
+            .query_and_then_named(&self.query.delete_params(), move |r| map_fn(r))
             .unwrap();
         let creates = fallible_iterator::convert(creates);
         let deletes = fallible_iterator::convert(deletes);
@@ -158,7 +171,7 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
     }
 }
 
-fn row_to_header(row: &Row) -> Result<SignedHeaderHashed, PlaceHolderError> {
+pub(crate) fn row_to_header(row: &Row) -> Result<SignedHeaderHashed, PlaceHolderError> {
     let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
     let SignedHeader(header, signature) = header;
     let header = HeaderHashed::from_content_sync(header);
