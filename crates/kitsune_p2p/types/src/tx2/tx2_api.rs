@@ -16,58 +16,84 @@ fn next_msg_id() -> u64 {
     MSG_ID.fetch_add(1, atomic::Ordering::Relaxed)
 }
 
+#[allow(dead_code)]
+struct ConItem<C: Codec + 'static + Send + Unpin> {
+    hnd: ConHnd,
+    url: TxUrl,
+    inner: ShareInner<C>,
+}
+
+impl<C: Codec + 'static + Send + Unpin> Drop for ConItem<C> {
+    fn drop(&mut self) {
+        let _ = self.inner.share_mut(|i, _| {
+            i.url_to_con.remove(&self.url);
+            Ok(())
+        });
+    }
+}
+
 type RSend<C> = tokio::sync::oneshot::Sender<KitsuneResult<C>>;
-type ShareRMap<C> = Arc<Share<RMap<C>>>;
 
-struct RMap<C: Codec + 'static + Send + Unpin>(HashMap<(ConHnd, u64), (RSend<C>, KitsuneTimeout)>);
+#[allow(dead_code)]
+struct ApiInner<C: Codec + 'static + Send + Unpin> {
+    rmap: HashMap<(ConHnd, u64), (RSend<C>, KitsuneTimeout)>,
+    cons: lru::LruCache<ConHnd, ConItem<C>>,
+    url_to_con: HashMap<TxUrl, ConHnd>,
+}
 
-impl<C: Codec + 'static + Send + Unpin> RMap<C> {
-    pub fn new() -> Self {
-        Self(HashMap::new())
+impl<C: Codec + 'static + Send + Unpin> ApiInner<C> {
+    pub fn new(max_cons: usize) -> Self {
+        Self {
+            rmap: HashMap::new(),
+            cons: lru::LruCache::new(max_cons),
+            url_to_con: HashMap::new(),
+        }
     }
 
-    pub fn insert(&mut self, con: ConHnd, msg_id: u64, s_res: RSend<C>, timeout: KitsuneTimeout) {
-        self.0.insert((con, msg_id), (s_res, timeout));
+    pub fn rmap_insert(&mut self, con: ConHnd, msg_id: u64, s_res: RSend<C>, timeout: KitsuneTimeout) {
+        self.rmap.insert((con, msg_id), (s_res, timeout));
     }
 
-    pub fn respond(&mut self, con: ConHnd, msg_id: u64, c: C) {
-        if let Some((s_res, _)) = self.0.remove(&(con, msg_id)) {
+    pub fn rmap_respond(&mut self, con: ConHnd, msg_id: u64, c: C) {
+        if let Some((s_res, _)) = self.rmap.remove(&(con, msg_id)) {
             let _ = s_res.send(Ok(c));
         }
     }
 }
 
+type ShareInner<C> = Arc<Share<ApiInner<C>>>;
+
 /// Cleanup our map when the request future completes
 /// either by recieving the response or timing out.
-struct RMapDropCleanup<C: Codec + 'static + Send + Unpin>(ShareRMap<C>, ConHnd, u64);
+struct RMapDropCleanup<C: Codec + 'static + Send + Unpin>(ShareInner<C>, ConHnd, u64);
 
 impl<C: Codec + 'static + Send + Unpin> Drop for RMapDropCleanup<C> {
     fn drop(&mut self) {
         let _ = self.0.share_mut(|i, _| {
-            i.0.remove(&(self.1.clone(), self.2));
+            i.rmap.remove(&(self.1.clone(), self.2));
             Ok(())
         });
     }
 }
 
 fn rmap_insert<C: Codec + 'static + Send + Unpin>(
-    rmap: ShareRMap<C>,
+    inner: ShareInner<C>,
     con: ConHnd,
     msg_id: u64,
     s_res: RSend<C>,
     timeout: KitsuneTimeout,
 ) -> KitsuneResult<RMapDropCleanup<C>> {
     let con2 = con.clone();
-    rmap.share_mut(move |i, _| {
-        i.insert(con2, msg_id, s_res, timeout);
+    inner.share_mut(move |i, _| {
+        i.rmap_insert(con2, msg_id, s_res, timeout);
         Ok(())
     })?;
-    Ok(RMapDropCleanup(rmap, con, msg_id))
+    Ok(RMapDropCleanup(inner, con, msg_id))
 }
 
 /// A connection handle - use this to manage an open connection.
 #[derive(Clone)]
-pub struct Tx2ConHnd<C: Codec + 'static + Send + Unpin>(ConHnd, ShareRMap<C>);
+pub struct Tx2ConHnd<C: Codec + 'static + Send + Unpin>(ConHnd, ShareInner<C>);
 
 impl<C: Codec + 'static + Send + Unpin> std::fmt::Debug for Tx2ConHnd<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -76,8 +102,8 @@ impl<C: Codec + 'static + Send + Unpin> std::fmt::Debug for Tx2ConHnd<C> {
 }
 
 impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
-    fn new(con: ConHnd, rmap: ShareRMap<C>) -> Self {
-        Self(con, rmap)
+    fn new(con: ConHnd, inner: ShareInner<C>) -> Self {
+        Self(con, inner)
     }
 }
 
@@ -126,7 +152,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
             return async move { Err(KitsuneError::other(e)) }.boxed();
         }
         let con = self.0.clone();
-        let rmap = self.1.clone();
+        let inner = self.1.clone();
         async move {
             let msg_id = next_msg_id();
             let (s_res, r_res) = tokio::sync::oneshot::channel::<KitsuneResult<C>>();
@@ -134,7 +160,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
             // insert our response receive handler
             // Cleanup our map when this future completes
             // either by recieving the response or timing out.
-            let _drop_cleanup = rmap_insert(rmap, con.clone(), msg_id, s_res, timeout)?;
+            let _drop_cleanup = rmap_insert(inner, con.clone(), msg_id, s_res, timeout)?;
 
             con.write(MsgId::new(msg_id).as_req(), buf, timeout).await?;
 
@@ -146,12 +172,12 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
 
 /// An endpoint handle - use this to manage a bound endpoint.
 #[derive(Clone)]
-pub struct Tx2EpHnd<C: Codec + 'static + Send + Unpin>(EpHnd, ShareRMap<C>);
+pub struct Tx2EpHnd<C: Codec + 'static + Send + Unpin>(EpHnd, ShareInner<C>);
 
 impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
-    fn new(ep: EpHnd) -> Self {
-        let rmap = Arc::new(Share::new(RMap::new()));
-        Self(ep, rmap)
+    fn new(ep: EpHnd, max_cons: usize) -> Self {
+        let inner = Arc::new(Share::new(ApiInner::new(max_cons)));
+        Self(ep, inner)
     }
 }
 
@@ -194,16 +220,36 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
         self.0.local_addr()
     }
 
+    /// Write a request to this connection.
+    pub fn request<U: Into<TxUrl>>(
+        &self,
+        remote: U,
+        data: &C,
+        _timeout: KitsuneTimeout,
+    ) -> impl std::future::Future<Output = KitsuneResult<C>> + 'static + Send {
+        let mut buf = PoolBuf::new();
+        if let Err(e) = data.encode(&mut buf) {
+            return async move { Err(KitsuneError::other(e)) }.boxed();
+        }
+        let _remote = remote.into();
+        let _sub_ep = self.0.clone();
+        let _inner = self.1.clone();
+        async move {
+            unimplemented!()
+        }
+        .boxed()
+    }
+
     /// Establish a new connection.
     pub fn connect<U: Into<TxUrl>>(
         &self,
         remote: U,
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<Tx2ConHnd<C>>> + 'static + Send {
-        let rmap = self.1.clone();
+        let inner = self.1.clone();
         self.0
             .connect(remote.into(), timeout)
-            .map_ok(move |con| Tx2ConHnd::new(con, rmap))
+            .map_ok(move |con| Tx2ConHnd::new(con, inner))
     }
 }
 
@@ -328,15 +374,15 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let rmap = self.0 .1.clone();
-        let inner = &mut self.1;
-        futures::pin_mut!(inner);
-        match Stream::poll_next(inner, cx) {
+        let inner = self.0 .1.clone();
+        let sub_ep = &mut self.1;
+        futures::pin_mut!(sub_ep);
+        match Stream::poll_next(sub_ep, cx) {
             std::task::Poll::Ready(Some(evt)) => {
                 let evt = match evt {
                     EpEvent::IncomingConnection(EpIncomingConnection { con, url }) => {
                         Tx2EpEvent::IncomingConnection(Tx2EpIncomingConnection {
-                            con: Tx2ConHnd::new(con, rmap),
+                            con: Tx2ConHnd::new(con, inner),
                             url,
                         })
                     }
@@ -358,14 +404,14 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                         match msg_id.get_type() {
                             MsgIdType::Notify => unimplemented!(),
                             MsgIdType::Req => Tx2EpEvent::IncomingRequest(Tx2EpIncomingRequest {
-                                con: Tx2ConHnd::new(con.clone(), rmap),
+                                con: Tx2ConHnd::new(con.clone(), inner),
                                 url,
                                 data: c,
                                 respond: Tx2Respond::new(con, msg_id.as_id()),
                             }),
                             MsgIdType::Res => {
-                                let _ = rmap.share_mut(move |i, _| {
-                                    i.respond(con, msg_id.as_id(), c);
+                                let _ = inner.share_mut(move |i, _| {
+                                    i.rmap_respond(con, msg_id.as_id(), c);
                                     Ok(())
                                 });
                                 Tx2EpEvent::Tick
@@ -378,7 +424,7 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                         code,
                         reason,
                     }) => Tx2EpEvent::ConnectionClosed(Tx2EpConnectionClosed {
-                        con: Tx2ConHnd::new(con, rmap),
+                        con: Tx2ConHnd::new(con, inner),
                         url,
                         code,
                         reason,
@@ -403,12 +449,12 @@ impl<C: Codec + 'static + Send + Unpin> Tx2Ep<C> {
 
 /// Endpoint binding factory - lets us easily pass around logic
 /// for later binding network transports.
-pub struct Tx2EpFactory<C: Codec + 'static + Send + Unpin>(EpFactory, std::marker::PhantomData<C>);
+pub struct Tx2EpFactory<C: Codec + 'static + Send + Unpin>(EpFactory, usize, std::marker::PhantomData<C>);
 
 impl<C: Codec + 'static + Send + Unpin> Tx2EpFactory<C> {
     /// Construct a new Tx2EpFactory instance from a frontend EpFactory
-    pub fn new(factory: EpFactory) -> Self {
-        Self(factory, std::marker::PhantomData)
+    pub fn new(factory: EpFactory, max_cons: usize) -> Self {
+        Self(factory, max_cons, std::marker::PhantomData)
     }
 
     /// Bind a new local transport endpoint.
@@ -417,9 +463,10 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpFactory<C> {
         bind_spec: U,
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<Tx2Ep<C>>> + 'static + Send {
-        self.0.bind(bind_spec.into(), timeout).map_ok(|ep| {
+        let max_cons = self.1;
+        self.0.bind(bind_spec.into(), timeout).map_ok(move |ep| {
             let ep_hnd = ep.handle().clone();
-            Tx2Ep(Tx2EpHnd::new(ep_hnd), ep)
+            Tx2Ep(Tx2EpHnd::new(ep_hnd, max_cons), ep)
         })
     }
 }
@@ -461,7 +508,7 @@ mod tests {
 
         let f = MemBackendAdapt::new();
         let f = tx2_promote(f, 32);
-        let f = <Tx2EpFactory<Test>>::new(f);
+        let f = <Tx2EpFactory<Test>>::new(f, 32);
 
         let ep1 = f.bind("none:", t).await.unwrap();
         let ep1_hnd = ep1.handle().clone();
