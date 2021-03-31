@@ -1,0 +1,33 @@
+[package]
+name = "holochain_cascade2"
+version = "0.0.1"
+description = "Logic for cascading updates to Holochain state and network interaction"
+license-file = "LICENSE_CAL-1.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://github.com/holochain/holochain"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+edition = "2018"
+
+[dependencies]
+derive_more = "0.99.3"
+either = "1.5"
+fallible-iterator = "0.2"
+fixt = { version = "^0.0.2-alpha.1", path = "../fixt" }
+futures = "0.3"
+ghost_actor = "0.3.0-alpha.1"
+hdk = { version = "^0.0.101-alpha.0", path = "../hdk" }
+hdk_derive = { version = "^0.0.2-alpha.1", path = "../hdk_derive" }
+holo_hash = { version = "^0.0.2-alpha.1", path = "../holo_hash", features = ["full"] }
+holochain_sqlite = { version = "0.0.1", path = "../holochain_sqlite" }
+holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
+holochain_serialized_bytes = "=0.0.50"
+holochain_state = { version = "0.0.1", path = "../holochain_state" }
+holochain_types = { version = "0.0.1", path = "../holochain_types" }
+holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
+kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
+serde = { version = "1.0", features = [ "derive" ] }
+serde_derive = "1.0"
+tokio = { version = "1.3", features = [ "full" ] }
+thiserror = "1.0"
+tracing = "0.1"
+tracing-futures = "0.2"

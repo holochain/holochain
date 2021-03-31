@@ -14,6 +14,7 @@ members = [
 
   "crates/holochain",
   "crates/holochain_cascade",
+  "crates/holochain_cascade2",
   "crates/holochain_conductor_api",
   "crates/holochain_p2p",
   "crates/holochain_keystore",
