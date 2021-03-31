@@ -11,6 +11,13 @@ use futures::stream::StreamExt;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::transport::*;
 use kitsune_p2p_types::transport_pool::*;
+use kitsune_p2p_types::*;
+use kitsune_p2p_types::tx2::*;
+use kitsune_p2p_types::tx2::tx2_promote::*;
+use kitsune_p2p_types::tx2::tx2_api::*;
+use kitsune_p2p_proxy::ProxyUrl;
+use kitsune_p2p_proxy::tx2::*;
+use kitsune_p2p_transport_quic::tx2::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -33,79 +40,13 @@ ghost_actor::ghost_chan! {
 }
 
 pub(crate) struct KitsuneP2pActor {
+    this_addr: url2::Url2,
     channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
     internal_sender: ghost_actor::GhostSender<Internal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    transport: ghost_actor::GhostSender<TransportListener>,
+    tx2: Tx2EpHnd,
     spaces: HashMap<Arc<KitsuneSpace>, AsyncLazy<ghost_actor::GhostSender<KitsuneP2p>>>,
     config: Arc<KitsuneP2pConfig>,
-}
-
-fn build_transport(
-    t_conf: TransportConfig,
-    tuning_params: Arc<kitsune_p2p_types::config::KitsuneP2pTuningParams>,
-    tls_config: Arc<kitsune_p2p_proxy::TlsConfig>,
-) -> must_future::MustBoxFuture<
-    'static,
-    TransportResult<(
-        ghost_actor::GhostSender<TransportListener>,
-        TransportEventReceiver,
-    )>,
-> {
-    must_future::MustBoxFuture::new(async move {
-        match t_conf {
-            TransportConfig::Mem {} => {
-                Ok(kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?)
-            }
-            TransportConfig::Quic {
-                bind_to,
-                override_host,
-                override_port,
-            } => {
-                let sub_conf = kitsune_p2p_transport_quic::ConfigListenerQuic::default()
-                    .set_bind_to(bind_to)
-                    .set_override_host(override_host)
-                    .set_override_port(override_port);
-                Ok(kitsune_p2p_transport_quic::spawn_transport_listener_quic(sub_conf).await?)
-            }
-            TransportConfig::Proxy {
-                sub_transport,
-                proxy_config,
-            } => {
-                let (sub_lstn, sub_evt) =
-                    build_transport(*sub_transport, tuning_params.clone(), tls_config.clone())
-                        .await?;
-                let sub_conf = match proxy_config {
-                    ProxyConfig::RemoteProxyClient { proxy_url } => {
-                        kitsune_p2p_proxy::ProxyConfig::remote_proxy_client(
-                            (*tls_config).clone(),
-                            proxy_url.into(),
-                        )
-                    }
-                    ProxyConfig::LocalProxyServer {
-                        proxy_accept_config,
-                    } => kitsune_p2p_proxy::ProxyConfig::local_proxy_server(
-                        (*tls_config).clone(),
-                        match proxy_accept_config {
-                            Some(ProxyAcceptConfig::AcceptAll) => {
-                                kitsune_p2p_proxy::AcceptProxyCallback::accept_all()
-                            }
-                            None | Some(ProxyAcceptConfig::RejectAll) => {
-                                kitsune_p2p_proxy::AcceptProxyCallback::reject_all()
-                            }
-                        },
-                    ),
-                };
-                Ok(kitsune_p2p_proxy::spawn_kitsune_proxy_listener(
-                    sub_conf,
-                    tuning_params,
-                    sub_lstn,
-                    sub_evt,
-                )
-                .await?)
-            }
-        }
-    })
 }
 
 impl KitsuneP2pActor {
@@ -117,17 +58,78 @@ impl KitsuneP2pActor {
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ) -> KitsuneP2pResult<Self> {
         crate::types::metrics::init();
-        let tls_config = Arc::new(tls_config);
-        let (t_pool, transport, t_event) = spawn_transport_pool().await?;
-        for t_conf in config.transport_pool.clone() {
-            let (l, e) =
-                build_transport(t_conf, config.tuning_params.clone(), tls_config.clone()).await?;
-            t_pool.push_sub_transport(l, e).await?;
-        }
+
+        let tx2_conf = config.to_tx2().map_err(KitsuneP2pError::other)?;
+
+        // set up our backend based on config
+        let (f, bind_to) = match tx2_conf.backend {
+            KitsuneP2pTx2Backend::Mem => {
+                (MemBackendAdapt::new(), "none:".into())
+            }
+            KitsuneP2pTx2Backend::Quic { bind_to } => {
+                let mut conf = QuicConfig::default();
+                conf.tls = Some(tls_config.clone());
+                conf.tuning_params = Some(config.tuning_params.clone());
+                (
+                    QuicBackendAdapt::new(conf).await.map_err(KitsuneP2pError::other)?,
+                    bind_to,
+                )
+            }
+        };
+
+        // convert to frontend
+        let f = tx2_promote(f, 4096);
+
+        // wrap in proxy
+        let f = tx2_proxy(f, tls_config.clone());
+
+        // wrap in api
+        let f = <Tx2EpFactory<wire::Wire>>::new(f);
+
+        // bind local endpoint
+        let ep = f.bind(bind_to, KitsuneTimeout::from_millis(30 * 1000)).await.map_err(KitsuneP2pError::other)?;
+
+        // capture endpoint handle
+        let ep_hnd = ep.handle().clone();
+
+        // if we should be proxying - set up the proxy connect retry / proxy addr
+        let this_addr = if let Some(use_proxy) = tx2_conf.use_proxy {
+            let local = ep_hnd.local_addr().map_err(KitsuneP2pError::other)?;
+            let this_digest = ProxyUrl::from(local.as_str()).digest();
+            let proxy_url = ProxyUrl::from(use_proxy.as_str());
+
+            // spawn logic that will attempt to keep us connected to the proxy
+            let ep_hnd = ep_hnd.clone();
+            tokio::task::spawn(async move {
+                let mut con: Option<Tx2ConHnd<wire::Wire>> = None;
+                loop {
+                    // see if we need a new connection to the proxy
+                    if con.is_none() || con.as_ref().unwrap().is_closed() {
+                        match ep_hnd.connect(use_proxy.clone(), KitsuneTimeout::from_millis(30 * 1000)).await {
+                            Ok(c) => {
+                                con = Some(c);
+                            }
+                            Err(e) => {
+                                tracing::warn!("failure to establish proxy connection: {:?}", e);
+                            }
+                        }
+                    }
+
+                    // this is very naive... just running every 5 seconds
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                }
+            });
+
+            ProxyUrl::new(proxy_url.as_base().as_str(), this_digest).unwrap().as_str().into()
+        } else {
+            ep_hnd.local_addr().map_err(KitsuneP2pError::other)?
+        };
+
+        tracing::info!("this_addr: {}", this_addr);
 
         tokio::task::spawn({
             let evt_sender = evt_sender.clone();
-            t_event.for_each_concurrent(/* limit */ 10, move |event| {
+            ep.for_each_concurrent(/* limit */ 10, move |event| {
                 let evt_sender = evt_sender.clone();
                 async move {
                     let evt_sender = &evt_sender;
@@ -350,10 +352,10 @@ impl KitsuneP2pActor {
         });
 
         Ok(Self {
+            this_addr: this_addr.into(),
             channel_factory,
             internal_sender,
             evt_sender,
-            transport,
             spaces: HashMap::new(),
             config: Arc::new(config),
         })
@@ -497,16 +499,8 @@ impl ghost_actor::GhostHandler<KitsuneP2p> for KitsuneP2pActor {}
 
 impl KitsuneP2pHandler for KitsuneP2pActor {
     fn handle_list_transport_bindings(&mut self) -> KitsuneP2pHandlerResult<Vec<url2::Url2>> {
-        let fut = self.transport.bound_url();
-        Ok(async move {
-            let urls = fut.await?;
-            Ok(urls
-                .query_pairs()
-                .map(|(_, url)| url2::url2!("{}", url))
-                .collect())
-        }
-        .boxed()
-        .into())
+        let this_addr = vec![self.this_addr.clone()];
+        Ok(async move { Ok(this_addr) }.boxed().into())
     }
 
     fn handle_join(

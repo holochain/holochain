@@ -1,11 +1,28 @@
+use kitsune_p2p_types::*;
+use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use std::sync::Arc;
 use url2::Url2;
 
+/// TODO - FIXME - holochain bootstrap should not be encoded in kitsune
 /// The default production bootstrap service url.
 pub const BOOTSTRAP_SERVICE_DEFAULT: &str = "https://bootstrap-staging.holo.host";
+
+/// TODO - FIXME - holochain bootstrap should not be encoded in kitsune
 /// The default development bootstrap service url.
 pub const BOOTSTRAP_SERVICE_DEV: &str = "https://bootstrap-dev.holohost.workers.dev";
+
+pub(crate) enum KitsuneP2pTx2Backend {
+    Mem,
+    Quic {
+        bind_to: TxUrl
+    },
+}
+
+pub(crate) struct KitsuneP2pTx2Config {
+    pub backend: KitsuneP2pTx2Backend,
+    pub use_proxy: Option<TxUrl>,
+}
 
 /// Configure the kitsune actor
 #[non_exhaustive]
@@ -32,6 +49,45 @@ impl Default for KitsuneP2pConfig {
             bootstrap_service: None,
             tuning_params: Arc::new(KitsuneP2pTuningParams::default()),
             network_type: NetworkType::QuicBootstrap,
+        }
+    }
+}
+
+impl KitsuneP2pConfig {
+    pub(crate) fn to_tx2(&self) -> KitsuneResult<KitsuneP2pTx2Config> {
+        if self.transport_pool.len() != 1 {
+            return Err("kitsune tx2 expects exactly 1 transport".into());
+        }
+        let tx = self.transport_pool.get(0);
+        if let TransportConfig::Proxy {
+            sub_transport,
+            proxy_config,
+        } = tx.unwrap() {
+            let backend = match &**sub_transport {
+                TransportConfig::Mem {} => KitsuneP2pTx2Backend::Mem,
+                TransportConfig::Quic {
+                    bind_to,
+                    ..
+                } => {
+                    let bind_to = match bind_to {
+                        Some(bind_to) => bind_to.clone().into(),
+                        None => "kitsune-quic://0.0.0.0:0".into(),
+                    };
+                    KitsuneP2pTx2Backend::Quic {
+                        bind_to,
+                    }
+                }
+                _ => return Err("kitsune tx2 backend must be mem or quic".into()),
+            };
+            let use_proxy = match proxy_config {
+                ProxyConfig::RemoteProxyClient { proxy_url } => {
+                    Some(proxy_url.clone().into())
+                }
+                ProxyConfig::LocalProxyServer { .. } => None,
+            };
+            Ok(KitsuneP2pTx2Config { backend, use_proxy })
+        } else {
+            return Err("kitsune tx2 requires top-level proxy".into());
         }
     }
 }

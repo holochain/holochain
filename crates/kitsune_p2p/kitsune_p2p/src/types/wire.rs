@@ -21,6 +21,9 @@ kitsune_p2p_types::write_codec_enum! {
             reason.0: String,
         },
 
+        /// Proxy Keepalive
+        ProxyKeepalive(0x01) {},
+
         /// "Call" to the remote.
         Call(0x010) {
             space.0: Arc<KitsuneSpace>,
