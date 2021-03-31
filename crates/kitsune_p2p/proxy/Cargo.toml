@@ -34,5 +34,9 @@ webpki = "0.21.2"
 criterion = "*"
 
 [[bench]]
+name = "old_proxy_thru"
+harness = false
+
+[[bench]]
 name = "thru"
 harness = false
