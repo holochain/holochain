@@ -31,8 +31,13 @@ rand = {version = "0.7", optional = true}
 byteorder = { version = "1.4", optional = true }
 itertools = { version = "0.10", optional = true }
 
+# sqlite dependencies
+rusqlite = { version = "0.24", optional = true }
+
 [features]
 default = ["fixturators", "test_utils", "tinyid"]
+
+full = ["default", "rusqlite"]
 
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
 
