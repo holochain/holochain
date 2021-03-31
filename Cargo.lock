@@ -1917,6 +1917,7 @@ dependencies = [
  "byteorder",
  "chrono",
  "derive_more",
+ "either",
  "fallible-iterator",
  "fixt",
  "hdk",

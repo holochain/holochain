@@ -13,6 +13,7 @@ pub mod fatal;
 pub mod key;
 pub mod prelude;
 pub mod schema;
+pub mod scratch;
 pub mod swansong;
 pub mod transaction;
 

@@ -5,6 +5,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::rusqlite::Row;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::{Transaction, NO_PARAMS};
+use holochain_sqlite::scratch::Scratch;
 use holochain_sqlite::{impl_to_sql_via_display, rusqlite::TransactionBehavior};
 use holochain_sqlite::{
     rusqlite::{named_params, Connection},
@@ -149,6 +150,7 @@ impl EntryTestData {
 #[tokio::test(flavor = "multi_thread")]
 async fn get_links() {
     observability::test_run().ok();
+    let mut scratch = Scratch::default();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
 
@@ -171,7 +173,7 @@ async fn get_links() {
     insert_op(&mut txn, td.create_link_op.clone());
 
     // - Check we can get the link query back.
-    let r = get_link_query(&mut [&mut txn], td.tag_query.clone());
+    let r = get_link_query(&mut [&mut txn], None, td.tag_query.clone());
     assert_eq!(r[0], td.link);
 
     // - Add the same link to the cache.
@@ -182,18 +184,31 @@ async fn get_links() {
     // - Check duplicates don't cause issues.
     insert_op(&mut cache_txn, td.create_link_op.clone());
 
+    // - Add to the scratch
+    insert_op_scratch(&mut scratch, td.base_op.clone());
+    insert_op_scratch(&mut scratch, td.target_op.clone());
+    insert_op_scratch(&mut scratch, td.create_link_op.clone());
+
     // - Check we can resolve this to a single link.
-    let r = get_link_query(&mut [&mut cache_txn], td.base_query.clone());
+    let r = get_link_query(&mut [&mut cache_txn], Some(&scratch), td.base_query.clone());
     assert_eq!(r[0], td.link);
     assert_eq!(r.len(), 1);
-    let r = get_link_query(&mut [&mut cache_txn, &mut txn], td.tag_query.clone());
+    let r = get_link_query(
+        &mut [&mut cache_txn, &mut txn],
+        Some(&scratch),
+        td.tag_query.clone(),
+    );
     assert_eq!(r[0], td.link);
     assert_eq!(r.len(), 1);
 
     // - Insert a delete op.
     insert_op(&mut txn, td.delete_link_op.clone());
 
-    let r = get_link_query(&mut [&mut cache_txn, &mut txn], td.tag_query.clone());
+    let r = get_link_query(
+        &mut [&mut cache_txn, &mut txn],
+        Some(&scratch),
+        td.tag_query.clone(),
+    );
     // - We should not have any links now.
     assert!(r.is_empty())
 }
@@ -201,6 +216,7 @@ async fn get_links() {
 #[tokio::test(flavor = "multi_thread")]
 async fn get_entry() {
     observability::test_run().ok();
+    let mut scratch = Scratch::default();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
 
@@ -221,7 +237,7 @@ async fn get_entry() {
     insert_op(&mut txn, td.store_entry_op.clone());
 
     // - Check we get that header back.
-    let r = get_entry_query(&mut [&mut txn], td.query.clone()).unwrap();
+    let r = get_entry_query(&mut [&mut txn], None, td.query.clone()).unwrap();
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);
 
     // - Create the same entry in the cache.
@@ -229,8 +245,15 @@ async fn get_entry() {
     // - Check duplicates is ok.
     insert_op(&mut cache_txn, td.store_entry_op.clone());
 
+    // - Add to the scratch
+    insert_op_scratch(&mut scratch, td.store_entry_op.clone());
+
     // - Get the entry from both stores and union the query results.
-    let r = get_entry_query(&mut [&mut txn, &mut cache_txn], td.query.clone());
+    let r = get_entry_query(
+        &mut [&mut txn, &mut cache_txn],
+        Some(&scratch),
+        td.query.clone(),
+    );
     // - Check it's the correct entry and header.
     let r = r.unwrap();
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);
@@ -240,7 +263,11 @@ async fn get_entry() {
     insert_op(&mut cache_txn, td.delete_entry_header_op.clone());
 
     // - Get the entry from both stores and union the queries.
-    let r = get_entry_query(&mut [&mut txn, &mut cache_txn], td.query.clone());
+    let r = get_entry_query(
+        &mut [&mut txn, &mut cache_txn],
+        Some(&scratch),
+        td.query.clone(),
+    );
     // - There should be no live headers so resolving
     // returns no element.
     assert!(r.is_none());
@@ -503,6 +530,11 @@ impl From<holochain_sqlite::rusqlite::Error> for PlaceHolderError {
         todo!()
     }
 }
+impl From<std::convert::Infallible> for PlaceHolderError {
+    fn from(_: std::convert::Infallible) -> Self {
+        unreachable!()
+    }
+}
 
 type Params<'a> = (&'a str, &'a dyn holochain_sqlite::rusqlite::ToSql);
 
@@ -545,6 +577,8 @@ trait Query: Clone {
     }
     fn init_fold(&self) -> Result<Self::State, PlaceHolderError>;
 
+    fn as_filter(&self) -> Box<dyn Fn(&Header) -> bool>;
+
     fn fold(
         &mut self,
         state: Self::State,
@@ -556,14 +590,25 @@ trait Query: Clone {
         txns: &mut Transactions<'_, '_>,
     ) -> Result<Self::Output, PlaceHolderError>;
 
-    fn run(&mut self, txns: &mut Transactions<'_, '_>) -> Result<Self::Output, PlaceHolderError> {
+    fn run(
+        &mut self,
+        txns: &mut Transactions<'_, '_>,
+        scratch: Option<&Scratch>,
+    ) -> Result<Self::Output, PlaceHolderError> {
         let mut stmts: Vec<_> = txns
             .into_iter()
             .map(|txn| QueryStmt::new(txn, self.clone()))
             .collect();
         let iter = stmts.iter_mut().map(|stmt| Ok(stmt.iter()));
         let iter = fallible_iterator::convert(iter).flatten();
-        let result = iter.fold(self.init_fold()?, |state, i| self.fold(state, i))?;
+        let scratch = scratch.map(|s| s.filter(self.as_filter()).map_err(PlaceHolderError::from));
+        let result = match scratch {
+            Some(scratch) => {
+                let iter = iter.chain(scratch);
+                iter.fold(self.init_fold()?, |state, i| self.fold(state, i))?
+            }
+            None => iter.fold(self.init_fold()?, |state, i| self.fold(state, i))?,
+        };
         drop(stmts);
         self.render(result, txns)
     }
@@ -591,6 +636,19 @@ impl Query for GetQuery {
 
     fn init_fold(&self) -> Result<Self::State, PlaceHolderError> {
         Ok(Maps::new())
+    }
+
+    fn as_filter(&self) -> Box<dyn Fn(&Header) -> bool> {
+        let entry_filter = self.0.clone();
+        let f = move |header: &Header| match header {
+            Header::Create(Create { entry_hash, .. }) => *entry_hash == entry_filter,
+            Header::Delete(Delete {
+                deletes_entry_address,
+                ..
+            }) => *deletes_entry_address == entry_filter,
+            _ => false,
+        };
+        Box::new(f)
     }
 
     fn fold(
@@ -677,6 +735,27 @@ impl Query for LinkQuery {
         Ok(Maps::new())
     }
 
+    fn as_filter(&self) -> Box<dyn Fn(&Header) -> bool> {
+        let base_filter = self.base.clone();
+        let zome_id_filter = self.zome_id.clone();
+        let tag_filter = self.tag.clone();
+        let f = move |header: &Header| match header {
+            Header::CreateLink(CreateLink {
+                base_address,
+                zome_id,
+                tag,
+                ..
+            }) => {
+                *base_address == base_filter
+                    && *zome_id == zome_id_filter
+                    && tag_filter.as_ref().map(|t| tag == t).unwrap_or(true)
+            }
+            Header::DeleteLink(DeleteLink { base_address, .. }) => *base_address == base_filter,
+            _ => false,
+        };
+        Box::new(f)
+    }
+
     fn fold(
         &mut self,
         mut state: Self::State,
@@ -754,16 +833,18 @@ fn row_to_header(row: &Row) -> Result<SignedHeaderHashed, PlaceHolderError> {
 
 fn get_link_query<'a, 'b: 'a>(
     txns: &mut [&'a mut Transaction<'b>],
+    scratch: Option<&Scratch>,
     mut query: LinkQuery,
 ) -> Vec<Link> {
-    query.run(txns).unwrap()
+    query.run(txns, scratch).unwrap()
 }
 
 fn get_entry_query<'a, 'b: 'a>(
     txns: &mut [&'a mut Transaction<'b>],
+    scratch: Option<&Scratch>,
     mut query: GetQuery,
 ) -> Option<Element> {
-    query.run(txns).unwrap()
+    query.run(txns, scratch).unwrap()
 }
 
 fn link_from_header(header: Header) -> Link {
@@ -777,6 +858,21 @@ fn link_from_header(header: Header) -> Link {
         },
         _ => panic!("TODO: handle this properly"),
     }
+}
+
+fn insert_op_scratch(scratch: &mut Scratch, op: DhtOpHashed) {
+    let (op, _) = op.into_inner();
+    let op_light = op.to_light();
+    let header = op.header();
+    let signature = op.signature().clone();
+    if let Some(entry) = op.entry() {
+        let _entry_hashed =
+            EntryHashed::with_pre_hashed(entry.clone(), header.entry_hash().unwrap().clone());
+        // TODO: Should we store the entry somewhere?
+    }
+    let header_hashed = HeaderHashed::with_pre_hashed(header, op_light.header_hash().to_owned());
+    let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
+    scratch.add_header(header_hashed);
 }
 
 fn insert_op(txn: &mut Transaction, op: DhtOpHashed) {

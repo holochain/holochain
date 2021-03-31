@@ -46,9 +46,9 @@ CREATE TABLE Header (
     -- CreateLink
     -- NB: basis_hash can't be foreign key, since it could map to either
     --     Entry or Header
-    -- FIXME: @freesig Actually this can only be an EntryHash. 
+    -- FIXME: @freesig Actually this can only be an EntryHash.
     -- Links can't be on headers.
-    base_hash       BLOB           NULL,
+    base_hash        BLOB           NULL,
     zome_id          INTEGER        NULL,
     tag              BLOB           NULL,
 
