@@ -6,6 +6,7 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_sqlite::scratch::FilteredScratch;
 use holochain_sqlite::scratch::Scratch;
 use holochain_zome_types::Entry;
 use holochain_zome_types::HeaderHashed;
@@ -32,7 +33,10 @@ pub mod prelude {
     pub use super::Params;
     pub use super::Query;
     pub use super::StateQueryResult;
+    pub use super::Stores;
     pub use super::Transactions;
+    pub use super::Txn;
+    pub use super::Txns;
     pub use holochain_sqlite::rusqlite::named_params;
     pub use holochain_sqlite::rusqlite::Row;
     pub use std::sync::Arc;
@@ -56,6 +60,8 @@ impl<T> Maps<T> {
 
 pub type Transactions<'a, 'txn> = [&'a Transaction<'txn>];
 
+/// You should keep your query type cheap to clone.
+/// If there is any large data put it in an Arc.
 pub trait Query: Clone {
     type State;
     type Data: Clone;
@@ -89,39 +95,170 @@ pub trait Query: Clone {
 
     fn fold(&mut self, state: Self::State, data: Self::Data) -> StateQueryResult<Self::State>;
 
-    fn render(
-        &mut self,
-        state: Self::State,
-        txns: &Transactions<'_, '_>,
-    ) -> StateQueryResult<Self::Output>;
+    fn run<S>(&mut self, stores: S) -> StateQueryResult<Self::Output>
+    where
+        S: Stores<Self>,
+    {
+        let mut stores_iter = stores.init(self.clone())?;
+        let iter = stores_iter.iter()?;
+        let result = iter.fold(self.init_fold()?, |state, i| self.fold(state, i))?;
+        drop(stores_iter);
+        self.render(result, stores)
+    }
 
-    fn run(
-        &mut self,
-        txns: &Transactions<'_, '_>,
-        scratch: Option<&Scratch<Self::Data>>,
-    ) -> StateQueryResult<Self::Output> {
-        let mut stmts: Vec<_> = fallible_iterator::convert(
-            txns.into_iter()
-                .map(|txn| QueryStmt::new(txn, self.clone())),
-        )
-        .collect()?;
-        let map_fn = self.as_map();
-        let iter = stmts.iter_mut().map(|stmt| Ok(stmt.iter(map_fn.clone())?));
-        let iter = fallible_iterator::convert(iter).flatten();
-        let scratch = scratch.map(|s| s.filter(self.as_filter()).map_err(StateQueryError::from));
-        let result = match scratch {
-            Some(scratch) => {
-                let iter = iter.chain(scratch);
-                iter.fold(self.init_fold()?, |state, i| self.fold(state, i))?
-            }
-            None => iter.fold(self.init_fold()?, |state, i| self.fold(state, i))?,
-        };
-        drop(stmts);
-        self.render(result, txns)
+    fn render<S>(&mut self, state: Self::State, stores: S) -> StateQueryResult<Self::Output>
+    where
+        S: Stores<Self>;
+}
+
+pub trait Stores<Q: Query> {
+    type O: StoresIter<Q::Data>;
+    fn init(&self, query: Q) -> StateQueryResult<Self::O>;
+    fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>>;
+}
+pub trait StoresIter<T> {
+    fn iter<'iter>(&'iter mut self) -> StateQueryResult<StmtIter<'iter, T>>;
+}
+
+pub struct Txn<'borrow, 'txn> {
+    txn: &'borrow Transaction<'txn>,
+}
+
+pub struct Txns<'borrow, 'txn> {
+    txns: Vec<Txn<'borrow, 'txn>>,
+}
+
+pub struct DbScratch<'borrow, 'txn, T> {
+    txns: Txns<'borrow, 'txn>,
+    scratch: &'borrow Scratch<T>,
+}
+pub struct DbScratchIter<'stmt, Q: Query, T> {
+    stmts: QueryStmts<'stmt, Q>,
+    filtered_scratch: FilteredScratch<T>,
+}
+
+impl<'stmt, Q: Query> Stores<Q> for Txn<'stmt, '_> {
+    type O = QueryStmt<'stmt, Q>;
+
+    fn init(&self, query: Q) -> StateQueryResult<Self::O> {
+        QueryStmt::new(&self.txn, query)
+    }
+
+    fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
+        get_entry_from_db(&self.txn, hash)
     }
 }
 
-struct QueryStmt<'stmt, Q: Query> {
+impl<'stmt, Q: Query> StoresIter<Q::Data> for QueryStmt<'stmt, Q> {
+    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Q::Data>> {
+        self.iter()
+    }
+}
+
+impl<'stmt, Q: Query> Stores<Q> for Txns<'stmt, '_> {
+    type O = QueryStmts<'stmt, Q>;
+
+    fn init(&self, query: Q) -> StateQueryResult<Self::O> {
+        let stmts = fallible_iterator::convert(self.txns.iter().map(|txn| txn.init(query.clone())))
+            .collect()?;
+        Ok(QueryStmts { stmts })
+    }
+
+    fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
+        for txn in &self.txns {
+            let r = <Txn as Stores<Q>>::get_entry(&txn, hash)?;
+            if r.is_some() {
+                return Ok(r);
+            }
+        }
+        Ok(None)
+    }
+}
+
+impl<'stmt, Q: Query> StoresIter<Q::Data> for QueryStmts<'stmt, Q> {
+    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Q::Data>> {
+        Ok(Box::new(
+            fallible_iterator::convert(self.stmts.iter_mut().map(Ok)).flat_map(|stmt| stmt.iter()),
+        ))
+    }
+}
+
+impl<Q: Query> Stores<Q> for Scratch<Q::Data> {
+    type O = FilteredScratch<Q::Data>;
+
+    fn init(&self, query: Q) -> StateQueryResult<Self::O> {
+        Ok(self.as_filter(query.as_filter()))
+    }
+
+    fn get_entry(&self, _hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
+        // TODO: we should probably store entries in the scratch as well.
+        Ok(None)
+    }
+}
+
+impl<T> StoresIter<T> for FilteredScratch<T> {
+    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, T>> {
+        Ok(Box::new(fallible_iterator::convert(
+            self.into_iter().map(Ok),
+        )))
+    }
+}
+
+impl<'borrow, 'txn, Q: Query> Stores<Q> for DbScratch<'borrow, 'txn, Q::Data> {
+    type O = DbScratchIter<'borrow, Q, Q::Data>;
+
+    fn init(&self, query: Q) -> StateQueryResult<Self::O> {
+        Ok(DbScratchIter {
+            stmts: self.txns.init(query.clone())?,
+            filtered_scratch: self.scratch.init(query.clone())?,
+        })
+    }
+
+    fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
+        let r = <Txns as Stores<Q>>::get_entry(&self.txns, hash)?;
+        if r.is_none() {
+            <Scratch<Q::Data> as Stores<Q>>::get_entry(&self.scratch, hash)
+        } else {
+            Ok(r)
+        }
+    }
+}
+
+impl<'stmt, Q: Query> StoresIter<Q::Data> for DbScratchIter<'stmt, Q, Q::Data> {
+    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Q::Data>> {
+        Ok(Box::new(
+            self.stmts.iter()?.chain(self.filtered_scratch.iter()?),
+        ))
+    }
+}
+
+impl<'borrow, 'txn, T> DbScratch<'borrow, 'txn, T> {
+    pub fn new(txns: &'borrow Transactions<'borrow, 'txn>, scratch: &'borrow Scratch<T>) -> Self {
+        Self {
+            txns: txns.into(),
+            scratch,
+        }
+    }
+}
+
+impl<'borrow, 'txn> From<&'borrow Transaction<'txn>> for Txn<'borrow, 'txn> {
+    fn from(txn: &'borrow Transaction<'txn>) -> Self {
+        Self { txn }
+    }
+}
+
+impl<'borrow, 'txn> From<&'borrow Transactions<'borrow, 'txn>> for Txns<'borrow, 'txn> {
+    fn from(txns: &'borrow Transactions<'borrow, 'txn>) -> Self {
+        let txns = txns.into_iter().map(|&txn| Txn::from(txn)).collect();
+        Self { txns }
+    }
+}
+
+pub struct QueryStmts<'stmt, Q: Query> {
+    stmts: Vec<QueryStmt<'stmt, Q>>,
+}
+
+pub struct QueryStmt<'stmt, Q: Query> {
     create_stmt: Option<Statement<'stmt>>,
     delete_stmt: Option<Statement<'stmt>>,
     update_stmt: Option<Statement<'stmt>>,
@@ -150,10 +287,8 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
             query,
         })
     }
-    fn iter<T: 'iter>(
-        &'iter mut self,
-        map_fn: std::sync::Arc<dyn Fn(&Row) -> StateQueryResult<T>>,
-    ) -> StateQueryResult<StmtIter<'iter, T>> {
+    fn iter(&'iter mut self) -> StateQueryResult<StmtIter<'iter, Q::Data>> {
+        let map_fn = self.query.as_map();
         let creates = Self::new_iter(
             &self.query.create_params(),
             self.create_stmt.as_mut(),

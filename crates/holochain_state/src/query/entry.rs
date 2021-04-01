@@ -94,10 +94,10 @@ impl Query for GetEntryQuery {
         Ok(state)
     }
 
-    fn render(
+    fn render<S: Stores<Self>>(
         &mut self,
         state: Self::State,
-        txns: &Transactions<'_, '_>,
+        stores: S,
     ) -> StateQueryResult<Self::Output> {
         // Choose an arbitrary header
         let header = state.creates.into_iter().map(|(_, v)| v).next();
@@ -105,17 +105,10 @@ impl Query for GetEntryQuery {
             Some(header) => {
                 // TODO: Handle error where header doesn't have entry hash.
                 let entry_hash = header.header().entry_hash().unwrap();
-                for txn in txns.into_iter() {
-                    let entry = get_entry_from_db(txn, &entry_hash)?;
-                    if entry.is_none() {
-                        continue;
-                    } else {
-                        // TODO: Handle this error.
-                        let entry = entry.unwrap();
-                        return Ok(Some(Element::new(header, Some(entry))));
-                    }
-                }
-                panic!("TODO: Handle case where entry wasn't found but we had headers")
+                let entry = stores
+                    .get_entry(&entry_hash)?
+                    .expect("TODO: Handle case where entry wasn't found but we had headers");
+                Ok(Some(Element::new(header, Some(entry))))
             }
             None => Ok(None),
         }

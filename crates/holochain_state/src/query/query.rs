@@ -345,7 +345,13 @@ fn get_link_query<'a, 'b: 'a>(
     scratch: Option<&Scratch<SignedHeaderHashed>>,
     mut query: LinkQuery,
 ) -> Vec<Link> {
-    query.run(txns, scratch).unwrap()
+    match scratch {
+        Some(scratch) => {
+            let stores = DbScratch::new(txns, scratch);
+            query.run(stores).unwrap()
+        }
+        None => query.run(Txns::from(txns)).unwrap(),
+    }
 }
 
 fn get_entry_query<'a, 'b: 'a>(
@@ -353,5 +359,11 @@ fn get_entry_query<'a, 'b: 'a>(
     scratch: Option<&Scratch<SignedHeaderHashed>>,
     mut query: GetEntryQuery,
 ) -> Option<Element> {
-    query.run(txns, scratch).unwrap()
+    match scratch {
+        Some(scratch) => {
+            let stores = DbScratch::new(txns, scratch);
+            query.run(stores).unwrap()
+        }
+        None => query.run(Txns::from(txns)).unwrap(),
+    }
 }

@@ -130,21 +130,18 @@ impl Query for GetEntryOpsQuery {
         Ok(state)
     }
 
-    fn render(
+    fn render<S: Stores<Self>>(
         &mut self,
         mut state: Self::State,
-        txns: &Transactions<'_, '_>,
+        stores: S,
     ) -> StateQueryResult<Self::Output> {
-        // We only use a single transaction for this query.
-        // TODO: @freesig It would be nice to set this at the type level.
-        let txn = txns[0];
         // TODO: Handle error where header is missing entry hash.
         let entry_hash = state
             .creates
             .first()
             .map(|wire_op| wire_op.header.entry_hash().unwrap());
         if let Some(entry_hash) = entry_hash {
-            let entry = holochain_state::query::get_entry_from_db(txn, entry_hash)?;
+            let entry = stores.get_entry(entry_hash)?;
             state.entry = entry;
         }
         Ok(state)

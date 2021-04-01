@@ -6,6 +6,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
 use holochain_sqlite::db::ReadManager;
 use holochain_state::query::Query;
+use holochain_state::query::Txn;
 use holochain_types::prelude::*;
 use tracing::*;
 
@@ -23,7 +24,7 @@ pub fn handle_get_entry(
     let mut query = GetEntryOpsQuery::new(hash);
     let results = state_env
         .conn()?
-        .with_reader(|txn| query.run(&[&txn], None))?;
+        .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;
     Ok(results)
 }
 

@@ -13,6 +13,8 @@ use fallible_iterator::FallibleIterator;
 #[derive(Debug, Clone)]
 pub struct Scratch<T>(Vec<T>);
 
+pub struct FilteredScratch<T>(Vec<T>);
+
 impl<T> Scratch<T>
 where
     T: Clone,
@@ -36,6 +38,16 @@ where
                 .cloned()
                 .map(Ok),
         )
+    }
+
+    pub fn as_filter(&self, f: impl Fn(&T) -> bool) -> FilteredScratch<T> {
+        FilteredScratch(self.0.iter().filter(|&t| f(t)).cloned().collect())
+    }
+}
+
+impl<T> FilteredScratch<T> {
+    pub fn into_iter<'iter>(&'iter mut self) -> impl Iterator<Item = T> + 'iter {
+        self.0.drain(..)
     }
 }
 
