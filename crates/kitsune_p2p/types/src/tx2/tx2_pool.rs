@@ -7,9 +7,9 @@ use crate::*;
 use futures::future::BoxFuture;
 use futures::stream::Stream;
 
-/// Frontend Traits - you probably don't need these
-/// unless you are implementing a custom tx2 frontend transport.
-pub mod tx2_frontend_traits {
+/// Pool Traits - you probably don't need these
+/// unless you are implementing a custom tx2 pool transport.
+pub mod tx2_pool_traits {
     use super::*;
 
     /// Trait representing a connection handle.
@@ -64,7 +64,7 @@ pub mod tx2_frontend_traits {
     }
 }
 
-use tx2_frontend_traits::*;
+use tx2_pool_traits::*;
 
 /// An endpoint handle - use this to manage a bound endpoint.
 #[derive(Clone)]
