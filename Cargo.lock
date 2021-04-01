@@ -2022,6 +2022,7 @@ dependencies = [
  "serde_yaml",
  "shrinkwraprs",
  "strum",
+ "strum_macros",
  "tempdir",
  "thiserror",
  "tokio",

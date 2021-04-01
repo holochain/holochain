@@ -4,6 +4,8 @@
 //!
 //! [DhtOp]: enum.DhtOp.html
 
+use std::str::FromStr;
+
 use crate::element::ElementGroup;
 use crate::header::NewEntryHeader;
 use crate::prelude::*;
@@ -11,6 +13,7 @@ use error::DhtOpError;
 use error::DhtOpResult;
 use holo_hash::hash_type;
 use holo_hash::HashableContentBytes;
+use holochain_sqlite::rusqlite::types::FromSql;
 use holochain_sqlite::rusqlite::ToSql;
 use holochain_zome_types::prelude::*;
 use serde::Deserialize;
@@ -149,7 +152,17 @@ impl std::hash::Hash for DhtOpLight {
 
 /// This enum is used to
 #[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash, derive_more::Display)]
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Hash,
+    derive_more::Display,
+    strum_macros::EnumString,
+)]
 pub enum DhtOpType {
     #[display(fmt = "StoreElement")]
     StoreElement,
@@ -178,6 +191,17 @@ impl ToSql for DhtOpType {
         Ok(holochain_sqlite::rusqlite::types::ToSqlOutput::Owned(
             format!("{}", self).into(),
         ))
+    }
+}
+
+impl FromSql for DhtOpType {
+    fn column_result(
+        value: holochain_sqlite::rusqlite::types::ValueRef<'_>,
+    ) -> holochain_sqlite::rusqlite::types::FromSqlResult<Self> {
+        String::column_result(value).and_then(|string| {
+            DhtOpType::from_str(&string)
+                .map_err(|_| holochain_sqlite::rusqlite::types::FromSqlError::InvalidType)
+        })
     }
 }
 

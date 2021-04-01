@@ -1,10 +1,13 @@
 use fallible_iterator::FallibleIterator;
+use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
+use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::scratch::Scratch;
+use holochain_zome_types::Entry;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
@@ -89,14 +92,16 @@ pub trait Query: Clone {
     }
     fn init_fold(&self) -> Result<Self::State, PlaceHolderError>;
 
-    fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool>;
+    fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {
+        Box::new(|_| true)
+    }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> Result<Self::Data, PlaceHolderError>>;
 
     fn fold(
         &mut self,
         state: Self::State,
-        header: Self::Data,
+        data: Self::Data,
     ) -> Result<Self::State, PlaceHolderError>;
 
     fn render(
@@ -185,4 +190,29 @@ pub fn to_blob<T: Serialize + std::fmt::Debug>(t: T) -> Vec<u8> {
 
 pub fn from_blob<T: DeserializeOwned + std::fmt::Debug>(blob: Vec<u8>) -> T {
     holochain_serialized_bytes::decode(&blob).unwrap()
+}
+
+pub fn get_entry_from_db(
+    txn: &Transaction,
+    entry_hash: &EntryHash,
+) -> Result<Option<Entry>, PlaceHolderError> {
+    let entry = txn.query_row_named(
+        "
+        SELECT Entry.blob AS entry_blob FROM Entry
+        WHERE hash = :entry_hash
+        ",
+        named_params! {
+            ":entry_hash": entry_hash,
+        },
+        |row| {
+            Ok(from_blob::<Entry>(
+                row.get(row.column_index("entry_blob")?)?,
+            ))
+        },
+    );
+    if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &entry {
+        Ok(None)
+    } else {
+        Ok(Some(entry?))
+    }
 }

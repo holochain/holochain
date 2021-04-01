@@ -7,15 +7,15 @@ use std::fmt::Debug;
 use super::*;
 
 #[derive(Debug, Clone)]
-pub struct GetQuery(EntryHash);
+pub struct GetEntryQuery(EntryHash);
 
-impl GetQuery {
+impl GetEntryQuery {
     pub fn new(hash: EntryHash) -> Self {
         Self(hash)
     }
 }
 
-impl Query for GetQuery {
+impl Query for GetEntryQuery {
     type Data = SignedHeaderHashed;
     type State = Maps<SignedHeaderHashed>;
     type Output = Option<Element>;
@@ -103,23 +103,11 @@ impl Query for GetQuery {
         let header = state.creates.into_iter().map(|(_, v)| v).next();
         match header {
             Some(header) => {
+                // TODO: Handle error where header doesn't have entry hash.
+                let entry_hash = header.header().entry_hash().unwrap();
                 for txn in txns.into_iter() {
-                    let entry_hash = header.header().entry_hash().unwrap();
-                    let entry = txn.query_row_named(
-                        "
-                    SELECT Entry.blob AS entry_blob FROM Entry
-                    WHERE hash = :entry_hash
-                    ",
-                        named_params! {
-                            ":entry_hash": entry_hash.clone(),
-                        },
-                        |row| {
-                            Ok(from_blob::<Entry>(
-                                row.get(row.column_index("entry_blob")?)?,
-                            ))
-                        },
-                    );
-                    if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &entry {
+                    let entry = get_entry_from_db(txn, &entry_hash)?;
+                    if entry.is_none() {
                         continue;
                     } else {
                         // TODO: Handle this error.

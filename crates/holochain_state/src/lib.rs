@@ -39,11 +39,11 @@ pub mod chain_sequence;
 pub mod dht_op_integration;
 #[allow(missing_docs)]
 pub mod element_buf;
-pub mod metadata;
-pub mod query;
 pub mod insert;
+pub mod metadata;
 #[allow(missing_docs)]
 pub mod prelude;
+pub mod query;
 #[allow(missing_docs)]
 pub mod source_chain;
 pub mod validation_db;

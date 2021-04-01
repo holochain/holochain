@@ -28,7 +28,7 @@ struct EntryTestData {
     store_entry_op: DhtOpHashed,
     delete_entry_header_op: DhtOpHashed,
     entry: Entry,
-    query: GetQuery,
+    query: GetEntryQuery,
     header: SignedHeaderHashed,
 }
 
@@ -128,7 +128,7 @@ impl EntryTestData {
             DhtOp::RegisterDeletedEntryHeader(signature.clone(), delete.clone()),
         );
 
-        let query = GetQuery::new(entry_hash.clone());
+        let query = GetEntryQuery::new(entry_hash.clone());
 
         Self {
             store_entry_op,
@@ -351,7 +351,7 @@ fn get_link_query<'a, 'b: 'a>(
 fn get_entry_query<'a, 'b: 'a>(
     txns: &[&'a Transaction<'b>],
     scratch: Option<&Scratch<SignedHeaderHashed>>,
-    mut query: GetQuery,
+    mut query: GetEntryQuery,
 ) -> Option<Element> {
     query.run(txns, scratch).unwrap()
 }
