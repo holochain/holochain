@@ -148,7 +148,7 @@ impl Query for LinkQuery {
         self.delete_params()
     }
 
-    fn init_fold(&self) -> Result<Self::State, PlaceHolderError> {
+    fn init_fold(&self) -> StateQueryResult<Self::State> {
         Ok(Maps::new())
     }
 
@@ -177,7 +177,7 @@ impl Query for LinkQuery {
         &mut self,
         mut state: Self::State,
         shh: SignedHeaderHashed,
-    ) -> Result<Self::State, PlaceHolderError> {
+    ) -> StateQueryResult<Self::State> {
         let (header, _) = shh.into_header_and_signature();
         let (header, hash) = header.into_inner();
         match header {
@@ -201,11 +201,11 @@ impl Query for LinkQuery {
         &mut self,
         state: Self::State,
         _: &Transactions<'_, '_>,
-    ) -> Result<Self::Output, PlaceHolderError> {
+    ) -> StateQueryResult<Self::Output> {
         Ok(state.creates.into_iter().map(|(_, v)| v).collect())
     }
 
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> Result<Self::Data, PlaceHolderError>> {
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
         Arc::new(|row| row_to_header(row))
     }
 }

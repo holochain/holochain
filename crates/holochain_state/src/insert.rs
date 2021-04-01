@@ -120,6 +120,17 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) {
             })
             .unwrap();
         }
+        Header::Update(update) => {
+            sql_insert!(txn, Header, {
+                "hash": hash,
+                "type": header_type ,
+                "seq": header_seq,
+                "original_entry_hash": update.original_entry_address.clone(),
+                "original_header_hash": update.original_header_address.clone(),
+                "blob": to_blob(SignedHeader::from((Header::Update(update), signature))),
+            })
+            .unwrap();
+        }
         _ => todo!(),
     }
 }

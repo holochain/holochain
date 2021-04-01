@@ -56,7 +56,7 @@ impl Query for GetEntryQuery {
         params.to_vec()
     }
 
-    fn init_fold(&self) -> Result<Self::State, PlaceHolderError> {
+    fn init_fold(&self) -> StateQueryResult<Self::State> {
         Ok(Maps::new())
     }
 
@@ -77,7 +77,7 @@ impl Query for GetEntryQuery {
         &mut self,
         mut state: Self::State,
         shh: SignedHeaderHashed,
-    ) -> Result<Self::State, PlaceHolderError> {
+    ) -> StateQueryResult<Self::State> {
         let hash = shh.as_hash().clone();
         match shh.header() {
             Header::Create(_) => {
@@ -98,7 +98,7 @@ impl Query for GetEntryQuery {
         &mut self,
         state: Self::State,
         txns: &Transactions<'_, '_>,
-    ) -> Result<Self::Output, PlaceHolderError> {
+    ) -> StateQueryResult<Self::Output> {
         // Choose an arbitrary header
         let header = state.creates.into_iter().map(|(_, v)| v).next();
         match header {
@@ -121,7 +121,7 @@ impl Query for GetEntryQuery {
         }
     }
 
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> Result<Self::Data, PlaceHolderError>> {
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
         Arc::new(|row| row_to_header(row))
     }
 }

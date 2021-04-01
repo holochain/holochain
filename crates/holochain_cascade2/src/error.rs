@@ -49,7 +49,7 @@ pub enum CascadeError {
     AuthorityDataError(#[from] AuthorityDataError),
 
     #[error(transparent)]
-    QueryError(#[from] holochain_state::query::PlaceHolderError),
+    QueryError(#[from] holochain_state::query::StateQueryError),
 }
 
 pub type CascadeResult<T> = Result<T, CascadeError>;

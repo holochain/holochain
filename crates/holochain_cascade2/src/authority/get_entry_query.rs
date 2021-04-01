@@ -1,13 +1,7 @@
-use std::sync::Arc;
-
 use holo_hash::EntryHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
-use holochain_state::query::from_blob;
-use holochain_state::query::Params;
-use holochain_state::query::PlaceHolderError;
-use holochain_state::query::Query;
-use holochain_state::query::Transactions;
+use holochain_state::query::prelude::*;
 use holochain_types::dht_op::DhtOpType;
 use holochain_zome_types::Entry;
 use holochain_zome_types::Header;
@@ -112,7 +106,7 @@ impl Query for GetEntryOpsQuery {
         params.to_vec()
     }
 
-    fn init_fold(&self) -> Result<Self::State, PlaceHolderError> {
+    fn init_fold(&self) -> StateQueryResult<Self::State> {
         Ok(WireEntryOps::new())
     }
 
@@ -120,7 +114,7 @@ impl Query for GetEntryOpsQuery {
         &mut self,
         mut state: Self::State,
         dht_op: Self::Data,
-    ) -> Result<Self::State, PlaceHolderError> {
+    ) -> StateQueryResult<Self::State> {
         match &dht_op.op_type {
             DhtOpType::StoreEntry => {
                 state.creates.push(dht_op);
@@ -140,7 +134,7 @@ impl Query for GetEntryOpsQuery {
         &mut self,
         mut state: Self::State,
         txns: &Transactions<'_, '_>,
-    ) -> Result<Self::Output, PlaceHolderError> {
+    ) -> StateQueryResult<Self::Output> {
         // We only use a single transaction for this query.
         // TODO: @freesig It would be nice to set this at the type level.
         let txn = txns[0];
@@ -156,7 +150,7 @@ impl Query for GetEntryOpsQuery {
         Ok(state)
     }
 
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> Result<Self::Data, PlaceHolderError>> {
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
         let f = |row: &Row| {
             let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
             let SignedHeader(header, signature) = header;

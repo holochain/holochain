@@ -12,6 +12,8 @@ struct EntryTestData {
     wire_create: WireDhtOp,
     delete_entry_header_op: DhtOpHashed,
     wire_delete: WireDhtOp,
+    update_content_op: DhtOpHashed,
+    wire_update: WireDhtOp,
     hash: EntryHash,
     entry: Entry,
 }
@@ -19,6 +21,7 @@ struct EntryTestData {
 impl EntryTestData {
     fn new() -> Self {
         let mut create = fixt!(Create);
+        let mut update = fixt!(Update);
         let mut delete = fixt!(Delete);
         let entry = fixt!(Entry);
         let entry_hash = EntryHash::with_data_sync(&entry);
@@ -30,7 +33,11 @@ impl EntryTestData {
         delete.deletes_entry_address = entry_hash.clone();
         delete.deletes_address = create_hash.clone();
 
+        update.original_entry_address = entry_hash.clone();
+        update.original_header_address = create_hash.clone();
+
         let delete_header = Header::Delete(delete.clone());
+        let update_header = Header::Update(update.clone());
 
         let signature = fixt!(Signature);
         let store_entry_op = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
@@ -56,13 +63,27 @@ impl EntryTestData {
             signature: signature.clone(),
         };
 
+        let signature = fixt!(Signature);
+        let update_content_op = DhtOpHashed::from_content_sync(DhtOp::RegisterUpdatedContent(
+            signature.clone(),
+            update.clone(),
+            Some(Box::new(fixt!(Entry))),
+        ));
+        let wire_update = WireDhtOp {
+            op_type: update_content_op.as_content().get_type(),
+            header: update_header.clone(),
+            signature: signature.clone(),
+        };
+
         Self {
             store_entry_op,
             delete_entry_header_op,
+            update_content_op,
             hash: entry_hash,
             entry,
             wire_create,
             wire_delete,
+            wire_update,
         }
     }
 }
@@ -98,6 +119,17 @@ async fn get_entry() {
         creates: vec![td.wire_create.clone()],
         deletes: vec![td.wire_delete.clone()],
         updates: vec![],
+        entry: Some(td.entry.clone()),
+    };
+    assert_eq!(result, expected);
+
+    fill_db(&env.env(), td.update_content_op.clone());
+
+    let result = handle_get_entry(env.env().into(), td.hash.clone(), options.clone()).unwrap();
+    let expected = WireEntryOps {
+        creates: vec![td.wire_create.clone()],
+        deletes: vec![td.wire_delete.clone()],
+        updates: vec![td.wire_update.clone()],
         entry: Some(td.entry.clone()),
     };
     assert_eq!(result, expected);
