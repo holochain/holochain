@@ -511,14 +511,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             agent_key,
             installed_app_id,
             membrane_proofs,
-            uuid,
+            uid,
         } = payload;
 
         let bundle: AppBundle = {
             let original_bundle = source.resolve().await?;
-            if let Some(uuid) = uuid {
+            if let Some(uid) = uid {
                 let mut manifest = original_bundle.manifest().to_owned();
-                manifest.set_uuid(uuid);
+                manifest.set_uid(uid);
                 AppBundle::from(original_bundle.into_inner().update_manifest(manifest)?)
             } else {
                 original_bundle
