@@ -10,6 +10,7 @@ use kitsune_p2p_types::tx2::tx2_backend::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
+use lair_keystore_api::actor::CertDigest;
 use std::sync::Arc;
 
 /// Tls ALPN identifier for kitsune quic handshaking
@@ -93,14 +94,36 @@ impl futures::stream::Stream for QuicInChanRecvAdapt {
 impl InChanRecvAdapt for QuicInChanRecvAdapt {}
 
 struct QuicConAdaptInner {
+    local_digest: CertDigest,
     con: quinn::Connection,
 }
 
 struct QuicConAdapt(Share<QuicConAdaptInner>, Uniq);
 
+pub(crate) fn blake2b_32(data: &[u8]) -> Vec<u8> {
+    blake2b_simd::Params::new()
+        .hash_length(32)
+        .to_state()
+        .update(data)
+        .finalize()
+        .as_bytes()
+        .to_vec()
+}
+
 impl QuicConAdapt {
-    pub fn new(con: quinn::Connection) -> Self {
-        Self(Share::new(QuicConAdaptInner { con }), Uniq::default())
+    pub fn new(con: quinn::Connection) -> KitsuneResult<Self> {
+        let local_digest = match con.peer_identity() {
+            None => return Err("invalid peer certificate".into()),
+            Some(chain) => {
+                match chain.iter().next() {
+                    None => return Err("invalid peer certificate".into()),
+                    Some(cert) => {
+                        CertDigest(Arc::new(blake2b_32(cert.as_ref())))
+                    }
+                }
+            }
+        };
+        Ok(Self(Share::new(QuicConAdaptInner { local_digest, con }), Uniq::default()))
     }
 }
 
@@ -109,13 +132,17 @@ impl ConAdapt for QuicConAdapt {
         self.1
     }
 
-    fn remote_addr(&self) -> KitsuneResult<TxUrl> {
+    fn peer_addr(&self) -> KitsuneResult<TxUrl> {
         let addr = self.0.share_mut(|i, _| Ok(i.con.remote_address()))?;
 
         use kitsune_p2p_types::dependencies::url2;
         let url = url2::url2!("{}://{}", crate::SCHEME, addr);
 
         Ok(url.into())
+    }
+
+    fn peer_digest(&self) -> KitsuneResult<CertDigest> {
+        self.0.share_mut(|i, _| Ok(i.local_digest.clone()))
     }
 
     fn out_chan(&self, timeout: KitsuneTimeout) -> OutChanFut {
@@ -151,7 +178,7 @@ fn connecting(con_fut: quinn::Connecting) -> ConFut {
             ..
         } = con_fut.await.map_err(KitsuneError::other)?;
 
-        let con: Arc<dyn ConAdapt> = Arc::new(QuicConAdapt::new(connection));
+        let con: Arc<dyn ConAdapt> = Arc::new(QuicConAdapt::new(connection)?);
         let chan_recv: Box<dyn InChanRecvAdapt> = Box::new(QuicInChanRecvAdapt::new(uni_streams));
 
         Ok((con, chan_recv))
@@ -359,16 +386,17 @@ mod tests {
     async fn test_quic_tx2() {
         let t = KitsuneTimeout::from_millis(5000);
 
-        let config = QuicConfig::default();
-        let factory = QuicBackendAdapt::new(config).await.unwrap();
-
         let (s_done, r_done) = tokio::sync::oneshot::channel();
 
+        let config = QuicConfig::default();
+        let factory = QuicBackendAdapt::new(config).await.unwrap();
         let (ep1, _con_recv1) = factory
             .bind("kitsune-quic://0.0.0.0:0".into(), t)
             .await
             .unwrap();
 
+        let config = QuicConfig::default();
+        let factory = QuicBackendAdapt::new(config).await.unwrap();
         let (ep2, mut con_recv2) = factory
             .bind("kitsune-quic://0.0.0.0:0".into(), t)
             .await

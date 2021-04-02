@@ -12,7 +12,7 @@ use kitsune_p2p_types::tx2::tx2_pool::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
-//use std::collections::HashMap;
+use std::collections::HashMap;
 
 /// Wrap a tx2 backend transport with proxy logic.
 pub fn tx2_proxy(sub_fact: EpFactory, tls_config: TlsConfig) -> EpFactory {
@@ -71,9 +71,13 @@ impl AsConHnd for ProxyConHnd {
         async move {}.boxed()
     }
 
-    fn remote_addr(&self) -> KitsuneResult<TxUrl> {
-        let remote_addr = self.sub_con.remote_addr()?;
-        promote_addr(&remote_addr, &self.remote_digest)
+    fn peer_addr(&self) -> KitsuneResult<TxUrl> {
+        let peer_addr = self.sub_con.peer_addr()?;
+        promote_addr(&peer_addr, &self.remote_digest)
+    }
+
+    fn peer_digest(&self) -> KitsuneResult<CertDigest> {
+        Ok(self.remote_digest.clone())
     }
 
     fn write(
@@ -105,6 +109,7 @@ struct ProxyEpInner {
 
     // allows us to remove the ConRef when a ConHnd close event is received
     sub_con_to_base_url: HashMap<ConHnd, TxUrl>,
+    */
 
     // we only proxy over *incoming* connections
     // therefore it is a 1-to-1 relationship to remote digest
@@ -112,8 +117,7 @@ struct ProxyEpInner {
 
     // allows us to cleanup the digest to sub_con proxy mapping
     // when a ConHnd close event is received
-    in_sub_con_to_digest: HashMap<ConHnd, CertDigest>,
-    */
+    in_base_url_to_digest: HashMap<TxUrl, CertDigest>,
 }
 
 struct ProxyEpHnd {
@@ -138,9 +142,9 @@ impl ProxyEpHnd {
                 /*
                 base_url_to_sub_con: HashMap::new(),
                 sub_con_to_base_url: HashMap::new(),
-                in_digest_to_sub_con: HashMap::new(),
-                in_sub_con_to_digest: HashMap::new(),
                 */
+                in_digest_to_sub_con: HashMap::new(),
+                in_base_url_to_digest: HashMap::new(),
             }),
         })
     }
@@ -459,7 +463,23 @@ async fn incoming_evt_handle(
     use EpEvent::*;
     match evt {
         OutgoingConnection(_) => (),
-        IncomingConnection(_) => (),
+        IncomingConnection(EpConnection {
+            con: sub_con,
+            url: base_url,
+        }) => {
+            let digest = match sub_con.peer_digest() {
+                Err(e) => {
+                    sub_con.close(500, &format!("{:?}", e)).await;
+                    return;
+                }
+                Ok(d) => d,
+            };
+            let _ = hnd.inner.share_mut(move |i, _| {
+                i.in_digest_to_sub_con.insert(digest.clone(), sub_con);
+                i.in_base_url_to_digest.insert(base_url, digest);
+                Ok(())
+            });
+        }
         IncomingData(EpIncomingData {
             con: sub_con,
             url: base_url,
@@ -494,7 +514,6 @@ async fn incoming_evt_handle(
                         let _ = logic_hnd.emit(evt).await;
                     } else {
                         println!("data to forward");
-                        /*
                         let dest = hnd.inner.share_mut(|i, _| {
                             Ok(i.in_digest_to_sub_con.get(&dest_digest).cloned())
                         });
@@ -512,7 +531,6 @@ async fn incoming_evt_handle(
                             //                an error type.
                             tracing::error!("Proxy Fwd Error: {:?}", e);
                         }
-                        */
                     }
                 }
                 b => {
@@ -522,16 +540,27 @@ async fn incoming_evt_handle(
             }
         }
         ConnectionClosed(EpConnectionClosed {
-            url,
-            code,
-            reason,
+            url: base_url,
+            ..
         }) => {
+            let _ = hnd.inner.share_mut(|i, _| {
+                if let Some(digest) = i.in_base_url_to_digest.remove(&base_url) {
+                    i.in_digest_to_sub_con.remove(&digest);
+                }
+                Ok(())
+            });
+
+            // TODO - FIXME
+            // iterate all pseudo-connections somehow
+            // there isn't just one event, but all that came through the proxy
+            /*
             let evt = ConnectionClosed(EpConnectionClosed {
                 url,
                 code,
                 reason,
             });
             let _ = logic_hnd.emit(evt).await;
+            */
         }
         Error(e) => {
             let _ = logic_hnd.emit(Error(e)).await;

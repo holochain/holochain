@@ -41,7 +41,10 @@ pub trait ConAdapt: 'static + Send + Sync + Unpin {
     fn uniq(&self) -> Uniq;
 
     /// Get the string address (url) of the remote.
-    fn remote_addr(&self) -> KitsuneResult<TxUrl>;
+    fn peer_addr(&self) -> KitsuneResult<TxUrl>;
+
+    /// Get the certificate digest of the remote.
+    fn peer_digest(&self) -> KitsuneResult<CertDigest>;
 
     /// Create a new outgoing channel to the remote.
     fn out_chan(&self, timeout: KitsuneTimeout) -> OutChanFut;

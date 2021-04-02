@@ -16,6 +16,13 @@ use std::sync::atomic;
 
 static NEXT_MEM_ID: atomic::AtomicU64 = atomic::AtomicU64::new(1);
 
+fn id_to_digest(id: u64) -> CertDigest {
+    let bytes = id.to_le_bytes();
+    let mut out = vec![0; 32];
+    out[..8].copy_from_slice(&bytes);
+    CertDigest(Arc::new(out))
+}
+
 type ChanSend = TSender<InChan>;
 type ChanRecv = TReceiver<InChan>;
 type ConSend = TSender<Con>;
@@ -64,7 +71,8 @@ impl InChanRecvAdapt for MemInChanRecvAdapt {}
 
 struct MemConAdaptInner {
     uniq: Uniq,
-    remote_addr: TxUrl,
+    peer_addr: TxUrl,
+    peer_digest: CertDigest,
     chan_send: ChanSend,
     con_active: Active,
     mix_active: Active,
@@ -74,14 +82,16 @@ struct MemConAdapt(MemConAdaptInner);
 
 impl MemConAdapt {
     fn new(
-        remote_addr: TxUrl,
+        peer_addr: TxUrl,
+        peer_digest: CertDigest,
         chan_send: ChanSend,
         con_active: Active,
         mix_active: Active,
     ) -> Self {
         Self(MemConAdaptInner {
             uniq: Uniq::default(),
-            remote_addr,
+            peer_addr,
+            peer_digest,
             chan_send,
             con_active,
             mix_active,
@@ -94,8 +104,12 @@ impl ConAdapt for MemConAdapt {
         self.0.uniq
     }
 
-    fn remote_addr(&self) -> KitsuneResult<TxUrl> {
-        Ok(self.0.remote_addr.clone())
+    fn peer_addr(&self) -> KitsuneResult<TxUrl> {
+        Ok(self.0.peer_addr.clone())
+    }
+
+    fn peer_digest(&self) -> KitsuneResult<CertDigest> {
+        Ok(self.0.peer_digest.clone())
     }
 
     fn out_chan(&self, _timeout: KitsuneTimeout) -> OutChanFut {
@@ -225,13 +239,14 @@ impl EndpointAdapt for MemEndpointAdapt {
     }
 
     fn connect(&self, url: TxUrl, timeout: KitsuneTimeout) -> ConFut {
-        let (this_url, this_ep_active) = {
+        let (this_url, this_id, this_ep_active) = {
             let inner = self.0.lock();
             if !inner.ep_active.is_active() {
                 return async move { Err(KitsuneErrorKind::Closed.into()) }.boxed();
             }
-            (inner.url.clone(), inner.ep_active.clone())
+            (inner.url.clone(), inner.id, inner.ep_active.clone())
         };
+        let local_digest = id_to_digest(this_id);
         async move {
             let con_id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
 
@@ -251,6 +266,8 @@ impl EndpointAdapt for MemEndpointAdapt {
                 Ok(id) => id,
             };
 
+            let remote_digest = id_to_digest(id);
+
             let (c_send, oth_ep_active) = match MEM_ENDPOINTS.lock().get(&id) {
                 None => return Err(format!("remote not found: {}", url).into()),
                 Some((s, a)) => (s.clone(), a.clone()),
@@ -265,6 +282,7 @@ impl EndpointAdapt for MemEndpointAdapt {
 
             let oth_con = MemConAdapt::new(
                 format!("{}/{}", this_url, con_id).into(),
+                local_digest,
                 oth_send,
                 con_active.clone(),
                 mix_active.clone(),
@@ -273,6 +291,7 @@ impl EndpointAdapt for MemEndpointAdapt {
 
             let con = MemConAdapt::new(
                 format!("{}/{}", url, con_id).into(),
+                remote_digest,
                 send,
                 con_active,
                 mix_active.clone(),
@@ -507,7 +526,7 @@ mod tests {
         println!("addr2 = {}", addr2);
 
         let (con1, mut chan_recv1) = ep1.connect(addr2, t).await.unwrap();
-        println!("con to = {}", con1.remote_addr().unwrap());
+        println!("con to = {}", con1.peer_addr().unwrap());
 
         let mut out_chan = con1.out_chan(t).await.unwrap();
         let mut buf = PoolBuf::new();

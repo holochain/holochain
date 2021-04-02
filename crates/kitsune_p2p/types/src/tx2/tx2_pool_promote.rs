@@ -190,8 +190,12 @@ impl AsConHnd for ConItem {
         self.uniq
     }
 
-    fn remote_addr(&self) -> KitsuneResult<TxUrl> {
+    fn peer_addr(&self) -> KitsuneResult<TxUrl> {
         self.item.share_mut(|i, _| Ok(i.url.clone()))
+    }
+
+    fn peer_digest(&self) -> KitsuneResult<CertDigest> {
+        self.item.share_mut(|i, _| i.con.peer_digest())
     }
 
     fn is_closed(&self) -> bool {
@@ -550,7 +554,7 @@ async fn con_recv_logic(
                 }
                 Ok(r) => r,
             };
-            let url = match con.remote_addr() {
+            let url = match con.peer_addr() {
                 Err(e) => {
                     let _ = logic_hnd.emit(EpEvent::Error(e)).await;
                     return;

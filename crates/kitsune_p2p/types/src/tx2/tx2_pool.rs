@@ -13,7 +13,10 @@ pub trait AsConHnd: std::fmt::Debug + 'static + Send + Sync + Unpin {
     fn uniq(&self) -> Uniq;
 
     /// Get the remote address of this connection.
-    fn remote_addr(&self) -> KitsuneResult<TxUrl>;
+    fn peer_addr(&self) -> KitsuneResult<TxUrl>;
+
+    /// Get the certificate digest of the remote.
+    fn peer_digest(&self) -> KitsuneResult<CertDigest>;
 
     /// Is this connection closed?
     fn is_closed(&self) -> bool;
