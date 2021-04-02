@@ -17,7 +17,6 @@ use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_p2p::kitsune_p2p;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
-use holochain_types::prelude::DnaSource;
 use holochain_types::prelude::InstallAppDnaPayload;
 use holochain_types::prelude::InstallAppPayload;
 use holochain_types::prelude::InstalledCell;
@@ -26,6 +25,7 @@ use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppBundlePayload};
 use holochain_types::prelude::{DnaHash, InstalledApp};
+use holochain_types::prelude::{DnaSource, Uuid};
 use std::convert::TryFrom;
 
 use crate::cmds::Existing;
@@ -156,6 +156,9 @@ pub struct InstallAppBundle {
     #[structopt(required = true)]
     /// Location of the *.happ bundle file to install.
     pub path: PathBuf,
+
+    /// Optional UUID override for every DNA in this app
+    pub uuid: Option<Uuid>,
 }
 
 #[derive(Debug, StructOpt, Clone)]
@@ -468,6 +471,7 @@ pub async fn install_app_bundle(
         app_id,
         agent_key,
         path,
+        uuid,
     } = args;
 
     let bundle = AppBundleSource::Path(path).resolve().await?;
@@ -482,6 +486,7 @@ pub async fn install_app_bundle(
         agent_key,
         source: AppBundleSource::Bundle(bundle),
         membrane_proofs: Default::default(),
+        uuid,
     };
 
     let r = AdminRequest::InstallAppBundle(Box::new(payload));

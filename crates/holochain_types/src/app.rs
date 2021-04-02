@@ -118,6 +118,11 @@ pub struct InstallAppBundlePayload {
     /// Include proof-of-membrane-membership data for cells that require it,
     /// keyed by the CellNick specified in the app bundle manifest.
     pub membrane_proofs: HashMap<CellNick, MembraneProof>,
+
+    /// Optional: overwrites all UUIDs for all DNAs of Cells created by this app.
+    /// The app can still use existing Cells, i.e. this does not require that
+    /// all Cells have DNAs with the same overridden DNA.
+    pub uuid: Option<Uuid>,
 }
 
 /// The possible locations of an AppBundle

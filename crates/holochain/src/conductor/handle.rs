@@ -511,9 +511,23 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             agent_key,
             installed_app_id,
             membrane_proofs,
+            uuid,
         } = payload;
 
-        let bundle = source.resolve().await?;
+        let bundle: AppBundle = {
+            let original_bundle = source.resolve().await?;
+            if let Some(uuid) = uuid {
+                let mut manifest = original_bundle.manifest().to_owned();
+                manifest.set_uuid(uuid);
+                AppBundle::from(
+                    original_bundle
+                        .into_inner()
+                        .update_manifest(manifest.into())?,
+                )
+            } else {
+                original_bundle
+            }
+        };
 
         let installed_app_id =
             installed_app_id.unwrap_or_else(|| bundle.manifest().app_name().to_owned());
