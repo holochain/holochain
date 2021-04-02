@@ -70,7 +70,10 @@ pub mod test_utils;
 pub use entry::Entry;
 pub use header::Header;
 pub use prelude::*;
-pub use subtle;
+/// Re-exported dependencies
+pub mod dependencies {
+    pub use ::subtle;
+}
 
 #[allow(missing_docs)]
 pub trait CallbackResult {
