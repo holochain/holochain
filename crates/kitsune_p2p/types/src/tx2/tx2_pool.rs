@@ -7,160 +7,66 @@ use crate::*;
 use futures::future::BoxFuture;
 use futures::stream::Stream;
 
-/// Pool Traits - you probably don't need these
-/// unless you are implementing a custom tx2 pool transport.
-pub mod tx2_pool_traits {
-    use super::*;
+/// Trait representing a connection handle.
+pub trait AsConHnd: std::fmt::Debug + 'static + Send + Sync + Unpin {
+    /// Get the opaque Uniq identifier for this connection.
+    fn uniq(&self) -> Uniq;
 
-    /// Trait representing a connection handle.
-    pub trait AsEpHnd: 'static + Send + Sync + Unpin {
-        /// Capture a debugging internal state dump.
-        fn debug(&self) -> serde_json::Value;
+    /// Get the remote address of this connection.
+    fn remote_addr(&self) -> KitsuneResult<TxUrl>;
 
-        /// Get the opaque Uniq identifier for this endpoint.
-        fn uniq(&self) -> Uniq;
+    /// Is this connection closed?
+    fn is_closed(&self) -> bool;
 
-        /// Is this endpoint closed?
-        fn is_closed(&self) -> bool;
+    /// Close this connection.
+    fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()>;
 
-        /// Close this endpoint.
-        fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()>;
-
-        /// Force close a specific connection.
-        fn close_connection(
-            &self,
-            remote: TxUrl,
-            code: u32,
-            reason: &str,
-        ) -> BoxFuture<'static, ()>;
-
-        /// Get the bound local address of this endpoint.
-        fn local_addr(&self) -> KitsuneResult<TxUrl>;
-
-        /// Write data to target remote.
-        fn write(
-            &self,
-            remote: TxUrl,
-            msg_id: MsgId,
-            data: PoolBuf,
-            timeout: KitsuneTimeout,
-        ) -> BoxFuture<'static, KitsuneResult<()>>;
-    }
-
-    /// Trait representing a transport endpoint.
-    pub trait AsEp: 'static + Send + Unpin + Stream<Item = EpEvent> {
-        /// A cheaply clone-able handle to this endpoint.
-        fn handle(&self) -> &EpHnd;
-    }
-
-    /// Trait representing an endpoint factory (binder).
-    pub trait AsEpFactory: 'static + Send + Sync + Unpin {
-        /// Bind a new local transport endpoint.
-        fn bind(
-            &self,
-            bind_spec: TxUrl,
-            timeout: KitsuneTimeout,
-        ) -> BoxFuture<'static, KitsuneResult<Ep>>;
-    }
-}
-
-use tx2_pool_traits::*;
-
-/// An endpoint handle - use this to manage a bound endpoint.
-#[derive(Clone)]
-pub struct EpHnd(pub Arc<dyn AsEpHnd>);
-
-impl PartialEq for EpHnd {
-    fn eq(&self, oth: &Self) -> bool {
-        self.uniq().eq(&oth.uniq())
-    }
-}
-
-impl Eq for EpHnd {}
-
-impl std::hash::Hash for EpHnd {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.uniq().hash(state);
-    }
-}
-
-impl EpHnd {
-    /// Capture a debugging internal state dump.
-    pub fn debug(&self) -> serde_json::Value {
-        AsEpHnd::debug(self)
-    }
-
-    /// Is this endpoint closed?
-    pub fn is_closed(&self) -> bool {
-        AsEpHnd::is_closed(self)
-    }
-
-    /// Close this endpoint.
-    pub fn close(
+    /// Write data to this connection.
+    fn write(
         &self,
-        code: u32,
-        reason: &str,
-    ) -> impl std::future::Future<Output = ()> + 'static + Send {
-        AsEpHnd::close(self, code, reason)
-    }
-
-    /// Force close a specific connection.
-    pub fn close_connection<U: Into<TxUrl>>(
-        &self,
-        remote: U,
-        code: u32,
-        reason: &str,
-    ) -> impl std::future::Future<Output = ()> + 'static + Send {
-        AsEpHnd::close_connection(self, remote.into(), code, reason)
-    }
-
-    /// Get the bound local address of this endpoint.
-    pub fn local_addr(&self) -> KitsuneResult<TxUrl> {
-        AsEpHnd::local_addr(self)
-    }
-
-    /// Write data to target remote.
-    pub fn write<U: Into<TxUrl>>(
-        &self,
-        remote: U,
         msg_id: MsgId,
         data: PoolBuf,
         timeout: KitsuneTimeout,
-    ) -> impl std::future::Future<Output = KitsuneResult<()>> + 'static + Send {
-        AsEpHnd::write(self, remote.into(), msg_id, data, timeout)
-    }
+    ) -> BoxFuture<'static, KitsuneResult<()>>;
 }
 
-impl AsEpHnd for EpHnd {
-    fn debug(&self) -> serde_json::Value {
-        self.0.debug()
-    }
+/// Trait object connection handle
+pub type ConHnd = Arc<dyn AsConHnd>;
 
-    fn uniq(&self) -> Uniq {
-        self.0.uniq()
-    }
+/// Trait representing a connection handle.
+pub trait AsEpHnd: 'static + Send + Sync + Unpin {
+    /// Capture a debugging internal state dump.
+    fn debug(&self) -> serde_json::Value;
 
-    fn is_closed(&self) -> bool {
-        self.0.is_closed()
-    }
+    /// Get the opaque Uniq identifier for this endpoint.
+    fn uniq(&self) -> Uniq;
 
-    fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
-        self.0.close(code, reason)
-    }
+    /// Get the bound local address of this endpoint.
+    fn local_addr(&self) -> KitsuneResult<TxUrl>;
 
+    /// Is this endpoint closed?
+    fn is_closed(&self) -> bool;
+
+    /// Close this endpoint.
+    fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()>;
+
+    /// Force close a specific connection.
     fn close_connection(
         &self,
         remote: TxUrl,
         code: u32,
         reason: &str,
-    ) -> BoxFuture<'static, ()> {
-        self.0.close_connection(remote, code, reason)
-    }
+    ) -> BoxFuture<'static, ()>;
 
-    fn local_addr(&self) -> KitsuneResult<TxUrl> {
-        self.0.local_addr()
-    }
+    /// Get a connection handle to an existing connection.
+    /// If one does not exist, establish a new connection.
+    fn get_connection(
+        &self,
+        remote: TxUrl,
+        timeout: KitsuneTimeout,
+    ) -> BoxFuture<'static, KitsuneResult<ConHnd>>;
 
+    /// Write data to target remote.
     fn write(
         &self,
         remote: TxUrl,
@@ -168,13 +74,54 @@ impl AsEpHnd for EpHnd {
         data: PoolBuf,
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<()>> {
-        self.0.write(remote, msg_id, data, timeout)
+        let con_fut = self.get_connection(remote, timeout);
+        futures::future::FutureExt::boxed(async move {
+            con_fut.await?.write(msg_id, data, timeout).await
+        })
     }
+}
+
+/// Trait object endpoint handle
+pub type EpHnd = Arc<dyn AsEpHnd>;
+
+/// Trait representing a transport endpoint.
+pub trait AsEp: 'static + Send + Unpin + Stream<Item = EpEvent> {
+    /// A cheaply clone-able handle to this endpoint.
+    fn handle(&self) -> &EpHnd;
+}
+
+/// Trait object endpoint
+pub type Ep = Box<dyn AsEp>;
+
+/// Trait representing an endpoint factory (binder).
+pub trait AsEpFactory: 'static + Send + Sync + Unpin {
+    /// Bind a new local transport endpoint.
+    fn bind(
+        &self,
+        bind_spec: TxUrl,
+        timeout: KitsuneTimeout,
+    ) -> BoxFuture<'static, KitsuneResult<Ep>>;
+}
+
+/// Trait object endpoint factory
+pub type EpFactory = Arc<dyn AsEpFactory>;
+
+/// Data associated with an IncomingConnection EpEvent
+#[derive(Debug)]
+pub struct EpConnection {
+    /// handle to the remote connection
+    pub con: ConHnd,
+
+    /// the remote url for this connection
+    pub url: TxUrl,
 }
 
 /// Data associated with an IncomingData EpEvent
 #[derive(Debug)]
 pub struct EpIncomingData {
+    /// handle to the remote connection that send this data
+    pub con: ConHnd,
+
     /// the remote url from which this data originated
     pub url: TxUrl,
 
@@ -201,8 +148,11 @@ pub struct EpConnectionClosed {
 /// Event emitted by a transport endpoint.
 #[derive(Debug)]
 pub enum EpEvent {
+    /// We've established an outgoing connection.
+    OutgoingConnection(EpConnection),
+
     /// We've accepted an incoming connection.
-    IncomingConnection(TxUrl),
+    IncomingConnection(EpConnection),
 
     /// We've received incoming data on an open connection.
     IncomingData(EpIncomingData),
@@ -215,59 +165,4 @@ pub enum EpEvent {
 
     /// The endpoint has closed.
     EndpointClosed,
-}
-
-/// Represents a bound endpoint. To manage this endpoint, see handle()/EpHnd.
-/// To receive events from this endpoint, poll_next this instance as a Stream.
-pub struct Ep(pub Box<dyn AsEp>);
-
-impl Stream for Ep {
-    type Item = EpEvent;
-
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        let inner = &mut self.0;
-        futures::pin_mut!(inner);
-        Stream::poll_next(inner, cx)
-    }
-}
-
-impl Ep {
-    /// A cheaply clone-able handle to this endpoint.
-    pub fn handle(&self) -> &EpHnd {
-        AsEp::handle(self)
-    }
-}
-
-impl AsEp for Ep {
-    fn handle(&self) -> &EpHnd {
-        self.0.handle()
-    }
-}
-
-/// Endpoint binding factory - lets us easily pass around logic
-/// for later binding network transports.
-pub struct EpFactory(pub Arc<dyn AsEpFactory>);
-
-impl EpFactory {
-    /// Bind a new local transport endpoint.
-    pub fn bind<U: Into<TxUrl>>(
-        &self,
-        bind_spec: U,
-        timeout: KitsuneTimeout,
-    ) -> impl std::future::Future<Output = KitsuneResult<Ep>> + 'static + Send {
-        AsEpFactory::bind(self, bind_spec.into(), timeout)
-    }
-}
-
-impl AsEpFactory for EpFactory {
-    fn bind(
-        &self,
-        bind_spec: TxUrl,
-        timeout: KitsuneTimeout,
-    ) -> BoxFuture<'static, KitsuneResult<Ep>> {
-        self.0.bind(bind_spec, timeout)
-    }
 }

@@ -3,7 +3,7 @@ use criterion::{/*black_box,*/ criterion_group, criterion_main, Criterion};
 
 use futures::stream::StreamExt;
 use kitsune_p2p_types::tx2::tx2_api::*;
-use kitsune_p2p_types::tx2::tx2_promote::*;
+use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
@@ -24,19 +24,19 @@ const RES: &[u8] = &[0xdb; SIZE];
 #[allow(dead_code)]
 struct Test {
     dst_ep: Tx2EpHnd<TestData>,
+    dst_url: TxUrl,
     src_ep: Tx2EpHnd<TestData>,
-    src_con: Tx2ConHnd<TestData>,
 }
 
 impl Test {
     pub async fn new() -> Self {
         let (dst_url, dst_ep) = mk_dst().await;
-        let (src_ep, src_con) = mk_src(dst_url).await;
+        let src_ep = mk_src().await;
 
         Self {
             dst_ep,
+            dst_url,
             src_ep,
-            src_con,
         }
     }
 
@@ -46,8 +46,12 @@ impl Test {
         let data = TestData::one(data);
 
         let res = self
-            .src_con
-            .request(&data, KitsuneTimeout::from_millis(5000))
+            .src_ep
+            .request(
+                self.dst_url.clone(),
+                &data,
+                KitsuneTimeout::from_millis(5000),
+            )
             .await
             .unwrap();
 
@@ -63,8 +67,8 @@ async fn mk_core() -> (TxUrl, Tx2Ep<TestData>, Tx2EpHnd<TestData>) {
     let t = KitsuneTimeout::from_millis(5000);
 
     let f = MemBackendAdapt::new();
-    let f = tx2_promote(f, 32);
-    let f = Tx2EpFactory::new(f);
+    let f = tx2_pool_promote(f, 32);
+    let f = Tx2EpFactory::new(f, 32);
 
     let ep = f.bind("none:", t).await.unwrap();
     let ep_hnd = ep.handle().clone();
@@ -98,17 +102,12 @@ async fn mk_dst() -> (TxUrl, Tx2EpHnd<TestData>) {
     (url, ep_hnd)
 }
 
-async fn mk_src(url: TxUrl) -> (Tx2EpHnd<TestData>, Tx2ConHnd<TestData>) {
+async fn mk_src() -> Tx2EpHnd<TestData> {
     let (_url, mut ep, ep_hnd) = mk_core().await;
 
     tokio::task::spawn(async move { while let Some(_evt) = ep.next().await {} });
 
-    let con_hnd = ep_hnd
-        .connect(url, KitsuneTimeout::from_millis(5000))
-        .await
-        .unwrap();
-
-    (ep_hnd, con_hnd)
+    ep_hnd
 }
 
 async fn test(this: &Share<Option<Test>>) {

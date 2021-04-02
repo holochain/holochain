@@ -1,21 +1,21 @@
 #![allow(clippy::new_ret_no_self)]
+#![allow(clippy::manual_async_fn)]
 //! Promote a tx2 transport backend to a tx2 transport frontend.
 
 use crate::tx2::tx2_backend::*;
-use crate::tx2::tx2_pool::tx2_pool_traits::*;
 use crate::tx2::tx2_pool::*;
 use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
 use crate::*;
-use ghost_actor::dependencies::tracing;
 use futures::future::{BoxFuture, FutureExt, Shared};
 use futures::stream::{Stream, StreamExt};
+use ghost_actor::dependencies::tracing;
 use std::collections::HashMap;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 /// Promote a tx2 transport backend to a tx2 transport frontend.
 pub fn tx2_pool_promote(backend: BackendFactory, max_cons: usize) -> EpFactory {
-    EpFactory(Arc::new(PromoteFactory { max_cons, backend }))
+    Arc::new(PromoteFactory { max_cons, backend })
 }
 
 // -- private -- //
@@ -40,11 +40,16 @@ struct ConItemInner {
 }
 
 impl ConItemInner {
-    pub fn close(&self, uniq: Uniq, code: u32, reason: &str) -> impl std::future::Future<Output = ()> + 'static + Send {
+    pub fn close(
+        &self,
+        uniq: Uniq,
+        code: u32,
+        reason: &str,
+    ) -> impl std::future::Future<Output = ()> + 'static + Send {
         let _ = self.inner.share_mut(|i, _| {
             let u = match i.cons.get(&self.url) {
                 None => return Ok(()),
-                Some(ci) => ci.uniq.clone(),
+                Some(ci) => ci.uniq,
             };
             if u == uniq {
                 i.cons.remove(&self.url);
@@ -108,7 +113,9 @@ async fn in_chan_recv_logic(
                     Ok(r) => r,
                 };
 
+                let con: ConHnd = Arc::new(con_item.clone());
                 let data = EpIncomingData {
+                    con,
                     url: url.clone(),
                     msg_id,
                     data,
@@ -172,8 +179,26 @@ struct ConItem {
     pub item: Share<ConItemInner>,
 }
 
-impl ConItem {
-    pub fn close(&self, code: u32, reason: &str) -> impl std::future::Future<Output = ()> + 'static + Send {
+impl std::fmt::Debug for ConItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("ConHnd").field(&self.uniq).finish()
+    }
+}
+
+impl AsConHnd for ConItem {
+    fn uniq(&self) -> Uniq {
+        self.uniq
+    }
+
+    fn remote_addr(&self) -> KitsuneResult<TxUrl> {
+        self.item.share_mut(|i, _| Ok(i.url.clone()))
+    }
+
+    fn is_closed(&self) -> bool {
+        self.item.is_closed()
+    }
+
+    fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
         let maybe = self.item.share_mut(|i, c| {
             *c = true;
             Ok(i.close(self.uniq, code, reason))
@@ -183,21 +208,51 @@ impl ConItem {
                 close_fut.await;
             }
         }
+        .boxed()
     }
 
+    fn write(
+        &self,
+        msg_id: MsgId,
+        data: PoolBuf,
+        timeout: KitsuneTimeout,
+    ) -> BoxFuture<'static, KitsuneResult<()>> {
+        let this = self.clone();
+        async move {
+            let mut writer = this
+                .item
+                .share_mut(|i, _| Ok(i.writer_bucket.acquire(Some(timeout))))?
+                .await?;
+
+            if let Err(e) = writer.writer.write(msg_id, data, timeout).await {
+                let reason = format!("{:?}", e);
+                // TODO - standardize codes?
+                this.close(500, &reason).await;
+                return Err(e);
+            }
+
+            this.item.share_mut(move |i, _| {
+                i.writer_bucket.release(writer);
+                Ok(())
+            })
+        }
+        .boxed()
+    }
+}
+
+impl ConItem {
     pub async fn out_chan(&self, t: KitsuneTimeout) -> KitsuneResult<OutChan> {
-        self.item.share_mut(|i, _| {
-            Ok(i.con.out_chan(t))
-        })?.await
+        self.item.share_mut(|i, _| Ok(i.con.out_chan(t)))?.await
     }
 
     // register this connection
-    pub fn reg_con_inner(
+    pub async fn reg_con_inner(
         inner: Share<PromoteEpInner>,
         permit: OwnedSemaphorePermit,
         con: Arc<dyn ConAdapt>,
         url: TxUrl,
         in_chan_recv: Box<dyn InChanRecvAdapt>,
+        is_outgoing: bool,
     ) -> KitsuneResult<Self> {
         let uniq = con.uniq();
 
@@ -229,12 +284,24 @@ impl ConItem {
         // Instead, we spawn one task per connection, gathering
         // the incoming channel data to be processed.
         tokio::task::spawn(in_chan_recv_logic(
-            url,
+            url.clone(),
             con_item.clone(),
             writer_bucket,
-            logic_hnd,
+            logic_hnd.clone(),
             in_chan_recv,
         ));
+
+        if is_outgoing {
+            let _ = logic_hnd.emit(EpEvent::OutgoingConnection(EpConnection {
+                con: Arc::new(con_item.clone()),
+                url,
+            })).await;
+        } else {
+            let _ = logic_hnd.emit(EpEvent::IncomingConnection(EpConnection {
+                con: Arc::new(con_item.clone()),
+                url,
+            })).await;
+        }
 
         Ok(con_item)
     }
@@ -248,27 +315,24 @@ impl ConItem {
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<Self>> {
         timeout.mix(async move {
-            let permit = con_limit.acquire_owned().await.map_err(KitsuneError::other)?;
+            let permit = con_limit
+                .acquire_owned()
+                .await
+                .map_err(KitsuneError::other)?;
 
             let mut next_wait_ms = 200;
 
             let try_connect = || async {
-                inner.share_mut(|i, _| {
-                    Ok(i.sub_ep.connect(remote.clone(), timeout))
-                })?.await
+                inner
+                    .share_mut(|i, _| Ok(i.sub_ep.connect(remote.clone(), timeout)))?
+                    .await
             };
 
             loop {
                 match try_connect().await {
                     Err(e) => tracing::warn!("connect error: {:?}", e),
                     Ok((con, in_chan_recv)) => {
-                        return Self::reg_con_inner(
-                            inner,
-                            permit,
-                            con,
-                            remote,
-                            in_chan_recv,
-                        );
+                        return Self::reg_con_inner(inner, permit, con, remote, in_chan_recv, true).await;
                     }
                 }
 
@@ -291,15 +355,7 @@ impl ConItem {
     ) -> Shared<BoxFuture<'static, KitsuneResult<Self>>> {
         async move {
             match Self::inner_con_inner(inner.clone(), con_limit, remote.clone(), timeout).await {
-                Ok(con_item) => {
-                    // move us to the full cons list
-                    inner.share_mut(|i, _| {
-                        i.pend_cons.remove(&remote);
-                        i.cons.insert(remote, con_item.clone());
-                        Ok(())
-                    })?;
-                    Ok(con_item)
-                }
+                Ok(con_item) => Ok(con_item),
                 Err(e) => {
                     // remove the pending entry
                     let _ = inner.share_mut(|i, _| {
@@ -309,7 +365,9 @@ impl ConItem {
                     Err(e)
                 }
             }
-        }.boxed().shared()
+        }
+        .boxed()
+        .shared()
     }
 
     // Check cons && pend_cons or create a new pend_cons
@@ -317,22 +375,24 @@ impl ConItem {
         inner: Share<PromoteEpInner>,
         remote: TxUrl,
         timeout: KitsuneTimeout,
-    ) -> impl std::future::Future<Output = KitsuneResult<Self>> {
+    ) -> impl std::future::Future<Output = KitsuneResult<Self>> + 'static + Send {
         async move {
             let inner2 = inner.clone();
-            inner.share_mut(|i, _| {
-                if let Some(con_item) = i.cons.get(&remote) {
-                    let con_item = con_item.clone();
-                    return Ok(async move { Ok(con_item) }.boxed());
-                }
-                if let Some(pend_con_fut) = i.pend_cons.get(&remote) {
-                    return Ok(pend_con_fut.clone().boxed());
-                }
-                let con_limit = i.con_limit.clone();
-                let pend_con_fut = Self::inner_con(inner2, con_limit, remote.clone(), timeout);
-                i.pend_cons.insert(remote, pend_con_fut.clone());
-                Ok(pend_con_fut.boxed())
-            })?.await
+            inner
+                .share_mut(|i, _| {
+                    if let Some(con_item) = i.cons.get(&remote) {
+                        let con_item = con_item.clone();
+                        return Ok(async move { Ok(con_item) }.boxed());
+                    }
+                    if let Some(pend_con_fut) = i.pend_cons.get(&remote) {
+                        return Ok(pend_con_fut.clone().boxed());
+                    }
+                    let con_limit = i.con_limit.clone();
+                    let pend_con_fut = Self::inner_con(inner2, con_limit, remote.clone(), timeout);
+                    i.pend_cons.insert(remote, pend_con_fut.clone());
+                    Ok(pend_con_fut.boxed())
+                })?
+                .await
         }
     }
 }
@@ -390,6 +450,10 @@ impl AsEpHnd for PromoteEpHnd {
         self.1
     }
 
+    fn local_addr(&self) -> KitsuneResult<TxUrl> {
+        self.0.share_mut(|i, _| i.sub_ep.local_addr())
+    }
+
     fn is_closed(&self) -> bool {
         self.0.is_closed()
     }
@@ -403,71 +467,33 @@ impl AsEpHnd for PromoteEpHnd {
             async move {
                 close_fut.await;
                 logic_hnd.close();
-            }.boxed()
+            }
+            .boxed()
         } else {
             async move {}.boxed()
         }
     }
 
-    fn close_connection(
-        &self,
-        remote: TxUrl,
-        code: u32,
-        reason: &str,
-    ) -> BoxFuture<'static, ()> {
-        if let Ok(Some(con_item)) = self.0.share_mut(|i, _| {
-            Ok(i.cons.get(&remote).cloned())
-        }) {
+    fn close_connection(&self, remote: TxUrl, code: u32, reason: &str) -> BoxFuture<'static, ()> {
+        if let Ok(Some(con_item)) = self.0.share_mut(|i, _| Ok(i.cons.get(&remote).cloned())) {
             con_item.close(code, reason).boxed()
         } else {
             async move {}.boxed()
         }
     }
 
-    fn local_addr(&self) -> KitsuneResult<TxUrl> {
-        self.0.share_mut(|i, _| i.sub_ep.local_addr())
-    }
-
-    fn write(
+    fn get_connection(
         &self,
         remote: TxUrl,
-        msg_id: MsgId,
-        data: PoolBuf,
         timeout: KitsuneTimeout,
-    ) -> BoxFuture<'static, KitsuneResult<()>> {
+    ) -> BoxFuture<'static, KitsuneResult<ConHnd>> {
         let inner = self.0.clone();
         async move {
-            let con_item = ConItem::get_or_create(inner.clone(), remote.clone(), timeout).await?;
-            let mut writer = con_item.item.share_mut(|i, _| {
-                Ok(i.writer_bucket.acquire(Some(timeout)))
-            })?.await?;
-            if let Err(e) = writer.writer.write(msg_id, data, timeout).await {
-                let _ = inner.share_mut(|i, _| {
-                    let uniq = match i.cons.get(&remote) {
-                        None => return Ok(()),
-                        Some(ci) => ci.uniq.clone(),
-                    };
-                    if uniq == con_item.uniq {
-                        i.cons.remove(&remote);
-                    }
-                    Ok(())
-                });
-                let reason = format!("{:?}", e);
-                if let Ok(close_fut) = con_item.item.share_mut(|i, c| {
-                    *c = true;
-                    // TODO - standardize codes?
-                    Ok(i.con.close(500, &reason))
-                }) {
-                    close_fut.await;
-                }
-                return Err(e);
-            }
-            con_item.item.share_mut(move |i, _| {
-                i.writer_bucket.release(writer);
-                Ok(())
-            })?;
-            Ok(())
-        }.boxed()
+            let con_item = ConItem::get_or_create(inner.clone(), remote, timeout).await?;
+            let con: ConHnd = Arc::new(con_item);
+            Ok(con)
+        }
+        .boxed()
     }
 }
 
@@ -519,27 +545,21 @@ async fn con_recv_logic(
             let (permit, r) = r;
             let (con, in_chan_recv) = match r.await {
                 Err(e) => {
-                    let _ = logic_hnd.emit(EpEvent::Error(e));
+                    let _ = logic_hnd.emit(EpEvent::Error(e)).await;
                     return;
                 }
                 Ok(r) => r,
             };
             let url = match con.remote_addr() {
                 Err(e) => {
-                    let _ = logic_hnd.emit(EpEvent::Error(e));
+                    let _ = logic_hnd.emit(EpEvent::Error(e)).await;
                     return;
                 }
                 Ok(r) => r,
             };
-            let _con_item = match ConItem::reg_con_inner(inner.clone(), permit, con, url.clone(), in_chan_recv) {
-                Err(e) => {
-                    let _ = logic_hnd.emit(EpEvent::Error(e));
-                    return;
-                }
-                Ok(r) => r,
-            };
-            let evt = EpEvent::IncomingConnection(url);
-            let _ = logic_hnd.emit(evt);
+            if let Err(e) = ConItem::reg_con_inner(inner.clone(), permit, con, url.clone(), in_chan_recv, false).await {
+                let _ = logic_hnd.emit(EpEvent::Error(e)).await;
+            }
         })
         .await;
 }
@@ -566,7 +586,7 @@ impl PromoteEp {
         ))
         .await?;
 
-        let hnd = EpHnd(Arc::new(hnd));
+        let hnd: EpHnd = Arc::new(hnd);
         Ok(Self { hnd, logic_chan })
     }
 }
@@ -604,13 +624,14 @@ impl AsEpFactory for PromoteFactory {
         let max_cons = self.max_cons;
         let con_limit = Arc::new(Semaphore::new(max_cons));
         let pair_fut = self.backend.bind(bind_spec, timeout);
-        timeout.mix(async move {
-            let pair = pair_fut.await?;
-            let ep = PromoteEp::new(max_cons, con_limit, pair).await?;
-            let ep = Ep(Box::new(ep));
-            Ok(ep)
-        })
-        .boxed()
+        timeout
+            .mix(async move {
+                let pair = pair_fut.await?;
+                let ep = PromoteEp::new(max_cons, con_limit, pair).await?;
+                let ep: Ep = Box::new(ep);
+                Ok(ep)
+            })
+            .boxed()
     }
 }
 
@@ -629,20 +650,19 @@ mod tests {
         // as old connections complete, new ones will be accepted
         let fact = tx2_pool_promote(MemBackendAdapt::new(), COUNT / 2);
 
-        let mut tgt = fact.bind("none:", t).await.unwrap();
+        let mut tgt = fact.bind("none:".into(), t).await.unwrap();
         let tgt_hnd = tgt.handle().clone();
         let tgt_addr = tgt_hnd.local_addr().unwrap();
 
-        let tgt_hnd2 = tgt_hnd.clone();
         w_send
             .send(tokio::task::spawn(async move {
                 while let Some(evt) = tgt.next().await {
                     match evt {
-                        EpEvent::IncomingData(EpIncomingData { url, mut data, .. }) => {
+                        EpEvent::IncomingData(EpIncomingData { con, mut data, .. }) => {
                             assert_eq!(b"hello", data.as_ref());
                             data.clear();
                             data.extend_from_slice(b"world");
-                            tgt_hnd2.write(url, 0.into(), data, t).await.unwrap();
+                            con.write(0.into(), data, t).await.unwrap();
                         }
                         _ => (),
                     }
@@ -653,7 +673,7 @@ mod tests {
 
         let mut all_fut = Vec::new();
         for _ in 0..COUNT {
-            let ep_fut = fact.bind("none:", t);
+            let ep_fut = fact.bind("none:".into(), t);
             let w_send = w_send.clone();
             let tgt_addr = tgt_addr.clone();
             all_fut.push(async move {
