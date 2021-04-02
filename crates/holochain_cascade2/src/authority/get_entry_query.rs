@@ -1,7 +1,7 @@
 use holo_hash::EntryHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
-use holochain_state::query::prelude::*;
+use holochain_state::query::{prelude::*, StoresIter};
 use holochain_types::dht_op::DhtOpType;
 use holochain_zome_types::Entry;
 use holochain_zome_types::Header;
@@ -130,11 +130,11 @@ impl Query for GetEntryOpsQuery {
         Ok(state)
     }
 
-    fn render<S: Stores<Self>>(
-        &mut self,
-        mut state: Self::State,
-        stores: S,
-    ) -> StateQueryResult<Self::Output> {
+    fn render<S>(&mut self, mut state: Self::State, stores: S) -> StateQueryResult<Self::Output>
+    where
+        S: Stores<Self>,
+        S::O: StoresIter<Self::Data>,
+    {
         // TODO: Handle error where header is missing entry hash.
         let entry_hash = state
             .creates

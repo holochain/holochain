@@ -20,7 +20,7 @@ use std::sync::Arc;
 pub use error::*;
 
 #[cfg(test)]
-mod query;
+mod tests;
 
 pub mod entry;
 pub mod error;
@@ -42,8 +42,11 @@ pub mod prelude {
     pub use std::sync::Arc;
 }
 
+/// Alias for the params required by rusqlite query execution
 pub type Params<'a> = (&'a str, &'a dyn holochain_sqlite::rusqlite::ToSql);
 
+/// A common accumulator type used by folds to collapse queries down to a
+/// simpler structure, i.e. to let deletions annihilate creations.
 pub struct Maps<T> {
     pub creates: HashMap<HeaderHash, T>,
     pub deletes: HashSet<HeaderHash>,
@@ -57,8 +60,6 @@ impl<T> Maps<T> {
         }
     }
 }
-
-pub type Transactions<'a, 'txn> = [&'a Transaction<'txn>];
 
 /// You should keep your query type cheap to clone.
 /// If there is any large data put it in an Arc.
@@ -99,7 +100,7 @@ pub trait Query: Clone {
     where
         S: Stores<Self>,
     {
-        let mut stores_iter = stores.init(self.clone())?;
+        let mut stores_iter = stores.get_initial_data(self.clone())?;
         let iter = stores_iter.iter()?;
         let result = iter.fold(self.init_fold()?, |state, i| self.fold(state, i))?;
         drop(stores_iter);
@@ -108,25 +109,45 @@ pub trait Query: Clone {
 
     fn render<S>(&mut self, state: Self::State, stores: S) -> StateQueryResult<Self::Output>
     where
-        S: Stores<Self>;
+        S: Stores<Self>,
+        S::O: StoresIter<Self::Data>;
 }
 
+/// Represents the data sources which are needed to perform a Query.
+/// From these sources, we need:
+/// - a collection of Data needed by the query (`Q::Data`)
+/// - the ability to fetch an Entry during the Render phase of the query.
 pub trait Stores<Q: Query> {
     type O: StoresIter<Q::Data>;
-    fn init(&self, query: Q) -> StateQueryResult<Self::O>;
+
+    /// Gets the raw initial data from the database, needed to begin the query.
+    // MD: can the query be &Q?
+    fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O>;
+
+    /// Get an Entry from the database
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>>;
 }
+
+/// Each Stores implementation has its own custom way of iterating over itself,
+/// which this trait represents.
+// MD: does this definitely need to be its own trait? Why can't a Stores
+// just return an iterator?
 pub trait StoresIter<T> {
     fn iter<'iter>(&'iter mut self) -> StateQueryResult<StmtIter<'iter, T>>;
 }
 
+/// Wrapper around a transaction reference, to which trait impls are attached
 pub struct Txn<'borrow, 'txn> {
     txn: &'borrow Transaction<'txn>,
 }
 
+/// Wrapper around a collection of Txns, to which trait impls are attached
 pub struct Txns<'borrow, 'txn> {
     txns: Vec<Txn<'borrow, 'txn>>,
 }
+
+/// Alias for an array of Transaction references
+pub type Transactions<'a, 'txn> = [&'a Transaction<'txn>];
 
 pub struct DbScratch<'borrow, 'txn, T> {
     txns: Txns<'borrow, 'txn>,
@@ -140,7 +161,7 @@ pub struct DbScratchIter<'stmt, Q: Query, T> {
 impl<'stmt, Q: Query> Stores<Q> for Txn<'stmt, '_> {
     type O = QueryStmt<'stmt, Q>;
 
-    fn init(&self, query: Q) -> StateQueryResult<Self::O> {
+    fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O> {
         QueryStmt::new(&self.txn, query)
     }
 
@@ -158,9 +179,13 @@ impl<'stmt, Q: Query> StoresIter<Q::Data> for QueryStmt<'stmt, Q> {
 impl<'stmt, Q: Query> Stores<Q> for Txns<'stmt, '_> {
     type O = QueryStmts<'stmt, Q>;
 
-    fn init(&self, query: Q) -> StateQueryResult<Self::O> {
-        let stmts = fallible_iterator::convert(self.txns.iter().map(|txn| txn.init(query.clone())))
-            .collect()?;
+    fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O> {
+        let stmts = fallible_iterator::convert(
+            self.txns
+                .iter()
+                .map(|txn| txn.get_initial_data(query.clone())),
+        )
+        .collect()?;
         Ok(QueryStmts { stmts })
     }
 
@@ -186,7 +211,7 @@ impl<'stmt, Q: Query> StoresIter<Q::Data> for QueryStmts<'stmt, Q> {
 impl<Q: Query> Stores<Q> for Scratch<Q::Data> {
     type O = FilteredScratch<Q::Data>;
 
-    fn init(&self, query: Q) -> StateQueryResult<Self::O> {
+    fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O> {
         Ok(self.as_filter(query.as_filter()))
     }
 
@@ -207,10 +232,10 @@ impl<T> StoresIter<T> for FilteredScratch<T> {
 impl<'borrow, 'txn, Q: Query> Stores<Q> for DbScratch<'borrow, 'txn, Q::Data> {
     type O = DbScratchIter<'borrow, Q, Q::Data>;
 
-    fn init(&self, query: Q) -> StateQueryResult<Self::O> {
+    fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O> {
         Ok(DbScratchIter {
-            stmts: self.txns.init(query.clone())?,
-            filtered_scratch: self.scratch.init(query.clone())?,
+            stmts: self.txns.get_initial_data(query.clone())?,
+            filtered_scratch: self.scratch.get_initial_data(query.clone())?,
         })
     }
 
@@ -258,6 +283,13 @@ pub struct QueryStmts<'stmt, Q: Query> {
     stmts: Vec<QueryStmt<'stmt, Q>>,
 }
 
+/// A collection of prepared SQL statements used to perform a cascade query
+/// on a particular database.
+///
+/// This type is needed because queries happen in two steps: statement creation,
+/// and then statement execution, and a lifetime needs to be enforced across
+/// those steps, so we have to hold on to the statements rather than letting
+/// them drop as temporary values.
 pub struct QueryStmt<'stmt, Q: Query> {
     create_stmt: Option<Statement<'stmt>>,
     delete_stmt: Option<Statement<'stmt>>,
@@ -334,14 +366,17 @@ pub(crate) fn row_to_header(row: &Row) -> StateQueryResult<SignedHeaderHashed> {
     Ok(shh)
 }
 
+/// Serialize a value to be stored in a database as a BLOB type
 pub fn to_blob<T: Serialize + std::fmt::Debug>(t: T) -> Vec<u8> {
     holochain_serialized_bytes::encode(&t).unwrap()
 }
 
+/// Deserialize a BLOB from a database into a value
 pub fn from_blob<T: DeserializeOwned + std::fmt::Debug>(blob: Vec<u8>) -> T {
     holochain_serialized_bytes::decode(&blob).unwrap()
 }
 
+/// Fetch an Entry from a DB by its hash. Requires no joins.
 pub fn get_entry_from_db(
     txn: &Transaction,
     entry_hash: &EntryHash,

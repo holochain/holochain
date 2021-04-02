@@ -13,6 +13,7 @@ use fallible_iterator::FallibleIterator;
 #[derive(Debug, Clone)]
 pub struct Scratch<T>(Vec<T>);
 
+// MD: hmm, why does this need to be a separate type? Why collect into this?
 pub struct FilteredScratch<T>(Vec<T>);
 
 impl<T> Scratch<T>

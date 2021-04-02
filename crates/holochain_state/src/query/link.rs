@@ -197,11 +197,11 @@ impl Query for LinkQuery {
         Ok(state)
     }
 
-    fn render<S: Stores<Self>>(
-        &mut self,
-        state: Self::State,
-        _stores: S,
-    ) -> StateQueryResult<Self::Output> {
+    fn render<S>(&mut self, state: Self::State, _stores: S) -> StateQueryResult<Self::Output>
+    where
+        S: Stores<Self>,
+        S::O: StoresIter<Self::Data>,
+    {
         Ok(state.creates.into_iter().map(|(_, v)| v).collect())
     }
 
