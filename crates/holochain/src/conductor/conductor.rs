@@ -30,6 +30,7 @@ use super::manager::spawn_task_manager;
 use super::manager::ManagedTaskAdd;
 use super::manager::ManagedTaskHandle;
 use super::manager::TaskManagerRunHandle;
+use super::manager::TaskOutcome;
 use super::p2p_store;
 use super::p2p_store::all_agent_infos;
 use super::p2p_store::get_single_agent_info;
@@ -280,7 +281,7 @@ where
 
             // First, register the keepalive task, to ensure the conductor doesn't shut down
             // in the absence of other "real" tasks
-            self.manage_task(ManagedTaskAdd::dont_handle(tokio::spawn(keep_alive_task(
+            self.manage_task(ManagedTaskAdd::ignore(tokio::spawn(keep_alive_task(
                 stop_tx.subscribe(),
             ))))
             .await?;
@@ -294,7 +295,7 @@ where
                         result.unwrap_or_else(|e| {
                             error!(error = &e as &dyn std::error::Error, "Interface died")
                         });
-                        None
+                        TaskOutcome::Ignore
                     }),
                 ))
                 .await?
@@ -326,7 +327,7 @@ where
             .await
             .map_err(Box::new)?;
         // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
-        self.manage_task(ManagedTaskAdd::dont_handle(task)).await?;
+        self.manage_task(ManagedTaskAdd::ignore(task)).await?;
         let interface = AppInterfaceRuntime::Websocket { signal_tx };
 
         if self.app_interfaces.contains_key(&interface_id) {

@@ -70,7 +70,7 @@ pub async fn spawn_queue_consumer_tasks(
     let (tx_publish, handle) =
         spawn_publish_dht_ops_consumer(env.clone(), stop.subscribe(), cell_network.clone());
     task_sender
-        .send(ManagedTaskAdd::dont_handle(handle))
+        .send(ManagedTaskAdd::unrecoverable(handle))
         .await
         .expect("Failed to manage workflow handle");
 
@@ -78,7 +78,7 @@ pub async fn spawn_queue_consumer_tasks(
     let (tx_receipt, handle) =
         spawn_validation_receipt_consumer(env.clone(), stop.subscribe(), cell_network.clone());
     task_sender
-        .send(ManagedTaskAdd::dont_handle(handle))
+        .send(ManagedTaskAdd::unrecoverable(handle))
         .await
         .expect("Failed to manage workflow handle");
 
@@ -92,7 +92,7 @@ pub async fn spawn_queue_consumer_tasks(
         tx_receipt.clone(),
     );
     task_sender
-        .send(ManagedTaskAdd::dont_handle(handle))
+        .send(ManagedTaskAdd::unrecoverable(handle))
         .await
         .expect("Failed to manage workflow handle");
 
@@ -105,7 +105,7 @@ pub async fn spawn_queue_consumer_tasks(
         cell_network.clone(),
     );
     task_sender
-        .send(ManagedTaskAdd::dont_handle(handle))
+        .send(ManagedTaskAdd::unrecoverable(handle))
         .await
         .expect("Failed to manage workflow handle");
 
@@ -118,7 +118,7 @@ pub async fn spawn_queue_consumer_tasks(
         conductor_api,
     );
     task_sender
-        .send(ManagedTaskAdd::dont_handle(handle))
+        .send(ManagedTaskAdd::unrecoverable(handle))
         .await
         .expect("Failed to manage workflow handle");
     if create_tx_sys.send(tx_sys.clone()).is_err() {
@@ -129,7 +129,7 @@ pub async fn spawn_queue_consumer_tasks(
     let (tx_produce, handle) =
         spawn_produce_dht_ops_consumer(env.clone(), stop.subscribe(), tx_publish.clone());
     task_sender
-        .send(ManagedTaskAdd::dont_handle(handle))
+        .send(ManagedTaskAdd::unrecoverable(handle))
         .await
         .expect("Failed to manage workflow handle");
 
