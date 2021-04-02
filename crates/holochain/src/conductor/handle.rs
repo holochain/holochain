@@ -519,11 +519,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             if let Some(uuid) = uuid {
                 let mut manifest = original_bundle.manifest().to_owned();
                 manifest.set_uuid(uuid);
-                AppBundle::from(
-                    original_bundle
-                        .into_inner()
-                        .update_manifest(manifest.into())?,
-                )
+                AppBundle::from(original_bundle.into_inner().update_manifest(manifest)?)
             } else {
                 original_bundle
             }
