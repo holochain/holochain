@@ -458,6 +458,10 @@ impl AsEpHnd for PromoteEpHnd {
         self.0.share_mut(|i, _| i.sub_ep.local_addr())
     }
 
+    fn local_digest(&self) -> KitsuneResult<CertDigest> {
+        self.0.share_mut(|i, _| i.sub_ep.local_digest())
+    }
+
     fn is_closed(&self) -> bool {
         self.0.is_closed()
     }
@@ -650,9 +654,11 @@ mod tests {
         const COUNT: usize = 100;
         let (w_send, w_recv) = t_chan(COUNT * 3);
 
+        let fact = MemBackendAdapt::new(MemConfig::default()).await.unwrap();
+
         // we can set the max con count to half...
         // as old connections complete, new ones will be accepted
-        let fact = tx2_pool_promote(MemBackendAdapt::new(), COUNT / 2);
+        let fact = tx2_pool_promote(fact, COUNT / 2);
 
         let mut tgt = fact.bind("none:".into(), t).await.unwrap();
         let tgt_hnd = tgt.handle().clone();

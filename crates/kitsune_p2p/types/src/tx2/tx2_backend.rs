@@ -78,6 +78,9 @@ pub trait EndpointAdapt: 'static + Send + Sync + Unpin {
     /// Get the string address (url) of this binding.
     fn local_addr(&self) -> KitsuneResult<TxUrl>;
 
+    /// Get the local certificate digest.
+    fn local_digest(&self) -> KitsuneResult<CertDigest>;
+
     /// Create a new outgoing connection to a remote.
     fn connect(&self, url: TxUrl, timeout: KitsuneTimeout) -> ConFut;
 

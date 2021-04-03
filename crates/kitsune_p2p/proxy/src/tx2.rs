@@ -252,6 +252,10 @@ impl AsEpHnd for ProxyEpHnd {
         Ok(proxy_addr)
     }
 
+    fn local_digest(&self) -> KitsuneResult<CertDigest> {
+        self.sub_ep_hnd.local_digest()
+    }
+
     fn is_closed(&self) -> bool {
         self.sub_ep_hnd.is_closed()
     }
@@ -435,7 +439,6 @@ async fn incoming_evt_handle(
 async fn incoming_evt_logic(
     sub_ep: Ep,
     hnd: Arc<ProxyEpHnd>,
-    local_digest: CertDigest,
     logic_hnd: LogicChanHandle<EpEvent>,
 ) {
     // erm - this const is not pub in types
@@ -448,7 +451,7 @@ async fn incoming_evt_logic(
     // instead of for_each_concurrent... but maybe other problems caused that?
     sub_ep
         .for_each_concurrent(CHANNEL_COUNT, |evt| async {
-            incoming_evt_handle(evt, &hnd, &local_digest, &logic_hnd).await;
+            incoming_evt_handle(evt, &hnd, &logic_hnd).await;
         })
         .await;
 }
@@ -456,7 +459,6 @@ async fn incoming_evt_logic(
 async fn incoming_evt_handle(
     evt: EpEvent,
     hnd: &Arc<ProxyEpHnd>,
-    _local_digest: &CertDigest,
     logic_hnd: &LogicChanHandle<EpEvent>,
 ) {
     println!("EVT: {:?}", evt);
@@ -499,6 +501,9 @@ async fn incoming_evt_handle(
                     const DEST_END: usize = DEST_START + DIGEST_BYTES;
                     let src_digest = CertDigest(Arc::new(data[SRC_START..SRC_END].to_vec()));
                     let dest_digest = CertDigest(Arc::new(data[DEST_START..DEST_END].to_vec()));
+                    println!("src: {:?}", src_digest);
+                    println!("dst: {:?}", dest_digest);
+                    println!("loc: {:?}", hnd.local_digest);
                     if dest_digest == hnd.local_digest {
                         // this data is destined for US!
                         data.cheap_move_start(SRC_END);
@@ -515,6 +520,7 @@ async fn incoming_evt_handle(
                     } else {
                         println!("data to forward");
                         let dest = hnd.inner.share_mut(|i, _| {
+                            println!("ALALA: {:?}", i.in_digest_to_sub_con);
                             Ok(i.in_digest_to_sub_con.get(&dest_digest).cloned())
                         });
                         if let Err(e) = match dest {
@@ -582,7 +588,7 @@ struct ProxyEp {
 }
 
 impl ProxyEp {
-    pub async fn new(sub_ep: Ep, local_digest: CertDigest) -> KitsuneResult<Ep> {
+    pub async fn new(sub_ep: Ep) -> KitsuneResult<Ep> {
         let logic_chan = LogicChan::new(32);
         let logic_hnd = logic_chan.handle().clone();
 
@@ -592,7 +598,7 @@ impl ProxyEp {
             logic_hnd.clone(),
         );
 
-        let logic = incoming_evt_logic(sub_ep, hnd.clone(), local_digest, logic_hnd);
+        let logic = incoming_evt_logic(sub_ep, hnd.clone(), logic_hnd);
 
         let l_hnd = logic_chan.handle().clone();
         l_hnd.capture_logic(logic).await?;
@@ -625,12 +631,11 @@ impl AsEp for ProxyEp {
 }
 
 struct ProxyEpFactory {
-    tls_config: TlsConfig,
     sub_fact: EpFactory,
 }
 
 impl ProxyEpFactory {
-    pub fn new(sub_fact: EpFactory, tls_config: TlsConfig) -> EpFactory {
+    pub fn new(sub_fact: EpFactory) -> EpFactory {
         let fact: EpFactory = Arc::new(ProxyEpFactory {
             tls_config,
             sub_fact,
@@ -645,11 +650,10 @@ impl AsEpFactory for ProxyEpFactory {
         bind_spec: TxUrl,
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<Ep>> {
-        let digest = self.tls_config.cert_digest.clone();
         let fut = self.sub_fact.bind(bind_spec, timeout);
         async move {
             let sub_ep = fut.await?;
-            ProxyEp::new(sub_ep, digest).await
+            ProxyEp::new(sub_ep).await
         }
         .boxed()
     }
@@ -665,7 +669,8 @@ mod tests {
     ) -> (tokio::task::JoinHandle<()>, TxUrl, EpHnd) {
         let t = KitsuneTimeout::from_millis(5000);
 
-        let f = tx2_pool_promote(MemBackendAdapt::new(), 32);
+        let f = MemBackendAdapt::new(MemConfig::default()).await.unwrap();
+        let f = tx2_pool_promote(f, 32);
 
         let f = tx2_proxy(f, TlsConfig::new_ephemeral().await.unwrap());
 
@@ -709,6 +714,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_proxy() {
+        observability::test_run().ok();
+
         let t = KitsuneTimeout::from_millis(5000);
 
         let mut all_tasks = Vec::new();
@@ -716,11 +723,13 @@ mod tests {
         let (p_join, p_addr, p_ep) = build_node(None).await;
         all_tasks.push(p_join);
         //println!("PROXY ADDR = {}", p_addr);
+        println!("PROXY: {:?}", p_ep.local_digest().unwrap());
 
         let (t_join, t_addr, t_ep) = build_node(None).await;
         all_tasks.push(t_join);
 
         //println!("TGT ADDR = {}", t_addr);
+        println!("TGT: {:?}", t_ep.local_digest().unwrap());
 
         // establish proxy connection
         let _ = t_ep.get_connection(p_addr.clone(), t).await.unwrap();
@@ -728,12 +737,14 @@ mod tests {
         let t_addr_proxy = proxify_addr(&p_addr, &t_addr);
         //println!("TGT PROXY ADDR = {}", t_addr_proxy);
 
-        const COUNT: usize = 100;
+        const COUNT: usize = 1;
 
         let mut all_futs = Vec::new();
         for _ in 0..COUNT {
             let (s_done, r_done) = tokio::sync::oneshot::channel();
             let (n_join, _n_addr, n_ep) = build_node(Some(s_done)).await;
+            println!("N: {:?}", n_ep.local_digest().unwrap());
+
             let t_addr_proxy = t_addr_proxy.clone();
             all_futs.push(async move {
                 let mut data = PoolBuf::new();

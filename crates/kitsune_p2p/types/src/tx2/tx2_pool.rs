@@ -47,6 +47,9 @@ pub trait AsEpHnd: 'static + Send + Sync + Unpin {
     /// Get the bound local address of this endpoint.
     fn local_addr(&self) -> KitsuneResult<TxUrl>;
 
+    /// Get the local certificate digest.
+    fn local_digest(&self) -> KitsuneResult<CertDigest>;
+
     /// Is this endpoint closed?
     fn is_closed(&self) -> bool;
 

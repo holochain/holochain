@@ -4,6 +4,8 @@
 use crate::tx2::tx2_backend::*;
 use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
+use crate::tls::*;
+use crate::config::*;
 use crate::*;
 use futures::{
     future::{BoxFuture, FutureExt},
@@ -14,21 +16,52 @@ use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::atomic;
 
-static NEXT_MEM_ID: atomic::AtomicU64 = atomic::AtomicU64::new(1);
+/// Configuration for QuicBackendAdapt
+#[non_exhaustive]
+pub struct MemConfig {
+    /// Tls config
+    /// Default: None = ephemeral.
+    pub tls: Option<TlsConfig>,
 
-fn id_to_digest(id: u64) -> CertDigest {
-    let bytes = id.to_le_bytes();
-    let mut out = vec![0; 32];
-    out[..8].copy_from_slice(&bytes);
-    CertDigest(Arc::new(out))
+    /// Tuning Params
+    /// Default: None = default.
+    pub tuning_params: Option<Arc<KitsuneP2pTuningParams>>,
 }
+
+impl Default for MemConfig {
+    fn default() -> Self {
+        Self {
+            tls: None,
+            tuning_params: None,
+        }
+    }
+}
+
+impl MemConfig {
+    /// into inner contents with default application
+    pub async fn split(self) -> KitsuneResult<(TlsConfig, Arc<KitsuneP2pTuningParams>)> {
+        let MemConfig { tls, tuning_params } = self;
+
+        let tls = match tls {
+            None => TlsConfig::new_ephemeral().await?,
+            Some(tls) => tls,
+        };
+
+        let tuning_params =
+            tuning_params.unwrap_or_else(|| Arc::new(KitsuneP2pTuningParams::default()));
+
+        Ok((tls, tuning_params))
+    }
+}
+
+static NEXT_MEM_ID: atomic::AtomicU64 = atomic::AtomicU64::new(1);
 
 type ChanSend = TSender<InChan>;
 type ChanRecv = TReceiver<InChan>;
 type ConSend = TSender<Con>;
 type ConRecv = TReceiver<Con>;
 
-static MEM_ENDPOINTS: Lazy<Mutex<HashMap<u64, (ConSend, Active)>>> =
+static MEM_ENDPOINTS: Lazy<Mutex<HashMap<u64, (ConSend, Active, CertDigest)>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 struct MemInChanRecvAdapt(BoxStream<'static, InChanFut>);
@@ -177,6 +210,7 @@ impl ConRecvAdapt for MemConRecvAdapt {}
 
 struct MemEndpointAdaptInner {
     id: u64,
+    local_digest: CertDigest,
     url: TxUrl,
     ep_active: Active,
     c_send: ConSend,
@@ -191,13 +225,14 @@ impl Drop for MemEndpointAdaptInner {
 struct MemEndpointAdapt(Mutex<MemEndpointAdaptInner>, Uniq);
 
 impl MemEndpointAdapt {
-    pub fn new(c_send: ConSend, id: u64) -> (Self, Active) {
+    pub fn new(c_send: ConSend, id: u64, local_digest: CertDigest) -> (Self, Active) {
         let url = format!("kitsune-mem://{}", id);
         let ep_active = Active::new();
         (
             Self(
                 Mutex::new(MemEndpointAdaptInner {
                     id,
+                    local_digest,
                     url: url.into(),
                     ep_active: ep_active.clone(),
                     c_send,
@@ -238,15 +273,22 @@ impl EndpointAdapt for MemEndpointAdapt {
         Ok(inner.url.clone())
     }
 
+    fn local_digest(&self) -> KitsuneResult<CertDigest> {
+        let inner = self.0.lock();
+        if !inner.ep_active.is_active() {
+            return Err(KitsuneErrorKind::Closed.into());
+        }
+        Ok(inner.local_digest.clone())
+    }
+
     fn connect(&self, url: TxUrl, timeout: KitsuneTimeout) -> ConFut {
-        let (this_url, this_id, this_ep_active) = {
+        let (this_url, local_digest, this_ep_active) = {
             let inner = self.0.lock();
             if !inner.ep_active.is_active() {
                 return async move { Err(KitsuneErrorKind::Closed.into()) }.boxed();
             }
-            (inner.url.clone(), inner.id, inner.ep_active.clone())
+            (inner.url.clone(), inner.local_digest.clone(), inner.ep_active.clone())
         };
-        let local_digest = id_to_digest(this_id);
         async move {
             let con_id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
 
@@ -266,11 +308,9 @@ impl EndpointAdapt for MemEndpointAdapt {
                 Ok(id) => id,
             };
 
-            let remote_digest = id_to_digest(id);
-
-            let (c_send, oth_ep_active) = match MEM_ENDPOINTS.lock().get(&id) {
+            let (c_send, oth_ep_active, remote_digest) = match MEM_ENDPOINTS.lock().get(&id) {
                 None => return Err(format!("remote not found: {}", url).into()),
-                Some((s, a)) => (s.clone(), a.clone()),
+                Some((s, a, d)) => (s.clone(), a.clone(), d.clone()),
             };
 
             let con_active = Active::new();
@@ -335,27 +375,29 @@ impl EndpointAdapt for MemEndpointAdapt {
 }
 
 /// Memory-based test endpoint adapter for kitsune tx2.
-pub struct MemBackendAdapt;
+pub struct MemBackendAdapt(CertDigest);
 
 impl MemBackendAdapt {
     /// Construct a new memory-based test endpoint adapter for kitsune tx2.
-    pub fn new() -> BackendFactory {
-        let out: BackendFactory = Arc::new(Self);
-        out
+    pub async fn new(config: MemConfig) -> KitsuneResult<BackendFactory> {
+        let (tls, _tuning_params) = config.split().await?;
+        let out: BackendFactory = Arc::new(Self(tls.cert_digest));
+        Ok(out)
     }
 }
 
 impl BackendAdapt for MemBackendAdapt {
-    fn bind(&self, _url: TxUrl, _timeout: KitsuneTimeout) -> EndpointFut {
-        async move {
+    fn bind(&self, _url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut {
+        let local_digest = self.0.clone();
+        timeout.mix(async move {
             let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
             let (c_send, c_recv) = t_chan(32);
-            let (ep, ep_active) = MemEndpointAdapt::new(c_send.clone(), id);
-            MEM_ENDPOINTS.lock().insert(id, (c_send, ep_active.clone()));
+            let (ep, ep_active) = MemEndpointAdapt::new(c_send.clone(), id, local_digest.clone());
+            MEM_ENDPOINTS.lock().insert(id, (c_send, ep_active.clone(), local_digest));
             let ep: Arc<dyn EndpointAdapt> = Arc::new(ep);
             let rc: Box<dyn ConRecvAdapt> = Box::new(MemConRecvAdapt::new(c_recv, ep_active));
             Ok((ep, rc))
-        }
+        })
         .boxed()
     }
 }
@@ -435,7 +477,7 @@ mod tests {
 
         const COUNT: usize = 100;
 
-        let f = MemBackendAdapt::new();
+        let f = MemBackendAdapt::new(MemConfig::default()).await.unwrap();
         let (r_send, mut r_recv) = t_chan(COUNT * 3);
         let (w_send, w_recv) = t_chan(COUNT * 3);
 
@@ -490,7 +532,7 @@ mod tests {
     async fn test_tx2_mem_backend() {
         let t = KitsuneTimeout::from_millis(5000);
 
-        let back = MemBackendAdapt::new();
+        let back = MemBackendAdapt::new(MemConfig::default()).await.unwrap();
         let (ep1, _con_recv1) = back.bind("none:".into(), t).await.unwrap();
         let (ep2, mut con_recv2) = back.bind("none:".into(), t).await.unwrap();
 
