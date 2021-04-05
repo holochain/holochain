@@ -515,7 +515,7 @@ mod tests {
         }
 
         let f = tx2_mem_adapter(MemConfig::default()).await.unwrap();
-        let f = tx2_pool_promote(f, 32);
+        let f = tx2_pool_promote(f, Default::default());
         let f = tx2_api(f);
 
         let ep1 = f.bind("none:", t).await.unwrap();

@@ -33,8 +33,8 @@ async fn inner() -> KitsuneResult<()> {
     let mut conf = QuicConfig::default();
     conf.tls = Some(tls_config.clone());
     let f = QuicBackendAdapt::new(conf).await?;
-    let f = tx2_pool_promote(f, 8);
-    let f = tx2_proxy(f);
+    let f = tx2_pool_promote(f, Default::default());
+    let f = tx2_proxy(f, Default::default());
 
     let t = KitsuneTimeout::from_millis(30 * 1000);
 

@@ -68,7 +68,7 @@ const ALPN_KITSUNE_PROXY_0: &[u8] = b"kitsune-proxy/0";
 #[allow(dead_code)]
 pub(crate) fn gen_tls_configs(
     tls: &TlsConfig,
-    tuning_params: Arc<kitsune_p2p_types::config::KitsuneP2pTuningParams>,
+    tuning_params: kitsune_p2p_types::config::KitsuneP2pTuningParams,
 ) -> TransportResult<(Arc<rustls::ServerConfig>, Arc<rustls::ClientConfig>)> {
     kitsune_p2p_types::tls::gen_tls_configs(ALPN_KITSUNE_PROXY_0, tls, tuning_params)
         .map_err(TransportError::other)

@@ -25,7 +25,7 @@ pub struct MemConfig {
 
     /// Tuning Params
     /// Default: None = default.
-    pub tuning_params: Option<Arc<KitsuneP2pTuningParams>>,
+    pub tuning_params: Option<KitsuneP2pTuningParams>,
 }
 
 impl Default for MemConfig {
@@ -39,7 +39,7 @@ impl Default for MemConfig {
 
 impl MemConfig {
     /// into inner contents with default application
-    pub async fn split(self) -> KitsuneResult<(TlsConfig, Arc<KitsuneP2pTuningParams>)> {
+    pub async fn split(self) -> KitsuneResult<(TlsConfig, KitsuneP2pTuningParams)> {
         let MemConfig { tls, tuning_params } = self;
 
         let tls = match tls {
@@ -47,8 +47,7 @@ impl MemConfig {
             Some(tls) => tls,
         };
 
-        let tuning_params =
-            tuning_params.unwrap_or_else(|| Arc::new(KitsuneP2pTuningParams::default()));
+        let tuning_params = tuning_params.unwrap_or_else(KitsuneP2pTuningParams::default);
 
         Ok((tls, tuning_params))
     }

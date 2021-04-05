@@ -1,6 +1,7 @@
 use futures::stream::StreamExt;
 use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_transport_quic::tx2::*;
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dependencies::{ghost_actor::dependencies::tracing, serde_json};
 use kitsune_p2p_types::metrics::*;
 use kitsune_p2p_types::tls::*;
@@ -68,6 +69,9 @@ impl From<TlsFileCert> for TlsConfig {
 }
 
 async fn inner() -> KitsuneResult<()> {
+    // TODO - FIXME - all setting via config
+    let tuning_params = KitsuneP2pTuningParams::default();
+
     let opt = Opt::from_args();
 
     if let Some(gen_cert) = &opt.danger_gen_unenc_cert {
@@ -103,10 +107,11 @@ async fn inner() -> KitsuneResult<()> {
 
     let mut conf = QuicConfig::default();
     conf.tls = Some(tls_conf.clone());
+    conf.tuning_params = Some(tuning_params.clone());
 
     let f = QuicBackendAdapt::new(conf).await?;
-    let f = tx2_pool_promote(f, 4096 /* max connection count */);
-    let f = tx2_proxy(f);
+    let f = tx2_pool_promote(f, tuning_params.clone());
+    let f = tx2_proxy(f, tuning_params);
 
     let ep = f
         .bind(opt.bind_to.into(), KitsuneTimeout::from_millis(30 * 1000))

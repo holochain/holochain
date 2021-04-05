@@ -132,8 +132,8 @@ async fn mk_core(tt: TT) -> (TxUrl, Ep, EpHnd) {
         TT::Quic => tx2_quic_adapter(QuicConfig::default()).await.unwrap(),
     };
 
-    let f = tx2_pool_promote(f, NODE_COUNT * 3);
-    let f = tx2_proxy(f);
+    let f = tx2_pool_promote(f, Default::default());
+    let f = tx2_proxy(f, Default::default());
 
     let ep = f.bind("kitsune-quic://0.0.0.0:0".into(), t).await.unwrap();
     let ep_hnd = ep.handle().clone();

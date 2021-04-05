@@ -14,17 +14,17 @@ use std::collections::HashMap;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 /// Promote a tx2 transport adapter to a tx2 transport frontend.
-pub fn tx2_pool_promote(adapter: AdapterFactory, max_cons: usize) -> EpFactory {
-    Arc::new(PromoteFactory { max_cons, adapter })
+pub fn tx2_pool_promote(
+    adapter: AdapterFactory,
+    tuning_params: KitsuneP2pTuningParams,
+) -> EpFactory {
+    Arc::new(PromoteFactory {
+        adapter,
+        tuning_params,
+    })
 }
 
 // -- private -- //
-
-/// Limit the number of active channels allowed per connection.
-const CHANNELS_PER_CONNECTION: usize = 3;
-
-/// Timeout after which we will give up trying to read from a channel.
-const MAX_READ_TIMEOUT: u64 = 1000 * 30;
 
 struct WriteChan {
     _permit: OwnedSemaphorePermit,
@@ -61,6 +61,7 @@ impl ConItemInner {
 }
 
 async fn in_chan_recv_logic(
+    tuning_params: KitsuneP2pTuningParams,
     url: TxUrl,
     con_item: ConItem,
     writer_bucket: ResourceBucket<WriteChan>,
@@ -68,40 +69,19 @@ async fn in_chan_recv_logic(
     logic_hnd: LogicChanHandle<EpEvent>,
     in_chan_recv: Box<dyn InChanRecvAdapt>,
 ) {
+    let tuning_params = &tuning_params;
     let url = &url;
     let con_item = &con_item;
     let logic_hnd = &logic_hnd;
 
     let recv_fut = in_chan_recv
-        .for_each_concurrent(CHANNELS_PER_CONNECTION, move |chan| async move {
-            let mut chan = match chan.await {
-                Err(e) => {
-                    // unable to resolve incoming channel
-                    // shut down the connection
-
-                    let reason = format!("{:?}", e);
-
-                    // TODO - standardize codes?
-                    con_item.close(500, &reason).await;
-
-                    // exit the loop
-                    return;
-                }
-                Ok(c) => c,
-            };
-            loop {
-                let r = chan
-                    .read(KitsuneTimeout::from_millis(MAX_READ_TIMEOUT))
-                    .await;
-
-                let (msg_id, data) = match r {
-                    Err(e) if *e.kind() == KitsuneErrorKind::Closed => {
-                        // this channel was closed - exit the loop
-                        // allowing another channel to be processed.
-                        break;
-                    }
+        .for_each_concurrent(
+            tuning_params.tx2_channel_count_per_connection,
+            move |chan| async move {
+                let mut chan = match chan.await {
                     Err(e) => {
-                        // unrecoverable error - shut down the connection
+                        // unable to resolve incoming channel
+                        // shut down the connection
 
                         let reason = format!("{:?}", e);
 
@@ -109,27 +89,54 @@ async fn in_chan_recv_logic(
                         con_item.close(500, &reason).await;
 
                         // exit the loop
+                        return;
+                    }
+                    Ok(c) => c,
+                };
+                loop {
+                    let r = chan
+                        .read(KitsuneTimeout::from_millis(
+                            tuning_params.tx2_read_timeout_ms as u64,
+                        ))
+                        .await;
+
+                    let (msg_id, data) = match r {
+                        Err(e) if *e.kind() == KitsuneErrorKind::Closed => {
+                            // this channel was closed - exit the loop
+                            // allowing another channel to be processed.
+                            break;
+                        }
+                        Err(e) => {
+                            // unrecoverable error - shut down the connection
+
+                            let reason = format!("{:?}", e);
+
+                            // TODO - standardize codes?
+                            con_item.close(500, &reason).await;
+
+                            // exit the loop
+                            break;
+                        }
+                        Ok(r) => r,
+                    };
+
+                    let con: ConHnd = Arc::new(con_item.clone());
+                    let data = EpIncomingData {
+                        con,
+                        url: url.clone(),
+                        msg_id,
+                        data,
+                    };
+
+                    if logic_hnd.emit(EpEvent::IncomingData(data)).await.is_err() {
+                        // the only reason this will error is if our
+                        // endpoint is shut down, in which case we
+                        // no longer care about the error.
                         break;
                     }
-                    Ok(r) => r,
-                };
-
-                let con: ConHnd = Arc::new(con_item.clone());
-                let data = EpIncomingData {
-                    con,
-                    url: url.clone(),
-                    msg_id,
-                    data,
-                };
-
-                if logic_hnd.emit(EpEvent::IncomingData(data)).await.is_err() {
-                    // the only reason this will error is if our
-                    // endpoint is shut down, in which case we
-                    // no longer care about the error.
-                    break;
                 }
-            }
-        })
+            },
+        )
         .boxed();
 
     let write_fut = async move {
@@ -145,7 +152,9 @@ async fn in_chan_recv_logic(
             };
 
             let writer = match con_item
-                .out_chan(KitsuneTimeout::from_millis(MAX_READ_TIMEOUT))
+                .out_chan(KitsuneTimeout::from_millis(
+                    tuning_params.tx2_read_timeout_ms as u64,
+                ))
                 .await
             {
                 Err(e) => {
@@ -269,6 +278,7 @@ impl ConItem {
 
     // register this connection
     pub async fn reg_con_inner(
+        tuning_params: KitsuneP2pTuningParams,
         inner: Share<PromoteEpInner>,
         permit: OwnedSemaphorePermit,
         con: Arc<dyn ConAdapt>,
@@ -280,7 +290,9 @@ impl ConItem {
         let uniq = con.uniq();
 
         let writer_bucket = ResourceBucket::new();
-        let write_chan_limit = Arc::new(Semaphore::new(CHANNELS_PER_CONNECTION));
+        let write_chan_limit = Arc::new(Semaphore::new(
+            tuning_params.tx2_channel_count_per_connection,
+        ));
 
         let con_item = Share::new(ConItemInner {
             _permit: permit,
@@ -309,6 +321,7 @@ impl ConItem {
         // Instead, we spawn one task per connection, gathering
         // the incoming channel data to be processed.
         tokio::task::spawn(in_chan_recv_logic(
+            tuning_params,
             url.clone(),
             con_item.clone(),
             writer_bucket,
@@ -339,6 +352,7 @@ impl ConItem {
     // The raw fallible inner future
     // `inner_connect` must catch errors to delete the entry from pend_cons
     pub fn inner_con_inner(
+        tuning_params: KitsuneP2pTuningParams,
         inner: Share<PromoteEpInner>,
         con_limit: Arc<Semaphore>,
         remote: TxUrl,
@@ -350,7 +364,7 @@ impl ConItem {
                 .await
                 .map_err(KitsuneError::other)?;
 
-            let mut next_wait_ms = 200;
+            let mut next_wait_ms = tuning_params.tx2_initial_connect_retry_delay_ms as u64;
 
             let try_connect = || async {
                 inner
@@ -362,8 +376,16 @@ impl ConItem {
                 match try_connect().await {
                     Err(e) => tracing::warn!("connect error: {:?}", e),
                     Ok((con, in_chan_recv)) => {
-                        return Self::reg_con_inner(inner, permit, con, remote, in_chan_recv, true)
-                            .await;
+                        return Self::reg_con_inner(
+                            tuning_params,
+                            inner,
+                            permit,
+                            con,
+                            remote,
+                            in_chan_recv,
+                            true,
+                        )
+                        .await;
                     }
                 }
 
@@ -379,13 +401,22 @@ impl ConItem {
 
     // Build the future that goes in pend_cons
     fn inner_con(
+        tuning_params: KitsuneP2pTuningParams,
         inner: Share<PromoteEpInner>,
         con_limit: Arc<Semaphore>,
         remote: TxUrl,
         timeout: KitsuneTimeout,
     ) -> Shared<BoxFuture<'static, KitsuneResult<Self>>> {
         async move {
-            match Self::inner_con_inner(inner.clone(), con_limit, remote.clone(), timeout).await {
+            match Self::inner_con_inner(
+                tuning_params,
+                inner.clone(),
+                con_limit,
+                remote.clone(),
+                timeout,
+            )
+            .await
+            {
                 Ok(con_item) => Ok(con_item),
                 Err(e) => {
                     // remove the pending entry
@@ -419,7 +450,13 @@ impl ConItem {
                         return Ok(pend_con_fut.clone().boxed());
                     }
                     let con_limit = i.con_limit.clone();
-                    let pend_con_fut = Self::inner_con(inner2, con_limit, remote.clone(), timeout);
+                    let pend_con_fut = Self::inner_con(
+                        i.tuning_params.clone(),
+                        inner2,
+                        con_limit,
+                        remote.clone(),
+                        timeout,
+                    );
                     i.pend_cons.insert(remote, pend_con_fut.clone());
                     Ok(pend_con_fut.boxed())
                 })?
@@ -429,6 +466,7 @@ impl ConItem {
 }
 
 struct PromoteEpInner {
+    tuning_params: KitsuneP2pTuningParams,
     con_limit: Arc<Semaphore>,
     logic_hnd: LogicChanHandle<EpEvent>,
     pend_cons: HashMap<TxUrl, Shared<BoxFuture<'static, KitsuneResult<ConItem>>>>,
@@ -440,6 +478,7 @@ struct PromoteEpHnd(Share<PromoteEpInner>, Uniq);
 
 impl PromoteEpHnd {
     pub fn new(
+        tuning_params: KitsuneP2pTuningParams,
         con_limit: Arc<Semaphore>,
         logic_hnd: LogicChanHandle<EpEvent>,
         sub_ep: Arc<dyn EndpointAdapt>,
@@ -447,6 +486,7 @@ impl PromoteEpHnd {
         let uniq = sub_ep.uniq();
         Self(
             Share::new(PromoteEpInner {
+                tuning_params,
                 con_limit,
                 logic_hnd,
                 pend_cons: HashMap::new(),
@@ -543,6 +583,7 @@ struct PromoteEp {
 }
 
 async fn con_recv_logic(
+    tuning_params: KitsuneP2pTuningParams,
     inner: Share<PromoteEpInner>,
     logic_hnd: LogicChanHandle<EpEvent>,
     _max_cons: usize,
@@ -580,6 +621,7 @@ async fn con_recv_logic(
     // This *is* actually bound, by the max connections semaphore.
     let inner = &inner;
     let logic_hnd = &logic_hnd;
+    let tuning_params = &tuning_params;
     pend_stream
         .for_each_concurrent(None, move |r| async move {
             let (permit, r) = r;
@@ -597,9 +639,16 @@ async fn con_recv_logic(
                 }
                 Ok(r) => r,
             };
-            if let Err(e) =
-                ConItem::reg_con_inner(inner.clone(), permit, con, url.clone(), in_chan_recv, false)
-                    .await
+            if let Err(e) = ConItem::reg_con_inner(
+                tuning_params.clone(),
+                inner.clone(),
+                permit,
+                con,
+                url.clone(),
+                in_chan_recv,
+                false,
+            )
+            .await
             {
                 let _ = logic_hnd.emit(EpEvent::Error(e)).await;
             }
@@ -609,6 +658,7 @@ async fn con_recv_logic(
 
 impl PromoteEp {
     pub async fn new(
+        tuning_params: KitsuneP2pTuningParams,
         max_cons: usize,
         con_limit: Arc<Semaphore>,
         pair: Endpoint,
@@ -617,10 +667,16 @@ impl PromoteEp {
 
         let logic_chan = LogicChan::new(max_cons);
         let logic_hnd = logic_chan.handle().clone();
-        let hnd = PromoteEpHnd::new(con_limit.clone(), logic_hnd.clone(), sub_ep);
+        let hnd = PromoteEpHnd::new(
+            tuning_params.clone(),
+            con_limit.clone(),
+            logic_hnd.clone(),
+            sub_ep,
+        );
 
         let hnd2 = logic_chan.handle().clone();
         hnd2.capture_logic(con_recv_logic(
+            tuning_params,
             hnd.0.clone(),
             logic_hnd,
             max_cons,
@@ -654,8 +710,8 @@ impl AsEp for PromoteEp {
 }
 
 struct PromoteFactory {
-    max_cons: usize,
     adapter: AdapterFactory,
+    tuning_params: KitsuneP2pTuningParams,
 }
 
 impl AsEpFactory for PromoteFactory {
@@ -664,13 +720,14 @@ impl AsEpFactory for PromoteFactory {
         bind_spec: TxUrl,
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<Ep>> {
-        let max_cons = self.max_cons;
+        let tuning_params = self.tuning_params.clone();
+        let max_cons = tuning_params.tx2_pool_max_connection_count as usize;
         let con_limit = Arc::new(Semaphore::new(max_cons));
         let pair_fut = self.adapter.bind(bind_spec, timeout);
         timeout
             .mix(async move {
                 let pair = pair_fut.await?;
-                let ep = PromoteEp::new(max_cons, con_limit, pair).await?;
+                let ep = PromoteEp::new(tuning_params, max_cons, con_limit, pair).await?;
                 let ep: Ep = Box::new(ep);
                 Ok(ep)
             })
@@ -693,7 +750,7 @@ mod tests {
 
         // we can set the max con count to half...
         // as old connections complete, new ones will be accepted
-        let fact = tx2_pool_promote(fact, COUNT / 2);
+        let fact = tx2_pool_promote(fact, Default::default());
 
         let mut tgt = fact.bind("none:".into(), t).await.unwrap();
         let tgt_hnd = tgt.handle().clone();

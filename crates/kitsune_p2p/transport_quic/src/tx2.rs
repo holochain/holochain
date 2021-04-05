@@ -22,7 +22,7 @@ pub struct QuicConfig {
 
     /// Tuning Params
     /// Default: None = default.
-    pub tuning_params: Option<Arc<KitsuneP2pTuningParams>>,
+    pub tuning_params: Option<KitsuneP2pTuningParams>,
 }
 
 impl Default for QuicConfig {
@@ -36,7 +36,7 @@ impl Default for QuicConfig {
 
 impl QuicConfig {
     /// into inner contents with default application
-    pub async fn split(self) -> KitsuneResult<(TlsConfig, Arc<KitsuneP2pTuningParams>)> {
+    pub async fn split(self) -> KitsuneResult<(TlsConfig, KitsuneP2pTuningParams)> {
         let QuicConfig { tls, tuning_params } = self;
 
         let tls = match tls {
@@ -44,8 +44,7 @@ impl QuicConfig {
             Some(tls) => tls,
         };
 
-        let tuning_params =
-            tuning_params.unwrap_or_else(|| Arc::new(KitsuneP2pTuningParams::default()));
+        let tuning_params = tuning_params.unwrap_or_else(KitsuneP2pTuningParams::default);
 
         Ok((tls, tuning_params))
     }
@@ -330,7 +329,7 @@ impl QuicBackendAdapt {
 
         let local_digest = tls.cert_digest.clone();
 
-        let (tls_srv, tls_cli) = gen_tls_configs(ALPN_KITSUNE_QUIC_0, &tls, tuning_params)?;
+        let (tls_srv, tls_cli) = gen_tls_configs(ALPN_KITSUNE_QUIC_0, &tls, tuning_params.clone())?;
 
         let mut transport = quinn::TransportConfig::default();
 
@@ -349,9 +348,10 @@ impl QuicBackendAdapt {
 
         // see also `keep_alive_interval`.
         // right now keep_alive_interval is None,
-        // so connections will idle timeout after 20 seconds.
         transport
-            .max_idle_timeout(Some(std::time::Duration::from_millis(30_000)))
+            .max_idle_timeout(Some(std::time::Duration::from_millis(
+                tuning_params.tx2_quic_max_idle_timeout_ms as u64,
+            )))
             .unwrap();
 
         let transport = Arc::new(transport);
