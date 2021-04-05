@@ -114,16 +114,15 @@ impl QuicConAdapt {
     pub fn new(con: quinn::Connection) -> KitsuneResult<Self> {
         let local_digest = match con.peer_identity() {
             None => return Err("invalid peer certificate".into()),
-            Some(chain) => {
-                match chain.iter().next() {
-                    None => return Err("invalid peer certificate".into()),
-                    Some(cert) => {
-                        CertDigest(Arc::new(blake2b_32(cert.as_ref())))
-                    }
-                }
-            }
+            Some(chain) => match chain.iter().next() {
+                None => return Err("invalid peer certificate".into()),
+                Some(cert) => CertDigest(Arc::new(blake2b_32(cert.as_ref()))),
+            },
         };
-        Ok(Self(Share::new(QuicConAdaptInner { local_digest, con }), Uniq::default()))
+        Ok(Self(
+            Share::new(QuicConAdaptInner { local_digest, con }),
+            Uniq::default(),
+        ))
     }
 }
 
@@ -226,7 +225,10 @@ struct QuicEndpointAdapt(Share<QuicEndpointAdaptInner>, Uniq);
 
 impl QuicEndpointAdapt {
     pub fn new(ep: quinn::Endpoint, local_digest: CertDigest) -> Self {
-        Self(Share::new(QuicEndpointAdaptInner { ep, local_digest }), Uniq::default())
+        Self(
+            Share::new(QuicEndpointAdaptInner { ep, local_digest }),
+            Uniq::default(),
+        )
     }
 }
 
@@ -355,7 +357,11 @@ impl QuicBackendAdapt {
         quic_cli.transport = transport;
         quic_cli.crypto = tls_cli;
 
-        let out: BackendFactory = Arc::new(Self { local_digest, quic_srv, quic_cli });
+        let out: BackendFactory = Arc::new(Self {
+            local_digest,
+            quic_srv,
+            quic_cli,
+        });
 
         Ok(out)
     }

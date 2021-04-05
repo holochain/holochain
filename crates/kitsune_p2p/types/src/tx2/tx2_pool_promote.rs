@@ -37,6 +37,7 @@ struct ConItemInner {
     con: Arc<dyn ConAdapt>,
     url: TxUrl,
     writer_bucket: ResourceBucket<WriteChan>,
+    write_chan_limit: Arc<Semaphore>,
 }
 
 impl ConItemInner {
@@ -46,14 +47,13 @@ impl ConItemInner {
         code: u32,
         reason: &str,
     ) -> impl std::future::Future<Output = ()> + 'static + Send {
+        self.write_chan_limit.close();
         let _ = self.inner.share_mut(|i, _| {
-            let u = match i.cons.get(&self.url) {
-                None => return Ok(()),
-                Some(ci) => ci.uniq,
+            if let Some(ci) = i.cons.get(&self.url) {
+                if ci.uniq == uniq {
+                    i.cons.remove(&self.url);
+                }
             };
-            if u == uniq {
-                i.cons.remove(&self.url);
-            }
             Ok(())
         });
         self.con.close(code, reason)
@@ -64,6 +64,7 @@ async fn in_chan_recv_logic(
     url: TxUrl,
     con_item: ConItem,
     writer_bucket: ResourceBucket<WriteChan>,
+    write_chan_limit: Arc<Semaphore>,
     logic_hnd: LogicChanHandle<EpEvent>,
     in_chan_recv: Box<dyn InChanRecvAdapt>,
 ) {
@@ -97,7 +98,7 @@ async fn in_chan_recv_logic(
                     Err(e) if *e.kind() == KitsuneErrorKind::Closed => {
                         // this channel was closed - exit the loop
                         // allowing another channel to be processed.
-                        return;
+                        break;
                     }
                     Err(e) => {
                         // unrecoverable error - shut down the connection
@@ -108,7 +109,7 @@ async fn in_chan_recv_logic(
                         con_item.close(500, &reason).await;
 
                         // exit the loop
-                        return;
+                        break;
                     }
                     Ok(r) => r,
                 };
@@ -132,13 +133,13 @@ async fn in_chan_recv_logic(
         .boxed();
 
     let write_fut = async move {
-        let limit = Arc::new(Semaphore::new(CHANNELS_PER_CONNECTION));
         loop {
-            let permit = match limit.clone().acquire_owned().await {
+            let permit = match write_chan_limit.clone().acquire_owned().await {
                 Err(_) => {
-                    // we only get errors here when our endpoint has closed
+                    // we only get errors here when our
+                    // connection / endpoint has closed
                     // we can safely just exit this loop
-                    return;
+                    break;
                 }
                 Ok(p) => p,
             };
@@ -157,7 +158,7 @@ async fn in_chan_recv_logic(
                     con_item.close(500, &reason).await;
 
                     // exit the loop
-                    return;
+                    break;
                 }
                 Ok(c) => c,
             };
@@ -176,6 +177,7 @@ async fn in_chan_recv_logic(
 #[derive(Clone)]
 struct ConItem {
     pub uniq: Uniq,
+    pub logic_hnd: LogicChanHandle<EpEvent>,
     pub item: Share<ConItemInner>,
 }
 
@@ -205,10 +207,19 @@ impl AsConHnd for ConItem {
     fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
         let maybe = self.item.share_mut(|i, c| {
             *c = true;
-            Ok(i.close(self.uniq, code, reason))
+            let emit_fut = self
+                .logic_hnd
+                .emit(EpEvent::ConnectionClosed(EpConnectionClosed {
+                    url: i.url.clone(),
+                    code,
+                    reason: reason.to_string(),
+                }));
+            let close_fut = i.close(self.uniq, code, reason);
+            Ok((emit_fut, close_fut))
         });
         async move {
-            if let Ok(close_fut) = maybe {
+            if let Ok((emit_fut, close_fut)) = maybe {
+                let _ = emit_fut.await;
                 close_fut.await;
             }
         }
@@ -223,22 +234,29 @@ impl AsConHnd for ConItem {
     ) -> BoxFuture<'static, KitsuneResult<()>> {
         let this = self.clone();
         async move {
-            let mut writer = this
-                .item
-                .share_mut(|i, _| Ok(i.writer_bucket.acquire(Some(timeout))))?
-                .await?;
+            let this = &this;
+            let logic = move || async move {
+                let mut writer = this
+                    .item
+                    .share_mut(|i, _| Ok(i.writer_bucket.acquire(Some(timeout))))?
+                    .await?;
 
-            if let Err(e) = writer.writer.write(msg_id, data, timeout).await {
+                writer.writer.write(msg_id, data, timeout).await?;
+
+                this.item.share_mut(move |i, _| {
+                    i.writer_bucket.release(writer);
+                    Ok(())
+                })
+            };
+
+            if let Err(e) = logic().await {
                 let reason = format!("{:?}", e);
                 // TODO - standardize codes?
                 this.close(500, &reason).await;
                 return Err(e);
             }
 
-            this.item.share_mut(move |i, _| {
-                i.writer_bucket.release(writer);
-                Ok(())
-            })
+            Ok(())
         }
         .boxed()
     }
@@ -258,9 +276,11 @@ impl ConItem {
         in_chan_recv: Box<dyn InChanRecvAdapt>,
         is_outgoing: bool,
     ) -> KitsuneResult<Self> {
+        let url = &url;
         let uniq = con.uniq();
 
         let writer_bucket = ResourceBucket::new();
+        let write_chan_limit = Arc::new(Semaphore::new(CHANNELS_PER_CONNECTION));
 
         let con_item = Share::new(ConItemInner {
             _permit: permit,
@@ -268,18 +288,19 @@ impl ConItem {
             con,
             url: url.clone(),
             writer_bucket: writer_bucket.clone(),
+            write_chan_limit: write_chan_limit.clone(),
         });
 
-        let con_item = Self {
-            uniq,
-            item: con_item,
-        };
-
         // move us to the full cons list
-        let logic_hnd = inner.share_mut(|i, _| {
+        let (logic_hnd, con_item) = inner.share_mut(move |i, _| {
+            let con_item = Self {
+                uniq,
+                logic_hnd: i.logic_hnd.clone(),
+                item: con_item,
+            };
             i.pend_cons.remove(&url);
             i.cons.insert(url.clone(), con_item.clone());
-            Ok(i.logic_hnd.clone())
+            Ok((i.logic_hnd.clone(), con_item))
         })?;
 
         // This is a calculated task spawn.
@@ -291,20 +312,25 @@ impl ConItem {
             url.clone(),
             con_item.clone(),
             writer_bucket,
+            write_chan_limit,
             logic_hnd.clone(),
             in_chan_recv,
         ));
 
         if is_outgoing {
-            let _ = logic_hnd.emit(EpEvent::OutgoingConnection(EpConnection {
-                con: Arc::new(con_item.clone()),
-                url,
-            })).await;
+            let _ = logic_hnd
+                .emit(EpEvent::OutgoingConnection(EpConnection {
+                    con: Arc::new(con_item.clone()),
+                    url: url.clone(),
+                }))
+                .await;
         } else {
-            let _ = logic_hnd.emit(EpEvent::IncomingConnection(EpConnection {
-                con: Arc::new(con_item.clone()),
-                url,
-            })).await;
+            let _ = logic_hnd
+                .emit(EpEvent::IncomingConnection(EpConnection {
+                    con: Arc::new(con_item.clone()),
+                    url: url.clone(),
+                }))
+                .await;
         }
 
         Ok(con_item)
@@ -336,7 +362,8 @@ impl ConItem {
                 match try_connect().await {
                     Err(e) => tracing::warn!("connect error: {:?}", e),
                     Ok((con, in_chan_recv)) => {
-                        return Self::reg_con_inner(inner, permit, con, remote, in_chan_recv, true).await;
+                        return Self::reg_con_inner(inner, permit, con, remote, in_chan_recv, true)
+                            .await;
                     }
                 }
 
@@ -467,13 +494,18 @@ impl AsEpHnd for PromoteEpHnd {
     }
 
     fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
-        if let Ok((close_fut, logic_hnd)) = self.0.share_mut(|i, c| {
+        if let Ok((cons, ep_close_fut, logic_hnd)) = self.0.share_mut(|i, c| {
             *c = true;
             i.con_limit.close();
-            Ok((i.sub_ep.close(code, reason), i.logic_hnd.clone()))
+            let cons = i.cons.iter().map(|(_, c)| c.clone()).collect::<Vec<_>>();
+            let ep_close_fut = i.sub_ep.close(code, reason);
+            Ok((cons, ep_close_fut, i.logic_hnd.clone()))
         }) {
+            let reason = reason.to_string();
             async move {
-                close_fut.await;
+                futures::future::join_all(cons.into_iter().map(|c| c.close(code, &reason))).await;
+                ep_close_fut.await;
+                let _ = logic_hnd.emit(EpEvent::EndpointClosed).await;
                 logic_hnd.close();
             }
             .boxed()
@@ -565,7 +597,10 @@ async fn con_recv_logic(
                 }
                 Ok(r) => r,
             };
-            if let Err(e) = ConItem::reg_con_inner(inner.clone(), permit, con, url.clone(), in_chan_recv, false).await {
+            if let Err(e) =
+                ConItem::reg_con_inner(inner.clone(), permit, con, url.clone(), in_chan_recv, false)
+                    .await
+            {
                 let _ = logic_hnd.emit(EpEvent::Error(e)).await;
             }
         })

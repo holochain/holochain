@@ -4,8 +4,8 @@ use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::dependencies::{ghost_actor::dependencies::tracing, serde_json};
 use kitsune_p2p_types::metrics::*;
 use kitsune_p2p_types::tls::*;
-use kitsune_p2p_types::tx2::tx2_frontend::*;
-use kitsune_p2p_types::tx2::tx2_promote::*;
+use kitsune_p2p_types::tx2::tx2_pool::*;
+use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 use kitsune_p2p_types::*;
 use structopt::StructOpt;
 
@@ -105,11 +105,11 @@ async fn inner() -> KitsuneResult<()> {
     conf.tls = Some(tls_conf.clone());
 
     let f = QuicBackendAdapt::new(conf).await?;
-    let f = tx2_promote(f, 4096 /* max connection count */);
-    let f = tx2_proxy(f, tls_conf);
+    let f = tx2_pool_promote(f, 4096 /* max connection count */);
+    let f = tx2_proxy(f);
 
     let ep = f
-        .bind(opt.bind_to, KitsuneTimeout::from_millis(30 * 1000))
+        .bind(opt.bind_to.into(), KitsuneTimeout::from_millis(30 * 1000))
         .await?;
     println!("{}", ep.handle().local_addr()?);
 

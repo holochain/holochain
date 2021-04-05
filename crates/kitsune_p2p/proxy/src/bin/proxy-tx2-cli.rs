@@ -3,8 +3,8 @@ use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::metrics::*;
 use kitsune_p2p_types::tls::*;
-use kitsune_p2p_types::tx2::tx2_frontend::*;
-use kitsune_p2p_types::tx2::tx2_promote::*;
+use kitsune_p2p_types::tx2::tx2_pool::*;
+use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use structopt::StructOpt;
@@ -33,12 +33,12 @@ async fn inner() -> KitsuneResult<()> {
     let mut conf = QuicConfig::default();
     conf.tls = Some(tls_config.clone());
     let f = QuicBackendAdapt::new(conf).await?;
-    let f = tx2_promote(f, 8);
-    let f = tx2_proxy(f, tls_config);
+    let f = tx2_pool_promote(f, 8);
+    let f = tx2_proxy(f);
 
     let t = KitsuneTimeout::from_millis(30 * 1000);
 
-    let mut ep = f.bind("kitsune-quic://0.0.0.0:0", t).await?;
+    let mut ep = f.bind("kitsune-quic://0.0.0.0:0".into(), t).await?;
 
     let ep_hnd = ep.handle().clone();
 
@@ -52,7 +52,7 @@ async fn inner() -> KitsuneResult<()> {
         KitsuneResult::Ok(())
     });
 
-    let con = ep_hnd.connect(opt.proxy_url, t).await?;
+    let con = ep_hnd.get_connection(opt.proxy_url.into(), t).await?;
 
     con.write(0.into(), PoolBuf::new(), t).await?;
 

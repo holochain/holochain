@@ -15,8 +15,8 @@ use kitsune_p2p_types::*;
 use std::collections::HashMap;
 
 /// Wrap a tx2 backend transport with proxy logic.
-pub fn tx2_proxy(sub_fact: EpFactory, tls_config: TlsConfig) -> EpFactory {
-    ProxyEpFactory::new(sub_fact, tls_config)
+pub fn tx2_proxy(sub_fact: EpFactory) -> EpFactory {
+    ProxyEpFactory::new(sub_fact)
 }
 
 // -- private -- //
@@ -110,7 +110,6 @@ struct ProxyEpInner {
     // allows us to remove the ConRef when a ConHnd close event is received
     sub_con_to_base_url: HashMap<ConHnd, TxUrl>,
     */
-
     // we only proxy over *incoming* connections
     // therefore it is a 1-to-1 relationship to remote digest
     in_digest_to_sub_con: HashMap<CertDigest, ConHnd>,
@@ -131,10 +130,10 @@ struct ProxyEpHnd {
 impl ProxyEpHnd {
     pub fn new(
         sub_ep_hnd: EpHnd,
-        local_digest: CertDigest,
         logic_hnd: LogicChanHandle<EpEvent>,
-    ) -> Arc<ProxyEpHnd> {
-        Arc::new(ProxyEpHnd {
+    ) -> KitsuneResult<Arc<ProxyEpHnd>> {
+        let local_digest = sub_ep_hnd.local_digest()?;
+        Ok(Arc::new(ProxyEpHnd {
             sub_ep_hnd,
             local_digest,
             logic_hnd,
@@ -146,7 +145,7 @@ impl ProxyEpHnd {
                 in_digest_to_sub_con: HashMap::new(),
                 in_base_url_to_digest: HashMap::new(),
             }),
-        })
+        }))
     }
 }
 
@@ -222,12 +221,12 @@ async fn ingest_incoming_con(
 impl AsEpHnd for ProxyEpHnd {
     fn debug(&self) -> serde_json::Value {
         let addr = self.local_addr();
-        match self.inner.share_mut(|_i, _| {
+        match self.inner.share_mut(|i, _| {
             Ok(serde_json::json!({
                 "type": "tx2_proxy",
                 "state": "open",
                 "addr": addr?,
-                //"proxy_count": i.in_digest_to_sub_con.len(),
+                "proxy_count": i.in_digest_to_sub_con.len(),
                 "sub": self.sub_ep_hnd.debug(),
             }))
         }) {
@@ -264,7 +263,12 @@ impl AsEpHnd for ProxyEpHnd {
         self.sub_ep_hnd.close(code, reason).boxed()
     }
 
-    fn close_connection(&self, _remote: TxUrl, _code: u32, _reason: &str) -> BoxFuture<'static, ()> {
+    fn close_connection(
+        &self,
+        _remote: TxUrl,
+        _code: u32,
+        _reason: &str,
+    ) -> BoxFuture<'static, ()> {
         // TODO - FIXME
         // we don't want to close the underlying sub_con,
         // it could be shared for proxying...
@@ -436,11 +440,7 @@ async fn incoming_evt_handle(
 }
 */
 
-async fn incoming_evt_logic(
-    sub_ep: Ep,
-    hnd: Arc<ProxyEpHnd>,
-    logic_hnd: LogicChanHandle<EpEvent>,
-) {
+async fn incoming_evt_logic(sub_ep: Ep, hnd: Arc<ProxyEpHnd>, logic_hnd: LogicChanHandle<EpEvent>) {
     // erm - this const is not pub in types
     const CHANNEL_COUNT: usize = 3;
 
@@ -461,7 +461,7 @@ async fn incoming_evt_handle(
     hnd: &Arc<ProxyEpHnd>,
     logic_hnd: &LogicChanHandle<EpEvent>,
 ) {
-    println!("EVT: {:?}", evt);
+    //println!("EVT: {:?}", evt);
     use EpEvent::*;
     match evt {
         OutgoingConnection(_) => (),
@@ -501,13 +501,13 @@ async fn incoming_evt_handle(
                     const DEST_END: usize = DEST_START + DIGEST_BYTES;
                     let src_digest = CertDigest(Arc::new(data[SRC_START..SRC_END].to_vec()));
                     let dest_digest = CertDigest(Arc::new(data[DEST_START..DEST_END].to_vec()));
-                    println!("src: {:?}", src_digest);
-                    println!("dst: {:?}", dest_digest);
-                    println!("loc: {:?}", hnd.local_digest);
+                    //println!("src: {:?}", src_digest);
+                    //println!("dst: {:?}", dest_digest);
+                    //println!("loc: {:?}", hnd.local_digest);
                     if dest_digest == hnd.local_digest {
                         // this data is destined for US!
                         data.cheap_move_start(SRC_END);
-                        println!("got data for US: {}", String::from_utf8_lossy(data.as_ref()));
+                        //println!("got data for US: {}", String::from_utf8_lossy(data.as_ref()));
                         let url = promote_addr(&base_url, &src_digest).unwrap();
                         let con = ProxyConHnd::new(sub_con, dest_digest, src_digest);
                         let evt = EpEvent::IncomingData(EpIncomingData {
@@ -518,9 +518,9 @@ async fn incoming_evt_handle(
                         });
                         let _ = logic_hnd.emit(evt).await;
                     } else {
-                        println!("data to forward");
+                        //println!("data to forward");
                         let dest = hnd.inner.share_mut(|i, _| {
-                            println!("ALALA: {:?}", i.in_digest_to_sub_con);
+                            //println!("ALALA: {:?}", i.in_digest_to_sub_con);
                             Ok(i.in_digest_to_sub_con.get(&dest_digest).cloned())
                         });
                         if let Err(e) = match dest {
@@ -541,14 +541,13 @@ async fn incoming_evt_handle(
                 }
                 b => {
                     let reason = format!("Invalid Proxy Byte: {}", b);
-                    hnd.sub_ep_hnd.close_connection(base_url, 500, &reason).await;
+                    hnd.sub_ep_hnd
+                        .close_connection(base_url, 500, &reason)
+                        .await;
                 }
             }
         }
-        ConnectionClosed(EpConnectionClosed {
-            url: base_url,
-            ..
-        }) => {
+        ConnectionClosed(EpConnectionClosed { url: base_url, .. }) => {
             let _ = hnd.inner.share_mut(|i, _| {
                 if let Some(digest) = i.in_base_url_to_digest.remove(&base_url) {
                     i.in_digest_to_sub_con.remove(&digest);
@@ -592,21 +591,14 @@ impl ProxyEp {
         let logic_chan = LogicChan::new(32);
         let logic_hnd = logic_chan.handle().clone();
 
-        let hnd = ProxyEpHnd::new(
-            sub_ep.handle().clone(),
-            local_digest.clone(),
-            logic_hnd.clone(),
-        );
+        let hnd = ProxyEpHnd::new(sub_ep.handle().clone(), logic_hnd.clone())?;
 
         let logic = incoming_evt_logic(sub_ep, hnd.clone(), logic_hnd);
 
         let l_hnd = logic_chan.handle().clone();
         l_hnd.capture_logic(logic).await?;
 
-        let ep: Ep = Box::new(ProxyEp {
-            logic_chan,
-            hnd,
-        });
+        let ep: Ep = Box::new(ProxyEp { logic_chan, hnd });
         Ok(ep)
     }
 }
@@ -636,10 +628,7 @@ struct ProxyEpFactory {
 
 impl ProxyEpFactory {
     pub fn new(sub_fact: EpFactory) -> EpFactory {
-        let fact: EpFactory = Arc::new(ProxyEpFactory {
-            tls_config,
-            sub_fact,
-        });
+        let fact: EpFactory = Arc::new(ProxyEpFactory { sub_fact });
         fact
     }
 }
@@ -672,7 +661,7 @@ mod tests {
         let f = MemBackendAdapt::new(MemConfig::default()).await.unwrap();
         let f = tx2_pool_promote(f, 32);
 
-        let f = tx2_proxy(f, TlsConfig::new_ephemeral().await.unwrap());
+        let f = tx2_proxy(f);
 
         let mut ep = f.bind("none:".into(), t).await.unwrap();
         let ephnd = ep.handle().clone();
@@ -723,13 +712,13 @@ mod tests {
         let (p_join, p_addr, p_ep) = build_node(None).await;
         all_tasks.push(p_join);
         //println!("PROXY ADDR = {}", p_addr);
-        println!("PROXY: {:?}", p_ep.local_digest().unwrap());
+        //println!("PROXY: {:?}", p_ep.local_digest().unwrap());
 
         let (t_join, t_addr, t_ep) = build_node(None).await;
         all_tasks.push(t_join);
 
         //println!("TGT ADDR = {}", t_addr);
-        println!("TGT: {:?}", t_ep.local_digest().unwrap());
+        //println!("TGT: {:?}", t_ep.local_digest().unwrap());
 
         // establish proxy connection
         let _ = t_ep.get_connection(p_addr.clone(), t).await.unwrap();
@@ -737,13 +726,13 @@ mod tests {
         let t_addr_proxy = proxify_addr(&p_addr, &t_addr);
         //println!("TGT PROXY ADDR = {}", t_addr_proxy);
 
-        const COUNT: usize = 1;
+        const COUNT: usize = 100;
 
         let mut all_futs = Vec::new();
         for _ in 0..COUNT {
             let (s_done, r_done) = tokio::sync::oneshot::channel();
             let (n_join, _n_addr, n_ep) = build_node(Some(s_done)).await;
-            println!("N: {:?}", n_ep.local_digest().unwrap());
+            //println!("N: {:?}", n_ep.local_digest().unwrap());
 
             let t_addr_proxy = t_addr_proxy.clone();
             all_futs.push(async move {

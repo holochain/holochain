@@ -57,12 +57,7 @@ pub trait AsEpHnd: 'static + Send + Sync + Unpin {
     fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()>;
 
     /// Force close a specific connection.
-    fn close_connection(
-        &self,
-        remote: TxUrl,
-        code: u32,
-        reason: &str,
-    ) -> BoxFuture<'static, ()>;
+    fn close_connection(&self, remote: TxUrl, code: u32, reason: &str) -> BoxFuture<'static, ()>;
 
     /// Get a connection handle to an existing connection.
     /// If one does not exist, establish a new connection.

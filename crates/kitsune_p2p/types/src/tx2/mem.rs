@@ -1,11 +1,11 @@
 #![allow(clippy::new_ret_no_self)]
 #![allow(clippy::never_loop)]
 
+use crate::config::*;
+use crate::tls::*;
 use crate::tx2::tx2_backend::*;
 use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
-use crate::tls::*;
-use crate::config::*;
 use crate::*;
 use futures::{
     future::{BoxFuture, FutureExt},
@@ -61,7 +61,8 @@ type ChanRecv = TReceiver<InChan>;
 type ConSend = TSender<Con>;
 type ConRecv = TReceiver<Con>;
 
-static MEM_ENDPOINTS: Lazy<Mutex<HashMap<u64, (ConSend, Active, CertDigest)>>> =
+type EndpointItem = (ConSend, Active, CertDigest);
+static MEM_ENDPOINTS: Lazy<Mutex<HashMap<u64, EndpointItem>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 struct MemInChanRecvAdapt(BoxStream<'static, InChanFut>);
@@ -287,7 +288,11 @@ impl EndpointAdapt for MemEndpointAdapt {
             if !inner.ep_active.is_active() {
                 return async move { Err(KitsuneErrorKind::Closed.into()) }.boxed();
             }
-            (inner.url.clone(), inner.local_digest.clone(), inner.ep_active.clone())
+            (
+                inner.url.clone(),
+                inner.local_digest.clone(),
+                inner.ep_active.clone(),
+            )
         };
         async move {
             let con_id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
@@ -389,16 +394,20 @@ impl MemBackendAdapt {
 impl BackendAdapt for MemBackendAdapt {
     fn bind(&self, _url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut {
         let local_digest = self.0.clone();
-        timeout.mix(async move {
-            let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
-            let (c_send, c_recv) = t_chan(32);
-            let (ep, ep_active) = MemEndpointAdapt::new(c_send.clone(), id, local_digest.clone());
-            MEM_ENDPOINTS.lock().insert(id, (c_send, ep_active.clone(), local_digest));
-            let ep: Arc<dyn EndpointAdapt> = Arc::new(ep);
-            let rc: Box<dyn ConRecvAdapt> = Box::new(MemConRecvAdapt::new(c_recv, ep_active));
-            Ok((ep, rc))
-        })
-        .boxed()
+        timeout
+            .mix(async move {
+                let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
+                let (c_send, c_recv) = t_chan(32);
+                let (ep, ep_active) =
+                    MemEndpointAdapt::new(c_send.clone(), id, local_digest.clone());
+                MEM_ENDPOINTS
+                    .lock()
+                    .insert(id, (c_send, ep_active.clone(), local_digest));
+                let ep: Arc<dyn EndpointAdapt> = Arc::new(ep);
+                let rc: Box<dyn ConRecvAdapt> = Box::new(MemConRecvAdapt::new(c_recv, ep_active));
+                Ok((ep, rc))
+            })
+            .boxed()
     }
 }
 
