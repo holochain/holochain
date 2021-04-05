@@ -18,7 +18,7 @@ async fn direct_validation_test() {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "direct_validation_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: vec![TestWasm::Update.into()].into(),
         },
@@ -41,7 +41,7 @@ async fn direct_validation_test() {
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }
 
 /// - Commit a valid update should pass

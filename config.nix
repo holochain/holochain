@@ -1,25 +1,28 @@
 {
 
  # configure holonix itself
- holonix = {
+ holonix = rec {
 
   # true = use a github repository as the holonix base (recommended)
   # false = use a local copy of holonix (useful for debugging)
   use-github = true;
+
+  # controls whether holonix' holochain binaries (holochain, hc, etc.) are included in PATH
+  includeHolochainBinaries = false;
 
   # configure the remote holonix github when use-github = true
   github = {
 
    # can be any github ref
    # branch, tag, commit, etc.
-   ref = "6decb861920a517fae5840acf79766196ede9b0d";
+   ref = "fac0d28f7ebdbcf5564c1de1ae350b79cc81aac0";
 
    # the sha of what is downloaded from the above ref
    # note: even if you change the above ref it will not be redownloaded until
    #       the sha here changes (the sha is the cache key for downloads)
    # note: to get a new sha, get nix to try and download a bad sha
    #       it will complain and tell you the right sha
-   sha256 = "0f6p2vz32g8fgphkvfiswlg3wb0bpld6nsagfpmc2ad1g0l85xqy";
+   sha256 = "0yiv9wzkb52chra87fd7fmhjbsgvqb9xb2mwkci304x9rr9z70gq";
 
    # the github owner of the holonix repo
    owner = "holochain";
@@ -34,7 +37,17 @@
    path = ../holonix;
   };
 
-  includeHolochainBinaries = false;
+  pathFn = _: if use-github
+     then builtins.fetchTarball (with github; {
+        url = "https://github.com/${owner}/${repo}/archive/${ref}.tar.gz";
+        inherit sha256; }
+       )
+     else local.path;
+
+  importFn = _: import (pathFn {}) {
+      inherit includeHolochainBinaries;
+    }
+    ;
  };
 
  release = {

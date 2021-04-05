@@ -64,6 +64,7 @@ macro_rules! assert_length {
 ///
 /// There is custom de/serialization implemented in [ser.rs]
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct HoloHash<T: HashType> {
     hash: Vec<u8>,
     hash_type: T,
