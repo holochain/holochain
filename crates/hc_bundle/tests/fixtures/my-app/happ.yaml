@@ -11,7 +11,7 @@ slots:
       deferred: false
     dna:
       bundled: dnas/dna1/a dna.dna
-      uuid: 0123456
+      uid: 0123456
       properties: ~
       clone_limit: 0
   - id: slot-2
@@ -20,7 +20,7 @@ slots:
       deferred: true
     dna:
       bundled: dnas/dna2/another dna.dna
-      uuid: ~
+      uid: ~
       properties:
         foo: 1111
         bar: it could be anything

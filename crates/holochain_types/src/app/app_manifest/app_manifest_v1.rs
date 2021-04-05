@@ -11,8 +11,8 @@ use crate::prelude::{SlotId, YamlProperties};
 use holo_hash::{DnaHash, DnaHashB64};
 use std::collections::HashMap;
 
-/// Placeholder for a real UUID type
-pub type Uuid = String;
+/// Placeholder for a real UID type
+pub type Uid = String;
 
 /// Version 1 of the App manifest schema
 #[derive(
@@ -76,8 +76,8 @@ pub struct AppSlotDnaManifest {
     /// Optional default properties. May be overridden during installation.
     pub properties: Option<YamlProperties>,
 
-    /// Optional fixed UUID. May be overridden during installation.
-    pub uuid: Option<Uuid>,
+    /// Optional fixed UID. May be overridden during installation.
+    pub uid: Option<Uid>,
 
     /// The versioning constraints for the DNA. Ensures that only a DNA that
     /// matches the version spec will be used.
@@ -99,7 +99,7 @@ impl AppSlotDnaManifest {
                 "./path/to/my/dnabundle.dna".into(),
             )),
             properties: None,
-            uuid: None,
+            uid: None,
             version: None,
             clone_limit: 0,
         }
@@ -168,7 +168,7 @@ pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
     Create { deferred: bool },
     /// Always create a new Cell when installing the App,
-    /// and use a unique UUID to ensure a distinct DHT network
+    /// and use a unique UID to ensure a distinct DHT network
     CreateClone { deferred: bool },
     /// Require that a Cell is already installed which matches the DNA version
     /// spec, and which has an Agent that's associated with this App's agent
@@ -188,17 +188,17 @@ impl Default for CellProvisioning {
 }
 
 impl AppManifestV1 {
-    /// Update the UUID for all DNAs used in Create-provisioned Cells.
+    /// Update the UID for all DNAs used in Create-provisioned Cells.
     /// Cells with other provisioning strategies are not affected.
     ///
     // TODO: it probably makes sense to do this for CreateIfNotExists cells
     // too, in the Create case, but we would have to do that during installation
     // rather than simply updating the manifest. Let's hold off on that until
     // we know we need it, since this way is substantially simpler.
-    pub fn set_uuid(&mut self, uuid: Uuid) {
+    pub fn set_uid(&mut self, uid: Uid) {
         for mut slot in self.slots.iter_mut() {
             if matches!(slot.provisioning, Some(CellProvisioning::Create { .. })) {
-                slot.dna.uuid = Some(uuid.clone());
+                slot.dna.uid = Some(uid.clone());
             }
         }
     }
@@ -222,7 +222,7 @@ impl AppManifestV1 {
                         location,
                         properties,
                         version,
-                        uuid,
+                        uid,
                         clone_limit,
                     } = dna;
                     // Go from "flexible" enum into proper DnaVersionSpec.
@@ -233,7 +233,7 @@ impl AppManifestV1 {
                             clone_limit,
                             location: Self::require(location, "slots.dna.(path|url)")?,
                             properties,
-                            uuid,
+                            uid,
                             version,
                         },
                         CellProvisioning::CreateClone { deferred } => {
@@ -259,7 +259,7 @@ impl AppManifestV1 {
                                 location: Self::require(location, "slots.dna.(path|url)")?,
                                 version: Self::require(version, "slots.dna.version")?,
                                 properties,
-                                uuid,
+                                uid,
                             }
                         }
                         CellProvisioning::Disabled => AppSlotManifestValidated::Disabled {
@@ -318,7 +318,7 @@ pub mod tests {
             dna: AppSlotDnaManifest {
                 location,
                 properties: Some(YamlProperties::new(serde_yaml::to_value(props).unwrap())),
-                uuid: Some("uuid".into()),
+                uid: Some("uid".into()),
                 version: Some(version),
                 clone_limit: 50,
             },
@@ -359,7 +359,7 @@ slots:
         - {}
         - {}
       clone_limit: 50
-      uuid: uuid
+      uid: uid
       properties:
         salad: "bar"
 
@@ -384,7 +384,7 @@ slots:
     }
 
     #[tokio::test]
-    async fn manifest_v1_set_uuid() {
+    async fn manifest_v1_set_uid() {
         let mut u = arbitrary::Unstructured::new(&[0]);
         let mut manifest = AppManifestV1::arbitrary(&mut u).unwrap();
         manifest.slots = vec![
@@ -399,15 +399,15 @@ slots:
         manifest.slots[3].provisioning =
             Some(CellProvisioning::CreateIfNotExists { deferred: false });
 
-        let uuid = Uuid::from("blabla");
-        manifest.set_uuid(uuid.clone());
+        let uid = Uid::from("blabla");
+        manifest.set_uid(uid.clone());
 
-        // - The Create slots have the UUID rewritten.
-        assert_eq!(manifest.slots[0].dna.uuid.as_ref(), Some(&uuid));
-        assert_eq!(manifest.slots[1].dna.uuid.as_ref(), Some(&uuid));
+        // - The Create slots have the UID rewritten.
+        assert_eq!(manifest.slots[0].dna.uid.as_ref(), Some(&uid));
+        assert_eq!(manifest.slots[1].dna.uid.as_ref(), Some(&uid));
 
         // - The others do not.
-        assert_ne!(manifest.slots[2].dna.uuid.as_ref(), Some(&uuid));
-        assert_ne!(manifest.slots[3].dna.uuid.as_ref(), Some(&uuid));
+        assert_ne!(manifest.slots[2].dna.uid.as_ref(), Some(&uid));
+        assert_ne!(manifest.slots[3].dna.uid.as_ref(), Some(&uid));
     }
 }

@@ -50,11 +50,11 @@ pub enum AppSlotManifestValidated {
         deferred: bool,
         location: DnaLocation,
         properties: Option<YamlProperties>,
-        uuid: Option<String>, // TODO: use UUID
+        uid: Option<String>,
         version: Option<DnaVersionSpec>,
     },
     /// Always create a new Cell when installing the App,
-    /// and use a unique UUID to ensure a distinct DHT network
+    /// and use a unique UID to ensure a distinct DHT network
     CreateClone {
         clone_limit: u32,
         deferred: bool,
@@ -76,7 +76,7 @@ pub enum AppSlotManifestValidated {
         deferred: bool,
         location: DnaLocation,
         properties: Option<YamlProperties>,
-        uuid: Option<String>, // TODO: use UUID
+        uid: Option<String>,
         version: DnaVersionSpec,
     },
     /// Disallow provisioning altogether. In this case, we expect
