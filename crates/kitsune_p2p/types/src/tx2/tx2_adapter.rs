@@ -1,4 +1,4 @@
-//! Types and Traits for writing tx2 backends.
+//! Types and Traits for writing tx2 adapters.
 
 use crate::tx2::tx2_utils::TxUrl;
 use crate::tx2::*;
@@ -98,11 +98,11 @@ pub type Endpoint = (Arc<dyn EndpointAdapt>, Box<dyn ConRecvAdapt>);
 /// Tx backend future resolves to an Endpoint instance.
 pub type EndpointFut = BoxFuture<'static, KitsuneResult<Endpoint>>;
 
-/// Tx backend adapter represents the ability to bind local endpoints.
-pub trait BackendAdapt: 'static + Send + Sync + Unpin {
+/// Tx bind adapter represents the ability to bind local endpoints.
+pub trait BindAdapt: 'static + Send + Sync + Unpin {
     /// Bind a local endpoint, given a url spec.
     fn bind(&self, url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut;
 }
 
 /// Tx backend endpoint binding factory type.
-pub type BackendFactory = Arc<dyn BackendAdapt>;
+pub type AdapterFactory = Arc<dyn BindAdapt>;

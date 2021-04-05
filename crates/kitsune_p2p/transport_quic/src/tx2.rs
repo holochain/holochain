@@ -6,15 +6,12 @@ use futures::stream::{BoxStream, StreamExt};
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::dependencies::serde_json;
 use kitsune_p2p_types::tls::*;
-use kitsune_p2p_types::tx2::tx2_backend::*;
+use kitsune_p2p_types::tx2::tx2_adapter::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
 use lair_keystore_api::actor::CertDigest;
 use std::sync::Arc;
-
-/// Tls ALPN identifier for kitsune quic handshaking
-const ALPN_KITSUNE_QUIC_0: &[u8] = b"kitsune-quic/0";
 
 /// Configuration for QuicBackendAdapt
 #[non_exhaustive]
@@ -53,6 +50,16 @@ impl QuicConfig {
         Ok((tls, tuning_params))
     }
 }
+
+/// Quic endpoint bind adapter for kitsune tx2
+pub async fn tx2_quic_adapter(config: QuicConfig) -> KitsuneResult<AdapterFactory> {
+    QuicBackendAdapt::new(config).await
+}
+
+// -- private -- //
+
+/// Tls ALPN identifier for kitsune quic handshaking
+const ALPN_KITSUNE_QUIC_0: &[u8] = b"kitsune-quic/0";
 
 struct QuicInChanRecvAdapt(BoxStream<'static, InChanFut>);
 
@@ -318,7 +325,7 @@ pub struct QuicBackendAdapt {
 
 impl QuicBackendAdapt {
     /// Construct a new quic tx2 backend bind adapter
-    pub async fn new(config: QuicConfig) -> KitsuneResult<BackendFactory> {
+    pub async fn new(config: QuicConfig) -> KitsuneResult<AdapterFactory> {
         let (tls, tuning_params) = config.split().await?;
 
         let local_digest = tls.cert_digest.clone();
@@ -357,7 +364,7 @@ impl QuicBackendAdapt {
         quic_cli.transport = transport;
         quic_cli.crypto = tls_cli;
 
-        let out: BackendFactory = Arc::new(Self {
+        let out: AdapterFactory = Arc::new(Self {
             local_digest,
             quic_srv,
             quic_cli,
@@ -367,7 +374,7 @@ impl QuicBackendAdapt {
     }
 }
 
-impl BackendAdapt for QuicBackendAdapt {
+impl BindAdapt for QuicBackendAdapt {
     fn bind(&self, url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut {
         let local_digest = self.local_digest.clone();
         let quic_srv = self.quic_srv.clone();

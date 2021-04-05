@@ -1,8 +1,8 @@
 #![allow(clippy::new_ret_no_self)]
 #![allow(clippy::manual_async_fn)]
-//! Promote a tx2 transport backend to a tx2 transport frontend.
+//! Promote a tx2 transport adapter to a tx2 transport frontend.
 
-use crate::tx2::tx2_backend::*;
+use crate::tx2::tx2_adapter::*;
 use crate::tx2::tx2_pool::*;
 use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
@@ -13,9 +13,9 @@ use ghost_actor::dependencies::tracing;
 use std::collections::HashMap;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
-/// Promote a tx2 transport backend to a tx2 transport frontend.
-pub fn tx2_pool_promote(backend: BackendFactory, max_cons: usize) -> EpFactory {
-    Arc::new(PromoteFactory { max_cons, backend })
+/// Promote a tx2 transport adapter to a tx2 transport frontend.
+pub fn tx2_pool_promote(adapter: AdapterFactory, max_cons: usize) -> EpFactory {
+    Arc::new(PromoteFactory { max_cons, adapter })
 }
 
 // -- private -- //
@@ -466,7 +466,7 @@ impl AsEpHnd for PromoteEpHnd {
                 "state": "open",
                 "pending_connection_count": i.pend_cons.len(),
                 "open_connection_count": i.cons.len(),
-                "backend": i.sub_ep.debug(),
+                "adapter": i.sub_ep.debug(),
             }))
         }) {
             Ok(j) => j,
@@ -655,7 +655,7 @@ impl AsEp for PromoteEp {
 
 struct PromoteFactory {
     max_cons: usize,
-    backend: BackendFactory,
+    adapter: AdapterFactory,
 }
 
 impl AsEpFactory for PromoteFactory {
@@ -666,7 +666,7 @@ impl AsEpFactory for PromoteFactory {
     ) -> BoxFuture<'static, KitsuneResult<Ep>> {
         let max_cons = self.max_cons;
         let con_limit = Arc::new(Semaphore::new(max_cons));
-        let pair_fut = self.backend.bind(bind_spec, timeout);
+        let pair_fut = self.adapter.bind(bind_spec, timeout);
         timeout
             .mix(async move {
                 let pair = pair_fut.await?;
@@ -689,7 +689,7 @@ mod tests {
         const COUNT: usize = 100;
         let (w_send, w_recv) = t_chan(COUNT * 3);
 
-        let fact = MemBackendAdapt::new(MemConfig::default()).await.unwrap();
+        let fact = tx2_mem_adapter(MemConfig::default()).await.unwrap();
 
         // we can set the max con count to half...
         // as old connections complete, new ones will be accepted

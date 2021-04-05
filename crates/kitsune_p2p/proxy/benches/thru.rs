@@ -128,8 +128,8 @@ async fn mk_core(tt: TT) -> (TxUrl, Ep, EpHnd) {
     let t = KitsuneTimeout::from_millis(5000);
 
     let f = match tt {
-        TT::Mem => MemBackendAdapt::new(MemConfig::default()).await.unwrap(),
-        TT::Quic => QuicBackendAdapt::new(QuicConfig::default()).await.unwrap(),
+        TT::Mem => tx2_mem_adapter(MemConfig::default()).await.unwrap(),
+        TT::Quic => tx2_quic_adapter(QuicConfig::default()).await.unwrap(),
     };
 
     let f = tx2_pool_promote(f, NODE_COUNT * 3);

@@ -3,7 +3,7 @@
 
 use crate::config::*;
 use crate::tls::*;
-use crate::tx2::tx2_backend::*;
+use crate::tx2::tx2_adapter::*;
 use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
 use crate::*;
@@ -53,6 +53,13 @@ impl MemConfig {
         Ok((tls, tuning_params))
     }
 }
+
+/// Construct a new memory-based test endpoint adapter for kitsune tx2.
+pub async fn tx2_mem_adapter(config: MemConfig) -> KitsuneResult<AdapterFactory> {
+    MemBackendAdapt::new(config).await
+}
+
+// -- private -- //
 
 static NEXT_MEM_ID: atomic::AtomicU64 = atomic::AtomicU64::new(1);
 
@@ -380,18 +387,18 @@ impl EndpointAdapt for MemEndpointAdapt {
 }
 
 /// Memory-based test endpoint adapter for kitsune tx2.
-pub struct MemBackendAdapt(CertDigest);
+struct MemBackendAdapt(CertDigest);
 
 impl MemBackendAdapt {
     /// Construct a new memory-based test endpoint adapter for kitsune tx2.
-    pub async fn new(config: MemConfig) -> KitsuneResult<BackendFactory> {
+    pub async fn new(config: MemConfig) -> KitsuneResult<AdapterFactory> {
         let (tls, _tuning_params) = config.split().await?;
-        let out: BackendFactory = Arc::new(Self(tls.cert_digest));
+        let out: AdapterFactory = Arc::new(Self(tls.cert_digest));
         Ok(out)
     }
 }
 
-impl BackendAdapt for MemBackendAdapt {
+impl BindAdapt for MemBackendAdapt {
     fn bind(&self, _url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut {
         let local_digest = self.0.clone();
         timeout
@@ -454,7 +461,7 @@ mod tests {
     }
 
     async fn mk_node(
-        f: &BackendFactory,
+        f: &AdapterFactory,
         r_send: TSender<()>,
         w_send: TSender<tokio::task::JoinHandle<()>>,
     ) -> (TxUrl, Arc<dyn EndpointAdapt>) {
@@ -481,7 +488,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_tx2_mem_backend_stress() {
+    async fn test_tx2_mem_stress() {
         let t = KitsuneTimeout::from_millis(5000);
 
         const COUNT: usize = 100;
@@ -538,7 +545,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_tx2_mem_backend() {
+    async fn test_tx2_mem() {
         let t = KitsuneTimeout::from_millis(5000);
 
         let back = MemBackendAdapt::new(MemConfig::default()).await.unwrap();

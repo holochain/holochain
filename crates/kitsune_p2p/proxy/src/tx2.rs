@@ -7,14 +7,14 @@ use futures::future::BoxFuture;
 use futures::stream::{Stream, StreamExt};
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::dependencies::serde_json;
-use kitsune_p2p_types::tx2::tx2_backend::*;
+use kitsune_p2p_types::tx2::tx2_adapter::*;
 use kitsune_p2p_types::tx2::tx2_pool::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
 use std::collections::HashMap;
 
-/// Wrap a tx2 backend transport with proxy logic.
+/// Wrap a tx2 transport pool adapter with proxy logic.
 pub fn tx2_proxy(sub_fact: EpFactory) -> EpFactory {
     ProxyEpFactory::new(sub_fact)
 }
@@ -658,7 +658,7 @@ mod tests {
     ) -> (tokio::task::JoinHandle<()>, TxUrl, EpHnd) {
         let t = KitsuneTimeout::from_millis(5000);
 
-        let f = MemBackendAdapt::new(MemConfig::default()).await.unwrap();
+        let f = tx2_mem_adapter(MemConfig::default()).await.unwrap();
         let f = tx2_pool_promote(f, 32);
 
         let f = tx2_proxy(f);
