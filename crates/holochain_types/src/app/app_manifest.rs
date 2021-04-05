@@ -60,4 +60,12 @@ impl AppManifest {
             Self::V1(manifest) => manifest.validate(),
         }
     }
+
+    /// Update the UUID for all DNAs used in Create-provisioned Cells.
+    /// Cells with other provisioning strategies are not affected.
+    pub fn set_uuid(&mut self, uuid: Uuid) {
+        match self {
+            Self::V1(manifest) => manifest.set_uuid(uuid),
+        }
+    }
 }

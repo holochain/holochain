@@ -19,15 +19,16 @@ pub type Uuid = String;
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct AppManifestV1 {
     /// Name of the App. This may be used as the installed_app_id.
-    pub(super) name: String,
+    pub name: String,
 
     /// Description of the app, just for context.
-    pub(super) description: Option<String>,
+    pub description: Option<String>,
 
     /// The Cell manifests that make up this app.
-    pub(super) slots: Vec<AppSlotManifest>,
+    pub slots: Vec<AppSlotManifest>,
 }
 
 /// Description of an app "slot" defined by this app.
@@ -35,16 +36,17 @@ pub struct AppManifestV1 {
 /// potential runtime clones.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct AppSlotManifest {
     /// The SlotId which will be given to the installed Cell for this Dna.
-    pub(super) id: SlotId,
+    pub id: SlotId,
 
     /// Determines if, how, and when a Cell will be provisioned.
-    pub(super) provisioning: Option<CellProvisioning>,
+    pub provisioning: Option<CellProvisioning>,
 
     /// Declares where to find the DNA, and options to modify it before
     /// inclusion in a Cell
-    pub(super) dna: AppSlotDnaManifest,
+    pub dna: AppSlotDnaManifest,
 }
 
 impl AppSlotManifest {
@@ -61,6 +63,7 @@ impl AppSlotManifest {
 /// The DNA portion of an app slot
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct AppSlotDnaManifest {
     /// Where to find this Dna. To specify a DNA included in a hApp Bundle,
     /// use a local relative path that corresponds with the bundle structure.
@@ -68,24 +71,24 @@ pub struct AppSlotDnaManifest {
     /// Note that since this is flattened,
     /// there is no actual "location" key in the manifest.
     #[serde(flatten)]
-    pub(super) location: Option<mr_bundle::Location>,
+    pub location: Option<mr_bundle::Location>,
 
     /// Optional default properties. May be overridden during installation.
-    pub(super) properties: Option<YamlProperties>,
+    pub properties: Option<YamlProperties>,
 
     /// Optional fixed UUID. May be overridden during installation.
-    pub(super) uuid: Option<Uuid>,
+    pub uuid: Option<Uuid>,
 
     /// The versioning constraints for the DNA. Ensures that only a DNA that
     /// matches the version spec will be used.
-    pub(super) version: Option<DnaVersionFlexible>,
+    pub version: Option<DnaVersionFlexible>,
 
     /// Allow up to this many "clones" to be created at runtime.
     /// Each runtime clone is created by the `CreateClone` strategy,
     /// regardless of the provisioning strategy set in the manifest.
     /// Default: 0
     #[serde(default)]
-    pub(super) clone_limit: u32,
+    pub clone_limit: u32,
 }
 
 impl AppSlotDnaManifest {
@@ -108,6 +111,7 @@ impl AppSlotDnaManifest {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
 #[serde(rename_all = "snake_case")]
 #[serde(untagged)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum DnaVersionFlexible {
     /// A version spec with a single hash
     Singleton(DnaHashB64),
@@ -133,6 +137,7 @@ pub type DnaLocation = mr_bundle::Location;
 /// valid DnaHashes. The order of the list is from latest version to earliest.
 /// In subsequent manifest versions, this will become more expressive.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct DnaVersionSpec(Vec<DnaHashB64>);
 
 // NB: the following is likely to remain in the API for DnaVersionSpec
@@ -157,6 +162,7 @@ impl DnaVersionSpec {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "strategy")]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[allow(missing_docs)]
 pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
@@ -182,6 +188,21 @@ impl Default for CellProvisioning {
 }
 
 impl AppManifestV1 {
+    /// Update the UUID for all DNAs used in Create-provisioned Cells.
+    /// Cells with other provisioning strategies are not affected.
+    ///
+    // TODO: it probably makes sense to do this for CreateIfNotExists cells
+    // too, in the Create case, but we would have to do that during installation
+    // rather than simply updating the manifest. Let's hold off on that until
+    // we know we need it, since this way is substantially simpler.
+    pub fn set_uuid(&mut self, uuid: Uuid) {
+        for mut slot in self.slots.iter_mut() {
+            if matches!(slot.provisioning, Some(CellProvisioning::Create { .. })) {
+                slot.dna.uuid = Some(uuid.clone());
+            }
+        }
+    }
+
     /// Convert this human-focused manifest into a validated, concise representation
     pub fn validate(self) -> AppManifestResult<AppManifestValidated> {
         let AppManifestV1 {
@@ -267,6 +288,9 @@ pub mod tests {
     use crate::{app::app_manifest::AppManifest, prelude::DnaDef};
     use ::fixt::prelude::*;
     use std::path::PathBuf;
+
+    #[cfg(feature = "arbitrary")]
+    use arbitrary::Arbitrary;
 
     #[derive(serde::Serialize, serde::Deserialize)]
     struct Props {
@@ -357,5 +381,33 @@ slots:
         assert_eq!(actual.get(fields[1]), expected.get(fields[1]));
         assert_eq!(actual.get(fields[2]), expected.get(fields[2]));
         assert_eq!(actual.get(fields[3]), expected.get(fields[3]));
+    }
+
+    #[tokio::test]
+    async fn manifest_v1_set_uuid() {
+        let mut u = arbitrary::Unstructured::new(&[0]);
+        let mut manifest = AppManifestV1::arbitrary(&mut u).unwrap();
+        manifest.slots = vec![
+            AppSlotManifest::arbitrary(&mut u).unwrap(),
+            AppSlotManifest::arbitrary(&mut u).unwrap(),
+            AppSlotManifest::arbitrary(&mut u).unwrap(),
+            AppSlotManifest::arbitrary(&mut u).unwrap(),
+        ];
+        manifest.slots[0].provisioning = Some(CellProvisioning::Create { deferred: false });
+        manifest.slots[1].provisioning = Some(CellProvisioning::Create { deferred: false });
+        manifest.slots[2].provisioning = Some(CellProvisioning::UseExisting { deferred: false });
+        manifest.slots[3].provisioning =
+            Some(CellProvisioning::CreateIfNotExists { deferred: false });
+
+        let uuid = Uuid::from("blabla");
+        manifest.set_uuid(uuid.clone());
+
+        // - The Create slots have the UUID rewritten.
+        assert_eq!(manifest.slots[0].dna.uuid.as_ref(), Some(&uuid));
+        assert_eq!(manifest.slots[1].dna.uuid.as_ref(), Some(&uuid));
+
+        // - The others do not.
+        assert_ne!(manifest.slots[2].dna.uuid.as_ref(), Some(&uuid));
+        assert_ne!(manifest.slots[3].dna.uuid.as_ref(), Some(&uuid));
     }
 }
