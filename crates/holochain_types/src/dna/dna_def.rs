@@ -38,6 +38,14 @@ impl From<()> for YamlProperties {
     }
 }
 
+/// Not a great implementation: always returns null
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for YamlProperties {
+    fn arbitrary(_: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(serde_yaml::Value::Null.into())
+    }
+}
+
 /// The definition of a DNA: the hash of this data is what produces the DnaHash.
 ///
 /// Historical note: This struct was written before `DnaManifest` appeared.
