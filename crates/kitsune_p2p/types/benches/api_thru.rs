@@ -41,17 +41,20 @@ impl Test {
     }
 
     pub async fn test(&mut self) {
+        let t = KitsuneTimeout::from_millis(5000);
+
         let mut data = PoolBuf::new();
         data.extend_from_slice(REQ);
         let data = TestData::one(data);
 
-        let res = self
+        let con = self
             .src_ep
-            .request(
-                self.dst_url.clone(),
-                &data,
-                KitsuneTimeout::from_millis(5000),
-            )
+            .get_connection(self.dst_url.clone(), t)
+            .await
+            .unwrap();
+
+        let res = con
+            .request(&data, KitsuneTimeout::from_millis(5000))
             .await
             .unwrap();
 
@@ -66,9 +69,9 @@ impl Test {
 async fn mk_core() -> (TxUrl, Tx2Ep<TestData>, Tx2EpHnd<TestData>) {
     let t = KitsuneTimeout::from_millis(5000);
 
-    let f = MemBackendAdapt::new();
+    let f = tx2_mem_adapter(MemConfig::default()).await.unwrap();
     let f = tx2_pool_promote(f, 32);
-    let f = Tx2EpFactory::new(f, 32);
+    let f = Tx2EpFactory::new(f);
 
     let ep = f.bind("none:", t).await.unwrap();
     let ep_hnd = ep.handle().clone();
