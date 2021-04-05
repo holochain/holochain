@@ -686,7 +686,7 @@ where
                         .dna_store
                         .get(parent_dna_hash)
                         .ok_or_else(|| DnaError::DnaMissing(parent_dna_hash.to_owned()))?
-                        .modify_phenotype(random_uuid(), properties)?;
+                        .modify_phenotype(random_uid(), properties)?;
                     Ok((state, dna))
                 } else {
                     Err(ConductorError::AppNotActive(installed_app_id.clone()))

@@ -40,11 +40,11 @@ fn prompt_required(prompt: &str) -> io::Result<String> {
 
 fn prompt_dna_init(root_dir: PathBuf) -> anyhow::Result<DnaBundle> {
     let name = prompt_required("name:")?;
-    let uuid = Some(prompt_default(
-        "uuid:",
+    let uid = Some(prompt_default(
+        "uid:",
         "00000000-0000-0000-0000-000000000000",
     )?);
-    let manifest = DnaManifest::current(name, uuid, None, vec![]);
+    let manifest = DnaManifest::current(name, uid, None, vec![]);
     Ok(DnaBundle::new(manifest, vec![], root_dir)?)
 }
 

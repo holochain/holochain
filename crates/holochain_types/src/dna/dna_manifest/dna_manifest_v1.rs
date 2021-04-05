@@ -19,9 +19,9 @@ pub struct DnaManifestV1 {
     /// The friendly "name" of a Holochain DNA.
     pub(crate) name: String,
 
-    /// A UUID for uniquifying this Dna.
+    /// A UID for uniquifying this Dna.
     // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
-    pub(crate) uuid: Option<String>,
+    pub(crate) uid: Option<String>,
 
     /// Any arbitrary application properties can be included in this object.
     pub(crate) properties: Option<YamlProperties>,
