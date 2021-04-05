@@ -22,6 +22,7 @@ pub use error::*;
 #[cfg(test)]
 mod tests;
 
+pub mod chain_head;
 pub mod entry;
 pub mod error;
 pub mod link;
@@ -358,7 +359,14 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
     }
 }
 
-pub(crate) fn row_to_header(row: &Row) -> StateQueryResult<SignedHeaderHashed> {
+pub(crate) fn row_to_header(index: &str) -> impl Fn(&Row) -> StateQueryResult<SignedHeader> {
+    move |row| {
+        let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+        Ok(header)
+    }
+}
+
+pub(crate) fn row_to_signed_header(row: &Row) -> StateQueryResult<SignedHeaderHashed> {
     let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
     let SignedHeader(header, signature) = header;
     let header = HeaderHashed::from_content_sync(header);

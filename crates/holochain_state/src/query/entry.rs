@@ -115,6 +115,6 @@ impl Query for GetEntryQuery {
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
-        Arc::new(|row| row_to_header(row))
+        Arc::new(|row| row_to_signed_header(row))
     }
 }

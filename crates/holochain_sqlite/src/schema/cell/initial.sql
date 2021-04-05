@@ -28,6 +28,7 @@ CREATE TABLE Header (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             VARCHAR(64)    NOT NULL,
     seq              INTEGER        NOT NULL,
+    author           BLOB           NOT NULL,
 
     blob             BLOB           NOT NULL,
 
@@ -69,6 +70,7 @@ CREATE TABLE Header (
     FOREIGN KEY(create_link_hash) REFERENCES Header(hash)
 );
 CREATE INDEX Header_type_idx ON Header ( type );
+CREATE INDEX Header_author ON Header ( author );
 
 
 -- NB: basis_hash, header_hash, and entry_hash, in general, will have
