@@ -71,7 +71,7 @@ async fn mk_core() -> (TxUrl, Tx2Ep<TestData>, Tx2EpHnd<TestData>) {
 
     let f = tx2_mem_adapter(MemConfig::default()).await.unwrap();
     let f = tx2_pool_promote(f, 32);
-    let f = Tx2EpFactory::new(f);
+    let f = tx2_api(f);
 
     let ep = f.bind("none:", t).await.unwrap();
     let ep_hnd = ep.handle().clone();
