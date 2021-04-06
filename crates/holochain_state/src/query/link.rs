@@ -152,6 +152,10 @@ impl Query for LinkQuery {
         Ok(Maps::new())
     }
 
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
+        Arc::new(row_to_signed_header("header_blob"))
+    }
+
     fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {
         let base_filter = self.base.clone();
         let zome_id_filter = self.zome_id.clone();
@@ -203,10 +207,6 @@ impl Query for LinkQuery {
         S::O: StoresIter<Self::Data>,
     {
         Ok(state.creates.into_iter().map(|(_, v)| v).collect())
-    }
-
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
-        Arc::new(|row| row_to_signed_header(row))
     }
 }
 

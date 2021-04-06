@@ -368,12 +368,16 @@ pub(crate) fn row_to_header(
     }
 }
 
-pub(crate) fn row_to_signed_header(row: &Row) -> StateQueryResult<SignedHeaderHashed> {
-    let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
-    let SignedHeader(header, signature) = header;
-    let header = HeaderHashed::from_content_sync(header);
-    let shh = SignedHeaderHashed::with_presigned(header, signature);
-    Ok(shh)
+pub(crate) fn row_to_signed_header(
+    index: &'static str,
+) -> impl Fn(&Row) -> StateQueryResult<SignedHeaderHashed> {
+    move |row| {
+        let header = from_blob::<SignedHeader>(row.get(row.column_index(index)?)?);
+        let SignedHeader(header, signature) = header;
+        let header = HeaderHashed::from_content_sync(header);
+        let shh = SignedHeaderHashed::with_presigned(header, signature);
+        Ok(shh)
+    }
 }
 
 /// Serialize a value to be stored in a database as a BLOB type

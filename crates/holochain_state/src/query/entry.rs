@@ -56,8 +56,8 @@ impl Query for GetEntryQuery {
         params.to_vec()
     }
 
-    fn init_fold(&self) -> StateQueryResult<Self::State> {
-        Ok(Maps::new())
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
+        Arc::new(row_to_signed_header("header_blob"))
     }
 
     fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {
@@ -71,6 +71,10 @@ impl Query for GetEntryQuery {
             _ => false,
         };
         Box::new(f)
+    }
+
+    fn init_fold(&self) -> StateQueryResult<Self::State> {
+        Ok(Maps::new())
     }
 
     fn fold(
@@ -112,9 +116,5 @@ impl Query for GetEntryQuery {
             }
             None => Ok(None),
         }
-    }
-
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
-        Arc::new(|row| row_to_signed_header(row))
     }
 }

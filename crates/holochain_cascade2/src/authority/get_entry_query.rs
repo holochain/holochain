@@ -106,6 +106,20 @@ impl Query for GetEntryOpsQuery {
         params.to_vec()
     }
 
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
+        let f = |row: &Row| {
+            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+            let SignedHeader(header, signature) = header;
+            let op_type = row.get(row.column_index("dht_type")?)?;
+            Ok(WireDhtOp {
+                op_type,
+                header,
+                signature,
+            })
+        };
+        Arc::new(f)
+    }
+
     fn init_fold(&self) -> StateQueryResult<Self::State> {
         Ok(WireEntryOps::new())
     }
@@ -141,19 +155,5 @@ impl Query for GetEntryOpsQuery {
             state.entry = entry;
         }
         Ok(state)
-    }
-
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
-        let f = |row: &Row| {
-            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
-            let SignedHeader(header, signature) = header;
-            let op_type = row.get(row.column_index("dht_type")?)?;
-            Ok(WireDhtOp {
-                op_type,
-                header,
-                signature,
-            })
-        };
-        Arc::new(f)
     }
 }

@@ -44,6 +44,9 @@ impl Query for ChainHeadQuery {
 
     fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {
         let author = self.0.clone();
+        // NB: it's a little redundant to filter on author, since we should never
+        // be putting any headers by other authors in our scratch, but it
+        // certainly doesn't hurt to be consistent.
         let f = move |header: &SignedHeader| *header.header().author() == author;
         Box::new(f)
     }
