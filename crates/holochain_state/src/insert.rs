@@ -76,12 +76,14 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) {
     let (header, hash) = header.into_inner();
     let header_type: HeaderTypeSql = header.header_type().into();
     let header_seq = header.header_seq();
+    let author = header.author().clone();
     match header {
         Header::CreateLink(create_link) => {
             sql_insert!(txn, Header, {
                 "hash": hash,
                 "type": header_type ,
                 "seq": header_seq,
+                "author": author,
                 "base_hash": create_link.base_address.clone(),
                 "zome_id": create_link.zome_id.index() as u32,
                 "tag": create_link.tag.clone(),
@@ -94,6 +96,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) {
                 "hash": hash,
                 "type": header_type ,
                 "seq": header_seq,
+                "author": author,
                 "create_link_hash": delete_link.link_add_address.clone(),
                 "blob": to_blob(SignedHeader::from((Header::DeleteLink(delete_link), signature))),
             })
@@ -104,6 +107,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) {
                 "hash": hash,
                 "type": header_type ,
                 "seq": header_seq,
+                "author": author,
                 "entry_hash": create.entry_hash.clone(),
                 "blob": to_blob(SignedHeader::from((Header::Create(create), signature))),
             })
@@ -114,6 +118,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) {
                 "hash": hash,
                 "type": header_type ,
                 "seq": header_seq,
+                "author": author,
                 "deletes_entry_hash": delete.deletes_entry_address.clone(),
                 "deletes_header_hash": delete.deletes_address.clone(),
                 "blob": to_blob(SignedHeader::from((Header::Delete(delete), signature))),
@@ -125,9 +130,20 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) {
                 "hash": hash,
                 "type": header_type ,
                 "seq": header_seq,
+                "author": author,
                 "original_entry_hash": update.original_entry_address.clone(),
                 "original_header_hash": update.original_header_address.clone(),
                 "blob": to_blob(SignedHeader::from((Header::Update(update), signature))),
+            })
+            .unwrap();
+        }
+        Header::InitZomesComplete(izc) => {
+            sql_insert!(txn, Header, {
+                "hash": hash,
+                "type": header_type ,
+                "seq": header_seq,
+                "author": author,
+                "blob": to_blob(SignedHeader::from((Header::InitZomesComplete(izc), signature))),
             })
             .unwrap();
         }

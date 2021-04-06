@@ -1,5 +1,5 @@
 use holo_hash::*;
-use holochain_sqlite::rusqlite::named_params;
+use holochain_sqlite::rusqlite::*;
 use holochain_zome_types::*;
 use std::fmt::Debug;
 
@@ -23,7 +23,7 @@ impl Query for ChainHeadQuery {
         "
             SELECT H.blob FROM Header AS H
             JOIN (
-                SELECT MAX(seq) FROM Header
+                SELECT author, MAX(seq) FROM Header
                 GROUP BY author
             ) AS H2
             ON H.author = H2.author
@@ -72,5 +72,73 @@ impl Query for ChainHeadQuery {
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
         Arc::new(row_to_header("blob"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::insert::insert_header;
+    use ::fixt::prelude::*;
+    use holochain_sqlite::{schema::SCHEMA_CELL, scratch::Scratch};
+
+    #[test]
+    fn test_chain_head_query() {
+        observability::test_run().ok();
+        let mut conn = Connection::open_in_memory().unwrap();
+        SCHEMA_CELL.initialize(&mut conn, None).unwrap();
+
+        let mut txn = conn
+            .transaction_with_behavior(TransactionBehavior::Exclusive)
+            .unwrap();
+
+        let author = fixt!(AgentPubKey);
+
+        // Create 5 consecutive headers for the authoring agent,
+        // as well as 5 other random headers, interspersed.
+        let shhs: Vec<_> = vec![
+            fixt!(HeaderBuilderCommon),
+            fixt!(HeaderBuilderCommon),
+            fixt!(HeaderBuilderCommon),
+            fixt!(HeaderBuilderCommon),
+            fixt!(HeaderBuilderCommon),
+        ]
+        .into_iter()
+        .enumerate()
+        .flat_map(|(seq, random_header)| {
+            let mut chain_header = random_header.clone();
+            chain_header.header_seq = seq as u32;
+            chain_header.author = author.clone();
+            vec![chain_header, random_header]
+        })
+        .map(|b| {
+            SignedHeaderHashed::with_presigned(
+                // A chain made entirely of InitZomesComplete headers is totally invalid,
+                // but we don't need a valid chain for this test,
+                // we just need an ordered sequence of headers
+                HeaderHashed::from_content_sync(InitZomesComplete::from_builder(b).into()),
+                fixt!(Signature),
+            )
+        })
+        .collect();
+
+        let expected_head = shhs[8].clone();
+
+        for shh in &shhs[..6] {
+            insert_header(&mut txn, shh.clone());
+        }
+
+        let mut scratch = Scratch::<SignedHeader>::new();
+
+        // It's also totally invalid for a call_zome scratch to contain headers
+        // from other authors, but it doesn't matter here
+        for shh in &shhs[6..] {
+            scratch.add_item(shh.clone().into());
+        }
+
+        let mut query = ChainHeadQuery::new(author);
+
+        let head = query.run(DbScratch::new(&[&mut txn], &scratch)).unwrap();
+        assert_eq!(head.as_ref(), Some(expected_head.as_hash()));
     }
 }

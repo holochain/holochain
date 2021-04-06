@@ -275,6 +275,13 @@ impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
     }
 }
 
+impl From<SignedHeaderHashed> for SignedHeader {
+    fn from(shh: SignedHeaderHashed) -> SignedHeader {
+        let (signed_header, _) = shh.into_inner();
+        signed_header
+    }
+}
+
 impl From<Element> for Option<Entry> {
     fn from(e: Element) -> Self {
         e.entry.into_option()

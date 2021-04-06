@@ -359,9 +359,11 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
     }
 }
 
-pub(crate) fn row_to_header(index: &str) -> impl Fn(&Row) -> StateQueryResult<SignedHeader> {
+pub(crate) fn row_to_header(
+    index: &'static str,
+) -> impl Fn(&Row) -> StateQueryResult<SignedHeader> {
     move |row| {
-        let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+        let header = from_blob::<SignedHeader>(row.get(row.column_index(index)?)?);
         Ok(header)
     }
 }
