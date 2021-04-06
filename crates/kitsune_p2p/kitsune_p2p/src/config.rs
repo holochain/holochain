@@ -52,33 +52,33 @@ impl Default for KitsuneP2pConfig {
 
 impl KitsuneP2pConfig {
     pub(crate) fn to_tx2(&self) -> KitsuneResult<KitsuneP2pTx2Config> {
-        if self.transport_pool.len() != 1 {
-            return Err("kitsune tx2 expects exactly 1 transport".into());
-        }
-        let tx = self.transport_pool.get(0);
-        if let TransportConfig::Proxy {
-            sub_transport,
-            proxy_config,
-        } = tx.unwrap()
-        {
-            let backend = match &**sub_transport {
-                TransportConfig::Mem {} => KitsuneP2pTx2Backend::Mem,
-                TransportConfig::Quic { bind_to, .. } => {
-                    let bind_to = match bind_to {
-                        Some(bind_to) => bind_to.clone().into(),
-                        None => "kitsune-quic://0.0.0.0:0".into(),
-                    };
-                    KitsuneP2pTx2Backend::Quic { bind_to }
-                }
-                _ => return Err("kitsune tx2 backend must be mem or quic".into()),
-            };
-            let use_proxy = match proxy_config {
-                ProxyConfig::RemoteProxyClient { proxy_url } => Some(proxy_url.clone().into()),
-                ProxyConfig::LocalProxyServer { .. } => None,
-            };
-            Ok(KitsuneP2pTx2Config { backend, use_proxy })
-        } else {
-            Err("kitsune tx2 requires top-level proxy".into())
+        match self.transport_pool.get(0) {
+            Some(TransportConfig::Proxy {
+                sub_transport,
+                proxy_config,
+            }) => {
+                let backend = match &**sub_transport {
+                    TransportConfig::Mem {} => KitsuneP2pTx2Backend::Mem,
+                    TransportConfig::Quic { bind_to, .. } => {
+                        let bind_to = match bind_to {
+                            Some(bind_to) => bind_to.clone().into(),
+                            None => "kitsune-quic://0.0.0.0:0".into(),
+                        };
+                        KitsuneP2pTx2Backend::Quic { bind_to }
+                    }
+                    _ => return Err("kitsune tx2 backend must be mem or quic".into()),
+                };
+                let use_proxy = match proxy_config {
+                    ProxyConfig::RemoteProxyClient { proxy_url } => Some(proxy_url.clone().into()),
+                    ProxyConfig::LocalProxyServer { .. } => None,
+                };
+                Ok(KitsuneP2pTx2Config { backend, use_proxy })
+            }
+            None => Ok(KitsuneP2pTx2Config {
+                backend: KitsuneP2pTx2Backend::Mem,
+                use_proxy: None,
+            }),
+            _ => Err("kitsune tx2 expects exactly 1 proxy transport".into()),
         }
     }
 }
