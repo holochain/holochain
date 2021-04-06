@@ -1,11 +1,11 @@
 use holochain::conductor::config::ConductorConfig;
 use holochain::conductor::interactive;
+use holochain::conductor::manager::handle_shutdown;
 use holochain::conductor::paths::ConfigFilePath;
 use holochain::conductor::Conductor;
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use observability::Output;
-use std::error::Error;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::*;
@@ -71,16 +71,13 @@ async fn async_main() {
 
     // Await on the main JoinHandle, keeping the process alive until all
     // Conductor activity has ceased
-    conductor
+    let result = conductor
         .take_shutdown_handle()
         .await
         .expect("The shutdown handle has already been taken.")
-        .await
-        .map_err(|e| {
-            error!(error = &e as &dyn Error, "Failed to join the main task");
-            e
-        })
-        .expect("Error while joining threads during shutdown");
+        .await;
+
+    handle_shutdown(result);
 
     // TODO: on SIGINT/SIGKILL, kill the conductor:
     // conductor.kill().await

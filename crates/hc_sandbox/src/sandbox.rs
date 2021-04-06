@@ -27,6 +27,7 @@ pub async fn default_with_network(
         app_id: Some(app_id),
         agent_key: None,
         path: happ,
+        uid: None,
     };
     crate::calls::install_app_bundle(&mut cmd, install_bundle).await?;
     Ok(path)

@@ -22,6 +22,7 @@ pub use error::*;
 #[cfg(test)]
 mod tests;
 
+pub mod chain_head;
 pub mod entry;
 pub mod error;
 pub mod link;
@@ -94,9 +95,9 @@ pub trait Query: Clone {
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>>;
 
-    fn fold(&mut self, state: Self::State, data: Self::Data) -> StateQueryResult<Self::State>;
+    fn fold(&self, state: Self::State, data: Self::Data) -> StateQueryResult<Self::State>;
 
-    fn run<S>(&mut self, stores: S) -> StateQueryResult<Self::Output>
+    fn run<S>(&self, stores: S) -> StateQueryResult<Self::Output>
     where
         S: Stores<Self>,
     {
@@ -107,7 +108,7 @@ pub trait Query: Clone {
         self.render(result, stores)
     }
 
-    fn render<S>(&mut self, state: Self::State, stores: S) -> StateQueryResult<Self::Output>
+    fn render<S>(&self, state: Self::State, stores: S) -> StateQueryResult<Self::Output>
     where
         S: Stores<Self>,
         S::O: StoresIter<Self::Data>;
@@ -358,12 +359,25 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
     }
 }
 
-pub(crate) fn row_to_header(row: &Row) -> StateQueryResult<SignedHeaderHashed> {
-    let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
-    let SignedHeader(header, signature) = header;
-    let header = HeaderHashed::from_content_sync(header);
-    let shh = SignedHeaderHashed::with_presigned(header, signature);
-    Ok(shh)
+pub(crate) fn row_to_header(
+    index: &'static str,
+) -> impl Fn(&Row) -> StateQueryResult<SignedHeader> {
+    move |row| {
+        let header = from_blob::<SignedHeader>(row.get(row.column_index(index)?)?);
+        Ok(header)
+    }
+}
+
+pub(crate) fn row_to_signed_header(
+    index: &'static str,
+) -> impl Fn(&Row) -> StateQueryResult<SignedHeaderHashed> {
+    move |row| {
+        let header = from_blob::<SignedHeader>(row.get(row.column_index(index)?)?);
+        let SignedHeader(header, signature) = header;
+        let header = HeaderHashed::from_content_sync(header);
+        let shh = SignedHeaderHashed::with_presigned(header, signature);
+        Ok(shh)
+    }
 }
 
 /// Serialize a value to be stored in a database as a BLOB type

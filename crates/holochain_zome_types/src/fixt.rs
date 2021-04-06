@@ -602,3 +602,13 @@ fixturator!(
         }
     };
 );
+
+fixturator!(
+    HeaderHashed;
+    constructor fn from_content_sync(Header);
+);
+
+fixturator!(
+    SignedHeaderHashed;
+    constructor fn with_presigned(HeaderHashed, Signature);
+);

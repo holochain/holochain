@@ -299,7 +299,7 @@ async fn register_and_install_dna(
     nick: String,
 ) -> DnaHash {
     let register_payload = RegisterDnaPayload {
-        uuid: None,
+        uid: None,
         properties,
         source: DnaSource::Path(dna_path),
     };
@@ -586,7 +586,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     );
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
     let register_payload = RegisterDnaPayload {
-        uuid: None,
+        uid: None,
         properties: None,
         source: DnaSource::Path(fake_dna_path),
     };
@@ -647,7 +647,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     );
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
     let register_payload = RegisterDnaPayload {
-        uuid: None,
+        uid: None,
         properties: None,
         source: DnaSource::Path(fake_dna_path),
     };

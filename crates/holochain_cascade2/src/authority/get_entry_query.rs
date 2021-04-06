@@ -106,15 +106,25 @@ impl Query for GetEntryOpsQuery {
         params.to_vec()
     }
 
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
+        let f = |row: &Row| {
+            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+            let SignedHeader(header, signature) = header;
+            let op_type = row.get(row.column_index("dht_type")?)?;
+            Ok(WireDhtOp {
+                op_type,
+                header,
+                signature,
+            })
+        };
+        Arc::new(f)
+    }
+
     fn init_fold(&self) -> StateQueryResult<Self::State> {
         Ok(WireEntryOps::new())
     }
 
-    fn fold(
-        &mut self,
-        mut state: Self::State,
-        dht_op: Self::Data,
-    ) -> StateQueryResult<Self::State> {
+    fn fold(&self, mut state: Self::State, dht_op: Self::Data) -> StateQueryResult<Self::State> {
         match &dht_op.op_type {
             DhtOpType::StoreEntry => {
                 state.creates.push(dht_op);
@@ -130,7 +140,7 @@ impl Query for GetEntryOpsQuery {
         Ok(state)
     }
 
-    fn render<S>(&mut self, mut state: Self::State, stores: S) -> StateQueryResult<Self::Output>
+    fn render<S>(&self, mut state: Self::State, stores: S) -> StateQueryResult<Self::Output>
     where
         S: Stores<Self>,
         S::O: StoresIter<Self::Data>,
@@ -145,19 +155,5 @@ impl Query for GetEntryOpsQuery {
             state.entry = entry;
         }
         Ok(state)
-    }
-
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
-        let f = |row: &Row| {
-            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
-            let SignedHeader(header, signature) = header;
-            let op_type = row.get(row.column_index("dht_type")?)?;
-            Ok(WireDhtOp {
-                op_type,
-                header,
-                signature,
-            })
-        };
-        Arc::new(f)
     }
 }

@@ -24,6 +24,7 @@ use crate::{error::HoloHashResult, HashType};
     derive_more::Into,
     derive_more::AsRef,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[serde(transparent)]
 pub struct HoloHashB64<T: HashType>(HoloHash<T>);
 

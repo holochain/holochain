@@ -37,6 +37,11 @@ impl AppBundle {
             .map_err(Into::into)
     }
 
+    /// Convert to the inner Bundle
+    pub fn into_inner(self) -> mr_bundle::Bundle<AppManifest> {
+        self.0
+    }
+
     /// Given a DnaGamut, decide which of the available DNAs or Cells should be
     /// used for each cell in this app.
     pub async fn resolve_cells(
