@@ -4,6 +4,7 @@
 //! where as retrieve only checks that where the data was found
 //! the appropriate validation has been run.
 
+use authority::WireEntryOps;
 use error::CascadeResult;
 use holo_hash::hash_type::AnyDht;
 use holo_hash::AgentPubKey;
@@ -13,45 +14,105 @@ use holo_hash::HeaderHash;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
+// use holochain_p2p::HolochainP2pCell;
+// use holochain_p2p::HolochainP2pCellT2;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
+use test_utils::HolochainP2pCellT2;
+use test_utils::PassThroughNetwork;
 use tracing::*;
 
 pub mod authority;
 pub mod error;
 
-pub struct Cascade<Network = HolochainP2pCell> {
-    env: EnvRead,
-    _network: Option<Network>,
+// FIXME: Make this test_utils feature once we update to
+// the real network.
+// #[cfg(any(test, feature = "test_utils"))]
+pub mod test_utils;
+
+/////////////////
+// Helper macros
+/////////////////
+
+/// Get an item from an option
+/// or return early from the function
+macro_rules! ok_or_return {
+    ($n:expr) => {
+        match $n {
+            Some(n) => n,
+            None => return Ok(()),
+        }
+    };
+    ($n:expr, $ret:expr) => {
+        match $n {
+            Some(n) => n,
+            None => return Ok($ret),
+        }
+    };
+}
+
+pub struct Cascade<Network = PassThroughNetwork> {
+    vault: Option<EnvRead>,
+    cache: Option<EnvWrite>,
+    network: Option<Network>,
 }
 
 impl<Network> Cascade<Network>
 where
-    Network: HolochainP2pCellT + Clone + 'static + Send,
+    Network: HolochainP2pCellT2 + Clone + 'static + Send,
 {
     /// Constructs a [Cascade]
-    pub fn new(env: EnvRead) -> Self {
+    pub fn empty() -> Self {
         Self {
-            env,
-            _network: None,
+            vault: None,
+            network: None,
+            cache: None,
+        }
+    }
+
+    /// Constructs a [Cascade]
+    pub fn with_vault(self, vault: EnvRead) -> Self {
+        Self {
+            vault: Some(vault),
+            ..self
         }
     }
 
     /// Add the network to the cascade
-    pub fn with_network<N: HolochainP2pCellT + Clone>(self, network: N) -> Cascade<N> {
+    pub fn with_network<N: HolochainP2pCellT2 + Clone>(self, network: N) -> Cascade<N> {
         Cascade {
-            env: self.env,
-            _network: Some(network),
+            vault: self.vault,
+            cache: self.cache,
+            network: Some(network),
         }
     }
 }
 
 impl<Network> Cascade<Network>
 where
-    Network: HolochainP2pCellT + Clone + 'static + Send,
+    Network: HolochainP2pCellT2 + Clone + 'static + Send,
 {
+    fn merge_entry_ops_into_cache(&mut self, _response: WireEntryOps) -> CascadeResult<()> {
+        todo!()
+    }
+
+    #[instrument(skip(self, options))]
+    async fn fetch_element_via_entry(
+        &mut self,
+        hash: EntryHash,
+        options: NetworkGetOptions,
+    ) -> CascadeResult<()> {
+        let network = ok_or_return!(self.network.as_mut());
+        let results = network
+            .get(hash.clone().into(), options.clone())
+            .instrument(debug_span!("fetch_element_via_entry::network_get"))
+            .await?;
+
+        for response in results {
+            self.merge_entry_ops_into_cache(response)?;
+        }
+        Ok(())
+    }
     /// Check if this hash has been validated.
     /// Elements can end up in the cache or integrated table because
     /// they were gossiped to you or you authored them.
@@ -93,14 +154,16 @@ where
         todo!()
     }
 
-    #[instrument(skip(self, _options))]
+    #[instrument(skip(self, options))]
     /// Returns the oldest live [Element] for this [EntryHash] by getting the
     /// latest available metadata from authorities combined with this agents authored data.
     pub async fn dht_get_entry(
         &mut self,
-        _entry_hash: EntryHash,
-        _options: GetOptions,
+        entry_hash: EntryHash,
+        options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
+        self.fetch_element_via_entry(entry_hash, options.into())
+            .await?;
         todo!()
     }
 

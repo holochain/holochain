@@ -1722,6 +1722,7 @@ dependencies = [
 name = "holochain_cascade2"
 version = "0.0.1"
 dependencies = [
+ "async-trait",
  "derive_more",
  "either",
  "fallible-iterator",

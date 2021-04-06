@@ -1,5 +1,4 @@
 use self::get_entry_query::GetEntryOpsQuery;
-use self::get_entry_query::WireEntryOps;
 
 use super::error::CascadeResult;
 use holo_hash::AgentPubKey;
@@ -9,6 +8,9 @@ use holochain_state::query::Query;
 use holochain_state::query::Txn;
 use holochain_types::prelude::*;
 use tracing::*;
+
+pub use get_entry_query::WireDhtOp;
+pub use get_entry_query::WireEntryOps;
 
 #[cfg(test)]
 mod test;
