@@ -28,6 +28,7 @@ ghost_actor::ghost_chan! {
 
 pub(crate) async fn spawn_space(
     space: Arc<KitsuneSpace>,
+    this_addr: url2::Url2,
     ep_hnd: Tx2EpHnd<wire::Wire>,
     config: Arc<KitsuneP2pConfig>,
 ) -> KitsuneP2pResult<(
@@ -55,7 +56,7 @@ pub(crate) async fn spawn_space(
         .create_channel::<KitsuneP2p>()
         .await?;
 
-    tokio::task::spawn(builder.spawn(Space::new(space, i_s, evt_send, ep_hnd, config)));
+    tokio::task::spawn(builder.spawn(Space::new(space, this_addr, i_s, evt_send, ep_hnd, config)));
 
     Ok((sender, evt_recv))
 }
@@ -436,16 +437,12 @@ impl SpaceInternalHandler for Space {
         let mut mdns_handles = self.mdns_handles.clone();
         let network_type = self.config.network_type.clone();
         let agent_list: Vec<Arc<KitsuneAgent>> = self.local_joined_agents.iter().cloned().collect();
-        let bound_url = self.ep_hnd.local_addr();
+        let bound_url = self.this_addr.clone();
         let evt_sender = self.evt_sender.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         Ok(async move {
-            let bound_url = bound_url?;
-            let urls = bound_url
-                .query_pairs()
-                .map(|(_, sub_url)| url2::url2!("{}", sub_url))
-                .collect::<Vec<_>>();
+            let urls = vec![bound_url];
             for agent in agent_list {
                 let agent_info = crate::types::agent_store::AgentInfo::new(
                     (*space).clone(),
@@ -774,6 +771,7 @@ impl KitsuneP2pHandler for Space {
 /// areas that share common transport infrastructure for communication.
 pub(crate) struct Space {
     pub(crate) space: Arc<KitsuneSpace>,
+    pub(crate) this_addr: url2::Url2,
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     pub(crate) ep_hnd: Tx2EpHnd<wire::Wire>,
@@ -787,6 +785,7 @@ impl Space {
     /// space constructor
     pub fn new(
         space: Arc<KitsuneSpace>,
+        this_addr: url2::Url2,
         i_s: ghost_actor::GhostSender<SpaceInternal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
@@ -804,6 +803,7 @@ impl Space {
 
         Self {
             space,
+            this_addr,
             i_s,
             evt_sender,
             ep_hnd,

@@ -154,6 +154,7 @@ impl KitsuneP2pActor {
                     let evt_sender = &evt_sender;
                     use tx2_api::Tx2EpEvent::*;
                     match event {
+                        Tick => (),
                         IncomingRequest(Tx2EpIncomingRequest {
                             con: _,
                             url: _,
@@ -561,12 +562,13 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     ) -> KitsuneP2pHandlerResult<()> {
         let internal_sender = self.internal_sender.clone();
         let space2 = space.clone();
+        let this_addr = self.this_addr.clone();
         let ep_hnd = self.ep_hnd.clone();
         let config = Arc::clone(&self.config);
         let space_sender = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(AsyncLazy::new(async move {
-                let (send, evt_recv) = spawn_space(space2, ep_hnd, config)
+                let (send, evt_recv) = spawn_space(space2, this_addr, ep_hnd, config)
                     .await
                     .expect("cannot fail to create space");
                 internal_sender
