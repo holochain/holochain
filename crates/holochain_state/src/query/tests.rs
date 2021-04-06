@@ -343,7 +343,7 @@ async fn insert_op_equivalence() {
 fn get_link_query<'a, 'b: 'a>(
     txns: &[&'a Transaction<'b>],
     scratch: Option<&Scratch<SignedHeaderHashed>>,
-    mut query: LinkQuery,
+    query: LinkQuery,
 ) -> Vec<Link> {
     match scratch {
         Some(scratch) => {
@@ -357,7 +357,7 @@ fn get_link_query<'a, 'b: 'a>(
 fn get_entry_query<'a, 'b: 'a>(
     txns: &[&'a Transaction<'b>],
     scratch: Option<&Scratch<SignedHeaderHashed>>,
-    mut query: GetEntryQuery,
+    query: GetEntryQuery,
 ) -> Option<Element> {
     match scratch {
         Some(scratch) => {

@@ -95,9 +95,9 @@ pub trait Query: Clone {
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>>;
 
-    fn fold(&mut self, state: Self::State, data: Self::Data) -> StateQueryResult<Self::State>;
+    fn fold(&self, state: Self::State, data: Self::Data) -> StateQueryResult<Self::State>;
 
-    fn run<S>(&mut self, stores: S) -> StateQueryResult<Self::Output>
+    fn run<S>(&self, stores: S) -> StateQueryResult<Self::Output>
     where
         S: Stores<Self>,
     {
@@ -108,7 +108,7 @@ pub trait Query: Clone {
         self.render(result, stores)
     }
 
-    fn render<S>(&mut self, state: Self::State, stores: S) -> StateQueryResult<Self::Output>
+    fn render<S>(&self, state: Self::State, stores: S) -> StateQueryResult<Self::Output>
     where
         S: Stores<Self>,
         S::O: StoresIter<Self::Data>;

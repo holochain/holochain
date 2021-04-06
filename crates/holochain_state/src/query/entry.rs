@@ -74,7 +74,7 @@ impl Query for GetEntryQuery {
     }
 
     fn fold(
-        &mut self,
+        &self,
         mut state: Self::State,
         shh: SignedHeaderHashed,
     ) -> StateQueryResult<Self::State> {
@@ -94,7 +94,7 @@ impl Query for GetEntryQuery {
         Ok(state)
     }
 
-    fn render<S>(&mut self, state: Self::State, stores: S) -> StateQueryResult<Self::Output>
+    fn render<S>(&self, state: Self::State, stores: S) -> StateQueryResult<Self::Output>
     where
         S: Stores<Self>,
         S::O: StoresIter<Self::Data>,

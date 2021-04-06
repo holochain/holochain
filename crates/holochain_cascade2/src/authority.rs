@@ -21,7 +21,7 @@ pub fn handle_get_entry(
     hash: EntryHash,
     _options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<WireEntryOps> {
-    let mut query = GetEntryOpsQuery::new(hash);
+    let query = GetEntryOpsQuery::new(hash);
     let results = state_env
         .conn()?
         .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;

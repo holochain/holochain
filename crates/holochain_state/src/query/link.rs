@@ -174,7 +174,7 @@ impl Query for LinkQuery {
     }
 
     fn fold(
-        &mut self,
+        &self,
         mut state: Self::State,
         shh: SignedHeaderHashed,
     ) -> StateQueryResult<Self::State> {
@@ -197,7 +197,7 @@ impl Query for LinkQuery {
         Ok(state)
     }
 
-    fn render<S>(&mut self, state: Self::State, _stores: S) -> StateQueryResult<Self::Output>
+    fn render<S>(&self, state: Self::State, _stores: S) -> StateQueryResult<Self::Output>
     where
         S: Stores<Self>,
         S::O: StoresIter<Self::Data>,

@@ -48,7 +48,7 @@ impl Query for ChainHeadQuery {
         Box::new(f)
     }
 
-    fn fold(&mut self, state: Self::State, sh: SignedHeader) -> StateQueryResult<Self::State> {
+    fn fold(&self, state: Self::State, sh: SignedHeader) -> StateQueryResult<Self::State> {
         // Simple maximum finding
         Ok(Some(match state {
             None => sh,
@@ -62,7 +62,7 @@ impl Query for ChainHeadQuery {
         }))
     }
 
-    fn render<S>(&mut self, state: Self::State, _stores: S) -> StateQueryResult<Self::Output>
+    fn render<S>(&self, state: Self::State, _stores: S) -> StateQueryResult<Self::Output>
     where
         S: Stores<Self>,
         S::O: StoresIter<Self::Data>,
@@ -136,7 +136,7 @@ mod tests {
             scratch.add_item(shh.clone().into());
         }
 
-        let mut query = ChainHeadQuery::new(author);
+        let query = ChainHeadQuery::new(author);
 
         let head = query.run(DbScratch::new(&[&mut txn], &scratch)).unwrap();
         assert_eq!(head.as_ref(), Some(expected_head.as_hash()));

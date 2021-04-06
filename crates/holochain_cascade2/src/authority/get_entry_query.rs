@@ -110,11 +110,7 @@ impl Query for GetEntryOpsQuery {
         Ok(WireEntryOps::new())
     }
 
-    fn fold(
-        &mut self,
-        mut state: Self::State,
-        dht_op: Self::Data,
-    ) -> StateQueryResult<Self::State> {
+    fn fold(&self, mut state: Self::State, dht_op: Self::Data) -> StateQueryResult<Self::State> {
         match &dht_op.op_type {
             DhtOpType::StoreEntry => {
                 state.creates.push(dht_op);
@@ -130,7 +126,7 @@ impl Query for GetEntryOpsQuery {
         Ok(state)
     }
 
-    fn render<S>(&mut self, mut state: Self::State, stores: S) -> StateQueryResult<Self::Output>
+    fn render<S>(&self, mut state: Self::State, stores: S) -> StateQueryResult<Self::Output>
     where
         S: Stores<Self>,
         S::O: StoresIter<Self::Data>,
