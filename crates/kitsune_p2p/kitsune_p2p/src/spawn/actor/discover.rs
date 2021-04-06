@@ -2,7 +2,6 @@
 use super::*;
 use crate::agent_store::AgentInfo;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
-use kitsune_p2p_types::codec::Codec;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 
@@ -14,8 +13,7 @@ pub(crate) enum PeerDiscoverResult {
     OkShortcut,
     OkRemote {
         url: url2::Url2,
-        write: TransportChannelWrite,
-        read: TransportChannelRead,
+        con_hnd: Tx2ConHnd<wire::Wire>,
     },
     Err(KitsuneP2pError),
 }
@@ -29,14 +27,16 @@ pub(crate) fn peer_discover(
 ) -> MustBoxFuture<'static, PeerDiscoverResult> {
     let i_s = space.i_s.clone();
     let evt_sender = space.evt_sender.clone();
-    let tx = space.transport.clone();
+    let ep_hnd = space.ep_hnd.clone();
     let bootstrap_service = space.config.bootstrap_service.clone();
     let space = space.space.clone();
     async move {
         // run tx.create_channel an conver success result into our return type
-        let try_connect = |url| async {
-            let (url, write, read) = tx.create_channel(url).await?;
-            KitsuneP2pResult::Ok(PeerDiscoverResult::OkRemote { url, write, read })
+        let try_connect = |url: url2::Url2| async {
+            let con_hnd = ep_hnd
+                .get_connection(url.clone(), KitsuneTimeout::from_millis(1000 * 30))
+                .await?;
+            KitsuneP2pResult::Ok(PeerDiscoverResult::OkRemote { url, con_hnd })
         };
 
         // check if this agent is locally joined
@@ -86,7 +86,7 @@ pub(crate) fn peer_discover(
             let (req_info, _) = futures::future::select_ok(nodes.into_iter().take(3).map(|info| {
                 // grr we need to move info in but not everything else...
                 // thus, we have to shadow all these with references
-                let tx = &tx;
+                let ep_hnd = &ep_hnd;
                 let space = &space;
                 let to_agent = &to_agent;
                 async move {
@@ -95,7 +95,9 @@ pub(crate) fn peer_discover(
                         .get(0)
                         .ok_or_else(|| KitsuneP2pError::from("no url"))?
                         .clone();
-                    let (_, mut write, read) = tx.create_channel(url).await?;
+                    let con_hnd = ep_hnd
+                        .get_connection(url, KitsuneTimeout::from_millis(1000 * 30))
+                        .await?;
 
                     // write the query request
                     let msg = wire::Wire::agent_info_query(
@@ -103,14 +105,12 @@ pub(crate) fn peer_discover(
                         Arc::new(info.as_agent_ref().clone()),
                         Some(to_agent.clone()),
                         None,
-                    )
-                    .encode_vec()?;
-                    KitsuneMetrics::count(KitsuneMetrics::AgentInfoQuery, msg.len());
-                    write.write_and_close(msg).await?;
+                    );
+                    //KitsuneMetrics::count(KitsuneMetrics::AgentInfoQuery, msg.len());
+                    let res = con_hnd
+                        .request(&msg, KitsuneTimeout::from_millis(1000 * 30))
+                        .await?;
 
-                    // parse the response
-                    let res = read.read_to_end().await;
-                    let (_, res) = wire::Wire::decode_ref(&res)?;
                     match res {
                         wire::Wire::AgentInfoQueryResp(wire::AgentInfoQueryResp {
                             mut agent_infos,
@@ -200,7 +200,7 @@ where
 {
     let i_s = space.i_s.clone();
     let evt_sender = space.evt_sender.clone();
-    let tx = space.transport.clone();
+    let ep_hnd = space.ep_hnd.clone();
     let bootstrap_service = space.config.bootstrap_service.clone();
     let space = space.space.clone();
     let accept_result_cb = Arc::new(accept_result_cb);
@@ -253,12 +253,14 @@ where
                             None => continue,
                             Some(url) => url.clone(),
                         };
-                        let fut = tx.create_channel(url);
-                        let mut payload = payload.clone();
+                        let fut =
+                            ep_hnd.get_connection(url, KitsuneTimeout::from_millis(1000 * 30));
+                        let payload = payload.clone();
                         let accept_result_cb = accept_result_cb.clone();
                         let out = out.clone();
                         tokio::task::spawn(async move {
-                            let (_, mut write, read) = fut.await?;
+                            let con_hnd = fut.await?;
+                            /*
                             let metric_type = match &mut payload {
                                 wire::Wire::Notify(n) => {
                                     n.to_agent = to_agent.clone();
@@ -270,11 +272,11 @@ where
                                 }
                                 _ => panic!("cannot message {:?}", payload),
                             };
-                            let payload = payload.encode_vec()?;
                             KitsuneMetrics::count(metric_type, payload.len());
-                            write.write_and_close(payload).await?;
-                            let res = read.read_to_end().await;
-                            let (_, res) = wire::Wire::decode_ref(&res)?;
+                            */
+                            let res = con_hnd
+                                .request(&payload, KitsuneTimeout::from_millis(1000 * 30))
+                                .await?;
                             if let Ok(res) = accept_result_cb(to_agent, res) {
                                 out.lock().await.push(res);
                             }

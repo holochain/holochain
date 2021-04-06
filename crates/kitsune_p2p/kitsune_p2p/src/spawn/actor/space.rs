@@ -1,10 +1,10 @@
-use crate::types::metrics::KitsuneMetrics;
+//use crate::types::metrics::KitsuneMetrics;
 
 use super::*;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
 use kitsune_p2p_mdns::*;
-use kitsune_p2p_types::codec::{rmp_decode, rmp_encode, Codec};
+use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::sync::atomic::AtomicBool;
@@ -28,7 +28,7 @@ ghost_actor::ghost_chan! {
 
 pub(crate) async fn spawn_space(
     space: Arc<KitsuneSpace>,
-    transport: ghost_actor::GhostSender<TransportListener>,
+    ep_hnd: Tx2EpHnd<wire::Wire>,
     config: Arc<KitsuneP2pConfig>,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
@@ -55,7 +55,7 @@ pub(crate) async fn spawn_space(
         .create_channel::<KitsuneP2p>()
         .await?;
 
-    tokio::task::spawn(builder.spawn(Space::new(space, i_s, evt_send, transport, config)));
+    tokio::task::spawn(builder.spawn(Space::new(space, i_s, evt_send, ep_hnd, config)));
 
     Ok((sender, evt_recv))
 }
@@ -116,7 +116,7 @@ impl gossip::GossipEventHandler for Space {
                 from_agent,
                 op_count,
             } = input;
-            let transport_tx = self.transport.clone();
+            let ep_hnd = self.ep_hnd.clone();
             let evt_sender = self.evt_sender.clone();
             let space = self.space.clone();
             Ok(async move {
@@ -139,15 +139,16 @@ impl gossip::GossipEventHandler for Space {
                     since_utc_epoch_s,
                     until_utc_epoch_s,
                     op_count,
-                )
-                .encode_vec()?;
+                );
                 let info = types::agent_store::AgentInfo::try_from(&info)?;
                 let url = info.as_urls_ref().get(0).unwrap().clone();
-                let (_, mut write, read) = transport_tx.create_channel(url).await?;
-                KitsuneMetrics::count(KitsuneMetrics::FetchOpHashes, data.len());
-                write.write_and_close(data.to_vec()).await?;
-                let read = read.read_to_end().await;
-                let (_, read) = wire::Wire::decode_ref(&read)?;
+                let con_hnd = ep_hnd
+                    .get_connection(url, KitsuneTimeout::from_millis(1000 * 30))
+                    .await?;
+                //KitsuneMetrics::count(KitsuneMetrics::FetchOpHashes, data.len());
+                let read = con_hnd
+                    .request(&data, KitsuneTimeout::from_millis(1000 * 30))
+                    .await?;
                 match read {
                     wire::Wire::Failure(wire::Failure { reason }) => Err(reason.into()),
                     wire::Wire::FetchOpHashesResponse(wire::FetchOpHashesResponse {
@@ -176,7 +177,7 @@ impl gossip::GossipEventHandler for Space {
                 op_hashes,
                 peer_hashes,
             } = input;
-            let transport_tx = self.transport.clone();
+            let ep_hnd = self.ep_hnd.clone();
             let evt_sender = self.evt_sender.clone();
             let space = self.space.clone();
             Ok(async move {
@@ -192,15 +193,16 @@ impl gossip::GossipEventHandler for Space {
                     Some(i) => i,
                 };
                 let data =
-                    wire::Wire::fetch_op_data(space, from_agent, to_agent, op_hashes, peer_hashes)
-                        .encode_vec()?;
+                    wire::Wire::fetch_op_data(space, from_agent, to_agent, op_hashes, peer_hashes);
                 let info = types::agent_store::AgentInfo::try_from(&info)?;
                 let url = info.as_urls_ref().get(0).unwrap().clone();
-                let (_, mut write, read) = transport_tx.create_channel(url).await?;
-                KitsuneMetrics::count(KitsuneMetrics::FetchOpData, data.len());
-                write.write_and_close(data.to_vec()).await?;
-                let read = read.read_to_end().await;
-                let (_, read) = wire::Wire::decode_ref(&read)?;
+                let con_hnd = ep_hnd
+                    .get_connection(url, KitsuneTimeout::from_millis(1000 * 30))
+                    .await?;
+                //KitsuneMetrics::count(KitsuneMetrics::FetchOpData, data.len());
+                let read = con_hnd
+                    .request(&data, KitsuneTimeout::from_millis(1000 * 30))
+                    .await?;
                 match read {
                     wire::Wire::Failure(wire::Failure { reason }) => Err(reason.into()),
                     wire::Wire::FetchOpDataResponse(wire::FetchOpDataResponse {
@@ -229,7 +231,7 @@ impl gossip::GossipEventHandler for Space {
                 ops,
                 agents,
             } = input;
-            let transport_tx = self.transport.clone();
+            let ep_hnd = self.ep_hnd.clone();
             let evt_sender = self.evt_sender.clone();
             let space = self.space.clone();
             Ok(async move {
@@ -250,15 +252,16 @@ impl gossip::GossipEventHandler for Space {
                     to_agent.clone(),
                     ops.into_iter().map(|(k, v)| (k, v.into())).collect(),
                     agents,
-                )
-                .encode_vec()?;
+                );
                 let info = types::agent_store::AgentInfo::try_from(&info)?;
                 let url = info.as_urls_ref().get(0).unwrap().clone();
-                let (_, mut write, read) = transport_tx.create_channel(url.clone()).await?;
-                KitsuneMetrics::count(KitsuneMetrics::Gossip, data.len());
-                write.write_and_close(data.to_vec()).await?;
-                let read = read.read_to_end().await;
-                let (_, read) = wire::Wire::decode_ref(&read)?;
+                let con_hnd = ep_hnd
+                    .get_connection(url.clone(), KitsuneTimeout::from_millis(1000 * 30))
+                    .await?;
+                //KitsuneMetrics::count(KitsuneMetrics::Gossip, data.len());
+                let read = con_hnd
+                    .request(&data, KitsuneTimeout::from_millis(1000 * 30))
+                    .await?;
                 match read {
                     wire::Wire::Failure(wire::Failure { reason }) => Err(dbg!(reason.into())),
                     wire::Wire::GossipResp(_) => Ok(()),
@@ -433,12 +436,12 @@ impl SpaceInternalHandler for Space {
         let mut mdns_handles = self.mdns_handles.clone();
         let network_type = self.config.network_type.clone();
         let agent_list: Vec<Arc<KitsuneAgent>> = self.local_joined_agents.iter().cloned().collect();
-        let bound_url = self.transport.bound_url();
+        let bound_url = self.ep_hnd.local_addr();
         let evt_sender = self.evt_sender.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         Ok(async move {
-            let bound_url = bound_url.await?;
+            let bound_url = bound_url?;
             let urls = bound_url
                 .query_pairs()
                 .map(|(_, sub_url)| url2::url2!("{}", sub_url))
@@ -662,20 +665,17 @@ impl KitsuneP2pHandler for Space {
                     // reflect this request locally
                     evt_sender.call(space, to_agent, from_agent, payload).await
                 }
-                discover::PeerDiscoverResult::OkRemote {
-                    mut write, read, ..
-                } => {
+                discover::PeerDiscoverResult::OkRemote { con_hnd, .. } => {
                     let payload = wire::Wire::call(
                         space.clone(),
                         from_agent.clone(),
                         to_agent.clone(),
                         payload.into(),
-                    )
-                    .encode_vec()?;
-                    KitsuneMetrics::count(KitsuneMetrics::Call, payload.len());
-                    write.write_and_close(payload).await?;
-                    let res = read.read_to_end().await;
-                    let (_, res) = wire::Wire::decode_ref(&res)?;
+                    );
+                    //KitsuneMetrics::count(KitsuneMetrics::Call, payload.len());
+                    let res = con_hnd
+                        .request(&payload, KitsuneTimeout::from_millis(1000 * 30))
+                        .await?;
                     match res {
                         wire::Wire::Failure(wire::Failure { reason }) => Err(reason.into()),
                         wire::Wire::CallResp(wire::CallResp { data }) => Ok(data.into()),
@@ -776,7 +776,7 @@ pub(crate) struct Space {
     pub(crate) space: Arc<KitsuneSpace>,
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    pub(crate) transport: ghost_actor::GhostSender<TransportListener>,
+    pub(crate) ep_hnd: Tx2EpHnd<wire::Wire>,
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
@@ -789,7 +789,7 @@ impl Space {
         space: Arc<KitsuneSpace>,
         i_s: ghost_actor::GhostSender<SpaceInternal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-        transport: ghost_actor::GhostSender<TransportListener>,
+        ep_hnd: Tx2EpHnd<wire::Wire>,
         config: Arc<KitsuneP2pConfig>,
     ) -> Self {
         let i_s_c = i_s.clone();
@@ -806,7 +806,7 @@ impl Space {
             space,
             i_s,
             evt_sender,
-            transport,
+            ep_hnd,
             local_joined_agents: HashSet::new(),
             config,
             mdns_handles: HashMap::new(),

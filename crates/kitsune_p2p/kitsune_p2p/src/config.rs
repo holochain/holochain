@@ -1,6 +1,6 @@
-use kitsune_p2p_types::*;
-use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use kitsune_p2p_types::tx2::tx2_utils::*;
+use kitsune_p2p_types::*;
 use url2::Url2;
 
 /// TODO - FIXME - holochain bootstrap should not be encoded in kitsune
@@ -13,9 +13,7 @@ pub const BOOTSTRAP_SERVICE_DEV: &str = "https://bootstrap-dev.holohost.workers.
 
 pub(crate) enum KitsuneP2pTx2Backend {
     Mem,
-    Quic {
-        bind_to: TxUrl
-    },
+    Quic { bind_to: TxUrl },
 }
 
 pub(crate) struct KitsuneP2pTx2Config {
@@ -61,32 +59,26 @@ impl KitsuneP2pConfig {
         if let TransportConfig::Proxy {
             sub_transport,
             proxy_config,
-        } = tx.unwrap() {
+        } = tx.unwrap()
+        {
             let backend = match &**sub_transport {
                 TransportConfig::Mem {} => KitsuneP2pTx2Backend::Mem,
-                TransportConfig::Quic {
-                    bind_to,
-                    ..
-                } => {
+                TransportConfig::Quic { bind_to, .. } => {
                     let bind_to = match bind_to {
                         Some(bind_to) => bind_to.clone().into(),
                         None => "kitsune-quic://0.0.0.0:0".into(),
                     };
-                    KitsuneP2pTx2Backend::Quic {
-                        bind_to,
-                    }
+                    KitsuneP2pTx2Backend::Quic { bind_to }
                 }
                 _ => return Err("kitsune tx2 backend must be mem or quic".into()),
             };
             let use_proxy = match proxy_config {
-                ProxyConfig::RemoteProxyClient { proxy_url } => {
-                    Some(proxy_url.clone().into())
-                }
+                ProxyConfig::RemoteProxyClient { proxy_url } => Some(proxy_url.clone().into()),
                 ProxyConfig::LocalProxyServer { .. } => None,
             };
             Ok(KitsuneP2pTx2Config { backend, use_proxy })
         } else {
-            return Err("kitsune tx2 requires top-level proxy".into());
+            Err("kitsune tx2 requires top-level proxy".into())
         }
     }
 }

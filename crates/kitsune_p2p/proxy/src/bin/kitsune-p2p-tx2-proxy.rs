@@ -121,7 +121,13 @@ async fn inner() -> KitsuneResult<()> {
     let ep_hnd = ep.handle().clone();
     let ep_hnd = &ep_hnd;
     ep.for_each_concurrent(3, move |evt| async move {
-        if let EpEvent::IncomingData(EpIncomingData { con, msg_id, mut data, .. }) = evt {
+        if let EpEvent::IncomingData(EpIncomingData {
+            con,
+            msg_id,
+            mut data,
+            ..
+        }) = evt
+        {
             let debug = serde_json::json!({
                 "proxy": ep_hnd.debug(),
                 "sys_info": get_sys_info(),
@@ -130,7 +136,11 @@ async fn inner() -> KitsuneResult<()> {
             data.clear();
             data.extend_from_slice(debug.as_bytes());
             let t = KitsuneTimeout::from_millis(30 * 3000);
-            let msg_id = if msg_id.is_notify() { 0.into() } else { msg_id.as_res() };
+            let msg_id = if msg_id.is_notify() {
+                0.into()
+            } else {
+                msg_id.as_res()
+            };
             if let Err(e) = con.write(msg_id, data, t).await {
                 tracing::error!("write proxy debug error: {:?}", e);
             }
