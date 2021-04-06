@@ -50,7 +50,17 @@ impl Default for KitsuneP2pConfig {
     }
 }
 
+fn cnv_bind_to(bind_to: &Option<url2::Url2>) -> TxUrl {
+    match bind_to {
+        Some(bind_to) => bind_to.clone().into(),
+        None => "kitsune-quic://0.0.0.0:0".into(),
+    }
+}
+
 impl KitsuneP2pConfig {
+    /// tx2 is currently designed to use exactly one proxy wrapped transport
+    /// so, convert a bunch of the options from the previous transport
+    /// paradigm into that pattern.
     pub(crate) fn to_tx2(&self) -> KitsuneResult<KitsuneP2pTx2Config> {
         match self.transport_pool.get(0) {
             Some(TransportConfig::Proxy {
@@ -60,10 +70,7 @@ impl KitsuneP2pConfig {
                 let backend = match &**sub_transport {
                     TransportConfig::Mem {} => KitsuneP2pTx2Backend::Mem,
                     TransportConfig::Quic { bind_to, .. } => {
-                        let bind_to = match bind_to {
-                            Some(bind_to) => bind_to.clone().into(),
-                            None => "kitsune-quic://0.0.0.0:0".into(),
-                        };
+                        let bind_to = cnv_bind_to(bind_to);
                         KitsuneP2pTx2Backend::Quic { bind_to }
                     }
                     _ => return Err("kitsune tx2 backend must be mem or quic".into()),
@@ -74,11 +81,17 @@ impl KitsuneP2pConfig {
                 };
                 Ok(KitsuneP2pTx2Config { backend, use_proxy })
             }
-            None => Ok(KitsuneP2pTx2Config {
+            Some(TransportConfig::Quic { bind_to, .. }) => {
+                let bind_to = cnv_bind_to(bind_to);
+                Ok(KitsuneP2pTx2Config {
+                    backend: KitsuneP2pTx2Backend::Quic { bind_to },
+                    use_proxy: None,
+                })
+            }
+            None | Some(TransportConfig::Mem {}) => Ok(KitsuneP2pTx2Config {
                 backend: KitsuneP2pTx2Backend::Mem,
                 use_proxy: None,
             }),
-            _ => Err("kitsune tx2 expects exactly 1 proxy transport".into()),
         }
     }
 }
