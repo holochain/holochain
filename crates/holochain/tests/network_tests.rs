@@ -169,7 +169,7 @@ async fn get_from_another_agent() {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "dht_get_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: vec![TestWasm::Create.into()].into(),
         },
@@ -313,7 +313,7 @@ async fn get_links_from_another_agent() {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "dht_get_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: vec![TestWasm::Create.into()].into(),
         },

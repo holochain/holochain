@@ -19,6 +19,7 @@ pub type ResourceMap = HashMap<PathBuf, ResourceBytes>;
 ///
 /// The manifest may describe locations of resources not included in the Bundle.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Bundle<M>
 where
     M: Manifest,
@@ -107,6 +108,12 @@ where
 
     pub fn manifest(&self) -> &M {
         &self.manifest
+    }
+
+    /// Return a new Bundle with an updated manifest, subject to the same
+    /// validation constraints as creating a new Bundle from scratch.
+    pub fn update_manifest(self, manifest: M) -> MrBundleResult<Self> {
+        Self::from_parts(manifest, self.resources, self.root_dir)
     }
 
     pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
