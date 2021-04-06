@@ -21,8 +21,7 @@ async fn tls_server_and_client() {
 async fn tls_server_and_client_inner() -> TransportResult<()> {
     tracing::warn!("start test");
 
-    let tuning_params =
-        std::sync::Arc::new(kitsune_p2p_types::config::KitsuneP2pTuningParams::default());
+    let tuning_params = kitsune_p2p_types::config::KitsuneP2pTuningParams::default();
     let tls_config_1 = TlsConfig::new_ephemeral().await?;
     let tls_config_2 = TlsConfig::new_ephemeral().await?;
 

@@ -11,6 +11,7 @@ categories = [ "network-programming" ]
 edition = "2018"
 
 [dependencies]
+blake2b_simd = "0.5.10"
 futures = "0.3"
 if-addrs = "0.6"
 kitsune_p2p_types = { version = "0.0.1", path = "../types" }
