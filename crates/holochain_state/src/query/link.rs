@@ -203,8 +203,7 @@ impl Query for LinkQuery {
 
     fn render<S>(&self, state: Self::State, _stores: S) -> StateQueryResult<Self::Output>
     where
-        S: Stores<Self>,
-        S::O: StoresIter<Self::Data>,
+        S: Store,
     {
         Ok(state.creates.into_iter().map(|(_, v)| v).collect())
     }

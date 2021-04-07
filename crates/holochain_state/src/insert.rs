@@ -26,7 +26,7 @@ macro_rules! sql_insert {
     }};
 }
 
-pub fn insert_op_scratch(scratch: &mut Scratch<SignedHeaderHashed>, op: DhtOpHashed) {
+pub fn insert_op_scratch(scratch: &mut Scratch, op: DhtOpHashed) {
     let (op, _) = op.into_inner();
     let op_light = op.to_light();
     let header = op.header();

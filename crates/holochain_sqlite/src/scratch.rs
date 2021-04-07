@@ -16,26 +16,23 @@ use holochain_zome_types::SignedHeaderHashed;
 /// onto the iterators over the Headers in the database(s) produced by the
 /// Cascade.
 #[derive(Debug, Clone)]
-pub struct Scratch<T>(Vec<T>);
+pub struct Scratch(Vec<SignedHeaderHashed>);
 
 // MD: hmm, why does this need to be a separate type? Why collect into this?
-pub struct FilteredScratch<T>(Vec<T>);
+pub struct FilteredScratch(Vec<SignedHeaderHashed>);
 
-impl<T> Scratch<T>
-where
-    T: Clone,
-{
+impl Scratch {
     pub fn new() -> Self {
         Self(Vec::new())
     }
-    pub fn add_item(&mut self, item: T) {
+    pub fn add_item(&mut self, item: SignedHeaderHashed) {
         self.0.push(item);
     }
 
-    pub fn filter<'a, F: Fn(&'a T) -> bool + 'a>(
+    pub fn filter<'a, F: Fn(&'a SignedHeaderHashed) -> bool + 'a>(
         &'a self,
         f: F,
-    ) -> impl FallibleIterator<Item = T, Error = Infallible> + 'a {
+    ) -> impl FallibleIterator<Item = SignedHeaderHashed, Error = Infallible> + 'a {
         fallible_iterator::convert(
             self.0
                 .iter()
@@ -46,16 +43,14 @@ where
         )
     }
 
-    pub fn as_filter(&self, f: impl Fn(&T) -> bool) -> FilteredScratch<T> {
+    pub fn as_filter(&self, f: impl Fn(&SignedHeaderHashed) -> bool) -> FilteredScratch {
         FilteredScratch(self.0.iter().filter(|&t| f(t)).cloned().collect())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
+    pub fn iter(&self) -> impl Iterator<Item = &SignedHeaderHashed> {
         self.0.iter()
     }
-}
 
-impl Scratch<SignedHeaderHashed> {
     pub fn contains_hash(&self, hash: &AnyDhtHash) -> bool {
         match *hash.hash_type() {
             AnyDht::Entry => self.contains_entry(&hash.clone().into()),
@@ -74,8 +69,8 @@ impl Scratch<SignedHeaderHashed> {
     }
 }
 
-impl<T> FilteredScratch<T> {
-    pub fn into_iter<'iter>(&'iter mut self) -> impl Iterator<Item = T> + 'iter {
+impl FilteredScratch {
+    pub fn into_iter<'iter>(&'iter mut self) -> impl Iterator<Item = SignedHeaderHashed> + 'iter {
         self.0.drain(..)
     }
 }

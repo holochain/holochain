@@ -100,8 +100,7 @@ impl Query for GetEntryQuery {
 
     fn render<S>(&self, state: Self::State, stores: S) -> StateQueryResult<Self::Output>
     where
-        S: Stores<Self>,
-        S::O: StoresIter<Self::Data>,
+        S: Store,
     {
         // Choose an arbitrary header
         let header = state.creates.into_iter().map(|(_, v)| v).next();

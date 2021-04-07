@@ -36,6 +36,7 @@ pub mod prelude {
     pub use super::Params;
     pub use super::Query;
     pub use super::StateQueryResult;
+    pub use super::Store;
     pub use super::Stores;
     pub use super::StoresIter;
     pub use super::Transactions;
@@ -103,6 +104,7 @@ pub trait Query: Clone {
     fn run<S>(&self, stores: S) -> StateQueryResult<Self::Output>
     where
         S: Stores<Self>,
+        S: Store,
     {
         let mut stores_iter = stores.get_initial_data(self.clone())?;
         let iter = stores_iter.iter()?;
@@ -113,8 +115,7 @@ pub trait Query: Clone {
 
     fn render<S>(&self, state: Self::State, stores: S) -> StateQueryResult<Self::Output>
     where
-        S: Stores<Self>,
-        S::O: StoresIter<Self::Data>;
+        S: Store;
 }
 
 /// Represents the data sources which are needed to perform a Query.
@@ -127,7 +128,9 @@ pub trait Stores<Q: Query> {
     /// Gets the raw initial data from the database, needed to begin the query.
     // MD: can the query be &Q?
     fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O>;
+}
 
+pub trait Store {
     /// Get an Entry from the database
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>>;
 
@@ -167,13 +170,17 @@ pub struct Txns<'borrow, 'txn> {
 /// Alias for an array of Transaction references
 pub type Transactions<'a, 'txn> = [&'a Transaction<'txn>];
 
-pub struct DbScratch<'borrow, 'txn, T> {
+pub struct DbScratch<'borrow, 'txn> {
     txns: Txns<'borrow, 'txn>,
-    scratch: &'borrow Scratch<T>,
+    scratch: &'borrow Scratch,
 }
-pub struct DbScratchIter<'stmt, Q: Query, T> {
+
+pub struct DbScratchIter<'stmt, Q>
+where
+    Q: Query<Data = SignedHeaderHashed>,
+{
     stmts: QueryStmts<'stmt, Q>,
-    filtered_scratch: FilteredScratch<T>,
+    filtered_scratch: FilteredScratch,
 }
 
 impl<'stmt, Q: Query> Stores<Q> for Txn<'stmt, '_> {
@@ -182,7 +189,9 @@ impl<'stmt, Q: Query> Stores<Q> for Txn<'stmt, '_> {
     fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O> {
         QueryStmt::new(&self.txn, query)
     }
+}
 
+impl<'stmt> Store for Txn<'stmt, '_> {
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
         get_entry_from_db(&self.txn, hash)
     }
@@ -214,10 +223,12 @@ impl<'stmt, Q: Query> Stores<Q> for Txns<'stmt, '_> {
         .collect()?;
         Ok(QueryStmts { stmts })
     }
+}
 
+impl<'stmt> Store for Txns<'stmt, '_> {
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
         for txn in &self.txns {
-            let r = <Txn as Stores<Q>>::get_entry(&txn, hash)?;
+            let r = txn.get_entry(hash)?;
             if r.is_some() {
                 return Ok(r);
             }
@@ -227,7 +238,7 @@ impl<'stmt, Q: Query> Stores<Q> for Txns<'stmt, '_> {
 
     fn contains_entry(&self, hash: &EntryHash) -> StateQueryResult<bool> {
         for txn in &self.txns {
-            let r = <Txn as Stores<Q>>::contains_entry(&txn, hash)?;
+            let r = txn.contains_entry(hash)?;
             if r {
                 return Ok(r);
             }
@@ -237,7 +248,7 @@ impl<'stmt, Q: Query> Stores<Q> for Txns<'stmt, '_> {
 
     fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
         for txn in &self.txns {
-            let r = <Txn as Stores<Q>>::contains_header(&txn, hash)?;
+            let r = txn.contains_header(hash)?;
             if r {
                 return Ok(r);
             }
@@ -254,37 +265,44 @@ impl<'stmt, Q: Query> StoresIter<Q::Data> for QueryStmts<'stmt, Q> {
     }
 }
 
-impl<Q: Query> Stores<Q> for Scratch<Q::Data> {
-    type O = FilteredScratch<Q::Data>;
+impl<Q> Stores<Q> for Scratch
+where
+    Q: Query<Data = SignedHeaderHashed>,
+{
+    type O = FilteredScratch;
 
     fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O> {
         Ok(self.as_filter(query.as_filter()))
     }
+}
 
+impl Store for Scratch {
     fn get_entry(&self, _hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
-        // TODO: we should probably store entries in the scratch as well.
-        Ok(None)
-    }
-
-    fn contains_entry(&self, _hash: &EntryHash) -> StateQueryResult<bool> {
         todo!()
     }
 
-    fn contains_header(&self, _hash: &HeaderHash) -> StateQueryResult<bool> {
-        todo!()
+    fn contains_entry(&self, hash: &EntryHash) -> StateQueryResult<bool> {
+        Ok(self.contains_entry(hash))
+    }
+
+    fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
+        Ok(self.contains_header(hash))
     }
 }
 
-impl<T> StoresIter<T> for FilteredScratch<T> {
-    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, T>> {
+impl StoresIter<SignedHeaderHashed> for FilteredScratch {
+    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, SignedHeaderHashed>> {
         Ok(Box::new(fallible_iterator::convert(
             self.into_iter().map(Ok),
         )))
     }
 }
 
-impl<'borrow, 'txn, Q: Query> Stores<Q> for DbScratch<'borrow, 'txn, Q::Data> {
-    type O = DbScratchIter<'borrow, Q, Q::Data>;
+impl<'borrow, 'txn, Q> Stores<Q> for DbScratch<'borrow, 'txn>
+where
+    Q: Query<Data = SignedHeaderHashed>,
+{
+    type O = DbScratchIter<'borrow, Q>;
 
     fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O> {
         Ok(DbScratchIter {
@@ -292,36 +310,41 @@ impl<'borrow, 'txn, Q: Query> Stores<Q> for DbScratch<'borrow, 'txn, Q::Data> {
             filtered_scratch: self.scratch.get_initial_data(query.clone())?,
         })
     }
+}
 
+impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
-        let r = <Txns as Stores<Q>>::get_entry(&self.txns, hash)?;
+        let r = self.txns.get_entry(hash)?;
         if r.is_none() {
-            <Scratch<Q::Data> as Stores<Q>>::get_entry(&self.scratch, hash)
+            self.scratch.get_entry(hash)
         } else {
             Ok(r)
         }
     }
 
     fn contains_entry(&self, hash: &EntryHash) -> StateQueryResult<bool> {
-        let r = <Txns as Stores<Q>>::contains_entry(&self.txns, hash)?;
+        let r = self.txns.contains_entry(hash)?;
         if !r {
-            <Scratch<Q::Data> as Stores<Q>>::contains_entry(&self.scratch, hash)
+            Ok(self.scratch.contains_entry(hash))
         } else {
             Ok(r)
         }
     }
 
     fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
-        let r = <Txns as Stores<Q>>::contains_header(&self.txns, hash)?;
+        let r = self.txns.contains_header(hash)?;
         if !r {
-            <Scratch<Q::Data> as Stores<Q>>::contains_header(&self.scratch, hash)
+            Ok(self.scratch.contains_header(hash))
         } else {
             Ok(r)
         }
     }
 }
 
-impl<'stmt, Q: Query> StoresIter<Q::Data> for DbScratchIter<'stmt, Q, Q::Data> {
+impl<'stmt, Q> StoresIter<Q::Data> for DbScratchIter<'stmt, Q>
+where
+    Q: Query<Data = SignedHeaderHashed>,
+{
     fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Q::Data>> {
         Ok(Box::new(
             self.stmts.iter()?.chain(self.filtered_scratch.iter()?),
@@ -329,8 +352,8 @@ impl<'stmt, Q: Query> StoresIter<Q::Data> for DbScratchIter<'stmt, Q, Q::Data> {
     }
 }
 
-impl<'borrow, 'txn, T> DbScratch<'borrow, 'txn, T> {
-    pub fn new(txns: &'borrow Transactions<'borrow, 'txn>, scratch: &'borrow Scratch<T>) -> Self {
+impl<'borrow, 'txn> DbScratch<'borrow, 'txn> {
+    pub fn new(txns: &'borrow Transactions<'borrow, 'txn>, scratch: &'borrow Scratch) -> Self {
         Self {
             txns: txns.into(),
             scratch,
@@ -432,10 +455,15 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
 
 pub(crate) fn row_to_header(
     index: &'static str,
-) -> impl Fn(&Row) -> StateQueryResult<SignedHeader> {
+    hash: &'static str,
+) -> impl Fn(&Row) -> StateQueryResult<SignedHeaderHashed> {
     move |row| {
         let header = from_blob::<SignedHeader>(row.get(row.column_index(index)?)?);
-        Ok(header)
+        let SignedHeader(header, signature) = header;
+        let hash: HeaderHash = row.get(row.column_index(hash)?)?;
+        let header = HeaderHashed::with_pre_hashed(header, hash);
+        let shh = SignedHeaderHashed::with_presigned(header, signature);
+        Ok(shh)
     }
 }
 

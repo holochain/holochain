@@ -142,8 +142,7 @@ impl Query for GetEntryOpsQuery {
 
     fn render<S>(&self, mut state: Self::State, stores: S) -> StateQueryResult<Self::Output>
     where
-        S: Stores<Self>,
-        S::O: StoresIter<Self::Data>,
+        S: Store,
     {
         // TODO: Handle error where header is missing entry hash.
         let entry_hash = state

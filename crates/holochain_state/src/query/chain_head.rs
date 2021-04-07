@@ -15,13 +15,13 @@ impl ChainHeadQuery {
 }
 
 impl Query for ChainHeadQuery {
-    type Data = SignedHeader;
-    type State = Option<SignedHeader>;
+    type Data = SignedHeaderHashed;
+    type State = Option<SignedHeaderHashed>;
     type Output = Option<HeaderHash>;
 
     fn create_query(&self) -> &str {
         "
-            SELECT H.blob FROM Header AS H
+            SELECT H.blob, H.hash FROM Header AS H
             JOIN DhtOp as D
             ON D.header_hash = H.hash
             JOIN (
@@ -49,11 +49,11 @@ impl Query for ChainHeadQuery {
         // NB: it's a little redundant to filter on author, since we should never
         // be putting any headers by other authors in our scratch, but it
         // certainly doesn't hurt to be consistent.
-        let f = move |header: &SignedHeader| *header.header().author() == author;
+        let f = move |header: &SignedHeaderHashed| *header.header().author() == author;
         Box::new(f)
     }
 
-    fn fold(&self, state: Self::State, sh: SignedHeader) -> StateQueryResult<Self::State> {
+    fn fold(&self, state: Self::State, sh: SignedHeaderHashed) -> StateQueryResult<Self::State> {
         // Simple maximum finding
         Ok(Some(match state {
             None => sh,
@@ -69,14 +69,13 @@ impl Query for ChainHeadQuery {
 
     fn render<S>(&self, state: Self::State, _stores: S) -> StateQueryResult<Self::Output>
     where
-        S: Stores<Self>,
-        S::O: StoresIter<Self::Data>,
+        S: Store,
     {
         Ok(state.map(|sh| HeaderHash::with_data_sync(sh.header())))
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
-        Arc::new(row_to_header("blob"))
+        Arc::new(row_to_header("blob", "hash"))
     }
 }
 
@@ -137,7 +136,7 @@ mod tests {
             insert_op_lite(&mut txn, op, fixt!(DhtOpHash), true);
         }
 
-        let mut scratch = Scratch::<SignedHeader>::new();
+        let mut scratch = Scratch::new();
 
         // It's also totally invalid for a call_zome scratch to contain headers
         // from other authors, but it doesn't matter here
@@ -148,6 +147,7 @@ mod tests {
         let query = ChainHeadQuery::new(author);
 
         let head = query.run(DbScratch::new(&[&mut txn], &scratch)).unwrap();
+        // let head = query.run(Txn::from(&txn)).unwrap();
         assert_eq!(head.as_ref(), Some(expected_head.as_hash()));
     }
 }

@@ -61,7 +61,7 @@ macro_rules! ok_or_return {
 pub struct Cascade<Network = PassThroughNetwork> {
     vault: Option<EnvRead>,
     cache: Option<EnvWrite>,
-    scratch: Option<Scratch<SignedHeaderHashed>>,
+    scratch: Option<Scratch>,
     network: Option<Network>,
 }
 
