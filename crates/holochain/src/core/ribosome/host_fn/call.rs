@@ -33,16 +33,14 @@ pub fn call(
     };
 
     // Make the call using this workspace
-    Ok(
-        tokio_helper::block_forever_on(async move {
-            conductor_handle
-                .call_zome(invocation, workspace)
-                .await
-                .map_err(Box::new)
-        })
-        .map_err(|conductor_api_error| WasmError::Host(conductor_api_error.to_string()))?
-        .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?,
-    )
+    Ok(tokio_helper::block_forever_on(async move {
+        conductor_handle
+            .call_zome(invocation, workspace)
+            .await
+            .map_err(Box::new)
+    })
+    .map_err(|conductor_api_error| WasmError::Host(conductor_api_error.to_string()))?
+    .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?)
 }
 
 #[cfg(test)]
@@ -209,7 +207,7 @@ pub mod wasm_test {
         let dna_file = DnaFile::new(
             DnaDef {
                 name: dna_name.to_string(),
-                uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 zomes: zomes.clone().into_iter().map(Into::into).collect(),
             },

@@ -147,7 +147,7 @@ fixturator!(
         name: StringFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
-        uuid: StringFixturator::new_indexed(Empty, get_fixt_index!())
+        uid: StringFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
         properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
@@ -162,7 +162,7 @@ fixturator!(
         name: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
-        uuid: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
+        uid: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
         properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
@@ -177,7 +177,7 @@ fixturator!(
         name: StringFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        uuid: StringFixturator::new_indexed(Predictable, get_fixt_index!())
+        uid: StringFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
         properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())

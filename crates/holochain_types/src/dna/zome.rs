@@ -88,7 +88,7 @@ impl From<Zome> for ZomeDef {
 /// NB: Only Wasm Zomes are valid to pass through round-trip serialization,
 /// because Rust functions are not serializable. Hence, this enum serializes
 /// as if it were a bare WasmZome, and when deserializing, only Wasm zomes
-/// can be produced. InlineZomes are serialized as their UUID, so that a
+/// can be produced. InlineZomes are serialized as their UID, so that a
 /// hash can be computed, but it is invalid to attempt to deserialize them
 /// again.
 ///
@@ -108,19 +108,19 @@ pub enum ZomeDef {
 }
 
 /// The serialized form of a ZomeDef, which is identical for Wasm zomes, but
-/// unwraps InlineZomes to just a bare UUID.
+/// unwraps InlineZomes to just a bare UID.
 #[derive(Serialize)]
 #[serde(untagged)]
 enum ZomeDefSerialized {
     Wasm(WasmZome),
-    InlineUuid(String),
+    InlineUid(String),
 }
 
 impl From<ZomeDef> for ZomeDefSerialized {
     fn from(d: ZomeDef) -> Self {
         match d {
             ZomeDef::Wasm(zome) => Self::Wasm(zome),
-            ZomeDef::Inline(zome) => Self::InlineUuid(zome.uuid.clone()),
+            ZomeDef::Inline(zome) => Self::InlineUid(zome.uuid.clone()),
         }
     }
 }
