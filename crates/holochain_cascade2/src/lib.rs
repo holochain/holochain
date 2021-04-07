@@ -4,6 +4,7 @@
 //! where as retrieve only checks that where the data was found
 //! the appropriate validation has been run.
 
+use authority::WireDhtOp;
 use authority::WireEntryOps;
 use error::CascadeResult;
 use holo_hash::hash_type::AnyDht;
@@ -14,10 +15,15 @@ use holo_hash::HeaderHash;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
-// use holochain_p2p::HolochainP2pCell;
-// use holochain_p2p::HolochainP2pCellT2;
+use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::prelude::*;
+use holochain_state::query::entry::GetEntryQuery;
+use holochain_state::query::prelude::*;
+use holochain_state::query::StateQueryError;
 use holochain_types::prelude::*;
+use insert::insert_entry;
+use insert::insert_header;
+use insert::insert_op_lite;
 use test_utils::HolochainP2pCellT2;
 use test_utils::PassThroughNetwork;
 use tracing::*;
@@ -79,10 +85,14 @@ where
     }
 
     /// Add the network to the cascade
-    pub fn with_network<N: HolochainP2pCellT2 + Clone>(self, network: N) -> Cascade<N> {
+    pub fn with_network<N: HolochainP2pCellT2 + Clone>(
+        self,
+        network: N,
+        cache_env: EnvWrite,
+    ) -> Cascade<N> {
         Cascade {
             vault: self.vault,
-            cache: self.cache,
+            cache: Some(cache_env),
             network: Some(network),
         }
     }
@@ -92,8 +102,52 @@ impl<Network> Cascade<Network>
 where
     Network: HolochainP2pCellT2 + Clone + 'static + Send,
 {
-    fn merge_entry_ops_into_cache(&mut self, _response: WireEntryOps) -> CascadeResult<()> {
-        todo!()
+    fn insert_wire_op(txn: &mut Transaction, wire_op: WireDhtOp) -> CascadeResult<()> {
+        let WireDhtOp {
+            op_type,
+            header,
+            signature,
+        } = wire_op;
+        let (header, op_hash) = UniqueForm::op_hash(op_type, header)?;
+        let header_hashed = HeaderHashed::from_content_sync(header);
+        // TODO: Verify signature?
+        let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
+        let op_light = DhtOpLight::from_type(
+            op_type,
+            header_hashed.as_hash().clone(),
+            header_hashed.header(),
+        )?;
+
+        insert_header(txn, header_hashed);
+        insert_op_lite(txn, op_light, op_hash);
+        Ok(())
+    }
+    
+    fn merge_entry_ops_into_cache(&mut self, response: WireEntryOps) -> CascadeResult<()> {
+        let cache = ok_or_return!(self.cache.as_mut());
+        let WireEntryOps {
+            creates,
+            updates,
+            deletes,
+            entry,
+        } = response;
+        cache.conn()?.with_commit(|txn| {
+            if let Some(entry) = entry {
+                let entry_hashed = EntryHashed::from_content_sync(entry);
+                insert_entry(txn, entry_hashed);
+            }
+            for op in creates {
+                Self::insert_wire_op(txn, op)?;
+            }
+            for op in updates {
+                Self::insert_wire_op(txn, op)?;
+            }
+            for op in deletes {
+                Self::insert_wire_op(txn, op)?;
+            }
+            CascadeResult::Ok(())
+        })?;
+        Ok(())
     }
 
     #[instrument(skip(self, options))]
@@ -162,9 +216,24 @@ where
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
-        self.fetch_element_via_entry(entry_hash, options.into())
+        self.fetch_element_via_entry(entry_hash.clone(), options.into())
             .await?;
-        todo!()
+        let query = GetEntryQuery::new(entry_hash);
+        let mut conns = Vec::new();
+        let mut txns = Vec::new();
+        if let Some(cache) = &mut self.cache {
+            conns.push(cache.conn()?);
+        }
+        if let Some(vault) = &mut self.vault {
+            conns.push(vault.conn()?);
+        }
+        for conn in &mut conns {
+            let txn = conn.transaction().map_err(StateQueryError::from)?;
+            txns.push(txn);
+        }
+        let txns_ref: Vec<_> = txns.iter().collect();
+        let results = query.run(Txns::from(&txns_ref[..]))?;
+        Ok(results)
     }
 
     #[instrument(skip(self, _options))]

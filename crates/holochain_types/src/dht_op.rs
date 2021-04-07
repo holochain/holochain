@@ -154,6 +154,7 @@ impl std::hash::Hash for DhtOpLight {
 #[allow(missing_docs)]
 #[derive(
     Clone,
+    Copy,
     Debug,
     Serialize,
     Deserialize,
@@ -404,6 +405,77 @@ impl DhtOpLight {
             DhtOpLight::RegisterRemoveLink(_, _) => DhtOpType::RegisterRemoveLink,
         }
     }
+
+    /// From a type with the hashes.
+    pub fn from_type(
+        op_type: DhtOpType,
+        header_hash: HeaderHash,
+        header: &Header,
+    ) -> DhtOpResult<Self> {
+        let op = match op_type {
+            DhtOpType::StoreElement => {
+                let entry_hash = header.entry_hash().cloned();
+                Self::StoreElement(header_hash.clone(), entry_hash, header_hash.into())
+            }
+            DhtOpType::StoreEntry => {
+                let entry_hash = header
+                    .entry_hash()
+                    .cloned()
+                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?;
+                Self::StoreEntry(header_hash, entry_hash.clone(), entry_hash.into())
+            }
+            DhtOpType::RegisterAgentActivity => {
+                Self::RegisterAgentActivity(header_hash, header.author().clone().into())
+            }
+            DhtOpType::RegisterUpdatedContent => {
+                let entry_hash = header
+                    .entry_hash()
+                    .cloned()
+                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?;
+                let basis = match header {
+                    Header::Update(update) => update.original_entry_address.clone(),
+                    _ => return Err(DhtOpError::OpHeaderMismatch(op_type, header.header_type())),
+                };
+                Self::RegisterUpdatedContent(header_hash, entry_hash, basis.into())
+            }
+            DhtOpType::RegisterUpdatedElement => {
+                let entry_hash = header
+                    .entry_hash()
+                    .cloned()
+                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?;
+                let basis = match header {
+                    Header::Update(update) => update.original_entry_address.clone(),
+                    _ => return Err(DhtOpError::OpHeaderMismatch(op_type, header.header_type())),
+                };
+                Self::RegisterUpdatedElement(header_hash, entry_hash, basis.into())
+            }
+            DhtOpType::RegisterDeletedBy => {
+                Self::RegisterDeletedBy(header_hash.clone(), header_hash.into())
+            }
+            DhtOpType::RegisterDeletedEntryHeader => {
+                let basis = header
+                    .entry_hash()
+                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?
+                    .clone();
+                Self::RegisterDeletedBy(header_hash.clone(), basis.into())
+            }
+            DhtOpType::RegisterAddLink => {
+                let basis = match header {
+                    Header::CreateLink(create_link) => create_link.base_address.clone(),
+                    _ => return Err(DhtOpError::OpHeaderMismatch(op_type, header.header_type())),
+                };
+                Self::RegisterAddLink(header_hash, basis.into())
+            }
+            DhtOpType::RegisterRemoveLink => {
+                let basis = match header {
+                    Header::DeleteLink(delete_link) => delete_link.base_address.clone(),
+                    _ => return Err(DhtOpError::OpHeaderMismatch(op_type, header.header_type())),
+                };
+                Self::RegisterRemoveLink(header_hash, basis.into())
+            }
+        };
+        Ok(op)
+    }
 }
 
 // FIXME: need to use this in HashableContent
@@ -441,6 +513,56 @@ impl<'a> UniqueForm<'a> {
             }
             UniqueForm::RegisterAddLink(header) => header.base_address.clone().into(),
             UniqueForm::RegisterRemoveLink(header) => header.base_address.clone().into(),
+        }
+    }
+
+    /// Get the dht op hash without cloning the header.
+    pub fn op_hash(op_type: DhtOpType, header: Header) -> DhtOpResult<(Header, DhtOpHash)> {
+        match op_type {
+            DhtOpType::StoreElement => {
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::StoreElement(&header));
+                Ok((header, hash))
+            }
+            DhtOpType::StoreEntry => {
+                let header = header.try_into()?;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::StoreEntry(&header));
+                Ok((header.into(), hash))
+            }
+            DhtOpType::RegisterAgentActivity => {
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterAgentActivity(&header));
+                Ok((header, hash))
+            }
+            DhtOpType::RegisterUpdatedContent => {
+                let header = header.try_into()?;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterUpdatedContent(&header));
+                Ok((header.into(), hash))
+            }
+            DhtOpType::RegisterUpdatedElement => {
+                let header = header.try_into()?;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterUpdatedElement(&header));
+                Ok((header.into(), hash))
+            }
+            DhtOpType::RegisterDeletedBy => {
+                let header = header.try_into()?;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterDeletedBy(&header));
+                Ok((header.into(), hash))
+            }
+            DhtOpType::RegisterDeletedEntryHeader => {
+                let header = header.try_into()?;
+                let hash =
+                    DhtOpHash::with_data_sync(&UniqueForm::RegisterDeletedEntryHeader(&header));
+                Ok((header.into(), hash))
+            }
+            DhtOpType::RegisterAddLink => {
+                let header = header.try_into()?;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterAddLink(&header));
+                Ok((header.into(), hash))
+            }
+            DhtOpType::RegisterRemoveLink => {
+                let header = header.try_into()?;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterRemoveLink(&header));
+                Ok((header.into(), hash))
+            }
         }
     }
 }

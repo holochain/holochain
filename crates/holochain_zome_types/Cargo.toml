@@ -33,11 +33,12 @@ itertools = { version = "0.10", optional = true }
 
 # sqlite dependencies
 rusqlite = { version = "0.24", optional = true }
+num_enum = { version = "0.5", optional = true }
 
 [features]
 default = ["fixturators", "test_utils", "tinyid"]
 
-full = ["default", "rusqlite"]
+full = ["default", "rusqlite", "num_enum"]
 
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
 

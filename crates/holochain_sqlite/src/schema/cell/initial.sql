@@ -83,6 +83,9 @@ CREATE TABLE DhtOp (
     is_authored      INTEGER        NOT NULL,      -- BOOLEAN
     require_receipt  INTEGER        NOT NULL,      -- BOOLEAN
 
+    -- If this is null then validation is still in progress.
+    validation_status INTEGER       NULL,
+
     when_integrated  NUMERIC        NULL,          -- DATETIME
 
     blob             BLOB           NOT NULL,

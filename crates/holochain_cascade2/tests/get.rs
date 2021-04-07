@@ -8,6 +8,7 @@ async fn entry_not_authority_or_author() {
     observability::test_run().ok();
 
     // Environments
+    let cache = test_cell_env();
     let other = test_cell_env();
 
     // Data
@@ -15,7 +16,7 @@ async fn entry_not_authority_or_author() {
     fill_db(&other.env(), td.store_entry_op.clone());
 
     let network = PassThroughNetwork(vec![other.env().clone().into()]);
-    let mut cascade = Cascade::<PassThroughNetwork>::empty().with_network(network);
+    let mut cascade = Cascade::<PassThroughNetwork>::empty().with_network(network, cache.env());
 
     cascade
         .dht_get(td.hash.clone().into(), Default::default())

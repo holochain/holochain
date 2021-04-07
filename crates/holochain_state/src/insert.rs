@@ -4,6 +4,7 @@
 use crate::query::to_blob;
 use holo_hash::*;
 use holochain_sqlite::impl_to_sql_via_display;
+use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::scratch::Scratch;
 use holochain_types::dht_op::DhtOpHashed;
@@ -68,6 +69,25 @@ pub fn insert_op_lite(txn: &mut Transaction, op_lite: DhtOpLight, hash: DhtOpHas
         "require_receipt": 0,
         "blob": to_blob(op_lite),
     })
+    .unwrap();
+}
+
+pub fn update_op_validation_status(
+    txn: &mut Transaction,
+    hash: DhtOpHash,
+    status: ValidationStatus,
+) {
+    txn.execute_named(
+        "
+        UPDATE DhtOp
+        SET validation_status = :validation_status
+        WHERE hash = :hash
+        ",
+        named_params! {
+            ":validation_status": status,
+            ":hash": hash,
+        },
+    )
     .unwrap();
 }
 

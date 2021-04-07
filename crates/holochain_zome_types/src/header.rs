@@ -71,7 +71,7 @@ macro_rules! write_into_header {
 
         /// A unit enum which just maps onto the different Header variants,
         /// without containing any extra data
-        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
+        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Eq, Clone, Debug)]
         pub enum HeaderType {
             $($n,)*
         }

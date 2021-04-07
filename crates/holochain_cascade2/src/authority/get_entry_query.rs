@@ -1,7 +1,7 @@
 use holo_hash::EntryHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
-use holochain_state::query::{prelude::*, StoresIter};
+use holochain_state::query::prelude::*;
 use holochain_types::dht_op::DhtOpType;
 use holochain_zome_types::Entry;
 use holochain_zome_types::Header;

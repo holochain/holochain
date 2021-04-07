@@ -35,6 +35,7 @@ pub mod prelude {
     pub use super::Query;
     pub use super::StateQueryResult;
     pub use super::Stores;
+    pub use super::StoresIter;
     pub use super::Transactions;
     pub use super::Txn;
     pub use super::Txns;
