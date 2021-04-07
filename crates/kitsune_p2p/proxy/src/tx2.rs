@@ -203,6 +203,13 @@ impl AsEpHnd for ProxyEpHnd {
     ) -> BoxFuture<'static, KitsuneResult<ConHnd>> {
         let purl = ProxyUrl::from(remote.as_str());
         let remote_digest = purl.digest();
+        if remote_digest == self.local_digest {
+            tracing::warn!("refusing outgoing connection to node with same cert");
+            return async move {
+                Err("refusing outgoing connection to node with same cert".into())
+            }.boxed();
+        }
+
         let base_url: TxUrl = purl.as_base().as_str().into();
 
         let local_digest = self.local_digest.clone();
@@ -221,6 +228,15 @@ async fn incoming_evt_logic(
     hnd: Arc<ProxyEpHnd>,
     logic_hnd: LogicChanHandle<EpEvent>,
 ) {
+    let local_digest = match sub_ep.handle().local_digest() {
+        Err(_) => {
+            tracing::warn!("ep closed before evt handler launch");
+            return;
+        }
+        Ok(d) => d,
+    };
+    let local_digest = &local_digest;
+
     // use CHANNEL_COUNT concurrents because that is how many channels
     // we have for sending outgoing data... most everything else in here is sync
     // and so will be processed serially anyways.
@@ -230,7 +246,7 @@ async fn incoming_evt_logic(
         .for_each_concurrent(
             tuning_params.tx2_channel_count_per_connection,
             |evt| async {
-                incoming_evt_handle(evt, &hnd, &logic_hnd).await;
+                incoming_evt_handle(evt, local_digest.clone(), &hnd, &logic_hnd).await;
             },
         )
         .await;
@@ -238,6 +254,7 @@ async fn incoming_evt_logic(
 
 async fn incoming_evt_handle(
     evt: EpEvent,
+    local_digest: CertDigest,
     hnd: &Arc<ProxyEpHnd>,
     logic_hnd: &LogicChanHandle<EpEvent>,
 ) {
@@ -256,6 +273,13 @@ async fn incoming_evt_handle(
                 }
                 Ok(d) => d,
             };
+            if digest == local_digest {
+                sub_con
+                    .close(500, "refusing connection with matching cert")
+                    .await;
+                tracing::warn!("refusing connection with matching cert");
+                return;
+            }
             let _ = hnd.inner.share_mut(move |i, _| {
                 i.in_digest_to_sub_con.insert(digest.clone(), sub_con);
                 i.in_base_url_to_digest.insert(base_url, digest);

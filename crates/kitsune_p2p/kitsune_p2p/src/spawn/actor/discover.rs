@@ -255,11 +255,20 @@ where
                         };
                         let fut =
                             ep_hnd.get_connection(url, KitsuneTimeout::from_millis(1000 * 30));
-                        let payload = payload.clone();
+                        let mut payload = payload.clone();
                         let accept_result_cb = accept_result_cb.clone();
                         let out = out.clone();
                         tokio::task::spawn(async move {
                             let con_hnd = fut.await?;
+                            match &mut payload {
+                                wire::Wire::Notify(n) => {
+                                    n.to_agent = to_agent.clone();
+                                }
+                                wire::Wire::Call(c) => {
+                                    c.to_agent = to_agent.clone();
+                                }
+                                _ => panic!("cannot message {:?}", payload),
+                            }
                             /*
                             let metric_type = match &mut payload {
                                 wire::Wire::Notify(n) => {
