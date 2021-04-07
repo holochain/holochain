@@ -1,3 +1,4 @@
+#![allow(clippy::mem_discriminant_non_enum)] // these actually *are* enums...
 //! Usability api for tx2 kitsune transports.
 
 use crate::codec::*;
@@ -74,6 +75,7 @@ pub struct Tx2ConHnd<C: Codec + 'static + Send + Unpin> {
     con: ConHnd,
     url: TxUrl,
     rmap: ShareRMap<C>,
+    metrics: Arc<Tx2ApiMetrics<C>>,
 }
 
 impl<C: Codec + 'static + Send + Unpin> std::fmt::Debug for Tx2ConHnd<C> {
@@ -83,8 +85,13 @@ impl<C: Codec + 'static + Send + Unpin> std::fmt::Debug for Tx2ConHnd<C> {
 }
 
 impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
-    fn new(con: ConHnd, url: TxUrl, rmap: ShareRMap<C>) -> Self {
-        Self { con, url, rmap }
+    fn new(con: ConHnd, url: TxUrl, rmap: ShareRMap<C>, metrics: Arc<Tx2ApiMetrics<C>>) -> Self {
+        Self {
+            con,
+            url,
+            rmap,
+            metrics,
+        }
     }
 }
 
@@ -136,6 +143,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
         &self,
         data: PoolBuf,
         timeout: KitsuneTimeout,
+        d: std::mem::Discriminant<C>,
     ) -> impl std::future::Future<Output = KitsuneResult<C>> + 'static + Send {
         let this = self.clone();
         async move {
@@ -148,9 +156,13 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
             let _drop_cleanup =
                 rmap_insert(this.rmap.clone(), this.url.clone(), msg_id, s_res, timeout)?;
 
+            let len = data.len();
+
             this.con
                 .write(MsgId::new(msg_id).as_req(), data, timeout)
                 .await?;
+
+            this.metrics.write_len(d, len);
 
             timeout.mix(r_res.map_err(KitsuneError::other)).await?
         }
@@ -162,22 +174,23 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
         data: &C,
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<C>> + 'static + Send {
+        let d = std::mem::discriminant(data);
         let mut buf = PoolBuf::new();
         if let Err(e) = data.encode(&mut buf) {
             return async move { Err(KitsuneError::other(e)) }.boxed();
         }
-        self.priv_request(buf, timeout).boxed()
+        self.priv_request(buf, timeout, d).boxed()
     }
 }
 
 /// An endpoint handle - use this to manage a bound endpoint.
 #[derive(Clone)]
-pub struct Tx2EpHnd<C: Codec + 'static + Send + Unpin>(EpHnd, ShareRMap<C>);
+pub struct Tx2EpHnd<C: Codec + 'static + Send + Unpin>(EpHnd, ShareRMap<C>, Arc<Tx2ApiMetrics<C>>);
 
 impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
-    fn new(ep: EpHnd) -> Self {
+    fn new(ep: EpHnd, metrics: Arc<Tx2ApiMetrics<C>>) -> Self {
         let rmap = Arc::new(Share::new(RMap::new()));
-        Self(ep, rmap)
+        Self(ep, rmap, metrics)
     }
 }
 
@@ -239,9 +252,10 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
     ) -> impl std::future::Future<Output = KitsuneResult<Tx2ConHnd<C>>> + 'static + Send {
         let remote = remote.into();
         let rmap = self.1.clone();
+        let metrics = self.2.clone();
         self.0
             .get_connection(remote.clone(), timeout)
-            .map_ok(move |con| Tx2ConHnd::new(con, remote, rmap))
+            .map_ok(move |con| Tx2ConHnd::new(con, remote, rmap, metrics))
     }
 
     /// Write a request to this connection.
@@ -251,14 +265,15 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
         data: &C,
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<C>> + 'static + Send {
+        let d = std::mem::discriminant(data);
         let mut buf = PoolBuf::new();
         if let Err(e) = data.encode(&mut buf) {
             return async move { Err(KitsuneError::other(e)) }.boxed();
         }
         let con_fut = self.get_connection(remote.into(), timeout);
-        futures::future::FutureExt::boxed(
-            async move { con_fut.await?.priv_request(buf, timeout).await },
-        )
+        futures::future::FutureExt::boxed(async move {
+            con_fut.await?.priv_request(buf, timeout, d).await
+        })
     }
 }
 
@@ -369,7 +384,7 @@ pub enum Tx2EpEvent<C: Codec + 'static + Send + Unpin> {
 
 /// Represents a bound endpoint. To manage this endpoint, see handle()/Tx2EpHnd.
 /// To receive events from this endpoint, poll_next this instance as a Stream.
-pub struct Tx2Ep<C: Codec + 'static + Send + Unpin>(Tx2EpHnd<C>, Ep);
+pub struct Tx2Ep<C: Codec + 'static + Send + Unpin>(Tx2EpHnd<C>, Ep, Arc<Tx2ApiMetrics<C>>);
 
 impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
     type Item = Tx2EpEvent<C>;
@@ -386,13 +401,13 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                 let evt = match evt {
                     EpEvent::OutgoingConnection(EpConnection { con, url }) => {
                         Tx2EpEvent::OutgoingConnection(Tx2EpConnection {
-                            con: Tx2ConHnd::new(con, url.clone(), rmap),
+                            con: Tx2ConHnd::new(con, url.clone(), rmap, self.2.clone()),
                             url,
                         })
                     }
                     EpEvent::IncomingConnection(EpConnection { con, url }) => {
                         Tx2EpEvent::IncomingConnection(Tx2EpConnection {
-                            con: Tx2ConHnd::new(con, url.clone(), rmap),
+                            con: Tx2ConHnd::new(con, url.clone(), rmap, self.2.clone()),
                             url,
                         })
                     }
@@ -414,7 +429,7 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                         match msg_id.get_type() {
                             MsgIdType::Notify => unimplemented!(),
                             MsgIdType::Req => Tx2EpEvent::IncomingRequest(Tx2EpIncomingRequest {
-                                con: Tx2ConHnd::new(con.clone(), url.clone(), rmap),
+                                con: Tx2ConHnd::new(con.clone(), url.clone(), rmap, self.2.clone()),
                                 url,
                                 data: c,
                                 respond: Tx2Respond::new(con, msg_id.as_id()),
@@ -449,19 +464,59 @@ impl<C: Codec + 'static + Send + Unpin> Tx2Ep<C> {
     }
 }
 
+type WriteLenCb<C> = Box<dyn Fn(std::mem::Discriminant<C>, usize) + 'static + Send + Sync>;
+
+/// Metrics callback manager to be injected into the endpoint
+pub struct Tx2ApiMetrics<C: Codec + 'static + Send + Unpin> {
+    write_len: Option<WriteLenCb<C>>,
+}
+
+impl<C: Codec + 'static + Send + Unpin> Default for Tx2ApiMetrics<C> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<C: Codec + 'static + Send + Unpin> Tx2ApiMetrics<C> {
+    /// Construct a new default Tx2ApiMetrics with no set callbacks
+    pub fn new() -> Self {
+        Self { write_len: None }
+    }
+
+    /// This callback will be invoked when we successfully write data
+    /// to a transport connection.
+    pub fn set_write_len<F>(mut self, f: F) -> Self
+    where
+        F: Fn(std::mem::Discriminant<C>, usize) + 'static + Send + Sync,
+    {
+        let f: WriteLenCb<C> = Box::new(f);
+        self.write_len = Some(f);
+        self
+    }
+
+    fn write_len(&self, d: std::mem::Discriminant<C>, l: usize) {
+        if let Some(cb) = &self.write_len {
+            cb(d, l)
+        }
+    }
+}
+
 /// Construct a new Tx2EpFactory instance from a pool EpFactory
-pub fn tx2_api<C: Codec + 'static + Send + Unpin>(factory: EpFactory) -> Tx2EpFactory<C> {
-    Tx2EpFactory::new(factory)
+pub fn tx2_api<C: Codec + 'static + Send + Unpin>(
+    factory: EpFactory,
+    metrics: Tx2ApiMetrics<C>,
+) -> Tx2EpFactory<C> {
+    Tx2EpFactory::new(factory, metrics)
 }
 
 /// Endpoint binding factory - lets us easily pass around logic
 /// for later binding network transports.
-pub struct Tx2EpFactory<C: Codec + 'static + Send + Unpin>(EpFactory, std::marker::PhantomData<C>);
+pub struct Tx2EpFactory<C: Codec + 'static + Send + Unpin>(EpFactory, Arc<Tx2ApiMetrics<C>>);
 
 impl<C: Codec + 'static + Send + Unpin> Tx2EpFactory<C> {
     /// Construct a new Tx2EpFactory instance from a frontend EpFactory
-    pub fn new(factory: EpFactory) -> Self {
-        Self(factory, std::marker::PhantomData)
+    pub fn new(factory: EpFactory, metrics: Tx2ApiMetrics<C>) -> Self {
+        Self(factory, Arc::new(metrics))
     }
 
     /// Bind a new local transport endpoint.
@@ -470,9 +525,10 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpFactory<C> {
         bind_spec: U,
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<Tx2Ep<C>>> + 'static + Send {
-        self.0.bind(bind_spec.into(), timeout).map_ok(|ep| {
+        let metrics = self.1.clone();
+        self.0.bind(bind_spec.into(), timeout).map_ok(move |ep| {
             let ep_hnd = ep.handle().clone();
-            Tx2Ep(Tx2EpHnd::new(ep_hnd), ep)
+            Tx2Ep(Tx2EpHnd::new(ep_hnd, metrics.clone()), ep, metrics)
         })
     }
 }
@@ -514,7 +570,7 @@ mod tests {
 
         let f = tx2_mem_adapter(MemConfig::default()).await.unwrap();
         let f = tx2_pool_promote(f, Default::default());
-        let f = tx2_api(f);
+        let f = tx2_api(f, Default::default());
 
         let ep1 = f.bind("none:", t).await.unwrap();
         let ep1_hnd = ep1.handle().clone();

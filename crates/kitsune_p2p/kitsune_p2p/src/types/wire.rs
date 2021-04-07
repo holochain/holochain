@@ -5,6 +5,7 @@ use crate::types::gossip::{OpConsistency, OpCount};
 use crate::types::*;
 use derive_more::*;
 use kitsune_p2p_types::dht_arc::DhtArc;
+use once_cell::sync::Lazy;
 use std::sync::Arc;
 
 /// Type used for content data of wire messages.
@@ -20,9 +21,6 @@ kitsune_p2p_types::write_codec_enum! {
         Failure(0x00) {
             reason.0: String,
         },
-
-        /// Proxy Keepalive
-        ProxyKeepalive(0x01) {},
 
         /// "Call" to the remote.
         Call(0x010) {
@@ -108,3 +106,117 @@ kitsune_p2p_types::write_codec_enum! {
         },
     }
 }
+
+pub(crate) type DiscriminantMap =
+    std::collections::HashMap<std::mem::Discriminant<wire::Wire>, crate::metrics::KitsuneMetrics>;
+pub(crate) static DISC_MAP: Lazy<DiscriminantMap> = Lazy::new(|| {
+    use crate::metrics::KitsuneMetrics;
+    let mut map = std::collections::HashMap::new();
+
+    let space = Arc::new(KitsuneSpace(vec![]));
+    let agent = Arc::new(KitsuneAgent(vec![]));
+
+    map.insert(
+        std::mem::discriminant(&Wire::Failure(Failure {
+            reason: "".to_string(),
+        })),
+        KitsuneMetrics::Fail,
+    );
+    map.insert(
+        std::mem::discriminant(&Wire::Call(Call {
+            space: space.clone(),
+            from_agent: agent.clone(),
+            to_agent: agent.clone(),
+            data: WireData(vec![]),
+        })),
+        KitsuneMetrics::Call,
+    );
+    map.insert(
+        std::mem::discriminant(&Wire::CallResp(CallResp {
+            data: WireData(vec![]),
+        })),
+        KitsuneMetrics::CallResp,
+    );
+    map.insert(
+        std::mem::discriminant(&Wire::Notify(Notify {
+            space: space.clone(),
+            from_agent: agent.clone(),
+            to_agent: agent.clone(),
+            data: WireData(vec![]),
+        })),
+        KitsuneMetrics::Call,
+    );
+    map.insert(
+        std::mem::discriminant(&Wire::NotifyResp(NotifyResp {})),
+        KitsuneMetrics::NotifyResp,
+    );
+    map.insert(
+        std::mem::discriminant(&Wire::FetchOpHashes(FetchOpHashes {
+            space: space.clone(),
+            from_agent: agent.clone(),
+            to_agent: agent.clone(),
+            dht_arc: DhtArc {
+                center_loc: 0.into(),
+                half_length: 0,
+            },
+            since_utc_epoch_s: 0,
+            until_utc_epoch_s: 0,
+            last_count: OpCount::Variance,
+        })),
+        KitsuneMetrics::FetchOpHashes,
+    );
+    map.insert(
+        std::mem::discriminant(&Wire::FetchOpHashesResponse(FetchOpHashesResponse {
+            hashes: OpConsistency::Consistent,
+            peer_hashes: vec![],
+        })),
+        KitsuneMetrics::FetchOpHashesResp,
+    );
+    map.insert(
+        std::mem::discriminant(&Wire::FetchOpData(FetchOpData {
+            space: space.clone(),
+            from_agent: agent.clone(),
+            to_agent: agent.clone(),
+            op_hashes: vec![],
+            peer_hashes: vec![],
+        })),
+        KitsuneMetrics::FetchOpData,
+    );
+    map.insert(
+        std::mem::discriminant(&Wire::FetchOpDataResponse(FetchOpDataResponse {
+            op_data: vec![],
+            agent_infos: vec![],
+        })),
+        KitsuneMetrics::FetchOpDataResp,
+    );
+    map.insert(
+        std::mem::discriminant(&Wire::AgentInfoQuery(AgentInfoQuery {
+            space: space.clone(),
+            to_agent: agent.clone(),
+            by_agent: None,
+            by_basis_arc: None,
+        })),
+        KitsuneMetrics::AgentInfoQuery,
+    );
+    map.insert(
+        std::mem::discriminant(&Wire::AgentInfoQueryResp(AgentInfoQueryResp {
+            agent_infos: vec![],
+        })),
+        KitsuneMetrics::AgentInfoQuery,
+    );
+    map.insert(
+        std::mem::discriminant(&Wire::Gossip(Gossip {
+            space,
+            from_agent: agent.clone(),
+            to_agent: agent,
+            ops: vec![],
+            agents: vec![],
+        })),
+        KitsuneMetrics::Gossip,
+    );
+    map.insert(
+        std::mem::discriminant(&Wire::GossipResp(GossipResp {})),
+        KitsuneMetrics::GossipResp,
+    );
+    map
+});

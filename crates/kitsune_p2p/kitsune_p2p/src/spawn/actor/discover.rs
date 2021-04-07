@@ -106,7 +106,6 @@ pub(crate) fn peer_discover(
                         Some(to_agent.clone()),
                         None,
                     );
-                    //KitsuneMetrics::count(KitsuneMetrics::AgentInfoQuery, msg.len());
                     let res = con_hnd
                         .request(&msg, KitsuneTimeout::from_millis(1000 * 30))
                         .await?;
@@ -269,20 +268,6 @@ where
                                 }
                                 _ => panic!("cannot message {:?}", payload),
                             }
-                            /*
-                            let metric_type = match &mut payload {
-                                wire::Wire::Notify(n) => {
-                                    n.to_agent = to_agent.clone();
-                                    KitsuneMetrics::Notify
-                                }
-                                wire::Wire::Call(c) => {
-                                    c.to_agent = to_agent.clone();
-                                    KitsuneMetrics::Call
-                                }
-                                _ => panic!("cannot message {:?}", payload),
-                            };
-                            KitsuneMetrics::count(metric_type, payload.len());
-                            */
                             let res = con_hnd
                                 .request(&payload, KitsuneTimeout::from_millis(1000 * 30))
                                 .await?;

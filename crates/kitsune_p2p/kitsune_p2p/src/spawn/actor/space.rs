@@ -1,5 +1,3 @@
-//use crate::types::metrics::KitsuneMetrics;
-
 use super::*;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
@@ -146,7 +144,6 @@ impl gossip::GossipEventHandler for Space {
                 let con_hnd = ep_hnd
                     .get_connection(url, KitsuneTimeout::from_millis(1000 * 30))
                     .await?;
-                //KitsuneMetrics::count(KitsuneMetrics::FetchOpHashes, data.len());
                 let read = con_hnd
                     .request(&data, KitsuneTimeout::from_millis(1000 * 30))
                     .await?;
@@ -200,7 +197,6 @@ impl gossip::GossipEventHandler for Space {
                 let con_hnd = ep_hnd
                     .get_connection(url, KitsuneTimeout::from_millis(1000 * 30))
                     .await?;
-                //KitsuneMetrics::count(KitsuneMetrics::FetchOpData, data.len());
                 let read = con_hnd
                     .request(&data, KitsuneTimeout::from_millis(1000 * 30))
                     .await?;
@@ -259,7 +255,6 @@ impl gossip::GossipEventHandler for Space {
                 let con_hnd = ep_hnd
                     .get_connection(url.clone(), KitsuneTimeout::from_millis(1000 * 30))
                     .await?;
-                //KitsuneMetrics::count(KitsuneMetrics::Gossip, data.len());
                 let read = con_hnd
                     .request(&data, KitsuneTimeout::from_millis(1000 * 30))
                     .await?;
@@ -669,7 +664,6 @@ impl KitsuneP2pHandler for Space {
                         to_agent.clone(),
                         payload.into(),
                     );
-                    //KitsuneMetrics::count(KitsuneMetrics::Call, payload.len());
                     let res = con_hnd
                         .request(&payload, KitsuneTimeout::from_millis(1000 * 30))
                         .await?;

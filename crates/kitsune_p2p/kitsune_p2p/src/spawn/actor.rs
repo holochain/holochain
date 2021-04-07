@@ -4,7 +4,7 @@ use crate::actor;
 use crate::actor::*;
 use crate::event::*;
 use crate::gossip::*;
-//use crate::metrics::KitsuneMetrics;
+use crate::metrics::KitsuneMetrics;
 use crate::*;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
@@ -90,8 +90,14 @@ impl KitsuneP2pActor {
         // wrap in proxy
         let f = tx2_proxy(f, config.tuning_params.clone());
 
+        let metrics = Tx2ApiMetrics::default().set_write_len(|d, l| {
+            if let Some(t) = wire::DISC_MAP.get(&d) {
+                KitsuneMetrics::count(*t, l);
+            }
+        });
+
         // wrap in api
-        let f = tx2_api(f);
+        let f = tx2_api(f, metrics);
 
         // bind local endpoint
         let ep = f
@@ -176,7 +182,6 @@ impl KitsuneP2pActor {
                                         Err(err) => {
                                             let reason = format!("{:?}", err);
                                             let fail = wire::Wire::failure(reason);
-                                            //KitsuneMetrics::count(KitsuneMetrics::Fail, fail.len());
                                             let _ = respond
                                                 .respond(
                                                     fail,
@@ -188,7 +193,6 @@ impl KitsuneP2pActor {
                                         Ok(r) => r,
                                     };
                                     let resp = wire::Wire::call_resp(res.into());
-                                    //KitsuneMetrics::count(KitsuneMetrics::CallResp, resp.len());
                                     let _ = respond
                                         .respond(resp, KitsuneTimeout::from_millis(1000 * 30))
                                         .await;
@@ -206,14 +210,12 @@ impl KitsuneP2pActor {
                                     {
                                         let reason = format!("{:?}", err);
                                         let fail = wire::Wire::failure(reason);
-                                        //KitsuneMetrics::count(KitsuneMetrics::Fail, fail.len());
                                         let _ = respond
                                             .respond(fail, KitsuneTimeout::from_millis(1000 * 30))
                                             .await;
                                         return;
                                     }
                                     let resp = wire::Wire::notify_resp();
-                                    //KitsuneMetrics::count(KitsuneMetrics::NotifyResp, resp.len());
                                     let _ = respond
                                         .respond(resp, KitsuneTimeout::from_millis(1000 * 30))
                                         .await;
@@ -245,7 +247,6 @@ impl KitsuneP2pActor {
                                         Err(err) => {
                                             let reason = format!("{:?}", err);
                                             let fail = wire::Wire::failure(reason);
-                                            //KitsuneMetrics::count(KitsuneMetrics::Fail, fail.len());
                                             let _ = respond
                                                 .respond(
                                                     fail,
@@ -271,12 +272,6 @@ impl KitsuneP2pActor {
                                     };
                                     let resp =
                                         wire::Wire::fetch_op_hashes_response(hashes, agent_hashes);
-                                    /*
-                                    KitsuneMetrics::count(
-                                        KitsuneMetrics::FetchOpHashesResp,
-                                        resp.len(),
-                                    );
-                                    */
                                     let _ = respond
                                         .respond(resp, KitsuneTimeout::from_millis(1000 * 30))
                                         .await;
@@ -299,12 +294,6 @@ impl KitsuneP2pActor {
                                             Err(err) => {
                                                 let reason = format!("{:?}", err);
                                                 let fail = wire::Wire::failure(reason);
-                                                /*
-                                                KitsuneMetrics::count(
-                                                    KitsuneMetrics::Fail,
-                                                    fail.len(),
-                                                );
-                                                */
                                                 let _ = respond
                                                     .respond(
                                                         fail,
@@ -319,12 +308,6 @@ impl KitsuneP2pActor {
                                         op_data.into_iter().map(|(h, op)| (h, op.into())).collect();
                                     let resp =
                                         wire::Wire::fetch_op_data_response(op_data, agent_infos);
-                                    /*
-                                    KitsuneMetrics::count(
-                                        KitsuneMetrics::FetchOpDataResp,
-                                        resp.len(),
-                                    );
-                                    */
                                     let _ = respond
                                         .respond(resp, KitsuneTimeout::from_millis(1000 * 30))
                                         .await;
@@ -333,12 +316,6 @@ impl KitsuneP2pActor {
                                     match agent_info_query(q, evt_sender.clone()).await {
                                         Ok(r) => {
                                             let resp = wire::Wire::agent_info_query_resp(r);
-                                            /*
-                                            KitsuneMetrics::count(
-                                                KitsuneMetrics::AgentInfoQueryResp,
-                                                resp.len(),
-                                            );
-                                            */
                                             let _ = respond
                                                 .respond(
                                                     resp,
@@ -349,7 +326,6 @@ impl KitsuneP2pActor {
                                         Err(err) => {
                                             let reason = format!("{:?}", err);
                                             let fail = wire::Wire::failure(reason);
-                                            //KitsuneMetrics::count(KitsuneMetrics::Fail, fail.len());
                                             let _ = respond
                                                 .respond(
                                                     fail,
@@ -378,14 +354,12 @@ impl KitsuneP2pActor {
                                         let reason = format!("{:?}", err);
                                         tracing::error!("got err: {}", reason);
                                         let fail = wire::Wire::failure(reason);
-                                        //KitsuneMetrics::count(KitsuneMetrics::Fail, fail.len());
                                         let _ = respond
                                             .respond(fail, KitsuneTimeout::from_millis(1000 * 30))
                                             .await;
                                         return;
                                     }
                                     let resp = wire::Wire::gossip_resp();
-                                    //KitsuneMetrics::count(KitsuneMetrics::GossipResp, resp.len());
                                     let _ = respond
                                         .respond(resp, KitsuneTimeout::from_millis(1000 * 30))
                                         .await;
