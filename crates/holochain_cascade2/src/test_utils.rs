@@ -222,7 +222,7 @@ pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit(|txn| {
-            insert_op(txn, op);
+            insert_op(txn, op, false);
             DatabaseResult::Ok(())
         })
         .unwrap();

@@ -40,7 +40,7 @@ pub fn insert_op_scratch(scratch: &mut Scratch<SignedHeaderHashed>, op: DhtOpHas
     scratch.add_item(header_hashed);
 }
 
-pub fn insert_op(txn: &mut Transaction, op: DhtOpHashed) {
+pub fn insert_op(txn: &mut Transaction, op: DhtOpHashed, is_authored: bool) {
     let (op, hash) = op.into_inner();
     let op_light = op.to_light();
     let header = op.header();
@@ -53,10 +53,15 @@ pub fn insert_op(txn: &mut Transaction, op: DhtOpHashed) {
     let header_hashed = HeaderHashed::with_pre_hashed(header, op_light.header_hash().to_owned());
     let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
     insert_header(txn, header_hashed);
-    insert_op_lite(txn, op_light, hash);
+    insert_op_lite(txn, op_light, hash, is_authored);
 }
 
-pub fn insert_op_lite(txn: &mut Transaction, op_lite: DhtOpLight, hash: DhtOpHash) {
+pub fn insert_op_lite(
+    txn: &mut Transaction,
+    op_lite: DhtOpLight,
+    hash: DhtOpHash,
+    is_authored: bool,
+) {
     let header_hash = op_lite.header_hash().clone();
     let basis = op_lite.dht_basis().to_owned();
     sql_insert!(txn, DhtOp, {
@@ -64,7 +69,7 @@ pub fn insert_op_lite(txn: &mut Transaction, op_lite: DhtOpLight, hash: DhtOpHas
         "type": op_lite.get_type(),
         "basis_hash": basis,
         "header_hash": header_hash,
-        "is_authored": 1,
+        "is_authored": is_authored,
         "require_receipt": 0,
         "blob": to_blob(op_lite),
     })

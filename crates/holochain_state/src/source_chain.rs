@@ -17,6 +17,7 @@ use std::collections::HashSet;
 
 mod error;
 mod source_chain_buffer;
+// mod source_chain_buffer_sql;
 
 /// A wrapper around [SourceChainBuf] with the assumption that the source chain has been initialized,
 /// i.e. has undergone Genesis.
