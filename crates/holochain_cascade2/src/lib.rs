@@ -119,10 +119,10 @@ where
         )?;
 
         insert_header(txn, header_hashed);
-        insert_op_lite(txn, op_light, op_hash);
+        insert_op_lite(txn, op_light, op_hash, false);
         Ok(())
     }
-    
+
     fn merge_entry_ops_into_cache(&mut self, response: WireEntryOps) -> CascadeResult<()> {
         let cache = ok_or_return!(self.cache.as_mut());
         let WireEntryOps {
