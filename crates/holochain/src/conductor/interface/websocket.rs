@@ -145,9 +145,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
 ) {
     while let Some(msg) = rx_from_iface.next().await {
         match handle_incoming_message(msg, api.clone()).await {
-            Err(e) => {
-                error!(error = &e as &dyn std::error::Error)
-            }
+            Err(e) => error!(error = &e as &dyn std::error::Error),
             Ok(()) => {}
         }
     }
@@ -671,11 +669,11 @@ pub mod test {
         shutdown.await.unwrap().unwrap();
     }
 
-    async fn make_dna(uuid: &str, zomes: Vec<TestWasm>) -> DnaFile {
+    async fn make_dna(uid: &str, zomes: Vec<TestWasm>) -> DnaFile {
         DnaFile::new(
             DnaDef {
                 name: "conductor_test".to_string(),
-                uuid: uuid.to_string(),
+                uid: uid.to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 zomes: zomes.clone().into_iter().map(Into::into).collect(),
             },

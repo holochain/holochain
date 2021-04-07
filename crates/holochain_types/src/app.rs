@@ -53,8 +53,8 @@ pub enum DnaSource {
 /// The instructions on how to get the DNA to be registered
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterDnaPayload {
-    /// UUID to override when installing this Dna
-    pub uuid: Option<String>,
+    /// UID to override when installing this Dna
+    pub uid: Option<String>,
     /// Properties to override when installing this Dna
     pub properties: Option<YamlProperties>,
     /// Where to find the DNA
@@ -118,6 +118,11 @@ pub struct InstallAppBundlePayload {
     /// Include proof-of-membrane-membership data for cells that require it,
     /// keyed by the CellNick specified in the app bundle manifest.
     pub membrane_proofs: HashMap<CellNick, MembraneProof>,
+
+    /// Optional: overwrites all UIDs for all DNAs of Cells created by this app.
+    /// The app can still use existing Cells, i.e. this does not require that
+    /// all Cells have DNAs with the same overridden DNA.
+    pub uid: Option<Uid>,
 }
 
 /// The possible locations of an AppBundle

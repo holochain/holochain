@@ -108,7 +108,7 @@ impl DnaBundle {
                     .unwrap_or_else(|| SerializedBytes::try_from(()))?;
                 let dna_def = DnaDef {
                     name: manifest.name.clone(),
-                    uuid: manifest.uuid.clone().unwrap_or_default(),
+                    uid: manifest.uid.clone().unwrap_or_default(),
                     properties,
                     zomes,
                 };
@@ -153,7 +153,7 @@ impl DnaBundle {
             .collect();
         Ok(DnaManifestCurrent {
             name: dna_def.name,
-            uuid: Some(dna_def.uuid),
+            uid: Some(dna_def.uid),
             properties: Some(dna_def.properties.try_into().map_err(|e| {
                 DnaError::DnaFileToBundleConversionError(format!(
                     "DnaDef properties were not YAML-deserializable: {}",
@@ -183,7 +183,7 @@ mod tests {
         let hash2 = WasmHash::with_data(&DnaWasm::from(wasm2.clone())).await;
         let mut manifest = DnaManifestCurrent {
             name: "name".into(),
-            uuid: None,
+            uid: None,
             properties: None,
             zomes: vec![
                 ZomeManifest {
