@@ -39,11 +39,11 @@ impl DnaManifest {
     /// Be sure to update this function when creating a new version.
     pub fn current(
         name: String,
-        uuid: Option<String>,
+        uid: Option<String>,
         properties: Option<YamlProperties>,
         zomes: Vec<ZomeManifest>,
     ) -> Self {
-        DnaManifestCurrent::new(name, uuid, properties, zomes).into()
+        DnaManifestCurrent::new(name, uid, properties, zomes).into()
     }
 
     /// Getter for properties
@@ -53,10 +53,10 @@ impl DnaManifest {
         }
     }
 
-    /// Getter for uuid
-    pub fn uuid(&self) -> Option<String> {
+    /// Getter for uid
+    pub fn uid(&self) -> Option<String> {
         match self {
-            DnaManifest::V1(manifest) => manifest.uuid.clone(),
+            DnaManifest::V1(manifest) => manifest.uid.clone(),
         }
     }
 
