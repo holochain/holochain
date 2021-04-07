@@ -17,7 +17,6 @@ use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_p2p::kitsune_p2p;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
-use holochain_types::prelude::DnaSource;
 use holochain_types::prelude::InstallAppDnaPayload;
 use holochain_types::prelude::InstallAppPayload;
 use holochain_types::prelude::InstalledCell;
@@ -26,6 +25,7 @@ use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppBundlePayload};
 use holochain_types::prelude::{DnaHash, InstalledApp};
+use holochain_types::prelude::{DnaSource, Uid};
 use std::convert::TryFrom;
 
 use crate::cmds::Existing;
@@ -101,8 +101,8 @@ pub struct AddAppWs {
 /// and registers a Dna. You can only use a path or a hash not both.
 pub struct RegisterDna {
     #[structopt(short, long)]
-    /// UUID to override when installing this Dna
-    pub uuid: Option<String>,
+    /// UID to override when installing this Dna
+    pub uid: Option<String>,
     #[structopt(short, long)]
     /// Properties to override when installing this Dna
     pub properties: Option<PathBuf>,
@@ -156,6 +156,9 @@ pub struct InstallAppBundle {
     #[structopt(required = true)]
     /// Location of the *.happ bundle file to install.
     pub path: PathBuf,
+
+    /// Optional UID override for every DNA in this app
+    pub uid: Option<Uid>,
 }
 
 #[derive(Debug, StructOpt, Clone)]
@@ -384,7 +387,7 @@ pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyho
 /// Calls [`AdminRequest::RegisterDna`] and registers dna.
 pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Result<DnaHash> {
     let RegisterDna {
-        uuid,
+        uid,
         properties,
         path,
         hash,
@@ -401,7 +404,7 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
         _ => unreachable!("Can't have hash and path for dna source"),
     };
     let dna = RegisterDnaPayload {
-        uuid,
+        uid,
         properties,
         source,
     };
@@ -468,6 +471,7 @@ pub async fn install_app_bundle(
         app_id,
         agent_key,
         path,
+        uid,
     } = args;
 
     let bundle = AppBundleSource::Path(path).resolve().await?;
@@ -482,6 +486,7 @@ pub async fn install_app_bundle(
         agent_key,
         source: AppBundleSource::Bundle(bundle),
         membrane_proofs: Default::default(),
+        uid,
     };
 
     let r = AdminRequest::InstallAppBundle(Box::new(payload));

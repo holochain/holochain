@@ -842,6 +842,6 @@ where
 }
 
 /// A fixture example dna for unit testing.
-pub fn fake_valid_dna_file(uuid: &str) -> DnaFile {
-    fake_dna_zomes(uuid, vec![(TestWasm::Foo.into(), TestWasm::Foo.into())])
+pub fn fake_valid_dna_file(uid: &str) -> DnaFile {
+    fake_dna_zomes(uid, vec![(TestWasm::Foo.into(), TestWasm::Foo.into())])
 }
