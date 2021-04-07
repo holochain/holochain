@@ -89,7 +89,7 @@ mod tests {
 ---
 manifest_version: "1"
 name: test_dna
-uuid: blablabla
+uid: blablabla
 properties:
   some: 42
   props: yay
