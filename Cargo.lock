@@ -1644,7 +1644,6 @@ dependencies = [
  "cfg-if 0.1.10",
  "chrono",
  "criterion",
- "derivative",
  "derive_more",
  "directories 2.0.2",
  "either",
