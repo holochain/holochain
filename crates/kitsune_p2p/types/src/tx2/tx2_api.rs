@@ -32,6 +32,8 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
 
     pub fn respond(&mut self, con: ConHnd, msg_id: u64, c: C) {
         if let Some((s_res, _)) = self.0.remove(&(con, msg_id)) {
+            // if the recv side is dropped, we no longer need to respond
+            // so it's ok to ignore errors here.
             let _ = s_res.send(Ok(c));
         }
     }
@@ -251,11 +253,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2Respond<C> {
             let mut buf = PoolBuf::new();
             data.encode(&mut buf).map_err(KitsuneError::other)?;
 
-            // ignore errors, the remote con may have closed
-            // but that's their loss.
-            let _ = con.write(MsgId::new(msg_id).as_res(), buf, timeout).await;
-
-            Ok(())
+            con.write(MsgId::new(msg_id).as_res(), buf, timeout).await
         }
     }
 }
