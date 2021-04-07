@@ -1,6 +1,11 @@
 use std::convert::Infallible;
 
 use fallible_iterator::FallibleIterator;
+use holo_hash::hash_type::AnyDht;
+use holo_hash::AnyDhtHash;
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
+use holochain_zome_types::SignedHeaderHashed;
 
 /// The "scratch" is an in-memory space to stage Headers to be committed at the
 /// end of the CallZome workflow.
@@ -43,6 +48,29 @@ where
 
     pub fn as_filter(&self, f: impl Fn(&T) -> bool) -> FilteredScratch<T> {
         FilteredScratch(self.0.iter().filter(|&t| f(t)).cloned().collect())
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.0.iter()
+    }
+}
+
+impl Scratch<SignedHeaderHashed> {
+    pub fn contains_hash(&self, hash: &AnyDhtHash) -> bool {
+        match *hash.hash_type() {
+            AnyDht::Entry => self.contains_entry(&hash.clone().into()),
+            AnyDht::Header => self.contains_header(&hash.clone().into()),
+        }
+    }
+
+    /// Check if an entry is contained in the store
+    pub fn contains_entry(&self, _hash: &EntryHash) -> bool {
+        todo!()
+    }
+
+    /// Check if a header is contained in the store
+    pub fn contains_header(&self, hash: &HeaderHash) -> bool {
+        self.0.iter().find(|h| h.header_address() == hash).is_some()
     }
 }
 

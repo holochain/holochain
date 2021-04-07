@@ -1760,6 +1760,7 @@ dependencies = [
  "holochain_types",
  "holochain_zome_types",
  "kitsune_p2p",
+ "mockall 0.9.1",
  "serde",
  "serde_derive",
  "thiserror",

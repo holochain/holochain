@@ -16,6 +16,7 @@ use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_sqlite::scratch::Scratch;
 use holochain_state::prelude::*;
 use holochain_state::query::entry::GetEntryQuery;
 use holochain_state::query::prelude::*;
@@ -60,6 +61,7 @@ macro_rules! ok_or_return {
 pub struct Cascade<Network = PassThroughNetwork> {
     vault: Option<EnvRead>,
     cache: Option<EnvWrite>,
+    scratch: Option<Scratch<SignedHeaderHashed>>,
     network: Option<Network>,
 }
 
@@ -73,6 +75,7 @@ where
             vault: None,
             network: None,
             cache: None,
+            scratch: None,
         }
     }
 
@@ -92,6 +95,7 @@ where
     ) -> Cascade<N> {
         Cascade {
             vault: self.vault,
+            scratch: self.scratch,
             cache: Some(cache_env),
             network: Some(network),
         }
@@ -216,6 +220,7 @@ where
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
+        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
         self.fetch_element_via_entry(entry_hash.clone(), options.into())
             .await?;
         let query = GetEntryQuery::new(entry_hash);
@@ -427,8 +432,9 @@ where
         todo!()
     }
 
-    async fn _am_i_authoring(&mut self, _hash: &AnyDhtHash) -> CascadeResult<bool> {
-        todo!()
+    fn am_i_authoring(&mut self, hash: &AnyDhtHash) -> CascadeResult<bool> {
+        let scratch = ok_or_return!(self.scratch.as_ref(), false);
+        Ok(scratch.contains_hash(hash))
     }
 
     async fn _am_i_an_authority(&mut self, _hash: AnyDhtHash) -> CascadeResult<bool> {

@@ -1,4 +1,6 @@
 use fallible_iterator::FallibleIterator;
+use holo_hash::hash_type::AnyDht;
+use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
@@ -128,6 +130,20 @@ pub trait Stores<Q: Query> {
 
     /// Get an Entry from the database
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>>;
+
+    /// Check if a hash is contained in the store
+    fn contains_hash(&self, hash: &AnyDhtHash) -> StateQueryResult<bool> {
+        match *hash.hash_type() {
+            AnyDht::Entry => self.contains_entry(&hash.clone().into()),
+            AnyDht::Header => self.contains_header(&hash.clone().into()),
+        }
+    }
+
+    /// Check if an entry is contained in the store
+    fn contains_entry(&self, hash: &EntryHash) -> StateQueryResult<bool>;
+
+    /// Check if a header is contained in the store
+    fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool>;
 }
 
 /// Each Stores implementation has its own custom way of iterating over itself,
@@ -170,6 +186,14 @@ impl<'stmt, Q: Query> Stores<Q> for Txn<'stmt, '_> {
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
         get_entry_from_db(&self.txn, hash)
     }
+
+    fn contains_entry(&self, _hash: &EntryHash) -> StateQueryResult<bool> {
+        todo!()
+    }
+
+    fn contains_header(&self, _hash: &HeaderHash) -> StateQueryResult<bool> {
+        todo!()
+    }
 }
 
 impl<'stmt, Q: Query> StoresIter<Q::Data> for QueryStmt<'stmt, Q> {
@@ -200,6 +224,26 @@ impl<'stmt, Q: Query> Stores<Q> for Txns<'stmt, '_> {
         }
         Ok(None)
     }
+
+    fn contains_entry(&self, hash: &EntryHash) -> StateQueryResult<bool> {
+        for txn in &self.txns {
+            let r = <Txn as Stores<Q>>::contains_entry(&txn, hash)?;
+            if r {
+                return Ok(r);
+            }
+        }
+        Ok(false)
+    }
+
+    fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
+        for txn in &self.txns {
+            let r = <Txn as Stores<Q>>::contains_header(&txn, hash)?;
+            if r {
+                return Ok(r);
+            }
+        }
+        Ok(false)
+    }
 }
 
 impl<'stmt, Q: Query> StoresIter<Q::Data> for QueryStmts<'stmt, Q> {
@@ -220,6 +264,14 @@ impl<Q: Query> Stores<Q> for Scratch<Q::Data> {
     fn get_entry(&self, _hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
         // TODO: we should probably store entries in the scratch as well.
         Ok(None)
+    }
+
+    fn contains_entry(&self, _hash: &EntryHash) -> StateQueryResult<bool> {
+        todo!()
+    }
+
+    fn contains_header(&self, _hash: &HeaderHash) -> StateQueryResult<bool> {
+        todo!()
     }
 }
 
@@ -245,6 +297,24 @@ impl<'borrow, 'txn, Q: Query> Stores<Q> for DbScratch<'borrow, 'txn, Q::Data> {
         let r = <Txns as Stores<Q>>::get_entry(&self.txns, hash)?;
         if r.is_none() {
             <Scratch<Q::Data> as Stores<Q>>::get_entry(&self.scratch, hash)
+        } else {
+            Ok(r)
+        }
+    }
+
+    fn contains_entry(&self, hash: &EntryHash) -> StateQueryResult<bool> {
+        let r = <Txns as Stores<Q>>::contains_entry(&self.txns, hash)?;
+        if !r {
+            <Scratch<Q::Data> as Stores<Q>>::contains_entry(&self.scratch, hash)
+        } else {
+            Ok(r)
+        }
+    }
+
+    fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
+        let r = <Txns as Stores<Q>>::contains_header(&self.txns, hash)?;
+        if !r {
+            <Scratch<Q::Data> as Stores<Q>>::contains_header(&self.scratch, hash)
         } else {
             Ok(r)
         }

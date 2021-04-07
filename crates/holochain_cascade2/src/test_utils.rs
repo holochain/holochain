@@ -30,6 +30,16 @@ use holochain_state::insert::insert_op;
 #[derive(Clone)]
 pub struct PassThroughNetwork(pub Vec<EnvRead>);
 
+#[derive(Clone)]
+pub struct MockNetwork(std::sync::Arc<tokio::sync::Mutex<MockHolochainP2pCellT2>>);
+
+impl MockNetwork {
+    pub fn new(mock: MockHolochainP2pCellT2) -> Self {
+        Self(std::sync::Arc::new(tokio::sync::Mutex::new(mock)))
+    }
+}
+
+#[mockall::automock]
 #[async_trait::async_trait]
 pub trait HolochainP2pCellT2 {
     async fn get_validation_package(
@@ -140,10 +150,13 @@ impl HolochainP2pCellT2 for PassThroughNetwork {
 pub struct EntryTestData {
     pub store_entry_op: DhtOpHashed,
     pub wire_create: WireDhtOp,
+    pub create_hash: HeaderHash,
     pub delete_entry_header_op: DhtOpHashed,
     pub wire_delete: WireDhtOp,
+    pub delete_hash: HeaderHash,
     pub update_content_op: DhtOpHashed,
     pub wire_update: WireDhtOp,
+    pub update_hash: HeaderHash,
     pub hash: EntryHash,
     pub entry: Entry,
 }
@@ -168,6 +181,8 @@ impl EntryTestData {
 
         let delete_header = Header::Delete(delete.clone());
         let update_header = Header::Update(update.clone());
+        let delete_hash = HeaderHash::with_data_sync(&delete_header);
+        let update_hash = HeaderHash::with_data_sync(&update_header);
 
         let signature = fixt!(Signature);
         let store_entry_op = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
@@ -214,6 +229,9 @@ impl EntryTestData {
             wire_create,
             wire_delete,
             wire_update,
+            create_hash,
+            delete_hash,
+            update_hash,
         }
     }
 }
@@ -226,4 +244,66 @@ pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
             DatabaseResult::Ok(())
         })
         .unwrap();
+}
+
+pub fn fill_db_as_author(env: &EnvWrite, op: DhtOpHashed) {
+    env.conn()
+        .unwrap()
+        .with_commit(|txn| {
+            insert_op(txn, op, true);
+            DatabaseResult::Ok(())
+        })
+        .unwrap();
+}
+
+#[async_trait::async_trait]
+impl HolochainP2pCellT2 for MockNetwork {
+    async fn get_validation_package(
+        &mut self,
+        request_from: AgentPubKey,
+        header_hash: HeaderHash,
+    ) -> actor::HolochainP2pResult<ValidationPackageResponse> {
+        self.0
+            .lock()
+            .await
+            .get_validation_package(request_from, header_hash)
+            .await
+    }
+
+    async fn get(
+        &mut self,
+        dht_hash: holo_hash::AnyDhtHash,
+        options: actor::GetOptions,
+    ) -> actor::HolochainP2pResult<Vec<WireEntryOps>> {
+        self.0.lock().await.get(dht_hash, options).await
+    }
+
+    async fn get_meta(
+        &mut self,
+        dht_hash: holo_hash::AnyDhtHash,
+        options: actor::GetMetaOptions,
+    ) -> actor::HolochainP2pResult<Vec<MetadataSet>> {
+        self.0.lock().await.get_meta(dht_hash, options).await
+    }
+
+    async fn get_links(
+        &mut self,
+        link_key: WireLinkMetaKey,
+        options: actor::GetLinksOptions,
+    ) -> actor::HolochainP2pResult<Vec<GetLinksResponse>> {
+        self.0.lock().await.get_links(link_key, options).await
+    }
+
+    async fn get_agent_activity(
+        &mut self,
+        agent: AgentPubKey,
+        query: QueryFilter,
+        options: actor::GetActivityOptions,
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>> {
+        self.0
+            .lock()
+            .await
+            .get_agent_activity(agent, query, options)
+            .await
+    }
 }
