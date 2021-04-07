@@ -16,7 +16,7 @@ type BoxApi = Box<dyn HostFnApiT>;
 
 /// An InlineZome, which consists
 pub struct InlineZome {
-    /// Since closures cannot be serialized, we include a UUID which
+    /// Since closures cannot be serialized, we include a UID which
     /// is the only part of an InlineZome that gets serialized.
     /// This uuid becomes part of the determination of the DnaHash
     /// that it is a part of.
@@ -32,7 +32,7 @@ pub struct InlineZome {
 }
 
 impl InlineZome {
-    /// Create a new zome with the given UUID
+    /// Create a new zome with the given UID
     pub fn new<S: Into<String>>(uuid: S, entry_defs: Vec<EntryDef>) -> Self {
         let entry_defs_callback =
             move |_, _: ()| Ok(EntryDefsCallbackResult::Defs(entry_defs.clone().into()));
@@ -42,7 +42,7 @@ impl InlineZome {
         }
         .callback("entry_defs", Box::new(entry_defs_callback))
     }
-    /// Create a new zome with a unique random UUID
+    /// Create a new zome with a unique random UID
     pub fn new_unique(entry_defs: Vec<EntryDef>) -> Self {
         Self::new(nanoid::nanoid!(), entry_defs)
     }
