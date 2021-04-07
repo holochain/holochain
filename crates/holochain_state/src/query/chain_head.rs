@@ -22,12 +22,14 @@ impl Query for ChainHeadQuery {
     fn create_query(&self) -> &str {
         "
             SELECT H.blob FROM Header AS H
+            JOIN DhtOp as D
+            ON D.header_hash = H.hash
             JOIN (
                 SELECT author, MAX(seq) FROM Header
                 GROUP BY author
             ) AS H2
             ON H.author = H2.author
-            WHERE H.author = :author
+            WHERE H.author = :author AND D.is_authored = 1
         "
     }
 
@@ -81,9 +83,10 @@ impl Query for ChainHeadQuery {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::insert::insert_header;
+    use crate::insert::{insert_header, insert_op_lite};
     use ::fixt::prelude::*;
     use holochain_sqlite::{schema::SCHEMA_CELL, scratch::Scratch};
+    use holochain_types::dht_op::DhtOpLight;
 
     #[test]
     fn test_chain_head_query() {
@@ -128,7 +131,10 @@ mod tests {
         let expected_head = shhs[8].clone();
 
         for shh in &shhs[..6] {
+            let hash = shh.header_address();
+            let op = DhtOpLight::StoreElement(hash.clone(), None, hash.clone().into());
             insert_header(&mut txn, shh.clone());
+            insert_op_lite(&mut txn, op, fixt!(DhtOpHash), true);
         }
 
         let mut scratch = Scratch::<SignedHeader>::new();
