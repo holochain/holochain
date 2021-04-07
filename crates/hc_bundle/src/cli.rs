@@ -30,15 +30,15 @@ pub enum HcDnaBundle {
     ///
     /// $ hc-dna pack ./some/directory/foo/`
     ///
-    /// will create file `./some/directory/foo/foo.dna`
+    /// would create file `./some/directory/foo/foo.dna`, if the `name` property in the dna.yaml file was `foo`
     Pack {
         /// The path to the unpacked directory containing a `dna.yaml` manifest
         path: std::path::PathBuf,
 
         /// Specify the output path for the packed bundle file.
         ///
-        /// If not specified, the file will be placed alongside the input directory,
-        /// and given the name "[DIRECTORY].dna"
+        /// If not specified, the file will be placed inside the input directory,
+        /// and given the name "[DNA_NAME].dna" where [DNA_NAME] is the `name` property of the `dna.yaml` file
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
     },
@@ -79,15 +79,15 @@ pub enum HcAppBundle {
     ///
     /// $ hc-app pack ./some/directory/foo/`
     ///
-    /// will create file `./some/directory/foo.happ`
+    /// would create file `./some/directory/foo/foo.happ`, if the `name` property in the happ.yaml file was `foo`
     Pack {
         /// The path to the unpacked directory containing a `happ.yaml` manifest
         path: std::path::PathBuf,
 
         /// Specify the output path for the packed bundle file.
         ///
-        /// If not specified, the file will be placed alongside the input directory,
-        /// and given the name "[DIRECTORY].happ"
+        /// If not specified, the file will be placed inside the input directory,
+        /// and given the name "[HAPP_NAME].happ" where [HAPP_NAME] is the `name` property of the `happ.yaml` file
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
     },
