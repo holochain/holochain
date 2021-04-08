@@ -243,6 +243,16 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
         self.0.close(code, reason)
     }
 
+    /// Force close a specific connection.
+    pub fn close_connection(
+        &self,
+        remote: TxUrl,
+        code: u32,
+        reason: &str,
+    ) -> impl std::future::Future<Output = ()> + 'static + Send {
+        self.0.close_connection(remote, code, reason)
+    }
+
     /// Get an existing connection.
     /// If one is not available, establish a new connection.
     pub fn get_connection<U: Into<TxUrl>>(
