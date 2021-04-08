@@ -1,9 +1,11 @@
 use holo_hash::hash_type::AnyDht;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
+use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 use holochain_p2p::actor;
 use holochain_p2p::HolochainP2pError;
+use holochain_state::insert::update_op_validation_status;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
@@ -18,6 +20,7 @@ use holochain_zome_types::fixt::*;
 use holochain_zome_types::Entry;
 use holochain_zome_types::Header;
 use holochain_zome_types::QueryFilter;
+use holochain_zome_types::ValidationStatus;
 
 use crate::authority;
 use crate::authority::WireDhtOp;
@@ -28,7 +31,26 @@ use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::insert::insert_op;
 
 #[derive(Clone)]
-pub struct PassThroughNetwork(pub Vec<EnvRead>);
+pub struct PassThroughNetwork {
+    envs: Vec<EnvRead>,
+    authority: bool,
+}
+
+impl PassThroughNetwork {
+    pub fn authority_for_all(envs: Vec<EnvRead>) -> Self {
+        Self {
+            envs,
+            authority: true,
+        }
+    }
+
+    pub fn authority_for_nothing(envs: Vec<EnvRead>) -> Self {
+        Self {
+            envs,
+            authority: false,
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct MockNetwork(std::sync::Arc<tokio::sync::Mutex<MockHolochainP2pCellT2>>);
@@ -72,6 +94,11 @@ pub trait HolochainP2pCellT2 {
         query: QueryFilter,
         options: actor::GetActivityOptions,
     ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>>;
+
+    async fn authority_for_hash(
+        &mut self,
+        dht_hash: holo_hash::AnyDhtHash,
+    ) -> actor::HolochainP2pResult<bool>;
 }
 
 #[async_trait::async_trait]
@@ -92,7 +119,7 @@ impl HolochainP2pCellT2 for PassThroughNetwork {
         let mut out = Vec::new();
         match *dht_hash.hash_type() {
             AnyDht::Entry => {
-                for env in &self.0 {
+                for env in &self.envs {
                     let r = authority::handle_get_entry(
                         env.clone(),
                         dht_hash.clone().into(),
@@ -119,7 +146,7 @@ impl HolochainP2pCellT2 for PassThroughNetwork {
         options: actor::GetLinksOptions,
     ) -> actor::HolochainP2pResult<Vec<GetLinksResponse>> {
         let mut out = Vec::new();
-        for env in &self.0 {
+        for env in &self.envs {
             let r = authority::handle_get_links(env.clone(), link_key.clone(), (&options).into())
                 .map_err(|e| HolochainP2pError::Other(e.into()))?;
             out.push(r);
@@ -133,7 +160,7 @@ impl HolochainP2pCellT2 for PassThroughNetwork {
         options: actor::GetActivityOptions,
     ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>> {
         let mut out = Vec::new();
-        for env in &self.0 {
+        for env in &self.envs {
             let r = authority::handle_get_agent_activity(
                 env.clone(),
                 agent.clone(),
@@ -145,8 +172,16 @@ impl HolochainP2pCellT2 for PassThroughNetwork {
         }
         Ok(out)
     }
+
+    async fn authority_for_hash(
+        &mut self,
+        _dht_hash: holo_hash::AnyDhtHash,
+    ) -> actor::HolochainP2pResult<bool> {
+        Ok(self.authority)
+    }
 }
 
+#[derive(Debug)]
 pub struct EntryTestData {
     pub store_entry_op: DhtOpHashed,
     pub wire_create: WireDhtOp,
@@ -166,7 +201,8 @@ impl EntryTestData {
         let mut create = fixt!(Create);
         let mut update = fixt!(Update);
         let mut delete = fixt!(Delete);
-        let entry = fixt!(Entry);
+        let entry = fixt!(AppEntryBytes);
+        let entry = Entry::App(entry);
         let entry_hash = EntryHash::with_data_sync(&entry);
         create.entry_hash = entry_hash.clone();
 
@@ -195,6 +231,7 @@ impl EntryTestData {
             op_type: store_entry_op.as_content().get_type(),
             header: create_header.clone(),
             signature: signature.clone(),
+            validation_status: None,
         };
 
         let signature = fixt!(Signature);
@@ -206,6 +243,7 @@ impl EntryTestData {
             op_type: delete_entry_header_op.as_content().get_type(),
             header: delete_header.clone(),
             signature: signature.clone(),
+            validation_status: None,
         };
 
         let signature = fixt!(Signature);
@@ -218,6 +256,7 @@ impl EntryTestData {
             op_type: update_content_op.as_content().get_type(),
             header: update_header.clone(),
             signature: signature.clone(),
+            validation_status: None,
         };
 
         Self {
@@ -240,7 +279,21 @@ pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit(|txn| {
+            let hash = op.as_hash().clone();
             insert_op(txn, op, false);
+            update_op_validation_status(txn, hash, ValidationStatus::Valid);
+            DatabaseResult::Ok(())
+        })
+        .unwrap();
+}
+
+pub fn fill_db_rejected(env: &EnvWrite, op: DhtOpHashed) {
+    env.conn()
+        .unwrap()
+        .with_commit(|txn| {
+            let hash = op.as_hash().clone();
+            insert_op(txn, op, false);
+            update_op_validation_status(txn, hash, ValidationStatus::Rejected);
             DatabaseResult::Ok(())
         })
         .unwrap();
@@ -305,5 +358,12 @@ impl HolochainP2pCellT2 for MockNetwork {
             .await
             .get_agent_activity(agent, query, options)
             .await
+    }
+
+    async fn authority_for_hash(
+        &mut self,
+        dht_hash: holo_hash::AnyDhtHash,
+    ) -> actor::HolochainP2pResult<bool> {
+        self.0.lock().await.authority_for_hash(dht_hash).await
     }
 }

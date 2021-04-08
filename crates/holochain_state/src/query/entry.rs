@@ -27,16 +27,20 @@ impl Query for GetEntryQuery {
             WHERE DhtOp.type = :store_entry
             AND
             DhtOp.basis_hash = :entry_hash
+            AND
+            DhtOp.validation_status = :status
         "
     }
 
     fn delete_query(&self) -> &str {
         "
-        SELECT Header.blob AS header_blob FROM DhtOp
-        JOIN Header On DhtOp.header_hash = Header.hash
-        WHERE DhtOp.type = :delete
-        AND
-        DhtOp.basis_hash = :entry_hash
+            SELECT Header.blob AS header_blob FROM DhtOp
+            JOIN Header On DhtOp.header_hash = Header.hash
+            WHERE DhtOp.type = :delete
+            AND
+            DhtOp.basis_hash = :entry_hash
+            AND
+            DhtOp.validation_status = :status
         "
     }
 
@@ -44,6 +48,7 @@ impl Query for GetEntryQuery {
         let params = named_params! {
             ":store_entry": DhtOpType::StoreEntry,
             ":entry_hash": self.0,
+            ":status": ValidationStatus::Valid,
         };
         params.to_vec()
     }
@@ -52,6 +57,7 @@ impl Query for GetEntryQuery {
         let params = named_params! {
             ":delete": DhtOpType::RegisterDeletedEntryHeader,
             ":entry_hash": self.0,
+            ":status": ValidationStatus::Valid,
         };
         params.to_vec()
     }

@@ -44,6 +44,7 @@ pub mod metadata;
 #[allow(missing_docs)]
 pub mod prelude;
 pub mod query;
+pub mod scratch;
 #[allow(missing_docs)]
 pub mod source_chain;
 pub mod validation_db;

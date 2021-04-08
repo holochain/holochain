@@ -84,7 +84,7 @@ mod tests {
     use super::*;
     use crate::insert::{insert_header, insert_op_lite};
     use ::fixt::prelude::*;
-    use holochain_sqlite::{schema::SCHEMA_CELL, scratch::Scratch};
+    use holochain_sqlite::schema::SCHEMA_CELL;
     use holochain_types::dht_op::DhtOpLight;
 
     #[test]
@@ -141,7 +141,7 @@ mod tests {
         // It's also totally invalid for a call_zome scratch to contain headers
         // from other authors, but it doesn't matter here
         for shh in &shhs[6..] {
-            scratch.add_item(shh.clone().into());
+            scratch.add_header(shh.clone().into());
         }
 
         let query = ChainHeadQuery::new(author);

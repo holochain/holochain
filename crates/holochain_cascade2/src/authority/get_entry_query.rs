@@ -7,6 +7,7 @@ use holochain_zome_types::Entry;
 use holochain_zome_types::Header;
 use holochain_zome_types::Signature;
 use holochain_zome_types::SignedHeader;
+use holochain_zome_types::ValidationStatus;
 
 #[derive(Debug, Clone)]
 pub struct GetEntryOpsQuery(EntryHash);
@@ -39,6 +40,7 @@ impl WireEntryOps {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct WireDhtOp {
+    pub validation_status: Option<ValidationStatus>,
     pub op_type: DhtOpType,
     pub header: Header,
     pub signature: Signature,
@@ -51,7 +53,8 @@ impl Query for GetEntryOpsQuery {
 
     fn create_query(&self) -> &str {
         "
-        SELECT Header.blob AS header_blob, DhtOp.type AS dht_type
+        SELECT Header.blob AS header_blob, DhtOp.type AS dht_type,
+        DhtOp.validation_status AS status
         FROM DhtOp
         JOIN Header On DhtOp.header_hash = Header.hash
         WHERE DhtOp.type = :store_entry
@@ -62,7 +65,8 @@ impl Query for GetEntryOpsQuery {
 
     fn delete_query(&self) -> &str {
         "
-        SELECT Header.blob AS header_blob, DhtOp.type AS dht_type
+        SELECT Header.blob AS header_blob, DhtOp.type AS dht_type,
+        DhtOp.validation_status AS status
         FROM DhtOp
         JOIN Header On DhtOp.header_hash = Header.hash
         WHERE DhtOp.type = :delete
@@ -73,7 +77,8 @@ impl Query for GetEntryOpsQuery {
 
     fn update_query(&self) -> &str {
         "
-        SELECT Header.blob AS header_blob, DhtOp.type AS dht_type
+        SELECT Header.blob AS header_blob, DhtOp.type AS dht_type,
+        DhtOp.validation_status AS status
         FROM DhtOp
         JOIN Header On DhtOp.header_hash = Header.hash
         WHERE DhtOp.type = :update
@@ -111,7 +116,9 @@ impl Query for GetEntryOpsQuery {
             let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
             let SignedHeader(header, signature) = header;
             let op_type = row.get(row.column_index("dht_type")?)?;
+            let validation_status = row.get(row.column_index("status")?)?;
             Ok(WireDhtOp {
+                validation_status,
                 op_type,
                 header,
                 signature,

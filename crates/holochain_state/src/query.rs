@@ -1,3 +1,5 @@
+use crate::scratch::FilteredScratch;
+use crate::scratch::Scratch;
 use fallible_iterator::FallibleIterator;
 use holo_hash::hash_type::AnyDht;
 use holo_hash::AnyDhtHash;
@@ -8,8 +10,6 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_sqlite::scratch::FilteredScratch;
-use holochain_sqlite::scratch::Scratch;
 use holochain_zome_types::Entry;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::SignedHeader;
@@ -276,20 +276,6 @@ where
     }
 }
 
-impl Store for Scratch {
-    fn get_entry(&self, _hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
-        todo!()
-    }
-
-    fn contains_entry(&self, hash: &EntryHash) -> StateQueryResult<bool> {
-        Ok(self.contains_entry(hash))
-    }
-
-    fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
-        Ok(self.contains_header(hash))
-    }
-}
-
 impl StoresIter<SignedHeaderHashed> for FilteredScratch {
     fn iter(&mut self) -> StateQueryResult<StmtIter<'_, SignedHeaderHashed>> {
         Ok(Box::new(fallible_iterator::convert(
@@ -325,7 +311,7 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
     fn contains_entry(&self, hash: &EntryHash) -> StateQueryResult<bool> {
         let r = self.txns.contains_entry(hash)?;
         if !r {
-            Ok(self.scratch.contains_entry(hash))
+            self.scratch.contains_entry(hash)
         } else {
             Ok(r)
         }
@@ -334,7 +320,7 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
     fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
         let r = self.txns.contains_header(hash)?;
         if !r {
-            Ok(self.scratch.contains_header(hash))
+            self.scratch.contains_header(hash)
         } else {
             Ok(r)
         }

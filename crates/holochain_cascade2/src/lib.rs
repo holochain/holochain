@@ -16,11 +16,13 @@ use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_sqlite::scratch::Scratch;
+use holochain_state::insert::update_op_validation_status;
 use holochain_state::prelude::*;
 use holochain_state::query::entry::GetEntryQuery;
 use holochain_state::query::prelude::*;
+use holochain_state::query::DbScratch;
 use holochain_state::query::StateQueryError;
+use holochain_state::scratch::Scratch;
 use holochain_types::prelude::*;
 use insert::insert_entry;
 use insert::insert_header;
@@ -69,7 +71,7 @@ impl<Network> Cascade<Network>
 where
     Network: HolochainP2pCellT2 + Clone + 'static + Send,
 {
-    /// Constructs a [Cascade]
+    /// Constructs an empty [Cascade].
     pub fn empty() -> Self {
         Self {
             vault: None,
@@ -79,7 +81,7 @@ where
         }
     }
 
-    /// Constructs a [Cascade]
+    /// Add the vault to the cascade.
     pub fn with_vault(self, vault: EnvRead) -> Self {
         Self {
             vault: Some(vault),
@@ -87,7 +89,26 @@ where
         }
     }
 
-    /// Add the network to the cascade
+    /// Add the cache to the cascade.
+    // TODO: We do want to be able to use the cache without
+    // the network but we always need a cache when we have a
+    // network. Perhaps this can be proven at the type level?
+    pub fn with_cache(self, cache: EnvWrite) -> Self {
+        Self {
+            cache: Some(cache),
+            ..self
+        }
+    }
+
+    /// Add the cache to the cascade.
+    pub fn with_scratch(self, scratch: Scratch) -> Self {
+        Self {
+            scratch: Some(scratch),
+            ..self
+        }
+    }
+
+    /// Add the network and cache to the cascade.
     pub fn with_network<N: HolochainP2pCellT2 + Clone>(
         self,
         network: N,
@@ -111,6 +132,7 @@ where
             op_type,
             header,
             signature,
+            validation_status,
         } = wire_op;
         let (header, op_hash) = UniqueForm::op_hash(op_type, header)?;
         let header_hashed = HeaderHashed::from_content_sync(header);
@@ -123,8 +145,21 @@ where
         )?;
 
         insert_header(txn, header_hashed);
-        insert_op_lite(txn, op_light, op_hash, false);
+        insert_op_lite(txn, op_light, op_hash.clone(), false);
+        if let Some(status) = validation_status {
+            update_op_validation_status(txn, op_hash, status);
+        }
         Ok(())
+    }
+
+    fn verify_entry_hash(
+        header_entry_hash: Option<&EntryHash>,
+        entry_hash: &Option<EntryHash>,
+    ) -> bool {
+        match (header_entry_hash, entry_hash) {
+            (Some(a), Some(b)) => a == b,
+            _ => true,
+        }
     }
 
     fn merge_entry_ops_into_cache(&mut self, response: WireEntryOps) -> CascadeResult<()> {
@@ -136,12 +171,24 @@ where
             entry,
         } = response;
         cache.conn()?.with_commit(|txn| {
+            let mut entry_hash = None;
+
             if let Some(entry) = entry {
                 let entry_hashed = EntryHashed::from_content_sync(entry);
+                entry_hash = Some(entry_hashed.as_hash().clone());
                 insert_entry(txn, entry_hashed);
             }
+            // Do we need to be able to handle creates without an entry.
+            // I think we do because we might already have the entry.
             for op in creates {
-                Self::insert_wire_op(txn, op)?;
+                if Self::verify_entry_hash(op.header.entry_hash(), &entry_hash) {
+                    Self::insert_wire_op(txn, op)?;
+                } else {
+                    tracing::info!(
+                        "Store entry op {:?} from the network entry hash does not match the header",
+                        op
+                    );
+                }
             }
             for op in updates {
                 Self::insert_wire_op(txn, op)?;
@@ -203,27 +250,10 @@ where
         todo!("I'm guessing we can remove this function")
     }
 
-    #[instrument(skip(self, _options))]
-    pub async fn get_entry_details(
-        &mut self,
-        _entry_hash: EntryHash,
-        _options: GetOptions,
-    ) -> CascadeResult<Option<EntryDetails>> {
-        todo!()
-    }
-
-    #[instrument(skip(self, options))]
-    /// Returns the oldest live [Element] for this [EntryHash] by getting the
-    /// latest available metadata from authorities combined with this agents authored data.
-    pub async fn dht_get_entry(
-        &mut self,
-        entry_hash: EntryHash,
-        options: GetOptions,
-    ) -> CascadeResult<Option<Element>> {
-        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
-        self.fetch_element_via_entry(entry_hash.clone(), options.into())
-            .await?;
-        let query = GetEntryQuery::new(entry_hash);
+    fn cascading<Q>(&mut self, query: Q) -> CascadeResult<Q::Output>
+    where
+        Q: Query<Data = SignedHeaderHashed>,
+    {
         let mut conns = Vec::new();
         let mut txns = Vec::new();
         if let Some(cache) = &mut self.cache {
@@ -237,7 +267,10 @@ where
             txns.push(txn);
         }
         let txns_ref: Vec<_> = txns.iter().collect();
-        let results = query.run(Txns::from(&txns_ref[..]))?;
+        let results = match &self.scratch {
+            Some(scratch) => query.run(DbScratch::new(&txns_ref, scratch))?,
+            None => query.run(Txns::from(&txns_ref[..]))?,
+        };
         Ok(results)
     }
 
@@ -334,6 +367,53 @@ where
         _options: NetworkGetOptions,
     ) -> CascadeResult<Option<Element>> {
         todo!()
+    }
+
+    #[instrument(skip(self, _options))]
+    pub async fn get_entry_details(
+        &mut self,
+        _entry_hash: EntryHash,
+        _options: GetOptions,
+    ) -> CascadeResult<Option<EntryDetails>> {
+        todo!()
+    }
+
+    #[instrument(skip(self, options))]
+    /// Returns the oldest live [Element] for this [EntryHash] by getting the
+    /// latest available metadata from authorities combined with this agents authored data.
+    pub async fn dht_get_entry(
+        &mut self,
+        entry_hash: EntryHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<Element>> {
+        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
+        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
+        let query = GetEntryQuery::new(entry_hash.clone());
+
+        // We don't need metadata and only need the content
+        // so if we have it locally then we can avoid the network.
+        if let GetStrategy::Content = options.strategy {
+            let results = self.cascading(query.clone())?;
+            // We got a result so can short circuit.
+            if results.is_some() {
+                return Ok(results);
+            // We didn't get a result so if we are either authoring
+            // or the authority there's nothing left to do.
+            } else if authoring || authority {
+                return Ok(None);
+            }
+        }
+
+        // If we are not in the process of authoring this hash and we are not the
+        // authority we can skip the network call.
+        if !authoring && !authority {
+            self.fetch_element_via_entry(entry_hash, options.into())
+                .await?;
+        }
+
+        // Check if we have the data now after the network call.
+        let results = self.cascading(query)?;
+        Ok(results)
     }
 
     #[instrument(skip(self))]
@@ -434,10 +514,11 @@ where
 
     fn am_i_authoring(&mut self, hash: &AnyDhtHash) -> CascadeResult<bool> {
         let scratch = ok_or_return!(self.scratch.as_ref(), false);
-        Ok(scratch.contains_hash(hash))
+        Ok(scratch.contains_hash(hash)?)
     }
 
-    async fn _am_i_an_authority(&mut self, _hash: AnyDhtHash) -> CascadeResult<bool> {
-        todo!()
+    async fn am_i_an_authority(&mut self, hash: AnyDhtHash) -> CascadeResult<bool> {
+        let network = ok_or_return!(self.network.as_mut(), false);
+        Ok(network.authority_for_hash(hash).await?)
     }
 }

@@ -2,11 +2,11 @@
 // yet and these functions are currently only used in tests. Feel free to change the name.
 
 use crate::query::to_blob;
+use crate::scratch::Scratch;
 use holo_hash::*;
 use holochain_sqlite::impl_to_sql_via_display;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_sqlite::scratch::Scratch;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::EntryHashed;
@@ -32,13 +32,13 @@ pub fn insert_op_scratch(scratch: &mut Scratch, op: DhtOpHashed) {
     let header = op.header();
     let signature = op.signature().clone();
     if let Some(entry) = op.entry() {
-        let _entry_hashed =
+        let entry_hashed =
             EntryHashed::with_pre_hashed(entry.clone(), header.entry_hash().unwrap().clone());
-        // TODO: Should we store the entry somewhere?
+        scratch.add_entry(entry_hashed);
     }
     let header_hashed = HeaderHashed::with_pre_hashed(header, op_light.header_hash().to_owned());
     let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
-    scratch.add_item(header_hashed);
+    scratch.add_header(header_hashed);
 }
 
 pub fn insert_op(txn: &mut Transaction, op: DhtOpHashed, is_authored: bool) {
