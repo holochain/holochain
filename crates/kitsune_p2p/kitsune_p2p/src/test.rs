@@ -10,6 +10,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_transport_coms() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
+        observability::metrics::init();
         let (harness, _evt) = spawn_test_harness_mem().await?;
 
         let space = harness.add_space().await?;

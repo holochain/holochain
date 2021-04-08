@@ -109,6 +109,12 @@ kitsune_p2p_types::write_codec_enum! {
 
 pub(crate) type DiscriminantMap =
     std::collections::HashMap<std::mem::Discriminant<wire::Wire>, crate::metrics::KitsuneMetrics>;
+
+/// This is used to map wire types to the KitsuneMetrics enum type.
+/// Unfortunately, the only way to get a discriminant for a variant
+/// is to have an actual variant instance. This lazy represents
+/// a first-access one-time cost of creating dummy variants
+/// to generate the discriminants.
 pub(crate) static DISC_MAP: Lazy<DiscriminantMap> = Lazy::new(|| {
     use crate::metrics::KitsuneMetrics;
     let mut map = std::collections::HashMap::new();
