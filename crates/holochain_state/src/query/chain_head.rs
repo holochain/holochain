@@ -75,7 +75,7 @@ impl Query for ChainHeadQuery {
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
-        Arc::new(row_to_header("blob", "hash"))
+        Arc::new(row_blob_and_hash_to_header("blob", "hash"))
     }
 }
 

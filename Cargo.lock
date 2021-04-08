@@ -2039,6 +2039,7 @@ dependencies = [
  "observability",
  "rand 0.7.3",
  "regex",
+ "rusqlite",
  "serde",
  "serde_bytes",
  "serde_derive",

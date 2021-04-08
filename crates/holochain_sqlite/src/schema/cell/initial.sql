@@ -2,7 +2,8 @@
 
 CREATE TABLE Entry (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
-    type             VARCHAR(64)    NOT NULL,
+    -- might not need this index, let's avoid for now
+    -- type             VARCHAR(64)    NOT NULL,
 
     blob             BLOB           NOT NULL,
 
@@ -34,7 +35,7 @@ CREATE TABLE Header (
 
     -- Create / Update
     entry_hash       BLOB           NULL,
-    entry_type       VARCHAR(64)    NULL,
+    entry_type       VARCHAR(64)    NULL,  -- The opaque EntryType
 
     -- Update
     original_entry_hash   BLOB      NULL,
@@ -100,3 +101,4 @@ CREATE TABLE DhtOp (
     FOREIGN KEY(header_hash) REFERENCES Header(hash)
 );
 CREATE INDEX DhtOp_type_idx ON DhtOp ( type );
+-- CREATE INDEX DhtOp_basis_hash_idx ON DhtOp ( basis_hash );

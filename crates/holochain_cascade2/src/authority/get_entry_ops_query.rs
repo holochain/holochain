@@ -57,55 +57,16 @@ impl Query for GetEntryOpsQuery {
         DhtOp.validation_status AS status
         FROM DhtOp
         JOIN Header On DhtOp.header_hash = Header.hash
-        WHERE DhtOp.type = :store_entry
-        AND
-        DhtOp.basis_hash = :entry_hash
-        "
-    }
-
-    fn delete_query(&self) -> &str {
-        "
-        SELECT Header.blob AS header_blob, DhtOp.type AS dht_type,
-        DhtOp.validation_status AS status
-        FROM DhtOp
-        JOIN Header On DhtOp.header_hash = Header.hash
-        WHERE DhtOp.type = :delete
-        AND
-        DhtOp.basis_hash = :entry_hash
-        "
-    }
-
-    fn update_query(&self) -> &str {
-        "
-        SELECT Header.blob AS header_blob, DhtOp.type AS dht_type,
-        DhtOp.validation_status AS status
-        FROM DhtOp
-        JOIN Header On DhtOp.header_hash = Header.hash
-        WHERE DhtOp.type = :update
-        AND
-        DhtOp.basis_hash = :entry_hash
+        WHERE DhtOp.type IN (:create_type, :delete_type, :update_type)
+        AND DhtOp.basis_hash = :entry_hash
         "
     }
 
     fn create_params(&self) -> Vec<Params> {
         let params = named_params! {
-            ":store_entry": DhtOpType::StoreEntry,
-            ":entry_hash": self.0,
-        };
-        params.to_vec()
-    }
-
-    fn delete_params(&self) -> Vec<Params> {
-        let params = named_params! {
-            ":delete": DhtOpType::RegisterDeletedEntryHeader,
-            ":entry_hash": self.0,
-        };
-        params.to_vec()
-    }
-
-    fn update_params(&self) -> Vec<Params> {
-        let params = named_params! {
-            ":update": DhtOpType::RegisterUpdatedContent,
+            ":create_type": DhtOpType::StoreEntry,
+            ":delete_type": DhtOpType::RegisterDeletedEntryHeader,
+            ":update_type": DhtOpType::RegisterUpdatedContent,
             ":entry_hash": self.0,
         };
         params.to_vec()

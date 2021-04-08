@@ -439,25 +439,25 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
     }
 }
 
-pub(crate) fn row_to_header(
-    index: &'static str,
-    hash: &'static str,
+pub fn row_blob_and_hash_to_header(
+    blob_index: &'static str,
+    hash_index: &'static str,
 ) -> impl Fn(&Row) -> StateQueryResult<SignedHeaderHashed> {
     move |row| {
-        let header = from_blob::<SignedHeader>(row.get(row.column_index(index)?)?);
+        let header = from_blob::<SignedHeader>(row.get(row.column_index(blob_index)?)?);
         let SignedHeader(header, signature) = header;
-        let hash: HeaderHash = row.get(row.column_index(hash)?)?;
+        let hash: HeaderHash = row.get(row.column_index(hash_index)?)?;
         let header = HeaderHashed::with_pre_hashed(header, hash);
         let shh = SignedHeaderHashed::with_presigned(header, signature);
         Ok(shh)
     }
 }
 
-pub(crate) fn row_to_signed_header(
-    index: &'static str,
+pub fn row_blob_to_header(
+    blob_index: &'static str,
 ) -> impl Fn(&Row) -> StateQueryResult<SignedHeaderHashed> {
     move |row| {
-        let header = from_blob::<SignedHeader>(row.get(row.column_index(index)?)?);
+        let header = from_blob::<SignedHeader>(row.get(row.column_index(blob_index)?)?);
         let SignedHeader(header, signature) = header;
         let header = HeaderHashed::from_content_sync(header);
         let shh = SignedHeaderHashed::with_presigned(header, signature);

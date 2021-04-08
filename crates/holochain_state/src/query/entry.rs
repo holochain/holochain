@@ -63,7 +63,7 @@ impl Query for GetEntryQuery {
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
-        Arc::new(row_to_signed_header("header_blob"))
+        Arc::new(row_blob_to_header("header_blob"))
     }
 
     fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {

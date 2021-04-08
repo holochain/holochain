@@ -1,4 +1,4 @@
-use self::get_entry_query::GetEntryOpsQuery;
+use self::get_entry_ops_query::GetEntryOpsQuery;
 
 use super::error::CascadeResult;
 use holo_hash::AgentPubKey;
@@ -9,13 +9,14 @@ use holochain_state::query::Txn;
 use holochain_types::prelude::*;
 use tracing::*;
 
-pub use get_entry_query::WireDhtOp;
-pub use get_entry_query::WireEntryOps;
+pub use get_entry_ops_query::WireDhtOp;
+pub use get_entry_ops_query::WireEntryOps;
 
 #[cfg(test)]
 mod test;
 
-mod get_entry_query;
+mod get_agent_activity_query;
+mod get_entry_ops_query;
 
 #[instrument(skip(state_env))]
 pub fn handle_get_entry(
@@ -35,14 +36,19 @@ pub fn handle_get_element(_env: EnvRead, _hash: HeaderHash) -> CascadeResult<Get
     todo!()
 }
 
-#[instrument(skip(_env))]
+#[instrument(skip(env))]
 pub fn handle_get_agent_activity(
-    _env: EnvRead,
-    _agent: AgentPubKey,
-    _query: ChainQueryFilter,
-    _options: holochain_p2p::event::GetActivityOptions,
+    env: EnvRead,
+    agent: AgentPubKey,
+    filter: ChainQueryFilter,
+    options: holochain_p2p::event::GetActivityOptions,
 ) -> CascadeResult<AgentActivityResponse> {
     todo!()
+    // let query = GetAgentActivityQuery::new(agent, filter, options);
+    // let results = state_env
+    //     .conn()?
+    //     .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;
+    // Ok(results)
 }
 
 #[instrument(skip(_env, _options))]
