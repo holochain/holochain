@@ -22,12 +22,15 @@ use std::sync::Arc;
 pub use error::*;
 
 #[cfg(test)]
+mod test_data;
+#[cfg(test)]
 mod tests;
 
 pub mod chain_head;
-pub mod entry;
 pub mod error;
 pub mod link;
+pub mod live_element;
+pub mod live_entry;
 
 pub mod prelude {
     pub use super::from_blob;
@@ -73,22 +76,10 @@ pub trait Query: Clone {
     type Data: Clone;
     type Output;
 
-    fn create_query(&self) -> &str {
+    fn query(&self) -> &str {
         ""
     }
-    fn delete_query(&self) -> &str {
-        ""
-    }
-    fn update_query(&self) -> &str {
-        ""
-    }
-    fn create_params(&self) -> Vec<Params> {
-        Vec::with_capacity(0)
-    }
-    fn delete_params(&self) -> Vec<Params> {
-        Vec::with_capacity(0)
-    }
-    fn update_params(&self) -> Vec<Params> {
+    fn params(&self) -> Vec<Params> {
         Vec::with_capacity(0)
     }
     fn init_fold(&self) -> StateQueryResult<Self::State>;
@@ -372,9 +363,7 @@ pub struct QueryStmts<'stmt, Q: Query> {
 /// those steps, so we have to hold on to the statements rather than letting
 /// them drop as temporary values.
 pub struct QueryStmt<'stmt, Q: Query> {
-    create_stmt: Option<Statement<'stmt>>,
-    delete_stmt: Option<Statement<'stmt>>,
-    update_stmt: Option<Statement<'stmt>>,
+    stmt: Option<Statement<'stmt>>,
     query: Q,
 }
 
@@ -389,35 +378,14 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
                 StateQueryResult::Ok(Some(txn.prepare(q)?))
             }
         };
-        let create_stmt = new_stmt(query.create_query())?;
-        let delete_stmt = new_stmt(query.delete_query())?;
-        let update_stmt = new_stmt(query.update_query())?;
+        let stmt = new_stmt(query.query())?;
 
-        Ok(Self {
-            create_stmt,
-            delete_stmt,
-            update_stmt,
-            query,
-        })
+        Ok(Self { stmt, query })
     }
     fn iter(&'iter mut self) -> StateQueryResult<StmtIter<'iter, Q::Data>> {
         let map_fn = self.query.as_map();
-        let creates = Self::new_iter(
-            &self.query.create_params(),
-            self.create_stmt.as_mut(),
-            map_fn.clone(),
-        )?;
-        let deletes = Self::new_iter(
-            &self.query.delete_params(),
-            self.delete_stmt.as_mut(),
-            map_fn.clone(),
-        )?;
-        let updates = Self::new_iter(
-            &self.query.update_params(),
-            self.update_stmt.as_mut(),
-            map_fn.clone(),
-        )?;
-        Ok(Box::new(creates.chain(deletes).chain(updates)))
+        let iter = Self::new_iter(&self.query.params(), self.stmt.as_mut(), map_fn.clone())?;
+        Ok(Box::new(iter))
     }
 
     fn new_iter<T: 'iter>(

@@ -1,40 +1,35 @@
-use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_state::query::prelude::*;
 use holochain_types::dht_op::DhtOpType;
 use holochain_zome_types::Entry;
-use holochain_zome_types::Header;
-use holochain_zome_types::Signature;
 use holochain_zome_types::SignedHeader;
-use holochain_zome_types::ValidationStatus;
+
+use super::WireDhtOp;
 
 #[derive(Debug, Clone)]
-pub struct GetEntryOpsQuery(EntryHash);
+pub struct GetElementOpsQuery(HeaderHash);
 
-impl GetEntryOpsQuery {
-    pub fn new(hash: EntryHash) -> Self {
+impl GetElementOpsQuery {
+    pub fn new(hash: HeaderHash) -> Self {
         Self(hash)
     }
 }
 
 // TODO: Move this to holochain types.
-// TODO: This currently looks the same as
-// [`WireElementOps`] but there are more things
-// we can condense on entry ops due to sharing the
-// same entry hash.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct WireEntryOps {
-    pub creates: Vec<WireDhtOp>,
+pub struct WireElementOps {
+    pub header: Option<WireDhtOp>,
     pub deletes: Vec<WireDhtOp>,
     pub updates: Vec<WireDhtOp>,
     pub entry: Option<Entry>,
 }
 
-impl WireEntryOps {
+impl WireElementOps {
     pub fn new() -> Self {
         Self {
-            creates: Vec::new(),
+            header: None,
             deletes: Vec::new(),
             updates: Vec::new(),
             entry: None,
@@ -42,17 +37,9 @@ impl WireEntryOps {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct WireDhtOp {
-    pub validation_status: Option<ValidationStatus>,
-    pub op_type: DhtOpType,
-    pub header: Header,
-    pub signature: Signature,
-}
-
-impl Query for GetEntryOpsQuery {
+impl Query for GetElementOpsQuery {
     type Data = WireDhtOp;
-    type State = WireEntryOps;
+    type State = WireElementOps;
     type Output = Self::State;
 
     fn query(&self) -> &str {
@@ -61,18 +48,18 @@ impl Query for GetEntryOpsQuery {
         DhtOp.validation_status AS status
         FROM DhtOp
         JOIN Header On DhtOp.header_hash = Header.hash
-        WHERE DhtOp.type IN (:store_entry, :delete, :update)
+        WHERE DhtOp.type IN (:store_element, :delete, :update)
         AND
-        DhtOp.basis_hash = :entry_hash
+        DhtOp.basis_hash = :header_hash
         "
     }
 
     fn params(&self) -> Vec<Params> {
         let params = named_params! {
-            ":store_entry": DhtOpType::StoreEntry,
-            ":delete": DhtOpType::RegisterDeletedEntryHeader,
-            ":update": DhtOpType::RegisterUpdatedContent,
-            ":entry_hash": self.0,
+            ":store_element": DhtOpType::StoreElement,
+            ":delete": DhtOpType::RegisterDeletedBy,
+            ":update": DhtOpType::RegisterUpdatedElement,
+            ":header_hash": self.0,
         };
         params.to_vec()
     }
@@ -94,18 +81,22 @@ impl Query for GetEntryOpsQuery {
     }
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {
-        Ok(WireEntryOps::new())
+        Ok(WireElementOps::new())
     }
 
     fn fold(&self, mut state: Self::State, dht_op: Self::Data) -> StateQueryResult<Self::State> {
         match &dht_op.op_type {
-            DhtOpType::StoreEntry => {
-                state.creates.push(dht_op);
+            DhtOpType::StoreElement => {
+                if state.header.is_none() {
+                    state.header = Some(dht_op);
+                } else {
+                    // TODO: This is weird there are multiple store elements ops for the same header??
+                }
             }
-            DhtOpType::RegisterDeletedEntryHeader => {
+            DhtOpType::RegisterDeletedBy => {
                 state.deletes.push(dht_op);
             }
-            DhtOpType::RegisterUpdatedContent => {
+            DhtOpType::RegisterUpdatedElement => {
                 state.updates.push(dht_op);
             }
             _ => panic!("TODO: Turn this into an error"),
@@ -117,11 +108,10 @@ impl Query for GetEntryOpsQuery {
     where
         S: Store,
     {
-        // TODO: Handle error where header is missing entry hash.
         let entry_hash = state
-            .creates
-            .first()
-            .map(|wire_op| wire_op.header.entry_hash().unwrap());
+            .header
+            .as_ref()
+            .and_then(|wire_op| wire_op.header.entry_hash());
         if let Some(entry_hash) = entry_hash {
             let entry = stores.get_entry(entry_hash)?;
             state.entry = entry;

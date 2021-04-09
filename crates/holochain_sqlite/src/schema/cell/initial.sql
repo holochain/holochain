@@ -62,12 +62,14 @@ CREATE TABLE Header (
     -- OpenChain / CloseChain
     prev_dna_hash    BLOB           NULL,
 
-    FOREIGN KEY(entry_hash) REFERENCES Entry(hash),
-    FOREIGN KEY(original_entry_hash) REFERENCES Entry(hash),
+    FOREIGN KEY(entry_hash) REFERENCES Entry(hash)
+    -- We can't have any of these constraint because 
+    -- the element authority doesn't get the create link for a remove link. @freesig
+    -- FOREIGN KEY(original_entry_hash) REFERENCES Entry(hash),
     -- FOREIGN KEY(original_header_hash) REFERENCES Header(hash),
-    FOREIGN KEY(deletes_entry_hash) REFERENCES Entry(hash),
+    -- FOREIGN KEY(deletes_entry_hash) REFERENCES Entry(hash)
     -- FOREIGN KEY(deletes_header_hash) REFERENCES Header(hash),
-    FOREIGN KEY(create_link_hash) REFERENCES Header(hash)
+    -- FOREIGN KEY(create_link_hash) REFERENCES Header(hash)
 );
 CREATE INDEX Header_type_idx ON Header ( type );
 CREATE INDEX Header_author ON Header ( author );

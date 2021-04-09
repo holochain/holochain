@@ -6,58 +6,41 @@ use std::fmt::Debug;
 
 use super::*;
 
-#[derive(Debug, Clone)]
-pub struct GetEntryQuery(EntryHash);
+#[cfg(test)]
+mod test;
 
-impl GetEntryQuery {
+#[derive(Debug, Clone)]
+pub struct GetLiveEntryQuery(EntryHash);
+
+impl GetLiveEntryQuery {
     pub fn new(hash: EntryHash) -> Self {
         Self(hash)
     }
 }
 
-impl Query for GetEntryQuery {
+impl Query for GetLiveEntryQuery {
     type Data = SignedHeaderHashed;
     type State = Maps<SignedHeaderHashed>;
     type Output = Option<Element>;
 
-    fn create_query(&self) -> &str {
+    fn query(&self) -> &str {
         "
-            SELECT Header.blob AS header_blob FROM DhtOp
-            JOIN Header On DhtOp.header_hash = Header.hash
-            WHERE DhtOp.type = :store_entry
-            AND
-            DhtOp.basis_hash = :entry_hash
-            AND
-            DhtOp.validation_status = :status
-        "
-    }
-
-    fn delete_query(&self) -> &str {
-        "
-            SELECT Header.blob AS header_blob FROM DhtOp
-            JOIN Header On DhtOp.header_hash = Header.hash
-            WHERE DhtOp.type = :delete
-            AND
-            DhtOp.basis_hash = :entry_hash
-            AND
-            DhtOp.validation_status = :status
+                    
+        SELECT Header.blob AS header_blob
+        FROM DhtOp
+        JOIN Header On DhtOp.header_hash = Header.hash
+        WHERE DhtOp.type IN (:create_type, :delete_type, :update_type)
+        AND DhtOp.basis_hash = :entry_hash
+        AND DhtOp.validation_status = :status
         "
     }
-
-    fn create_params(&self) -> Vec<Params> {
+    fn params(&self) -> Vec<Params> {
         let params = named_params! {
-            ":store_entry": DhtOpType::StoreEntry,
-            ":entry_hash": self.0,
+            ":create_type": DhtOpType::StoreEntry,
+            ":delete_type": DhtOpType::RegisterDeletedEntryHeader,
+            ":update_type": DhtOpType::RegisterUpdatedContent,
             ":status": ValidationStatus::Valid,
-        };
-        params.to_vec()
-    }
-
-    fn delete_params(&self) -> Vec<Params> {
-        let params = named_params! {
-            ":delete": DhtOpType::RegisterDeletedEntryHeader,
             ":entry_hash": self.0,
-            ":status": ValidationStatus::Valid,
         };
         params.to_vec()
     }
@@ -69,7 +52,8 @@ impl Query for GetEntryQuery {
     fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {
         let entry_filter = self.0.clone();
         let f = move |header: &SignedHeaderHashed| match header.header() {
-            Header::Create(Create { entry_hash, .. }) => *entry_hash == entry_filter,
+            Header::Create(Create { entry_hash, .. })
+            | Header::Update(Update { entry_hash, .. }) => *entry_hash == entry_filter,
             Header::Delete(Delete {
                 deletes_entry_address,
                 ..
@@ -93,6 +77,22 @@ impl Query for GetEntryQuery {
             Header::Create(_) => {
                 if !state.deletes.contains(&hash) {
                     state.creates.insert(hash, shh);
+                }
+            }
+            Header::Update(update) => {
+                if update.original_entry_address == self.0 && update.entry_hash == self.0 {
+                    if !state.deletes.contains(&hash) {
+                        state.creates.insert(hash, shh);
+                    }
+                // TODO: This is where update chains will be followed
+                // when we add that functionality.
+                } else if update.entry_hash == self.0 {
+                    if !state.deletes.contains(&hash) {
+                        state.creates.insert(hash, shh);
+                    }
+                } else if update.original_entry_address == self.0 {
+                    // TODO: This is where update chains will be followed
+                    // when we add that functionality.
                 }
             }
             Header::Delete(delete) => {

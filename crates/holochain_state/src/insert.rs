@@ -172,7 +172,46 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) {
             })
             .unwrap();
         }
-        _ => todo!(),
+        Header::Dna(dna) => {
+            sql_insert!(txn, Header, {
+                "hash": hash,
+                "type": header_type ,
+                "seq": header_seq,
+                "author": author,
+                "blob": to_blob(SignedHeader::from((Header::Dna(dna), signature))),
+            })
+            .unwrap();
+        }
+        Header::AgentValidationPkg(avp) => {
+            sql_insert!(txn, Header, {
+                "hash": hash,
+                "type": header_type ,
+                "seq": header_seq,
+                "author": author,
+                "blob": to_blob(SignedHeader::from((Header::AgentValidationPkg(avp), signature))),
+            })
+            .unwrap();
+        }
+        Header::OpenChain(open) => {
+            sql_insert!(txn, Header, {
+                "hash": hash,
+                "type": header_type ,
+                "seq": header_seq,
+                "author": author,
+                "blob": to_blob(SignedHeader::from((Header::OpenChain(open), signature))),
+            })
+            .unwrap();
+        }
+        Header::CloseChain(close) => {
+            sql_insert!(txn, Header, {
+                "hash": hash,
+                "type": header_type ,
+                "seq": header_seq,
+                "author": author,
+                "blob": to_blob(SignedHeader::from((Header::CloseChain(close), signature))),
+            })
+            .unwrap();
+        }
     }
 }
 
