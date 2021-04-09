@@ -1,5 +1,5 @@
-use std::io::Write;
 use crossterm::ExecutableCommand;
+use std::io::Write;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
@@ -12,10 +12,20 @@ async fn main() {
                 use crossterm::event::Event::*;
                 match crossterm::event::read()? {
                     Key(event) => {
-                        if event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                            if event.code == crossterm::event::KeyCode::Char('c') || event.code == crossterm::event::KeyCode::Char('c') || event.code == crossterm::event::KeyCode::Esc {
-                                stdout.execute(crossterm::cursor::MoveTo(0,0)).unwrap();
-                                stdout.execute(crossterm::terminal::Clear(crossterm::terminal::ClearType::All)).unwrap();
+                        if event
+                            .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL)
+                        {
+                            if event.code == crossterm::event::KeyCode::Char('c')
+                                || event.code == crossterm::event::KeyCode::Char('c')
+                                || event.code == crossterm::event::KeyCode::Esc
+                            {
+                                stdout.execute(crossterm::cursor::MoveTo(0, 0)).unwrap();
+                                stdout
+                                    .execute(crossterm::terminal::Clear(
+                                        crossterm::terminal::ClearType::All,
+                                    ))
+                                    .unwrap();
                                 crossterm::terminal::disable_raw_mode().unwrap();
                                 println!("DONE");
                                 std::process::exit(0);
@@ -33,11 +43,15 @@ async fn main() {
     });
 
     let mut stdout = std::io::stdout();
-    stdout.execute(crossterm::terminal::Clear(crossterm::terminal::ClearType::All)).unwrap();
-    stdout.execute(crossterm::cursor::MoveTo(5,5)).unwrap();
+    stdout
+        .execute(crossterm::terminal::Clear(
+            crossterm::terminal::ClearType::All,
+        ))
+        .unwrap();
+    stdout.execute(crossterm::cursor::MoveTo(5, 5)).unwrap();
     write!(stdout, "{}", "[---------------------------]").unwrap();
     stdout.flush().unwrap();
-    stdout.execute(crossterm::cursor::MoveTo(8,8)).unwrap();
+    stdout.execute(crossterm::cursor::MoveTo(8, 8)).unwrap();
 
     tokio::time::sleep(std::time::Duration::from_secs(20)).await;
 }
