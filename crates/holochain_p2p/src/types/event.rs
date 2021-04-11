@@ -57,6 +57,16 @@ pub struct GetActivityOptions {
     pub include_full_headers: bool,
 }
 
+impl Default for GetActivityOptions {
+    fn default() -> Self {
+        Self {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_full_headers: false,
+        }
+    }
+}
+
 impl From<&actor::GetActivityOptions> for GetActivityOptions {
     fn from(a: &actor::GetActivityOptions) -> Self {
         Self {

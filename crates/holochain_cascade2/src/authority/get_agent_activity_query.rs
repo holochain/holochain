@@ -1,4 +1,5 @@
 use holo_hash::*;
+use holochain_p2p::event::GetActivityOptions;
 use holochain_sqlite::rusqlite::*;
 use holochain_state::{prelude::*, query::row_blob_and_hash_to_header};
 use holochain_zome_types::*;
@@ -10,15 +11,11 @@ use super::*;
 pub struct GetAgentActivityQuery {
     agent: AgentPubKey,
     filter: ChainQueryFilter,
-    options: holochain_p2p::event::GetActivityOptions,
+    options: GetActivityOptions,
 }
 
 impl GetAgentActivityQuery {
-    pub fn new(
-        agent: AgentPubKey,
-        filter: ChainQueryFilter,
-        options: holochain_p2p::event::GetActivityOptions,
-    ) -> Self {
+    pub fn new(agent: AgentPubKey, filter: ChainQueryFilter, options: GetActivityOptions) -> Self {
         Self {
             agent,
             filter,
@@ -117,5 +114,45 @@ impl Query for GetAgentActivityQuery {
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
         Arc::new(row_blob_and_hash_to_header("blob", "hash"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::fill_db;
+    use ::fixt::prelude::*;
+
+    #[test]
+    fn agent_activity_query() {
+        observability::test_run().ok();
+        let test_env = test_cell_env();
+        let env = test_env.env();
+        let entry_type_1 = fixt!(EntryType);
+        let agents = [fixt!(AgentPubKey), fixt!(AgentPubKey), fixt!(AgentPubKey)];
+
+        for i in 0..10 {
+            let mut header_create = fixt!(Create);
+            header_create.entry_type = entry_type_1.clone();
+            header_create.author = agents[i % 3].clone();
+            let op_create = DhtOp::StoreEntry(
+                fixt!(Signature),
+                header_create.into(),
+                Box::new(fixt!(Entry)),
+            );
+            fill_db(&env, DhtOpHashed::from_content_sync(op_create));
+        }
+
+        let filter = ChainQueryFilter::new().entry_type(entry_type_1);
+        let options = GetActivityOptions::default();
+        let results = handle_get_agent_activity(
+            env.clone().into(),
+            agents[0].clone(),
+            filter.clone(),
+            options,
+        )
+        .unwrap();
+
+        dbg!(results);
     }
 }

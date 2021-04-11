@@ -1,5 +1,7 @@
-use self::get_element_query::GetElementOpsQuery;
 use self::get_entry_ops_query::GetEntryOpsQuery;
+use self::{
+    get_agent_activity_query::GetAgentActivityQuery, get_element_query::GetElementOpsQuery,
+};
 
 use super::error::CascadeResult;
 use holo_hash::AgentPubKey;
@@ -57,12 +59,11 @@ pub fn handle_get_agent_activity(
     filter: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
 ) -> CascadeResult<AgentActivityResponse> {
-    todo!()
-    // let query = GetAgentActivityQuery::new(agent, filter, options);
-    // let results = state_env
-    //     .conn()?
-    //     .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;
-    // Ok(results)
+    let query = GetAgentActivityQuery::new(agent, filter, options);
+    let results = env
+        .conn()?
+        .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;
+    Ok(results)
 }
 
 #[instrument(skip(_env, _options))]

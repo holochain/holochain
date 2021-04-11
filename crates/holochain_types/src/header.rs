@@ -18,7 +18,9 @@ use error::*;
 
 pub mod error;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, derive_more::From,
+)]
 /// A header of one of the two types that create a new entry.
 pub enum NewEntryHeader {
     /// A header which simply creates a new entry
