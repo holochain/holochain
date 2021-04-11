@@ -19,7 +19,7 @@ impl Query for ChainHeadQuery {
     type State = Option<SignedHeaderHashed>;
     type Output = Option<HeaderHash>;
 
-    fn query(&self) -> &str {
+    fn query(&self) -> String {
         "
             SELECT H.blob, H.hash FROM Header AS H
             JOIN DhtOp as D
@@ -31,6 +31,7 @@ impl Query for ChainHeadQuery {
             ON H.author = H2.author
             WHERE H.author = :author AND D.is_authored = 1
         "
+        .into()
     }
 
     fn params(&self) -> Vec<Params> {

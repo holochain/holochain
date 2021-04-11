@@ -55,7 +55,7 @@ impl Query for GetEntryOpsQuery {
     type State = WireEntryOps;
     type Output = Self::State;
 
-    fn query(&self) -> &str {
+    fn query(&self) -> String {
         "
         SELECT Header.blob AS header_blob, DhtOp.type AS dht_type,
         DhtOp.validation_status AS status
@@ -65,6 +65,7 @@ impl Query for GetEntryOpsQuery {
         AND
         DhtOp.basis_hash = :entry_hash
         "
+        .into()
     }
 
     fn params(&self) -> Vec<Params> {

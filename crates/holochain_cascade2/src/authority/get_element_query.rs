@@ -42,7 +42,7 @@ impl Query for GetElementOpsQuery {
     type State = WireElementOps;
     type Output = Self::State;
 
-    fn query(&self) -> &str {
+    fn query(&self) -> String {
         "
         SELECT Header.blob AS header_blob, DhtOp.type AS dht_type,
         DhtOp.validation_status AS status
@@ -52,6 +52,7 @@ impl Query for GetElementOpsQuery {
         AND
         DhtOp.basis_hash = :header_hash
         "
+        .into()
     }
 
     fn params(&self) -> Vec<Params> {

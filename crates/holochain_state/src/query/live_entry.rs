@@ -23,7 +23,7 @@ impl Query for GetLiveEntryQuery {
     type State = Maps<SignedHeaderHashed>;
     type Output = Option<Element>;
 
-    fn query(&self) -> &str {
+    fn query(&self) -> String {
         "
                     
         SELECT Header.blob AS header_blob
@@ -33,6 +33,7 @@ impl Query for GetLiveEntryQuery {
         AND DhtOp.basis_hash = :entry_hash
         AND DhtOp.validation_status = :status
         "
+        .into()
     }
     fn params(&self) -> Vec<Params> {
         let params = named_params! {

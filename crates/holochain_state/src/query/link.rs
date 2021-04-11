@@ -38,8 +38,8 @@ impl LinkQuery {
         format!("{} UNION ALL {}", create, delete)
     }
 
-    fn query(&self) -> &str {
-        &self.query
+    fn query(&self) -> String {
+        self.query.clone()
     }
 
     fn common_query_string() -> &'static str {
@@ -117,7 +117,7 @@ impl Query for LinkQuery {
     type State = Maps<Link>;
     type Output = Vec<Link>;
     type Data = SignedHeaderHashed;
-    fn query(&self) -> &str {
+    fn query(&self) -> String {
         self.query()
     }
 

@@ -40,7 +40,7 @@ impl Query for GetAgentActivityQuery {
     //     the full headers. Either way that option is ignored here.
     type Output = AgentActivityResponse<SignedHeaderHashed>;
 
-    fn create_query(&self) -> &str {
+    fn query(&self) -> String {
         let ChainQueryFilter {
             entry_type,
             header_type,
@@ -61,7 +61,7 @@ impl Query for GetAgentActivityQuery {
             .as_ref()
             .map(|_| "AND H.seq >= :range_start AND H.seq < :range_end")
             .unwrap_or("");
-        &format!(
+        format!(
             "
             SELECT H.blob, H.hash FROM Header AS H
             JOIN DhtOp as D
@@ -73,7 +73,7 @@ impl Query for GetAgentActivityQuery {
         )
     }
 
-    fn create_params(&self) -> Vec<Params> {
+    fn params(&self) -> Vec<Params> {
         let ChainQueryFilter {
             entry_type,
             header_type,
@@ -89,8 +89,8 @@ impl Query for GetAgentActivityQuery {
 
         let params = named_params! {
             ":author": self.agent,
-            ":entry_type": entry_type.to_owned().map(EntryTypeSql::from).unwrap_or_else(|| EntryType::AgentPubKey.into()),
-            ":header_type": header_type.to_owned().map(HeaderTypeSql::from).unwrap_or_else(|| HeaderType::Dna.into()),
+            ":entry_type": entry_type.as_ref().map(EntryTypeSql::from),
+            ":header_type": header_type.as_ref().map(HeaderTypeSql::from),
             ":range_start": start,
             ":range_end": end,
         };

@@ -17,6 +17,7 @@ pub use get_entry_ops_query::WireEntryOps;
 #[cfg(test)]
 mod test;
 
+mod get_agent_activity_query;
 mod get_element_query;
 mod get_entry_ops_query;
 

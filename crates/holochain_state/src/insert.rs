@@ -4,9 +4,9 @@
 use crate::query::to_blob;
 use crate::scratch::Scratch;
 use holo_hash::*;
+use holochain_sqlite::impl_to_sql_via_display;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_sqlite::{impl_to_sql_via_as_ref, impl_to_sql_via_display};
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::EntryHashed;
@@ -259,24 +259,24 @@ pub fn insert_entry(txn: &mut Transaction, entry: EntryHashed) {
 //     CapGrant,
 // }
 
-// impl From<&Entry> for EntryTypeName {
-//     fn from(e: &Entry) -> Self {
-//         match e {
-//             Entry::Agent(_) => Self::Agent,
-//             Entry::App(_) => Self::App,
-//             Entry::CapClaim(_) => Self::CapClaim,
-//             Entry::CapGrant(_) => Self::CapGrant,
-//         }
-//     }
-// }
+impl From<&Entry> for EntryTypeName {
+    fn from(e: &Entry) -> Self {
+        match e {
+            Entry::Agent(_) => Self::Agent,
+            Entry::App(_) => Self::App,
+            Entry::CapClaim(_) => Self::CapClaim,
+            Entry::CapGrant(_) => Self::CapGrant,
+        }
+    }
+}
 
-// impl From<&EntryType> for EntryTypeName {
-//     fn from(e: &EntryType) -> Self {
-//         match e {
-//             EntryType::Agent(_) => Self::Agent,
-//             EntryType::App(_) => Self::App,
-//             EntryType::CapClaim(_) => Self::CapClaim,
-//             EntryType::CapGrant(_) => Self::CapGrant,
-//         }
-//     }
-// }
+impl From<&EntryType> for EntryTypeName {
+    fn from(e: &EntryType) -> Self {
+        match e {
+            EntryType::Agent(_) => Self::Agent,
+            EntryType::App(_) => Self::App,
+            EntryType::CapClaim(_) => Self::CapClaim,
+            EntryType::CapGrant(_) => Self::CapGrant,
+        }
+    }
+}

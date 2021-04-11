@@ -23,7 +23,7 @@ impl Query for GetLiveElementQuery {
     type State = (Option<SignedHeaderHashed>, HashSet<HeaderHash>);
     type Output = Option<Element>;
 
-    fn query(&self) -> &str {
+    fn query(&self) -> String {
         "
         SELECT Header.blob AS header_blob
         FROM DhtOp
@@ -32,6 +32,7 @@ impl Query for GetLiveElementQuery {
         AND DhtOp.basis_hash = :header_hash
         AND DhtOp.validation_status = :status
         "
+        .into()
     }
     fn params(&self) -> Vec<Params> {
         let params = named_params! {

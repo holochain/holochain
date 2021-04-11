@@ -76,8 +76,8 @@ pub trait Query: Clone {
     type Data: Clone;
     type Output;
 
-    fn query(&self) -> &str {
-        ""
+    fn query(&self) -> String {
+        "".into()
     }
     fn params(&self) -> Vec<Params> {
         Vec::with_capacity(0)
@@ -378,7 +378,7 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
                 StateQueryResult::Ok(Some(txn.prepare(q)?))
             }
         };
-        let stmt = new_stmt(query.query())?;
+        let stmt = new_stmt(&query.query())?;
 
         Ok(Self { stmt, query })
     }
