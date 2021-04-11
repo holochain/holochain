@@ -1,6 +1,6 @@
-use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::timestamp::Timestamp;
+use crate::{entry_def::EntryVisibility, impl_to_sql_via_display};
 pub use builder::HeaderBuilder;
 pub use builder::HeaderBuilderCommon;
 use holo_hash::impl_hashable_content;
@@ -124,6 +124,9 @@ write_into_header! {
     Update,
     Delete,
 }
+
+#[cfg(feature = "rusqlite")]
+impl_to_sql_via_display!(HeaderType);
 
 /// a utility macro just to not have to type in the match statement everywhere.
 macro_rules! match_header {
@@ -446,6 +449,26 @@ impl EntryType {
         }
     }
 }
+
+impl std::fmt::Display for EntryType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EntryType::AgentPubKey => writeln!(f, "AgentPubKey"),
+            EntryType::App(aet) => writeln!(
+                f,
+                "App({:?}, {}, {:?})",
+                aet.id(),
+                aet.zome_id(),
+                aet.visibility()
+            ),
+            EntryType::CapClaim => writeln!(f, "CapClaim"),
+            EntryType::CapGrant => writeln!(f, "CapGrant"),
+        }
+    }
+}
+
+#[cfg(feature = "rusqlite")]
+impl_to_sql_via_display!(EntryType);
 
 /// Information about a class of Entries provided by the DNA
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]

@@ -1685,6 +1685,7 @@ dependencies = [
  "pretty_assertions",
  "rand 0.7.3",
  "ring",
+ "rusqlite",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -1926,6 +1927,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "byteorder",
+ "cfg-if 0.1.10",
  "chashmap",
  "chrono",
  "derive_more",

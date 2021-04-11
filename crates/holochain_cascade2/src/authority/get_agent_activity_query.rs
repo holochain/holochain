@@ -74,27 +74,20 @@ impl Query for GetAgentActivityQuery {
     }
 
     fn params(&self) -> Vec<Params> {
-        let ChainQueryFilter {
-            entry_type,
-            header_type,
-            sequence_range,
-            include_entries: _,
-            ..
-        } = &self.filter;
-
-        let (start, end) = sequence_range
-            .as_ref()
-            .map(|r| (r.start, r.end))
-            .unwrap_or((0, 0));
-
-        let params = named_params! {
+        let mut params = (named_params! {
             ":author": self.agent,
-            ":entry_type": entry_type.as_ref().map(EntryTypeSql::from),
-            ":header_type": header_type.as_ref().map(HeaderTypeSql::from),
-            ":range_start": start,
-            ":range_end": end,
+            ":entry_type": self.filter.entry_type,
+            ":header_type": self.filter.header_type,
+        })
+        .to_vec();
+
+        if let Some(sequence_range) = &self.filter.sequence_range {
+            params.extend(named_params! {
+                ":range_start": sequence_range.start,
+                ":range_end": sequence_range.end,
+            })
         };
-        params.to_vec()
+        params
     }
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {

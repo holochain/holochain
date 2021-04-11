@@ -22,7 +22,6 @@ use holochain_state::insert::update_op_validation_status;
 use holochain_state::prelude::*;
 use holochain_state::query::live_element::GetLiveElementQuery;
 use holochain_state::query::live_entry::GetLiveEntryQuery;
-use holochain_state::query::prelude::*;
 use holochain_state::query::DbScratch;
 use holochain_state::query::StateQueryError;
 use holochain_state::scratch::Scratch;

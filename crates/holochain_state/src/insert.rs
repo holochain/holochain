@@ -4,14 +4,12 @@
 use crate::query::to_blob;
 use crate::scratch::Scratch;
 use holo_hash::*;
-use holochain_sqlite::impl_to_sql_via_display;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::EntryHashed;
 use holochain_zome_types::*;
-use std::fmt::Debug;
 
 #[macro_export]
 macro_rules! sql_insert {
@@ -99,7 +97,7 @@ pub fn update_op_validation_status(
 pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) {
     let (header, signature) = header.into_header_and_signature();
     let (header, hash) = header.into_inner();
-    let header_type: HeaderTypeSql = header.header_type().into();
+    let header_type = header.header_type();
     let header_seq = header.header_seq();
     let author = header.author().clone();
     match header {
@@ -215,33 +213,6 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) {
     }
 }
 
-#[derive(Debug, Clone, derive_more::Display, derive_more::From, derive_more::Into)]
-pub struct HeaderTypeSql(HeaderType);
-
-impl_to_sql_via_display!(HeaderTypeSql);
-
-#[derive(Debug, Clone, derive_more::From, derive_more::Into)]
-pub struct EntryTypeSql(EntryType);
-
-impl std::fmt::Display for EntryTypeSql {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.0 {
-            EntryType::AgentPubKey => writeln!(f, "AgentPubKey"),
-            EntryType::App(aet) => writeln!(
-                f,
-                "App({:?}, {}, {:?})",
-                aet.id(),
-                aet.zome_id(),
-                aet.visibility()
-            ),
-            EntryType::CapClaim => writeln!(f, "CapClaim"),
-            EntryType::CapGrant => writeln!(f, "CapGrant"),
-        }
-    }
-}
-
-impl_to_sql_via_display!(EntryTypeSql);
-
 pub fn insert_entry(txn: &mut Transaction, entry: EntryHashed) {
     let (entry, hash) = entry.into_inner();
     sql_insert!(txn, Entry, {
@@ -259,24 +230,24 @@ pub fn insert_entry(txn: &mut Transaction, entry: EntryHashed) {
 //     CapGrant,
 // }
 
-impl From<&Entry> for EntryTypeName {
-    fn from(e: &Entry) -> Self {
-        match e {
-            Entry::Agent(_) => Self::Agent,
-            Entry::App(_) => Self::App,
-            Entry::CapClaim(_) => Self::CapClaim,
-            Entry::CapGrant(_) => Self::CapGrant,
-        }
-    }
-}
+// impl From<&Entry> for EntryTypeName {
+//     fn from(e: &Entry) -> Self {
+//         match e {
+//             Entry::Agent(_) => Self::Agent,
+//             Entry::App(_) => Self::App,
+//             Entry::CapClaim(_) => Self::CapClaim,
+//             Entry::CapGrant(_) => Self::CapGrant,
+//         }
+//     }
+// }
 
-impl From<&EntryType> for EntryTypeName {
-    fn from(e: &EntryType) -> Self {
-        match e {
-            EntryType::Agent(_) => Self::Agent,
-            EntryType::App(_) => Self::App,
-            EntryType::CapClaim(_) => Self::CapClaim,
-            EntryType::CapGrant(_) => Self::CapGrant,
-        }
-    }
-}
+// impl From<&EntryType> for EntryTypeName {
+//     fn from(e: &EntryType) -> Self {
+//         match e {
+//             EntryType::Agent(_) => Self::Agent,
+//             EntryType::App(_) => Self::App,
+//             EntryType::CapClaim(_) => Self::CapClaim,
+//             EntryType::CapGrant(_) => Self::CapGrant,
+//         }
+//     }
+// }

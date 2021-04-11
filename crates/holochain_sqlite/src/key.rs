@@ -14,31 +14,6 @@ use std::cmp::Ordering;
 
 mod prefix;
 
-#[macro_export]
-macro_rules! impl_to_sql_via_as_ref {
-    ($s: ty) => {
-        impl $crate::rusqlite::ToSql for $s {
-            fn to_sql(&self) -> $crate::rusqlite::Result<$crate::rusqlite::types::ToSqlOutput<'_>> {
-                Ok($crate::rusqlite::types::ToSqlOutput::Borrowed(
-                    self.as_ref().into(),
-                ))
-            }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! impl_to_sql_via_display {
-    ($s: ty) => {
-        impl $crate::rusqlite::ToSql for $s {
-            fn to_sql(&self) -> $crate::rusqlite::Result<$crate::rusqlite::types::ToSqlOutput<'_>> {
-                Ok($crate::rusqlite::types::ToSqlOutput::Owned(
-                    self.to_string().into(),
-                ))
-            }
-        }
-    };
-}
 pub trait BufKeyConstraints: Sized + Ord + Eq + AsRef<[u8]> + ToSql + Send + Sync {}
 impl<T> BufKeyConstraints for T where T: Sized + Ord + Eq + AsRef<[u8]> + ToSql + Send + Sync {}
 
