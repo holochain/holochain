@@ -11,18 +11,18 @@ pub struct LinkQuery {
     base: EntryHash,
     zome_id: ZomeId,
     tag: Option<LinkTag>,
-    create_string: String,
-    delete_string: String,
+    query: String,
 }
 
 impl LinkQuery {
     fn new(base: EntryHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
+        let create_string = Self::create_query_string(tag.is_some());
+        let delete_string = Self::delete_query_string(tag.is_some());
         Self {
             base,
             zome_id,
-            create_string: Self::create_query_string(tag.is_some()),
-            delete_string: Self::delete_query_string(tag.is_some()),
             tag,
+            query: Self::create_query(create_string, delete_string),
         }
     }
 
@@ -34,12 +34,12 @@ impl LinkQuery {
         Self::new(base, zome_id, Some(tag))
     }
 
-    fn create_query(&self) -> &str {
-        &self.create_string
+    fn create_query(create: String, delete: String) -> String {
+        format!("{} UNION ALL {}", create, delete)
     }
 
-    fn delete_query(&self) -> &str {
-        &self.delete_string
+    fn query(&self) -> &str {
+        &self.query
     }
 
     fn common_query_string() -> &'static str {
@@ -96,22 +96,7 @@ impl LinkQuery {
         delete_query
     }
 
-    fn create_params(&self) -> Vec<Params> {
-        let mut params = named_params! {
-            ":create": DhtOpType::RegisterAddLink,
-            ":base_hash": self.base,
-            ":zome_id": self.zome_id,
-        }
-        .to_vec();
-        if self.tag.is_some() {
-            params.extend(named_params! {
-                ":tag": self.tag,
-            });
-        }
-        params
-    }
-
-    fn delete_params(&self) -> Vec<Params> {
+    fn params(&self) -> Vec<Params> {
         let mut params = named_params! {
             ":create": DhtOpType::RegisterAddLink,
             ":delete": DhtOpType::RegisterRemoveLink,
@@ -132,20 +117,12 @@ impl Query for LinkQuery {
     type State = Maps<Link>;
     type Output = Vec<Link>;
     type Data = SignedHeaderHashed;
-    fn create_query(&self) -> &str {
-        self.create_query()
+    fn query(&self) -> &str {
+        self.query()
     }
 
-    fn delete_query(&self) -> &str {
-        self.delete_query()
-    }
-
-    fn create_params(&self) -> Vec<Params> {
-        self.create_params()
-    }
-
-    fn delete_params(&self) -> Vec<Params> {
-        self.delete_params()
+    fn params(&self) -> Vec<Params> {
+        self.params()
     }
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {

@@ -49,3 +49,55 @@ async fn get_entry() {
     };
     assert_eq!(result, expected);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn get_element() {
+    observability::test_run().ok();
+    let env = test_cell_env();
+
+    let td = ElementTestData::new();
+
+    fill_db(&env.env(), td.store_element_op.clone());
+
+    let result = handle_get_element(env.env().into(), td.create_hash.clone()).unwrap();
+    let expected = WireElementOps {
+        header: Some(td.wire_create.clone()),
+        deletes: vec![],
+        updates: vec![],
+        entry: Some(td.entry.clone()),
+    };
+    assert_eq!(result, expected);
+
+    fill_db(&env.env(), td.deleted_by_op.clone());
+
+    let result = handle_get_element(env.env().into(), td.create_hash.clone()).unwrap();
+    let expected = WireElementOps {
+        header: Some(td.wire_create.clone()),
+        deletes: vec![td.wire_delete.clone()],
+        updates: vec![],
+        entry: Some(td.entry.clone()),
+    };
+    assert_eq!(result, expected);
+
+    fill_db(&env.env(), td.update_element_op.clone());
+
+    let result = handle_get_element(env.env().into(), td.create_hash.clone()).unwrap();
+    let expected = WireElementOps {
+        header: Some(td.wire_create.clone()),
+        deletes: vec![td.wire_delete.clone()],
+        updates: vec![td.wire_update.clone()],
+        entry: Some(td.entry.clone()),
+    };
+    assert_eq!(result, expected);
+
+    fill_db(&env.env(), td.any_store_element_op.clone());
+
+    let result = handle_get_element(env.env().into(), td.any_header_hash.clone()).unwrap();
+    let expected = WireElementOps {
+        header: Some(td.any_header.clone()),
+        deletes: vec![],
+        updates: vec![],
+        entry: td.any_entry.clone(),
+    };
+    assert_eq!(result, expected);
+}

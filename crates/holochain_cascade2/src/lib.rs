@@ -5,7 +5,9 @@
 //! the appropriate validation has been run.
 
 use authority::WireDhtOp;
+use authority::WireElementOps;
 use authority::WireEntryOps;
+use authority::WireOps;
 use error::CascadeResult;
 use holo_hash::hash_type::AnyDht;
 use holo_hash::AgentPubKey;
@@ -18,7 +20,8 @@ use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::insert::update_op_validation_status;
 use holochain_state::prelude::*;
-use holochain_state::query::entry::GetEntryQuery;
+use holochain_state::query::live_element::GetLiveElementQuery;
+use holochain_state::query::live_entry::GetLiveEntryQuery;
 use holochain_state::query::prelude::*;
 use holochain_state::query::DbScratch;
 use holochain_state::query::StateQueryError;
@@ -157,7 +160,7 @@ where
         entry_hash: &Option<EntryHash>,
     ) -> bool {
         match (header_entry_hash, entry_hash) {
-            (Some(a), Some(b)) => a == b,
+            (Some(a), Some(b)) => dbg!(a) == dbg!(b),
             _ => true,
         }
     }
@@ -201,23 +204,64 @@ where
         Ok(())
     }
 
+    fn merge_element_ops_into_cache(&mut self, response: WireElementOps) -> CascadeResult<()> {
+        let cache = ok_or_return!(self.cache.as_mut());
+        let WireElementOps {
+            header,
+            updates,
+            deletes,
+            entry,
+        } = response;
+        cache.conn()?.with_commit(|txn| {
+            let mut entry_hash = None;
+
+            if let Some(entry) = entry {
+                let entry_hashed = EntryHashed::from_content_sync(entry);
+                entry_hash = Some(entry_hashed.as_hash().clone());
+                insert_entry(txn, entry_hashed);
+            }
+            if let Some(op) = header {
+                if Self::verify_entry_hash(op.header.entry_hash(), &entry_hash) {
+                    Self::insert_wire_op(txn, op)?;
+                } else {
+                    tracing::info!(
+                        "Store element op {:?} from the network entry hash does not match the header",
+                        op
+                    );
+                }
+            }
+            for op in updates {
+                Self::insert_wire_op(txn, op)?;
+            }
+            for op in deletes {
+                Self::insert_wire_op(txn, op)?;
+            }
+            CascadeResult::Ok(())
+        })?;
+        Ok(())
+    }
+
     #[instrument(skip(self, options))]
-    async fn fetch_element_via_entry(
+    async fn fetch_element(
         &mut self,
-        hash: EntryHash,
+        hash: AnyDhtHash,
         options: NetworkGetOptions,
     ) -> CascadeResult<()> {
         let network = ok_or_return!(self.network.as_mut());
         let results = network
-            .get(hash.clone().into(), options.clone())
+            .get(hash, options.clone())
             .instrument(debug_span!("fetch_element_via_entry::network_get"))
             .await?;
 
         for response in results {
-            self.merge_entry_ops_into_cache(response)?;
+            match response {
+                WireOps::Entry(response) => self.merge_entry_ops_into_cache(response)?,
+                WireOps::Element(response) => self.merge_element_ops_into_cache(response)?,
+            }
         }
         Ok(())
     }
+
     /// Check if this hash has been validated.
     /// Elements can end up in the cache or integrated table because
     /// they were gossiped to you or you authored them.
@@ -280,19 +324,6 @@ where
         _header_hash: HeaderHash,
         _options: GetOptions,
     ) -> CascadeResult<Option<ElementDetails>> {
-        todo!()
-    }
-
-    #[instrument(skip(self, _options))]
-    /// Returns the [Element] for this [HeaderHash] if it is live
-    /// by getting the latest available metadata from authorities
-    /// combined with this agents authored data.
-    /// _Note: Deleted headers are a tombstone set_
-    pub async fn dht_get_header(
-        &mut self,
-        _header_hash: HeaderHash,
-        _options: GetOptions,
-    ) -> CascadeResult<Option<Element>> {
         todo!()
     }
 
@@ -379,16 +410,22 @@ where
     }
 
     #[instrument(skip(self, options))]
-    /// Returns the oldest live [Element] for this [EntryHash] by getting the
-    /// latest available metadata from authorities combined with this agents authored data.
-    pub async fn dht_get_entry(
+    /// Returns the [Element] for this [HeaderHash] if it is live
+    /// by getting the latest available metadata from authorities
+    /// combined with this agents authored data.
+    /// _Note: Deleted headers are a tombstone set_
+    pub async fn dht_get_header(
         &mut self,
-        entry_hash: EntryHash,
+        header_hash: HeaderHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
-        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
-        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
-        let query = GetEntryQuery::new(entry_hash.clone());
+        let authoring = self.am_i_authoring(&header_hash.clone().into())?;
+        let authority = self.am_i_an_authority(header_hash.clone().into()).await?;
+        let query = GetLiveElementQuery::new(header_hash.clone());
+
+        // TODO: we can short circuit if we have any local deletes on a header.
+        // Is this bad because we will not go back to the network until our
+        // cache is cleared. Could someone create an attack based on this fact?
 
         // We don't need metadata and only need the content
         // so if we have it locally then we can avoid the network.
@@ -407,7 +444,45 @@ where
         // If we are not in the process of authoring this hash and we are not the
         // authority we can skip the network call.
         if !authoring && !authority {
-            self.fetch_element_via_entry(entry_hash, options.into())
+            self.fetch_element(header_hash.into(), options.into())
+                .await?;
+        }
+
+        // Check if we have the data now after the network call.
+        let results = self.cascading(query)?;
+        Ok(results)
+    }
+
+    #[instrument(skip(self, options))]
+    /// Returns the oldest live [Element] for this [EntryHash] by getting the
+    /// latest available metadata from authorities combined with this agents authored data.
+    pub async fn dht_get_entry(
+        &mut self,
+        entry_hash: EntryHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<Element>> {
+        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
+        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
+        let query = GetLiveEntryQuery::new(entry_hash.clone());
+
+        // We don't need metadata and only need the content
+        // so if we have it locally then we can avoid the network.
+        if let GetStrategy::Content = options.strategy {
+            let results = self.cascading(query.clone())?;
+            // We got a result so can short circuit.
+            if results.is_some() {
+                return Ok(results);
+            // We didn't get a result so if we are either authoring
+            // or the authority there's nothing left to do.
+            } else if authoring || authority {
+                return Ok(None);
+            }
+        }
+
+        // If we are not in the process of authoring this hash and we are not the
+        // authority we can skip the network call.
+        if !authoring && !authority {
+            self.fetch_element(entry_hash.into(), options.into())
                 .await?;
         }
 

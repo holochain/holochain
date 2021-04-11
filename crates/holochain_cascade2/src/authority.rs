@@ -1,3 +1,4 @@
+use self::get_element_query::GetElementOpsQuery;
 use self::get_entry_ops_query::GetEntryOpsQuery;
 
 use super::error::CascadeResult;
@@ -9,14 +10,22 @@ use holochain_state::query::Txn;
 use holochain_types::prelude::*;
 use tracing::*;
 
+pub use get_element_query::WireElementOps;
 pub use get_entry_ops_query::WireDhtOp;
 pub use get_entry_ops_query::WireEntryOps;
 
 #[cfg(test)]
 mod test;
 
-mod get_agent_activity_query;
+mod get_element_query;
 mod get_entry_ops_query;
+
+// TODO: Move this to holochain types.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum WireOps {
+    Entry(WireEntryOps),
+    Element(WireElementOps),
+}
 
 #[instrument(skip(state_env))]
 pub fn handle_get_entry(
@@ -31,9 +40,13 @@ pub fn handle_get_entry(
     Ok(results)
 }
 
-#[tracing::instrument(skip(_env))]
-pub fn handle_get_element(_env: EnvRead, _hash: HeaderHash) -> CascadeResult<GetElementResponse> {
-    todo!()
+#[tracing::instrument(skip(env))]
+pub fn handle_get_element(env: EnvRead, hash: HeaderHash) -> CascadeResult<WireElementOps> {
+    let query = GetElementOpsQuery::new(hash);
+    let results = env
+        .conn()?
+        .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;
+    Ok(results)
 }
 
 #[instrument(skip(env))]
