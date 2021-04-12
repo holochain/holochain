@@ -20,7 +20,7 @@ CREATE TABLE Entry (
     access_secret    BLOB           NULL,
     access_assignees BLOB           NULL
 );
-CREATE INDEX Entry_type_idx ON Entry ( type );
+-- CREATE INDEX Entry_type_idx ON Entry ( type );
 
 
 -- TODO: some of the NULL fields can be collapsed,
@@ -89,7 +89,10 @@ CREATE TABLE DhtOp (
     -- If this is null then validation is still in progress.
     validation_status INTEGER       NULL,
 
-    when_integrated  NUMERIC        NULL,          -- DATETIME
+    when_integrated  INTEGER NULL,          -- DATETIME
+    -- We need nanosecond accuracy which doesn't fit in 
+    -- an INTEGER.
+    when_integrated_ns  BLOB NULL,          -- DATETIME
 
     blob             BLOB           NOT NULL,
 

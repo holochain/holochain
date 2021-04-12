@@ -4,7 +4,12 @@ use holochain_cascade2::Cascade;
 use holochain_state::insert::insert_op_scratch;
 use holochain_state::prelude::test_cell_env;
 use holochain_state::scratch::Scratch;
+use holochain_zome_types::Details;
+use holochain_zome_types::EntryDetails;
+use holochain_zome_types::EntryDhtStatus;
 use holochain_zome_types::GetOptions;
+
+// TODO: Get element is so similar we should just combine it into this test file and save on boiler plate.
 
 #[tokio::test(flavor = "multi_thread")]
 async fn entry_not_authority_or_authoring() {
@@ -32,6 +37,23 @@ async fn entry_not_authority_or_authoring() {
 
     assert_eq!(*r.header_address(), td.create_hash);
     assert_eq!(r.header().entry_hash(), Some(&td.hash));
+
+    let r = cascade
+        .get_details(td.hash.clone().into(), Default::default())
+        .await
+        .unwrap()
+        .expect("Failed to get entry");
+
+    let expected = Details::Entry(EntryDetails {
+        entry: td.entry.clone(),
+        headers: vec![wire_op_to_shh(&td.wire_create)],
+        rejected_headers: vec![],
+        deletes: vec![],
+        updates: vec![],
+        entry_dht_status: EntryDhtStatus::Live,
+    });
+
+    assert_eq!(r, expected);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -65,6 +87,23 @@ async fn entry_authoring() {
 
     assert_eq!(*r.header_address(), td.create_hash);
     assert_eq!(r.header().entry_hash(), Some(&td.hash));
+
+    let r = cascade
+        .get_details(td.hash.clone().into(), Default::default())
+        .await
+        .unwrap()
+        .expect("Failed to get entry");
+
+    let expected = Details::Entry(EntryDetails {
+        entry: td.entry.clone(),
+        headers: vec![wire_op_to_shh(&td.wire_create)],
+        rejected_headers: vec![],
+        deletes: vec![],
+        updates: vec![],
+        entry_dht_status: EntryDhtStatus::Live,
+    });
+
+    assert_eq!(r, expected);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -98,6 +137,23 @@ async fn entry_authority() {
 
     assert_eq!(*r.header_address(), td.create_hash);
     assert_eq!(r.header().entry_hash(), Some(&td.hash));
+
+    let r = cascade
+        .get_details(td.hash.clone().into(), Default::default())
+        .await
+        .unwrap()
+        .expect("Failed to get entry");
+
+    let expected = Details::Entry(EntryDetails {
+        entry: td.entry.clone(),
+        headers: vec![wire_op_to_shh(&td.wire_create)],
+        rejected_headers: vec![],
+        deletes: vec![],
+        updates: vec![],
+        entry_dht_status: EntryDhtStatus::Live,
+    });
+
+    assert_eq!(r, expected);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -131,6 +187,23 @@ async fn content_not_authority_or_authoring() {
 
     assert_eq!(*r.header_address(), td.create_hash);
     assert_eq!(r.header().entry_hash(), Some(&td.hash));
+
+    let r = cascade
+        .get_details(td.hash.clone().into(), GetOptions::content())
+        .await
+        .unwrap()
+        .expect("Failed to get entry");
+
+    let expected = Details::Entry(EntryDetails {
+        entry: td.entry.clone(),
+        headers: vec![wire_op_to_shh(&td.wire_create)],
+        rejected_headers: vec![],
+        deletes: vec![],
+        updates: vec![],
+        entry_dht_status: EntryDhtStatus::Live,
+    });
+
+    assert_eq!(r, expected);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -164,6 +237,23 @@ async fn content_authoring() {
 
     assert_eq!(*r.header_address(), td.create_hash);
     assert_eq!(r.header().entry_hash(), Some(&td.hash));
+
+    let r = cascade
+        .get_details(td.hash.clone().into(), GetOptions::content())
+        .await
+        .unwrap()
+        .expect("Failed to get entry");
+
+    let expected = Details::Entry(EntryDetails {
+        entry: td.entry.clone(),
+        headers: vec![wire_op_to_shh(&td.wire_create)],
+        rejected_headers: vec![],
+        deletes: vec![],
+        updates: vec![],
+        entry_dht_status: EntryDhtStatus::Live,
+    });
+
+    assert_eq!(r, expected);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -194,6 +284,13 @@ async fn content_authority() {
         .unwrap();
 
     assert!(r.is_none());
+
+    let r = cascade
+        .get_details(td.hash.clone().into(), Default::default())
+        .await
+        .unwrap();
+
+    assert!(r.is_none());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -220,4 +317,45 @@ async fn rejected_ops() {
         .unwrap();
 
     assert!(r.is_none());
+
+    let r = cascade
+        .get_details(td.hash.clone().into(), Default::default())
+        .await
+        .unwrap()
+        .expect("Failed to get entry");
+
+    let expected = Details::Entry(EntryDetails {
+        entry: td.entry.clone(),
+        headers: vec![],
+        rejected_headers: vec![wire_op_to_shh(&td.wire_create)],
+        deletes: vec![],
+        updates: vec![],
+        entry_dht_status: EntryDhtStatus::Dead,
+    });
+
+    assert_eq!(r, expected);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn check_can_handle_rejected_ops_in_cache() {
+    todo!()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn check_all_queries_still_work() {
+    // TODO: Come up with a list of different states the authority could
+    // have data in (updates, rejected, abandoned, nothing etc.)
+    // then create an iterator that can put databases in these states and
+    // run all the above queries on them.
+    todo!()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn check_all_queries_still_work_with_cache() {
+    todo!()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_pending_data_isnt_returned() {
+    todo!()
 }

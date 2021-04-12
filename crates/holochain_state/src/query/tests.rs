@@ -15,6 +15,8 @@ use super::test_data::*;
 use super::*;
 use crate::insert::*;
 
+mod details;
+
 #[tokio::test(flavor = "multi_thread")]
 async fn get_links() {
     observability::test_run().ok();

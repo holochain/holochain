@@ -94,6 +94,23 @@ pub fn update_op_validation_status(
     .unwrap();
 }
 
+pub fn set_when_integrated(txn: &mut Transaction, hash: DhtOpHash, time: Timestamp) {
+    txn.execute_named(
+        "
+        UPDATE DhtOp
+        SET when_integrated = :when_integrated,
+        when_integrated_ns = :when_integrated_ns
+        WHERE hash = :hash
+        ",
+        named_params! {
+            ":when_integrated_ns": to_blob(time),
+            ":when_integrated": time,
+            ":hash": hash,
+        },
+    )
+    .unwrap();
+}
+
 pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) {
     let (header, signature) = header.into_header_and_signature();
     let (header, hash) = header.into_inner();

@@ -20,6 +20,8 @@ use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::insert::update_op_validation_status;
 use holochain_state::prelude::*;
+use holochain_state::query::element_details::GetElementDetailsQuery;
+use holochain_state::query::entry_details::GetEntryDetailsQuery;
 use holochain_state::query::live_element::GetLiveElementQuery;
 use holochain_state::query::live_entry::GetLiveEntryQuery;
 use holochain_state::query::DbScratch;
@@ -149,8 +151,11 @@ where
         insert_header(txn, header_hashed);
         insert_op_lite(txn, op_light, op_hash.clone(), false);
         if let Some(status) = validation_status {
-            update_op_validation_status(txn, op_hash, status);
+            update_op_validation_status(txn, op_hash.clone(), status);
         }
+        // We set the integrated to for the cache so it can match the
+        // same query as the vault. This can also be used for garbage collection.
+        set_when_integrated(txn, op_hash, timestamp::now());
         Ok(())
     }
 
@@ -295,7 +300,7 @@ where
 
     fn cascading<Q>(&mut self, query: Q) -> CascadeResult<Q::Output>
     where
-        Q: Query<Data = SignedHeaderHashed>,
+        Q: Query<Data = ValStatusOf<SignedHeaderHashed>>,
     {
         let mut conns = Vec::new();
         let mut txns = Vec::new();
@@ -315,15 +320,6 @@ where
             None => query.run(Txns::from(&txns_ref[..]))?,
         };
         Ok(results)
-    }
-
-    #[instrument(skip(self, _options))]
-    pub async fn get_header_details(
-        &mut self,
-        _header_hash: HeaderHash,
-        _options: GetOptions,
-    ) -> CascadeResult<Option<ElementDetails>> {
-        todo!()
     }
 
     /// Same as retrieve entry but retrieves many
@@ -399,13 +395,80 @@ where
         todo!()
     }
 
-    #[instrument(skip(self, _options))]
+    #[instrument(skip(self, options))]
     pub async fn get_entry_details(
         &mut self,
-        _entry_hash: EntryHash,
-        _options: GetOptions,
+        entry_hash: EntryHash,
+        options: GetOptions,
     ) -> CascadeResult<Option<EntryDetails>> {
-        todo!()
+        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
+        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
+        let query = GetEntryDetailsQuery::new(entry_hash.clone());
+
+        // We don't need metadata and only need the content
+        // so if we have it locally then we can avoid the network.
+        if let GetStrategy::Content = options.strategy {
+            let results = self.cascading(query.clone())?;
+            // We got a result so can short circuit.
+            if results.is_some() {
+                return Ok(results);
+            // We didn't get a result so if we are either authoring
+            // or the authority there's nothing left to do.
+            } else if authoring || authority {
+                return Ok(None);
+            }
+        }
+
+        // If we are not in the process of authoring this hash and we are not the
+        // authority we can skip the network call.
+        if !authoring && !authority {
+            self.fetch_element(entry_hash.into(), options.into())
+                .await?;
+        }
+
+        // Check if we have the data now after the network call.
+        let results = self.cascading(query)?;
+        Ok(results)
+    }
+
+    #[instrument(skip(self, options))]
+    pub async fn get_header_details(
+        &mut self,
+        header_hash: HeaderHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<ElementDetails>> {
+        let authoring = self.am_i_authoring(&header_hash.clone().into())?;
+        let authority = self.am_i_an_authority(header_hash.clone().into()).await?;
+        let query = GetElementDetailsQuery::new(header_hash.clone());
+
+        // TODO: we can short circuit if we have any local deletes on a header.
+        // Is this bad because we will not go back to the network until our
+        // cache is cleared. Could someone create an attack based on this fact?
+
+        // We don't need metadata and only need the content
+        // so if we have it locally then we can avoid the network.
+        if let GetStrategy::Content = options.strategy {
+            let results = self.cascading(query.clone())?;
+            // We got a result so can short circuit.
+            if results.is_some() {
+                return Ok(results);
+            // We didn't get a result so if we are either authoring
+            // or the authority there's nothing left to do.
+            } else if authoring || authority {
+                return Ok(None);
+            }
+        }
+
+        // If we are not in the process of authoring this hash and we are not the
+        // authority we can skip the network call.
+        if !authoring && !authority {
+            self.fetch_element(header_hash.into(), options.into())
+                .await?;
+        }
+
+        // Check if we have the data now after the network call.
+        let results = self.cascading(query)?;
+        Ok(results)
     }
 
     #[instrument(skip(self, options))]

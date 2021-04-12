@@ -10,6 +10,7 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_types::prelude::ValStatusOf;
 use holochain_zome_types::Entry;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::SignedHeader;
@@ -27,6 +28,8 @@ mod test_data;
 mod tests;
 
 pub mod chain_head;
+pub mod element_details;
+pub mod entry_details;
 pub mod error;
 pub mod link;
 pub mod live_element;
@@ -168,7 +171,7 @@ pub struct DbScratch<'borrow, 'txn> {
 
 pub struct DbScratchIter<'stmt, Q>
 where
-    Q: Query<Data = SignedHeaderHashed>,
+    Q: Query<Data = ValStatusOf<SignedHeaderHashed>>,
 {
     stmts: QueryStmts<'stmt, Q>,
     filtered_scratch: FilteredScratch,
@@ -256,28 +259,9 @@ impl<'stmt, Q: Query> StoresIter<Q::Data> for QueryStmts<'stmt, Q> {
     }
 }
 
-impl<Q> Stores<Q> for Scratch
-where
-    Q: Query<Data = SignedHeaderHashed>,
-{
-    type O = FilteredScratch;
-
-    fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O> {
-        Ok(self.as_filter(query.as_filter()))
-    }
-}
-
-impl StoresIter<SignedHeaderHashed> for FilteredScratch {
-    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, SignedHeaderHashed>> {
-        Ok(Box::new(fallible_iterator::convert(
-            self.into_iter().map(Ok),
-        )))
-    }
-}
-
 impl<'borrow, 'txn, Q> Stores<Q> for DbScratch<'borrow, 'txn>
 where
-    Q: Query<Data = SignedHeaderHashed>,
+    Q: Query<Data = ValStatusOf<SignedHeaderHashed>>,
 {
     type O = DbScratchIter<'borrow, Q>;
 
@@ -320,7 +304,7 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
 
 impl<'stmt, Q> StoresIter<Q::Data> for DbScratchIter<'stmt, Q>
 where
-    Q: Query<Data = SignedHeaderHashed>,
+    Q: Query<Data = ValStatusOf<SignedHeaderHashed>>,
 {
     fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Q::Data>> {
         Ok(Box::new(
@@ -367,7 +351,8 @@ pub struct QueryStmt<'stmt, Q: Query> {
     query: Q,
 }
 
-type StmtIter<'iter, T> = Box<dyn FallibleIterator<Item = T, Error = StateQueryError> + 'iter>;
+pub(crate) type StmtIter<'iter, T> =
+    Box<dyn FallibleIterator<Item = T, Error = StateQueryError> + 'iter>;
 
 impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
     fn new(txn: &'stmt Transaction, query: Q) -> StateQueryResult<Self> {

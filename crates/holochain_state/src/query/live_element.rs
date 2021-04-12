@@ -19,7 +19,7 @@ impl GetLiveElementQuery {
 }
 
 impl Query for GetLiveElementQuery {
-    type Data = SignedHeaderHashed;
+    type Data = ValStatusOf<SignedHeaderHashed>;
     type State = (Option<SignedHeaderHashed>, HashSet<HeaderHash>);
     type Output = Option<Element>;
 
@@ -31,6 +31,7 @@ impl Query for GetLiveElementQuery {
         WHERE DhtOp.type IN (:create_type, :delete_type, :update_type)
         AND DhtOp.basis_hash = :header_hash
         AND DhtOp.validation_status = :status
+        AND (DhtOp.when_integrated IS NOT NULL OR DhtOp.is_authored = 1)
         "
         .into()
     }
@@ -46,18 +47,20 @@ impl Query for GetLiveElementQuery {
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
-        Arc::new(row_blob_to_header("header_blob"))
+        let f = row_blob_to_header("header_blob");
+        // Data is valid because it is filtered in the sql query.
+        Arc::new(move |row| Ok(ValStatusOf::valid(f(row)?)))
     }
 
     fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {
         let header_filter = self.0.clone();
-        let f = move |header: &SignedHeaderHashed| {
-            if *header.header_address() == header_filter {
+        let f = move |header: &Self::Data| {
+            if *header.data.header_address() == header_filter {
                 true
             } else {
                 if let Header::Delete(Delete {
                     deletes_address, ..
-                }) = header.header()
+                }) = header.data.header()
                 {
                     *deletes_address == header_filter
                 } else {
@@ -72,11 +75,8 @@ impl Query for GetLiveElementQuery {
         Ok((None, HashSet::new()))
     }
 
-    fn fold(
-        &self,
-        mut state: Self::State,
-        shh: SignedHeaderHashed,
-    ) -> StateQueryResult<Self::State> {
+    fn fold(&self, mut state: Self::State, data: Self::Data) -> StateQueryResult<Self::State> {
+        let shh = data.data;
         let hash = shh.as_hash();
         if *hash == self.0 && state.0.is_none() {
             if !state.1.contains(hash) {

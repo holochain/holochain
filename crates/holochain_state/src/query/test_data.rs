@@ -22,6 +22,7 @@ pub struct EntryTestData {
     pub update_store_entry_op: DhtOpHashed,
     pub delete_entry_header_op: DhtOpHashed,
     pub entry: Entry,
+    pub hash: EntryHash,
     pub query: GetLiveEntryQuery,
     pub header: SignedHeaderHashed,
     pub update_header: SignedHeaderHashed,
@@ -44,12 +45,12 @@ impl LinkTestData {
         let mut delete_link = fixt!(DeleteLink);
 
         let mut create_base = fixt!(Create);
-        let base = fixt!(Entry);
+        let base = Entry::App(fixt!(AppEntryBytes));
         let base_hash = EntryHash::with_data_sync(&base);
         create_base.entry_hash = base_hash.clone();
 
         let mut create_target = fixt!(Create);
-        let target = fixt!(Entry);
+        let target = Entry::App(fixt!(AppEntryBytes));
         let target_hash = EntryHash::with_data_sync(&target);
         create_target.entry_hash = target_hash.clone();
 
@@ -109,7 +110,7 @@ impl EntryTestData {
         let mut create = fixt!(Create);
         let mut update = fixt!(Update);
         let mut delete = fixt!(Delete);
-        let entry = fixt!(Entry);
+        let entry = Entry::App(fixt!(AppEntryBytes));
         let entry_hash = EntryHash::with_data_sync(&entry);
         create.entry_hash = entry_hash.clone();
         update.entry_hash = entry_hash.clone();
@@ -157,6 +158,7 @@ impl EntryTestData {
             entry,
             query,
             delete_entry_header_op,
+            hash: entry_hash,
         }
     }
 }

@@ -5,6 +5,7 @@ use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 use holochain_p2p::actor;
 use holochain_p2p::HolochainP2pError;
+use holochain_state::insert::set_when_integrated;
 use holochain_state::insert::update_op_validation_status;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::dht_op::DhtOp;
@@ -16,11 +17,14 @@ use holochain_types::link::GetLinksResponse;
 use holochain_types::link::WireLinkMetaKey;
 use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::ValidationPackageResponse;
+use holochain_types::timestamp;
 use holochain_zome_types::fixt::*;
 use holochain_zome_types::Create;
 use holochain_zome_types::Entry;
 use holochain_zome_types::Header;
+use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::QueryFilter;
+use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::Update;
 use holochain_zome_types::ValidationStatus;
 
@@ -436,7 +440,8 @@ pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
         .with_commit(|txn| {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false);
-            update_op_validation_status(txn, hash, ValidationStatus::Valid);
+            update_op_validation_status(txn, hash.clone(), ValidationStatus::Valid);
+            set_when_integrated(txn, hash, timestamp::now());
             DatabaseResult::Ok(())
         })
         .unwrap();
@@ -448,7 +453,8 @@ pub fn fill_db_rejected(env: &EnvWrite, op: DhtOpHashed) {
         .with_commit(|txn| {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false);
-            update_op_validation_status(txn, hash, ValidationStatus::Rejected);
+            update_op_validation_status(txn, hash.clone(), ValidationStatus::Rejected);
+            set_when_integrated(txn, hash, timestamp::now());
             DatabaseResult::Ok(())
         })
         .unwrap();
@@ -521,4 +527,11 @@ impl HolochainP2pCellT2 for MockNetwork {
     ) -> actor::HolochainP2pResult<bool> {
         self.0.lock().await.authority_for_hash(dht_hash).await
     }
+}
+
+pub fn wire_op_to_shh(op: &WireDhtOp) -> SignedHeaderHashed {
+    SignedHeaderHashed::with_presigned(
+        HeaderHashed::from_content_sync(op.header.clone()),
+        op.signature.clone(),
+    )
 }
