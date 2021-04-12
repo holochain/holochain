@@ -158,7 +158,12 @@ async fn main() {
                         .respond(Wire::null(), KitsuneTimeout::from_millis(1000 * 5))
                         .await;
                 }
-                _ => (),
+                Tick => (),
+                evt => {
+                    let _ = s_o_2
+                        .send(Evt::Output(format!("[cli-chat evt: {:?}]", evt)))
+                        .await;
+                }
             }
         })
         .await;

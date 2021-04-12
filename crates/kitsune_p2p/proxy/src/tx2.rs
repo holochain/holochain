@@ -117,30 +117,60 @@ struct ProxyEpInner {
 }
 
 impl ProxyEpInner {
-    pub fn get_out_con_hnd(
+    pub fn get_con_hnd(
         &mut self,
         sub_con: ConHnd,
         local_digest: CertDigest,
         remote_digest: CertDigest,
-    ) -> KitsuneResult<ConHnd> {
+    ) -> KitsuneResult<(bool, ConHnd)> {
         let base_url = sub_con.peer_addr()?;
         let inner_map = self
             .base_url_to_uniq_out_con_hnd
             .entry(base_url)
             .or_insert_with(HashMap::new);
-        Ok(inner_map
-            .entry(remote_digest.clone())
-            .or_insert_with(move || ProxyConHnd::new(sub_con, local_digest, remote_digest))
-            .clone())
+        let mut did_insert = false;
+        let con = {
+            let did_insert = &mut did_insert;
+            inner_map
+                .entry(remote_digest.clone())
+                .or_insert_with(move || {
+                    *did_insert = true;
+                    ProxyConHnd::new(sub_con, local_digest, remote_digest)
+                })
+                .clone()
+        };
+        Ok((did_insert, con))
     }
 }
 
 struct ProxyEpHnd {
     sub_ep_hnd: EpHnd,
     local_digest: CertDigest,
-    #[allow(dead_code)]
     logic_hnd: LogicChanHandle<EpEvent>,
     inner: Share<ProxyEpInner>,
+}
+
+async fn get_con_hnd(
+    inner: &Share<ProxyEpInner>,
+    logic_hnd: LogicChanHandle<EpEvent>,
+    sub_con: ConHnd,
+    local_digest: CertDigest,
+    remote_digest: CertDigest,
+    is_outgoing: bool,
+) -> KitsuneResult<ConHnd> {
+    let (did_insert, con) =
+        inner.share_mut(move |i, _| i.get_con_hnd(sub_con, local_digest, remote_digest))?;
+    if did_insert {
+        let con = con.clone();
+        let url = con.peer_addr()?;
+        let evt = if is_outgoing {
+            EpEvent::OutgoingConnection(EpConnection { con, url })
+        } else {
+            EpEvent::IncomingConnection(EpConnection { con, url })
+        };
+        let _ = logic_hnd.emit(evt).await;
+    }
+    Ok(con)
 }
 
 impl ProxyEpHnd {
@@ -237,11 +267,20 @@ impl AsEpHnd for ProxyEpHnd {
         let base_url: TxUrl = purl.as_base().as_str().into();
 
         let local_digest = self.local_digest.clone();
+        let logic_hnd = self.logic_hnd.clone();
         let con_fut = self.sub_ep_hnd.get_connection(base_url, timeout);
         let inner = self.inner.clone();
         async move {
             let sub_con = con_fut.await?;
-            inner.share_mut(move |i, _| i.get_out_con_hnd(sub_con, local_digest, remote_digest))
+            get_con_hnd(
+                &inner,
+                logic_hnd,
+                sub_con,
+                local_digest,
+                remote_digest,
+                true,
+            )
+            .await
         }
         .boxed()
     }
@@ -338,9 +377,16 @@ async fn incoming_evt_handle(
                         data.cheap_move_start(SRC_END);
                         //println!("got data for US: {}", String::from_utf8_lossy(data.as_ref()));
                         let url = promote_addr(&base_url, &src_digest).unwrap();
-                        let con = match hnd.inner.share_mut(move |i, _| {
-                            i.get_out_con_hnd(sub_con, dest_digest, src_digest)
-                        }) {
+                        let con = match get_con_hnd(
+                            &hnd.inner,
+                            logic_hnd.clone(),
+                            sub_con,
+                            dest_digest,
+                            src_digest,
+                            false,
+                        )
+                        .await
+                        {
                             Err(_) => return,
                             Ok(con) => con,
                         };
@@ -381,26 +427,35 @@ async fn incoming_evt_handle(
                 }
             }
         }
-        ConnectionClosed(EpConnectionClosed { url: base_url, .. }) => {
-            let _ = hnd.inner.share_mut(|i, _| {
+        ConnectionClosed(EpConnectionClosed {
+            url: base_url,
+            code,
+            reason,
+        }) => {
+            let kill_cons = hnd.inner.share_mut(|i, _| {
                 if let Some(digest) = i.in_base_url_to_digest.remove(&base_url) {
                     i.in_digest_to_sub_con.remove(&digest);
                 }
-                i.base_url_to_uniq_out_con_hnd.remove(&base_url);
-                Ok(())
+                Ok(i.base_url_to_uniq_out_con_hnd.remove(&base_url))
             });
 
-            // TODO - FIXME
-            // iterate all pseudo-connections somehow
-            // there isn't just one event, but all that came through the proxy
-            /*
-            let evt = ConnectionClosed(EpConnectionClosed {
-                url,
-                code,
-                reason,
-            });
-            let _ = logic_hnd.emit(evt).await;
-            */
+            let kill_cons = match kill_cons {
+                Ok(Some(c)) => c,
+                _ => return,
+            };
+
+            for (_, c) in kill_cons.into_iter() {
+                let url = match c.peer_addr() {
+                    Ok(url) => url,
+                    _ => continue,
+                };
+                let evt = ConnectionClosed(EpConnectionClosed {
+                    url,
+                    code,
+                    reason: reason.clone(),
+                });
+                let _ = logic_hnd.emit(evt).await;
+            }
         }
         Error(e) => {
             let _ = logic_hnd.emit(Error(e)).await;
