@@ -471,6 +471,18 @@ pub fn fill_db_rejected(env: &EnvWrite, op: DhtOpHashed) {
         .unwrap();
 }
 
+pub fn fill_db_pending(env: &EnvWrite, op: DhtOpHashed) {
+    env.conn()
+        .unwrap()
+        .with_commit(|txn| {
+            let hash = op.as_hash().clone();
+            insert_op(txn, op, false);
+            update_op_validation_status(txn, hash.clone(), ValidationStatus::Valid);
+            DatabaseResult::Ok(())
+        })
+        .unwrap();
+}
+
 pub fn fill_db_as_author(env: &EnvWrite, op: DhtOpHashed) {
     env.conn()
         .unwrap()

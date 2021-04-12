@@ -164,7 +164,7 @@ where
         entry_hash: &Option<EntryHash>,
     ) -> bool {
         match (header_entry_hash, entry_hash) {
-            (Some(a), Some(b)) => dbg!(a) == dbg!(b),
+            (Some(a), Some(b)) => a == b,
             _ => true,
         }
     }

@@ -334,5 +334,35 @@ async fn check_all_queries_still_work_with_cache() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_pending_data_isnt_returned() {
-    todo!()
+    observability::test_run().ok();
+
+    // Environments
+    let cache = test_cell_env();
+    let authority = test_cell_env();
+    let vault = test_cell_env();
+
+    // Data
+    let td_entry = EntryTestData::new();
+    let td_element = ElementTestData::new();
+    fill_db_pending(&authority.env(), td_entry.store_entry_op.clone());
+    fill_db_pending(&authority.env(), td_element.any_store_element_op.clone());
+    fill_db_pending(&vault.env(), td_entry.store_entry_op.clone());
+    fill_db_pending(&vault.env(), td_element.any_store_element_op.clone());
+    fill_db_pending(&cache.env(), td_entry.store_entry_op.clone());
+    fill_db_pending(&cache.env(), td_element.any_store_element_op.clone());
+
+    // Network
+    let network = PassThroughNetwork::authority_for_nothing(vec![authority.env().clone().into()]);
+
+    // Cascade
+    let mut cascade = Cascade::<PassThroughNetwork>::empty().with_network(network, cache.env());
+
+    assert_is_none(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
+
+    let network = PassThroughNetwork::authority_for_all(vec![authority.env().clone().into()]);
+
+    // Cascade
+    let mut cascade = Cascade::<PassThroughNetwork>::empty().with_network(network, cache.env());
+
+    assert_is_none(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
 }

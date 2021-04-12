@@ -51,6 +51,8 @@ impl Query for GetElementOpsQuery {
         WHERE DhtOp.type IN (:store_element, :delete, :update)
         AND
         DhtOp.basis_hash = :header_hash
+        AND 
+        DhtOp.when_integrated IS NOT NULL
         "
         .into()
     }

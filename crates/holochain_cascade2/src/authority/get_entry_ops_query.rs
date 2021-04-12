@@ -64,6 +64,8 @@ impl Query for GetEntryOpsQuery {
         WHERE DhtOp.type IN (:store_entry, :delete, :update)
         AND
         DhtOp.basis_hash = :entry_hash
+        AND 
+        DhtOp.when_integrated IS NOT NULL
         "
         .into()
     }
