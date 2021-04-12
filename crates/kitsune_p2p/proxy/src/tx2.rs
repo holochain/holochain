@@ -110,6 +110,29 @@ struct ProxyEpInner {
     // allows us to cleanup the digest to sub_con proxy mapping
     // when a ConHnd close event is received
     in_base_url_to_digest: HashMap<TxUrl, CertDigest>,
+
+    // allows us to clone Tx2ConHnd items which will share
+    // the same Uniq, rather than duplicating handles to the same connection.
+    base_url_to_uniq_out_con_hnd: HashMap<TxUrl, HashMap<CertDigest, ConHnd>>,
+}
+
+impl ProxyEpInner {
+    pub fn get_out_con_hnd(
+        &mut self,
+        sub_con: ConHnd,
+        local_digest: CertDigest,
+        remote_digest: CertDigest,
+    ) -> KitsuneResult<ConHnd> {
+        let base_url = sub_con.peer_addr()?;
+        let inner_map = self
+            .base_url_to_uniq_out_con_hnd
+            .entry(base_url)
+            .or_insert_with(HashMap::new);
+        Ok(inner_map
+            .entry(remote_digest.clone())
+            .or_insert_with(move || ProxyConHnd::new(sub_con, local_digest, remote_digest))
+            .clone())
+    }
 }
 
 struct ProxyEpHnd {
@@ -133,6 +156,7 @@ impl ProxyEpHnd {
             inner: Share::new(ProxyEpInner {
                 in_digest_to_sub_con: HashMap::new(),
                 in_base_url_to_digest: HashMap::new(),
+                base_url_to_uniq_out_con_hnd: HashMap::new(),
             }),
         }))
     }
@@ -214,9 +238,10 @@ impl AsEpHnd for ProxyEpHnd {
 
         let local_digest = self.local_digest.clone();
         let con_fut = self.sub_ep_hnd.get_connection(base_url, timeout);
+        let inner = self.inner.clone();
         async move {
             let sub_con = con_fut.await?;
-            Ok(ProxyConHnd::new(sub_con, local_digest, remote_digest))
+            inner.share_mut(move |i, _| i.get_out_con_hnd(sub_con, local_digest, remote_digest))
         }
         .boxed()
     }
@@ -313,7 +338,12 @@ async fn incoming_evt_handle(
                         data.cheap_move_start(SRC_END);
                         //println!("got data for US: {}", String::from_utf8_lossy(data.as_ref()));
                         let url = promote_addr(&base_url, &src_digest).unwrap();
-                        let con = ProxyConHnd::new(sub_con, dest_digest, src_digest);
+                        let con = match hnd.inner.share_mut(move |i, _| {
+                            i.get_out_con_hnd(sub_con, dest_digest, src_digest)
+                        }) {
+                            Err(_) => return,
+                            Ok(con) => con,
+                        };
                         let evt = EpEvent::IncomingData(EpIncomingData {
                             con,
                             url,
@@ -356,6 +386,7 @@ async fn incoming_evt_handle(
                 if let Some(digest) = i.in_base_url_to_digest.remove(&base_url) {
                     i.in_digest_to_sub_con.remove(&digest);
                 }
+                i.base_url_to_uniq_out_con_hnd.remove(&base_url);
                 Ok(())
             });
 

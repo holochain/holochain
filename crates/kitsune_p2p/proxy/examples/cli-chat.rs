@@ -6,6 +6,7 @@ use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 use kitsune_p2p_types::*;
+use std::collections::HashSet;
 use std::io::Write;
 
 kitsune_p2p_types::write_codec_enum! {
@@ -18,7 +19,9 @@ kitsune_p2p_types::write_codec_enum! {
     }
 }
 
+#[derive(Debug)]
 enum Evt {
+    InCon(Tx2ConHnd<Wire>),
     Output(String),
     Key(char),
     Backspace,
@@ -26,7 +29,7 @@ enum Evt {
     End,
 }
 
-fn spawn_evt() -> (tokio::sync::mpsc::Sender<String>, BoxStream<'static, Evt>) {
+fn spawn_evt() -> (tokio::sync::mpsc::Sender<Evt>, BoxStream<'static, Evt>) {
     use crossterm::event::{poll, read, Event, KeyCode::*, KeyModifiers};
     let (s_o, mut r_o) = tokio::sync::mpsc::channel(32);
     let (s, mut r) = tokio::sync::mpsc::channel(32);
@@ -61,10 +64,9 @@ fn spawn_evt() -> (tokio::sync::mpsc::Sender<String>, BoxStream<'static, Evt>) {
             }
         }
     });
-    let r_o = futures::stream::poll_fn(move |cx| -> std::task::Poll<Option<String>> {
-        r_o.poll_recv(cx)
-    });
-    let r_o = r_o.map(|s| Evt::Output(s)).boxed();
+    let r_o =
+        futures::stream::poll_fn(move |cx| -> std::task::Poll<Option<Evt>> { r_o.poll_recv(cx) })
+            .boxed();
     let r = futures::stream::poll_fn(move |cx| -> std::task::Poll<Option<Evt>> { r.poll_recv(cx) })
         .boxed();
     (s_o, futures::stream::select_all(vec![r, r_o]).boxed())
@@ -140,13 +142,18 @@ async fn main() {
         ep.for_each_concurrent(32, move |evt| async move {
             use Tx2EpEvent::*;
             match evt {
-                IncomingRequest(Tx2EpIncomingRequest { data, respond, .. }) => {
+                IncomingRequest(Tx2EpIncomingRequest {
+                    con, data, respond, ..
+                }) => {
                     match data {
                         Wire::Msg(Msg { usr, msg }) => {
-                            let _ = s_o_2.send(format!("{} says: {}", usr, msg)).await;
+                            let _ = s_o_2
+                                .send(Evt::Output(format!("{} says: {}", usr, msg)))
+                                .await;
                         }
                         _ => (),
                     }
+                    let _ = s_o_2.send(Evt::InCon(con)).await;
                     let _ = respond
                         .respond(Wire::null(), KitsuneTimeout::from_millis(1000 * 5))
                         .await;
@@ -159,8 +166,9 @@ async fn main() {
 
     let mut stdout = std::io::stdout();
     let mut line = String::new();
-    let mut con_list = Vec::new();
+    let mut con_set = HashSet::new();
 
+    // clear the current line restoring the current prompt
     macro_rules! rline {
         ($($t:tt)*) => {{
             use crossterm::cursor::MoveToColumn;
@@ -182,6 +190,7 @@ async fn main() {
         }};
     }
 
+    // clear current line + print text, advancing the scroll - like println!
     macro_rules! pline {
         ($($t:tt)*) => {{
             use crossterm::terminal::{Clear, ClearType::*};
@@ -193,9 +202,24 @@ async fn main() {
         }};
     }
 
+    // replace current line with status text, without advancing scroll
+    macro_rules! sline {
+        ($($t:tt)*) => {{
+            use crossterm::terminal::{Clear, ClearType::*};
+            use crossterm::cursor::{MoveToColumn};
+            stdout.execute(Clear(CurrentLine)).unwrap();
+            stdout.execute(MoveToColumn(0)).unwrap();
+            write!(stdout, $($t)*).unwrap();
+            stdout.flush().unwrap();
+        }};
+    }
+
     rline!();
     while let Some(evt) = evt.next().await {
         match evt {
+            Evt::InCon(c) => {
+                con_set.insert(c);
+            }
             Evt::Output(o) => pline!("{}", o),
             Evt::Key(evt) => line.push(evt),
             Evt::Backspace => {
@@ -227,7 +251,7 @@ async fn main() {
                                 .await
                                 .unwrap();
 
-                            con_list.push(con);
+                            con_set.insert(con);
 
                             pline!("connected to {}", url);
                         }
@@ -235,21 +259,26 @@ async fn main() {
                     }
                     line.clear();
                 } else {
-                    let mut new_vec = Vec::new();
-                    for c in con_list.drain(..) {
-                        if c.request(
-                            &Wire::msg(username.clone(), line.clone()),
-                            KitsuneTimeout::from_millis(1000 * 5),
-                        )
-                        .await
-                        .is_ok()
+                    let cons = con_set.drain().collect::<Vec<_>>();
+                    for c in cons.into_iter() {
+                        sline!("-- sending to con {:?} --", c.uniq());
+                        match c
+                            .request(
+                                &Wire::msg(username.clone(), line.clone()),
+                                KitsuneTimeout::from_millis(1000 * 5),
+                            )
+                            .await
                         {
-                            new_vec.push(c);
+                            Ok(_) => {
+                                con_set.insert(c);
+                            }
+                            Err(e) => {
+                                pline!("send error: {:?}", e);
+                            }
                         }
                     }
-                    con_list = new_vec;
                     send_output
-                        .send(format!("{} says: {}", username, line))
+                        .send(Evt::Output(format!("{} says: {}", username, line)))
                         .await
                         .unwrap();
                     line.clear();
