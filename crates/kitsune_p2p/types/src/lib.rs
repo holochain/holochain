@@ -36,6 +36,25 @@ pub enum KitsuneErrorKind {
     Other(Box<dyn std::error::Error + Send + Sync>),
 }
 
+impl PartialEq for KitsuneErrorKind {
+    fn eq(&self, oth: &Self) -> bool {
+        match self {
+            Self::TimedOut => {
+                if let Self::TimedOut = oth {
+                    return true;
+                }
+            }
+            Self::Closed => {
+                if let Self::Closed = oth {
+                    return true;
+                }
+            }
+            _ => (),
+        }
+        false
+    }
+}
+
 /// Error related to remote communication.
 #[derive(Clone, Debug)]
 pub struct KitsuneError(pub Arc<KitsuneErrorKind>);
@@ -49,6 +68,11 @@ impl std::fmt::Display for KitsuneError {
 impl std::error::Error for KitsuneError {}
 
 impl KitsuneError {
+    /// the "kind" of this KitsuneError
+    pub fn kind(&self) -> &KitsuneErrorKind {
+        &self.0
+    }
+
     /// promote a custom error type to a KitsuneError
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
         Self(Arc::new(KitsuneErrorKind::Other(e.into())))
