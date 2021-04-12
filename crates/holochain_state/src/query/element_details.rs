@@ -31,7 +31,6 @@ impl Query for GetElementDetailsQuery {
     fn query(&self) -> String {
         "
         SELECT Header.blob AS header_blob, DhtOp.validation_status AS status
-        SELECT Header.blob AS header_blob
         FROM DhtOp
         JOIN Header On DhtOp.header_hash = Header.hash
         WHERE DhtOp.type IN (:create_type, :delete_type, :update_type)
@@ -42,9 +41,9 @@ impl Query for GetElementDetailsQuery {
     }
     fn params(&self) -> Vec<Params> {
         let params = named_params! {
-            ":create_type": DhtOpType::StoreEntry,
-            ":delete_type": DhtOpType::RegisterDeletedEntryHeader,
-            ":update_type": DhtOpType::RegisterUpdatedContent,
+            ":create_type": DhtOpType::StoreElement,
+            ":delete_type": DhtOpType::RegisterDeletedBy,
+            ":update_type": DhtOpType::RegisterUpdatedElement,
             ":header_hash": self.0,
         };
         params.to_vec()
@@ -113,7 +112,6 @@ impl Query for GetElementDetailsQuery {
             }
         };
         match shh.header() {
-            Header::Create(_) => add_header(&mut state, shh),
             Header::Update(update) => {
                 if update.original_header_address == self.0 && *shh.as_hash() == self.0 {
                     state.updates.insert(shh.clone());
@@ -127,7 +125,7 @@ impl Query for GetElementDetailsQuery {
             Header::Delete(_) => {
                 state.deletes.insert(shh);
             }
-            _ => panic!("TODO: Turn this into an error"),
+            _ => add_header(&mut state, shh),
         }
         Ok(state)
     }

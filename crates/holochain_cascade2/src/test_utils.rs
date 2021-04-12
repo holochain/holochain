@@ -20,6 +20,7 @@ use holochain_types::prelude::ValidationPackageResponse;
 use holochain_types::timestamp;
 use holochain_zome_types::fixt::*;
 use holochain_zome_types::Create;
+use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::Header;
 use holochain_zome_types::HeaderHashed;
@@ -226,6 +227,7 @@ pub struct ElementTestData {
     pub any_header_hash: HeaderHash,
     pub any_entry: Option<Entry>,
     pub any_entry_hash: Option<EntryHash>,
+    pub any_element: Element,
 }
 
 impl EntryTestData {
@@ -407,6 +409,14 @@ impl ElementTestData {
             any_entry.clone(),
         ));
 
+        let any_element = Element::new(
+            SignedHeaderHashed::with_presigned(
+                HeaderHashed::from_content_sync(any_header.clone()),
+                signature.clone(),
+            ),
+            any_entry.clone().map(|i| *i),
+        );
+
         let any_header = WireDhtOp {
             op_type: any_store_element_op.as_content().get_type(),
             header: any_header.clone(),
@@ -431,6 +441,7 @@ impl ElementTestData {
             any_header_hash,
             any_entry: any_entry.map(|e| *e),
             any_entry_hash,
+            any_element,
         }
     }
 }

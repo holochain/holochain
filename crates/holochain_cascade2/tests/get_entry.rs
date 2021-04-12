@@ -5,12 +5,110 @@ use holochain_state::insert::insert_op_scratch;
 use holochain_state::prelude::test_cell_env;
 use holochain_state::scratch::Scratch;
 use holochain_zome_types::Details;
+use holochain_zome_types::ElementDetails;
 use holochain_zome_types::EntryDetails;
 use holochain_zome_types::EntryDhtStatus;
 use holochain_zome_types::GetOptions;
+use holochain_zome_types::ValidationStatus;
 
-// TODO: Get element is so similar we should just combine it into this test file and save on boiler plate.
+async fn assert_can_get<N: HolochainP2pCellT2 + Clone + Send + 'static>(
+    td_entry: &EntryTestData,
+    td_element: &ElementTestData,
+    cascade: &mut Cascade<N>,
+    options: GetOptions,
+) {
+    // - Get via entry hash
+    let r = cascade
+        .dht_get(td_entry.hash.clone().into(), options.clone())
+        .await
+        .unwrap()
+        .expect("Failed to get entry");
 
+    assert_eq!(*r.header_address(), td_entry.create_hash);
+    assert_eq!(r.header().entry_hash(), Some(&td_entry.hash));
+
+    // - Get via header hash
+    let r = cascade
+        .dht_get(td_element.any_header_hash.clone().into(), options.clone())
+        .await
+        .unwrap()
+        .expect("Failed to get element");
+
+    assert_eq!(*r.header_address(), td_element.any_header_hash);
+    assert_eq!(r.header().entry_hash(), td_element.any_entry_hash.as_ref());
+
+    // - Get details via entry hash
+    let r = cascade
+        .get_details(td_entry.hash.clone().into(), options.clone())
+        .await
+        .unwrap()
+        .expect("Failed to get entry");
+
+    let expected = Details::Entry(EntryDetails {
+        entry: td_entry.entry.clone(),
+        headers: vec![wire_op_to_shh(&td_entry.wire_create)],
+        rejected_headers: vec![],
+        deletes: vec![],
+        updates: vec![],
+        entry_dht_status: EntryDhtStatus::Live,
+    });
+
+    assert_eq!(r, expected);
+
+    // - Get details via header hash
+    let r = cascade
+        .get_details(td_element.any_header_hash.clone().into(), options.clone())
+        .await
+        .unwrap()
+        .expect("Failed to get element details");
+
+    let expected = Details::Element(ElementDetails {
+        element: td_element.any_element.clone(),
+        validation_status: ValidationStatus::Valid,
+        deletes: vec![],
+        updates: vec![],
+    });
+    assert_eq!(r, expected);
+}
+
+async fn assert_is_none<N: HolochainP2pCellT2 + Clone + Send + 'static>(
+    td_entry: &EntryTestData,
+    td_element: &ElementTestData,
+    cascade: &mut Cascade<N>,
+    options: GetOptions,
+) {
+    // - Get via entry hash
+    let r = cascade
+        .dht_get(td_entry.hash.clone().into(), options.clone())
+        .await
+        .unwrap();
+
+    assert!(r.is_none());
+
+    // - Get via header hash
+    let r = cascade
+        .dht_get(td_element.any_header_hash.clone().into(), options.clone())
+        .await
+        .unwrap();
+
+    assert!(r.is_none());
+
+    // - Get details via entry hash
+    let r = cascade
+        .get_details(td_entry.hash.clone().into(), options.clone())
+        .await
+        .unwrap();
+
+    assert!(r.is_none());
+
+    // - Get details via header hash
+    let r = cascade
+        .get_details(td_element.any_header_hash.clone().into(), options.clone())
+        .await
+        .unwrap();
+
+    assert!(r.is_none());
+}
 #[tokio::test(flavor = "multi_thread")]
 async fn entry_not_authority_or_authoring() {
     observability::test_run().ok();
@@ -20,8 +118,10 @@ async fn entry_not_authority_or_authoring() {
     let authority = test_cell_env();
 
     // Data
-    let td = EntryTestData::new();
-    fill_db(&authority.env(), td.store_entry_op.clone());
+    let td_entry = EntryTestData::new();
+    let td_element = ElementTestData::new();
+    fill_db(&authority.env(), td_entry.store_entry_op.clone());
+    fill_db(&authority.env(), td_element.any_store_element_op.clone());
 
     // Network
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.env().clone().into()]);
@@ -29,31 +129,7 @@ async fn entry_not_authority_or_authoring() {
     // Cascade
     let mut cascade = Cascade::<PassThroughNetwork>::empty().with_network(network, cache.env());
 
-    let r = cascade
-        .dht_get(td.hash.clone().into(), Default::default())
-        .await
-        .unwrap()
-        .expect("Failed to get entry");
-
-    assert_eq!(*r.header_address(), td.create_hash);
-    assert_eq!(r.header().entry_hash(), Some(&td.hash));
-
-    let r = cascade
-        .get_details(td.hash.clone().into(), Default::default())
-        .await
-        .unwrap()
-        .expect("Failed to get entry");
-
-    let expected = Details::Entry(EntryDetails {
-        entry: td.entry.clone(),
-        headers: vec![wire_op_to_shh(&td.wire_create)],
-        rejected_headers: vec![],
-        deletes: vec![],
-        updates: vec![],
-        entry_dht_status: EntryDhtStatus::Live,
-    });
-
-    assert_eq!(r, expected);
+    assert_can_get(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -65,8 +141,10 @@ async fn entry_authoring() {
     let mut scratch = Scratch::new();
 
     // Data
-    let td = EntryTestData::new();
-    insert_op_scratch(&mut scratch, td.store_entry_op.clone());
+    let td_entry = EntryTestData::new();
+    let td_element = ElementTestData::new();
+    insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone());
+    insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone());
 
     // Network
     // - Not expecting any calls to the network.
@@ -79,31 +157,7 @@ async fn entry_authoring() {
         .with_scratch(scratch)
         .with_network(mock, cache.env());
 
-    let r = cascade
-        .dht_get(td.hash.clone().into(), Default::default())
-        .await
-        .unwrap()
-        .expect("Failed to get entry");
-
-    assert_eq!(*r.header_address(), td.create_hash);
-    assert_eq!(r.header().entry_hash(), Some(&td.hash));
-
-    let r = cascade
-        .get_details(td.hash.clone().into(), Default::default())
-        .await
-        .unwrap()
-        .expect("Failed to get entry");
-
-    let expected = Details::Entry(EntryDetails {
-        entry: td.entry.clone(),
-        headers: vec![wire_op_to_shh(&td.wire_create)],
-        rejected_headers: vec![],
-        deletes: vec![],
-        updates: vec![],
-        entry_dht_status: EntryDhtStatus::Live,
-    });
-
-    assert_eq!(r, expected);
+    assert_can_get(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -115,8 +169,10 @@ async fn entry_authority() {
     let vault = test_cell_env();
 
     // Data
-    let td = EntryTestData::new();
-    fill_db(&vault.env(), td.store_entry_op.clone());
+    let td_entry = EntryTestData::new();
+    let td_element = ElementTestData::new();
+    fill_db(&vault.env(), td_entry.store_entry_op.clone());
+    fill_db(&vault.env(), td_element.any_store_element_op.clone());
 
     // Network
     // - Not expecting any calls to the network.
@@ -129,31 +185,7 @@ async fn entry_authority() {
         .with_vault(vault.env().into())
         .with_network(mock, cache.env());
 
-    let r = cascade
-        .dht_get(td.hash.clone().into(), Default::default())
-        .await
-        .unwrap()
-        .expect("Failed to get entry");
-
-    assert_eq!(*r.header_address(), td.create_hash);
-    assert_eq!(r.header().entry_hash(), Some(&td.hash));
-
-    let r = cascade
-        .get_details(td.hash.clone().into(), Default::default())
-        .await
-        .unwrap()
-        .expect("Failed to get entry");
-
-    let expected = Details::Entry(EntryDetails {
-        entry: td.entry.clone(),
-        headers: vec![wire_op_to_shh(&td.wire_create)],
-        rejected_headers: vec![],
-        deletes: vec![],
-        updates: vec![],
-        entry_dht_status: EntryDhtStatus::Live,
-    });
-
-    assert_eq!(r, expected);
+    assert_can_get(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -165,8 +197,10 @@ async fn content_not_authority_or_authoring() {
     let vault = test_cell_env();
 
     // Data
-    let td = EntryTestData::new();
-    fill_db(&vault.env(), td.store_entry_op.clone());
+    let td_entry = EntryTestData::new();
+    let td_element = ElementTestData::new();
+    fill_db(&vault.env(), td_entry.store_entry_op.clone());
+    fill_db(&vault.env(), td_element.any_store_element_op.clone());
 
     // Network
     // - Not expecting any calls to the network.
@@ -179,31 +213,7 @@ async fn content_not_authority_or_authoring() {
         .with_vault(vault.env().into())
         .with_network(mock, cache.env());
 
-    let r = cascade
-        .dht_get(td.hash.clone().into(), GetOptions::content())
-        .await
-        .unwrap()
-        .expect("Failed to get entry");
-
-    assert_eq!(*r.header_address(), td.create_hash);
-    assert_eq!(r.header().entry_hash(), Some(&td.hash));
-
-    let r = cascade
-        .get_details(td.hash.clone().into(), GetOptions::content())
-        .await
-        .unwrap()
-        .expect("Failed to get entry");
-
-    let expected = Details::Entry(EntryDetails {
-        entry: td.entry.clone(),
-        headers: vec![wire_op_to_shh(&td.wire_create)],
-        rejected_headers: vec![],
-        deletes: vec![],
-        updates: vec![],
-        entry_dht_status: EntryDhtStatus::Live,
-    });
-
-    assert_eq!(r, expected);
+    assert_can_get(&td_entry, &td_element, &mut cascade, GetOptions::content()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -215,8 +225,10 @@ async fn content_authoring() {
     let mut scratch = Scratch::new();
 
     // Data
-    let td = EntryTestData::new();
-    insert_op_scratch(&mut scratch, td.store_entry_op.clone());
+    let td_entry = EntryTestData::new();
+    let td_element = ElementTestData::new();
+    insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone());
+    insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone());
 
     // Network
     // - Not expecting any calls to the network.
@@ -229,31 +241,7 @@ async fn content_authoring() {
         .with_scratch(scratch)
         .with_network(mock, cache.env());
 
-    let r = cascade
-        .dht_get(td.hash.clone().into(), GetOptions::content())
-        .await
-        .unwrap()
-        .expect("Failed to get entry");
-
-    assert_eq!(*r.header_address(), td.create_hash);
-    assert_eq!(r.header().entry_hash(), Some(&td.hash));
-
-    let r = cascade
-        .get_details(td.hash.clone().into(), GetOptions::content())
-        .await
-        .unwrap()
-        .expect("Failed to get entry");
-
-    let expected = Details::Entry(EntryDetails {
-        entry: td.entry.clone(),
-        headers: vec![wire_op_to_shh(&td.wire_create)],
-        rejected_headers: vec![],
-        deletes: vec![],
-        updates: vec![],
-        entry_dht_status: EntryDhtStatus::Live,
-    });
-
-    assert_eq!(r, expected);
+    assert_can_get(&td_entry, &td_element, &mut cascade, GetOptions::content()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -265,7 +253,8 @@ async fn content_authority() {
     let vault = test_cell_env();
 
     // Data
-    let td = EntryTestData::new();
+    let td_entry = EntryTestData::new();
+    let td_element = ElementTestData::new();
 
     // Network
     // - Not expecting any calls to the network.
@@ -278,19 +267,7 @@ async fn content_authority() {
         .with_vault(vault.env().into())
         .with_network(mock, cache.env());
 
-    let r = cascade
-        .dht_get(td.hash.clone().into(), Default::default())
-        .await
-        .unwrap();
-
-    assert!(r.is_none());
-
-    let r = cascade
-        .get_details(td.hash.clone().into(), Default::default())
-        .await
-        .unwrap();
-
-    assert!(r.is_none());
+    assert_is_none(&td_entry, &td_element, &mut cascade, GetOptions::content()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
