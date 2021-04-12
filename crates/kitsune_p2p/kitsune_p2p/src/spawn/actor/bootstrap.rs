@@ -210,7 +210,12 @@ mod tests {
     use lair_keystore_api::internal::sign_ed25519::sign_ed25519_keypair_new_from_entropy;
     use std::convert::TryInto;
 
+    // TODO - FIXME - davidb
+    // I'm disabling all these tests that depend on outside systems
+    // we need local testing to prove these out in a ci environment.
+
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "flaky"]
     async fn test_bootstrap() {
         let keypair = sign_ed25519_keypair_new_from_entropy().await.unwrap();
         let space = fixt!(KitsuneSpace);
@@ -256,6 +261,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "flaky"]
     async fn test_now() {
         let local_now = std::time::SystemTime::now();
         let local_millis: u64 = local_now
