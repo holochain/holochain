@@ -11,7 +11,7 @@ use holochain_sqlite::rusqlite::Row;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::HasValidationStatus;
-use holochain_types::prelude::ValStatusOf;
+use holochain_types::prelude::Judged;
 use holochain_zome_types::Entry;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::SignedHeader;
@@ -175,7 +175,7 @@ pub struct DbScratch<'borrow, 'txn> {
 
 pub struct DbScratchIter<'stmt, Q>
 where
-    Q: Query<Item = ValStatusOf<SignedHeaderHashed>>,
+    Q: Query<Item = Judged<SignedHeaderHashed>>,
 {
     stmts: QueryStmts<'stmt, Q>,
     filtered_scratch: FilteredScratch,
@@ -265,7 +265,7 @@ impl<'stmt, Q: Query> StoresIter<Q::Item> for QueryStmts<'stmt, Q> {
 
 impl<'borrow, 'txn, Q> Stores<Q> for DbScratch<'borrow, 'txn>
 where
-    Q: Query<Item = ValStatusOf<SignedHeaderHashed>>,
+    Q: Query<Item = Judged<SignedHeaderHashed>>,
 {
     type O = DbScratchIter<'borrow, Q>;
 
@@ -308,7 +308,7 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
 
 impl<'stmt, Q> StoresIter<Q::Item> for DbScratchIter<'stmt, Q>
 where
-    Q: Query<Item = ValStatusOf<SignedHeaderHashed>>,
+    Q: Query<Item = Judged<SignedHeaderHashed>>,
 {
     fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Q::Item>> {
         Ok(Box::new(
