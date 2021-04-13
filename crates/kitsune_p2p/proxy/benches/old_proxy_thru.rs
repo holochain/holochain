@@ -21,13 +21,9 @@ async fn connect(
     //let (bind, evt) = kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?;
     let (bind, evt) = spawn_transport_listener_quic(Default::default()).await?;
 
-    let (bind, mut evt) = spawn_kitsune_proxy_listener(
-        proxy_config,
-        Arc::new(KitsuneP2pTuningParams::default()),
-        bind,
-        evt,
-    )
-    .await?;
+    let (bind, mut evt) =
+        spawn_kitsune_proxy_listener(proxy_config, KitsuneP2pTuningParams::default(), bind, evt)
+            .await?;
     let addr = bind.bound_url().await?;
 
     tokio::task::spawn(async move {

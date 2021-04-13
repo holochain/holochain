@@ -230,9 +230,7 @@ async fn proxy_tls_inner(
     let (bind, evt) = kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?;
     let (bind1, mut evt1) = spawn_kitsune_proxy_listener(
         proxy_config,
-        std::sync::Arc::new(
-            kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams::default(),
-        ),
+        kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams::default(),
         bind,
         evt,
     )
@@ -259,9 +257,7 @@ async fn proxy_tls_inner(
     let (bind, evt) = kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?;
     let (bind2, _evt2) = spawn_kitsune_proxy_listener(
         proxy_config,
-        std::sync::Arc::new(
-            kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams::default(),
-        ),
+        kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams::default(),
         bind,
         evt,
     )

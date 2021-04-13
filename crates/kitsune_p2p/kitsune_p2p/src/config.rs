@@ -1,5 +1,4 @@
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
-use std::sync::Arc;
 use url2::Url2;
 
 /// The default production bootstrap service url.
@@ -20,7 +19,7 @@ pub struct KitsuneP2pConfig {
     /// that no longer exists, or a value that does not parse,
     /// a warning will be printed in the tracing log.
     #[serde(default)]
-    pub tuning_params: Arc<KitsuneP2pTuningParams>,
+    pub tuning_params: KitsuneP2pTuningParams,
     /// The network used for connecting to other peers
     pub network_type: NetworkType,
 }
@@ -30,7 +29,7 @@ impl Default for KitsuneP2pConfig {
         Self {
             transport_pool: Vec::new(),
             bootstrap_service: None,
-            tuning_params: Arc::new(KitsuneP2pTuningParams::default()),
+            tuning_params: KitsuneP2pTuningParams::default(),
             network_type: NetworkType::QuicBootstrap,
         }
     }
