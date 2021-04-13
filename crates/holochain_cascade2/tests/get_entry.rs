@@ -109,6 +109,65 @@ async fn assert_is_none<N: HolochainP2pCellT2 + Clone + Send + 'static>(
 
     assert!(r.is_none());
 }
+
+async fn assert_rejected<N: HolochainP2pCellT2 + Clone + Send + 'static>(
+    td_entry: &EntryTestData,
+    td_element: &ElementTestData,
+    cascade: &mut Cascade<N>,
+    options: GetOptions,
+) {
+    // - Get via entry hash
+    let r = cascade
+        .dht_get(td_entry.hash.clone().into(), options.clone())
+        .await
+        .unwrap();
+
+    assert!(r.is_none());
+
+    // - Get via header hash
+    let r = cascade
+        .dht_get(td_element.any_header_hash.clone().into(), options.clone())
+        .await
+        .unwrap();
+
+    assert!(r.is_none());
+
+    let r = cascade
+        .get_details(td_entry.hash.clone().into(), Default::default())
+        .await
+        .unwrap()
+        .expect("Failed to get entry");
+
+    let expected = Details::Entry(EntryDetails {
+        entry: td_entry.entry.clone(),
+        headers: vec![],
+        rejected_headers: vec![wire_op_to_shh(&td_entry.wire_create)],
+        deletes: vec![],
+        updates: vec![],
+        entry_dht_status: EntryDhtStatus::Dead,
+    });
+
+    assert_eq!(r, expected);
+
+    let r = cascade
+        .get_details(
+            td_element.any_header_hash.clone().into(),
+            Default::default(),
+        )
+        .await
+        .unwrap()
+        .expect("Failed to get entry");
+
+    let expected = Details::Element(ElementDetails {
+        element: td_element.any_element.clone(),
+        validation_status: ValidationStatus::Rejected,
+        deletes: vec![],
+        updates: vec![],
+    });
+
+    assert_eq!(r, expected);
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn entry_not_authority_or_authoring() {
     observability::test_run().ok();
@@ -279,43 +338,39 @@ async fn rejected_ops() {
     let authority = test_cell_env();
 
     // Data
-    let td = EntryTestData::new();
-    fill_db_rejected(&authority.env(), td.store_entry_op.clone());
+    let td_entry = EntryTestData::new();
+    let td_element = ElementTestData::new();
+    fill_db_rejected(&authority.env(), td_entry.store_entry_op.clone());
+    fill_db_rejected(&authority.env(), td_element.any_store_element_op.clone());
 
     // Network
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.env().clone().into()]);
 
     // Cascade
     let mut cascade = Cascade::<PassThroughNetwork>::empty().with_network(network, cache.env());
-
-    let r = cascade
-        .dht_get(td.hash.clone().into(), Default::default())
-        .await
-        .unwrap();
-
-    assert!(r.is_none());
-
-    let r = cascade
-        .get_details(td.hash.clone().into(), Default::default())
-        .await
-        .unwrap()
-        .expect("Failed to get entry");
-
-    let expected = Details::Entry(EntryDetails {
-        entry: td.entry.clone(),
-        headers: vec![],
-        rejected_headers: vec![wire_op_to_shh(&td.wire_create)],
-        deletes: vec![],
-        updates: vec![],
-        entry_dht_status: EntryDhtStatus::Dead,
-    });
-
-    assert_eq!(r, expected);
+    assert_rejected(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_can_handle_rejected_ops_in_cache() {
-    todo!()
+    observability::test_run().ok();
+
+    // Environments
+    let cache = test_cell_env();
+    let authority = test_cell_env();
+
+    // Data
+    let td_entry = EntryTestData::new();
+    let td_element = ElementTestData::new();
+    fill_db_rejected(&cache.env(), td_entry.store_entry_op.clone());
+    fill_db_rejected(&cache.env(), td_element.any_store_element_op.clone());
+
+    // Network
+    let network = PassThroughNetwork::authority_for_nothing(vec![authority.env().clone().into()]);
+
+    // Cascade
+    let mut cascade = Cascade::<PassThroughNetwork>::empty().with_network(network, cache.env());
+    assert_rejected(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -329,6 +384,11 @@ async fn check_all_queries_still_work() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_all_queries_still_work_with_cache() {
+    todo!()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn check_all_queries_still_work_with_scratch() {
     todo!()
 }
 

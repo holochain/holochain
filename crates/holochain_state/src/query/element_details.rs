@@ -16,6 +16,7 @@ impl GetElementDetailsQuery {
     }
 }
 
+#[derive(Debug)]
 pub struct State {
     header: Option<SignedHeaderHashed>,
     rejected_header: Option<SignedHeaderHashed>,
@@ -98,7 +99,7 @@ impl Query for GetElementDetailsQuery {
             data: shh,
             status: validation_status,
         } = data;
-        let add_header = |state: &mut State, shh| {
+        if *shh.as_hash() == self.0 {
             if state.header.is_none() && state.rejected_header.is_none() {
                 match validation_status {
                     Some(ValidationStatus::Valid) => {
@@ -110,23 +111,23 @@ impl Query for GetElementDetailsQuery {
                     _ => (),
                 }
             }
-        };
-        match shh.header() {
-            Header::Update(update) => {
-                if update.original_header_address == self.0 && *shh.as_hash() == self.0 {
-                    state.updates.insert(shh.clone());
-                    add_header(&mut state, shh);
-                } else if *shh.as_hash() == self.0 {
-                    add_header(&mut state, shh);
-                } else if update.original_header_address == self.0 {
-                    state.updates.insert(shh.clone());
+        } else {
+            match shh.header() {
+                Header::Update(Update {
+                    original_header_address,
+                    ..
+                }) if *original_header_address == self.0 => {
+                    state.updates.insert(shh);
                 }
+                Header::Delete(Delete {
+                    deletes_address, ..
+                }) if *deletes_address == self.0 => {
+                    state.deletes.insert(shh);
+                }
+                _ => (),
             }
-            Header::Delete(_) => {
-                state.deletes.insert(shh);
-            }
-            _ => add_header(&mut state, shh),
         }
+
         Ok(state)
     }
 
