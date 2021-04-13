@@ -15,6 +15,9 @@ pub mod dependencies {
     pub use ::url2;
 }
 
+pub use ::lair_keystore_api::actor::CertDigest;
+
+use config::KitsuneP2pTuningParams;
 use std::sync::Arc;
 
 /// Error related to remote communication.

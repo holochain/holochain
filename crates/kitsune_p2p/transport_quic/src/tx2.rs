@@ -6,14 +6,12 @@ use futures::stream::{BoxStream, StreamExt};
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::dependencies::serde_json;
 use kitsune_p2p_types::tls::*;
-use kitsune_p2p_types::tx2::tx2_backend::*;
+use kitsune_p2p_types::tx2::tx2_adapter::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
+use lair_keystore_api::actor::CertDigest;
 use std::sync::Arc;
-
-/// Tls ALPN identifier for kitsune quic handshaking
-const ALPN_KITSUNE_QUIC_0: &[u8] = b"kitsune-quic/0";
 
 /// Configuration for QuicBackendAdapt
 #[non_exhaustive]
@@ -24,7 +22,7 @@ pub struct QuicConfig {
 
     /// Tuning Params
     /// Default: None = default.
-    pub tuning_params: Option<Arc<KitsuneP2pTuningParams>>,
+    pub tuning_params: Option<KitsuneP2pTuningParams>,
 }
 
 impl Default for QuicConfig {
@@ -38,7 +36,7 @@ impl Default for QuicConfig {
 
 impl QuicConfig {
     /// into inner contents with default application
-    pub async fn split(self) -> KitsuneResult<(TlsConfig, Arc<KitsuneP2pTuningParams>)> {
+    pub async fn split(self) -> KitsuneResult<(TlsConfig, KitsuneP2pTuningParams)> {
         let QuicConfig { tls, tuning_params } = self;
 
         let tls = match tls {
@@ -46,12 +44,21 @@ impl QuicConfig {
             Some(tls) => tls,
         };
 
-        let tuning_params =
-            tuning_params.unwrap_or_else(|| Arc::new(KitsuneP2pTuningParams::default()));
+        let tuning_params = tuning_params.unwrap_or_else(KitsuneP2pTuningParams::default);
 
         Ok((tls, tuning_params))
     }
 }
+
+/// Quic endpoint bind adapter for kitsune tx2
+pub async fn tx2_quic_adapter(config: QuicConfig) -> KitsuneResult<AdapterFactory> {
+    QuicBackendAdapt::new(config).await
+}
+
+// -- private -- //
+
+/// Tls ALPN identifier for kitsune quic handshaking
+const ALPN_KITSUNE_QUIC_0: &[u8] = b"kitsune-quic/0";
 
 struct QuicInChanRecvAdapt(BoxStream<'static, InChanFut>);
 
@@ -93,14 +100,35 @@ impl futures::stream::Stream for QuicInChanRecvAdapt {
 impl InChanRecvAdapt for QuicInChanRecvAdapt {}
 
 struct QuicConAdaptInner {
+    local_digest: CertDigest,
     con: quinn::Connection,
 }
 
 struct QuicConAdapt(Share<QuicConAdaptInner>, Uniq);
 
+pub(crate) fn blake2b_32(data: &[u8]) -> Vec<u8> {
+    blake2b_simd::Params::new()
+        .hash_length(32)
+        .to_state()
+        .update(data)
+        .finalize()
+        .as_bytes()
+        .to_vec()
+}
+
 impl QuicConAdapt {
-    pub fn new(con: quinn::Connection) -> Self {
-        Self(Share::new(QuicConAdaptInner { con }), Uniq::default())
+    pub fn new(con: quinn::Connection) -> KitsuneResult<Self> {
+        let local_digest = match con.peer_identity() {
+            None => return Err("invalid peer certificate".into()),
+            Some(chain) => match chain.iter().next() {
+                None => return Err("invalid peer certificate".into()),
+                Some(cert) => CertDigest(Arc::new(blake2b_32(cert.as_ref()))),
+            },
+        };
+        Ok(Self(
+            Share::new(QuicConAdaptInner { local_digest, con }),
+            Uniq::default(),
+        ))
     }
 }
 
@@ -109,13 +137,17 @@ impl ConAdapt for QuicConAdapt {
         self.1
     }
 
-    fn remote_addr(&self) -> KitsuneResult<TxUrl> {
+    fn peer_addr(&self) -> KitsuneResult<TxUrl> {
         let addr = self.0.share_mut(|i, _| Ok(i.con.remote_address()))?;
 
         use kitsune_p2p_types::dependencies::url2;
         let url = url2::url2!("{}://{}", crate::SCHEME, addr);
 
         Ok(url.into())
+    }
+
+    fn peer_digest(&self) -> KitsuneResult<CertDigest> {
+        self.0.share_mut(|i, _| Ok(i.local_digest.clone()))
     }
 
     fn out_chan(&self, timeout: KitsuneTimeout) -> OutChanFut {
@@ -151,7 +183,7 @@ fn connecting(con_fut: quinn::Connecting) -> ConFut {
             ..
         } = con_fut.await.map_err(KitsuneError::other)?;
 
-        let con: Arc<dyn ConAdapt> = Arc::new(QuicConAdapt::new(connection));
+        let con: Arc<dyn ConAdapt> = Arc::new(QuicConAdapt::new(connection)?);
         let chan_recv: Box<dyn InChanRecvAdapt> = Box::new(QuicInChanRecvAdapt::new(uni_streams));
 
         Ok((con, chan_recv))
@@ -192,13 +224,17 @@ impl ConRecvAdapt for QuicConRecvAdapt {}
 
 struct QuicEndpointAdaptInner {
     ep: quinn::Endpoint,
+    local_digest: CertDigest,
 }
 
 struct QuicEndpointAdapt(Share<QuicEndpointAdaptInner>, Uniq);
 
 impl QuicEndpointAdapt {
-    pub fn new(ep: quinn::Endpoint) -> Self {
-        Self(Share::new(QuicEndpointAdaptInner { ep }), Uniq::default())
+    pub fn new(ep: quinn::Endpoint, local_digest: CertDigest) -> Self {
+        Self(
+            Share::new(QuicEndpointAdaptInner { ep, local_digest }),
+            Uniq::default(),
+        )
     }
 }
 
@@ -247,6 +283,10 @@ impl EndpointAdapt for QuicEndpointAdapt {
         Ok(url.into())
     }
 
+    fn local_digest(&self) -> KitsuneResult<CertDigest> {
+        self.0.share_mut(|i, _| Ok(i.local_digest.clone()))
+    }
+
     fn connect(&self, url: TxUrl, timeout: KitsuneTimeout) -> ConFut {
         let maybe_ep = self.0.share_mut(|i, _| Ok(i.ep.clone()));
         timeout
@@ -277,16 +317,19 @@ impl EndpointAdapt for QuicEndpointAdapt {
 
 /// Quic endpoint backend bind adapter for kitsune tx2
 pub struct QuicBackendAdapt {
+    local_digest: CertDigest,
     quic_srv: quinn::ServerConfig,
     quic_cli: quinn::ClientConfig,
 }
 
 impl QuicBackendAdapt {
     /// Construct a new quic tx2 backend bind adapter
-    pub async fn new(config: QuicConfig) -> KitsuneResult<BackendFactory> {
+    pub async fn new(config: QuicConfig) -> KitsuneResult<AdapterFactory> {
         let (tls, tuning_params) = config.split().await?;
 
-        let (tls_srv, tls_cli) = gen_tls_configs(ALPN_KITSUNE_QUIC_0, &tls, tuning_params)?;
+        let local_digest = tls.cert_digest.clone();
+
+        let (tls_srv, tls_cli) = gen_tls_configs(ALPN_KITSUNE_QUIC_0, &tls, tuning_params.clone())?;
 
         let mut transport = quinn::TransportConfig::default();
 
@@ -305,9 +348,10 @@ impl QuicBackendAdapt {
 
         // see also `keep_alive_interval`.
         // right now keep_alive_interval is None,
-        // so connections will idle timeout after 20 seconds.
         transport
-            .max_idle_timeout(Some(std::time::Duration::from_millis(30_000)))
+            .max_idle_timeout(Some(std::time::Duration::from_millis(
+                tuning_params.tx2_quic_max_idle_timeout_ms as u64,
+            )))
             .unwrap();
 
         let transport = Arc::new(transport);
@@ -320,14 +364,19 @@ impl QuicBackendAdapt {
         quic_cli.transport = transport;
         quic_cli.crypto = tls_cli;
 
-        let out: BackendFactory = Arc::new(Self { quic_srv, quic_cli });
+        let out: AdapterFactory = Arc::new(Self {
+            local_digest,
+            quic_srv,
+            quic_cli,
+        });
 
         Ok(out)
     }
 }
 
-impl BackendAdapt for QuicBackendAdapt {
+impl BindAdapt for QuicBackendAdapt {
     fn bind(&self, url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut {
+        let local_digest = self.local_digest.clone();
         let quic_srv = self.quic_srv.clone();
         let quic_cli = self.quic_cli.clone();
         timeout
@@ -342,7 +391,7 @@ impl BackendAdapt for QuicBackendAdapt {
 
                 let (ep, inc) = builder.bind(&addr).map_err(KitsuneError::other)?;
 
-                let ep: Arc<dyn EndpointAdapt> = Arc::new(QuicEndpointAdapt::new(ep));
+                let ep: Arc<dyn EndpointAdapt> = Arc::new(QuicEndpointAdapt::new(ep, local_digest));
                 let con_recv: Box<dyn ConRecvAdapt> = Box::new(QuicConRecvAdapt::new(inc));
 
                 Ok((ep, con_recv))
@@ -359,16 +408,17 @@ mod tests {
     async fn test_quic_tx2() {
         let t = KitsuneTimeout::from_millis(5000);
 
-        let config = QuicConfig::default();
-        let factory = QuicBackendAdapt::new(config).await.unwrap();
-
         let (s_done, r_done) = tokio::sync::oneshot::channel();
 
+        let config = QuicConfig::default();
+        let factory = QuicBackendAdapt::new(config).await.unwrap();
         let (ep1, _con_recv1) = factory
             .bind("kitsune-quic://0.0.0.0:0".into(), t)
             .await
             .unwrap();
 
+        let config = QuicConfig::default();
+        let factory = QuicBackendAdapt::new(config).await.unwrap();
         let (ep2, mut con_recv2) = factory
             .bind("kitsune-quic://0.0.0.0:0".into(), t)
             .await

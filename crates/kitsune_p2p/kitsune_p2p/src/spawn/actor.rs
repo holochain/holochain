@@ -43,7 +43,7 @@ pub(crate) struct KitsuneP2pActor {
 
 fn build_transport(
     t_conf: TransportConfig,
-    tuning_params: Arc<kitsune_p2p_types::config::KitsuneP2pTuningParams>,
+    tuning_params: kitsune_p2p_types::config::KitsuneP2pTuningParams,
     tls_config: Arc<kitsune_p2p_proxy::TlsConfig>,
 ) -> must_future::MustBoxFuture<
     'static,

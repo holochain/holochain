@@ -3,8 +3,8 @@ use futures::stream::StreamExt;
 use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::tx2::*;
-use kitsune_p2p_types::tx2::tx2_frontend::*;
-use kitsune_p2p_types::tx2::tx2_promote::*;
+use kitsune_p2p_types::tx2::tx2_pool::*;
+use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
@@ -51,7 +51,10 @@ impl Test {
         let mut tgt_addrs = Vec::new();
         for _ in 0..TGT_COUNT {
             let (tgt_addr, tgt_ep_hnd) = mk_tgt(tt).await;
-            let tgt_con = tgt_ep_hnd.connect(proxy_addr.clone(), t).await.unwrap();
+            let tgt_con = tgt_ep_hnd
+                .get_connection(proxy_addr.clone(), t)
+                .await
+                .unwrap();
             tgt_nodes.push((tgt_ep_hnd, tgt_con));
 
             tgt_addrs.push(proxify_addr(&proxy_addr, &tgt_addr));
@@ -71,7 +74,7 @@ impl Test {
                     }
                 };
                 let (_, ep_hnd) = mk_node(tt, d_send.clone()).await;
-                let con = ep_hnd.connect(tgt_addr.clone(), t).await.unwrap();
+                let con = ep_hnd.get_connection(tgt_addr.clone(), t).await.unwrap();
                 nodes.push((ep_hnd, con));
             }
         }
@@ -124,17 +127,15 @@ impl Test {
 async fn mk_core(tt: TT) -> (TxUrl, Ep, EpHnd) {
     let t = KitsuneTimeout::from_millis(5000);
 
-    let conf = QuicConfig::default();
-
     let f = match tt {
-        TT::Mem => MemBackendAdapt::new(),
-        TT::Quic => QuicBackendAdapt::new(conf).await.unwrap(),
+        TT::Mem => tx2_mem_adapter(MemConfig::default()).await.unwrap(),
+        TT::Quic => tx2_quic_adapter(QuicConfig::default()).await.unwrap(),
     };
 
-    let f = tx2_promote(f, NODE_COUNT * 3);
-    let f = tx2_proxy(f, TlsConfig::new_ephemeral().await.unwrap());
+    let f = tx2_pool_promote(f, Default::default());
+    let f = tx2_proxy(f, Default::default());
 
-    let ep = f.bind("kitsune-quic://0.0.0.0:0", t).await.unwrap();
+    let ep = f.bind("kitsune-quic://0.0.0.0:0".into(), t).await.unwrap();
     let ep_hnd = ep.handle().clone();
     let addr = ep_hnd.local_addr().unwrap();
 

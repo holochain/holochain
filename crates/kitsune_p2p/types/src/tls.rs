@@ -44,7 +44,7 @@ static CIPHER_SUITES: &[&rustls::SupportedCipherSuite] = &[
 pub fn gen_tls_configs(
     alpn: &[u8],
     tls: &TlsConfig,
-    tuning_params: Arc<KitsuneP2pTuningParams>,
+    tuning_params: KitsuneP2pTuningParams,
 ) -> KitsuneResult<(Arc<rustls::ServerConfig>, Arc<rustls::ClientConfig>)> {
     let cert = rustls::Certificate(tls.cert.0.to_vec());
     let cert_priv_key = rustls::PrivateKey(tls.cert_priv_key.0.to_vec());

@@ -5,7 +5,6 @@ use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dependencies::ghost_actor;
 use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::transport::*;
-use std::sync::Arc;
 use structopt::StructOpt;
 
 /// Option Parsing
@@ -36,7 +35,7 @@ async fn main() {
 async fn inner() -> TransportResult<()> {
     let opt = Opt::from_args();
 
-    let tuning_params = Arc::new(KitsuneP2pTuningParams::default());
+    let tuning_params = KitsuneP2pTuningParams::default();
 
     let (listener, events) = spawn_transport_listener_quic(ConfigListenerQuic::default()).await?;
 
