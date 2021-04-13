@@ -19,14 +19,17 @@ pub struct ValidationPackageResponse(pub Option<ValidationPackage>);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 /// Data with an optional validation status.
-pub struct ValStatusOf<T> {
+/// This type indicates that the use of the underlying data is tied to a
+/// ValidationStatus related to this data. It's meant to force you to think
+/// about the validity of this piece of data and assign a status.
+pub struct Judged<T> {
     /// The that the status applies to.
     pub data: T,
     /// The validation status of the data.
     pub status: Option<ValidationStatus>,
 }
 
-impl<T> ValStatusOf<T> {
+impl<T> Judged<T> {
     /// Create a valid status of T.
     pub fn valid(data: T) -> Self {
         Self {
@@ -41,16 +44,26 @@ impl<T> ValStatusOf<T> {
 }
 
 /// Data that requires a validation status.
-pub trait ValidationStatusT {
+pub trait HasValidationStatus {
+    /// The type of the inner data
+    type Data;
+
     /// Get the status of a some data.
     /// None means this data has not been validated yet.
-    fn status(&self) -> Option<ValidationStatus> {
-        None
-    }
+    fn validation_status(&self) -> Option<ValidationStatus>;
+
+    /// The data which has the validation status
+    fn data(&self) -> &Self::Data;
 }
 
-impl<T> ValidationStatusT for ValStatusOf<T> {
-    fn status(&self) -> Option<ValidationStatus> {
+impl<T> HasValidationStatus for Judged<T> {
+    type Data = T;
+
+    fn validation_status(&self) -> Option<ValidationStatus> {
         self.status
+    }
+
+    fn data(&self) -> &Self::Data {
+        &self.data
     }
 }

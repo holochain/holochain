@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_types::prelude::ValStatusOf;
+use holochain_types::prelude::Judged;
 use holochain_types::EntryHashed;
 use holochain_zome_types::Entry;
 use holochain_zome_types::SignedHeaderHashed;
@@ -25,13 +25,13 @@ use crate::query::Store;
 /// Cascade.
 #[derive(Debug, Clone)]
 pub struct Scratch {
-    headers: Vec<Arc<ValStatusOf<SignedHeaderHashed>>>,
+    headers: Vec<SignedHeaderHashed>,
     entries: HashMap<EntryHash, Arc<Entry>>,
 }
 
 // MD: hmm, why does this need to be a separate type? Why collect into this?
 pub struct FilteredScratch {
-    headers: Vec<Arc<ValStatusOf<SignedHeaderHashed>>>,
+    headers: Vec<SignedHeaderHashed>,
 }
 
 impl Scratch {
@@ -43,11 +43,7 @@ impl Scratch {
     }
 
     pub fn add_header(&mut self, item: SignedHeaderHashed) {
-        // We are assuming data in the scratch space is valid even though
-        // it hasn't been validated yet because if it does fail validation
-        // then this transaction will be rolled back.
-        // TODO: Write test to prove this assumption.
-        self.headers.push(Arc::new(ValStatusOf::valid(item)));
+        self.headers.push(item);
     }
 
     pub fn add_entry(&mut self, entry_hashed: EntryHashed) {
@@ -55,10 +51,7 @@ impl Scratch {
         self.entries.insert(hash, Arc::new(entry));
     }
 
-    pub fn as_filter(
-        &self,
-        f: impl Fn(&ValStatusOf<SignedHeaderHashed>) -> bool,
-    ) -> FilteredScratch {
+    pub fn as_filter(&self, f: impl Fn(&SignedHeaderHashed) -> bool) -> FilteredScratch {
         let headers = self.headers.iter().filter(|&t| f(t)).cloned().collect();
         FilteredScratch { headers }
     }
@@ -77,22 +70,20 @@ impl Store for Scratch {
         Ok(self
             .headers
             .iter()
-            .find(|h| h.data.header_address() == hash)
+            .find(|h| h.header_address() == hash)
             .is_some())
     }
 }
 
 impl FilteredScratch {
-    pub fn into_iter<'iter>(
-        &'iter mut self,
-    ) -> impl Iterator<Item = ValStatusOf<SignedHeaderHashed>> + 'iter {
-        self.headers.drain(..).map(|arc| (*arc).clone())
+    pub fn into_iter<'iter>(&'iter mut self) -> impl Iterator<Item = SignedHeaderHashed> + 'iter {
+        self.headers.drain(..)
     }
 }
 
 impl<Q> Stores<Q> for Scratch
 where
-    Q: Query<Data = ValStatusOf<SignedHeaderHashed>>,
+    Q: Query<Item = Judged<SignedHeaderHashed>>,
 {
     type O = FilteredScratch;
 
@@ -101,10 +92,14 @@ where
     }
 }
 
-impl StoresIter<ValStatusOf<SignedHeaderHashed>> for FilteredScratch {
-    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, ValStatusOf<SignedHeaderHashed>>> {
+impl StoresIter<Judged<SignedHeaderHashed>> for FilteredScratch {
+    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Judged<SignedHeaderHashed>>> {
+        // We are assuming data in the scratch space is valid even though
+        // it hasn't been validated yet because if it does fail validation
+        // then this transaction will be rolled back.
+        // TODO: Write test to prove this assumption.
         Ok(Box::new(fallible_iterator::convert(
-            self.into_iter().map(Ok),
+            self.into_iter().map(Judged::valid).map(Ok),
         )))
     }
 }

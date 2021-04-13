@@ -1,7 +1,10 @@
 use holo_hash::*;
 use holochain_p2p::event::GetActivityOptions;
 use holochain_sqlite::rusqlite::*;
-use holochain_state::{prelude::*, query::row_blob_and_hash_to_header};
+use holochain_state::{
+    prelude::*,
+    query::{row_blob_and_hash_to_header, QueryData},
+};
 use holochain_zome_types::*;
 use std::fmt::Debug;
 
@@ -30,7 +33,7 @@ pub struct GetAgentActivityQueryState {
 }
 
 impl Query for GetAgentActivityQuery {
-    type Data = ValStatusOf<SignedHeaderHashed>;
+    type Item = Judged<SignedHeaderHashed>;
     type State = AgentActivityResponse<SignedHeaderHashed>;
     // NB: the current options also specify the ability to return only hashes.
     //     we either need a separate query for this, or we just post-process
@@ -97,11 +100,11 @@ impl Query for GetAgentActivityQuery {
         })
     }
 
-    fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {
+    fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
         todo!()
     }
 
-    fn fold(&self, state: Self::State, data: Self::Data) -> StateQueryResult<Self::State> {
+    fn fold(&self, state: Self::State, data: Self::Item) -> StateQueryResult<Self::State> {
         todo!()
     }
 
@@ -112,10 +115,10 @@ impl Query for GetAgentActivityQuery {
         Ok(state)
     }
 
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = row_blob_and_hash_to_header("blob", "hash");
         // Data is valid because iI'm not sure why?
-        Arc::new(move |row| Ok(ValStatusOf::valid(f(row)?)))
+        Arc::new(move |row| Ok(Judged::valid(f(row)?)))
     }
 }
 

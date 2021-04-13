@@ -270,7 +270,7 @@ where
     /// Elements can end up in the cache or integrated table because
     /// they were gossiped to you or you authored them.
     /// If you care about the hash you are using being valid in the same
-    /// way as if you got it from the StoreElement authority you can     
+    /// way as if you got it from the StoreElement authority you can
     /// this function to verify that constraint.
     ///
     /// An example of how this could go wrong is you do a get for a HeaderHash
@@ -300,7 +300,7 @@ where
 
     fn cascading<Q>(&mut self, query: Q) -> CascadeResult<Q::Output>
     where
-        Q: Query<Data = ValStatusOf<SignedHeaderHashed>>,
+        Q: Query<Item = Judged<SignedHeaderHashed>>,
     {
         let mut conns = Vec::new();
         let mut txns = Vec::new();

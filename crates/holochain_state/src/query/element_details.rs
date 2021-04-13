@@ -1,7 +1,7 @@
 use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_types::dht_op::DhtOpType;
-use holochain_types::prelude::ValStatusOf;
+use holochain_types::prelude::Judged;
 use holochain_zome_types::*;
 use std::fmt::Debug;
 
@@ -25,7 +25,7 @@ pub struct State {
 }
 
 impl Query for GetElementDetailsQuery {
-    type Data = ValStatusOf<SignedHeaderHashed>;
+    type Item = Judged<SignedHeaderHashed>;
     type State = State;
     type Output = Option<ElementDetails>;
 
@@ -50,23 +50,23 @@ impl Query for GetElementDetailsQuery {
         params.to_vec()
     }
 
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = |row: &Row| {
             let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
             let SignedHeader(header, signature) = header;
             let header = HeaderHashed::from_content_sync(header);
             let shh = SignedHeaderHashed::with_presigned(header, signature);
             let status = row.get(row.column_index("status")?)?;
-            let r = ValStatusOf { data: shh, status };
+            let r = Judged { data: shh, status };
             Ok(r)
         };
         Arc::new(f)
     }
 
-    fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {
+    fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
         let header_filter = self.0.clone();
-        let f = move |header: &Self::Data| {
-            let header = &header.data;
+        let f = move |header: &QueryData<Self>| {
+            let header = &header;
             if *header.header_address() == header_filter {
                 true
             } else {
@@ -94,8 +94,8 @@ impl Query for GetElementDetailsQuery {
         })
     }
 
-    fn fold(&self, mut state: Self::State, data: Self::Data) -> StateQueryResult<Self::State> {
-        let ValStatusOf {
+    fn fold(&self, mut state: Self::State, data: Self::Item) -> StateQueryResult<Self::State> {
+        let Judged {
             data: shh,
             status: validation_status,
         } = data;

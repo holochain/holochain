@@ -19,7 +19,7 @@ impl GetLiveElementQuery {
 }
 
 impl Query for GetLiveElementQuery {
-    type Data = ValStatusOf<SignedHeaderHashed>;
+    type Item = Judged<SignedHeaderHashed>;
     type State = (Option<SignedHeaderHashed>, HashSet<HeaderHash>);
     type Output = Option<Element>;
 
@@ -46,21 +46,21 @@ impl Query for GetLiveElementQuery {
         params.to_vec()
     }
 
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = row_blob_to_header("header_blob");
         // Data is valid because it is filtered in the sql query.
-        Arc::new(move |row| Ok(ValStatusOf::valid(f(row)?)))
+        Arc::new(move |row| Ok(Judged::valid(f(row)?)))
     }
 
-    fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {
+    fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
         let header_filter = self.0.clone();
-        let f = move |header: &Self::Data| {
-            if *header.data.header_address() == header_filter {
+        let f = move |header: &QueryData<Self>| {
+            if *header.header_address() == header_filter {
                 true
             } else {
                 if let Header::Delete(Delete {
                     deletes_address, ..
-                }) = header.data.header()
+                }) = header.header()
                 {
                     *deletes_address == header_filter
                 } else {
@@ -75,7 +75,7 @@ impl Query for GetLiveElementQuery {
         Ok((None, HashSet::new()))
     }
 
-    fn fold(&self, mut state: Self::State, data: Self::Data) -> StateQueryResult<Self::State> {
+    fn fold(&self, mut state: Self::State, data: Self::Item) -> StateQueryResult<Self::State> {
         let shh = data.data;
         let hash = shh.as_hash();
         if *hash == self.0 && state.0.is_none() {
