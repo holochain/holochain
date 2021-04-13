@@ -179,11 +179,6 @@ impl EpHnd {
         AsEpHnd::debug(self)
     }
 
-    /// Get the opaque Uniq identifier for this endpoint.
-    pub fn uniq(&self) -> Uniq {
-        AsEpHnd::uniq(self)
-    }
-
     /// Is this endpoint closed?
     pub fn is_closed(&self) -> bool {
         AsEpHnd::is_closed(self)

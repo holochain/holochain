@@ -34,7 +34,12 @@ url2 = "0.0.6"
 webpki = "0.21.2"
 
 [dev-dependencies]
+criterion = "*"
 tracing-subscriber = "0.2"
+
+[[bench]]
+name = "api_thru"
+harness = false
 
 [features]
 test_utils = []
