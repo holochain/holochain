@@ -24,8 +24,7 @@ pub struct State {
 }
 
 impl Query for GetEntryDetailsQuery {
-    type Data = SignedHeaderHashed;
-    type ValidatedData = ValStatusOf<Self::Data>;
+    type Item = ValStatusOf<SignedHeaderHashed>;
     type State = State;
     type Output = Option<EntryDetails>;
 
@@ -50,7 +49,7 @@ impl Query for GetEntryDetailsQuery {
         params.to_vec()
     }
 
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::ValidatedData>> {
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = |row: &Row| {
             let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
             let SignedHeader(header, signature) = header;
@@ -63,9 +62,9 @@ impl Query for GetEntryDetailsQuery {
         Arc::new(f)
     }
 
-    fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {
+    fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
         let entry_filter = self.0.clone();
-        let f = move |header: &Self::Data| {
+        let f = move |header: &QueryData<Self>| {
             let header = &header;
             match header.header() {
                 Header::Create(Create { entry_hash, .. })
@@ -97,11 +96,7 @@ impl Query for GetEntryDetailsQuery {
         })
     }
 
-    fn fold(
-        &self,
-        mut state: Self::State,
-        data: Self::ValidatedData,
-    ) -> StateQueryResult<Self::State> {
+    fn fold(&self, mut state: Self::State, data: Self::Item) -> StateQueryResult<Self::State> {
         let ValStatusOf {
             data: shh,
             status: validation_status,

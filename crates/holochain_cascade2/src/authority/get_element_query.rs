@@ -1,7 +1,7 @@
 use holo_hash::HeaderHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
-use holochain_state::query::prelude::*;
+use holochain_state::query::{prelude::*, QueryData};
 use holochain_types::dht_op::DhtOpType;
 use holochain_zome_types::Entry;
 use holochain_zome_types::SignedHeader;
@@ -38,8 +38,7 @@ impl WireElementOps {
 }
 
 impl Query for GetElementOpsQuery {
-    type Data = WireDhtOp;
-    type ValidatedData = WireDhtOp;
+    type Item = WireDhtOp;
     type State = WireElementOps;
     type Output = Self::State;
 
@@ -68,7 +67,7 @@ impl Query for GetElementOpsQuery {
         params.to_vec()
     }
 
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::ValidatedData>> {
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = |row: &Row| {
             let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
             let SignedHeader(header, signature) = header;
@@ -88,7 +87,11 @@ impl Query for GetElementOpsQuery {
         Ok(WireElementOps::new())
     }
 
-    fn fold(&self, mut state: Self::State, dht_op: Self::Data) -> StateQueryResult<Self::State> {
+    fn fold(
+        &self,
+        mut state: Self::State,
+        dht_op: QueryData<Self>,
+    ) -> StateQueryResult<Self::State> {
         match &dht_op.op_type {
             DhtOpType::StoreElement => {
                 if state.header.is_none() {

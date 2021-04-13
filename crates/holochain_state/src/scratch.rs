@@ -83,7 +83,7 @@ impl FilteredScratch {
 
 impl<Q> Stores<Q> for Scratch
 where
-    Q: Query<Data = SignedHeaderHashed, ValidatedData = ValStatusOf<SignedHeaderHashed>>,
+    Q: Query<Item = ValStatusOf<SignedHeaderHashed>>,
 {
     type O = FilteredScratch;
 

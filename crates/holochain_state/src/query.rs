@@ -73,12 +73,14 @@ impl<T> Maps<T> {
     }
 }
 
+/// Helper for getting to the inner Data type of the Item of a Query
+pub type QueryData<Q> = <<Q as Query>::Item as HasValidationStatus>::Data;
+
 /// You should keep your query type cheap to clone.
 /// If there is any large data put it in an Arc.
 pub trait Query: Clone {
     type State;
-    type Data;
-    type ValidatedData: HasValidationStatus<Self::Data>;
+    type Item: HasValidationStatus;
     type Output;
 
     fn query(&self) -> String {
@@ -89,13 +91,13 @@ pub trait Query: Clone {
     }
     fn init_fold(&self) -> StateQueryResult<Self::State>;
 
-    fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {
+    fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
         Box::new(|_| true)
     }
 
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::ValidatedData>>;
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>>;
 
-    fn fold(&self, state: Self::State, data: Self::ValidatedData) -> StateQueryResult<Self::State>;
+    fn fold(&self, state: Self::State, data: Self::Item) -> StateQueryResult<Self::State>;
 
     fn run<S>(&self, stores: S) -> StateQueryResult<Self::Output>
     where
@@ -119,7 +121,7 @@ pub trait Query: Clone {
 /// - a collection of Data needed by the query (`Q::Data`)
 /// - the ability to fetch an Entry during the Render phase of the query.
 pub trait Stores<Q: Query> {
-    type O: StoresIter<Q::ValidatedData>;
+    type O: StoresIter<Q::Item>;
 
     /// Gets the raw initial data from the database, needed to begin the query.
     // MD: can the query be &Q?
@@ -173,7 +175,7 @@ pub struct DbScratch<'borrow, 'txn> {
 
 pub struct DbScratchIter<'stmt, Q>
 where
-    Q: Query<Data = SignedHeaderHashed, ValidatedData = ValStatusOf<SignedHeaderHashed>>,
+    Q: Query<Item = ValStatusOf<SignedHeaderHashed>>,
 {
     stmts: QueryStmts<'stmt, Q>,
     filtered_scratch: FilteredScratch,
@@ -201,8 +203,8 @@ impl<'stmt> Store for Txn<'stmt, '_> {
     }
 }
 
-impl<'stmt, Q: Query> StoresIter<Q::ValidatedData> for QueryStmt<'stmt, Q> {
-    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Q::ValidatedData>> {
+impl<'stmt, Q: Query> StoresIter<Q::Item> for QueryStmt<'stmt, Q> {
+    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Q::Item>> {
         self.iter()
     }
 }
@@ -253,8 +255,8 @@ impl<'stmt> Store for Txns<'stmt, '_> {
     }
 }
 
-impl<'stmt, Q: Query> StoresIter<Q::ValidatedData> for QueryStmts<'stmt, Q> {
-    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Q::ValidatedData>> {
+impl<'stmt, Q: Query> StoresIter<Q::Item> for QueryStmts<'stmt, Q> {
+    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Q::Item>> {
         Ok(Box::new(
             fallible_iterator::convert(self.stmts.iter_mut().map(Ok)).flat_map(|stmt| stmt.iter()),
         ))
@@ -263,7 +265,7 @@ impl<'stmt, Q: Query> StoresIter<Q::ValidatedData> for QueryStmts<'stmt, Q> {
 
 impl<'borrow, 'txn, Q> Stores<Q> for DbScratch<'borrow, 'txn>
 where
-    Q: Query<Data = SignedHeaderHashed, ValidatedData = ValStatusOf<SignedHeaderHashed>>,
+    Q: Query<Item = ValStatusOf<SignedHeaderHashed>>,
 {
     type O = DbScratchIter<'borrow, Q>;
 
@@ -304,11 +306,11 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
     }
 }
 
-impl<'stmt, Q> StoresIter<Q::ValidatedData> for DbScratchIter<'stmt, Q>
+impl<'stmt, Q> StoresIter<Q::Item> for DbScratchIter<'stmt, Q>
 where
-    Q: Query<Data = SignedHeaderHashed, ValidatedData = ValStatusOf<SignedHeaderHashed>>,
+    Q: Query<Item = ValStatusOf<SignedHeaderHashed>>,
 {
-    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Q::ValidatedData>> {
+    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Q::Item>> {
         Ok(Box::new(
             self.stmts.iter()?.chain(self.filtered_scratch.iter()?),
         ))
@@ -369,7 +371,7 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
 
         Ok(Self { stmt, query })
     }
-    fn iter(&'iter mut self) -> StateQueryResult<StmtIter<'iter, Q::ValidatedData>> {
+    fn iter(&'iter mut self) -> StateQueryResult<StmtIter<'iter, Q::Item>> {
         let map_fn = self.query.as_map();
         let iter = Self::new_iter(&self.query.params(), self.stmt.as_mut(), map_fn.clone())?;
         Ok(Box::new(iter))

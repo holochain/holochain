@@ -118,8 +118,7 @@ impl LinkQuery {
 }
 
 impl Query for LinkQuery {
-    type Data = SignedHeaderHashed;
-    type ValidatedData = ValStatusOf<Self::Data>;
+    type Item = ValStatusOf<SignedHeaderHashed>;
     type State = Maps<Link>;
     type Output = Vec<Link>;
     fn query(&self) -> String {
@@ -134,17 +133,17 @@ impl Query for LinkQuery {
         Ok(Maps::new())
     }
 
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::ValidatedData>> {
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = row_blob_to_header("header_blob");
         // Data is valid because it is filtered in the sql query.
         Arc::new(move |row| Ok(ValStatusOf::valid(f(row)?)))
     }
 
-    fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {
+    fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
         let base_filter = self.base.clone();
         let zome_id_filter = self.zome_id.clone();
         let tag_filter = self.tag.clone();
-        let f = move |header: &Self::Data| match header.header() {
+        let f = move |header: &QueryData<Self>| match header.header() {
             Header::CreateLink(CreateLink {
                 base_address,
                 zome_id,
@@ -161,11 +160,7 @@ impl Query for LinkQuery {
         Box::new(f)
     }
 
-    fn fold(
-        &self,
-        mut state: Self::State,
-        data: Self::ValidatedData,
-    ) -> StateQueryResult<Self::State> {
+    fn fold(&self, mut state: Self::State, data: Self::Item) -> StateQueryResult<Self::State> {
         let shh = data.data;
         let (header, _) = shh.into_header_and_signature();
         let (header, hash) = header.into_inner();

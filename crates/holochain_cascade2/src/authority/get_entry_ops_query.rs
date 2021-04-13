@@ -1,7 +1,7 @@
 use holo_hash::EntryHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
-use holochain_state::query::prelude::*;
+use holochain_state::query::{prelude::*, QueryData};
 use holochain_types::dht_op::DhtOpType;
 use holochain_types::prelude::HasValidationStatus;
 use holochain_zome_types::Entry;
@@ -51,19 +51,20 @@ pub struct WireDhtOp {
     pub signature: Signature,
 }
 
-impl HasValidationStatus<WireDhtOp> for WireDhtOp {
-    fn status(&self) -> Option<ValidationStatus> {
+impl HasValidationStatus for WireDhtOp {
+    type Data = Self;
+
+    fn validation_status(&self) -> Option<ValidationStatus> {
         self.validation_status
     }
 
-    fn inner(&self) -> &Self {
+    fn data(&self) -> &Self {
         self
     }
 }
 
 impl Query for GetEntryOpsQuery {
-    type Data = WireDhtOp;
-    type ValidatedData = WireDhtOp;
+    type Item = WireDhtOp;
     type State = WireEntryOps;
     type Output = Self::State;
 
@@ -92,7 +93,7 @@ impl Query for GetEntryOpsQuery {
         params.to_vec()
     }
 
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::ValidatedData>> {
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = |row: &Row| {
             let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
             let SignedHeader(header, signature) = header;
@@ -112,7 +113,11 @@ impl Query for GetEntryOpsQuery {
         Ok(WireEntryOps::new())
     }
 
-    fn fold(&self, mut state: Self::State, dht_op: Self::Data) -> StateQueryResult<Self::State> {
+    fn fold(
+        &self,
+        mut state: Self::State,
+        dht_op: QueryData<Self>,
+    ) -> StateQueryResult<Self::State> {
         match &dht_op.op_type {
             DhtOpType::StoreEntry => {
                 state.creates.push(dht_op);
