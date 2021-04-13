@@ -4,6 +4,7 @@
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::{BoxStream, StreamExt};
 use kitsune_p2p_types::config::*;
+use kitsune_p2p_types::dependencies::serde_json;
 use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_backend::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
@@ -202,6 +203,20 @@ impl QuicEndpointAdapt {
 }
 
 impl EndpointAdapt for QuicEndpointAdapt {
+    fn debug(&self) -> serde_json::Value {
+        match self.local_addr() {
+            Ok(addr) => serde_json::json!({
+                "type": "tx2_quic",
+                "state": "open",
+                "addr": addr,
+            }),
+            Err(_) => serde_json::json!({
+                "type": "tx2_quic",
+                "state": "closed",
+            }),
+        }
+    }
+
     fn uniq(&self) -> Uniq {
         self.1
     }
@@ -381,6 +396,9 @@ mod tests {
         let mut data = PoolBuf::new();
         data.extend_from_slice(b"hello");
         c.write(0.into(), data, t).await.unwrap();
+
+        let debug = ep1.debug();
+        println!("{}", serde_json::to_string_pretty(&debug).unwrap());
 
         r_done.await.unwrap();
 

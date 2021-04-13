@@ -37,6 +37,9 @@ pub mod tx2_frontend_traits {
 
     /// Trait representing a connection handle.
     pub trait AsEpHnd: 'static + Send + Sync + Unpin {
+        /// Capture a debugging internal state dump.
+        fn debug(&self) -> serde_json::Value;
+
         /// Get the opaque Uniq identifier for this endpoint.
         fn uniq(&self) -> Uniq;
 
@@ -171,6 +174,16 @@ impl std::hash::Hash for EpHnd {
 }
 
 impl EpHnd {
+    /// Capture a debugging internal state dump.
+    pub fn debug(&self) -> serde_json::Value {
+        AsEpHnd::debug(self)
+    }
+
+    /// Get the opaque Uniq identifier for this endpoint.
+    pub fn uniq(&self) -> Uniq {
+        AsEpHnd::uniq(self)
+    }
+
     /// Is this endpoint closed?
     pub fn is_closed(&self) -> bool {
         AsEpHnd::is_closed(self)
@@ -201,6 +214,10 @@ impl EpHnd {
 }
 
 impl AsEpHnd for EpHnd {
+    fn debug(&self) -> serde_json::Value {
+        self.0.debug()
+    }
+
     fn uniq(&self) -> Uniq {
         self.0.uniq()
     }

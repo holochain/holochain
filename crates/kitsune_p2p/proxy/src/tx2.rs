@@ -6,6 +6,7 @@ use crate::*;
 use futures::future::BoxFuture;
 use futures::stream::{Stream, StreamExt};
 use ghost_actor::dependencies::tracing;
+use kitsune_p2p_types::dependencies::serde_json;
 use kitsune_p2p_types::tx2::tx2_backend::*;
 use kitsune_p2p_types::tx2::tx2_frontend::tx2_frontend_traits::*;
 use kitsune_p2p_types::tx2::tx2_frontend::*;
@@ -218,6 +219,25 @@ async fn ingest_incoming_con(
 }
 
 impl AsEpHnd for ProxyEpHnd {
+    fn debug(&self) -> serde_json::Value {
+        let addr = self.local_addr();
+        match self.inner.share_mut(|i, _| {
+            Ok(serde_json::json!({
+                "type": "tx2_proxy",
+                "state": "open",
+                "addr": addr?,
+                "proxy_count": i.in_digest_to_sub_con.len(),
+                "sub": self.sub_ep_hnd.debug(),
+            }))
+        }) {
+            Ok(j) => j,
+            Err(_) => serde_json::json!({
+                "type": "tx2_proxy",
+                "state": "closed",
+            }),
+        }
+    }
+
     fn uniq(&self) -> Uniq {
         self.sub_ep_hnd.uniq()
     }
@@ -613,6 +633,9 @@ mod tests {
         }
 
         futures::future::join_all(all_futs).await;
+
+        let debug = p_ep.debug();
+        println!("{}", serde_json::to_string_pretty(&debug).unwrap());
 
         p_ep.close(0, "").await;
         t_ep.close(0, "").await;
