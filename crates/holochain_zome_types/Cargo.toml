@@ -35,13 +35,18 @@ itertools = { version = "0.10", optional = true }
 rusqlite = { version = "0.24", optional = true }
 num_enum = { version = "0.5", optional = true }
 
+# helper dependencies
+derive_more = { version = "0.99", optional = true }
+
 [features]
 default = ["fixturators", "test_utils", "tinyid"]
 
-full = ["default", "rusqlite", "num_enum"]
+full = ["default", "rusqlite", "num_enum", "helpers"]
 
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
 
-test_utils = ["holo_hash/hashing"]
+test_utils = ["holo_hash/hashing", "helpers"]
 
 tinyid = ["byteorder", "itertools"]
+
+helpers = ["derive_more"]

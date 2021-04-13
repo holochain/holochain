@@ -1,7 +1,8 @@
 use self::get_entry_ops_query::GetEntryOpsQuery;
 use self::get_links_ops_query::GetLinksOpsQuery;
 use self::{
-    get_agent_activity_query::GetAgentActivityQuery, get_element_query::GetElementOpsQuery,
+    get_agent_activity_query::GetAgentActivityDeterministicQuery,
+    get_element_query::GetElementOpsQuery,
 };
 
 use super::error::CascadeResult;
@@ -66,10 +67,10 @@ pub fn handle_get_element(env: EnvRead, hash: HeaderHash) -> CascadeResult<WireE
 pub fn handle_get_agent_activity(
     env: EnvRead,
     agent: AgentPubKey,
-    filter: ChainQueryFilter,
+    filter: AgentActivityFilterDeterministic,
     options: holochain_p2p::event::GetActivityOptions,
 ) -> CascadeResult<AgentActivityResponse> {
-    let query = GetAgentActivityQuery::new(agent, filter, options);
+    let query = GetAgentActivityDeterministicQuery::new(agent, filter, options);
     let results = env
         .conn()?
         .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;

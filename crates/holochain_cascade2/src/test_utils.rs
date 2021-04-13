@@ -17,13 +17,13 @@ use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::ValidationPackageResponse;
 use holochain_types::timestamp;
 use holochain_zome_types::fixt::*;
+use holochain_zome_types::AgentActivityFilterDeterministic;
 use holochain_zome_types::Create;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::Header;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::Link;
-use holochain_zome_types::QueryFilter;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::Update;
 use holochain_zome_types::ValidationStatus;
@@ -99,7 +99,7 @@ pub trait HolochainP2pCellT2 {
     async fn get_agent_activity(
         &mut self,
         agent: AgentPubKey,
-        query: QueryFilter,
+        query: AgentActivityFilterDeterministic,
         options: actor::GetActivityOptions,
     ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>>;
 
@@ -170,7 +170,7 @@ impl HolochainP2pCellT2 for PassThroughNetwork {
     async fn get_agent_activity(
         &mut self,
         agent: AgentPubKey,
-        query: QueryFilter,
+        query: AgentActivityFilterDeterministic,
         options: actor::GetActivityOptions,
     ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>> {
         let mut out = Vec::new();
@@ -603,7 +603,7 @@ impl HolochainP2pCellT2 for MockNetwork {
     async fn get_agent_activity(
         &mut self,
         agent: AgentPubKey,
-        query: QueryFilter,
+        query: AgentActivityFilterDeterministic,
         options: actor::GetActivityOptions,
     ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>> {
         self.0

@@ -36,6 +36,9 @@ tracing-futures = "0.2"
 async-trait = { version = "0.1", optional = true }
 mockall = { version = "0.9.1", optional = true }
 
+[dev-dependencies]
+matches = "0.1"
+
 [features]
 default = ["test_utils"]
 

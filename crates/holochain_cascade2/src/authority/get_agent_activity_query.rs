@@ -11,14 +11,18 @@ use std::fmt::Debug;
 use super::*;
 
 #[derive(Debug, Clone)]
-pub struct GetAgentActivityQuery {
+pub struct GetAgentActivityDeterministicQuery {
     agent: AgentPubKey,
-    filter: ChainQueryFilter,
+    filter: AgentActivityFilterDeterministic,
     options: GetActivityOptions,
 }
 
-impl GetAgentActivityQuery {
-    pub fn new(agent: AgentPubKey, filter: ChainQueryFilter, options: GetActivityOptions) -> Self {
+impl GetAgentActivityDeterministicQuery {
+    pub fn new(
+        agent: AgentPubKey,
+        filter: AgentActivityFilterDeterministic,
+        options: GetActivityOptions,
+    ) -> Self {
         Self {
             agent,
             filter,
@@ -27,12 +31,12 @@ impl GetAgentActivityQuery {
     }
 }
 
-pub struct GetAgentActivityQueryState {
+pub struct GetAgentActivityDeterministicQueryState {
     valid: Vec<SignedHeaderHashed>,
     rejected: Vec<SignedHeaderHashed>,
 }
 
-impl Query for GetAgentActivityQuery {
+impl Query for GetAgentActivityDeterministicQuery {
     type Item = Judged<SignedHeaderHashed>;
     type State = AgentActivityResponse<SignedHeaderHashed>;
     // NB: the current options also specify the ability to return only hashes.
@@ -41,53 +45,30 @@ impl Query for GetAgentActivityQuery {
     type Output = AgentActivityResponse<SignedHeaderHashed>;
 
     fn query(&self) -> String {
-        let ChainQueryFilter {
-            entry_type,
-            header_type,
-            sequence_range,
-            include_entries: _,
-            ..
-        } = &self.filter;
-
-        let entry_type_clause = entry_type
-            .as_ref()
-            .map(|_| "AND H.entry_type = :entry_type")
-            .unwrap_or("");
-        let header_type_clause = header_type
-            .as_ref()
-            .map(|_| "AND H.type = :header_type")
-            .unwrap_or("");
-        let range_clause = sequence_range
-            .as_ref()
-            .map(|_| "AND H.seq >= :range_start AND H.seq < :range_end")
-            .unwrap_or("");
         format!(
             "
             SELECT H.blob, H.hash FROM Header AS H
             JOIN DhtOp as D
             ON D.header_hash = H.hash
-            WHERE H.author = :author AND D.is_authored = 1
-            {} {} {}
-        ",
-            entry_type_clause, header_type_clause, range_clause,
+            WHERE H.author = :author
+            AND D.validation_status IS NOT NULL  -- FIXME: ensure that it's actually valid
+            AND (:entry_type IS NULL OR H.entry_type = :entry_type)
+            AND (:header_type IS NULL OR H.type = :header_type)
+            AND (:hash_low IS NULL OR H.seq >= (SELECT seq FROM Header WHERE hash = :hash_low))
+            AND H.seq <= (SELECT seq FROM Header WHERE hash = :hash_high)
+        "
         )
     }
 
     fn params(&self) -> Vec<Params> {
-        let mut params = (named_params! {
+        (named_params! {
             ":author": self.agent,
             ":entry_type": self.filter.entry_type,
             ":header_type": self.filter.header_type,
+            ":hash_low": self.filter.range.0,
+            ":hash_high": self.filter.range.1,
         })
-        .to_vec();
-
-        if let Some(sequence_range) = &self.filter.sequence_range {
-            params.extend(named_params! {
-                ":range_start": sequence_range.start,
-                ":range_end": sequence_range.end,
-            })
-        };
-        params
+        .to_vec()
     }
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {
@@ -128,36 +109,55 @@ mod tests {
     use crate::test_utils::fill_db;
     use ::fixt::prelude::*;
 
-    #[test]
-    fn agent_activity_query() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn agent_activity_query() {
         observability::test_run().ok();
         let test_env = test_cell_env();
         let env = test_env.env();
         let entry_type_1 = fixt!(EntryType);
         let agents = [fixt!(AgentPubKey), fixt!(AgentPubKey), fixt!(AgentPubKey)];
+        let mut top_hashes = vec![];
 
-        for i in 0..10 {
-            let mut header_create = fixt!(Create);
-            header_create.entry_type = entry_type_1.clone();
-            header_create.author = agents[i % 3].clone();
-            let op_create = DhtOp::StoreEntry(
-                fixt!(Signature),
-                header_create.into(),
-                Box::new(fixt!(Entry)),
-            );
-            fill_db(&env, DhtOpHashed::from_content_sync(op_create));
+        for a in 0..3 {
+            let mut top_header = None;
+            for _i in 0..10 {
+                let mut header_create = fixt!(Create);
+                header_create.entry_type = entry_type_1.clone();
+                header_create.author = agents[a].clone();
+                top_header = Some(header_create.clone());
+                let op_create = DhtOp::StoreEntry(
+                    fixt!(Signature),
+                    header_create.into(),
+                    Box::new(fixt!(Entry)),
+                );
+                let op = DhtOpHashed::from_content_sync(op_create);
+                dbg!(HeaderHash::with_data_sync(&op.header()));
+                fill_db(&env, op);
+            }
+            top_hashes.push(HeaderHash::with_data_sync(&Header::from(
+                top_header.unwrap(),
+            )));
         }
 
-        let filter = ChainQueryFilter::new().entry_type(entry_type_1);
+        dbg!(&top_hashes);
+
+        let filter = AgentActivityFilterDeterministic {
+            range: (None, top_hashes[2].clone()),
+            entry_type: Some(entry_type_1),
+            header_type: None,
+            include_entries: false,
+        };
         let options = GetActivityOptions::default();
         let results = handle_get_agent_activity(
             env.clone().into(),
-            agents[0].clone(),
+            agents[2].clone(),
             filter.clone(),
             options,
         )
         .unwrap();
 
-        dbg!(results);
+        dbg!(&results);
+
+        matches::assert_matches!(results.valid_activity, ChainItems::Full(items) if items.len() == 10)
     }
 }

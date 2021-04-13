@@ -1760,6 +1760,7 @@ dependencies = [
  "holochain_types",
  "holochain_zome_types",
  "kitsune_p2p",
+ "matches",
  "mockall 0.9.1",
  "observability",
  "serde",
@@ -2146,6 +2147,7 @@ version = "0.0.2-alpha.1"
 dependencies = [
  "byteorder",
  "chrono",
+ "derive_more",
  "fixt",
  "holo_hash",
  "holochain_serialized_bytes",
