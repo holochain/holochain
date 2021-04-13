@@ -2,6 +2,7 @@ use criterion::{/*black_box,*/ criterion_group, criterion_main, Criterion};
 use futures::stream::StreamExt;
 use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_proxy::*;
+use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::tx2::tx2_frontend::*;
 use kitsune_p2p_types::tx2::tx2_promote::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
@@ -14,6 +15,12 @@ const REQ: &[u8] = &[0xda; SIZE];
 const RES: &[u8] = &[0xdb; SIZE];
 const TGT_COUNT: usize = 10;
 const NODE_COUNT: usize = 100;
+
+#[derive(Clone, Copy)]
+enum TT {
+    Mem,
+    Quic,
+}
 
 struct Test {
     pub proxy_ep_hnd: EpHnd,
@@ -35,15 +42,15 @@ fn proxify_addr(purl: &TxUrl, nurl: &TxUrl) -> TxUrl {
 }
 
 impl Test {
-    pub async fn new() -> Self {
+    pub async fn new(tt: TT) -> Self {
         let t = KitsuneTimeout::from_millis(5000);
 
-        let (proxy_addr, proxy_ep_hnd) = mk_proxy().await;
+        let (proxy_addr, proxy_ep_hnd) = mk_proxy(tt).await;
 
         let mut tgt_nodes = Vec::new();
         let mut tgt_addrs = Vec::new();
         for _ in 0..TGT_COUNT {
-            let (tgt_addr, tgt_ep_hnd) = mk_tgt().await;
+            let (tgt_addr, tgt_ep_hnd) = mk_tgt(tt).await;
             let tgt_con = tgt_ep_hnd.connect(proxy_addr.clone(), t).await.unwrap();
             tgt_nodes.push((tgt_ep_hnd, tgt_con));
 
@@ -63,7 +70,7 @@ impl Test {
                         tgt_iter.next().unwrap()
                     }
                 };
-                let (_, ep_hnd) = mk_node(d_send.clone()).await;
+                let (_, ep_hnd) = mk_node(tt, d_send.clone()).await;
                 let con = ep_hnd.connect(tgt_addr.clone(), t).await.unwrap();
                 nodes.push((ep_hnd, con));
             }
@@ -114,29 +121,36 @@ impl Test {
     }
 }
 
-async fn mk_core() -> (TxUrl, Ep, EpHnd) {
+async fn mk_core(tt: TT) -> (TxUrl, Ep, EpHnd) {
     let t = KitsuneTimeout::from_millis(5000);
 
-    let f = tx2_promote(MemBackendAdapt::new(), NODE_COUNT * 3);
+    let conf = QuicConfig::default();
+
+    let f = match tt {
+        TT::Mem => MemBackendAdapt::new(),
+        TT::Quic => QuicBackendAdapt::new(conf).await.unwrap(),
+    };
+
+    let f = tx2_promote(f, NODE_COUNT * 3);
     let f = tx2_proxy(f, TlsConfig::new_ephemeral().await.unwrap());
 
-    let ep = f.bind("none:", t).await.unwrap();
+    let ep = f.bind("kitsune-quic://0.0.0.0:0", t).await.unwrap();
     let ep_hnd = ep.handle().clone();
     let addr = ep_hnd.local_addr().unwrap();
 
     (addr, ep, ep_hnd)
 }
 
-async fn mk_proxy() -> (TxUrl, EpHnd) {
-    let (addr, mut ep, ep_hnd) = mk_core().await;
+async fn mk_proxy(tt: TT) -> (TxUrl, EpHnd) {
+    let (addr, mut ep, ep_hnd) = mk_core(tt).await;
 
     tokio::task::spawn(async move { while let Some(_evt) = ep.next().await {} });
 
     (addr, ep_hnd)
 }
 
-async fn mk_tgt() -> (TxUrl, EpHnd) {
-    let (addr, mut ep, ep_hnd) = mk_core().await;
+async fn mk_tgt(tt: TT) -> (TxUrl, EpHnd) {
+    let (addr, mut ep, ep_hnd) = mk_core(tt).await;
 
     tokio::task::spawn(async move {
         while let Some(evt) = ep.next().await {
@@ -156,8 +170,11 @@ async fn mk_tgt() -> (TxUrl, EpHnd) {
     (addr, ep_hnd)
 }
 
-async fn mk_node(d_send: Arc<Share<Option<tokio::sync::mpsc::Sender<()>>>>) -> (TxUrl, EpHnd) {
-    let (addr, mut ep, ep_hnd) = mk_core().await;
+async fn mk_node(
+    tt: TT,
+    d_send: Arc<Share<Option<tokio::sync::mpsc::Sender<()>>>>,
+) -> (TxUrl, EpHnd) {
+    let (addr, mut ep, ep_hnd) = mk_core(tt).await;
 
     tokio::task::spawn(async move {
         while let Some(evt) = ep.next().await {
@@ -199,9 +216,11 @@ fn criterion_benchmark(c: &mut Criterion) {
         .build()
         .unwrap();
 
-    let t = rt.block_on(async { Share::new(Some(Test::new().await)) });
+    let t_mem = rt.block_on(async { Share::new(Some(Test::new(TT::Mem).await)) });
+    let t_quic = rt.block_on(async { Share::new(Some(Test::new(TT::Quic).await)) });
 
-    c.bench_function("thru", |b| b.iter(|| thru(&rt, &t)));
+    c.bench_function("thru-mem", |b| b.iter(|| thru(&rt, &t_mem)));
+    c.bench_function("thru-quic", |b| b.iter(|| thru(&rt, &t_quic)));
 }
 
 criterion_group!(benches, criterion_benchmark);

@@ -1,5 +1,5 @@
 //! Next-gen performance kitsune transport abstractions
-//!
+
 mod framed;
 pub use framed::*;
 
