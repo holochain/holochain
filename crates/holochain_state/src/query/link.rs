@@ -7,21 +7,21 @@ use std::fmt::Debug;
 use super::*;
 
 #[derive(Debug, Clone)]
-pub struct LinkQuery {
-    base: EntryHash,
+pub struct GetLinksQuery {
+    base: Arc<EntryHash>,
     zome_id: ZomeId,
-    tag: Option<LinkTag>,
+    tag: Option<Arc<LinkTag>>,
     query: String,
 }
 
-impl LinkQuery {
-    fn new(base: EntryHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
+impl GetLinksQuery {
+    pub fn new(base: EntryHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
         let create_string = Self::create_query_string(tag.is_some());
         let delete_string = Self::delete_query_string(tag.is_some());
         Self {
-            base,
+            base: Arc::new(base),
             zome_id,
-            tag,
+            tag: tag.map(Arc::new),
             query: Self::create_query(create_string, delete_string),
         }
     }
@@ -117,7 +117,7 @@ impl LinkQuery {
     }
 }
 
-impl Query for LinkQuery {
+impl Query for GetLinksQuery {
     type Item = Judged<SignedHeaderHashed>;
     type State = Maps<Link>;
     type Output = Vec<Link>;
@@ -150,11 +150,11 @@ impl Query for LinkQuery {
                 tag,
                 ..
             }) => {
-                *base_address == base_filter
+                *base_address == *base_filter
                     && *zome_id == zome_id_filter
-                    && tag_filter.as_ref().map(|t| tag == t).unwrap_or(true)
+                    && tag_filter.as_ref().map(|t| *tag == **t).unwrap_or(true)
             }
-            Header::DeleteLink(DeleteLink { base_address, .. }) => *base_address == base_filter,
+            Header::DeleteLink(DeleteLink { base_address, .. }) => *base_address == *base_filter,
             _ => false,
         };
         Box::new(f)

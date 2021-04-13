@@ -1,4 +1,5 @@
 use self::get_entry_ops_query::GetEntryOpsQuery;
+use self::get_links_ops_query::GetLinksOpsQuery;
 use self::{
     get_agent_activity_query::GetAgentActivityQuery, get_element_query::GetElementOpsQuery,
 };
@@ -15,6 +16,7 @@ use tracing::*;
 pub use get_element_query::WireElementOps;
 pub use get_entry_ops_query::WireDhtOp;
 pub use get_entry_ops_query::WireEntryOps;
+pub use get_links_ops_query::WireLinkOps;
 
 #[cfg(test)]
 mod test;
@@ -22,12 +24,20 @@ mod test;
 mod get_agent_activity_query;
 mod get_element_query;
 mod get_entry_ops_query;
+mod get_links_ops_query;
 
 // TODO: Move this to holochain types.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum WireOps {
     Entry(WireEntryOps),
     Element(WireElementOps),
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct WireLinkKey {
+    pub base: EntryHash,
+    pub zome_id: ZomeId,
+    pub tag: Option<LinkTag>,
 }
 
 #[instrument(skip(state_env))]
@@ -66,11 +76,15 @@ pub fn handle_get_agent_activity(
     Ok(results)
 }
 
-#[instrument(skip(_env, _options))]
+#[instrument(skip(env, _options))]
 pub fn handle_get_links(
-    _env: EnvRead,
-    _link_key: WireLinkMetaKey,
+    env: EnvRead,
+    link_key: WireLinkKey,
     _options: holochain_p2p::event::GetLinksOptions,
-) -> CascadeResult<GetLinksResponse> {
-    todo!()
+) -> CascadeResult<WireLinkOps> {
+    let query = GetLinksOpsQuery::new(link_key);
+    let results = env
+        .conn()?
+        .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;
+    Ok(results)
 }

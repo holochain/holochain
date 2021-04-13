@@ -13,8 +13,8 @@ pub struct LinkTestData {
     pub link: Link,
     pub base_op: DhtOpHashed,
     pub target_op: DhtOpHashed,
-    pub base_query: LinkQuery,
-    pub tag_query: LinkQuery,
+    pub base_query: GetLinksQuery,
+    pub tag_query: GetLinksQuery,
 }
 
 pub struct EntryTestData {
@@ -86,8 +86,8 @@ impl LinkTestData {
             create_link_hash: create_link_hash.clone(),
         };
 
-        let base_query = LinkQuery::base(base_hash.clone(), create_link.zome_id.clone());
-        let tag_query = LinkQuery::tag(
+        let base_query = GetLinksQuery::base(base_hash.clone(), create_link.zome_id.clone());
+        let tag_query = GetLinksQuery::tag(
             base_hash.clone(),
             create_link.zome_id.clone(),
             create_link.tag.clone(),

@@ -7,6 +7,8 @@
 use authority::WireDhtOp;
 use authority::WireElementOps;
 use authority::WireEntryOps;
+use authority::WireLinkKey;
+use authority::WireLinkOps;
 use authority::WireOps;
 use error::CascadeResult;
 use holo_hash::hash_type::AnyDht;
@@ -22,6 +24,7 @@ use holochain_state::insert::update_op_validation_status;
 use holochain_state::prelude::*;
 use holochain_state::query::element_details::GetElementDetailsQuery;
 use holochain_state::query::entry_details::GetEntryDetailsQuery;
+use holochain_state::query::link::GetLinksQuery;
 use holochain_state::query::live_element::GetLiveElementQuery;
 use holochain_state::query::live_entry::GetLiveEntryQuery;
 use holochain_state::query::DbScratch;
@@ -245,6 +248,21 @@ where
         Ok(())
     }
 
+    fn merge_link_ops_into_cache(&mut self, response: WireLinkOps) -> CascadeResult<()> {
+        let cache = ok_or_return!(self.cache.as_mut());
+        let WireLinkOps { creates, deletes } = response;
+        cache.conn()?.with_commit(|txn| {
+            for op in creates {
+                Self::insert_wire_op(txn, op)?;
+            }
+            for op in deletes {
+                Self::insert_wire_op(txn, op)?;
+            }
+            CascadeResult::Ok(())
+        })?;
+        Ok(())
+    }
+
     #[instrument(skip(self, options))]
     async fn fetch_element(
         &mut self,
@@ -262,6 +280,21 @@ where
                 WireOps::Entry(response) => self.merge_entry_ops_into_cache(response)?,
                 WireOps::Element(response) => self.merge_element_ops_into_cache(response)?,
             }
+        }
+        Ok(())
+    }
+
+    #[instrument(skip(self, options))]
+    async fn fetch_links(
+        &mut self,
+        link_key: WireLinkKey,
+        options: GetLinksOptions,
+    ) -> CascadeResult<()> {
+        let network = ok_or_return!(self.network.as_mut());
+        let results = network.get_links(link_key, options).await?;
+
+        for response in results {
+            self.merge_link_ops_into_cache(response)?;
         }
         Ok(())
     }
@@ -587,16 +620,21 @@ where
         }
     }
 
-    #[instrument(skip(self, _key, _options))]
+    #[instrument(skip(self, options))]
     /// Gets an links from the cas or cache depending on it's metadata
     // The default behavior is to skip deleted or replaced entries.
-    // TODO: Implement customization of this behavior with an options/builder struct
     pub async fn dht_get_links<'link>(
         &mut self,
-        _key: &'link LinkMetaKey<'link>,
-        _options: GetLinksOptions,
+        key: WireLinkKey,
+        options: GetLinksOptions,
     ) -> CascadeResult<Vec<Link>> {
-        todo!()
+        let authority = self.am_i_an_authority(key.base.clone().into()).await?;
+        if !authority {
+            self.fetch_links(key.clone(), options.into()).await?;
+        }
+        let query = GetLinksQuery::new(key.base, key.zome_id, key.tag);
+        let results = self.cascading(query)?;
+        Ok(results)
     }
 
     #[instrument(skip(self, _key, _options))]

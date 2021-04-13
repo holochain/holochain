@@ -13,8 +13,6 @@ use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::env::EnvRead;
 use holochain_types::env::EnvWrite;
 use holochain_types::header::NewEntryHeader;
-use holochain_types::link::GetLinksResponse;
-use holochain_types::link::WireLinkMetaKey;
 use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::ValidationPackageResponse;
 use holochain_types::timestamp;
@@ -24,6 +22,7 @@ use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::Header;
 use holochain_zome_types::HeaderHashed;
+use holochain_zome_types::Link;
 use holochain_zome_types::QueryFilter;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::Update;
@@ -31,6 +30,8 @@ use holochain_zome_types::ValidationStatus;
 
 use crate::authority;
 use crate::authority::WireDhtOp;
+use crate::authority::WireLinkKey;
+use crate::authority::WireLinkOps;
 use crate::authority::WireOps;
 use ::fixt::prelude::*;
 use holochain_sqlite::db::WriteManager;
@@ -91,9 +92,9 @@ pub trait HolochainP2pCellT2 {
 
     async fn get_links(
         &mut self,
-        link_key: WireLinkMetaKey,
+        link_key: WireLinkKey,
         options: actor::GetLinksOptions,
-    ) -> actor::HolochainP2pResult<Vec<GetLinksResponse>>;
+    ) -> actor::HolochainP2pResult<Vec<WireLinkOps>>;
 
     async fn get_agent_activity(
         &mut self,
@@ -155,9 +156,9 @@ impl HolochainP2pCellT2 for PassThroughNetwork {
     }
     async fn get_links(
         &mut self,
-        link_key: WireLinkMetaKey,
+        link_key: WireLinkKey,
         options: actor::GetLinksOptions,
-    ) -> actor::HolochainP2pResult<Vec<GetLinksResponse>> {
+    ) -> actor::HolochainP2pResult<Vec<WireLinkOps>> {
         let mut out = Vec::new();
         for env in &self.envs {
             let r = authority::handle_get_links(env.clone(), link_key.clone(), (&options).into())
@@ -207,6 +208,14 @@ pub struct EntryTestData {
     pub update_hash: HeaderHash,
     pub hash: EntryHash,
     pub entry: Entry,
+    // Links
+    pub create_link_op: DhtOpHashed,
+    pub delete_link_op: DhtOpHashed,
+    pub wire_create_link: WireDhtOp,
+    pub wire_delete_link: WireDhtOp,
+    pub link_key: WireLinkKey,
+    pub link_key_tag: WireLinkKey,
+    pub links: Vec<Link>,
 }
 
 #[derive(Debug)]
@@ -235,6 +244,10 @@ impl EntryTestData {
         let mut create = fixt!(Create);
         let mut update = fixt!(Update);
         let mut delete = fixt!(Delete);
+
+        let mut create_link = fixt!(CreateLink);
+        let mut delete_link = fixt!(DeleteLink);
+
         let entry = fixt!(AppEntryBytes);
         let entry = Entry::App(entry);
         let entry_hash = EntryHash::with_data_sync(&entry);
@@ -254,10 +267,17 @@ impl EntryTestData {
         update.original_entry_address = entry_hash.clone();
         update.original_header_address = create_hash.clone();
 
+        create_link.base_address = entry_hash.clone();
+        delete_link.base_address = entry_hash.clone();
+        let create_link_header = Header::CreateLink(create_link.clone());
         let delete_header = Header::Delete(delete.clone());
         let update_header = Header::Update(update.clone());
         let delete_hash = HeaderHash::with_data_sync(&delete_header);
         let update_hash = HeaderHash::with_data_sync(&update_header);
+
+        let create_link_hash = HeaderHash::with_data_sync(&create_link_header);
+        delete_link.link_add_address = create_link_hash.clone();
+        let delete_link_header = Header::DeleteLink(delete_link.clone());
 
         let signature = fixt!(Signature);
         let store_entry_op = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
@@ -298,6 +318,48 @@ impl EntryTestData {
             validation_status: Some(ValidationStatus::Valid),
         };
 
+        let signature = fixt!(Signature);
+        let create_link_op = DhtOpHashed::from_content_sync(DhtOp::RegisterAddLink(
+            signature.clone(),
+            create_link.clone(),
+        ));
+        let wire_create_link = WireDhtOp {
+            op_type: create_link_op.as_content().get_type(),
+            header: create_link_header.clone(),
+            signature: signature.clone(),
+            validation_status: Some(ValidationStatus::Valid),
+        };
+
+        let signature = fixt!(Signature);
+        let delete_link_op = DhtOpHashed::from_content_sync(DhtOp::RegisterRemoveLink(
+            signature.clone(),
+            delete_link.clone(),
+        ));
+        let wire_delete_link = WireDhtOp {
+            op_type: delete_link_op.as_content().get_type(),
+            header: delete_link_header.clone(),
+            signature: signature.clone(),
+            validation_status: Some(ValidationStatus::Valid),
+        };
+
+        let link_key = WireLinkKey {
+            base: create_link.base_address.clone(),
+            zome_id: create_link.zome_id,
+            tag: None,
+        };
+        let link_key_tag = WireLinkKey {
+            base: create_link.base_address.clone(),
+            zome_id: create_link.zome_id,
+            tag: Some(create_link.tag.clone()),
+        };
+
+        let link = Link {
+            target: create_link.target_address.clone(),
+            timestamp: create_link.timestamp.clone(),
+            tag: create_link.tag.clone(),
+            create_link_hash: create_link_hash.clone(),
+        };
+
         Self {
             store_entry_op,
             delete_entry_header_op,
@@ -310,6 +372,13 @@ impl EntryTestData {
             create_hash,
             delete_hash,
             update_hash,
+            create_link_op,
+            delete_link_op,
+            wire_create_link,
+            wire_delete_link,
+            link_key,
+            link_key_tag,
+            links: vec![link],
         }
     }
 }
@@ -525,9 +594,9 @@ impl HolochainP2pCellT2 for MockNetwork {
 
     async fn get_links(
         &mut self,
-        link_key: WireLinkMetaKey,
+        link_key: WireLinkKey,
         options: actor::GetLinksOptions,
-    ) -> actor::HolochainP2pResult<Vec<GetLinksResponse>> {
+    ) -> actor::HolochainP2pResult<Vec<WireLinkOps>> {
         self.0.lock().await.get_links(link_key, options).await
     }
 

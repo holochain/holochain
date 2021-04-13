@@ -220,7 +220,7 @@ async fn insert_op_equivalence() {
 fn get_link_query<'a, 'b: 'a>(
     txns: &[&'a Transaction<'b>],
     scratch: Option<&Scratch>,
-    query: LinkQuery,
+    query: GetLinksQuery,
 ) -> Vec<Link> {
     match scratch {
         Some(scratch) => {
