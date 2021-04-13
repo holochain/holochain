@@ -118,7 +118,7 @@ impl LinkQuery {
 }
 
 impl Query for LinkQuery {
-    type Item = ValStatusOf<SignedHeaderHashed>;
+    type Item = Judged<SignedHeaderHashed>;
     type State = Maps<Link>;
     type Output = Vec<Link>;
     fn query(&self) -> String {
@@ -136,7 +136,7 @@ impl Query for LinkQuery {
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = row_blob_to_header("header_blob");
         // Data is valid because it is filtered in the sql query.
-        Arc::new(move |row| Ok(ValStatusOf::valid(f(row)?)))
+        Arc::new(move |row| Ok(Judged::valid(f(row)?)))
     }
 
     fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {

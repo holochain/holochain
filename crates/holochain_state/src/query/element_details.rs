@@ -1,7 +1,7 @@
 use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_types::dht_op::DhtOpType;
-use holochain_types::prelude::ValStatusOf;
+use holochain_types::prelude::Judged;
 use holochain_zome_types::*;
 use std::fmt::Debug;
 
@@ -24,7 +24,7 @@ pub struct State {
 }
 
 impl Query for GetElementDetailsQuery {
-    type Item = ValStatusOf<SignedHeaderHashed>;
+    type Item = Judged<SignedHeaderHashed>;
     type State = State;
     type Output = Option<ElementDetails>;
 
@@ -56,7 +56,7 @@ impl Query for GetElementDetailsQuery {
             let header = HeaderHashed::from_content_sync(header);
             let shh = SignedHeaderHashed::with_presigned(header, signature);
             let status = row.get(row.column_index("status")?)?;
-            let r = ValStatusOf { data: shh, status };
+            let r = Judged { data: shh, status };
             Ok(r)
         };
         Arc::new(f)
@@ -94,7 +94,7 @@ impl Query for GetElementDetailsQuery {
     }
 
     fn fold(&self, mut state: Self::State, data: Self::Item) -> StateQueryResult<Self::State> {
-        let ValStatusOf {
+        let Judged {
             data: shh,
             status: validation_status,
         } = data;

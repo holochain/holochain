@@ -19,7 +19,7 @@ impl GetLiveEntryQuery {
 }
 
 impl Query for GetLiveEntryQuery {
-    type Item = ValStatusOf<SignedHeaderHashed>;
+    type Item = Judged<SignedHeaderHashed>;
     type State = Maps<SignedHeaderHashed>;
     type Output = Option<Element>;
 
@@ -49,7 +49,7 @@ impl Query for GetLiveEntryQuery {
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = row_blob_to_header("header_blob");
         // Data is valid because it is filtered in the sql query.
-        Arc::new(move |row| Ok(ValStatusOf::valid(f(row)?)))
+        Arc::new(move |row| Ok(Judged::valid(f(row)?)))
     }
 
     fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {

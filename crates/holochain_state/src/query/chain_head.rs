@@ -15,7 +15,7 @@ impl ChainHeadQuery {
 }
 
 impl Query for ChainHeadQuery {
-    type Item = ValStatusOf<SignedHeaderHashed>;
+    type Item = Judged<SignedHeaderHashed>;
     type State = Option<SignedHeaderHashed>;
     type Output = Option<HeaderHash>;
 
@@ -80,7 +80,7 @@ impl Query for ChainHeadQuery {
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = row_blob_and_hash_to_header("blob", "hash");
         // Valid because the data is authored.
-        Arc::new(move |r| Ok(ValStatusOf::valid(f(r)?)))
+        Arc::new(move |r| Ok(Judged::valid(f(r)?)))
     }
 }
 

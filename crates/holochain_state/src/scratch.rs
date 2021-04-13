@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_types::prelude::ValStatusOf;
+use holochain_types::prelude::Judged;
 use holochain_types::EntryHashed;
 use holochain_zome_types::Entry;
 use holochain_zome_types::SignedHeaderHashed;
@@ -83,7 +83,7 @@ impl FilteredScratch {
 
 impl<Q> Stores<Q> for Scratch
 where
-    Q: Query<Item = ValStatusOf<SignedHeaderHashed>>,
+    Q: Query<Item = Judged<SignedHeaderHashed>>,
 {
     type O = FilteredScratch;
 
@@ -92,14 +92,14 @@ where
     }
 }
 
-impl StoresIter<ValStatusOf<SignedHeaderHashed>> for FilteredScratch {
-    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, ValStatusOf<SignedHeaderHashed>>> {
+impl StoresIter<Judged<SignedHeaderHashed>> for FilteredScratch {
+    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Judged<SignedHeaderHashed>>> {
         // We are assuming data in the scratch space is valid even though
         // it hasn't been validated yet because if it does fail validation
         // then this transaction will be rolled back.
         // TODO: Write test to prove this assumption.
         Ok(Box::new(fallible_iterator::convert(
-            self.into_iter().map(ValStatusOf::valid).map(Ok),
+            self.into_iter().map(Judged::valid).map(Ok),
         )))
     }
 }

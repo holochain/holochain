@@ -300,7 +300,7 @@ where
 
     fn cascading<Q>(&mut self, query: Q) -> CascadeResult<Q::Output>
     where
-        Q: Query<Item = ValStatusOf<SignedHeaderHashed>>,
+        Q: Query<Item = Judged<SignedHeaderHashed>>,
     {
         let mut conns = Vec::new();
         let mut txns = Vec::new();
