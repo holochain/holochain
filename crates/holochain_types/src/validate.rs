@@ -41,16 +41,21 @@ impl<T> ValStatusOf<T> {
 }
 
 /// Data that requires a validation status.
-pub trait ValidationStatusT {
+pub trait HasValidationStatus<T> {
     /// Get the status of a some data.
     /// None means this data has not been validated yet.
-    fn status(&self) -> Option<ValidationStatus> {
-        None
-    }
+    fn status(&self) -> Option<ValidationStatus>;
+
+    /// The data which has the validation status
+    fn inner(&self) -> &T;
 }
 
-impl<T> ValidationStatusT for ValStatusOf<T> {
+impl<T> HasValidationStatus<T> for ValStatusOf<T> {
     fn status(&self) -> Option<ValidationStatus> {
         self.status
+    }
+
+    fn inner(&self) -> &T {
+        &self.data
     }
 }

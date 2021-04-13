@@ -39,6 +39,7 @@ impl WireElementOps {
 
 impl Query for GetElementOpsQuery {
     type Data = WireDhtOp;
+    type ValidatedData = WireDhtOp;
     type State = WireElementOps;
     type Output = Self::State;
 
@@ -51,7 +52,7 @@ impl Query for GetElementOpsQuery {
         WHERE DhtOp.type IN (:store_element, :delete, :update)
         AND
         DhtOp.basis_hash = :header_hash
-        AND 
+        AND
         DhtOp.when_integrated IS NOT NULL
         "
         .into()
@@ -67,7 +68,7 @@ impl Query for GetElementOpsQuery {
         params.to_vec()
     }
 
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::ValidatedData>> {
         let f = |row: &Row| {
             let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
             let SignedHeader(header, signature) = header;

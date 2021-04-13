@@ -50,7 +50,7 @@ impl LinkQuery {
             Header.base_hash = :base_hash
             AND
             Header.zome_id = :zome_id
-            AND 
+            AND
             DhtOp.validation_status = :status
             AND (DhtOp.when_integrated IS NOT NULL OR DhtOp.is_authored = 1)
         "
@@ -118,9 +118,10 @@ impl LinkQuery {
 }
 
 impl Query for LinkQuery {
+    type Data = SignedHeaderHashed;
+    type ValidatedData = ValStatusOf<Self::Data>;
     type State = Maps<Link>;
     type Output = Vec<Link>;
-    type Data = ValStatusOf<SignedHeaderHashed>;
     fn query(&self) -> String {
         self.query()
     }
@@ -133,7 +134,7 @@ impl Query for LinkQuery {
         Ok(Maps::new())
     }
 
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::ValidatedData>> {
         let f = row_blob_to_header("header_blob");
         // Data is valid because it is filtered in the sql query.
         Arc::new(move |row| Ok(ValStatusOf::valid(f(row)?)))
@@ -143,7 +144,7 @@ impl Query for LinkQuery {
         let base_filter = self.base.clone();
         let zome_id_filter = self.zome_id.clone();
         let tag_filter = self.tag.clone();
-        let f = move |header: &Self::Data| match header.data.header() {
+        let f = move |header: &Self::Data| match header.header() {
             Header::CreateLink(CreateLink {
                 base_address,
                 zome_id,
@@ -160,7 +161,11 @@ impl Query for LinkQuery {
         Box::new(f)
     }
 
-    fn fold(&self, mut state: Self::State, data: Self::Data) -> StateQueryResult<Self::State> {
+    fn fold(
+        &self,
+        mut state: Self::State,
+        data: Self::ValidatedData,
+    ) -> StateQueryResult<Self::State> {
         let shh = data.data;
         let (header, _) = shh.into_header_and_signature();
         let (header, hash) = header.into_inner();

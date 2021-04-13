@@ -15,7 +15,8 @@ impl ChainHeadQuery {
 }
 
 impl Query for ChainHeadQuery {
-    type Data = ValStatusOf<SignedHeaderHashed>;
+    type Data = SignedHeaderHashed;
+    type ValidatedData = ValStatusOf<Self::Data>;
     type State = Option<SignedHeaderHashed>;
     type Output = Option<HeaderHash>;
 
@@ -50,13 +51,11 @@ impl Query for ChainHeadQuery {
         // NB: it's a little redundant to filter on author, since we should never
         // be putting any headers by other authors in our scratch, but it
         // certainly doesn't hurt to be consistent.
-        let f = move |header: &ValStatusOf<SignedHeaderHashed>| {
-            *header.data.header().author() == author
-        };
+        let f = move |header: &SignedHeaderHashed| *header.header().author() == author;
         Box::new(f)
     }
 
-    fn fold(&self, state: Self::State, sh: Self::Data) -> StateQueryResult<Self::State> {
+    fn fold(&self, state: Self::State, sh: Self::ValidatedData) -> StateQueryResult<Self::State> {
         // We don't need the validation status from this point.
         let sh = sh.data;
         // Simple maximum finding
@@ -79,7 +78,7 @@ impl Query for ChainHeadQuery {
         Ok(state.map(|sh| HeaderHash::with_data_sync(sh.header())))
     }
 
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::ValidatedData>> {
         let f = row_blob_and_hash_to_header("blob", "hash");
         // Valid because the data is authored.
         Arc::new(move |r| Ok(ValStatusOf::valid(f(r)?)))

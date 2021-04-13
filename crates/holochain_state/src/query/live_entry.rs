@@ -19,7 +19,8 @@ impl GetLiveEntryQuery {
 }
 
 impl Query for GetLiveEntryQuery {
-    type Data = ValStatusOf<SignedHeaderHashed>;
+    type Data = SignedHeaderHashed;
+    type ValidatedData = ValStatusOf<Self::Data>;
     type State = Maps<SignedHeaderHashed>;
     type Output = Option<Element>;
 
@@ -46,7 +47,7 @@ impl Query for GetLiveEntryQuery {
         params.to_vec()
     }
 
-    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
+    fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::ValidatedData>> {
         let f = row_blob_to_header("header_blob");
         // Data is valid because it is filtered in the sql query.
         Arc::new(move |row| Ok(ValStatusOf::valid(f(row)?)))
@@ -54,7 +55,7 @@ impl Query for GetLiveEntryQuery {
 
     fn as_filter(&self) -> Box<dyn Fn(&Self::Data) -> bool> {
         let entry_filter = self.0.clone();
-        let f = move |header: &Self::Data| match header.data.header() {
+        let f = move |header: &Self::Data| match header.header() {
             Header::Create(Create { entry_hash, .. })
             | Header::Update(Update { entry_hash, .. }) => *entry_hash == entry_filter,
             Header::Delete(Delete {
@@ -70,7 +71,11 @@ impl Query for GetLiveEntryQuery {
         Ok(Maps::new())
     }
 
-    fn fold(&self, mut state: Self::State, data: Self::Data) -> StateQueryResult<Self::State> {
+    fn fold(
+        &self,
+        mut state: Self::State,
+        data: Self::ValidatedData,
+    ) -> StateQueryResult<Self::State> {
         let shh = data.data;
         let hash = shh.as_hash().clone();
         match shh.header() {
