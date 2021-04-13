@@ -2387,6 +2387,7 @@ dependencies = [
  "lair_keystore_api",
  "nanoid",
  "observability",
+ "parking_lot 0.11.1",
  "rmp-serde",
  "rustls",
  "serde",
