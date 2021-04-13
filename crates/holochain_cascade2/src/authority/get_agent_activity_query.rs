@@ -51,7 +51,10 @@ impl Query for GetAgentActivityDeterministicQuery {
             JOIN DhtOp as D
             ON D.header_hash = H.hash
             WHERE H.author = :author
+            AND D.type = :agent_activity
             AND D.validation_status IS NOT NULL  -- FIXME: ensure that it's actually valid
+            AND D.when_integrated IS NOT NULL
+            -- You can't filter on the authority side without risking they are lying to you.
             AND (:entry_type IS NULL OR H.entry_type = :entry_type)
             AND (:header_type IS NULL OR H.type = :header_type)
             AND (:hash_low IS NULL OR H.seq >= (SELECT seq FROM Header WHERE hash = :hash_low))
@@ -67,6 +70,7 @@ impl Query for GetAgentActivityDeterministicQuery {
             ":header_type": self.filter.header_type,
             ":hash_low": self.filter.range.0,
             ":hash_high": self.filter.range.1,
+            ":agent_activity": DhtOpType::RegisterAgentActivity,
         })
         .to_vec()
     }
@@ -124,12 +128,11 @@ mod tests {
                 let mut header_create = fixt!(Create);
                 header_create.entry_type = entry_type_1.clone();
                 header_create.author = agents[a].clone();
+                let entry = Entry::App(fixt!(AppEntryBytes));
+                header_create.entry_hash = EntryHash::with_data_sync(&entry);
                 top_header = Some(header_create.clone());
-                let op_create = DhtOp::StoreEntry(
-                    fixt!(Signature),
-                    header_create.into(),
-                    Box::new(fixt!(Entry)),
-                );
+                let op_create =
+                    DhtOp::RegisterAgentActivity(fixt!(Signature), header_create.into());
                 let op = DhtOpHashed::from_content_sync(op_create);
                 dbg!(HeaderHash::with_data_sync(&op.header()));
                 fill_db(&env, op);

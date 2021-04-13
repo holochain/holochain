@@ -61,11 +61,11 @@ CREATE TABLE Header (
     membrane_proof   BLOB           NULL,
 
     -- OpenChain / CloseChain
-    prev_dna_hash    BLOB           NULL,
+    prev_dna_hash    BLOB           NULL
 
-    FOREIGN KEY(entry_hash) REFERENCES Entry(hash)
     -- We can't have any of these constraint because 
     -- the element authority doesn't get the create link for a remove link. @freesig
+    -- FOREIGN KEY(entry_hash) REFERENCES Entry(hash)
     -- FOREIGN KEY(original_entry_hash) REFERENCES Entry(hash),
     -- FOREIGN KEY(original_header_hash) REFERENCES Header(hash),
     -- FOREIGN KEY(deletes_entry_hash) REFERENCES Entry(hash)
