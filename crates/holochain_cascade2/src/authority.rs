@@ -69,7 +69,7 @@ pub fn handle_get_agent_activity(
     agent: AgentPubKey,
     filter: AgentActivityFilterDeterministic,
     options: holochain_p2p::event::GetActivityOptions,
-) -> CascadeResult<AgentActivityResponse> {
+) -> CascadeResult<AgentActivityResponseDeterministic> {
     let query = GetAgentActivityDeterministicQuery::new(agent, filter, options);
     let results = env
         .conn()?

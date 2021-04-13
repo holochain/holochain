@@ -57,7 +57,7 @@ impl Query for GetElementDetailsQuery {
             let header = HeaderHashed::from_content_sync(header);
             let shh = SignedHeaderHashed::with_presigned(header, signature);
             let status = row.get(row.column_index("status")?)?;
-            let r = Judged { data: shh, status };
+            let r = Judged::new(shh, status);
             Ok(r)
         };
         Arc::new(f)
@@ -94,11 +94,8 @@ impl Query for GetElementDetailsQuery {
         })
     }
 
-    fn fold(&self, mut state: Self::State, data: Self::Item) -> StateQueryResult<Self::State> {
-        let Judged {
-            data: shh,
-            status: validation_status,
-        } = data;
+    fn fold(&self, mut state: Self::State, item: Self::Item) -> StateQueryResult<Self::State> {
+        let (shh, validation_status) = item.into();
         if *shh.as_hash() == self.0 {
             if state.header.is_none() && state.rejected_header.is_none() {
                 match validation_status {

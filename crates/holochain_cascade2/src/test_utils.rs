@@ -7,7 +7,6 @@ use holochain_p2p::actor;
 use holochain_p2p::HolochainP2pError;
 use holochain_state::insert::set_when_integrated;
 use holochain_state::insert::update_op_validation_status;
-use holochain_types::activity::AgentActivityResponse;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::env::EnvRead;
@@ -16,7 +15,6 @@ use holochain_types::header::NewEntryHeader;
 use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::ValidationPackageResponse;
 use holochain_types::timestamp;
-use holochain_zome_types::fixt::*;
 use holochain_zome_types::AgentActivityFilterDeterministic;
 use holochain_zome_types::Create;
 use holochain_zome_types::Element;
@@ -27,6 +25,7 @@ use holochain_zome_types::Link;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::Update;
 use holochain_zome_types::ValidationStatus;
+use holochain_zome_types::{fixt::*, AgentActivityResponseDeterministic};
 
 use crate::authority;
 use crate::authority::WireDhtOp;
@@ -101,7 +100,7 @@ pub trait HolochainP2pCellT2 {
         agent: AgentPubKey,
         query: AgentActivityFilterDeterministic,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>>;
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponseDeterministic>>;
 
     async fn authority_for_hash(
         &mut self,
@@ -172,7 +171,7 @@ impl HolochainP2pCellT2 for PassThroughNetwork {
         agent: AgentPubKey,
         query: AgentActivityFilterDeterministic,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>> {
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponseDeterministic>> {
         let mut out = Vec::new();
         for env in &self.envs {
             let r = authority::handle_get_agent_activity(
@@ -605,7 +604,7 @@ impl HolochainP2pCellT2 for MockNetwork {
         agent: AgentPubKey,
         query: AgentActivityFilterDeterministic,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>> {
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponseDeterministic>> {
         self.0
             .lock()
             .await

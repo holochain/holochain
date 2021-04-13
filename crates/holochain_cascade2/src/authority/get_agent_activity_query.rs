@@ -31,34 +31,29 @@ impl GetAgentActivityDeterministicQuery {
     }
 }
 
+#[derive(Debug)]
 pub struct GetAgentActivityDeterministicQueryState {
-    valid: Vec<SignedHeaderHashed>,
-    rejected: Vec<SignedHeaderHashed>,
+    chain: Vec<Judged<SignedHeader>>,
+    prev_header: Option<HeaderHash>,
 }
 
 impl Query for GetAgentActivityDeterministicQuery {
     type Item = Judged<SignedHeaderHashed>;
-    type State = AgentActivityResponse<SignedHeaderHashed>;
-    // NB: the current options also specify the ability to return only hashes.
-    //     we either need a separate query for this, or we just post-process
-    //     the full headers. Either way that option is ignored here.
-    type Output = AgentActivityResponse<SignedHeaderHashed>;
+    type State = GetAgentActivityDeterministicQueryState;
+    type Output = AgentActivityResponseDeterministic;
 
     fn query(&self) -> String {
         format!(
             "
-            SELECT H.blob, H.hash FROM Header AS H
+            SELECT H.blob, H.hash, D.validation_status FROM Header AS H
             JOIN DhtOp as D
             ON D.header_hash = H.hash
             WHERE H.author = :author
-            AND D.type = :agent_activity
-            AND D.validation_status IS NOT NULL  -- FIXME: ensure that it's actually valid
+            AND D.type = :op_type
+            AND D.validation_status IS NOT NULL
             AND D.when_integrated IS NOT NULL
-            -- You can't filter on the authority side without risking they are lying to you.
-            AND (:entry_type IS NULL OR H.entry_type = :entry_type)
-            AND (:header_type IS NULL OR H.type = :header_type)
             AND (:hash_low IS NULL OR H.seq >= (SELECT seq FROM Header WHERE hash = :hash_low))
-            AND H.seq <= (SELECT seq FROM Header WHERE hash = :hash_high)
+            -- AND H.seq <= (SELECT seq FROM Header WHERE hash = :hash_high)
         "
         )
     }
@@ -66,22 +61,17 @@ impl Query for GetAgentActivityDeterministicQuery {
     fn params(&self) -> Vec<Params> {
         (named_params! {
             ":author": self.agent,
-            ":entry_type": self.filter.entry_type,
-            ":header_type": self.filter.header_type,
             ":hash_low": self.filter.range.0,
-            ":hash_high": self.filter.range.1,
-            ":agent_activity": DhtOpType::RegisterAgentActivity,
+            // ":hash_high": self.filter.range.1,
+            ":op_type": DhtOpType::RegisterAgentActivity,
         })
         .to_vec()
     }
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {
-        Ok(AgentActivityResponse {
-            agent: self.agent.clone(),
-            valid_activity: ChainItems::Full(Vec::new()),
-            rejected_activity: ChainItems::Full(Vec::new()),
-            status: ChainStatus::Empty,
-            highest_observed: None,
+        Ok(GetAgentActivityDeterministicQueryState {
+            chain: Vec::new(),
+            prev_header: Some(self.filter.range.1.clone()),
         })
     }
 
@@ -89,21 +79,33 @@ impl Query for GetAgentActivityDeterministicQuery {
         todo!()
     }
 
-    fn fold(&self, state: Self::State, data: Self::Item) -> StateQueryResult<Self::State> {
-        todo!()
+    fn fold(&self, mut state: Self::State, item: Self::Item) -> StateQueryResult<Self::State> {
+        dbg!(&state, &item);
+        let (shh, status) = item.into();
+        let (header, hash) = shh.into_inner();
+        // By tracking the prev_header of the last header we added to the chain,
+        // we can filter out branches. If we performed branch detection in this
+        // query, it would not be deterministic.
+        if Some(hash) == state.prev_header {
+            state.prev_header = header.header().prev_header().cloned();
+            state.chain.push((header, status).into());
+        }
+        Ok(state)
     }
 
     fn render<S>(&self, state: Self::State, _stores: S) -> StateQueryResult<Self::Output>
     where
         S: Store,
     {
-        Ok(state)
+        Ok(AgentActivityResponseDeterministic::new(state.chain))
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = row_blob_and_hash_to_header("blob", "hash");
-        // Data is valid because iI'm not sure why?
-        Arc::new(move |row| Ok(Judged::valid(f(row)?)))
+        Arc::new(move |row| {
+            let validation_status: ValidationStatus = row.get("validation_status")?;
+            Ok(Judged::new(f(row)?, validation_status))
+        })
     }
 }
 
@@ -123,26 +125,28 @@ mod tests {
         let mut top_hashes = vec![];
 
         for a in 0..3 {
-            let mut top_header = None;
+            let mut top_hash: Option<HeaderHash> = None;
             for _i in 0..10 {
-                let mut header_create = fixt!(Create);
-                header_create.entry_type = entry_type_1.clone();
-                header_create.author = agents[a].clone();
-                let entry = Entry::App(fixt!(AppEntryBytes));
-                header_create.entry_hash = EntryHash::with_data_sync(&entry);
-                top_header = Some(header_create.clone());
-                let op_create =
-                    DhtOp::RegisterAgentActivity(fixt!(Signature), header_create.into());
-                let op = DhtOpHashed::from_content_sync(op_create);
-                dbg!(HeaderHash::with_data_sync(&op.header()));
+                let header: Header = if let Some(top_hash) = top_hash {
+                    let mut header = fixt!(Create);
+                    header.entry_type = entry_type_1.clone();
+                    header.author = agents[a].clone();
+                    header.prev_header = top_hash.clone();
+                    let entry = Entry::App(fixt!(AppEntryBytes));
+                    header.entry_hash = EntryHash::with_data_sync(&entry);
+                    header.into()
+                } else {
+                    let mut header = fixt!(Dna);
+                    header.author = agents[a].clone();
+                    header.into()
+                };
+                top_hash = Some(HeaderHash::with_data_sync(&header));
+                let op = DhtOp::RegisterAgentActivity(fixt!(Signature), header.into());
+                let op = DhtOpHashed::from_content_sync(op);
                 fill_db(&env, op);
             }
-            top_hashes.push(HeaderHash::with_data_sync(&Header::from(
-                top_header.unwrap(),
-            )));
+            top_hashes.push(top_hash.unwrap());
         }
-
-        dbg!(&top_hashes);
 
         let filter = AgentActivityFilterDeterministic {
             range: (None, top_hashes[2].clone()),
@@ -161,6 +165,6 @@ mod tests {
 
         dbg!(&results);
 
-        matches::assert_matches!(results.valid_activity, ChainItems::Full(items) if items.len() == 10)
+        assert_eq!(results.chain.len(), 10);
     }
 }

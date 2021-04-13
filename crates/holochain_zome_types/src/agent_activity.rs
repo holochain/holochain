@@ -1,5 +1,5 @@
-use crate::EntryType;
-use crate::HeaderType;
+use crate::{judged::Judged, HeaderType};
+use crate::{EntryType, SignedHeader};
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
@@ -37,4 +37,15 @@ pub struct AgentActivityFilterDeterministic {
     pub header_type: Option<HeaderType>,
     /// Include the entries in the elements
     pub include_entries: bool,
+}
+
+#[derive(Debug)]
+pub struct AgentActivityResponseDeterministic {
+    pub chain: Vec<Judged<SignedHeader>>,
+}
+
+impl AgentActivityResponseDeterministic {
+    pub fn new(chain: Vec<Judged<SignedHeader>>) -> Self {
+        Self { chain }
+    }
 }
