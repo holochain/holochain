@@ -54,6 +54,7 @@ impl Query for GetAgentActivityDeterministicQuery {
             AND D.when_integrated IS NOT NULL
             AND (:hash_low IS NULL OR H.seq >= (SELECT seq FROM Header WHERE hash = :hash_low))
             -- AND H.seq <= (SELECT seq FROM Header WHERE hash = :hash_high)
+            ORDER BY H.seq DESC
         "
         )
     }
@@ -80,7 +81,7 @@ impl Query for GetAgentActivityDeterministicQuery {
     }
 
     fn fold(&self, mut state: Self::State, item: Self::Item) -> StateQueryResult<Self::State> {
-        dbg!(&state, &item);
+        dbg!((state.chain.len(), &state.prev_header), &item.data.header_hashed());
         let (shh, status) = item.into();
         let (header, hash) = shh.into_inner();
         // By tracking the prev_header of the last header we added to the chain,
@@ -126,12 +127,13 @@ mod tests {
 
         for a in 0..3 {
             let mut top_hash: Option<HeaderHash> = None;
-            for _i in 0..10 {
+            for seq in 0..10 {
                 let header: Header = if let Some(top_hash) = top_hash {
                     let mut header = fixt!(Create);
                     header.entry_type = entry_type_1.clone();
                     header.author = agents[a].clone();
                     header.prev_header = top_hash.clone();
+                    header.header_seq = seq;
                     let entry = Entry::App(fixt!(AppEntryBytes));
                     header.entry_hash = EntryHash::with_data_sync(&entry);
                     header.into()
@@ -148,22 +150,27 @@ mod tests {
             top_hashes.push(top_hash.unwrap());
         }
 
-        let filter = AgentActivityFilterDeterministic {
+        let filter_full = AgentActivityFilterDeterministic {
             range: (None, top_hashes[2].clone()),
-            entry_type: Some(entry_type_1),
+            entry_type: Some(entry_type_1.clone()),
             header_type: None,
             include_entries: false,
         };
+
+        // let filter_partial = AgentActivityFilterDeterministic {
+        //     range: (None, top_hashes[2].clone()),
+        //     entry_type: Some(entry_type_1),
+        //     header_type: None,
+        //     include_entries: false,
+        // };
         let options = GetActivityOptions::default();
         let results = handle_get_agent_activity(
             env.clone().into(),
             agents[2].clone(),
-            filter.clone(),
+            filter_full.clone(),
             options,
         )
         .unwrap();
-
-        dbg!(&results);
 
         assert_eq!(results.chain.len(), 10);
     }
