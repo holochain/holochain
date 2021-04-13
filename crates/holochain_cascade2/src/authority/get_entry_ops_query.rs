@@ -3,6 +3,7 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_state::query::prelude::*;
 use holochain_types::dht_op::DhtOpType;
+use holochain_types::prelude::ValidationStatusT;
 use holochain_zome_types::Entry;
 use holochain_zome_types::Header;
 use holochain_zome_types::Signature;
@@ -48,6 +49,12 @@ pub struct WireDhtOp {
     pub op_type: DhtOpType,
     pub header: Header,
     pub signature: Signature,
+}
+
+impl ValidationStatusT for WireDhtOp {
+    fn status(&self) -> Option<ValidationStatus> {
+        self.validation_status
+    }
 }
 
 impl Query for GetEntryOpsQuery {

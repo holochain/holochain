@@ -11,6 +11,7 @@ use holochain_sqlite::rusqlite::Row;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::ValStatusOf;
+use holochain_types::prelude::ValidationStatusT;
 use holochain_zome_types::Entry;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::SignedHeader;
@@ -76,7 +77,7 @@ impl<T> Maps<T> {
 /// If there is any large data put it in an Arc.
 pub trait Query: Clone {
     type State;
-    type Data: Clone;
+    type Data: Clone + ValidationStatusT;
     type Output;
 
     fn query(&self) -> String {

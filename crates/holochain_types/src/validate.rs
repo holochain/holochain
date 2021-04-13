@@ -39,3 +39,18 @@ impl<T> ValStatusOf<T> {
         Self { data, status: None }
     }
 }
+
+/// Data that requires a validation status.
+pub trait ValidationStatusT {
+    /// Get the status of a some data.
+    /// None means this data has not been validated yet.
+    fn status(&self) -> Option<ValidationStatus> {
+        None
+    }
+}
+
+impl<T> ValidationStatusT for ValStatusOf<T> {
+    fn status(&self) -> Option<ValidationStatus> {
+        self.status
+    }
+}

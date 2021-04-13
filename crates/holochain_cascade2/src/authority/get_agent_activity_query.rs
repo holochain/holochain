@@ -30,7 +30,7 @@ pub struct GetAgentActivityQueryState {
 }
 
 impl Query for GetAgentActivityQuery {
-    type Data = SignedHeaderHashed;
+    type Data = ValStatusOf<SignedHeaderHashed>;
     type State = AgentActivityResponse<SignedHeaderHashed>;
     // NB: the current options also specify the ability to return only hashes.
     //     we either need a separate query for this, or we just post-process
@@ -101,7 +101,7 @@ impl Query for GetAgentActivityQuery {
         todo!()
     }
 
-    fn fold(&self, state: Self::State, sh: SignedHeaderHashed) -> StateQueryResult<Self::State> {
+    fn fold(&self, state: Self::State, data: Self::Data) -> StateQueryResult<Self::State> {
         todo!()
     }
 
@@ -113,7 +113,9 @@ impl Query for GetAgentActivityQuery {
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Data>> {
-        Arc::new(row_blob_and_hash_to_header("blob", "hash"))
+        let f = row_blob_and_hash_to_header("blob", "hash");
+        // Data is valid because iI'm not sure why?
+        Arc::new(move |row| Ok(ValStatusOf::valid(f(row)?)))
     }
 }
 
