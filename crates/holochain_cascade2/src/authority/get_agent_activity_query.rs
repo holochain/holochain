@@ -53,7 +53,7 @@ impl Query for GetAgentActivityDeterministicQuery {
             AND D.validation_status IS NOT NULL
             AND D.when_integrated IS NOT NULL
             AND (:hash_low IS NULL OR H.seq >= (SELECT seq FROM Header WHERE hash = :hash_low))
-            -- AND H.seq <= (SELECT seq FROM Header WHERE hash = :hash_high)
+            AND H.seq <= (SELECT seq FROM Header WHERE hash = :hash_high)
             ORDER BY H.seq DESC
         "
         )
@@ -63,7 +63,7 @@ impl Query for GetAgentActivityDeterministicQuery {
         (named_params! {
             ":author": self.agent,
             ":hash_low": self.filter.range.0,
-            // ":hash_high": self.filter.range.1,
+            ":hash_high": self.filter.range.1,
             ":op_type": DhtOpType::RegisterAgentActivity,
         })
         .to_vec()
@@ -81,12 +81,17 @@ impl Query for GetAgentActivityDeterministicQuery {
     }
 
     fn fold(&self, mut state: Self::State, item: Self::Item) -> StateQueryResult<Self::State> {
-        dbg!((state.chain.len(), &state.prev_header), &item.data.header_hashed());
         let (shh, status) = item.into();
         let (header, hash) = shh.into_inner();
         // By tracking the prev_header of the last header we added to the chain,
         // we can filter out branches. If we performed branch detection in this
         // query, it would not be deterministic.
+        //
+        // TODO: ensure that this still works with the scratch, and that we
+        // never have to run this query including the Cache. That is, if we join
+        // results from multiple Stores, the ordering of header_seq will be
+        // discontinuous, and we will have to collect into a sorted list before
+        // doing this fold.
         if Some(hash) == state.prev_header {
             state.prev_header = header.header().prev_header().cloned();
             state.chain.push((header, status).into());
@@ -123,16 +128,16 @@ mod tests {
         let env = test_env.env();
         let entry_type_1 = fixt!(EntryType);
         let agents = [fixt!(AgentPubKey), fixt!(AgentPubKey), fixt!(AgentPubKey)];
-        let mut top_hashes = vec![];
+        let mut chains = vec![];
 
         for a in 0..3 {
-            let mut top_hash: Option<HeaderHash> = None;
+            let mut chain: Vec<HeaderHash> = Vec::new();
             for seq in 0..10 {
-                let header: Header = if let Some(top_hash) = top_hash {
+                let header: Header = if let Some(top) = chain.last() {
                     let mut header = fixt!(Create);
                     header.entry_type = entry_type_1.clone();
                     header.author = agents[a].clone();
-                    header.prev_header = top_hash.clone();
+                    header.prev_header = top.clone();
                     header.header_seq = seq;
                     let entry = Entry::App(fixt!(AppEntryBytes));
                     header.entry_hash = EntryHash::with_data_sync(&entry);
@@ -142,36 +147,46 @@ mod tests {
                     header.author = agents[a].clone();
                     header.into()
                 };
-                top_hash = Some(HeaderHash::with_data_sync(&header));
+                chain.push(HeaderHash::with_data_sync(&header));
                 let op = DhtOp::RegisterAgentActivity(fixt!(Signature), header.into());
                 let op = DhtOpHashed::from_content_sync(op);
                 fill_db(&env, op);
             }
-            top_hashes.push(top_hash.unwrap());
+            chains.push(chain);
         }
 
         let filter_full = AgentActivityFilterDeterministic {
-            range: (None, top_hashes[2].clone()),
+            range: (None, chains[2].last().unwrap().clone()),
             entry_type: Some(entry_type_1.clone()),
             header_type: None,
             include_entries: false,
         };
 
-        // let filter_partial = AgentActivityFilterDeterministic {
-        //     range: (None, top_hashes[2].clone()),
-        //     entry_type: Some(entry_type_1),
-        //     header_type: None,
-        //     include_entries: false,
-        // };
+        let filter_partial = AgentActivityFilterDeterministic {
+            range: (Some(chains[2][4].clone()), chains[2][8].clone()),
+            entry_type: Some(entry_type_1),
+            header_type: None,
+            include_entries: false,
+        };
         let options = GetActivityOptions::default();
-        let results = handle_get_agent_activity(
+
+        let results_full = handle_get_agent_activity(
             env.clone().into(),
             agents[2].clone(),
-            filter_full.clone(),
+            filter_full,
+            options.clone(),
+        )
+        .unwrap();
+
+        let results_partial = handle_get_agent_activity(
+            env.clone().into(),
+            agents[2].clone(),
+            filter_partial,
             options,
         )
         .unwrap();
 
-        assert_eq!(results.chain.len(), 10);
+        assert_eq!(results_full.chain.len(), 10);
+        assert_eq!(results_partial.chain.len(), 5);
     }
 }
