@@ -205,8 +205,8 @@ impl AsConHnd for ConItem {
         self.item.share_mut(|i, _| Ok(i.url.clone()))
     }
 
-    fn peer_digest(&self) -> KitsuneResult<CertDigest> {
-        self.item.share_mut(|i, _| i.con.peer_digest())
+    fn peer_cert(&self) -> KitsuneResult<Tx2Cert> {
+        self.item.share_mut(|i, _| i.con.peer_cert())
     }
 
     fn is_closed(&self) -> bool {
@@ -525,8 +525,8 @@ impl AsEpHnd for PromoteEpHnd {
         self.0.share_mut(|i, _| i.sub_ep.local_addr())
     }
 
-    fn local_digest(&self) -> KitsuneResult<CertDigest> {
-        self.0.share_mut(|i, _| i.sub_ep.local_digest())
+    fn local_cert(&self) -> KitsuneResult<Tx2Cert> {
+        self.0.share_mut(|i, _| i.sub_ep.local_cert())
     }
 
     fn is_closed(&self) -> bool {

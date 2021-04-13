@@ -44,7 +44,7 @@ pub trait ConAdapt: 'static + Send + Sync + Unpin {
     fn peer_addr(&self) -> KitsuneResult<TxUrl>;
 
     /// Get the certificate digest of the remote.
-    fn peer_digest(&self) -> KitsuneResult<CertDigest>;
+    fn peer_cert(&self) -> KitsuneResult<Tx2Cert>;
 
     /// Create a new outgoing channel to the remote.
     fn out_chan(&self, timeout: KitsuneTimeout) -> OutChanFut;
@@ -79,7 +79,7 @@ pub trait EndpointAdapt: 'static + Send + Sync + Unpin {
     fn local_addr(&self) -> KitsuneResult<TxUrl>;
 
     /// Get the local certificate digest.
-    fn local_digest(&self) -> KitsuneResult<CertDigest>;
+    fn local_cert(&self) -> KitsuneResult<Tx2Cert>;
 
     /// Create a new outgoing connection to a remote.
     fn connect(&self, url: TxUrl, timeout: KitsuneTimeout) -> ConFut;

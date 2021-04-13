@@ -30,8 +30,8 @@ const PROXY_FWD_MSG: u8 = 0x30;
 struct ProxyConHnd {
     uniq: Uniq,
     sub_con: ConHnd,
-    local_digest: CertDigest,
-    remote_digest: CertDigest,
+    local_cert: Tx2Cert,
+    remote_cert: Tx2Cert,
 }
 
 impl std::fmt::Debug for ProxyConHnd {
@@ -41,13 +41,13 @@ impl std::fmt::Debug for ProxyConHnd {
 }
 
 impl ProxyConHnd {
-    pub fn new(sub_con: ConHnd, local_digest: CertDigest, remote_digest: CertDigest) -> ConHnd {
+    pub fn new(sub_con: ConHnd, local_cert: Tx2Cert, remote_cert: Tx2Cert) -> ConHnd {
         let uniq = Uniq::default();
         let con = Self {
             uniq,
             sub_con,
-            local_digest,
-            remote_digest,
+            local_cert,
+            remote_cert,
         };
         let con: ConHnd = Arc::new(con);
         con
@@ -73,11 +73,11 @@ impl AsConHnd for ProxyConHnd {
 
     fn peer_addr(&self) -> KitsuneResult<TxUrl> {
         let peer_addr = self.sub_con.peer_addr()?;
-        promote_addr(&peer_addr, &self.remote_digest)
+        promote_addr(&peer_addr, &self.remote_cert)
     }
 
-    fn peer_digest(&self) -> KitsuneResult<CertDigest> {
-        Ok(self.remote_digest.clone())
+    fn peer_cert(&self) -> KitsuneResult<Tx2Cert> {
+        Ok(self.remote_cert.clone())
     }
 
     fn write(
@@ -87,15 +87,15 @@ impl AsConHnd for ProxyConHnd {
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<()>> {
         data.reserve_front(PROXY_TYPE_BYTES + DIGEST_BYTES + DIGEST_BYTES);
-        data.prepend_from_slice(&self.local_digest);
-        data.prepend_from_slice(&self.remote_digest);
+        data.prepend_from_slice(&self.local_cert);
+        data.prepend_from_slice(&self.remote_cert);
         data.prepend_from_slice(&[PROXY_FWD_MSG]);
         self.sub_con.write(msg_id, data, timeout).boxed()
     }
 }
 
-fn promote_addr(base_addr: &TxUrl, cert_digest: &CertDigest) -> KitsuneResult<TxUrl> {
-    Ok(ProxyUrl::new(base_addr.as_str(), cert_digest.clone())
+fn promote_addr(base_addr: &TxUrl, cert: &Tx2Cert) -> KitsuneResult<TxUrl> {
+    Ok(ProxyUrl::new(base_addr.as_str(), cert.as_digest().clone())
         .map_err(KitsuneError::other)?
         .as_str()
         .into())
@@ -105,23 +105,23 @@ fn promote_addr(base_addr: &TxUrl, cert_digest: &CertDigest) -> KitsuneResult<Tx
 struct ProxyEpInner {
     // we only proxy over *incoming* connections
     // therefore it is a 1-to-1 relationship to remote digest
-    in_digest_to_sub_con: HashMap<CertDigest, ConHnd>,
+    in_digest_to_sub_con: HashMap<Tx2Cert, ConHnd>,
 
     // allows us to cleanup the digest to sub_con proxy mapping
     // when a ConHnd close event is received
-    in_base_url_to_digest: HashMap<TxUrl, CertDigest>,
+    in_base_url_to_digest: HashMap<TxUrl, Tx2Cert>,
 
     // allows us to clone Tx2ConHnd items which will share
     // the same Uniq, rather than duplicating handles to the same connection.
-    base_url_to_uniq_out_con_hnd: HashMap<TxUrl, HashMap<CertDigest, ConHnd>>,
+    base_url_to_uniq_out_con_hnd: HashMap<TxUrl, HashMap<Tx2Cert, ConHnd>>,
 }
 
 impl ProxyEpInner {
     pub fn get_con_hnd(
         &mut self,
         sub_con: ConHnd,
-        local_digest: CertDigest,
-        remote_digest: CertDigest,
+        local_cert: Tx2Cert,
+        remote_cert: Tx2Cert,
     ) -> KitsuneResult<(bool, ConHnd)> {
         let base_url = sub_con.peer_addr()?;
         let inner_map = self
@@ -132,10 +132,10 @@ impl ProxyEpInner {
         let con = {
             let did_insert = &mut did_insert;
             inner_map
-                .entry(remote_digest.clone())
+                .entry(remote_cert.clone())
                 .or_insert_with(move || {
                     *did_insert = true;
-                    ProxyConHnd::new(sub_con, local_digest, remote_digest)
+                    ProxyConHnd::new(sub_con, local_cert, remote_cert)
                 })
                 .clone()
         };
@@ -145,7 +145,7 @@ impl ProxyEpInner {
 
 struct ProxyEpHnd {
     sub_ep_hnd: EpHnd,
-    local_digest: CertDigest,
+    local_cert: Tx2Cert,
     logic_hnd: LogicChanHandle<EpEvent>,
     inner: Share<ProxyEpInner>,
 }
@@ -154,12 +154,12 @@ async fn get_con_hnd(
     inner: &Share<ProxyEpInner>,
     logic_hnd: LogicChanHandle<EpEvent>,
     sub_con: ConHnd,
-    local_digest: CertDigest,
-    remote_digest: CertDigest,
+    local_cert: Tx2Cert,
+    remote_cert: Tx2Cert,
     is_outgoing: bool,
 ) -> KitsuneResult<ConHnd> {
     let (did_insert, con) =
-        inner.share_mut(move |i, _| i.get_con_hnd(sub_con, local_digest, remote_digest))?;
+        inner.share_mut(move |i, _| i.get_con_hnd(sub_con, local_cert, remote_cert))?;
     if did_insert {
         let con = con.clone();
         let url = con.peer_addr()?;
@@ -178,10 +178,10 @@ impl ProxyEpHnd {
         sub_ep_hnd: EpHnd,
         logic_hnd: LogicChanHandle<EpEvent>,
     ) -> KitsuneResult<Arc<ProxyEpHnd>> {
-        let local_digest = sub_ep_hnd.local_digest()?;
+        let local_cert = sub_ep_hnd.local_cert()?;
         Ok(Arc::new(ProxyEpHnd {
             sub_ep_hnd,
-            local_digest,
+            local_cert,
             logic_hnd,
             inner: Share::new(ProxyEpInner {
                 in_digest_to_sub_con: HashMap::new(),
@@ -218,15 +218,16 @@ impl AsEpHnd for ProxyEpHnd {
 
     fn local_addr(&self) -> KitsuneResult<TxUrl> {
         let local_addr = self.sub_ep_hnd.local_addr()?;
-        let proxy_addr: TxUrl = ProxyUrl::new(local_addr.as_str(), self.local_digest.clone())
-            .map_err(KitsuneError::other)?
-            .as_str()
-            .into();
+        let proxy_addr: TxUrl =
+            ProxyUrl::new(local_addr.as_str(), self.local_cert.as_digest().clone())
+                .map_err(KitsuneError::other)?
+                .as_str()
+                .into();
         Ok(proxy_addr)
     }
 
-    fn local_digest(&self) -> KitsuneResult<CertDigest> {
-        self.sub_ep_hnd.local_digest()
+    fn local_cert(&self) -> KitsuneResult<Tx2Cert> {
+        self.sub_ep_hnd.local_cert()
     }
 
     fn is_closed(&self) -> bool {
@@ -256,8 +257,8 @@ impl AsEpHnd for ProxyEpHnd {
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<ConHnd>> {
         let purl = ProxyUrl::from(remote.as_str());
-        let remote_digest = purl.digest();
-        if remote_digest == self.local_digest {
+        let remote_cert = purl.digest().into();
+        if remote_cert == self.local_cert {
             tracing::warn!("refusing outgoing connection to node with same cert");
             return async move {
                 Err("refusing outgoing connection to node with same cert".into())
@@ -266,21 +267,13 @@ impl AsEpHnd for ProxyEpHnd {
 
         let base_url: TxUrl = purl.as_base().as_str().into();
 
-        let local_digest = self.local_digest.clone();
+        let local_cert = self.local_cert.clone();
         let logic_hnd = self.logic_hnd.clone();
         let con_fut = self.sub_ep_hnd.get_connection(base_url, timeout);
         let inner = self.inner.clone();
         async move {
             let sub_con = con_fut.await?;
-            get_con_hnd(
-                &inner,
-                logic_hnd,
-                sub_con,
-                local_digest,
-                remote_digest,
-                true,
-            )
-            .await
+            get_con_hnd(&inner, logic_hnd, sub_con, local_cert, remote_cert, true).await
         }
         .boxed()
     }
@@ -292,14 +285,14 @@ async fn incoming_evt_logic(
     hnd: Arc<ProxyEpHnd>,
     logic_hnd: LogicChanHandle<EpEvent>,
 ) {
-    let local_digest = match sub_ep.handle().local_digest() {
+    let local_cert = match sub_ep.handle().local_cert() {
         Err(_) => {
             tracing::warn!("ep closed before evt handler launch");
             return;
         }
         Ok(d) => d,
     };
-    let local_digest = &local_digest;
+    let local_cert = &local_cert;
 
     // use CHANNEL_COUNT concurrents because that is how many channels
     // we have for sending outgoing data... most everything else in here is sync
@@ -310,7 +303,7 @@ async fn incoming_evt_logic(
         .for_each_concurrent(
             tuning_params.tx2_channel_count_per_connection,
             |evt| async {
-                incoming_evt_handle(evt, local_digest.clone(), &hnd, &logic_hnd).await;
+                incoming_evt_handle(evt, local_cert.clone(), &hnd, &logic_hnd).await;
             },
         )
         .await;
@@ -318,7 +311,7 @@ async fn incoming_evt_logic(
 
 async fn incoming_evt_handle(
     evt: EpEvent,
-    local_digest: CertDigest,
+    local_cert: Tx2Cert,
     hnd: &Arc<ProxyEpHnd>,
     logic_hnd: &LogicChanHandle<EpEvent>,
 ) {
@@ -330,14 +323,14 @@ async fn incoming_evt_handle(
             con: sub_con,
             url: base_url,
         }) => {
-            let digest = match sub_con.peer_digest() {
+            let cert = match sub_con.peer_cert() {
                 Err(e) => {
                     sub_con.close(500, &format!("{:?}", e)).await;
                     return;
                 }
                 Ok(d) => d,
             };
-            if digest == local_digest {
+            if cert == local_cert {
                 sub_con
                     .close(500, "refusing connection with matching cert")
                     .await;
@@ -345,8 +338,8 @@ async fn incoming_evt_handle(
                 return;
             }
             let _ = hnd.inner.share_mut(move |i, _| {
-                i.in_digest_to_sub_con.insert(digest.clone(), sub_con);
-                i.in_base_url_to_digest.insert(base_url, digest);
+                i.in_digest_to_sub_con.insert(cert.clone(), sub_con);
+                i.in_base_url_to_digest.insert(base_url, cert);
                 Ok(())
             });
         }
@@ -367,22 +360,22 @@ async fn incoming_evt_handle(
 
                     const DEST_START: usize = PROXY_TYPE_BYTES;
                     const DEST_END: usize = DEST_START + DIGEST_BYTES;
-                    let src_digest = CertDigest(Arc::new(data[SRC_START..SRC_END].to_vec()));
-                    let dest_digest = CertDigest(Arc::new(data[DEST_START..DEST_END].to_vec()));
-                    //println!("src: {:?}", src_digest);
-                    //println!("dst: {:?}", dest_digest);
-                    //println!("loc: {:?}", hnd.local_digest);
-                    if dest_digest == hnd.local_digest {
+                    let src_cert = data[SRC_START..SRC_END].to_vec().into();
+                    let dest_cert = data[DEST_START..DEST_END].to_vec().into();
+                    //println!("src: {:?}", src_cert);
+                    //println!("dst: {:?}", dest_cert);
+                    //println!("loc: {:?}", hnd.local_cert);
+                    if dest_cert == hnd.local_cert {
                         // this data is destined for US!
                         data.cheap_move_start(SRC_END);
                         //println!("got data for US: {}", String::from_utf8_lossy(data.as_ref()));
-                        let url = promote_addr(&base_url, &src_digest).unwrap();
+                        let url = promote_addr(&base_url, &src_cert).unwrap();
                         let con = match get_con_hnd(
                             &hnd.inner,
                             logic_hnd.clone(),
                             sub_con,
-                            dest_digest,
-                            src_digest,
+                            dest_cert,
+                            src_cert,
                             false,
                         )
                         .await
@@ -401,7 +394,7 @@ async fn incoming_evt_handle(
                         //println!("data to forward");
                         let dest = hnd.inner.share_mut(|i, _| {
                             //println!("ALALA: {:?}", i.in_digest_to_sub_con);
-                            Ok(i.in_digest_to_sub_con.get(&dest_digest).cloned())
+                            Ok(i.in_digest_to_sub_con.get(&dest_cert).cloned())
                         });
                         if let Err(e) = match dest {
                             Ok(Some(d_sub_con)) => {
@@ -409,7 +402,7 @@ async fn incoming_evt_handle(
                                 d_sub_con.write(msg_id, data, t).await
                             }
                             Ok(None) => {
-                                Err(format!("Invalid Proxy Target: {:?}", dest_digest).into())
+                                Err(format!("Invalid Proxy Target: {:?}", dest_cert).into())
                             }
                             Err(e) => Err(e),
                         } {
@@ -433,8 +426,8 @@ async fn incoming_evt_handle(
             reason,
         }) => {
             let kill_cons = hnd.inner.share_mut(|i, _| {
-                if let Some(digest) = i.in_base_url_to_digest.remove(&base_url) {
-                    i.in_digest_to_sub_con.remove(&digest);
+                if let Some(cert) = i.in_base_url_to_digest.remove(&base_url) {
+                    i.in_digest_to_sub_con.remove(&cert);
                 }
                 Ok(i.base_url_to_uniq_out_con_hnd.remove(&base_url))
             });
@@ -613,13 +606,13 @@ mod tests {
         let (p_join, p_addr, p_ep) = build_node(None).await;
         all_tasks.push(p_join);
         //println!("PROXY ADDR = {}", p_addr);
-        //println!("PROXY: {:?}", p_ep.local_digest().unwrap());
+        //println!("PROXY: {:?}", p_ep.local_cert().unwrap());
 
         let (t_join, t_addr, t_ep) = build_node(None).await;
         all_tasks.push(t_join);
 
         //println!("TGT ADDR = {}", t_addr);
-        //println!("TGT: {:?}", t_ep.local_digest().unwrap());
+        //println!("TGT: {:?}", t_ep.local_cert().unwrap());
 
         // establish proxy connection
         let _ = t_ep.get_connection(p_addr.clone(), t).await.unwrap();
@@ -633,7 +626,7 @@ mod tests {
         for _ in 0..COUNT {
             let (s_done, r_done) = tokio::sync::oneshot::channel();
             let (n_join, _n_addr, n_ep) = build_node(Some(s_done)).await;
-            //println!("N: {:?}", n_ep.local_digest().unwrap());
+            //println!("N: {:?}", n_ep.local_cert().unwrap());
 
             let t_addr_proxy = t_addr_proxy.clone();
             all_futs.push(async move {

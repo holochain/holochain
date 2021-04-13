@@ -121,8 +121,8 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
     }
 
     /// Get the certificate digest of the remote.
-    pub fn peer_digest(&self) -> KitsuneResult<CertDigest> {
-        self.con.peer_digest()
+    pub fn peer_cert(&self) -> KitsuneResult<Tx2Cert> {
+        self.con.peer_cert()
     }
 
     /// Is this connection closed?
@@ -225,8 +225,8 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
     }
 
     /// Get the local certificate digest.
-    pub fn local_digest(&self) -> KitsuneResult<CertDigest> {
-        self.0.local_digest()
+    pub fn local_cert(&self) -> KitsuneResult<Tx2Cert> {
+        self.0.local_cert()
     }
 
     /// Is this endpoint closed?

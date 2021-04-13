@@ -10,7 +10,6 @@ use kitsune_p2p_types::tx2::tx2_adapter::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
-use lair_keystore_api::actor::CertDigest;
 use std::sync::Arc;
 
 /// Configuration for QuicBackendAdapt
@@ -100,7 +99,7 @@ impl futures::stream::Stream for QuicInChanRecvAdapt {
 impl InChanRecvAdapt for QuicInChanRecvAdapt {}
 
 struct QuicConAdaptInner {
-    local_digest: CertDigest,
+    local_cert: Tx2Cert,
     con: quinn::Connection,
 }
 
@@ -118,15 +117,15 @@ pub(crate) fn blake2b_32(data: &[u8]) -> Vec<u8> {
 
 impl QuicConAdapt {
     pub fn new(con: quinn::Connection) -> KitsuneResult<Self> {
-        let local_digest = match con.peer_identity() {
+        let local_cert = match con.peer_identity() {
             None => return Err("invalid peer certificate".into()),
             Some(chain) => match chain.iter().next() {
                 None => return Err("invalid peer certificate".into()),
-                Some(cert) => CertDigest(Arc::new(blake2b_32(cert.as_ref()))),
+                Some(cert) => blake2b_32(cert.as_ref()).into(),
             },
         };
         Ok(Self(
-            Share::new(QuicConAdaptInner { local_digest, con }),
+            Share::new(QuicConAdaptInner { local_cert, con }),
             Uniq::default(),
         ))
     }
@@ -146,8 +145,8 @@ impl ConAdapt for QuicConAdapt {
         Ok(url.into())
     }
 
-    fn peer_digest(&self) -> KitsuneResult<CertDigest> {
-        self.0.share_mut(|i, _| Ok(i.local_digest.clone()))
+    fn peer_cert(&self) -> KitsuneResult<Tx2Cert> {
+        self.0.share_mut(|i, _| Ok(i.local_cert.clone()))
     }
 
     fn out_chan(&self, timeout: KitsuneTimeout) -> OutChanFut {
@@ -224,15 +223,15 @@ impl ConRecvAdapt for QuicConRecvAdapt {}
 
 struct QuicEndpointAdaptInner {
     ep: quinn::Endpoint,
-    local_digest: CertDigest,
+    local_cert: Tx2Cert,
 }
 
 struct QuicEndpointAdapt(Share<QuicEndpointAdaptInner>, Uniq);
 
 impl QuicEndpointAdapt {
-    pub fn new(ep: quinn::Endpoint, local_digest: CertDigest) -> Self {
+    pub fn new(ep: quinn::Endpoint, local_cert: Tx2Cert) -> Self {
         Self(
-            Share::new(QuicEndpointAdaptInner { ep, local_digest }),
+            Share::new(QuicEndpointAdaptInner { ep, local_cert }),
             Uniq::default(),
         )
     }
@@ -283,8 +282,8 @@ impl EndpointAdapt for QuicEndpointAdapt {
         Ok(url.into())
     }
 
-    fn local_digest(&self) -> KitsuneResult<CertDigest> {
-        self.0.share_mut(|i, _| Ok(i.local_digest.clone()))
+    fn local_cert(&self) -> KitsuneResult<Tx2Cert> {
+        self.0.share_mut(|i, _| Ok(i.local_cert.clone()))
     }
 
     fn connect(&self, url: TxUrl, timeout: KitsuneTimeout) -> ConFut {
@@ -317,7 +316,7 @@ impl EndpointAdapt for QuicEndpointAdapt {
 
 /// Quic endpoint backend bind adapter for kitsune tx2
 pub struct QuicBackendAdapt {
-    local_digest: CertDigest,
+    local_cert: Tx2Cert,
     quic_srv: quinn::ServerConfig,
     quic_cli: quinn::ClientConfig,
 }
@@ -327,7 +326,7 @@ impl QuicBackendAdapt {
     pub async fn new(config: QuicConfig) -> KitsuneResult<AdapterFactory> {
         let (tls, tuning_params) = config.split().await?;
 
-        let local_digest = tls.cert_digest.clone();
+        let local_cert = tls.cert_digest.clone().into();
 
         let (tls_srv, tls_cli) = gen_tls_configs(ALPN_KITSUNE_QUIC_0, &tls, tuning_params.clone())?;
 
@@ -365,7 +364,7 @@ impl QuicBackendAdapt {
         quic_cli.crypto = tls_cli;
 
         let out: AdapterFactory = Arc::new(Self {
-            local_digest,
+            local_cert,
             quic_srv,
             quic_cli,
         });
@@ -376,7 +375,7 @@ impl QuicBackendAdapt {
 
 impl BindAdapt for QuicBackendAdapt {
     fn bind(&self, url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut {
-        let local_digest = self.local_digest.clone();
+        let local_cert = self.local_cert.clone();
         let quic_srv = self.quic_srv.clone();
         let quic_cli = self.quic_cli.clone();
         timeout
@@ -391,7 +390,7 @@ impl BindAdapt for QuicBackendAdapt {
 
                 let (ep, inc) = builder.bind(&addr).map_err(KitsuneError::other)?;
 
-                let ep: Arc<dyn EndpointAdapt> = Arc::new(QuicEndpointAdapt::new(ep, local_digest));
+                let ep: Arc<dyn EndpointAdapt> = Arc::new(QuicEndpointAdapt::new(ep, local_cert));
                 let con_recv: Box<dyn ConRecvAdapt> = Box::new(QuicConRecvAdapt::new(inc));
 
                 Ok((ep, con_recv))

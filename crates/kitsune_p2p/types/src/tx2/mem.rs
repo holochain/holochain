@@ -67,7 +67,7 @@ type ChanRecv = TReceiver<InChan>;
 type ConSend = TSender<Con>;
 type ConRecv = TReceiver<Con>;
 
-type EndpointItem = (ConSend, Active, CertDigest);
+type EndpointItem = (ConSend, Active, Tx2Cert);
 static MEM_ENDPOINTS: Lazy<Mutex<HashMap<u64, EndpointItem>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
@@ -112,7 +112,7 @@ impl InChanRecvAdapt for MemInChanRecvAdapt {}
 struct MemConAdaptInner {
     uniq: Uniq,
     peer_addr: TxUrl,
-    peer_digest: CertDigest,
+    peer_cert: Tx2Cert,
     chan_send: ChanSend,
     con_active: Active,
     mix_active: Active,
@@ -123,7 +123,7 @@ struct MemConAdapt(MemConAdaptInner);
 impl MemConAdapt {
     fn new(
         peer_addr: TxUrl,
-        peer_digest: CertDigest,
+        peer_cert: Tx2Cert,
         chan_send: ChanSend,
         con_active: Active,
         mix_active: Active,
@@ -131,7 +131,7 @@ impl MemConAdapt {
         Self(MemConAdaptInner {
             uniq: Uniq::default(),
             peer_addr,
-            peer_digest,
+            peer_cert,
             chan_send,
             con_active,
             mix_active,
@@ -148,8 +148,8 @@ impl ConAdapt for MemConAdapt {
         Ok(self.0.peer_addr.clone())
     }
 
-    fn peer_digest(&self) -> KitsuneResult<CertDigest> {
-        Ok(self.0.peer_digest.clone())
+    fn peer_cert(&self) -> KitsuneResult<Tx2Cert> {
+        Ok(self.0.peer_cert.clone())
     }
 
     fn out_chan(&self, _timeout: KitsuneTimeout) -> OutChanFut {
@@ -217,7 +217,7 @@ impl ConRecvAdapt for MemConRecvAdapt {}
 
 struct MemEndpointAdaptInner {
     id: u64,
-    local_digest: CertDigest,
+    local_cert: Tx2Cert,
     url: TxUrl,
     ep_active: Active,
     c_send: ConSend,
@@ -232,14 +232,14 @@ impl Drop for MemEndpointAdaptInner {
 struct MemEndpointAdapt(Mutex<MemEndpointAdaptInner>, Uniq);
 
 impl MemEndpointAdapt {
-    pub fn new(c_send: ConSend, id: u64, local_digest: CertDigest) -> (Self, Active) {
+    pub fn new(c_send: ConSend, id: u64, local_cert: Tx2Cert) -> (Self, Active) {
         let url = format!("kitsune-mem://{}", id);
         let ep_active = Active::new();
         (
             Self(
                 Mutex::new(MemEndpointAdaptInner {
                     id,
-                    local_digest,
+                    local_cert,
                     url: url.into(),
                     ep_active: ep_active.clone(),
                     c_send,
@@ -280,23 +280,23 @@ impl EndpointAdapt for MemEndpointAdapt {
         Ok(inner.url.clone())
     }
 
-    fn local_digest(&self) -> KitsuneResult<CertDigest> {
+    fn local_cert(&self) -> KitsuneResult<Tx2Cert> {
         let inner = self.0.lock();
         if !inner.ep_active.is_active() {
             return Err(KitsuneErrorKind::Closed.into());
         }
-        Ok(inner.local_digest.clone())
+        Ok(inner.local_cert.clone())
     }
 
     fn connect(&self, url: TxUrl, timeout: KitsuneTimeout) -> ConFut {
-        let (this_url, local_digest, this_ep_active) = {
+        let (this_url, local_cert, this_ep_active) = {
             let inner = self.0.lock();
             if !inner.ep_active.is_active() {
                 return async move { Err(KitsuneErrorKind::Closed.into()) }.boxed();
             }
             (
                 inner.url.clone(),
-                inner.local_digest.clone(),
+                inner.local_cert.clone(),
                 inner.ep_active.clone(),
             )
         };
@@ -319,7 +319,7 @@ impl EndpointAdapt for MemEndpointAdapt {
                 Ok(id) => id,
             };
 
-            let (c_send, oth_ep_active, remote_digest) = match MEM_ENDPOINTS.lock().get(&id) {
+            let (c_send, oth_ep_active, remote_cert) = match MEM_ENDPOINTS.lock().get(&id) {
                 None => return Err(format!("remote not found: {}", url).into()),
                 Some((s, a, d)) => (s.clone(), a.clone(), d.clone()),
             };
@@ -333,7 +333,7 @@ impl EndpointAdapt for MemEndpointAdapt {
 
             let oth_con = MemConAdapt::new(
                 format!("{}/{}", this_url, con_id).into(),
-                local_digest,
+                local_cert,
                 oth_send,
                 con_active.clone(),
                 mix_active.clone(),
@@ -342,7 +342,7 @@ impl EndpointAdapt for MemEndpointAdapt {
 
             let con = MemConAdapt::new(
                 format!("{}/{}", url, con_id).into(),
-                remote_digest,
+                remote_cert,
                 send,
                 con_active,
                 mix_active.clone(),
@@ -386,29 +386,28 @@ impl EndpointAdapt for MemEndpointAdapt {
 }
 
 /// Memory-based test endpoint adapter for kitsune tx2.
-struct MemBackendAdapt(CertDigest);
+struct MemBackendAdapt(Tx2Cert);
 
 impl MemBackendAdapt {
     /// Construct a new memory-based test endpoint adapter for kitsune tx2.
     pub async fn new(config: MemConfig) -> KitsuneResult<AdapterFactory> {
         let (tls, _tuning_params) = config.split().await?;
-        let out: AdapterFactory = Arc::new(Self(tls.cert_digest));
+        let out: AdapterFactory = Arc::new(Self(tls.cert_digest.into()));
         Ok(out)
     }
 }
 
 impl BindAdapt for MemBackendAdapt {
     fn bind(&self, _url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut {
-        let local_digest = self.0.clone();
+        let local_cert = self.0.clone();
         timeout
             .mix(async move {
                 let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
                 let (c_send, c_recv) = t_chan(32);
-                let (ep, ep_active) =
-                    MemEndpointAdapt::new(c_send.clone(), id, local_digest.clone());
+                let (ep, ep_active) = MemEndpointAdapt::new(c_send.clone(), id, local_cert.clone());
                 MEM_ENDPOINTS
                     .lock()
-                    .insert(id, (c_send, ep_active.clone(), local_digest));
+                    .insert(id, (c_send, ep_active.clone(), local_cert));
                 let ep: Arc<dyn EndpointAdapt> = Arc::new(ep);
                 let rc: Box<dyn ConRecvAdapt> = Box::new(MemConRecvAdapt::new(c_recv, ep_active));
                 Ok((ep, rc))
