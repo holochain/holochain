@@ -1,7 +1,7 @@
 use self::get_entry_ops_query::GetEntryOpsQuery;
 use self::get_links_ops_query::GetLinksOpsQuery;
 use self::{
-    get_agent_activity_query::GetAgentActivityDeterministicQuery,
+    deterministic_get_agent_activity_query::DeterministicGetAgentActivityQuery,
     get_element_query::GetElementOpsQuery,
 };
 
@@ -22,7 +22,7 @@ pub use get_links_ops_query::WireLinkOps;
 #[cfg(test)]
 mod test;
 
-mod get_agent_activity_query;
+mod deterministic_get_agent_activity_query;
 mod get_element_query;
 mod get_entry_ops_query;
 mod get_links_ops_query;
@@ -67,10 +67,10 @@ pub fn handle_get_element(env: EnvRead, hash: HeaderHash) -> CascadeResult<WireE
 pub fn handle_get_agent_activity(
     env: EnvRead,
     agent: AgentPubKey,
-    filter: AgentActivityFilterDeterministic,
+    filter: DeterministicGetAgentActivityFilter,
     options: holochain_p2p::event::GetActivityOptions,
-) -> CascadeResult<AgentActivityResponseDeterministic> {
-    let query = GetAgentActivityDeterministicQuery::new(agent, filter, options);
+) -> CascadeResult<DeterministicGetAgentActivityResponse> {
+    let query = DeterministicGetAgentActivityQuery::new(agent, filter, options);
     let results = env
         .conn()?
         .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;

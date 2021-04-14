@@ -15,8 +15,8 @@ use holochain_types::header::NewEntryHeader;
 use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::ValidationPackageResponse;
 use holochain_types::timestamp;
-use holochain_zome_types::AgentActivityFilterDeterministic;
 use holochain_zome_types::Create;
+use holochain_zome_types::DeterministicGetAgentActivityFilter;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::Header;
@@ -25,7 +25,7 @@ use holochain_zome_types::Link;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::Update;
 use holochain_zome_types::ValidationStatus;
-use holochain_zome_types::{fixt::*, AgentActivityResponseDeterministic};
+use holochain_zome_types::{fixt::*, DeterministicGetAgentActivityResponse};
 
 use crate::authority;
 use crate::authority::WireDhtOp;
@@ -98,9 +98,9 @@ pub trait HolochainP2pCellT2 {
     async fn get_agent_activity(
         &mut self,
         agent: AgentPubKey,
-        query: AgentActivityFilterDeterministic,
+        query: DeterministicGetAgentActivityFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponseDeterministic>>;
+    ) -> actor::HolochainP2pResult<Vec<DeterministicGetAgentActivityResponse>>;
 
     async fn authority_for_hash(
         &mut self,
@@ -169,9 +169,9 @@ impl HolochainP2pCellT2 for PassThroughNetwork {
     async fn get_agent_activity(
         &mut self,
         agent: AgentPubKey,
-        query: AgentActivityFilterDeterministic,
+        query: DeterministicGetAgentActivityFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponseDeterministic>> {
+    ) -> actor::HolochainP2pResult<Vec<DeterministicGetAgentActivityResponse>> {
         let mut out = Vec::new();
         for env in &self.envs {
             let r = authority::handle_get_agent_activity(
@@ -602,9 +602,9 @@ impl HolochainP2pCellT2 for MockNetwork {
     async fn get_agent_activity(
         &mut self,
         agent: AgentPubKey,
-        query: AgentActivityFilterDeterministic,
+        query: DeterministicGetAgentActivityFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponseDeterministic>> {
+    ) -> actor::HolochainP2pResult<Vec<DeterministicGetAgentActivityResponse>> {
         self.0
             .lock()
             .await

@@ -27,7 +27,7 @@ impl GetAgentActivityInput {
 
 /// Query arguments for the deterministic version of GetAgentActivity
 #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
-pub struct AgentActivityFilterDeterministic {
+pub struct DeterministicGetAgentActivityFilter {
     /// The upper and lower bound of headers to return.
     /// The lower bound is optional, and if omitted, will be set to the DNA element.
     pub range: (Option<HeaderHash>, HeaderHash),
@@ -40,11 +40,11 @@ pub struct AgentActivityFilterDeterministic {
 }
 
 #[derive(Debug)]
-pub struct AgentActivityResponseDeterministic {
+pub struct DeterministicGetAgentActivityResponse {
     pub chain: Vec<Judged<SignedHeader>>,
 }
 
-impl AgentActivityResponseDeterministic {
+impl DeterministicGetAgentActivityResponse {
     pub fn new(chain: Vec<Judged<SignedHeader>>) -> Self {
         Self { chain }
     }

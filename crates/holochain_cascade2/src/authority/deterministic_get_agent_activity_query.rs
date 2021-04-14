@@ -26,16 +26,16 @@ use std::fmt::Debug;
 use super::*;
 
 #[derive(Debug, Clone)]
-pub struct GetAgentActivityDeterministicQuery {
+pub struct DeterministicGetAgentActivityQuery {
     agent: AgentPubKey,
-    filter: AgentActivityFilterDeterministic,
+    filter: DeterministicGetAgentActivityFilter,
     options: GetActivityOptions,
 }
 
-impl GetAgentActivityDeterministicQuery {
+impl DeterministicGetAgentActivityQuery {
     pub fn new(
         agent: AgentPubKey,
-        filter: AgentActivityFilterDeterministic,
+        filter: DeterministicGetAgentActivityFilter,
         options: GetActivityOptions,
     ) -> Self {
         Self {
@@ -47,15 +47,15 @@ impl GetAgentActivityDeterministicQuery {
 }
 
 #[derive(Debug)]
-pub struct GetAgentActivityDeterministicQueryState {
+pub struct DeterministicGetAgentActivityQueryState {
     chain: Vec<Judged<SignedHeader>>,
     prev_header: Option<HeaderHash>,
 }
 
-impl Query for GetAgentActivityDeterministicQuery {
+impl Query for DeterministicGetAgentActivityQuery {
     type Item = Judged<SignedHeaderHashed>;
-    type State = GetAgentActivityDeterministicQueryState;
-    type Output = AgentActivityResponseDeterministic;
+    type State = DeterministicGetAgentActivityQueryState;
+    type Output = DeterministicGetAgentActivityResponse;
 
     fn query(&self) -> String {
         format!(
@@ -85,7 +85,7 @@ impl Query for GetAgentActivityDeterministicQuery {
     }
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {
-        Ok(GetAgentActivityDeterministicQueryState {
+        Ok(DeterministicGetAgentActivityQueryState {
             chain: Vec::new(),
             prev_header: Some(self.filter.range.1.clone()),
         })
@@ -118,7 +118,7 @@ impl Query for GetAgentActivityDeterministicQuery {
     where
         S: Store,
     {
-        Ok(AgentActivityResponseDeterministic::new(state.chain))
+        Ok(DeterministicGetAgentActivityResponse::new(state.chain))
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
@@ -170,14 +170,14 @@ mod tests {
             chains.push(chain);
         }
 
-        let filter_full = AgentActivityFilterDeterministic {
+        let filter_full = DeterministicGetAgentActivityFilter {
             range: (None, chains[2].last().unwrap().clone()),
             entry_type: Some(entry_type_1.clone()),
             header_type: None,
             include_entries: false,
         };
 
-        let filter_partial = AgentActivityFilterDeterministic {
+        let filter_partial = DeterministicGetAgentActivityFilter {
             range: (Some(chains[2][4].clone()), chains[2][8].clone()),
             entry_type: Some(entry_type_1),
             header_type: None,
