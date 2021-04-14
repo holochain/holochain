@@ -356,77 +356,96 @@ where
         Ok(results)
     }
 
-    /// Same as retrieve entry but retrieves many
-    /// entries in parallel
-    pub async fn retrieve_entries_parallel<'iter, I: IntoIterator<Item = EntryHash>>(
-        &mut self,
-        _hashes: I,
-        _options: NetworkGetOptions,
-    ) -> CascadeResult<Vec<Option<EntryHashed>>> {
-        todo!()
+    /// Search through the stores and return the first non-none result.
+    fn find_map<F, T>(&mut self, mut f: F) -> CascadeResult<Option<T>>
+    where
+        F: FnMut(&dyn Store) -> CascadeResult<Option<T>>,
+    {
+        if let Some(cache) = &mut self.cache {
+            let mut conn = cache.conn()?;
+            let txn = conn.transaction().map_err(StateQueryError::from)?;
+            let txn = Txn::from(&txn);
+            let r = f(&txn)?;
+            if r.is_some() {
+                return Ok(r);
+            }
+        }
+        if let Some(vault) = &mut self.vault {
+            let mut conn = vault.conn()?;
+            let txn = conn.transaction().map_err(StateQueryError::from)?;
+            let txn = Txn::from(&txn);
+            let r = f(&txn)?;
+            if r.is_some() {
+                return Ok(r);
+            }
+        }
+        if let Some(scratch) = &self.scratch {
+            let r = f(scratch)?;
+            if r.is_some() {
+                return Ok(r);
+            }
+        }
+        Ok(None)
     }
 
-    /// Same as retrieve_header but retrieves many
-    /// elements in parallel
-    pub async fn retrieve_headers_parallel<'iter, I: IntoIterator<Item = HeaderHash>>(
-        &mut self,
-        _hashes: I,
-        _options: NetworkGetOptions,
-    ) -> CascadeResult<Vec<Option<SignedHeaderHashed>>> {
-        todo!()
-    }
-
-    /// Same as retrieve but retrieves many
-    /// elements in parallel
-    pub async fn retrieve_parallel<'iter, I: IntoIterator<Item = HeaderHash>>(
-        &mut self,
-        _hashes: I,
-        _options: NetworkGetOptions,
-    ) -> CascadeResult<Vec<Option<Element>>> {
-        todo!()
-    }
-
-    /// Get the entry from the dht regardless of metadata or validation status.
-    /// This call has the opportunity to hit the local cache
-    /// and avoid a network call.
-    // TODO: This still fetches the full element and metadata.
-    // Need to add a fetch_retrieve_entry that only gets data.
+    /// Retrieve [`Entry`] from either locally or from an authority.
+    /// Data might not have been validated yet by the authority.
     pub async fn retrieve_entry(
         &mut self,
-        _hash: EntryHash,
-        _options: NetworkGetOptions,
+        hash: EntryHash,
+        mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<EntryHashed>> {
-        todo!()
+        let result = self.find_map(|store| Ok(store.get_entry(&hash)?))?;
+        if result.is_some() {
+            return Ok(result.map(EntryHashed::from_content_sync));
+        }
+        options.request_type = holochain_p2p::event::GetRequest::Pending;
+        self.fetch_element(hash.clone().into(), options.into())
+            .await?;
+
+        // Check if we have the data now after the network call.
+        let result = self.find_map(|store| Ok(store.get_entry(&hash)?))?;
+        Ok(result.map(EntryHashed::from_content_sync))
     }
 
-    /// Get only the header from the dht regardless of metadata or validation status.
-    /// Useful for avoiding getting the Entry if you don't need it.
-    /// This call has the opportunity to hit the local cache
-    /// and avoid a network call.
-    // TODO: This still fetches the full element and metadata.
-    // Need to add a fetch_retrieve_header that only gets data.
+    /// Retrieve [`SignedHeaderHashed`] from either locally or from an authority.
+    /// Data might not have been validated yet by the authority.
     pub async fn retrieve_header(
         &mut self,
-        _hash: HeaderHash,
-        _options: NetworkGetOptions,
+        hash: HeaderHash,
+        mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<SignedHeaderHashed>> {
-        todo!()
+        let result = self.find_map(|store| Ok(store.get_header(&hash)?))?;
+        if result.is_some() {
+            return Ok(result);
+        }
+        options.request_type = holochain_p2p::event::GetRequest::Pending;
+        self.fetch_element(hash.clone().into(), options.into())
+            .await?;
+
+        // Check if we have the data now after the network call.
+        let result = self.find_map(|store| Ok(store.get_header(&hash)?))?;
+        Ok(result)
     }
 
-    /// Get an element from the dht regardless of metadata or validation status.
-    /// Useful for checking if data is held.
-    /// This call has the opportunity to hit the local cache
-    /// and avoid a network call.
-    /// Note we still need to return the element as proof they are really
-    /// holding it unless we create a byte challenge function.
-    // TODO: This still fetches the full element and metadata.
-    // Need to add a fetch_retrieve that only gets data.
+    /// Retrieve data from either locally or from an authority.
+    /// Data might not have been validated yet by the authority.
     pub async fn retrieve(
         &mut self,
-        _hash: AnyDhtHash,
-        _options: NetworkGetOptions,
+        hash: AnyDhtHash,
+        mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<Element>> {
-        todo!()
+        let result = self.find_map(|store| Ok(store.get_element(&hash)?))?;
+        if result.is_some() {
+            return Ok(result);
+        }
+        options.request_type = holochain_p2p::event::GetRequest::Pending;
+        self.fetch_element(hash.clone().into(), options.into())
+            .await?;
+
+        // Check if we have the data now after the network call.
+        let result = self.find_map(|store| Ok(store.get_element(&hash)?))?;
+        Ok(result)
     }
 
     #[instrument(skip(self, options))]

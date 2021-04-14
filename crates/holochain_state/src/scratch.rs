@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use holo_hash::hash_type::AnyDht;
+use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_types::prelude::Judged;
 use holochain_types::EntryHashed;
+use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::SignedHeaderHashed;
 
@@ -55,6 +58,39 @@ impl Scratch {
         let headers = self.headers.iter().filter(|&t| f(t)).cloned().collect();
         FilteredScratch { headers }
     }
+
+    fn get_exact_element(
+        &self,
+        hash: &HeaderHash,
+    ) -> StateQueryResult<Option<holochain_zome_types::Element>> {
+        Ok(self.get_header(hash)?.map(|shh| {
+            let entry = shh
+                .header()
+                .entry_hash()
+                .and_then(|eh| self.get_entry(eh).ok());
+            Element::new(shh, entry.flatten())
+        }))
+    }
+
+    fn get_any_element(
+        &self,
+        hash: &EntryHash,
+    ) -> StateQueryResult<Option<holochain_zome_types::Element>> {
+        let r = self.get_entry(hash)?.and_then(|entry| {
+            let shh = self
+                .headers
+                .iter()
+                .find(|h| {
+                    h.header()
+                        .entry_hash()
+                        .map(|eh| eh == hash)
+                        .unwrap_or(false)
+                })?
+                .clone();
+            Some(Element::new(shh, Some(entry)))
+        });
+        Ok(r)
+    }
 }
 
 impl Store for Scratch {
@@ -72,6 +108,21 @@ impl Store for Scratch {
             .iter()
             .find(|h| h.header_address() == hash)
             .is_some())
+    }
+
+    fn get_header(&self, hash: &HeaderHash) -> StateQueryResult<Option<SignedHeaderHashed>> {
+        Ok(self
+            .headers
+            .iter()
+            .find(|h| h.header_address() == hash)
+            .map(|h| h.clone()))
+    }
+
+    fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>> {
+        match *hash.hash_type() {
+            AnyDht::Entry => self.get_any_element(&hash.clone().into()),
+            AnyDht::Header => self.get_exact_element(&hash.clone().into()),
+        }
     }
 }
 

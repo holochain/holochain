@@ -1,4 +1,5 @@
 use ghost_actor::dependencies::observability;
+use holo_hash::HasHash;
 use holochain_cascade2::test_utils::*;
 use holochain_cascade2::Cascade;
 use holochain_state::insert::insert_op_scratch;
@@ -166,6 +167,50 @@ async fn assert_rejected<N: HolochainP2pCellT2 + Clone + Send + 'static>(
     });
 
     assert_eq!(r, expected);
+}
+
+async fn assert_can_retrieve<N: HolochainP2pCellT2 + Clone + Send + 'static>(
+    td_entry: &EntryTestData,
+    cascade: &mut Cascade<N>,
+    options: GetOptions,
+) {
+    // - Retrieve via entry hash
+    let r = cascade
+        .retrieve(td_entry.hash.clone().into(), options.clone().into())
+        .await
+        .unwrap()
+        .expect("Failed to retrieve element");
+
+    assert_eq!(*r.header_address(), td_entry.create_hash);
+    assert_eq!(r.header().entry_hash(), Some(&td_entry.hash));
+
+    // - Retrieve via header hash
+    let r = cascade
+        .retrieve(td_entry.create_hash.clone().into(), options.clone().into())
+        .await
+        .unwrap()
+        .expect("Failed to retrieve element");
+
+    assert_eq!(*r.header_address(), td_entry.create_hash);
+    assert_eq!(r.header().entry_hash(), Some(&td_entry.hash));
+
+    // - Retrieve entry
+    let r = cascade
+        .retrieve_entry(td_entry.hash.clone(), options.clone().into())
+        .await
+        .unwrap()
+        .expect("Failed to retrieve entry");
+
+    assert_eq!(*r.as_hash(), td_entry.hash);
+
+    // - Retrieve header
+    let r = cascade
+        .retrieve_header(td_entry.create_hash.clone(), options.clone().into())
+        .await
+        .unwrap()
+        .expect("Failed to retrieve header");
+
+    assert_eq!(*r.as_hash(), td_entry.create_hash);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -419,10 +464,14 @@ async fn test_pending_data_isnt_returned() {
 
     assert_is_none(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
 
+    assert_can_retrieve(&td_entry, &mut cascade, GetOptions::latest()).await;
+
     let network = PassThroughNetwork::authority_for_all(vec![authority.env().clone().into()]);
 
     // Cascade
     let mut cascade = Cascade::<PassThroughNetwork>::empty().with_network(network, cache.env());
 
     assert_is_none(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
+
+    assert_can_retrieve(&td_entry, &mut cascade, GetOptions::latest()).await;
 }

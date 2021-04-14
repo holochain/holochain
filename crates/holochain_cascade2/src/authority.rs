@@ -55,8 +55,12 @@ pub fn handle_get_entry(
 }
 
 #[tracing::instrument(skip(env))]
-pub fn handle_get_element(env: EnvRead, hash: HeaderHash) -> CascadeResult<WireElementOps> {
-    let query = GetElementOpsQuery::new(hash);
+pub fn handle_get_element(
+    env: EnvRead,
+    hash: HeaderHash,
+    options: holochain_p2p::event::GetOptions,
+) -> CascadeResult<WireElementOps> {
+    let query = GetElementOpsQuery::new(hash, options);
     let results = env
         .conn()?
         .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;

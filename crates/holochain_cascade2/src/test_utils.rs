@@ -138,8 +138,12 @@ impl HolochainP2pCellT2 for PassThroughNetwork {
             }
             AnyDht::Header => {
                 for env in &self.envs {
-                    let r = authority::handle_get_element(env.clone(), dht_hash.clone().into())
-                        .map_err(|e| HolochainP2pError::Other(e.into()))?;
+                    let r = authority::handle_get_element(
+                        env.clone(),
+                        dht_hash.clone().into(),
+                        (&options).into(),
+                    )
+                    .map_err(|e| HolochainP2pError::Other(e.into()))?;
                     out.push(WireOps::Element(r));
                 }
             }

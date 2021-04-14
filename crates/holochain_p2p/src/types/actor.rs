@@ -1,6 +1,7 @@
 //! Module containing the HolochainP2p actor definition.
 #![allow(clippy::too_many_arguments)]
 
+use crate::event::GetRequest;
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
 
@@ -56,6 +57,10 @@ pub struct GetOptions {
     /// Return all live headers even if there is deletes.
     /// Useful for metadata calls.
     pub all_live_headers_with_metadata: bool,
+
+    /// [Remote]
+    /// The type of data this get request requires.
+    pub request_type: GetRequest,
 }
 
 impl Default for GetOptions {
@@ -67,6 +72,7 @@ impl Default for GetOptions {
             race_timeout_ms: None,
             follow_redirects: true,
             all_live_headers_with_metadata: false,
+            request_type: Default::default(),
         }
     }
 }

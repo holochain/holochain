@@ -12,6 +12,7 @@ use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::HasValidationStatus;
 use holochain_types::prelude::Judged;
+use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::SignedHeader;
@@ -130,8 +131,14 @@ pub trait Stores<Q: Query> {
 }
 
 pub trait Store {
-    /// Get an Entry from the database
+    /// Get an [`Entry`] from this store.
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>>;
+
+    /// Get an [`SignedHeaderHashed`] from this store.
+    fn get_header(&self, hash: &HeaderHash) -> StateQueryResult<Option<SignedHeaderHashed>>;
+
+    /// Get an [`Element`] from this store.
+    fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>>;
 
     /// Check if a hash is contained in the store
     fn contains_hash(&self, hash: &AnyDhtHash) -> StateQueryResult<bool> {
@@ -195,12 +202,157 @@ impl<'stmt> Store for Txn<'stmt, '_> {
         get_entry_from_db(&self.txn, hash)
     }
 
-    fn contains_entry(&self, _hash: &EntryHash) -> StateQueryResult<bool> {
-        todo!()
+    fn contains_entry(&self, hash: &EntryHash) -> StateQueryResult<bool> {
+        let exists = self.txn.query_row_named(
+            "
+            SELECT 
+            EXISTS(
+                SELECT 1 FROM Entry 
+                WHERE hash = :hash
+            )
+            ",
+            named_params! {
+                ":hash": hash,
+            },
+            |row| {
+                let exists: i32 = row.get(0)?;
+                if exists == 1 {
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            },
+        );
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &exists {
+            Ok(false)
+        } else {
+            Ok(exists?)
+        }
     }
 
-    fn contains_header(&self, _hash: &HeaderHash) -> StateQueryResult<bool> {
-        todo!()
+    fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
+        let exists = self.txn.query_row_named(
+            "
+            SELECT 
+            EXISTS(
+                SELECT 1 FROM Header 
+                WHERE hash = :hash
+            )
+            ",
+            named_params! {
+                ":hash": hash,
+            },
+            |row| {
+                let exists: i32 = row.get(0)?;
+                if exists == 1 {
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            },
+        );
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &exists {
+            Ok(false)
+        } else {
+            Ok(exists?)
+        }
+    }
+
+    fn get_header(&self, hash: &HeaderHash) -> StateQueryResult<Option<SignedHeaderHashed>> {
+        let shh = self.txn.query_row_named(
+            "
+            SELECT 
+            Header.blob, Header.hash
+            FROM Header
+            WHERE hash = :hash
+            ",
+            named_params! {
+                ":hash": hash,
+            },
+            |row| {
+                let header = from_blob::<SignedHeader>(row.get(row.column_index("blob")?)?);
+                let SignedHeader(header, signature) = header;
+                let hash: HeaderHash = row.get(row.column_index("hash")?)?;
+                let header = HeaderHashed::with_pre_hashed(header, hash);
+                let shh = SignedHeaderHashed::with_presigned(header, signature);
+                Ok(shh)
+            },
+        );
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &shh {
+            Ok(None)
+        } else {
+            Ok(Some(shh?))
+        }
+    }
+
+    fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>> {
+        match *hash.hash_type() {
+            AnyDht::Entry => self.get_any_element(&hash.clone().into()),
+            AnyDht::Header => self.get_exact_element(&hash.clone().into()),
+        }
+    }
+}
+
+impl<'stmt> Txn<'stmt, '_> {
+    fn get_exact_element(&self, hash: &HeaderHash) -> StateQueryResult<Option<Element>> {
+        let element = self.txn.query_row_named(
+            "
+            SELECT 
+            Header.blob AS header_blob, Header.hash, Entry.blob as entry_blob
+            FROM Header
+            LEFT JOIN Entry ON Header.entry_hash = Entry.hash
+            WHERE 
+            Header.hash = :hash
+            ",
+            named_params! {
+                ":hash": hash,
+            },
+            |row| {
+                let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+                let SignedHeader(header, signature) = header;
+                let hash: HeaderHash = row.get(row.column_index("hash")?)?;
+                let header = HeaderHashed::with_pre_hashed(header, hash);
+                let shh = SignedHeaderHashed::with_presigned(header, signature);
+                let entry: Option<Vec<u8>> = row.get(row.column_index("entry_blob")?)?;
+                let entry = entry.map(|blob| from_blob::<Entry>(blob));
+                Ok(Element::new(shh, entry))
+            },
+        );
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &element {
+            Ok(None)
+        } else {
+            Ok(Some(element?))
+        }
+    }
+    fn get_any_element(&self, hash: &EntryHash) -> StateQueryResult<Option<Element>> {
+        let element = self.txn.query_row_named(
+            "
+            SELECT 
+            Header.blob AS header_blob, Header.hash, Entry.blob as entry_blob
+            FROM Header
+            JOIN Entry ON Header.entry_hash = Entry.hash
+            WHERE 
+            Entry.hash = :hash
+            ",
+            named_params! {
+                ":hash": hash,
+            },
+            |row| {
+                let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+                let SignedHeader(header, signature) = header;
+                let hash: HeaderHash = row.get(row.column_index("hash")?)?;
+                let header = HeaderHashed::with_pre_hashed(header, hash);
+                let shh = SignedHeaderHashed::with_presigned(header, signature);
+                let entry: Option<Vec<u8>> = row.get(row.column_index("entry_blob")?)?;
+                let entry = entry.map(|blob| from_blob::<Entry>(blob));
+                Ok(Element::new(shh, entry))
+            },
+        );
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &element {
+            Ok(None)
+        } else {
+            Ok(Some(element?))
+        }
     }
 }
 
@@ -254,6 +406,26 @@ impl<'stmt> Store for Txns<'stmt, '_> {
         }
         Ok(false)
     }
+
+    fn get_header(&self, hash: &HeaderHash) -> StateQueryResult<Option<SignedHeaderHashed>> {
+        for txn in &self.txns {
+            let r = txn.get_header(hash)?;
+            if r.is_some() {
+                return Ok(r);
+            }
+        }
+        Ok(None)
+    }
+
+    fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>> {
+        for txn in &self.txns {
+            let r = txn.get_element(hash)?;
+            if r.is_some() {
+                return Ok(r);
+            }
+        }
+        Ok(None)
+    }
 }
 
 impl<'stmt, Q: Query> StoresIter<Q::Item> for QueryStmts<'stmt, Q> {
@@ -301,6 +473,24 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
         let r = self.txns.contains_header(hash)?;
         if !r {
             self.scratch.contains_header(hash)
+        } else {
+            Ok(r)
+        }
+    }
+
+    fn get_header(&self, hash: &HeaderHash) -> StateQueryResult<Option<SignedHeaderHashed>> {
+        let r = self.txns.get_header(hash)?;
+        if r.is_none() {
+            self.scratch.get_header(hash)
+        } else {
+            Ok(r)
+        }
+    }
+
+    fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>> {
+        let r = self.txns.get_element(hash)?;
+        if r.is_none() {
+            self.scratch.get_element(hash)
         } else {
             Ok(r)
         }

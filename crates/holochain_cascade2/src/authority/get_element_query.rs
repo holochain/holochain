@@ -1,4 +1,5 @@
 use holo_hash::HeaderHash;
+use holochain_p2p::event::GetOptions;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_state::query::{prelude::*, QueryData};
@@ -9,11 +10,11 @@ use holochain_zome_types::SignedHeader;
 use super::WireDhtOp;
 
 #[derive(Debug, Clone)]
-pub struct GetElementOpsQuery(HeaderHash);
+pub struct GetElementOpsQuery(HeaderHash, GetOptions);
 
 impl GetElementOpsQuery {
-    pub fn new(hash: HeaderHash) -> Self {
-        Self(hash)
+    pub fn new(hash: HeaderHash, request: GetOptions) -> Self {
+        Self(hash, request)
     }
 }
 
@@ -43,18 +44,28 @@ impl Query for GetElementOpsQuery {
     type Output = Self::State;
 
     fn query(&self) -> String {
-        "
-        SELECT Header.blob AS header_blob, DhtOp.type AS dht_type,
-        DhtOp.validation_status AS status
-        FROM DhtOp
-        JOIN Header On DhtOp.header_hash = Header.hash
-        WHERE DhtOp.type IN (:store_element, :delete, :update)
-        AND
-        DhtOp.basis_hash = :header_hash
-        AND
-        DhtOp.when_integrated IS NOT NULL
-        "
-        .into()
+        let request_type = self.1.request_type.clone();
+        let query = "
+            SELECT Header.blob AS header_blob, DhtOp.type AS dht_type,
+            DhtOp.validation_status AS status
+            FROM DhtOp
+            JOIN Header On DhtOp.header_hash = Header.hash
+            WHERE DhtOp.type IN (:store_element, :delete, :update)
+            AND
+            DhtOp.basis_hash = :header_hash
+        ";
+        let is_integrated = "
+            AND
+            DhtOp.when_integrated IS NOT NULL
+        ";
+        match request_type {
+            holochain_p2p::event::GetRequest::All
+            | holochain_p2p::event::GetRequest::Content
+            | holochain_p2p::event::GetRequest::Metadata => {
+                format!("{}{}", query, is_integrated)
+            }
+            holochain_p2p::event::GetRequest::Pending => query.into(),
+        }
     }
 
     fn params(&self) -> Vec<Params> {
