@@ -457,7 +457,7 @@ impl DhtOpLight {
                     .entry_hash()
                     .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?
                     .clone();
-                Self::RegisterDeletedBy(header_hash.clone(), basis.into())
+                Self::RegisterDeletedBy(header_hash, basis.into())
             }
             DhtOpType::RegisterAddLink => {
                 let basis = match header {

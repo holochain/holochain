@@ -81,18 +81,16 @@ impl Query for GetLiveEntryQuery {
             }
             Header::Update(update) => {
                 if update.original_entry_address == self.0 && update.entry_hash == self.0 {
+                    follow_update_chain(&state, &shh);
                     if !state.deletes.contains(&hash) {
                         state.creates.insert(hash, shh);
                     }
-                // TODO: This is where update chains will be followed
-                // when we add that functionality.
                 } else if update.entry_hash == self.0 {
                     if !state.deletes.contains(&hash) {
                         state.creates.insert(hash, shh);
                     }
                 } else if update.original_entry_address == self.0 {
-                    // TODO: This is where update chains will be followed
-                    // when we add that functionality.
+                    follow_update_chain(&state, &shh);
                 }
             }
             Header::Delete(delete) => {
@@ -122,4 +120,9 @@ impl Query for GetLiveEntryQuery {
             None => Ok(None),
         }
     }
+}
+
+fn follow_update_chain(_state: &Maps<SignedHeaderHashed>, _shh: &SignedHeaderHashed) {
+    // TODO: This is where update chains will be followed
+    // when we add that functionality.
 }

@@ -171,7 +171,7 @@ impl Query for GetLinksQuery {
     fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
         let query = &self.query;
         let base_filter = query.base.clone();
-        let zome_id_filter = query.zome_id.clone();
+        let zome_id_filter = query.zome_id;
         let tag_filter = query.tag.clone();
         let f = move |header: &QueryData<Self>| match header.header() {
             Header::CreateLink(CreateLink {

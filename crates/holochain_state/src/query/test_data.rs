@@ -1,3 +1,4 @@
+#![allow(clippy::clippy::redundant_clone)]
 use ::fixt::prelude::*;
 use holo_hash::*;
 use holochain_types::dht_op::DhtOpHashed;
@@ -110,27 +111,27 @@ impl LinkTestData {
 
         let link = Link {
             target: target_hash.clone(),
-            timestamp: create_link.timestamp.clone(),
+            timestamp: create_link.timestamp,
             tag: create_link.tag.clone(),
             create_link_hash: create_link_hash.clone(),
         };
 
         let later_link = Link {
             target: target_hash.clone(),
-            timestamp: later_create_link.timestamp.clone(),
+            timestamp: later_create_link.timestamp,
             tag: later_create_link.tag.clone(),
             create_link_hash: later_create_link_hash.clone(),
         };
 
-        let base_query = GetLinksQuery::base(base_hash.clone(), create_link.zome_id.clone());
+        let base_query = GetLinksQuery::base(base_hash.clone(), create_link.zome_id);
         let tag_query = GetLinksQuery::tag(
             base_hash.clone(),
-            create_link.zome_id.clone(),
+            create_link.zome_id,
             create_link.tag.clone(),
         );
         let details_tag_query = GetLinkDetailsQuery::tag(
             base_hash.clone(),
-            create_link.zome_id.clone(),
+            create_link.zome_id,
             create_link.tag.clone(),
         );
 

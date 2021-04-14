@@ -160,7 +160,7 @@ pub trait Store {
 // MD: does this definitely need to be its own trait? Why can't a Stores
 // just return an iterator?
 pub trait StoresIter<T> {
-    fn iter<'iter>(&'iter mut self) -> StateQueryResult<StmtIter<'iter, T>>;
+    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, T>>;
 }
 
 /// Wrapper around a transaction reference, to which trait impls are attached
@@ -314,7 +314,7 @@ impl<'stmt> Txn<'stmt, '_> {
                 let header = HeaderHashed::with_pre_hashed(header, hash);
                 let shh = SignedHeaderHashed::with_presigned(header, signature);
                 let entry: Option<Vec<u8>> = row.get(row.column_index("entry_blob")?)?;
-                let entry = entry.map(|blob| from_blob::<Entry>(blob));
+                let entry = entry.map(from_blob::<Entry>);
                 Ok(Element::new(shh, entry))
             },
         );
@@ -344,7 +344,7 @@ impl<'stmt> Txn<'stmt, '_> {
                 let header = HeaderHashed::with_pre_hashed(header, hash);
                 let shh = SignedHeaderHashed::with_presigned(header, signature);
                 let entry: Option<Vec<u8>> = row.get(row.column_index("entry_blob")?)?;
-                let entry = entry.map(|blob| from_blob::<Entry>(blob));
+                let entry = entry.map(from_blob::<Entry>);
                 Ok(Element::new(shh, entry))
             },
         );
@@ -445,7 +445,7 @@ where
     fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O> {
         Ok(DbScratchIter {
             stmts: self.txns.get_initial_data(query.clone())?,
-            filtered_scratch: self.scratch.get_initial_data(query.clone())?,
+            filtered_scratch: self.scratch.get_initial_data(query)?,
         })
     }
 }
@@ -525,7 +525,7 @@ impl<'borrow, 'txn> From<&'borrow Transaction<'txn>> for Txn<'borrow, 'txn> {
 
 impl<'borrow, 'txn> From<&'borrow Transactions<'borrow, 'txn>> for Txns<'borrow, 'txn> {
     fn from(txns: &'borrow Transactions<'borrow, 'txn>) -> Self {
-        let txns = txns.into_iter().map(|&txn| Txn::from(txn)).collect();
+        let txns = txns.iter().map(|&txn| Txn::from(txn)).collect();
         Self { txns }
     }
 }
@@ -569,7 +569,7 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
     }
 
     fn new_iter<T: 'iter>(
-        params: &Vec<Params>,
+        params: &[Params],
         stmt: Option<&'iter mut Statement>,
         map_fn: std::sync::Arc<dyn Fn(&Row) -> StateQueryResult<T>>,
     ) -> StateQueryResult<StmtIter<'iter, T>> {

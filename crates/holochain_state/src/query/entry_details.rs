@@ -153,7 +153,7 @@ impl Query for GetEntryDetailsQuery {
                     rejected_headers: state.rejected_headers.into_iter().collect(),
                     deletes: state.deletes.into_iter().map(|(_, v)| v).collect(),
                     updates: state.updates.into_iter().collect(),
-                    entry_dht_status: entry_dht_status,
+                    entry_dht_status,
                 };
                 Ok(Some(details))
             }

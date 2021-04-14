@@ -1,6 +1,6 @@
+use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::timestamp::Timestamp;
-use crate::{entry_def::EntryVisibility, impl_to_sql_via_display};
 pub use builder::HeaderBuilder;
 pub use builder::HeaderBuilderCommon;
 use holo_hash::impl_hashable_content;
@@ -11,6 +11,9 @@ use holo_hash::HashableContent;
 use holo_hash::HeaderHash;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
+
+#[cfg(feature = "rusqlite")]
+use crate::impl_to_sql_via_display;
 
 pub mod builder;
 pub mod conversions;

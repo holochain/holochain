@@ -19,7 +19,7 @@ impl GetElementOpsQuery {
 }
 
 // TODO: Move this to holochain types.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct WireElementOps {
     pub header: Option<WireDhtOp>,
     pub deletes: Vec<WireDhtOp>,
@@ -29,12 +29,7 @@ pub struct WireElementOps {
 
 impl WireElementOps {
     pub fn new() -> Self {
-        Self {
-            header: None,
-            deletes: Vec::new(),
-            updates: Vec::new(),
-            entry: None,
-        }
+        Self::default()
     }
 }
 

@@ -26,7 +26,7 @@ use crate::query::Store;
 /// a simple filter on the scratch space, and then chaining that iterator
 /// onto the iterators over the Headers in the database(s) produced by the
 /// Cascade.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Scratch {
     headers: Vec<SignedHeaderHashed>,
     entries: HashMap<EntryHash, Arc<Entry>>,
@@ -39,10 +39,7 @@ pub struct FilteredScratch {
 
 impl Scratch {
     pub fn new() -> Self {
-        Self {
-            headers: Vec::new(),
-            entries: HashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn add_header(&mut self, item: SignedHeaderHashed) {
@@ -103,11 +100,7 @@ impl Store for Scratch {
     }
 
     fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
-        Ok(self
-            .headers
-            .iter()
-            .find(|h| h.header_address() == hash)
-            .is_some())
+        Ok(self.headers.iter().any(|h| h.header_address() == hash))
     }
 
     fn get_header(&self, hash: &HeaderHash) -> StateQueryResult<Option<SignedHeaderHashed>> {
@@ -115,7 +108,7 @@ impl Store for Scratch {
             .headers
             .iter()
             .find(|h| h.header_address() == hash)
-            .map(|h| h.clone()))
+            .cloned())
     }
 
     fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>> {
@@ -127,7 +120,7 @@ impl Store for Scratch {
 }
 
 impl FilteredScratch {
-    pub fn into_iter<'iter>(&'iter mut self) -> impl Iterator<Item = SignedHeaderHashed> + 'iter {
+    pub fn drain(&mut self) -> impl Iterator<Item = SignedHeaderHashed> + '_ {
         self.headers.drain(..)
     }
 }
@@ -150,7 +143,7 @@ impl StoresIter<Judged<SignedHeaderHashed>> for FilteredScratch {
         // then this transaction will be rolled back.
         // TODO: Write test to prove this assumption.
         Ok(Box::new(fallible_iterator::convert(
-            self.into_iter().map(Judged::valid).map(Ok),
+            self.drain().map(Judged::valid).map(Ok),
         )))
     }
 }
@@ -183,7 +176,7 @@ CREATE TABLE mytable (
         .unwrap()
         .prepare_cached("SELECT x FROM mytable")
         .unwrap()
-        .query_map(NO_PARAMS, |row| Ok(dbg!(row.get(0))?))
+        .query_map(NO_PARAMS, |row| row.get(0))
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
@@ -193,7 +186,7 @@ CREATE TABLE mytable (
         .unwrap()
         .prepare_cached("SELECT * FROM mytable")
         .unwrap()
-        .query_map(NO_PARAMS, |row| Ok(row.get(0)?))
+        .query_map(NO_PARAMS, |row| row.get(0))
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
         .unwrap();

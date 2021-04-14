@@ -43,8 +43,7 @@ impl Query for GetAgentActivityDeterministicQuery {
     type Output = AgentActivityResponseDeterministic;
 
     fn query(&self) -> String {
-        format!(
-            "
+        "
             SELECT H.blob, H.hash, D.validation_status FROM Header AS H
             JOIN DhtOp as D
             ON D.header_hash = H.hash
@@ -56,7 +55,7 @@ impl Query for GetAgentActivityDeterministicQuery {
             AND H.seq <= (SELECT seq FROM Header WHERE hash = :hash_high)
             ORDER BY H.seq DESC
         "
-        )
+        .to_string()
     }
 
     fn params(&self) -> Vec<Params> {

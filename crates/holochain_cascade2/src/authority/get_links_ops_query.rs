@@ -28,7 +28,7 @@ impl GetLinksOpsQuery {
 }
 
 // TODO: Move this to holochain types.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct WireLinkOps {
     pub creates: Vec<WireDhtOp>,
     pub deletes: Vec<WireDhtOp>,
@@ -36,10 +36,7 @@ pub struct WireLinkOps {
 
 impl WireLinkOps {
     pub fn new() -> Self {
-        Self {
-            creates: Vec::new(),
-            deletes: Vec::new(),
-        }
+        Self::default()
     }
 }
 

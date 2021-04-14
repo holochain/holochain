@@ -31,7 +31,7 @@ impl Schema {
             conn.pragma_query_value(None, "user_version", |row| Ok(row.get(0)?))?;
         let db_kind = db_kind
             .map(ToString::to_string)
-            .unwrap_or("<no name>".to_string());
+            .unwrap_or_else(|| "<no name>".to_string());
 
         if user_version == 0 {
             // database just needs to be created / initialized
@@ -40,28 +40,32 @@ impl Schema {
             return Ok(());
         } else {
             let current_index = user_version as usize - 1;
-            if current_index < self.current_index {
-                // run forward migrations
-                for v in current_index..self.current_index + 1 {
-                    self.migrations[v].run(conn)?;
+            match current_index.cmp(&self.current_index) {
+                std::cmp::Ordering::Less => {
+                    // run forward migrations
+                    for v in current_index..self.current_index + 1 {
+                        self.migrations[v].run(conn)?;
+                    }
+                    // set the DB user_version so that next time we don't run
+                    // the same migration
+                    let new_user_version = (self.current_index + 1) as u16;
+                    conn.pragma_update(None, "user_version", &new_user_version)?;
+                    tracing::info!(
+                        "database forward migrated: {} from {} to {}",
+                        db_kind,
+                        current_index,
+                        self.current_index
+                    );
                 }
-                // set the DB user_version so that next time we don't run
-                // the same migration
-                let new_user_version = (self.current_index + 1) as u16;
-                conn.pragma_update(None, "user_version", &new_user_version)?;
-                tracing::info!(
-                    "database forward migrated: {} from {} to {}",
-                    db_kind,
-                    current_index,
-                    self.current_index
-                );
-            } else if current_index > self.current_index {
-                unimplemented!("backward migrations unimplemented");
-            } else {
-                tracing::debug!(
-                    "database needed no migration or initialization, good to go: {}",
-                    db_kind
-                );
+                std::cmp::Ordering::Equal => {
+                    tracing::debug!(
+                        "database needed no migration or initialization, good to go: {}",
+                        db_kind
+                    );
+                }
+                std::cmp::Ordering::Greater => {
+                    unimplemented!("backward migrations unimplemented");
+                }
             }
         }
 

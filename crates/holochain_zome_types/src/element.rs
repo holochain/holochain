@@ -189,7 +189,7 @@ impl HashableContent for SignedHeader {
 }
 
 /// The header and the signature that signed it
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, Serialize, Deserialize)]
 pub struct SignedHeaderHashed {
     header: HeaderHashed,
     signature: Signature,
@@ -199,6 +199,12 @@ impl std::hash::Hash for SignedHeaderHashed {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.signature.hash(state);
         self.as_hash().hash(state);
+    }
+}
+
+impl PartialEq for SignedHeaderHashed {
+    fn eq(&self, other: &Self) -> bool {
+        self.signature.eq(&other.signature) && self.as_hash() == other.as_hash()
     }
 }
 
