@@ -1,3 +1,18 @@
+//! Query for `deterministic_get_agent_activity`, designed for use in
+//! validation callbacks.
+//!
+//! This is a deterministic version of `get_agent_activity`, designed such that
+//! there can only be one possible valid result which satisfies the query
+//! criteria, so if you get back a result, you can verify that it is correct
+//! and safely use it in your own validation. If you don't get a value back,
+//! you cannot proceed with validation.
+//!
+//! - The agent authority will fully validate Headers, so it's OK to pass the
+//!   full headers to Wasm
+//! - Must return a contiguous range of Headers so that the requestor can
+//!   ensure that the data is valid (TODO we're skipping the actual validation
+//!   on the requestor side for now).
+
 use holo_hash::*;
 use holochain_p2p::event::GetActivityOptions;
 use holochain_sqlite::rusqlite::*;
