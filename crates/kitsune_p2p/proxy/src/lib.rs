@@ -22,6 +22,8 @@ pub(crate) fn blake2b_32(data: &[u8]) -> Vec<u8> {
         .to_vec()
 }
 
+pub mod tx2;
+
 mod proxy_url;
 pub use proxy_url::*;
 

@@ -215,7 +215,7 @@ pub mod tests {
             },
         });
         let mut tuning_params =
-            kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams::default();
+            kitsune_p2p::dependencies::kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning_params.gossip_loop_iteration_delay_ms = 42;
         tuning_params.default_notify_remote_agent_count = 42;
         tuning_params.default_notify_timeout_ms = 42;
