@@ -16,6 +16,7 @@ use super::*;
 use crate::insert::*;
 
 mod details;
+mod links;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_links() {

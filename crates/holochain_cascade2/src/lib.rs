@@ -25,6 +25,7 @@ use holochain_state::prelude::*;
 use holochain_state::query::element_details::GetElementDetailsQuery;
 use holochain_state::query::entry_details::GetEntryDetailsQuery;
 use holochain_state::query::link::GetLinksQuery;
+use holochain_state::query::link_details::GetLinkDetailsQuery;
 use holochain_state::query::live_element::GetLiveElementQuery;
 use holochain_state::query::live_entry::GetLiveEntryQuery;
 use holochain_state::query::DbScratch;
@@ -623,7 +624,7 @@ where
     #[instrument(skip(self, options))]
     /// Gets an links from the cas or cache depending on it's metadata
     // The default behavior is to skip deleted or replaced entries.
-    pub async fn dht_get_links<'link>(
+    pub async fn dht_get_links(
         &mut self,
         key: WireLinkKey,
         options: GetLinksOptions,
@@ -637,15 +638,21 @@ where
         Ok(results)
     }
 
-    #[instrument(skip(self, _key, _options))]
+    #[instrument(skip(self, key, options))]
     /// Return all CreateLink headers
     /// and DeleteLink headers ordered by time.
-    pub async fn get_link_details<'link>(
+    pub async fn get_link_details(
         &mut self,
-        _key: &'link LinkMetaKey<'link>,
-        _options: GetLinksOptions,
+        key: WireLinkKey,
+        options: GetLinksOptions,
     ) -> CascadeResult<Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)>> {
-        todo!()
+        let authority = self.am_i_an_authority(key.base.clone().into()).await?;
+        if !authority {
+            self.fetch_links(key.clone(), options.into()).await?;
+        }
+        let query = GetLinkDetailsQuery::new(key.base, key.zome_id, key.tag);
+        let results = self.cascading(query)?;
+        Ok(results)
     }
 
     // TODO: The whole chain needs to be retrieved so we can

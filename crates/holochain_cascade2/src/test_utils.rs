@@ -212,6 +212,8 @@ pub struct EntryTestData {
     pub delete_link_op: DhtOpHashed,
     pub wire_create_link: WireDhtOp,
     pub wire_delete_link: WireDhtOp,
+    pub create_link_header: SignedHeaderHashed,
+    pub delete_link_header: SignedHeaderHashed,
     pub link_key: WireLinkKey,
     pub link_key_tag: WireLinkKey,
     pub links: Vec<Link>,
@@ -328,6 +330,10 @@ impl EntryTestData {
             signature: signature.clone(),
             validation_status: Some(ValidationStatus::Valid),
         };
+        let create_link_header = SignedHeaderHashed::with_presigned(
+            HeaderHashed::from_content_sync(Header::CreateLink(create_link.clone())),
+            signature,
+        );
 
         let signature = fixt!(Signature);
         let delete_link_op = DhtOpHashed::from_content_sync(DhtOp::RegisterRemoveLink(
@@ -340,6 +346,10 @@ impl EntryTestData {
             signature: signature.clone(),
             validation_status: Some(ValidationStatus::Valid),
         };
+        let delete_link_header = SignedHeaderHashed::with_presigned(
+            HeaderHashed::from_content_sync(Header::DeleteLink(delete_link.clone())),
+            signature,
+        );
 
         let link_key = WireLinkKey {
             base: create_link.base_address.clone(),
@@ -378,6 +388,8 @@ impl EntryTestData {
             link_key,
             link_key_tag,
             links: vec![link],
+            create_link_header,
+            delete_link_header,
         }
     }
 }

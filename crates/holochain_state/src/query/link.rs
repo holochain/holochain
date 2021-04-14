@@ -8,13 +8,18 @@ use super::*;
 
 #[derive(Debug, Clone)]
 pub struct GetLinksQuery {
-    base: Arc<EntryHash>,
-    zome_id: ZomeId,
-    tag: Option<Arc<LinkTag>>,
-    query: String,
+    query: LinksQuery,
 }
 
-impl GetLinksQuery {
+#[derive(Debug, Clone)]
+pub struct LinksQuery {
+    pub base: Arc<EntryHash>,
+    pub zome_id: ZomeId,
+    pub tag: Option<Arc<LinkTag>>,
+    query: Arc<String>,
+}
+
+impl LinksQuery {
     pub fn new(base: EntryHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
         let create_string = Self::create_query_string(tag.is_some());
         let delete_string = Self::delete_query_string(tag.is_some());
@@ -22,7 +27,7 @@ impl GetLinksQuery {
             base: Arc::new(base),
             zome_id,
             tag: tag.map(Arc::new),
-            query: Self::create_query(create_string, delete_string),
+            query: Arc::new(Self::create_query(create_string, delete_string)),
         }
     }
 
@@ -38,8 +43,8 @@ impl GetLinksQuery {
         format!("{} UNION ALL {}", create, delete)
     }
 
-    fn query(&self) -> String {
-        self.query.clone()
+    pub fn query(&self) -> String {
+        (*self.query).clone()
     }
 
     fn common_query_string() -> &'static str {
@@ -93,13 +98,17 @@ impl GetLinksQuery {
             WHERE DhtOp.type = :delete
             AND
             Header.create_link_hash IN ({})
+            AND
+            DhtOp.validation_status = :status
+            AND 
+            (DhtOp.when_integrated IS NOT NULL OR DhtOp.is_authored = 1)
             ",
             sub_create_query
         );
         delete_query
     }
 
-    fn params(&self) -> Vec<Params> {
+    pub fn params(&self) -> Vec<Params> {
         let mut params = named_params! {
             ":create": DhtOpType::RegisterAddLink,
             ":delete": DhtOpType::RegisterRemoveLink,
@@ -117,16 +126,36 @@ impl GetLinksQuery {
     }
 }
 
+impl GetLinksQuery {
+    pub fn new(base: EntryHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
+        Self {
+            query: LinksQuery::new(base, zome_id, tag),
+        }
+    }
+
+    pub fn base(base: EntryHash, zome_id: ZomeId) -> Self {
+        Self {
+            query: LinksQuery::base(base, zome_id),
+        }
+    }
+
+    pub fn tag(base: EntryHash, zome_id: ZomeId, tag: LinkTag) -> Self {
+        Self {
+            query: LinksQuery::tag(base, zome_id, tag),
+        }
+    }
+}
+
 impl Query for GetLinksQuery {
     type Item = Judged<SignedHeaderHashed>;
     type State = Maps<Link>;
     type Output = Vec<Link>;
     fn query(&self) -> String {
-        self.query()
+        self.query.query()
     }
 
     fn params(&self) -> Vec<Params> {
-        self.params()
+        self.query.params()
     }
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {
@@ -140,9 +169,10 @@ impl Query for GetLinksQuery {
     }
 
     fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
-        let base_filter = self.base.clone();
-        let zome_id_filter = self.zome_id.clone();
-        let tag_filter = self.tag.clone();
+        let query = &self.query;
+        let base_filter = query.base.clone();
+        let zome_id_filter = query.zome_id.clone();
+        let tag_filter = query.tag.clone();
         let f = move |header: &QueryData<Self>| match header.header() {
             Header::CreateLink(CreateLink {
                 base_address,
@@ -185,7 +215,9 @@ impl Query for GetLinksQuery {
     where
         S: Store,
     {
-        Ok(state.creates.into_iter().map(|(_, v)| v).collect())
+        let mut links: Self::Output = state.creates.into_iter().map(|(_, v)| v).collect();
+        links.sort_by_key(|l| l.timestamp);
+        Ok(links)
     }
 }
 

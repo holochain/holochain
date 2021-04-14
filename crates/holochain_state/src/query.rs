@@ -33,6 +33,7 @@ pub mod element_details;
 pub mod entry_details;
 pub mod error;
 pub mod link;
+pub mod link_details;
 pub mod live_element;
 pub mod live_entry;
 

@@ -32,6 +32,13 @@ async fn links_not_authority() {
 
     assert_eq!(r, td.links);
 
+    let r = cascade
+        .get_link_details(td.link_key.clone(), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(r, vec![(td.create_link_header.clone(), vec![]),]);
+
     fill_db(&authority.env(), td.delete_link_op.clone());
 
     let r = cascade
@@ -40,6 +47,19 @@ async fn links_not_authority() {
         .unwrap();
 
     assert!(r.is_empty());
+
+    let r = cascade
+        .get_link_details(td.link_key.clone(), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(
+        r,
+        vec![(
+            td.create_link_header.clone(),
+            vec![td.delete_link_header.clone()]
+        ),]
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
