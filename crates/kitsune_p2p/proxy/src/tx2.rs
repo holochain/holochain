@@ -315,6 +315,15 @@ impl AsEpHnd for ProxyEpHnd {
     }
 }
 
+async fn close_ep(hnd: &Arc<ProxyEpHnd>, logic_hnd: &LogicChanHandle<EpEvent>) {
+    let _ = hnd.inner.share_mut(|_, c| {
+        *c = true;
+        Ok(())
+    });
+    let _ = logic_hnd.emit(EpEvent::EndpointClosed).await;
+    logic_hnd.close();
+}
+
 async fn incoming_evt_logic(
     tuning_params: KitsuneP2pTuningParams,
     allow_proxy_fwd: bool,
@@ -322,9 +331,11 @@ async fn incoming_evt_logic(
     hnd: Arc<ProxyEpHnd>,
     logic_hnd: LogicChanHandle<EpEvent>,
 ) {
-    let local_cert = match sub_ep.handle().local_cert() {
+    let maybe_cert = sub_ep.handle().local_cert();
+    let local_cert = match maybe_cert {
         Err(_) => {
             tracing::warn!("ep closed before evt handler launch");
+            close_ep(&hnd, &logic_hnd).await;
             return;
         }
         Ok(d) => d,
@@ -382,6 +393,7 @@ async fn incoming_evt_handle(
                 Ok(())
             });
         }
+        IncomingError(_) => unreachable!(), // currently no lower layers invoke this
         IncomingData(EpIncomingData {
             con: sub_con,
             url: base_url,
@@ -457,14 +469,44 @@ async fn incoming_evt_handle(
                             };
                             let mut data = PoolBuf::new();
                             data.extend_from_slice(format!("{:?}", e).as_bytes());
+                            data.prepend_from_slice(&local_cert);
                             data.prepend_from_slice(&[PROXY_ROUTE_ERR]);
                             let t = KitsuneTimeout::from_millis(1000 * 30);
                             let _ = sub_con.write(new_msg_id, data, t).await;
                         }
                     }
                 }
+                PROXY_ROUTE_ERR => {
+                    const SRC_START: usize = PROXY_TYPE_BYTES;
+                    const SRC_END: usize = SRC_START + DIGEST_BYTES;
+                    let src_cert = data[SRC_START..SRC_END].to_vec().into();
+                    data.cheap_move_start(SRC_END);
+
+                    let url = promote_addr(&base_url, &src_cert).unwrap();
+                    let con = match get_con_hnd(
+                        &hnd.inner,
+                        logic_hnd.clone(),
+                        sub_con,
+                        local_cert,
+                        src_cert,
+                        false,
+                    )
+                    .await
+                    {
+                        Err(_) => return,
+                        Ok(con) => con,
+                    };
+                    let evt = EpEvent::IncomingError(EpIncomingData {
+                        con,
+                        url,
+                        msg_id,
+                        data,
+                    });
+                    let _ = logic_hnd.emit(evt).await;
+                }
                 b => {
-                    let reason = format!("Invalid Proxy Byte: {}", b);
+                    let reason = format!("Invalid Proxy Byte: {}, closing connection", b);
+                    tracing::warn!("{}", reason);
                     hnd.sub_ep_hnd
                         .close_connection(base_url, 500, &reason)
                         .await;
@@ -505,12 +547,7 @@ async fn incoming_evt_handle(
             let _ = logic_hnd.emit(Error(e)).await;
         }
         EndpointClosed => {
-            let _ = hnd.inner.share_mut(|_, c| {
-                *c = true;
-                Ok(())
-            });
-            let _ = logic_hnd.emit(EndpointClosed).await;
-            logic_hnd.close();
+            close_ep(hnd, logic_hnd).await;
         }
     }
 }
@@ -614,6 +651,7 @@ mod tests {
 
     async fn build_node(
         mut s_done: Option<tokio::sync::oneshot::Sender<()>>,
+        expect_err: bool,
     ) -> (tokio::task::JoinHandle<()>, TxUrl, EpHnd) {
         let t = KitsuneTimeout::from_millis(5000);
 
@@ -630,21 +668,38 @@ mod tests {
 
         let join = tokio::task::spawn(async move {
             while let Some(evt) = ep.next().await {
-                if let EpEvent::IncomingData(EpIncomingData { con, mut data, .. }) = evt {
-                    if data.as_ref() == b"" {
-                        // pass - this is the proxy hello
-                    } else if data.as_ref() == b"hello" {
-                        data.clear();
-                        data.extend_from_slice(b"world");
-                        con.write(0.into(), data, t).await.unwrap();
-                    } else if data.as_ref() == b"world" {
+                match evt {
+                    EpEvent::IncomingData(EpIncomingData { con, mut data, .. }) => {
+                        if expect_err {
+                            panic!("got response, expected err");
+                        }
+
+                        if data.as_ref() == b"" {
+                            // pass - this is the proxy hello
+                        } else if data.as_ref() == b"hello" {
+                            data.clear();
+                            data.extend_from_slice(b"world");
+                            con.write(0.into(), data, t).await.unwrap();
+                        } else if data.as_ref() == b"world" {
+                            if let Some(s_done) = s_done.take() {
+                                let _ = s_done.send(());
+                                return;
+                            }
+                        } else {
+                            panic!("unexpected: {}", String::from_utf8_lossy(&data));
+                        }
+                    }
+                    EpEvent::IncomingError(EpIncomingData { data, .. }) => {
+                        let err = String::from_utf8_lossy(data.as_ref());
+                        if !expect_err {
+                            panic!("err: {:?}", err);
+                        }
                         if let Some(s_done) = s_done.take() {
                             let _ = s_done.send(());
                             return;
                         }
-                    } else {
-                        panic!("unexpected: {}", String::from_utf8_lossy(&data));
                     }
+                    _ => (),
                 }
             }
         });
@@ -663,6 +718,39 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn test_tx2_route_err() {
+        observability::test_run().ok();
+        let t = KitsuneTimeout::from_millis(5000);
+        let mut all_tasks = Vec::new();
+
+        let (p_join, p_addr, p_ep) = build_node(None, true).await;
+        all_tasks.push(p_join);
+
+        let fake_tgt: Tx2Cert = vec![0xdb; 32].into();
+        let fake_tgt = ProxyUrl::new(
+            ProxyUrl::from(p_addr.as_str()).as_base().as_str(),
+            fake_tgt.into(),
+        )
+        .unwrap();
+        let fake_tgt = fake_tgt.as_str().into();
+        println!("Fake Tgt: {:?}", fake_tgt);
+
+        let (s_done, r_done) = tokio::sync::oneshot::channel();
+        let (n_join, _n_addr, n_ep) = build_node(Some(s_done), true).await;
+
+        let mut data = PoolBuf::new();
+        data.extend_from_slice(b"hello");
+        n_ep.write(fake_tgt, 0.into(), data, t).await.unwrap();
+        r_done.await.unwrap();
+        n_ep.close(0, "").await;
+        n_join.await.unwrap();
+
+        p_ep.close(0, "").await;
+
+        futures::future::try_join_all(all_tasks).await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_proxy() {
         observability::test_run().ok();
 
@@ -670,12 +758,12 @@ mod tests {
 
         let mut all_tasks = Vec::new();
 
-        let (p_join, p_addr, p_ep) = build_node(None).await;
+        let (p_join, p_addr, p_ep) = build_node(None, false).await;
         all_tasks.push(p_join);
         //println!("PROXY ADDR = {}", p_addr);
         //println!("PROXY: {:?}", p_ep.local_cert().unwrap());
 
-        let (t_join, t_addr, t_ep) = build_node(None).await;
+        let (t_join, t_addr, t_ep) = build_node(None, false).await;
         all_tasks.push(t_join);
 
         //println!("TGT ADDR = {}", t_addr);
@@ -692,7 +780,7 @@ mod tests {
         let mut all_futs = Vec::new();
         for _ in 0..COUNT {
             let (s_done, r_done) = tokio::sync::oneshot::channel();
-            let (n_join, _n_addr, n_ep) = build_node(Some(s_done)).await;
+            let (n_join, _n_addr, n_ep) = build_node(Some(s_done), false).await;
             //println!("N: {:?}", n_ep.local_cert().unwrap());
 
             let t_addr_proxy = t_addr_proxy.clone();

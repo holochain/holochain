@@ -158,6 +158,9 @@ pub enum EpEvent {
     /// We've received incoming data on an open connection.
     IncomingData(EpIncomingData),
 
+    /// We've received incoming error on an open connection.
+    IncomingError(EpIncomingData),
+
     /// A connection has closed (Url, Code, Reason).
     ConnectionClosed(EpConnectionClosed),
 

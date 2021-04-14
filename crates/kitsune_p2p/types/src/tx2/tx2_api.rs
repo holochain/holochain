@@ -39,6 +39,14 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
             let _ = s_res.send(Ok(c));
         }
     }
+
+    pub fn respond_err(&mut self, url: TxUrl, msg_id: u64, err: String) {
+        if let Some((s_res, _)) = self.0.remove(&(url, msg_id)) {
+            // if the recv side is dropped, we no longer need to respond
+            // so it's ok to ignore errors here.
+            let _ = s_res.send(Err(err.into()));
+        }
+    }
 }
 
 /// Cleanup our map when the request future completes
@@ -453,6 +461,20 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                             }
                         }
                     }
+                    EpEvent::IncomingError(EpIncomingData {
+                        url, msg_id, data, ..
+                    }) => match msg_id.get_type() {
+                        MsgIdType::Notify => unimplemented!(),
+                        MsgIdType::Req => unimplemented!(),
+                        MsgIdType::Res => {
+                            let err = String::from_utf8_lossy(data.as_ref()).to_string();
+                            let _ = rmap.share_mut(move |i, _| {
+                                i.respond_err(url, msg_id.as_id(), err);
+                                Ok(())
+                            });
+                            Tx2EpEvent::Tick
+                        }
+                    },
                     EpEvent::ConnectionClosed(EpConnectionClosed { url, code, reason }) => {
                         Tx2EpEvent::ConnectionClosed(Tx2EpConnectionClosed { url, code, reason })
                     }
