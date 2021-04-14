@@ -5,8 +5,8 @@ use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 use holochain_p2p::actor;
 use holochain_p2p::HolochainP2pError;
-use holochain_state::insert::set_when_integrated;
-use holochain_state::insert::update_op_validation_status;
+use holochain_state::mutations::set_when_integrated;
+use holochain_state::mutations::update_op_validation_status;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::env::EnvRead;
@@ -35,7 +35,7 @@ use crate::authority::WireOps;
 use ::fixt::prelude::*;
 use holochain_sqlite::db::WriteManager;
 use holochain_sqlite::prelude::DatabaseResult;
-use holochain_state::insert::insert_op;
+use holochain_state::mutations::insert_op;
 
 #[derive(Clone)]
 pub struct PassThroughNetwork {
@@ -534,9 +534,9 @@ pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
         .unwrap()
         .with_commit(|txn| {
             let hash = op.as_hash().clone();
-            insert_op(txn, op, false);
-            update_op_validation_status(txn, hash.clone(), ValidationStatus::Valid);
-            set_when_integrated(txn, hash, timestamp::now());
+            insert_op(txn, op, false).unwrap();
+            update_op_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
+            set_when_integrated(txn, hash, timestamp::now()).unwrap();
             DatabaseResult::Ok(())
         })
         .unwrap();
@@ -547,9 +547,9 @@ pub fn fill_db_rejected(env: &EnvWrite, op: DhtOpHashed) {
         .unwrap()
         .with_commit(|txn| {
             let hash = op.as_hash().clone();
-            insert_op(txn, op, false);
-            update_op_validation_status(txn, hash.clone(), ValidationStatus::Rejected);
-            set_when_integrated(txn, hash, timestamp::now());
+            insert_op(txn, op, false).unwrap();
+            update_op_validation_status(txn, hash.clone(), ValidationStatus::Rejected).unwrap();
+            set_when_integrated(txn, hash, timestamp::now()).unwrap();
             DatabaseResult::Ok(())
         })
         .unwrap();
@@ -560,8 +560,8 @@ pub fn fill_db_pending(env: &EnvWrite, op: DhtOpHashed) {
         .unwrap()
         .with_commit(|txn| {
             let hash = op.as_hash().clone();
-            insert_op(txn, op, false);
-            update_op_validation_status(txn, hash.clone(), ValidationStatus::Valid);
+            insert_op(txn, op, false).unwrap();
+            update_op_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
             DatabaseResult::Ok(())
         })
         .unwrap();
@@ -571,7 +571,7 @@ pub fn fill_db_as_author(env: &EnvWrite, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit(|txn| {
-            insert_op(txn, op, true);
+            insert_op(txn, op, true).unwrap();
             DatabaseResult::Ok(())
         })
         .unwrap();

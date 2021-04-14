@@ -87,7 +87,7 @@ impl Query for ChainHeadQuery {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::insert::{insert_header, insert_op_lite};
+    use crate::mutations::{insert_header, insert_op_lite};
     use ::fixt::prelude::*;
     use holochain_sqlite::schema::SCHEMA_CELL;
     use holochain_types::dht_op::DhtOpLight;
@@ -137,8 +137,8 @@ mod tests {
         for shh in &shhs[..6] {
             let hash = shh.header_address();
             let op = DhtOpLight::StoreElement(hash.clone(), None, hash.clone().into());
-            insert_header(&mut txn, shh.clone());
-            insert_op_lite(&mut txn, op, fixt!(DhtOpHash), true);
+            insert_header(&mut txn, shh.clone()).unwrap();
+            insert_op_lite(&mut txn, op, fixt!(DhtOpHash), true).unwrap();
         }
 
         let mut scratch = Scratch::new();

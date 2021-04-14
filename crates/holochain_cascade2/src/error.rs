@@ -50,6 +50,9 @@ pub enum CascadeError {
 
     #[error(transparent)]
     QueryError(#[from] holochain_state::query::StateQueryError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] holochain_state::mutations::StateMutationError),
 }
 
 pub type CascadeResult<T> = Result<T, CascadeError>;

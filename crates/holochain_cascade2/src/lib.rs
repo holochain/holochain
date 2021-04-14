@@ -20,7 +20,7 @@ use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_state::insert::update_op_validation_status;
+use holochain_state::mutations::update_op_validation_status;
 use holochain_state::prelude::*;
 use holochain_state::query::element_details::GetElementDetailsQuery;
 use holochain_state::query::entry_details::GetEntryDetailsQuery;
@@ -32,9 +32,9 @@ use holochain_state::query::DbScratch;
 use holochain_state::query::StateQueryError;
 use holochain_state::scratch::Scratch;
 use holochain_types::prelude::*;
-use insert::insert_entry;
-use insert::insert_header;
-use insert::insert_op_lite;
+use mutations::insert_entry;
+use mutations::insert_header;
+use mutations::insert_op_lite;
 use test_utils::HolochainP2pCellT2;
 use test_utils::PassThroughNetwork;
 use tracing::*;
@@ -152,14 +152,14 @@ where
             header_hashed.header(),
         )?;
 
-        insert_header(txn, header_hashed);
-        insert_op_lite(txn, op_light, op_hash.clone(), false);
+        insert_header(txn, header_hashed)?;
+        insert_op_lite(txn, op_light, op_hash.clone(), false)?;
         if let Some(status) = validation_status {
-            update_op_validation_status(txn, op_hash.clone(), status);
+            update_op_validation_status(txn, op_hash.clone(), status)?;
         }
         // We set the integrated to for the cache so it can match the
         // same query as the vault. This can also be used for garbage collection.
-        set_when_integrated(txn, op_hash, timestamp::now());
+        set_when_integrated(txn, op_hash, timestamp::now())?;
         Ok(())
     }
 
@@ -187,7 +187,7 @@ where
             if let Some(entry) = entry {
                 let entry_hashed = EntryHashed::from_content_sync(entry);
                 entry_hash = Some(entry_hashed.as_hash().clone());
-                insert_entry(txn, entry_hashed);
+                insert_entry(txn, entry_hashed)?;
             }
             // Do we need to be able to handle creates without an entry.
             // I think we do because we might already have the entry.
@@ -226,7 +226,7 @@ where
             if let Some(entry) = entry {
                 let entry_hashed = EntryHashed::from_content_sync(entry);
                 entry_hash = Some(entry_hashed.as_hash().clone());
-                insert_entry(txn, entry_hashed);
+                insert_entry(txn, entry_hashed)?;
             }
             if let Some(op) = header {
                 if Self::verify_entry_hash(op.header.entry_hash(), &entry_hash) {

@@ -39,8 +39,8 @@ pub mod chain_sequence;
 pub mod dht_op_integration;
 #[allow(missing_docs)]
 pub mod element_buf;
-pub mod insert;
 pub mod metadata;
+pub mod mutations;
 #[allow(missing_docs)]
 pub mod prelude;
 pub mod query;

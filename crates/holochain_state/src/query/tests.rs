@@ -13,7 +13,7 @@ use super::link::*;
 use super::live_entry::*;
 use super::test_data::*;
 use super::*;
-use crate::insert::*;
+use crate::mutations::*;
 
 mod details;
 mod links;
@@ -40,26 +40,26 @@ async fn get_links() {
     let td = LinkTestData::new();
 
     // - Add link to db.
-    insert_op(&mut txn, td.base_op.clone(), false);
-    insert_op(&mut txn, td.target_op.clone(), false);
-    insert_op(&mut txn, td.create_link_op.clone(), false);
+    insert_op(&mut txn, td.base_op.clone(), false).unwrap();
+    insert_op(&mut txn, td.target_op.clone(), false).unwrap();
+    insert_op(&mut txn, td.create_link_op.clone(), false).unwrap();
 
     // - Check we can get the link query back.
     let r = get_link_query(&mut [&mut txn], None, td.tag_query.clone());
     assert_eq!(r[0], td.link);
 
     // - Add the same link to the cache.
-    insert_op(&mut cache_txn, td.base_op.clone(), false);
-    insert_op(&mut cache_txn, td.target_op.clone(), false);
-    insert_op(&mut cache_txn, td.create_link_op.clone(), false);
+    insert_op(&mut cache_txn, td.base_op.clone(), false).unwrap();
+    insert_op(&mut cache_txn, td.target_op.clone(), false).unwrap();
+    insert_op(&mut cache_txn, td.create_link_op.clone(), false).unwrap();
 
     // - Check duplicates don't cause issues.
-    insert_op(&mut cache_txn, td.create_link_op.clone(), false);
+    insert_op(&mut cache_txn, td.create_link_op.clone(), false).unwrap();
 
     // - Add to the scratch
-    insert_op_scratch(&mut scratch, td.base_op.clone());
-    insert_op_scratch(&mut scratch, td.target_op.clone());
-    insert_op_scratch(&mut scratch, td.create_link_op.clone());
+    insert_op_scratch(&mut scratch, td.base_op.clone()).unwrap();
+    insert_op_scratch(&mut scratch, td.target_op.clone()).unwrap();
+    insert_op_scratch(&mut scratch, td.create_link_op.clone()).unwrap();
 
     // - Check we can resolve this to a single link.
     let r = get_link_query(&mut [&mut cache_txn], Some(&scratch), td.base_query.clone());
@@ -74,7 +74,7 @@ async fn get_links() {
     assert_eq!(r.len(), 1);
 
     // - Insert a delete op.
-    insert_op(&mut txn, td.delete_link_op.clone(), false);
+    insert_op(&mut txn, td.delete_link_op.clone(), false).unwrap();
 
     let r = get_link_query(
         &mut [&mut cache_txn, &mut txn],
@@ -106,19 +106,19 @@ async fn get_entry() {
     let td = EntryTestData::new();
 
     // - Create an entry on main db.
-    insert_op(&mut txn, td.store_entry_op.clone(), false);
+    insert_op(&mut txn, td.store_entry_op.clone(), false).unwrap();
 
     // - Check we get that header back.
     let r = get_entry_query(&mut [&mut txn], None, td.query.clone()).unwrap();
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);
 
     // - Create the same entry in the cache.
-    insert_op(&mut cache_txn, td.store_entry_op.clone(), false);
+    insert_op(&mut cache_txn, td.store_entry_op.clone(), false).unwrap();
     // - Check duplicates is ok.
-    insert_op(&mut cache_txn, td.store_entry_op.clone(), false);
+    insert_op(&mut cache_txn, td.store_entry_op.clone(), false).unwrap();
 
     // - Add to the scratch
-    insert_op_scratch(&mut scratch, td.store_entry_op.clone());
+    insert_op_scratch(&mut scratch, td.store_entry_op.clone()).unwrap();
 
     // - Get the entry from both stores and union the query results.
     let r = get_entry_query(
@@ -132,7 +132,7 @@ async fn get_entry() {
     assert_eq!(*r.header(), *td.header.header());
 
     // - Delete the entry in the cache.
-    insert_op(&mut cache_txn, td.delete_entry_header_op.clone(), false);
+    insert_op(&mut cache_txn, td.delete_entry_header_op.clone(), false).unwrap();
 
     // - Get the entry from both stores and union the queries.
     let r = get_entry_query(
@@ -176,18 +176,19 @@ async fn insert_op_equivalence() {
         .transaction_with_behavior(TransactionBehavior::Exclusive)
         .unwrap();
 
-    insert_entry(&mut txn1, EntryHashed::from_content_sync(create_entry));
+    insert_entry(&mut txn1, EntryHashed::from_content_sync(create_entry)).unwrap();
     insert_header(
         &mut txn1,
         SignedHeaderHashed::with_presigned(
             HeaderHashed::from_content_sync(Header::Create(create_header.clone())),
             fixt!(Signature),
         ),
-    );
-    insert_op_lite(&mut txn1, op.to_light(), op.as_hash().clone(), false);
+    )
+    .unwrap();
+    insert_op_lite(&mut txn1, op.to_light(), op.as_hash().clone(), false).unwrap();
 
     // Insert the op in a single step on conn2
-    insert_op(&mut txn2, op, false);
+    insert_op(&mut txn2, op, false).unwrap();
 
     txn1.commit().unwrap();
     txn2.commit().unwrap();

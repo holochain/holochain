@@ -1,6 +1,7 @@
 use holo_hash::EntryHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
+use holochain_state::query::StateQueryError;
 use holochain_state::query::{prelude::*, QueryData};
 use holochain_types::dht_op::DhtOpType;
 use holochain_zome_types::LinkTag;
@@ -110,7 +111,7 @@ impl Query for GetLinksOpsQuery {
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = |row: &Row| {
-            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?)?;
             let SignedHeader(header, signature) = header;
             let op_type = row.get(row.column_index("dht_type")?)?;
             let validation_status = row.get(row.column_index("status")?)?;
@@ -140,7 +141,7 @@ impl Query for GetLinksOpsQuery {
             DhtOpType::RegisterRemoveLink => {
                 state.deletes.push(dht_op);
             }
-            _ => panic!("TODO: Turn this into an error"),
+            _ => return Err(StateQueryError::UnexpectedOp(dht_op.op_type)),
         }
         Ok(state)
     }

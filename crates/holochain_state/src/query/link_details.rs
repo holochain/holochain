@@ -89,7 +89,11 @@ impl Query for GetLinkDetailsQuery {
                     .or_insert((None, HashSet::new()));
                 entry.1.insert(shh);
             }
-            _ => panic!("TODO: Turn this into an error"),
+            _ => {
+                return Err(StateQueryError::UnexpectedHeader(
+                    shh.header().header_type(),
+                ))
+            }
         }
         Ok(state)
     }

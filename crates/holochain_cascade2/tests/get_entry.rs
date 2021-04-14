@@ -2,7 +2,7 @@ use ghost_actor::dependencies::observability;
 use holo_hash::HasHash;
 use holochain_cascade2::test_utils::*;
 use holochain_cascade2::Cascade;
-use holochain_state::insert::insert_op_scratch;
+use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_cell_env;
 use holochain_state::scratch::Scratch;
 use holochain_zome_types::Details;
@@ -247,8 +247,8 @@ async fn entry_authoring() {
     // Data
     let td_entry = EntryTestData::new();
     let td_element = ElementTestData::new();
-    insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone());
-    insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone());
+    insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone()).unwrap();
+    insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone()).unwrap();
 
     // Network
     // - Not expecting any calls to the network.
@@ -331,8 +331,8 @@ async fn content_authoring() {
     // Data
     let td_entry = EntryTestData::new();
     let td_element = ElementTestData::new();
-    insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone());
-    insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone());
+    insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone()).unwrap();
+    insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone()).unwrap();
 
     // Network
     // - Not expecting any calls to the network.

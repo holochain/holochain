@@ -2,7 +2,7 @@ use ghost_actor::dependencies::observability;
 use holochain_cascade2::authority::WireLinkOps;
 use holochain_cascade2::test_utils::*;
 use holochain_cascade2::Cascade;
-use holochain_state::insert::insert_op_scratch;
+use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_cell_env;
 use holochain_state::scratch::Scratch;
 
@@ -113,8 +113,8 @@ async fn links_authoring() {
 
     // Data
     let td = EntryTestData::new();
-    insert_op_scratch(&mut scratch, td.store_entry_op.clone());
-    insert_op_scratch(&mut scratch, td.create_link_op.clone());
+    insert_op_scratch(&mut scratch, td.store_entry_op.clone()).unwrap();
+    insert_op_scratch(&mut scratch, td.create_link_op.clone()).unwrap();
 
     // Network
     // - Not expecting any calls to the network.
@@ -140,7 +140,7 @@ async fn links_authoring() {
 
     assert_eq!(r, td.links);
 
-    insert_op_scratch(&mut scratch, td.delete_link_op.clone());
+    insert_op_scratch(&mut scratch, td.delete_link_op.clone()).unwrap();
 
     let mut cascade = Cascade::<MockNetwork>::empty()
         .with_network(mock, cache.env())

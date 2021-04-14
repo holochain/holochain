@@ -12,8 +12,8 @@ async fn exists() {
         .unwrap();
 
     let td = EntryTestData::new();
-    insert_op_scratch(&mut scratch, td.store_entry_op.clone());
-    insert_op(&mut txn, td.store_entry_op.clone(), true);
+    insert_op_scratch(&mut scratch, td.store_entry_op.clone()).unwrap();
+    insert_op(&mut txn, td.store_entry_op.clone(), true).unwrap();
     assert!(Txn::from(&txn)
         .contains_hash(&td.hash.clone().into())
         .unwrap());

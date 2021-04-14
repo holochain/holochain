@@ -199,14 +199,14 @@ impl Query for GetLinksQuery {
                 if !state.deletes.contains(&hash) {
                     state
                         .creates
-                        .insert(hash, link_from_header(Header::CreateLink(create_link)));
+                        .insert(hash, link_from_header(Header::CreateLink(create_link))?);
                 }
             }
             Header::DeleteLink(delete_link) => {
                 state.creates.remove(&delete_link.link_add_address);
                 state.deletes.insert(delete_link.link_add_address);
             }
-            _ => panic!("TODO: Turn this into an error"),
+            _ => return Err(StateQueryError::UnexpectedHeader(header.header_type())),
         }
         Ok(state)
     }
@@ -221,15 +221,15 @@ impl Query for GetLinksQuery {
     }
 }
 
-fn link_from_header(header: Header) -> Link {
+fn link_from_header(header: Header) -> StateQueryResult<Link> {
     let hash = HeaderHash::with_data_sync(&header);
     match header {
-        Header::CreateLink(header) => Link {
+        Header::CreateLink(header) => Ok(Link {
             target: header.target_address,
             timestamp: header.timestamp,
             tag: header.tag,
             create_link_hash: hash,
-        },
-        _ => panic!("TODO: handle this properly"),
+        }),
+        _ => Err(StateQueryError::UnexpectedHeader(header.header_type())),
     }
 }

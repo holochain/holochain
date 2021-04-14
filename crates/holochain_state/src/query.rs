@@ -271,17 +271,19 @@ impl<'stmt> Store for Txn<'stmt, '_> {
             },
             |row| {
                 let header = from_blob::<SignedHeader>(row.get(row.column_index("blob")?)?);
-                let SignedHeader(header, signature) = header;
-                let hash: HeaderHash = row.get(row.column_index("hash")?)?;
-                let header = HeaderHashed::with_pre_hashed(header, hash);
-                let shh = SignedHeaderHashed::with_presigned(header, signature);
-                Ok(shh)
+                Ok(header.and_then(|header| {
+                    let SignedHeader(header, signature) = header;
+                    let hash: HeaderHash = row.get(row.column_index("hash")?)?;
+                    let header = HeaderHashed::with_pre_hashed(header, hash);
+                    let shh = SignedHeaderHashed::with_presigned(header, signature);
+                    Ok(shh)
+                }))
             },
         );
         if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &shh {
             Ok(None)
         } else {
-            Ok(Some(shh?))
+            Ok(Some(shh??))
         }
     }
 
@@ -309,19 +311,24 @@ impl<'stmt> Txn<'stmt, '_> {
             },
             |row| {
                 let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
-                let SignedHeader(header, signature) = header;
-                let hash: HeaderHash = row.get(row.column_index("hash")?)?;
-                let header = HeaderHashed::with_pre_hashed(header, hash);
-                let shh = SignedHeaderHashed::with_presigned(header, signature);
-                let entry: Option<Vec<u8>> = row.get(row.column_index("entry_blob")?)?;
-                let entry = entry.map(from_blob::<Entry>);
-                Ok(Element::new(shh, entry))
+                Ok(header.and_then(|header| {
+                    let SignedHeader(header, signature) = header;
+                    let hash: HeaderHash = row.get(row.column_index("hash")?)?;
+                    let header = HeaderHashed::with_pre_hashed(header, hash);
+                    let shh = SignedHeaderHashed::with_presigned(header, signature);
+                    let entry: Option<Vec<u8>> = row.get(row.column_index("entry_blob")?)?;
+                    let entry = match entry {
+                        Some(entry) => Some(from_blob::<Entry>(entry)?),
+                        None => None,
+                    };
+                    Ok(Element::new(shh, entry))
+                }))
             },
         );
         if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &element {
             Ok(None)
         } else {
-            Ok(Some(element?))
+            Ok(Some(element??))
         }
     }
     fn get_any_element(&self, hash: &EntryHash) -> StateQueryResult<Option<Element>> {
@@ -339,19 +346,24 @@ impl<'stmt> Txn<'stmt, '_> {
             },
             |row| {
                 let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
-                let SignedHeader(header, signature) = header;
-                let hash: HeaderHash = row.get(row.column_index("hash")?)?;
-                let header = HeaderHashed::with_pre_hashed(header, hash);
-                let shh = SignedHeaderHashed::with_presigned(header, signature);
-                let entry: Option<Vec<u8>> = row.get(row.column_index("entry_blob")?)?;
-                let entry = entry.map(from_blob::<Entry>);
-                Ok(Element::new(shh, entry))
+                Ok(header.and_then(|header| {
+                    let SignedHeader(header, signature) = header;
+                    let hash: HeaderHash = row.get(row.column_index("hash")?)?;
+                    let header = HeaderHashed::with_pre_hashed(header, hash);
+                    let shh = SignedHeaderHashed::with_presigned(header, signature);
+                    let entry: Option<Vec<u8>> = row.get(row.column_index("entry_blob")?)?;
+                    let entry = match entry {
+                        Some(entry) => Some(from_blob::<Entry>(entry)?),
+                        None => None,
+                    };
+                    Ok(Element::new(shh, entry))
+                }))
             },
         );
         if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &element {
             Ok(None)
         } else {
-            Ok(Some(element?))
+            Ok(Some(element??))
         }
     }
 }
@@ -592,7 +604,7 @@ pub fn row_blob_and_hash_to_header(
     hash_index: &'static str,
 ) -> impl Fn(&Row) -> StateQueryResult<SignedHeaderHashed> {
     move |row| {
-        let header = from_blob::<SignedHeader>(row.get(row.column_index(blob_index)?)?);
+        let header = from_blob::<SignedHeader>(row.get(row.column_index(blob_index)?)?)?;
         let SignedHeader(header, signature) = header;
         let hash: HeaderHash = row.get(row.column_index(hash_index)?)?;
         let header = HeaderHashed::with_pre_hashed(header, hash);
@@ -605,7 +617,7 @@ pub fn row_blob_to_header(
     blob_index: &'static str,
 ) -> impl Fn(&Row) -> StateQueryResult<SignedHeaderHashed> {
     move |row| {
-        let header = from_blob::<SignedHeader>(row.get(row.column_index(blob_index)?)?);
+        let header = from_blob::<SignedHeader>(row.get(row.column_index(blob_index)?)?)?;
         let SignedHeader(header, signature) = header;
         let header = HeaderHashed::from_content_sync(header);
         let shh = SignedHeaderHashed::with_presigned(header, signature);
@@ -614,13 +626,13 @@ pub fn row_blob_to_header(
 }
 
 /// Serialize a value to be stored in a database as a BLOB type
-pub fn to_blob<T: Serialize + std::fmt::Debug>(t: T) -> Vec<u8> {
-    holochain_serialized_bytes::encode(&t).unwrap()
+pub fn to_blob<T: Serialize + std::fmt::Debug>(t: T) -> StateQueryResult<Vec<u8>> {
+    Ok(holochain_serialized_bytes::encode(&t)?)
 }
 
 /// Deserialize a BLOB from a database into a value
-pub fn from_blob<T: DeserializeOwned + std::fmt::Debug>(blob: Vec<u8>) -> T {
-    holochain_serialized_bytes::decode(&blob).unwrap()
+pub fn from_blob<T: DeserializeOwned + std::fmt::Debug>(blob: Vec<u8>) -> StateQueryResult<T> {
+    Ok(holochain_serialized_bytes::decode(&blob)?)
 }
 
 /// Fetch an Entry from a DB by its hash. Requires no joins.
@@ -645,6 +657,6 @@ pub fn get_entry_from_db(
     if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &entry {
         Ok(None)
     } else {
-        Ok(Some(entry?))
+        Ok(Some(entry??))
     }
 }
