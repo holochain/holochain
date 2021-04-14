@@ -74,5 +74,5 @@ async fn test_cell_handle_publish() {
     workspace.op_exists(&op_hash).unwrap();
 
     stop_tx.send(()).unwrap();
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }

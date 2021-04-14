@@ -28,13 +28,9 @@ async fn connect(
     let addr = bind.bound_url().await?;
     tracing::warn!("got bind: {}", addr);
 
-    let (bind, mut evt) = spawn_kitsune_proxy_listener(
-        proxy_config,
-        Arc::new(KitsuneP2pTuningParams::default()),
-        bind,
-        evt,
-    )
-    .await?;
+    let (bind, mut evt) =
+        spawn_kitsune_proxy_listener(proxy_config, KitsuneP2pTuningParams::default(), bind, evt)
+            .await?;
     let addr = bind.bound_url().await?;
     tracing::warn!("got proxy: {}", addr);
 

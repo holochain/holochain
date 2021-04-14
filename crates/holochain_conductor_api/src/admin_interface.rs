@@ -41,7 +41,7 @@ pub enum AdminRequest {
     /// "Clone" a DNA (in the biological sense), thus creating a new Cell.
     ///
     /// Using the provided, already-registered DNA, create a new DNA with a unique
-    /// UUID and the specified properties, create a new Cell from this cloned DNA,
+    /// UID and the specified properties, create a new Cell from this cloned DNA,
     /// and add the Cell to the specified App.
     ///
     /// Will be responded to with an [`AdminResponse::DnaCloned`]

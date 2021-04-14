@@ -5,7 +5,9 @@
 pub mod dependencies {
     pub use ::futures;
     pub use ::ghost_actor;
+    pub use ::lair_keystore_api;
     pub use ::paste;
+    pub use ::rustls;
     pub use ::serde;
     pub use ::serde_json;
     pub use ::thiserror;
@@ -13,6 +15,9 @@ pub mod dependencies {
     pub use ::url2;
 }
 
+pub use ::lair_keystore_api::actor::CertDigest;
+
+use config::KitsuneP2pTuningParams;
 use std::sync::Arc;
 
 /// Error related to remote communication.
@@ -36,6 +41,25 @@ pub enum KitsuneErrorKind {
     Other(Box<dyn std::error::Error + Send + Sync>),
 }
 
+impl PartialEq for KitsuneErrorKind {
+    fn eq(&self, oth: &Self) -> bool {
+        match self {
+            Self::TimedOut => {
+                if let Self::TimedOut = oth {
+                    return true;
+                }
+            }
+            Self::Closed => {
+                if let Self::Closed = oth {
+                    return true;
+                }
+            }
+            _ => (),
+        }
+        false
+    }
+}
+
 /// Error related to remote communication.
 #[derive(Clone, Debug)]
 pub struct KitsuneError(pub Arc<KitsuneErrorKind>);
@@ -49,6 +73,11 @@ impl std::fmt::Display for KitsuneError {
 impl std::error::Error for KitsuneError {}
 
 impl KitsuneError {
+    /// the "kind" of this KitsuneError
+    pub fn kind(&self) -> &KitsuneErrorKind {
+        &self.0
+    }
+
     /// promote a custom error type to a KitsuneError
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
         Self(Arc::new(KitsuneErrorKind::Other(e.into())))
@@ -104,6 +133,7 @@ pub mod codec;
 pub mod config;
 pub mod dht_arc;
 pub mod metrics;
+pub mod tls;
 pub mod transport;
 pub mod transport_mem;
 pub mod transport_pool;

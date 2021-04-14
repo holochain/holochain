@@ -4,6 +4,13 @@ use crate::conductor::error::ConductorError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
+pub enum ShutdownError {
+    #[error("Conductor has exited due to an unrecoverable error {0}")]
+    Unrecoverable(ManagedTaskError),
+    #[error("Task manager failed to start")]
+    TaskManagerFailedToStart,
+}
+#[derive(Error, Debug)]
 pub enum ManagedTaskError {
     #[error(transparent)]
     Conductor(#[from] ConductorError),
@@ -19,3 +26,5 @@ pub enum ManagedTaskError {
 }
 
 pub type ManagedTaskResult = Result<(), ManagedTaskError>;
+
+pub type ShutdownResult = Result<(), ShutdownError>;

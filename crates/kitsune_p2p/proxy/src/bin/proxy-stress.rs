@@ -9,7 +9,6 @@ use kitsune_p2p_types::{
     transport::*,
     transport_mem::*,
 };
-use std::sync::Arc;
 use structopt::StructOpt;
 
 /// Proxy transport selector
@@ -91,7 +90,7 @@ async fn gen_proxy_con(
     );
     spawn_kitsune_proxy_listener(
         proxy_config,
-        Arc::new(KitsuneP2pTuningParams::default()),
+        KitsuneP2pTuningParams::default(),
         listener,
         events,
     )
@@ -110,7 +109,7 @@ async fn gen_cli_con(
         ProxyConfig::remote_proxy_client(TlsConfig::new_ephemeral().await?, proxy_url.into());
     spawn_kitsune_proxy_listener(
         proxy_config,
-        Arc::new(KitsuneP2pTuningParams::default()),
+        KitsuneP2pTuningParams::default(),
         listener,
         events,
     )

@@ -130,6 +130,13 @@ impl ProxyUrl {
         Ok(Self { full, base })
     }
 
+    /// Extract the cert digest from the url
+    pub fn digest(&self) -> CertDigest {
+        let digest =
+            base64::decode_config(self.full.host_str().unwrap(), base64::URL_SAFE_NO_PAD).unwrap();
+        digest.into()
+    }
+
     /// Get a short-hash / first six characters of tls digest for logging
     pub fn short(&self) -> &str {
         let h = self.full.host_str().unwrap();
