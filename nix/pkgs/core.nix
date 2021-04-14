@@ -13,13 +13,8 @@ rec {
     export RUST_BACKTRACE=1
 
     # limit parallel jobs to reduce memory consumption
-    # export NUM_JOBS=8
-    # export CARGO_BUILD_JOBS=8
-
-    # FIXME: When introducing SQLCipher, reducing the number of jobs was the only way I could get tests to pass.
-    #        With any parallelism, we saw flaky tests, particularly when running `call_test_ribosome`
-    export NUM_JOBS=1
-    export CARGO_BUILD_JOBS=1
+    export NUM_JOBS=8
+    export CARGO_BUILD_JOBS=8
 
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
