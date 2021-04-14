@@ -119,15 +119,24 @@ pub mod tuning_params_struct {
         /// [Default: 3]
         tx2_channel_count_per_connection: usize = 3,
 
-        /// tx2 read-side timeout
+        /// tx2 timeout used for passive background operations
+        /// like reads / responds.
         /// [Default: 30 seconds]
-        tx2_read_timeout_ms: u32 = 1000 * 30,
+        tx2_implicit_timeout_ms: u32 = 1000 * 30,
 
         /// tx2 initial connect retry delay
         /// (note, this delay is currenty exponentially backed off--
         /// multiplied by 2x on every loop)
         /// [Default: 200 ms]
         tx2_initial_connect_retry_delay_ms: usize = 200,
+    }
+
+    impl KitsuneP2pTuningParams {
+        /// Generate a KitsuneTimeout instance
+        /// based on the tuning parameter tx2_implicit_timeout_ms
+        pub fn implicit_timeout(&self) -> crate::KitsuneTimeout {
+            crate::KitsuneTimeout::from_millis(self.tx2_implicit_timeout_ms as u64)
+        }
     }
 }
 

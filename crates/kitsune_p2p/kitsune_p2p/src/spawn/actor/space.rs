@@ -118,6 +118,7 @@ impl gossip::GossipEventHandler for Space {
             let ep_hnd = self.ep_hnd.clone();
             let evt_sender = self.evt_sender.clone();
             let space = self.space.clone();
+            let timeout = self.config.tuning_params.implicit_timeout();
             Ok(async move {
                 // see if we have an entry for this agent in our agent_store
                 let info = match evt_sender
@@ -141,12 +142,8 @@ impl gossip::GossipEventHandler for Space {
                 );
                 let info = types::agent_store::AgentInfo::try_from(&info)?;
                 let url = info.as_urls_ref().get(0).unwrap().clone();
-                let con_hnd = ep_hnd
-                    .get_connection(url, KitsuneTimeout::from_millis(1000 * 30))
-                    .await?;
-                let read = con_hnd
-                    .request(&data, KitsuneTimeout::from_millis(1000 * 30))
-                    .await?;
+                let con_hnd = ep_hnd.get_connection(url, timeout).await?;
+                let read = con_hnd.request(&data, timeout).await?;
                 match read {
                     wire::Wire::Failure(wire::Failure { reason }) => Err(reason.into()),
                     wire::Wire::FetchOpHashesResponse(wire::FetchOpHashesResponse {
@@ -178,6 +175,7 @@ impl gossip::GossipEventHandler for Space {
             let ep_hnd = self.ep_hnd.clone();
             let evt_sender = self.evt_sender.clone();
             let space = self.space.clone();
+            let timeout = self.config.tuning_params.implicit_timeout();
             Ok(async move {
                 // see if we have an entry for this agent in our agent_store
                 let info = match evt_sender
@@ -194,12 +192,8 @@ impl gossip::GossipEventHandler for Space {
                     wire::Wire::fetch_op_data(space, from_agent, to_agent, op_hashes, peer_hashes);
                 let info = types::agent_store::AgentInfo::try_from(&info)?;
                 let url = info.as_urls_ref().get(0).unwrap().clone();
-                let con_hnd = ep_hnd
-                    .get_connection(url, KitsuneTimeout::from_millis(1000 * 30))
-                    .await?;
-                let read = con_hnd
-                    .request(&data, KitsuneTimeout::from_millis(1000 * 30))
-                    .await?;
+                let con_hnd = ep_hnd.get_connection(url, timeout).await?;
+                let read = con_hnd.request(&data, timeout).await?;
                 match read {
                     wire::Wire::Failure(wire::Failure { reason }) => Err(reason.into()),
                     wire::Wire::FetchOpDataResponse(wire::FetchOpDataResponse {
@@ -231,6 +225,7 @@ impl gossip::GossipEventHandler for Space {
             let ep_hnd = self.ep_hnd.clone();
             let evt_sender = self.evt_sender.clone();
             let space = self.space.clone();
+            let timeout = self.config.tuning_params.implicit_timeout();
             Ok(async move {
                 // see if we have an entry for this agent in our agent_store
                 let info = match evt_sender
@@ -252,12 +247,8 @@ impl gossip::GossipEventHandler for Space {
                 );
                 let info = types::agent_store::AgentInfo::try_from(&info)?;
                 let url = info.as_urls_ref().get(0).unwrap().clone();
-                let con_hnd = ep_hnd
-                    .get_connection(url.clone(), KitsuneTimeout::from_millis(1000 * 30))
-                    .await?;
-                let read = con_hnd
-                    .request(&data, KitsuneTimeout::from_millis(1000 * 30))
-                    .await?;
+                let con_hnd = ep_hnd.get_connection(url.clone(), timeout).await?;
+                let read = con_hnd.request(&data, timeout).await?;
                 match read {
                     wire::Wire::Failure(wire::Failure { reason }) => Err(dbg!(reason.into())),
                     wire::Wire::GossipResp(_) => Ok(()),
@@ -647,6 +638,7 @@ impl KitsuneP2pHandler for Space {
             None | Some(0) => self.config.tuning_params.default_rpc_single_timeout_ms as u64,
             _ => timeout_ms.unwrap(),
         };
+        let timeout = KitsuneTimeout::from_millis(timeout_ms);
 
         let discover_fut =
             discover::peer_discover(self, to_agent.clone(), from_agent.clone(), timeout_ms);
@@ -664,9 +656,7 @@ impl KitsuneP2pHandler for Space {
                         to_agent.clone(),
                         payload.into(),
                     );
-                    let res = con_hnd
-                        .request(&payload, KitsuneTimeout::from_millis(1000 * 30))
-                        .await?;
+                    let res = con_hnd.request(&payload, timeout).await?;
                     match res {
                         wire::Wire::Failure(wire::Failure { reason }) => Err(reason.into()),
                         wire::Wire::CallResp(wire::CallResp { data }) => Ok(data.into()),

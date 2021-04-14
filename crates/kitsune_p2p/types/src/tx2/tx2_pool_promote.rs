@@ -94,11 +94,7 @@ async fn in_chan_recv_logic(
                     Ok(c) => c,
                 };
                 loop {
-                    let r = chan
-                        .read(KitsuneTimeout::from_millis(
-                            tuning_params.tx2_read_timeout_ms as u64,
-                        ))
-                        .await;
+                    let r = chan.read(tuning_params.implicit_timeout()).await;
 
                     let (msg_id, data) = match r {
                         Err(e) if *e.kind() == KitsuneErrorKind::Closed => {
@@ -151,12 +147,7 @@ async fn in_chan_recv_logic(
                 Ok(p) => p,
             };
 
-            let writer = match con_item
-                .out_chan(KitsuneTimeout::from_millis(
-                    tuning_params.tx2_read_timeout_ms as u64,
-                ))
-                .await
-            {
+            let writer = match con_item.out_chan(tuning_params.implicit_timeout()).await {
                 Err(e) => {
                     // we were not able to create an outgoing channel
                     // clean up the connection.
