@@ -354,7 +354,6 @@ impl KitsuneP2pActor {
                         }
                         evt => {
                             tracing::error!("UNHANDLED EVENT: {:?}", evt);
-                            println!("UNHANDLED EVENT: {:?}", evt);
                         }
                     }
                 }
