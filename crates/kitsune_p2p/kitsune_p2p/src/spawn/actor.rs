@@ -101,7 +101,7 @@ impl KitsuneP2pActor {
 
         // bind local endpoint
         let ep = f
-            .bind(bind_to, KitsuneTimeout::from_millis(30 * 1000))
+            .bind(bind_to, config.tuning_params.implicit_timeout())
             .await
             .map_err(KitsuneP2pError::other)?;
 
@@ -116,16 +116,14 @@ impl KitsuneP2pActor {
 
             // spawn logic that will attempt to keep us connected to the proxy
             let ep_hnd = ep_hnd.clone();
+            let tuning_params = config.tuning_params.clone();
             tokio::task::spawn(async move {
                 let mut con: Option<Tx2ConHnd<wire::Wire>> = None;
                 loop {
                     // see if we need a new connection to the proxy
                     if con.is_none() || con.as_ref().unwrap().is_closed() {
                         match ep_hnd
-                            .get_connection(
-                                use_proxy.clone(),
-                                KitsuneTimeout::from_millis(30 * 1000),
-                            )
+                            .get_connection(use_proxy.clone(), tuning_params.implicit_timeout())
                             .await
                         {
                             Ok(c) => {
@@ -154,8 +152,10 @@ impl KitsuneP2pActor {
 
         tokio::task::spawn({
             let evt_sender = evt_sender.clone();
+            let tuning_params = config.tuning_params.clone();
             ep.for_each_concurrent(/* limit */ 10, move |event| {
                 let evt_sender = evt_sender.clone();
+                let tuning_params = tuning_params.clone();
                 async move {
                     let evt_sender = &evt_sender;
                     use tx2_api::Tx2EpEvent::*;
@@ -183,10 +183,7 @@ impl KitsuneP2pActor {
                                             let reason = format!("{:?}", err);
                                             let fail = wire::Wire::failure(reason);
                                             let _ = respond
-                                                .respond(
-                                                    fail,
-                                                    KitsuneTimeout::from_millis(1000 * 30),
-                                                )
+                                                .respond(fail, tuning_params.implicit_timeout())
                                                 .await;
                                             return;
                                         }
@@ -194,7 +191,7 @@ impl KitsuneP2pActor {
                                     };
                                     let resp = wire::Wire::call_resp(res.into());
                                     let _ = respond
-                                        .respond(resp, KitsuneTimeout::from_millis(1000 * 30))
+                                        .respond(resp, tuning_params.implicit_timeout())
                                         .await;
                                 }
                                 wire::Wire::Notify(wire::Notify {
@@ -211,13 +208,13 @@ impl KitsuneP2pActor {
                                         let reason = format!("{:?}", err);
                                         let fail = wire::Wire::failure(reason);
                                         let _ = respond
-                                            .respond(fail, KitsuneTimeout::from_millis(1000 * 30))
+                                            .respond(fail, tuning_params.implicit_timeout())
                                             .await;
                                         return;
                                     }
                                     let resp = wire::Wire::notify_resp();
                                     let _ = respond
-                                        .respond(resp, KitsuneTimeout::from_millis(1000 * 30))
+                                        .respond(resp, tuning_params.implicit_timeout())
                                         .await;
                                 }
                                 wire::Wire::FetchOpHashes(wire::FetchOpHashes {
@@ -248,10 +245,7 @@ impl KitsuneP2pActor {
                                             let reason = format!("{:?}", err);
                                             let fail = wire::Wire::failure(reason);
                                             let _ = respond
-                                                .respond(
-                                                    fail,
-                                                    KitsuneTimeout::from_millis(1000 * 30),
-                                                )
+                                                .respond(fail, tuning_params.implicit_timeout())
                                                 .await;
                                             return;
                                         }
@@ -273,7 +267,7 @@ impl KitsuneP2pActor {
                                     let resp =
                                         wire::Wire::fetch_op_hashes_response(hashes, agent_hashes);
                                     let _ = respond
-                                        .respond(resp, KitsuneTimeout::from_millis(1000 * 30))
+                                        .respond(resp, tuning_params.implicit_timeout())
                                         .await;
                                 }
                                 wire::Wire::FetchOpData(wire::FetchOpData {
@@ -295,10 +289,7 @@ impl KitsuneP2pActor {
                                                 let reason = format!("{:?}", err);
                                                 let fail = wire::Wire::failure(reason);
                                                 let _ = respond
-                                                    .respond(
-                                                        fail,
-                                                        KitsuneTimeout::from_millis(1000 * 30),
-                                                    )
+                                                    .respond(fail, tuning_params.implicit_timeout())
                                                     .await;
                                                 return;
                                             }
@@ -309,7 +300,7 @@ impl KitsuneP2pActor {
                                     let resp =
                                         wire::Wire::fetch_op_data_response(op_data, agent_infos);
                                     let _ = respond
-                                        .respond(resp, KitsuneTimeout::from_millis(1000 * 30))
+                                        .respond(resp, tuning_params.implicit_timeout())
                                         .await;
                                 }
                                 wire::Wire::AgentInfoQuery(q) => {
@@ -317,20 +308,14 @@ impl KitsuneP2pActor {
                                         Ok(r) => {
                                             let resp = wire::Wire::agent_info_query_resp(r);
                                             let _ = respond
-                                                .respond(
-                                                    resp,
-                                                    KitsuneTimeout::from_millis(1000 * 30),
-                                                )
+                                                .respond(resp, tuning_params.implicit_timeout())
                                                 .await;
                                         }
                                         Err(err) => {
                                             let reason = format!("{:?}", err);
                                             let fail = wire::Wire::failure(reason);
                                             let _ = respond
-                                                .respond(
-                                                    fail,
-                                                    KitsuneTimeout::from_millis(1000 * 30),
-                                                )
+                                                .respond(fail, tuning_params.implicit_timeout())
                                                 .await;
                                         }
                                     }
@@ -355,13 +340,13 @@ impl KitsuneP2pActor {
                                         tracing::error!("got err: {}", reason);
                                         let fail = wire::Wire::failure(reason);
                                         let _ = respond
-                                            .respond(fail, KitsuneTimeout::from_millis(1000 * 30))
+                                            .respond(fail, tuning_params.implicit_timeout())
                                             .await;
                                         return;
                                     }
                                     let resp = wire::Wire::gossip_resp();
                                     let _ = respond
-                                        .respond(resp, KitsuneTimeout::from_millis(1000 * 30))
+                                        .respond(resp, tuning_params.implicit_timeout())
                                         .await;
                                 }
                                 data => unimplemented!("{:?}", data),

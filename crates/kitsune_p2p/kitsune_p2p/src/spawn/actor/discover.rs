@@ -23,8 +23,11 @@ pub(crate) fn peer_discover(
     space: &mut Space,
     to_agent: Arc<KitsuneAgent>,
     from_agent: Arc<KitsuneAgent>,
+    // TODO - FIXME - upgrade to KitsuneTimeout
     timeout_ms: u64,
 ) -> MustBoxFuture<'static, PeerDiscoverResult> {
+    let timeout = KitsuneTimeout::from_millis(timeout_ms);
+
     let i_s = space.i_s.clone();
     let evt_sender = space.evt_sender.clone();
     let ep_hnd = space.ep_hnd.clone();
@@ -33,9 +36,7 @@ pub(crate) fn peer_discover(
     async move {
         // run tx.create_channel an conver success result into our return type
         let try_connect = |url: url2::Url2| async {
-            let con_hnd = ep_hnd
-                .get_connection(url.clone(), KitsuneTimeout::from_millis(1000 * 30))
-                .await?;
+            let con_hnd = ep_hnd.get_connection(url.clone(), timeout).await?;
             KitsuneP2pResult::Ok(PeerDiscoverResult::OkRemote { url, con_hnd })
         };
 
@@ -95,9 +96,7 @@ pub(crate) fn peer_discover(
                         .get(0)
                         .ok_or_else(|| KitsuneP2pError::from("no url"))?
                         .clone();
-                    let con_hnd = ep_hnd
-                        .get_connection(url, KitsuneTimeout::from_millis(1000 * 30))
-                        .await?;
+                    let con_hnd = ep_hnd.get_connection(url, timeout).await?;
 
                     // write the query request
                     let msg = wire::Wire::agent_info_query(
@@ -106,9 +105,7 @@ pub(crate) fn peer_discover(
                         Some(to_agent.clone()),
                         None,
                     );
-                    let res = con_hnd
-                        .request(&msg, KitsuneTimeout::from_millis(1000 * 30))
-                        .await?;
+                    let res = con_hnd.request(&msg, timeout).await?;
 
                     match res {
                         wire::Wire::AgentInfoQueryResp(wire::AgentInfoQueryResp {
@@ -197,6 +194,10 @@ where
     T: 'static + Send,
     F: Fn(Arc<KitsuneAgent>, wire::Wire) -> Result<T, ()> + 'static + Send + Sync,
 {
+    // TODO - FIXME - this maybe we want to init two timeouts here
+    //                for the if any / even if none distinction?
+    let timeout_even_if_none = KitsuneTimeout::from_millis(stage_2_timeout_even_if_none_ms);
+
     let i_s = space.i_s.clone();
     let evt_sender = space.evt_sender.clone();
     let ep_hnd = space.ep_hnd.clone();
@@ -252,8 +253,7 @@ where
                             None => continue,
                             Some(url) => url.clone(),
                         };
-                        let fut =
-                            ep_hnd.get_connection(url, KitsuneTimeout::from_millis(1000 * 30));
+                        let fut = ep_hnd.get_connection(url, timeout_even_if_none);
                         let mut payload = payload.clone();
                         let accept_result_cb = accept_result_cb.clone();
                         let out = out.clone();
@@ -268,9 +268,7 @@ where
                                 }
                                 _ => panic!("cannot message {:?}", payload),
                             }
-                            let res = con_hnd
-                                .request(&payload, KitsuneTimeout::from_millis(1000 * 30))
-                                .await?;
+                            let res = con_hnd.request(&payload, timeout_even_if_none).await?;
                             if let Ok(res) = accept_result_cb(to_agent, res) {
                                 out.lock().await.push(res);
                             }
