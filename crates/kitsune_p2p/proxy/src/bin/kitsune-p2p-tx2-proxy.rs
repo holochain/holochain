@@ -111,7 +111,10 @@ async fn inner() -> KitsuneResult<()> {
 
     let f = QuicBackendAdapt::new(conf).await?;
     let f = tx2_pool_promote(f, tuning_params.clone());
-    let f = tx2_proxy(f, tuning_params);
+    let mut conf = ProxyConfig::default();
+    conf.tuning_params = Some(tuning_params);
+    conf.allow_proxy_fwd = true;
+    let f = tx2_proxy(f, conf)?;
 
     let ep = f
         .bind(opt.bind_to.into(), KitsuneTimeout::from_millis(30 * 1000))

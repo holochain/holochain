@@ -88,7 +88,9 @@ impl KitsuneP2pActor {
         let f = tx2_pool_promote(f, config.tuning_params.clone());
 
         // wrap in proxy
-        let f = tx2_proxy(f, config.tuning_params.clone());
+        let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
+        conf.tuning_params = Some(config.tuning_params.clone());
+        let f = tx2_proxy(f, conf)?;
 
         let metrics = Tx2ApiMetrics::default().set_write_len(|d, l| {
             if let Some(t) = wire::DISC_MAP.get(&d) {

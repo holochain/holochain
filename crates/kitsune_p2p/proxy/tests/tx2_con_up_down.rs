@@ -22,7 +22,9 @@ async fn gen_node() -> Tx2EpHnd<Wire> {
     let conf = QuicConfig::default();
     let f = tx2_quic_adapter(conf).await.unwrap();
     let f = tx2_pool_promote(f, Default::default());
-    let f = tx2_proxy(f, Default::default());
+    let mut conf = ProxyConfig::default();
+    conf.allow_proxy_fwd = true;
+    let f = tx2_proxy(f, conf).unwrap();
     let f = tx2_api::<Wire>(f, Default::default());
 
     let ep = f

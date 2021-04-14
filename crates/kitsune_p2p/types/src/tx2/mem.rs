@@ -16,7 +16,7 @@ use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::atomic;
 
-/// Configuration for QuicBackendAdapt
+/// Configuration for MemBackendAdapt
 #[non_exhaustive]
 pub struct MemConfig {
     /// Tls config

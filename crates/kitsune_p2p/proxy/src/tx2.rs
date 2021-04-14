@@ -15,9 +15,44 @@ use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
 use std::collections::HashMap;
 
+/// Configuration for MemBackendAdapt
+#[non_exhaustive]
+pub struct ProxyConfig {
+    /// Tuning Params
+    /// Default: None = default.
+    pub tuning_params: Option<KitsuneP2pTuningParams>,
+
+    /// If enabled, allow forwarding of messages (proxying)
+    /// Default: false.
+    pub allow_proxy_fwd: bool,
+}
+
+impl Default for ProxyConfig {
+    fn default() -> Self {
+        Self {
+            tuning_params: None,
+            allow_proxy_fwd: false,
+        }
+    }
+}
+
+impl ProxyConfig {
+    /// into inner contents with default application
+    pub fn split(self) -> KitsuneResult<(KitsuneP2pTuningParams, bool)> {
+        let ProxyConfig {
+            tuning_params,
+            allow_proxy_fwd,
+        } = self;
+
+        let tuning_params = tuning_params.unwrap_or_else(KitsuneP2pTuningParams::default);
+
+        Ok((tuning_params, allow_proxy_fwd))
+    }
+}
+
 /// Wrap a tx2 transport pool adapter with proxy logic.
-pub fn tx2_proxy(sub_fact: EpFactory, tuning_params: KitsuneP2pTuningParams) -> EpFactory {
-    ProxyEpFactory::new(sub_fact, tuning_params)
+pub fn tx2_proxy(sub_fact: EpFactory, config: ProxyConfig) -> KitsuneResult<EpFactory> {
+    ProxyEpFactory::new(sub_fact, config)
 }
 
 // -- private -- //
@@ -282,6 +317,7 @@ impl AsEpHnd for ProxyEpHnd {
 
 async fn incoming_evt_logic(
     tuning_params: KitsuneP2pTuningParams,
+    allow_proxy_fwd: bool,
     sub_ep: Ep,
     hnd: Arc<ProxyEpHnd>,
     logic_hnd: LogicChanHandle<EpEvent>,
@@ -304,13 +340,15 @@ async fn incoming_evt_logic(
         .for_each_concurrent(
             tuning_params.tx2_channel_count_per_connection,
             |evt| async {
-                incoming_evt_handle(evt, local_cert.clone(), &hnd, &logic_hnd).await;
+                incoming_evt_handle(allow_proxy_fwd, evt, local_cert.clone(), &hnd, &logic_hnd)
+                    .await;
             },
         )
         .await;
 }
 
 async fn incoming_evt_handle(
+    allow_proxy_fwd: bool,
     evt: EpEvent,
     local_cert: Tx2Cert,
     hnd: &Arc<ProxyEpHnd>,
@@ -393,10 +431,14 @@ async fn incoming_evt_handle(
                         let _ = logic_hnd.emit(evt).await;
                     } else {
                         //println!("data to forward");
-                        let dest = hnd.inner.share_mut(|i, _| {
-                            //println!("ALALA: {:?}", i.in_digest_to_sub_con);
-                            Ok(i.in_digest_to_sub_con.get(&dest_cert).cloned())
-                        });
+                        let dest = if !allow_proxy_fwd {
+                            Err("proxy fwd disallowed".into())
+                        } else {
+                            hnd.inner.share_mut(|i, _| {
+                                //println!("ALALA: {:?}", i.in_digest_to_sub_con);
+                                Ok(i.in_digest_to_sub_con.get(&dest_cert).cloned())
+                            })
+                        };
                         if let Err(e) = match dest {
                             Ok(Some(d_sub_con)) => {
                                 let t = KitsuneTimeout::from_millis(1000 * 30);
@@ -479,7 +521,11 @@ struct ProxyEp {
 }
 
 impl ProxyEp {
-    pub async fn new(sub_ep: Ep, tuning_params: KitsuneP2pTuningParams) -> KitsuneResult<Ep> {
+    pub async fn new(
+        sub_ep: Ep,
+        tuning_params: KitsuneP2pTuningParams,
+        allow_proxy_fwd: bool,
+    ) -> KitsuneResult<Ep> {
         // this isn't something that needs to be configurable,
         // because it's entirely dependent on the code written here
         // we only ever capture a singe logic closure
@@ -491,7 +537,13 @@ impl ProxyEp {
 
         let hnd = ProxyEpHnd::new(sub_ep.handle().clone(), logic_hnd.clone())?;
 
-        let logic = incoming_evt_logic(tuning_params, sub_ep, hnd.clone(), logic_hnd);
+        let logic = incoming_evt_logic(
+            tuning_params,
+            allow_proxy_fwd,
+            sub_ep,
+            hnd.clone(),
+            logic_hnd,
+        );
 
         let l_hnd = logic_chan.handle().clone();
         l_hnd.capture_logic(logic).await?;
@@ -522,16 +574,19 @@ impl AsEp for ProxyEp {
 
 struct ProxyEpFactory {
     tuning_params: KitsuneP2pTuningParams,
+    allow_proxy_fwd: bool,
     sub_fact: EpFactory,
 }
 
 impl ProxyEpFactory {
-    pub fn new(sub_fact: EpFactory, tuning_params: KitsuneP2pTuningParams) -> EpFactory {
+    pub fn new(sub_fact: EpFactory, config: ProxyConfig) -> KitsuneResult<EpFactory> {
+        let (tuning_params, allow_proxy_fwd) = config.split()?;
         let fact: EpFactory = Arc::new(ProxyEpFactory {
             tuning_params,
+            allow_proxy_fwd,
             sub_fact,
         });
-        fact
+        Ok(fact)
     }
 }
 
@@ -543,9 +598,10 @@ impl AsEpFactory for ProxyEpFactory {
     ) -> BoxFuture<'static, KitsuneResult<Ep>> {
         let tuning_params = self.tuning_params.clone();
         let fut = self.sub_fact.bind(bind_spec, timeout);
+        let allow_proxy_fwd = self.allow_proxy_fwd;
         async move {
             let sub_ep = fut.await?;
-            ProxyEp::new(sub_ep, tuning_params).await
+            ProxyEp::new(sub_ep, tuning_params, allow_proxy_fwd).await
         }
         .boxed()
     }
@@ -564,7 +620,9 @@ mod tests {
         let f = tx2_mem_adapter(MemConfig::default()).await.unwrap();
         let f = tx2_pool_promote(f, Default::default());
 
-        let f = tx2_proxy(f, Default::default());
+        let mut conf = ProxyConfig::default();
+        conf.allow_proxy_fwd = true;
+        let f = tx2_proxy(f, conf).unwrap();
 
         let mut ep = f.bind("none:".into(), t).await.unwrap();
         let ephnd = ep.handle().clone();
