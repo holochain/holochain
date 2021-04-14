@@ -26,6 +26,7 @@ const PROXY_TYPE_BYTES: usize = 1;
 const DIGEST_BYTES: usize = 32;
 
 const PROXY_FWD_MSG: u8 = 0x30;
+const PROXY_ROUTE_ERR: u8 = 0xc0;
 
 struct ProxyConHnd {
     uniq: Uniq,
@@ -406,9 +407,17 @@ async fn incoming_evt_handle(
                             }
                             Err(e) => Err(e),
                         } {
-                            // TODO - FIXME - also respond to requestor with
-                            //                an error type.
-                            tracing::error!("Proxy Fwd Error: {:?}", e);
+                            tracing::warn!("Proxy Fwd Error: {:?}", e);
+                            let new_msg_id = if msg_id.is_notify() {
+                                0.into()
+                            } else {
+                                msg_id.as_res()
+                            };
+                            let mut data = PoolBuf::new();
+                            data.extend_from_slice(format!("{:?}", e).as_bytes());
+                            data.prepend_from_slice(&[PROXY_ROUTE_ERR]);
+                            let t = KitsuneTimeout::from_millis(1000 * 30);
+                            let _ = sub_con.write(new_msg_id, data, t).await;
                         }
                     }
                 }
