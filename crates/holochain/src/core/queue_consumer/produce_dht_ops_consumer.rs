@@ -10,9 +10,11 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for Produce_dht_ops workflow
-#[instrument(skip(env, stop, trigger_publish))]
+#[instrument(skip(env, conductor_handle, cell_id, stop, trigger_publish))]
 pub fn spawn_produce_dht_ops_consumer(
     env: EnvironmentWrite,
+    conductor_handle: ConductorHandle,
+    cell_id: CellId,
     mut stop: sync::broadcast::Receiver<()>,
     mut trigger_publish: TriggerSender,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
@@ -29,12 +31,21 @@ pub fn spawn_produce_dht_ops_consumer(
 
             let workspace = ProduceDhtOpsWorkspace::new(env.clone().into())
                 .expect("Could not create Workspace");
-            if let WorkComplete::Incomplete =
-                produce_dht_ops_workflow(workspace, env.clone().into(), &mut trigger_publish)
-                    .await
-                    .expect("Error running Workflow")
+            match produce_dht_ops_workflow(workspace, env.clone().into(), &mut trigger_publish)
+                .await
             {
-                trigger_self.trigger()
+                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
+                Err(err) => {
+                    handle_workflow_error(
+                        conductor_handle.clone(),
+                        cell_id.clone(),
+                        err,
+                        "produce_dht_ops failure",
+                    )
+                    .await?;
+                    break;
+                }
+                _ => (),
             };
         }
         Ok(())

@@ -132,6 +132,7 @@ impl Cell {
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 &env,
                 holochain_p2p_cell.clone(),
+                conductor_handle.clone(),
                 conductor_api.clone(),
                 managed_task_add_sender,
                 managed_task_stop_broadcaster,

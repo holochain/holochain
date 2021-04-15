@@ -9,6 +9,7 @@ mod error;
 pub use error::*;
 
 use futures::stream::FuturesUnordered;
+use holochain_zome_types::CellId;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::Context;
@@ -19,14 +20,16 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tracing::*;
 
+use super::{conductor::StopBroadcaster, handle::ConductorHandleT, ConductorHandle};
+
 const CHANNEL_SIZE: usize = 1000;
 
 /// For a task to be "managed" simply means that it will shut itself down
 /// when it receives a message on the the "stop" channel passed in
 pub(crate) type ManagedTaskHandle = JoinHandle<ManagedTaskResult>;
-pub(crate) type TaskManagerRunHandle = JoinHandle<ShutdownResult>;
+pub(crate) type TaskManagerRunHandle = JoinHandle<TaskManagerResult>;
 
-pub(crate) type OnDeath = Box<dyn Fn(ManagedTaskResult) -> TaskOutcome + Send + Sync>;
+pub(crate) type OnDeath = Box<dyn FnOnce(ManagedTaskResult) -> TaskOutcome + Send + Sync>;
 
 /// A message sent to the TaskManager, registering an OnDeath closure to run upon
 /// completion of a task.
@@ -57,7 +60,19 @@ impl ManagedTaskAdd {
                 // Normal shutdown.
                 Ok(_) => TaskOutcome::Ignore,
                 // Task failed.
-                Err(e) => TaskOutcome::ExitConductor(Box::new(e)),
+                Err(e) => TaskOutcome::ShutdownConductor(Box::new(e)),
+            }
+        });
+        Self::new(handle, on_death)
+    }
+
+    pub(crate) fn cell_critical(handle: ManagedTaskHandle, cell_id: CellId) -> Self {
+        let on_death = Box::new(|r| {
+            match r {
+                // Normal shutdown.
+                Ok(_) => TaskOutcome::Ignore,
+                // Task failed.
+                Err(e) => TaskOutcome::RemoveCell(cell_id, Box::new(e)),
             }
         });
         Self::new(handle, on_death)
@@ -92,7 +107,9 @@ pub enum TaskOutcome {
     /// Ignore the exit and do nothing.
     Ignore,
     /// Close the conductor down because this is an unrecoverable error.
-    ExitConductor(Box<ManagedTaskError>),
+    ShutdownConductor(Box<ManagedTaskError>),
+    /// Remove the Cell which caused the panic, but let all other Cells remain.
+    RemoveCell(CellId, Box<ManagedTaskError>),
 }
 
 struct TaskManager {
@@ -106,9 +123,11 @@ impl TaskManager {
     }
 }
 
-pub(crate) fn spawn_task_manager() -> (mpsc::Sender<ManagedTaskAdd>, TaskManagerRunHandle) {
+pub(crate) fn spawn_task_manager(
+    handle: ConductorHandle,
+) -> (mpsc::Sender<ManagedTaskAdd>, TaskManagerRunHandle) {
     let (send, recv) = mpsc::channel(CHANNEL_SIZE);
-    (send, tokio::spawn(run(recv)))
+    (send, tokio::spawn(run(handle, recv)))
 }
 
 /// A super pessimistic task that is just waiting to die
@@ -119,14 +138,17 @@ pub(crate) async fn keep_alive_task(mut die: broadcast::Receiver<()>) -> Managed
     Ok(())
 }
 
-async fn run(mut new_task_channel: mpsc::Receiver<ManagedTaskAdd>) -> ShutdownResult {
+async fn run(
+    handle: ConductorHandle,
+    mut new_task_channel: mpsc::Receiver<ManagedTaskAdd>,
+) -> TaskManagerResult {
     let mut task_manager = TaskManager::new();
     // Need to have at least one item in the stream or it will exit early
     if let Some(new_task) = new_task_channel.recv().await {
         task_manager.stream.push(new_task);
     } else {
         error!("All senders to task manager were dropped before starting");
-        return Err(ShutdownError::TaskManagerFailedToStart);
+        return Err(TaskManagerError::TaskManagerFailedToStart);
     }
     loop {
         tokio::select! {
@@ -136,7 +158,7 @@ async fn run(mut new_task_channel: mpsc::Receiver<ManagedTaskAdd>) -> ShutdownRe
             result = task_manager.stream.next() => match result {
                 Some(TaskOutcome::NewTask(new_task)) => task_manager.stream.push(new_task),
                 Some(TaskOutcome::Ignore) => (),
-                Some(TaskOutcome::ExitConductor(error)) => {
+                Some(TaskOutcome::ShutdownConductor(error)) => {
                     let error = match *error {
                         ManagedTaskError::Join(error) => {
                             match error.try_into_panic() {
@@ -150,7 +172,15 @@ async fn run(mut new_task_channel: mpsc::Receiver<ManagedTaskAdd>) -> ShutdownRe
                         error => error,
                     };
                     error!("Shutting down conductor due to unrecoverable error: {:?}", error);
-                    return Err(ShutdownError::Unrecoverable(error));
+                    return Err(TaskManagerError::Unrecoverable(error));
+                },
+                Some(TaskOutcome::RemoveCell(cell_id, error)) => {
+                    let app_ids = handle.deactivate_apps_with_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
+                    tracing::error!(
+                        "Deactivating the following apps due to an unrecoverable error: {:?}\nError: {:?}",
+                        app_ids,
+                        error
+                    );
                 },
                 None => return Ok(()),
             }
@@ -163,7 +193,7 @@ fn handle_completed_task(on_death: &OnDeath, task_result: ManagedTaskResult) -> 
 }
 
 /// Handle the result of shutting down the main thread.
-pub fn handle_shutdown(result: Result<ShutdownResult, tokio::task::JoinError>) {
+pub fn handle_shutdown(result: Result<TaskManagerResult, tokio::task::JoinError>) {
     let result = result.map_err(|e| {
         error!(
             error = &e as &dyn std::error::Error,
@@ -183,17 +213,64 @@ pub fn handle_shutdown(result: Result<ShutdownResult, tokio::task::JoinError>) {
     }
 }
 
+/// A collection of channels and handles used by the Conductor to talk to the
+/// TaskManager task
+pub struct TaskManagerClient {
+    /// Channel on which to send info about tasks we want to manage
+    task_add_sender: mpsc::Sender<ManagedTaskAdd>,
+
+    /// By sending on this channel,
+    task_stop_broadcaster: StopBroadcaster,
+
+    /// The main task join handle to await on.
+    /// The conductor is intended to live as long as this task does.
+    run_handle: TaskManagerRunHandle,
+}
+
+impl TaskManagerClient {
+    /// Constructor
+    pub fn new(
+        task_add_sender: mpsc::Sender<ManagedTaskAdd>,
+        task_stop_broadcaster: StopBroadcaster,
+        run_handle: TaskManagerRunHandle,
+    ) -> Self {
+        Self {
+            task_add_sender,
+            task_stop_broadcaster,
+            run_handle,
+        }
+    }
+
+    /// Accessor
+    pub fn task_add_sender(&self) -> &mpsc::Sender<ManagedTaskAdd> {
+        &self.task_add_sender
+    }
+
+    /// Accessor
+    pub fn task_stop_broadcaster(&self) -> &StopBroadcaster {
+        &self.task_stop_broadcaster
+    }
+
+    /// Consume self, return the handle to be joined
+    pub fn close(self) -> TaskManagerRunHandle {
+        self.run_handle
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::conductor::error::ConductorError;
+    use crate::conductor::handle::MockConductorHandleT;
     use anyhow::Result;
     use observability;
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn spawn_and_handle_dying_task() -> Result<()> {
         observability::test_run().ok();
-        let (send_task_handle, main_task) = spawn_task_manager();
+        let mock_handle = MockConductorHandleT::new();
+        let (send_task_handle, main_task) = spawn_task_manager(Arc::new(mock_handle));
         let handle = tokio::spawn(async {
             Err(ConductorError::Todo("This task gotta die".to_string()).into())
         });
@@ -226,7 +303,8 @@ mod test {
     async fn unrecoverable_error() {
         observability::test_run().ok();
         let (_tx, rx) = tokio::sync::broadcast::channel(1);
-        let (send_task_handle, main_task) = spawn_task_manager();
+        let mock_handle = MockConductorHandleT::new();
+        let (send_task_handle, main_task) = spawn_task_manager(Arc::new(mock_handle));
         send_task_handle
             .send(ManagedTaskAdd::ignore(tokio::spawn(keep_alive_task(rx))))
             .await
@@ -248,7 +326,8 @@ mod test {
     async fn unrecoverable_panic() {
         observability::test_run().ok();
         let (_tx, rx) = tokio::sync::broadcast::channel(1);
-        let (send_task_handle, main_task) = spawn_task_manager();
+        let mock_handle = MockConductorHandleT::new();
+        let (send_task_handle, main_task) = spawn_task_manager(Arc::new(mock_handle));
         send_task_handle
             .send(ManagedTaskAdd::ignore(tokio::spawn(keep_alive_task(rx))))
             .await

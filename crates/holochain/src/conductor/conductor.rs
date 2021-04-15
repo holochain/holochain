@@ -8,7 +8,6 @@
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
-use super::api::RealAdminInterfaceApi;
 use super::api::RealAppInterfaceApi;
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
@@ -41,6 +40,7 @@ use super::state::ConductorState;
 use super::CellError;
 use super::{api::CellConductorApi, state::AppInterfaceConfig};
 use super::{api::CellConductorApiT, interface::AppInterfaceRuntime};
+use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::cell::Cell;
 use crate::conductor::config::ConductorConfig;
@@ -75,7 +75,6 @@ use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::mpsc;
 use tokio::sync::RwLock;
 use tracing::*;
 
@@ -136,15 +135,8 @@ where
     /// Collection app interface data, keyed by id
     app_interfaces: HashMap<AppInterfaceId, AppInterfaceRuntime>,
 
-    /// Channel on which to send info about tasks we want to manage
-    managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,
-
-    /// By sending on this channel,
-    managed_task_stop_broadcaster: StopBroadcaster,
-
-    /// The main task join handle to await on.
-    /// The conductor is intended to live as long as this task does.
-    task_manager_run_handle: Option<TaskManagerRunHandle>,
+    /// The channels and handles needed to interact with the task_manager task.
+    task_manager: Option<TaskManagerClient>,
 
     /// Placeholder for what will be the real DNA/Wasm cache
     dna_store: DS,
@@ -218,21 +210,24 @@ where
     /// `take_shutdown_handle` to await for completion.
     pub(super) fn shutdown(&mut self) {
         self.shutting_down = true;
-        tracing::info!(
-            "Sending shutdown signal to {} managed tasks.",
-            self.managed_task_stop_broadcaster.receiver_count(),
-        );
-        self.managed_task_stop_broadcaster
-            .send(())
-            .map(|_| ())
-            .unwrap_or_else(|e| {
-                error!(?e, "Couldn't broadcast stop signal to managed tasks!");
-            })
+        if let Some(manager) = &self.task_manager {
+            tracing::info!(
+                "Sending shutdown signal to {} managed tasks.",
+                manager.task_stop_broadcaster().receiver_count(),
+            );
+            manager
+                .task_stop_broadcaster()
+                .send(())
+                .map(|_| ())
+                .unwrap_or_else(|e| {
+                    error!(?e, "Couldn't broadcast stop signal to managed tasks!");
+                })
+        }
     }
 
     /// Return the handle which waits for the task manager task to complete
     pub(super) fn take_shutdown_handle(&mut self) -> Option<TaskManagerRunHandle> {
-        self.task_manager_run_handle.take()
+        self.task_manager.take().map(|manager| manager.close())
     }
 
     /// Spawn all admin interface tasks, register them with the TaskManager,
@@ -246,7 +241,12 @@ where
         DS: DnaStore + 'static,
     {
         let admin_api = RealAdminInterfaceApi::new(handle);
-        let stop_tx = self.managed_task_stop_broadcaster.clone();
+        let stop_tx = self
+            .task_manager
+            .as_ref()
+            .expect("Task manager not started yet")
+            .task_stop_broadcaster()
+            .clone();
 
         // Closure to process each admin config item
         let spawn_from_config = |AdminInterfaceConfig { driver, .. }| {
@@ -325,7 +325,12 @@ where
         // This receiver is thrown away because we can produce infinite new
         // receivers from the Sender
         let (signal_tx, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
-        let stop_rx = self.managed_task_stop_broadcaster.subscribe();
+        let stop_rx = self
+            .task_manager
+            .as_ref()
+            .expect("Task manager not initialized")
+            .task_stop_broadcaster()
+            .subscribe();
         let (port, task) = spawn_app_interface_task(port, app_api, signal_tx.clone(), stop_rx)
             .await
             .map_err(Box::new)?;
@@ -489,6 +494,10 @@ where
         // Data required to create apps
         let root_env_dir = self.root_env_dir.clone();
         let keystore = self.keystore.clone();
+        let task_manager = self
+            .task_manager
+            .as_ref()
+            .expect("Task manager not initialized");
 
         // Closure for creating all cells in an app
         let tasks = active_apps.into_iter().map(
@@ -533,8 +542,8 @@ where
                                 conductor_handle.clone(),
                                 env,
                                 holochain_p2p_cell,
-                                self.managed_task_add_sender.clone(),
-                                self.managed_task_stop_broadcaster.clone(),
+                                task_manager.task_add_sender().clone(),
+                                task_manager.task_stop_broadcaster().clone(),
                             )
                             .await
                         },
@@ -834,6 +843,19 @@ where
         Ok(active_apps.keys().cloned().collect())
     }
 
+    pub(super) async fn list_active_apps_for_cell_id(
+        &self,
+        cell_id: &CellId,
+    ) -> ConductorResult<Vec<InstalledAppId>> {
+        let active_apps = self.get_state().await?.active_apps;
+        Ok(active_apps
+            .iter()
+            .filter(|(_, v)| v.all_cells().find(|i| *i == cell_id).is_some())
+            .map(|(k, _)| k)
+            .cloned()
+            .collect())
+    }
+
     pub(super) async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.env();
@@ -907,9 +929,7 @@ where
         holochain_p2p: holochain_p2p::HolochainP2pRef,
     ) -> ConductorResult<Self> {
         let db: SingleStore = env.get_db(&db::CONDUCTOR_STATE)?;
-        let (task_tx, task_manager_run_handle) = spawn_task_manager();
-        let task_manager_run_handle = Some(task_manager_run_handle);
-        let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);
+
         Ok(Self {
             env,
             wasm_env,
@@ -918,15 +938,27 @@ where
             cells: HashMap::new(),
             shutting_down: false,
             app_interfaces: HashMap::new(),
-            managed_task_add_sender: task_tx,
-            managed_task_stop_broadcaster: stop_tx,
-            task_manager_run_handle,
+            task_manager: None,
             admin_websocket_ports: Vec::new(),
             dna_store,
             keystore,
             root_env_dir,
             holochain_p2p,
         })
+    }
+
+    pub(super) async fn start_task_manager(
+        &mut self,
+        handle: ConductorHandle,
+    ) -> ConductorResult<()> {
+        let (task_add_sender, run_handle) = spawn_task_manager(handle);
+        let (task_stop_broadcaster, _) = tokio::sync::broadcast::channel::<()>(1);
+        self.task_manager = Some(TaskManagerClient::new(
+            task_add_sender,
+            task_stop_broadcaster,
+            run_handle,
+        ));
+        Ok(())
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
@@ -968,7 +1000,10 @@ where
 
     /// Sends a JoinHandle to the TaskManager task to be managed
     async fn manage_task(&mut self, handle: ManagedTaskAdd) -> ConductorResult<()> {
-        self.managed_task_add_sender
+        self.task_manager
+            .as_ref()
+            .expect("Task manager not initialized")
+            .task_add_sender()
             .send(handle)
             .await
             .map_err(|e| ConductorError::SubmitTaskError(format!("{}", e)))
@@ -1150,7 +1185,7 @@ mod builder {
             }
 
             // Create app interfaces
-            handle.clone().startup_app_interfaces().await?;
+            handle.clone().initialize_with_handle().await?;
 
             handle.print_setup().await;
 

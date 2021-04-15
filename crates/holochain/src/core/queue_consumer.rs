@@ -33,6 +33,7 @@ use futures::future::Either;
 use holochain_lmdb::env::EnvironmentWrite;
 use holochain_lmdb::env::WriteManager;
 use holochain_lmdb::prelude::Writer;
+use holochain_zome_types::CellId;
 use tokio::sync;
 use tokio::sync::mpsc;
 
@@ -48,11 +49,13 @@ use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
 use validation_receipt_consumer::*;
 mod validation_receipt_consumer;
-use crate::conductor::api::CellConductorApiT;
-use crate::conductor::manager::ManagedTaskAdd;
-use holochain_p2p::HolochainP2pCell;
+use crate::conductor::{api::CellConductorApiT, manager::ManagedTaskResult};
+use crate::conductor::{manager::ManagedTaskAdd, ConductorHandle};
+use holochain_p2p::*;
 use holochain_state::workspace::WorkspaceError;
 use publish_dht_ops_consumer::*;
+
+use super::workflow::error::WorkflowError;
 
 /// Spawns several long-running tasks which are responsible for processing work
 /// which shows up on various databases.
@@ -62,21 +65,30 @@ use publish_dht_ops_consumer::*;
 pub async fn spawn_queue_consumer_tasks(
     env: &EnvironmentWrite,
     cell_network: HolochainP2pCell,
+    conductor_handle: ConductorHandle,
     conductor_api: impl CellConductorApiT + 'static,
     task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
     stop: sync::broadcast::Sender<()>,
 ) -> (QueueTriggers, InitialQueueTriggers) {
     // Publish
-    let (tx_publish, handle) =
-        spawn_publish_dht_ops_consumer(env.clone(), stop.subscribe(), cell_network.clone());
+    let (tx_publish, handle) = spawn_publish_dht_ops_consumer(
+        env.clone(),
+        conductor_handle.clone(),
+        stop.subscribe(),
+        cell_network.clone(),
+    );
     task_sender
         .send(ManagedTaskAdd::unrecoverable(handle))
         .await
         .expect("Failed to manage workflow handle");
 
     // Validation Receipt
-    let (tx_receipt, handle) =
-        spawn_validation_receipt_consumer(env.clone(), stop.subscribe(), cell_network.clone());
+    let (tx_receipt, handle) = spawn_validation_receipt_consumer(
+        env.clone(),
+        conductor_handle.clone(),
+        stop.subscribe(),
+        cell_network.clone(),
+    );
     task_sender
         .send(ManagedTaskAdd::unrecoverable(handle))
         .await
@@ -87,6 +99,8 @@ pub async fn spawn_queue_consumer_tasks(
     // Integration
     let (tx_integration, handle) = spawn_integrate_dht_ops_consumer(
         env.clone(),
+        conductor_handle.clone(),
+        cell_network.cell_id(),
         stop.subscribe(),
         get_tx_sys,
         tx_receipt.clone(),
@@ -99,6 +113,7 @@ pub async fn spawn_queue_consumer_tasks(
     // App validation
     let (tx_app, handle) = spawn_app_validation_consumer(
         env.clone(),
+        conductor_handle.clone(),
         stop.subscribe(),
         tx_integration.clone(),
         conductor_api.clone(),
@@ -112,9 +127,10 @@ pub async fn spawn_queue_consumer_tasks(
     // Sys validation
     let (tx_sys, handle) = spawn_sys_validation_consumer(
         env.clone(),
+        conductor_handle.clone(),
         stop.subscribe(),
         tx_app.clone(),
-        cell_network,
+        cell_network.clone(),
         conductor_api,
     );
     task_sender
@@ -126,8 +142,13 @@ pub async fn spawn_queue_consumer_tasks(
     }
 
     // Produce
-    let (tx_produce, handle) =
-        spawn_produce_dht_ops_consumer(env.clone(), stop.subscribe(), tx_publish.clone());
+    let (tx_produce, handle) = spawn_produce_dht_ops_consumer(
+        env.clone(),
+        conductor_handle.clone(),
+        cell_network.cell_id(),
+        stop.subscribe(),
+        tx_publish.clone(),
+    );
     task_sender
         .send(ManagedTaskAdd::unrecoverable(handle))
         .await
@@ -327,4 +348,20 @@ async fn next_job_or_exit(
     } else {
         Job::Run
     }
+}
+
+async fn handle_workflow_error(
+    conductor: ConductorHandle,
+    cell_id: CellId,
+    err: WorkflowError,
+    reason: &str,
+) -> ManagedTaskResult {
+    let app_ids = conductor.deactivate_apps_with_cell_id(&cell_id).await?;
+    tracing::error!(
+        "Deactivating the following apps: {:?}\nReason: {}\nError: {:?}",
+        app_ids,
+        reason,
+        err
+    );
+    Ok(())
 }

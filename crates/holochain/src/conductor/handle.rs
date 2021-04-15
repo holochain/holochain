@@ -99,7 +99,7 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Start up persisted app interfaces.
     /// Should only be run once at Conductor initialization.
-    async fn startup_app_interfaces(self: Arc<Self>) -> ConductorResult<()>;
+    async fn initialize_with_handle(self: Arc<Self>) -> ConductorResult<()>;
 
     /// Add an app interface
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16>;
@@ -203,6 +203,20 @@ pub trait ConductorHandleT: Send + Sync {
     /// List Active AppIds
     async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
 
+    /// Get the IDs of all active installed Apps which use this Cell
+    async fn list_active_apps_for_cell_id(
+        &self,
+        cell_id: &CellId,
+    ) -> ConductorResult<Vec<InstalledAppId>>;
+
+    /// Deactivate all apps which touch the specified CellId.
+    /// Used when a Cell causes an unrecoverable error, to allow other Cells
+    /// to continue functioning.
+    async fn deactivate_apps_with_cell_id(
+        &self,
+        cell_id: &CellId,
+    ) -> ConductorResult<Vec<InstalledAppId>>;
+
     /// Dump the cells state
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
@@ -280,13 +294,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
     }
 
-    async fn startup_app_interfaces(self: Arc<Self>) -> ConductorResult<()> {
-        let _ = self
-            .conductor
-            .write()
-            .await
+    async fn initialize_with_handle(self: Arc<Self>) -> ConductorResult<()> {
+        let mut conductor = self.conductor.write().await;
+        conductor
             .startup_app_interfaces_via_handle(self.clone())
             .await?;
+        conductor.start_task_manager(self.clone()).await?;
         Ok(())
     }
 
@@ -613,6 +626,28 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
         self.conductor.read().await.list_active_apps().await
+    }
+
+    async fn list_active_apps_for_cell_id(
+        &self,
+        cell_id: &CellId,
+    ) -> ConductorResult<Vec<InstalledAppId>> {
+        self.conductor
+            .read()
+            .await
+            .list_active_apps_for_cell_id(cell_id)
+            .await
+    }
+
+    async fn deactivate_apps_with_cell_id(
+        &self,
+        cell_id: &CellId,
+    ) -> ConductorResult<Vec<InstalledAppId>> {
+        let app_ids = self.list_active_apps_for_cell_id(&cell_id).await?;
+        for app_id in app_ids.iter() {
+            self.deactivate_app(app_id.to_owned()).await?;
+        }
+        Ok(app_ids)
     }
 
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {

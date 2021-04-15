@@ -11,9 +11,10 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for validation receipt workflow
-#[instrument(skip(env, stop, cell_network))]
+#[instrument(skip(env, conductor_handle, stop, cell_network))]
 pub fn spawn_validation_receipt_consumer(
     env: EnvironmentWrite,
+    conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
     mut cell_network: HolochainP2pCell,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
@@ -32,12 +33,21 @@ pub fn spawn_validation_receipt_consumer(
             // Run the workflow
             let workspace = ValidationReceiptWorkspace::new(env.clone().into())
                 .expect("Could not create ValidationReceiptWorkspace");
-            if let WorkComplete::Incomplete =
-                validation_receipt_workflow(workspace, env.clone().into(), &mut cell_network)
-                    .await
-                    .expect("Error running validation receipt workflow")
+            match validation_receipt_workflow(workspace, env.clone().into(), &mut cell_network)
+                .await
             {
-                trigger_self.trigger()
+                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
+                Err(err) => {
+                    handle_workflow_error(
+                        conductor_handle.clone(),
+                        cell_network.cell_id(),
+                        err,
+                        "validation_receipt_workflow failure",
+                    )
+                    .await?;
+                    break;
+                }
+                _ => (),
             };
         }
         Ok(())
