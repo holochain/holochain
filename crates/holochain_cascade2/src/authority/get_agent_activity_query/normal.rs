@@ -11,18 +11,12 @@ use crate::authority::*;
 #[derive(Debug, Clone)]
 pub struct GetAgentActivityQuery {
     agent: AgentPubKey,
-    filter: Filter,
+    filter: ChainQueryFilter,
     options: GetActivityOptions,
 }
 
 impl GetAgentActivityQuery {
     pub fn new(agent: AgentPubKey, filter: ChainQueryFilter, options: GetActivityOptions) -> Self {
-        let filter = Filter {
-            start: filter.sequence_range.clone().map(|r| r.start),
-            end: filter.sequence_range.clone().map(|r| r.end),
-            header_type: filter.header_type,
-            entry_type: filter.entry_type,
-        };
         Self {
             agent,
             filter,
@@ -31,26 +25,18 @@ impl GetAgentActivityQuery {
     }
 }
 
-#[derive(Debug, Clone)]
-struct Filter {
-    start: Option<u32>,
-    end: Option<u32>,
-    header_type: Option<HeaderType>,
-    entry_type: Option<EntryType>,
-}
-
 #[derive(Debug, Default)]
 pub struct State {
-    valid: Vec<(u32, HeaderHash)>,
-    rejected: Vec<(u32, HeaderHash)>,
-    pending: Vec<(u32, HeaderHash)>,
+    valid: Vec<HeaderHashed>,
+    rejected: Vec<HeaderHashed>,
+    pending: Vec<HeaderHashed>,
     status: Option<ChainStatus>,
 }
 
 #[derive(Debug)]
 pub enum Item {
-    Integrated((u32, HeaderHash)),
-    Pending((u32, HeaderHash)),
+    Integrated(HeaderHashed),
+    Pending(HeaderHashed),
 }
 
 impl Query for GetAgentActivityQuery {
@@ -60,28 +46,20 @@ impl Query for GetAgentActivityQuery {
 
     fn query(&self) -> String {
         "
-            SELECT Header.hash, DhtOp.validation_status, Header.seq,
+            SELECT Header.hash, DhtOp.validation_status, Header.blob AS header_blob,
             DhtOp.when_integrated
             FROM Header
             JOIN DhtOp ON DhtOp.header_hash = Header.hash
             WHERE Header.author = :author
             AND DhtOp.type = :op_type
-            AND
-            (:range_start IS NULL OR Header.seq >= :range_start)
-            AND
-            (:range_end IS NULL OR Header.seq < :range_end)
             ORDER BY Header.seq ASC 
         "
         .to_string()
-        // AND (:hash_low IS NULL OR H.seq >= (SELECT seq FROM Header WHERE hash = :hash_low))
-        // AND H.seq <= (SELECT seq FROM Header WHERE hash = :hash_high)
     }
 
     fn params(&self) -> Vec<Params> {
         (named_params! {
             ":author": self.agent,
-            ":range_start": self.filter.start,
-            ":range_end": self.filter.end,
             ":op_type": DhtOpType::RegisterAgentActivity,
         })
         .to_vec()
@@ -99,46 +77,52 @@ impl Query for GetAgentActivityQuery {
         Arc::new(move |row| {
             let validation_status: ValidationStatus = row.get("validation_status")?;
             let hash: HeaderHash = row.get("hash")?;
-            let seq: u32 = row.get("seq")?;
-            let integrated: Option<i32> = row.get("when_integrated")?;
-            let item = if integrated.is_some() {
-                Item::Integrated((seq, hash))
-            } else {
-                Item::Pending((seq, hash))
-            };
-            Ok(Judged::new(item, validation_status))
+            let item = from_blob::<SignedHeader>(row.get("header_blob")?).and_then(|header| {
+                let integrated: Option<i32> = row.get("when_integrated")?;
+                let header = HeaderHashed::with_pre_hashed(header.0, hash);
+                let item = if integrated.is_some() {
+                    Item::Integrated(header)
+                } else {
+                    Item::Pending(header)
+                };
+                Ok(Judged::new(item, validation_status))
+            });
+            Ok(item?)
         })
     }
 
     fn fold(&self, mut state: Self::State, item: Self::Item) -> StateQueryResult<Self::State> {
         let status = item.validation_status();
         match (status, item.data) {
-            (Some(ValidationStatus::Valid), Item::Integrated(data)) => {
+            (Some(ValidationStatus::Valid), Item::Integrated(header)) => {
+                let seq = header.header_seq();
                 if state.status.is_none() {
-                    let fork =
-                        state
-                            .valid
-                            .last()
-                            .and_then(|v| if data.0 == v.0 { Some(v) } else { None });
+                    let fork = state.valid.last().and_then(|v| {
+                        if seq == v.header_seq() {
+                            Some(v)
+                        } else {
+                            None
+                        }
+                    });
                     if let Some(fork) = fork {
                         state.status = Some(ChainStatus::Forked(ChainFork {
-                            fork_seq: data.0,
-                            first_header: data.1.clone(),
-                            second_header: fork.1.clone(),
+                            fork_seq: seq,
+                            first_header: header.as_hash().clone(),
+                            second_header: fork.as_hash().clone(),
                         }));
                     }
                 }
 
-                state.valid.push(data);
+                state.valid.push(header);
             }
-            (Some(ValidationStatus::Rejected), Item::Integrated(data)) => {
+            (Some(ValidationStatus::Rejected), Item::Integrated(header)) => {
                 if state.status.is_none() {
                     state.status = Some(ChainStatus::Invalid(ChainHead {
-                        header_seq: data.0,
-                        hash: data.1.clone(),
+                        header_seq: header.header_seq(),
+                        hash: header.as_hash().clone(),
                     }));
                 }
-                state.rejected.push(data);
+                state.rejected.push(header);
             }
             (_, Item::Pending(data)) => state.pending.push(data),
             _ => (),
@@ -156,11 +140,21 @@ impl Query for GetAgentActivityQuery {
         let valid = state.valid;
         let rejected = state.rejected;
         let valid_activity = if self.options.include_valid_activity {
+            let valid = valid
+                .into_iter()
+                .filter(|h| self.filter.check(h.as_content()))
+                .map(|h| (h.header_seq(), h.into_hash()))
+                .collect();
             ChainItems::Hashes(valid)
         } else {
             ChainItems::NotRequested
         };
         let rejected_activity = if self.options.include_rejected_activity {
+            let rejected = rejected
+                .into_iter()
+                .filter(|h| self.filter.check(h.as_content()))
+                .map(|h| (h.header_seq(), h.into_hash()))
+                .collect();
             ChainItems::Hashes(rejected)
         } else {
             ChainItems::NotRequested
@@ -183,8 +177,8 @@ fn compute_chain_status(state: &State) -> ChainStatus {
         } else {
             let last = state.valid.last().expect("Safe due to is_empty check");
             ChainStatus::Valid(ChainHead {
-                header_seq: last.0,
-                hash: last.1.clone(),
+                header_seq: last.header_seq(),
+                hash: last.as_hash().clone(),
             })
         }
     })
@@ -193,33 +187,33 @@ fn compute_chain_status(state: &State) -> ChainStatus {
 fn compute_highest_observed(state: &State) -> Option<HighestObserved> {
     let mut highest_observed = None;
     let mut hashes = Vec::new();
-    let mut check_highest = |i: &(u32, HeaderHash)| {
+    let mut check_highest = |seq: u32, hash: &HeaderHash| {
         if highest_observed.is_none() {
-            highest_observed = Some(i.0);
-            hashes.push(i.1.clone());
+            highest_observed = Some(seq);
+            hashes.push(hash.clone());
         } else {
             let last = highest_observed
                 .as_mut()
                 .expect("Safe due to none check above");
-            match i.0.cmp(last) {
+            match seq.cmp(last) {
                 std::cmp::Ordering::Less => {}
-                std::cmp::Ordering::Equal => hashes.push(i.1.clone()),
+                std::cmp::Ordering::Equal => hashes.push(hash.clone()),
                 std::cmp::Ordering::Greater => {
                     hashes.clear();
-                    hashes.push(i.1.clone());
-                    *last = i.0;
+                    hashes.push(hash.clone());
+                    *last = seq;
                 }
             }
         }
     };
     if let Some(valid) = state.valid.last() {
-        check_highest(valid);
+        check_highest(valid.header_seq(), valid.as_hash());
     }
     if let Some(rejected) = state.rejected.last() {
-        check_highest(rejected);
+        check_highest(rejected.header_seq(), rejected.as_hash());
     }
     if let Some(pending) = state.pending.last() {
-        check_highest(pending);
+        check_highest(pending.header_seq(), pending.as_hash());
     }
     highest_observed.map(|header_seq| HighestObserved {
         header_seq,

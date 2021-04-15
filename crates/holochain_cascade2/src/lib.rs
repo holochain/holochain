@@ -300,6 +300,17 @@ where
         Ok(())
     }
 
+    #[instrument(skip(self, options))]
+    async fn fetch_agent_activity(
+        &mut self,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: GetActivityOptions,
+    ) -> CascadeResult<Vec<AgentActivityResponse<HeaderHash>>> {
+        let network = ok_or_return!(self.network.as_mut(), Vec::with_capacity(0));
+        Ok(network.get_agent_activity(agent, query, options).await?)
+    }
+
     /// Check if this hash has been validated.
     /// Elements can end up in the cache or integrated table because
     /// they were gossiped to you or you authored them.

@@ -6,15 +6,15 @@ use holochain_p2p::actor;
 use holochain_p2p::HolochainP2pError;
 use holochain_state::mutations::set_when_integrated;
 use holochain_state::mutations::update_op_validation_status;
+use holochain_types::activity::AgentActivityResponse;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::env::EnvRead;
 use holochain_types::env::EnvWrite;
 use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::ValidationPackageResponse;
 use holochain_types::timestamp;
-use holochain_zome_types::AgentActivityFilterDeterministic;
-use holochain_zome_types::AgentActivityResponseDeterministic;
 use holochain_zome_types::HeaderHashed;
+use holochain_zome_types::QueryFilter;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::ValidationStatus;
 
@@ -96,9 +96,9 @@ pub trait HolochainP2pCellT2 {
     async fn get_agent_activity(
         &mut self,
         agent: AgentPubKey,
-        query: AgentActivityFilterDeterministic,
+        query: QueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponseDeterministic>>;
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<HeaderHash>>>;
 
     async fn authority_for_hash(
         &mut self,
@@ -171,12 +171,12 @@ impl HolochainP2pCellT2 for PassThroughNetwork {
     async fn get_agent_activity(
         &mut self,
         agent: AgentPubKey,
-        query: AgentActivityFilterDeterministic,
+        query: QueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponseDeterministic>> {
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<HeaderHash>>> {
         let mut out = Vec::new();
         for env in &self.envs {
-            let r = authority::handle_get_agent_activity_deterministic(
+            let r = authority::handle_get_agent_activity(
                 env.clone(),
                 agent.clone(),
                 query.clone(),
@@ -285,9 +285,9 @@ impl HolochainP2pCellT2 for MockNetwork {
     async fn get_agent_activity(
         &mut self,
         agent: AgentPubKey,
-        query: AgentActivityFilterDeterministic,
+        query: QueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponseDeterministic>> {
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<HeaderHash>>> {
         self.0
             .lock()
             .await

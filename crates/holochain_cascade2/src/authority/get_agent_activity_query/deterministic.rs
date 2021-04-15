@@ -1,4 +1,3 @@
-
 use holo_hash::*;
 use holochain_p2p::event::GetActivityOptions;
 use holochain_sqlite::rusqlite::*;
