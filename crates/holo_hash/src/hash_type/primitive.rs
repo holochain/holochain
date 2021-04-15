@@ -69,6 +69,7 @@ macro_rules! primitive_hash_type {
     ($name: ident, $display: ident, $visitor: ident, $prefix: ident) => {
         /// The $name PrimitiveHashType
         #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+        #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
         pub struct $name;
 
         impl PrimitiveHashType for $name {

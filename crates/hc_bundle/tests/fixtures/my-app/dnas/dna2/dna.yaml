@@ -1,7 +1,7 @@
 ---
 manifest_version: "1"
 name: another dna
-uuid: 00000000-0000-0000-0000-000000000000
+uid: 00000000-0000-0000-0000-000000000000
 properties: ~
 zomes:
   - name: zome1
