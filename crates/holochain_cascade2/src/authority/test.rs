@@ -1,9 +1,11 @@
 use super::*;
+use crate::authority::handle_get_agent_activity;
 use crate::test_utils::*;
 use ghost_actor::dependencies::observability;
 use holochain_p2p::actor;
 use holochain_p2p::event::GetRequest;
 use holochain_state::prelude::test_cell_env;
+use holochain_types::activity::ChainItems;
 
 fn options() -> holochain_p2p::event::GetOptions {
     holochain_p2p::event::GetOptions {
@@ -168,5 +170,59 @@ async fn get_links() {
         creates: vec![td.wire_create_link.clone()],
         deletes: vec![td.wire_delete_link.clone()],
     };
+    assert_eq!(result, expected);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn get_agent_activity() {
+    observability::test_run().ok();
+    let env = test_cell_env();
+
+    let td = ActivityTestData::valid_chain_scenario();
+
+    for hash_op in td.hash_ops.iter().cloned() {
+        fill_db(&env.env(), hash_op);
+    }
+    for hash_op in td.noise_ops.iter().cloned() {
+        fill_db(&env.env(), hash_op);
+    }
+
+    let options = actor::GetActivityOptions {
+        include_valid_activity: true,
+        include_rejected_activity: false,
+        include_full_headers: false,
+        ..Default::default()
+    };
+
+    let result = handle_get_agent_activity(
+        env.env().into(),
+        td.agent.clone(),
+        td.query_filter.clone(),
+        (&options).into(),
+    )
+    .unwrap();
+    let mut expected = AgentActivityResponse {
+        agent: td.agent.clone(),
+        valid_activity: td.valid_hashes.clone(),
+        rejected_activity: ChainItems::NotRequested,
+        status: ChainStatus::Valid(td.chain_head.clone()),
+        highest_observed: Some(td.highest_observed.clone()),
+    };
+    assert_eq!(result, expected);
+
+    expected.valid_activity = match expected.valid_activity.clone() {
+        ChainItems::Hashes(v) => ChainItems::Hashes(v.into_iter().take(20).collect()),
+        _ => unreachable!(),
+    };
+
+    let filter = td.query_filter.sequence_range(0..20u32);
+    let result = handle_get_agent_activity(
+        env.env().into(),
+        td.agent.clone(),
+        filter,
+        (&options).into(),
+    )
+    .unwrap();
+
     assert_eq!(result, expected);
 }

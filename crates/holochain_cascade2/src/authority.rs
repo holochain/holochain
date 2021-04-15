@@ -1,7 +1,8 @@
+use self::get_agent_activity_query::normal::GetAgentActivityQuery;
 use self::get_entry_ops_query::GetEntryOpsQuery;
 use self::get_links_ops_query::GetLinksOpsQuery;
 use self::{
-    get_agent_activity_query::GetAgentActivityDeterministicQuery,
+    get_agent_activity_query::deterministic::GetAgentActivityDeterministicQuery,
     get_element_query::GetElementOpsQuery,
 };
 
@@ -69,6 +70,20 @@ pub fn handle_get_element(
 
 #[instrument(skip(env))]
 pub fn handle_get_agent_activity(
+    env: EnvRead,
+    agent: AgentPubKey,
+    query: ChainQueryFilter,
+    options: holochain_p2p::event::GetActivityOptions,
+) -> CascadeResult<AgentActivityResponse<HeaderHash>> {
+    let query = GetAgentActivityQuery::new(agent, query, options);
+    let results = env
+        .conn()?
+        .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;
+    Ok(results)
+}
+
+#[instrument(skip(env))]
+pub fn handle_get_agent_activity_deterministic(
     env: EnvRead,
     agent: AgentPubKey,
     filter: AgentActivityFilterDeterministic,
