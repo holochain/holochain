@@ -39,7 +39,7 @@ async fn direct_validation_test() {
 
     run_test(alice_cell_id, handle.clone()).await;
 
-    let shutdown = handle.take_shutdown_handle().await.unwrap();
+    let shutdown = handle.take_task_manager().await.unwrap();
     handle.shutdown().await;
     shutdown.await.unwrap().unwrap();
 }

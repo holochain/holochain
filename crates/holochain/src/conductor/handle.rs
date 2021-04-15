@@ -85,21 +85,24 @@ pub trait ConductorHandleT: Send + Sync {
     /// Returns error if conductor is shutting down
     async fn check_running(&self) -> ConductorResult<()>;
 
-    /// Add a collection of Admin interfaces and spawn the necessary tasks.
+    /// Initialize the task manager, add admin interfaces from config,
+    /// start up app interfaces from db, and register all tasks.
     ///
     /// This requires a concrete ConductorHandle to be passed into the
     /// interface tasks. This is a bit weird to do, but it was the only way
     /// around having a circular reference in the types.
     ///
     /// Never use a ConductorHandle for different Conductor here!
+    async fn initialize_conductor(
+        self: Arc<Self>,
+        admin_configs: Vec<AdminInterfaceConfig>,
+    ) -> ConductorResult<()>;
+
+    /// Add a collection of admin interfaces from config
     async fn add_admin_interfaces(
         self: Arc<Self>,
         configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<()>;
-
-    /// Start up persisted app interfaces.
-    /// Should only be run once at Conductor initialization.
-    async fn initialize_with_handle(self: Arc<Self>) -> ConductorResult<()>;
 
     /// Add an app interface
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16>;
@@ -153,7 +156,7 @@ pub trait ConductorHandleT: Send + Sync {
     ///
     /// NB: The JoinHandle is not cloneable,
     /// so this can only ever be called successfully once.
-    async fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle>;
+    async fn take_task_manager(&self) -> Option<TaskManagerRunHandle>;
 
     /// Send a signal to all managed tasks asking them to end ASAP.
     async fn shutdown(&self);
@@ -294,12 +297,18 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
     }
 
-    async fn initialize_with_handle(self: Arc<Self>) -> ConductorResult<()> {
+    async fn initialize_conductor(
+        self: Arc<Self>,
+        admin_configs: Vec<AdminInterfaceConfig>,
+    ) -> ConductorResult<()> {
         let mut conductor = self.conductor.write().await;
+        conductor.start_task_manager(self.clone()).await?;
+        conductor
+            .add_admin_interfaces_via_handle(admin_configs, self.clone())
+            .await?;
         conductor
             .startup_app_interfaces_via_handle(self.clone())
             .await?;
-        conductor.start_task_manager(self.clone()).await?;
         Ok(())
     }
 
@@ -429,8 +438,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(())
     }
 
-    async fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle> {
-        self.conductor.write().await.take_shutdown_handle()
+    async fn take_task_manager(&self) -> Option<TaskManagerRunHandle> {
+        self.conductor.write().await.take_task_manager()
     }
 
     async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {

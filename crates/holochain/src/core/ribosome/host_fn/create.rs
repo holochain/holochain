@@ -382,7 +382,7 @@ pub mod wasm_test {
             ZomeCallResponse::Ok(ExternIO::encode(expected).unwrap())
         );
 
-        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        let shutdown = handle.take_task_manager().await.unwrap();
         handle.shutdown().await;
         shutdown.await.unwrap().unwrap();
     }

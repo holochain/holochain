@@ -72,7 +72,7 @@ async fn async_main() {
     // Await on the main JoinHandle, keeping the process alive until all
     // Conductor activity has ceased
     let result = conductor
-        .take_shutdown_handle()
+        .take_task_manager()
         .await
         .expect("The shutdown handle has already been taken.")
         .await;

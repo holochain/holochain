@@ -20,7 +20,7 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tracing::*;
 
-use super::{conductor::StopBroadcaster, handle::ConductorHandleT, ConductorHandle};
+use super::{conductor::StopBroadcaster, ConductorHandle};
 
 const CHANNEL_SIZE: usize = 1000;
 
@@ -29,53 +29,59 @@ const CHANNEL_SIZE: usize = 1000;
 pub(crate) type ManagedTaskHandle = JoinHandle<ManagedTaskResult>;
 pub(crate) type TaskManagerRunHandle = JoinHandle<TaskManagerResult>;
 
-pub(crate) type OnDeath = Box<dyn FnOnce(ManagedTaskResult) -> TaskOutcome + Send + Sync>;
+/// A generic function to run when a task completes
+pub type OnDeath = Box<dyn Fn(ManagedTaskResult) -> TaskOutcome + Send + Sync + 'static>;
 
-/// A message sent to the TaskManager, registering an OnDeath closure to run upon
-/// completion of a task.
-///
-/// The closure may itself return a new ManagedTaskAdd, which will cause another task to be
-/// added while this one is being removed.
+/// The "kind" of a managed task determines how the Result from the task's
+/// completion will be handled.
+pub enum TaskKind {
+    /// Log an error if there is one, but otherwise do nothing.
+    Ignore,
+    /// If the task returns an error, shut down the conductor.
+    Unrecoverable,
+    /// If the task returns an error, "freeze" the cell which caused the error,
+    /// but continue running the rest of the conductor and other managed tasks.
+    CellCritical(CellId),
+    /// A generic callback for handling the result
+    // TODO: B-01455: reevaluate whether this should be a callback
+    Generic(OnDeath),
+}
+
+/// A message sent to the TaskManager, registering an ManagedTask of a given kind.
 pub struct ManagedTaskAdd {
     handle: ManagedTaskHandle,
-    // TODO: B-01455: reevaluate whether this should be a callback
-    on_death: OnDeath,
+    kind: TaskKind,
+    name: String,
 }
 
 impl ManagedTaskAdd {
-    pub(crate) fn new(handle: ManagedTaskHandle, on_death: OnDeath) -> Self {
-        ManagedTaskAdd { handle, on_death }
+    fn new(handle: ManagedTaskHandle, kind: TaskKind, name: &str) -> Self {
+        ManagedTaskAdd {
+            handle,
+            kind,
+            name: name.to_string(),
+        }
     }
 
     /// You just want the task in the task manager but don't want
     /// to react to an error
-    pub(crate) fn ignore(handle: ManagedTaskHandle) -> Self {
-        let on_death = Box::new(|_| TaskOutcome::Ignore);
-        Self::new(handle, on_death)
+    pub fn ignore(handle: ManagedTaskHandle, name: &str) -> Self {
+        Self::new(handle, TaskKind::Ignore, name)
     }
 
-    pub(crate) fn unrecoverable(handle: ManagedTaskHandle) -> Self {
-        let on_death = Box::new(|r| {
-            match r {
-                // Normal shutdown.
-                Ok(_) => TaskOutcome::Ignore,
-                // Task failed.
-                Err(e) => TaskOutcome::ShutdownConductor(Box::new(e)),
-            }
-        });
-        Self::new(handle, on_death)
+    /// If this task fails, the entire conductor must be shut down
+    pub fn unrecoverable(handle: ManagedTaskHandle, name: &str) -> Self {
+        Self::new(handle, TaskKind::Unrecoverable, name)
     }
 
-    pub(crate) fn cell_critical(handle: ManagedTaskHandle, cell_id: CellId) -> Self {
-        let on_death = Box::new(|r| {
-            match r {
-                // Normal shutdown.
-                Ok(_) => TaskOutcome::Ignore,
-                // Task failed.
-                Err(e) => TaskOutcome::RemoveCell(cell_id, Box::new(e)),
-            }
-        });
-        Self::new(handle, on_death)
+    /// If this task fails, only the Cell which it runs under must be stopped
+    pub fn cell_critical(handle: ManagedTaskHandle, cell_id: CellId, name: &str) -> Self {
+        Self::new(handle, TaskKind::CellCritical(cell_id), name)
+    }
+
+    /// Handle a task's completion with a generic callback
+    pub fn generic(handle: ManagedTaskHandle, f: OnDeath) -> Self {
+        Self::new(handle, TaskKind::Generic(f), "unnamed".into())
     }
 }
 
@@ -86,8 +92,9 @@ impl Future for ManagedTaskAdd {
         let p = std::pin::Pin::new(&mut self.handle);
         match JoinHandle::poll(p, cx) {
             Poll::Ready(r) => Poll::Ready(handle_completed_task(
-                &self.on_death,
+                &self.kind,
                 r.unwrap_or_else(|e| Err(e.into())),
+                self.name.clone(),
             )),
             Poll::Pending => Poll::Pending,
         }
@@ -106,10 +113,12 @@ pub enum TaskOutcome {
     NewTask(ManagedTaskAdd),
     /// Ignore the exit and do nothing.
     Ignore,
+    /// Ignore the exit and do nothing.
+    MinorError(ManagedTaskError, String),
     /// Close the conductor down because this is an unrecoverable error.
-    ShutdownConductor(Box<ManagedTaskError>),
+    ShutdownConductor(Box<ManagedTaskError>, String),
     /// Remove the Cell which caused the panic, but let all other Cells remain.
-    RemoveCell(CellId, Box<ManagedTaskError>),
+    FreezeCell(CellId, Box<ManagedTaskError>, String),
 }
 
 struct TaskManager {
@@ -158,7 +167,10 @@ async fn run(
             result = task_manager.stream.next() => match result {
                 Some(TaskOutcome::NewTask(new_task)) => task_manager.stream.push(new_task),
                 Some(TaskOutcome::Ignore) => (),
-                Some(TaskOutcome::ShutdownConductor(error)) => {
+                Some(TaskOutcome::MinorError(error, context)) => {
+                    error!("Minor error during managed task: {:?}\nContext: {}", error, context)
+                }
+                Some(TaskOutcome::ShutdownConductor(error, context)) => {
                     let error = match *error {
                         ManagedTaskError::Join(error) => {
                             match error.try_into_panic() {
@@ -171,15 +183,16 @@ async fn run(
                         }
                         error => error,
                     };
-                    error!("Shutting down conductor due to unrecoverable error: {:?}", error);
+                    error!("Shutting down conductor due to unrecoverable error: {:?}\nContext: {}", error, context);
                     return Err(TaskManagerError::Unrecoverable(error));
                 },
-                Some(TaskOutcome::RemoveCell(cell_id, error)) => {
+                Some(TaskOutcome::FreezeCell(cell_id, error, context)) => {
                     let app_ids = handle.deactivate_apps_with_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
                     tracing::error!(
-                        "Deactivating the following apps due to an unrecoverable error: {:?}\nError: {:?}",
+                        "Deactivating the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
                         app_ids,
-                        error
+                        error,
+                        context
                     );
                 },
                 None => return Ok(()),
@@ -188,8 +201,23 @@ async fn run(
     }
 }
 
-fn handle_completed_task(on_death: &OnDeath, task_result: ManagedTaskResult) -> TaskOutcome {
-    on_death(task_result)
+fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: String) -> TaskOutcome {
+    use TaskOutcome::*;
+    match kind {
+        TaskKind::Ignore => match result {
+            Ok(_) => Ignore,
+            Err(err) => MinorError(err, name),
+        },
+        TaskKind::Unrecoverable => match result {
+            Ok(_) => Ignore,
+            Err(err) => ShutdownConductor(Box::new(err), name),
+        },
+        TaskKind::CellCritical(cell_id) => match result {
+            Ok(_) => Ignore,
+            Err(err) => FreezeCell(cell_id.to_owned(), Box::new(err), name),
+        },
+        TaskKind::Generic(f) => f(result),
+    }
 }
 
 /// Handle the result of shutting down the main thread.
@@ -274,13 +302,13 @@ mod test {
         let handle = tokio::spawn(async {
             Err(ConductorError::Todo("This task gotta die".to_string()).into())
         });
-        let handle = ManagedTaskAdd::new(
+        let handle = ManagedTaskAdd::generic(
             handle,
             Box::new(|result| match result {
                 Ok(_) => panic!("Task should have died"),
                 Err(ManagedTaskError::Conductor(ConductorError::Todo(_))) => {
                     let handle = tokio::spawn(async { Ok(()) });
-                    let handle = ManagedTaskAdd::new(handle, Box::new(|_| TaskOutcome::Ignore));
+                    let handle = ManagedTaskAdd::ignore(handle, "respawned task");
                     TaskOutcome::NewTask(handle)
                 }
                 _ => TaskOutcome::Ignore,
@@ -306,15 +334,21 @@ mod test {
         let mock_handle = MockConductorHandleT::new();
         let (send_task_handle, main_task) = spawn_task_manager(Arc::new(mock_handle));
         send_task_handle
-            .send(ManagedTaskAdd::ignore(tokio::spawn(keep_alive_task(rx))))
+            .send(ManagedTaskAdd::ignore(
+                tokio::spawn(keep_alive_task(rx)),
+                "",
+            ))
             .await
             .unwrap();
 
         send_task_handle
-            .send(ManagedTaskAdd::unrecoverable(tokio::spawn(async {
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                Err(ConductorError::Todo("Unrecoverable task failed".to_string()).into())
-            })))
+            .send(ManagedTaskAdd::unrecoverable(
+                tokio::spawn(async {
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    Err(ConductorError::Todo("Unrecoverable task failed".to_string()).into())
+                }),
+                "",
+            ))
             .await
             .unwrap();
 
@@ -329,15 +363,21 @@ mod test {
         let mock_handle = MockConductorHandleT::new();
         let (send_task_handle, main_task) = spawn_task_manager(Arc::new(mock_handle));
         send_task_handle
-            .send(ManagedTaskAdd::ignore(tokio::spawn(keep_alive_task(rx))))
+            .send(ManagedTaskAdd::ignore(
+                tokio::spawn(keep_alive_task(rx)),
+                "",
+            ))
             .await
             .unwrap();
 
         send_task_handle
-            .send(ManagedTaskAdd::unrecoverable(tokio::spawn(async {
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                panic!("Task has panicked")
-            })))
+            .send(ManagedTaskAdd::unrecoverable(
+                tokio::spawn(async {
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    panic!("Task has panicked")
+                }),
+                "",
+            ))
             .await
             .unwrap();
 

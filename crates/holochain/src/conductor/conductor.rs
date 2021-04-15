@@ -8,7 +8,6 @@
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
-use super::api::RealAppInterfaceApi;
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
 use super::dna_store::DnaDefBuf;
@@ -29,8 +28,6 @@ use super::manager::spawn_task_manager;
 use super::manager::ManagedTaskAdd;
 use super::manager::ManagedTaskHandle;
 use super::manager::TaskManagerRunHandle;
-use super::manager::TaskOutcome;
-use super::p2p_store;
 use super::p2p_store::all_agent_infos;
 use super::p2p_store::get_single_agent_info;
 use super::p2p_store::inject_agent_infos;
@@ -41,6 +38,7 @@ use super::CellError;
 use super::{api::CellConductorApi, state::AppInterfaceConfig};
 use super::{api::CellConductorApiT, interface::AppInterfaceRuntime};
 use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
+use super::{api::RealAppInterfaceApi, p2p_store};
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::cell::Cell;
 use crate::conductor::config::ConductorConfig;
@@ -207,7 +205,7 @@ where
 
     /// Broadcasts the shutdown signal to all managed tasks.
     /// To actually wait for these tasks to complete, be sure to
-    /// `take_shutdown_handle` to await for completion.
+    /// `take_task_manager` to await for completion.
     pub(super) fn shutdown(&mut self) {
         self.shutting_down = true;
         if let Some(manager) = &self.task_manager {
@@ -226,7 +224,7 @@ where
     }
 
     /// Return the handle which waits for the task manager task to complete
-    pub(super) fn take_shutdown_handle(&mut self) -> Option<TaskManagerRunHandle> {
+    pub(super) fn take_task_manager(&mut self) -> Option<TaskManagerRunHandle> {
         self.task_manager.take().map(|manager| manager.close())
     }
 
@@ -284,22 +282,18 @@ where
 
             // First, register the keepalive task, to ensure the conductor doesn't shut down
             // in the absence of other "real" tasks
-            self.manage_task(ManagedTaskAdd::ignore(tokio::spawn(keep_alive_task(
-                stop_tx.subscribe(),
-            ))))
+            self.manage_task(ManagedTaskAdd::ignore(
+                tokio::spawn(keep_alive_task(stop_tx.subscribe())),
+                "keepalive task",
+            ))
             .await?;
 
             // Now that tasks are spawned, register them with the TaskManager
             for (port, handle) in handles {
                 ports.push(port);
-                self.manage_task(ManagedTaskAdd::new(
+                self.manage_task(ManagedTaskAdd::ignore(
                     handle,
-                    Box::new(|result| {
-                        result.unwrap_or_else(|e| {
-                            error!(error = &e as &dyn std::error::Error, "Interface died")
-                        });
-                        TaskOutcome::Ignore
-                    }),
+                    &format!("admin interface, port {}", port),
                 ))
                 .await?
             }
@@ -335,7 +329,11 @@ where
             .await
             .map_err(Box::new)?;
         // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
-        self.manage_task(ManagedTaskAdd::ignore(task)).await?;
+        self.manage_task(ManagedTaskAdd::ignore(
+            task,
+            &format!("app interface, port {}", port),
+        ))
+        .await?;
         let interface = AppInterfaceRuntime::Websocket { signal_tx };
 
         if self.app_interfaces.contains_key(&interface_id) {
@@ -951,6 +949,9 @@ where
         &mut self,
         handle: ConductorHandle,
     ) -> ConductorResult<()> {
+        if self.task_manager.is_some() {
+            panic!("Cannot start task manager twice");
+        }
         let (task_add_sender, run_handle) = spawn_task_manager(handle);
         let (task_stop_broadcaster, _) = tokio::sync::broadcast::channel::<()>(1);
         self.task_manager = Some(TaskManagerClient::new(
@@ -1165,6 +1166,9 @@ mod builder {
                 holochain_p2p,
             });
 
+            let configs = conductor_config.admin_interfaces.unwrap_or_default();
+            handle.clone().initialize_conductor(configs).await?;
+
             handle.load_dnas().await?;
 
             tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
@@ -1178,14 +1182,6 @@ mod builder {
                     ?cell_startup_errors
                 );
             }
-
-            // Create admin interfaces
-            if let Some(configs) = conductor_config.admin_interfaces {
-                handle.clone().add_admin_interfaces(configs).await?;
-            }
-
-            // Create app interfaces
-            handle.clone().initialize_with_handle().await?;
 
             handle.print_setup().await;
 

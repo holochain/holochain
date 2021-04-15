@@ -192,7 +192,7 @@ impl ConductorTestData {
 
     /// Shutdown the conductor
     pub async fn shutdown_conductor(&mut self) {
-        let shutdown = self.handle.take_shutdown_handle().await.unwrap();
+        let shutdown = self.handle.take_task_manager().await.unwrap();
         self.handle.shutdown().await;
         shutdown.await.unwrap().unwrap();
     }

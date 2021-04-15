@@ -1443,7 +1443,7 @@ mod slow_tests {
         }
 
         // Shut everything down
-        let shutdown = conductor.take_shutdown_handle().await.unwrap();
+        let shutdown = conductor.take_task_manager().await.unwrap();
         conductor.shutdown().await;
         shutdown.await.unwrap().unwrap();
     }

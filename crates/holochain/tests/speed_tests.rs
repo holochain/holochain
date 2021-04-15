@@ -302,7 +302,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
             break;
         }
     }
-    let shutdown = handle.take_shutdown_handle().await.unwrap();
+    let shutdown = handle.take_task_manager().await.unwrap();
     handle.shutdown().await;
     shutdown.await.unwrap().unwrap();
     test_env

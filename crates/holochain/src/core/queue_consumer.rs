@@ -70,6 +70,7 @@ pub async fn spawn_queue_consumer_tasks(
     task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
     stop: sync::broadcast::Sender<()>,
 ) -> (QueueTriggers, InitialQueueTriggers) {
+    let cell_id = cell_network.cell_id();
     // Publish
     let (tx_publish, handle) = spawn_publish_dht_ops_consumer(
         env.clone(),
@@ -78,7 +79,11 @@ pub async fn spawn_queue_consumer_tasks(
         cell_network.clone(),
     );
     task_sender
-        .send(ManagedTaskAdd::unrecoverable(handle))
+        .send(ManagedTaskAdd::cell_critical(
+            handle,
+            cell_id.clone(),
+            "publish_dht_ops_consumer",
+        ))
         .await
         .expect("Failed to manage workflow handle");
 
@@ -90,7 +95,11 @@ pub async fn spawn_queue_consumer_tasks(
         cell_network.clone(),
     );
     task_sender
-        .send(ManagedTaskAdd::unrecoverable(handle))
+        .send(ManagedTaskAdd::cell_critical(
+            handle,
+            cell_id.clone(),
+            "validation_receipt_consumer",
+        ))
         .await
         .expect("Failed to manage workflow handle");
 
@@ -106,7 +115,11 @@ pub async fn spawn_queue_consumer_tasks(
         tx_receipt.clone(),
     );
     task_sender
-        .send(ManagedTaskAdd::unrecoverable(handle))
+        .send(ManagedTaskAdd::cell_critical(
+            handle,
+            cell_id.clone(),
+            "integrate_dht_ops_consumer",
+        ))
         .await
         .expect("Failed to manage workflow handle");
 
@@ -120,7 +133,11 @@ pub async fn spawn_queue_consumer_tasks(
         cell_network.clone(),
     );
     task_sender
-        .send(ManagedTaskAdd::unrecoverable(handle))
+        .send(ManagedTaskAdd::cell_critical(
+            handle,
+            cell_id.clone(),
+            "app_validation_consumer",
+        ))
         .await
         .expect("Failed to manage workflow handle");
 
@@ -134,7 +151,11 @@ pub async fn spawn_queue_consumer_tasks(
         conductor_api,
     );
     task_sender
-        .send(ManagedTaskAdd::unrecoverable(handle))
+        .send(ManagedTaskAdd::cell_critical(
+            handle,
+            cell_id.clone(),
+            "sys_validation_consumer",
+        ))
         .await
         .expect("Failed to manage workflow handle");
     if create_tx_sys.send(tx_sys.clone()).is_err() {
@@ -150,7 +171,11 @@ pub async fn spawn_queue_consumer_tasks(
         tx_publish.clone(),
     );
     task_sender
-        .send(ManagedTaskAdd::unrecoverable(handle))
+        .send(ManagedTaskAdd::cell_critical(
+            handle,
+            cell_id,
+            "produce_dht_ops_consumer",
+        ))
         .await
         .expect("Failed to manage workflow handle");
 

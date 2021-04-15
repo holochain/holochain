@@ -515,7 +515,7 @@ impl SweetConductorHandle {
     /// is useful if you need to know when it's finished cleaning up.
     pub async fn shutdown_and_wait(&self) {
         let c = &self.0;
-        if let Some(shutdown) = c.take_shutdown_handle().await {
+        if let Some(shutdown) = c.take_task_manager().await {
             c.shutdown().await;
             shutdown
                 .await
@@ -530,7 +530,7 @@ impl Drop for SweetConductor {
         if let Some(handle) = self.handle.take() {
             tokio::task::spawn(async move {
                 // Shutdown the conductor
-                if let Some(shutdown) = handle.take_shutdown_handle().await {
+                if let Some(shutdown) = handle.take_task_manager().await {
                     handle.shutdown().await;
                     if let Err(e) = shutdown.await {
                         tracing::warn!("Failed to join conductor shutdown task: {:?}", e);
