@@ -1,5 +1,8 @@
 //! Kitsune Config Tuning Params
 
+/// How long kitsune should wait before timing out when joining the network.
+pub const JOIN_NETWORK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+
 /// Wrapper for the actual KitsuneP2pTuningParams struct
 /// so the widely used type def can be an Arc<>
 pub mod tuning_params_struct {
