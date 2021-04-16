@@ -444,6 +444,7 @@ async fn incoming_evt_handle(
                     } else {
                         //println!("data to forward");
                         let dest = if !allow_proxy_fwd {
+                            tracing::error!("received fwd request on, but proxy fwd is disallowed");
                             Err("proxy fwd disallowed".into())
                         } else {
                             hnd.inner.share_mut(|i, _| {
@@ -496,11 +497,13 @@ async fn incoming_evt_handle(
                         Err(_) => return,
                         Ok(con) => con,
                     };
-                    let evt = EpEvent::IncomingError(EpIncomingData {
+                    let err = String::from_utf8_lossy(data.as_ref());
+                    let err: &str = &err;
+                    let evt = EpEvent::IncomingError(EpIncomingError {
                         con,
                         url,
                         msg_id,
-                        data,
+                        err: err.into(),
                     });
                     let _ = logic_hnd.emit(evt).await;
                 }
@@ -689,8 +692,7 @@ mod tests {
                             panic!("unexpected: {}", String::from_utf8_lossy(&data));
                         }
                     }
-                    EpEvent::IncomingError(EpIncomingData { data, .. }) => {
-                        let err = String::from_utf8_lossy(data.as_ref());
+                    EpEvent::IncomingError(EpIncomingError { err, .. }) => {
                         if !expect_err {
                             panic!("err: {:?}", err);
                         }

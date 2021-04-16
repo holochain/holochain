@@ -14,25 +14,58 @@ static PROC_CPU_USAGE_PCT_1000: AtomicUsize = AtomicUsize::new(0);
 static TX_BYTES_PER_SEC: AtomicU64 = AtomicU64::new(0);
 static RX_BYTES_PER_SEC: AtomicU64 = AtomicU64::new(0);
 
-static POOL_BUF_RELEASE_SIZE_TOT: AtomicU64 = AtomicU64::new(0);
-static POOL_BUF_RELEASE_SIZE_CNT: AtomicU64 = AtomicU64::new(0);
+macro_rules! _make_avg {
+    (
+        $push:ident,
+        $pull:ident,
+        $m:ident,
+        $stat:ident,
+    ) => {
+        mod $m {
+            use super::*;
 
-pub(crate) fn metric_push_pool_buf_release_size(size: usize) {
-    POOL_BUF_RELEASE_SIZE_CNT.fetch_add(1, Ordering::SeqCst);
-    let tot = POOL_BUF_RELEASE_SIZE_TOT.fetch_add(size as u64, Ordering::SeqCst);
+            pub(crate) static $stat: AtomicU64 = AtomicU64::new(0);
+        }
 
-    if tot > u64::MAX / 2 {
-        POOL_BUF_RELEASE_SIZE_TOT.store(0, Ordering::SeqCst);
-        POOL_BUF_RELEASE_SIZE_CNT.store(0, Ordering::SeqCst);
-    }
+        pub(crate) fn $push(v: u64) {
+            // implement this as a bizzarre "drifting" average
+            // new entries always effect the difference by one fifth
+            // old entries account for 4/5 of the weight, so
+            // after 5 updates, they start to fade out of relevance.
+            $m::$stat
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, move |p| {
+                    if p == 0 {
+                        Some(v)
+                    } else {
+                        Some((p * 4 + v * 1) / 5)
+                    }
+                })
+                .unwrap();
+        }
+
+        pub(crate) fn $pull() -> u64 {
+            $m::$stat.load(Ordering::SeqCst)
+        }
+    };
 }
 
-fn metric_pull_pool_buf_release_size() -> u64 {
-    let tot = POOL_BUF_RELEASE_SIZE_TOT.load(Ordering::SeqCst);
-    let cnt = POOL_BUF_RELEASE_SIZE_CNT.load(Ordering::SeqCst);
-
-    tot / cnt
+macro_rules! make_avg {
+    ($push:ident, $pull:ident,) => {
+        paste::paste! {
+            _make_avg!(
+                $push,
+                $pull,
+                [<__ $push:snake>],
+                [<$push:snake:upper>],
+            );
+        }
+    };
 }
+
+make_avg!(
+    metric_push_pool_buf_release_size,
+    metric_pull_pool_buf_release_size,
+);
 
 /// Spawns a tokio task with given future/async block.
 /// Captures a new TaskCounter instance to track task count.
@@ -66,7 +99,7 @@ pub struct MetricSysInfo {
     pub rx_bytes_per_sec: u64,
     /// number of active tokio tasks
     pub tokio_task_count: usize,
-    /// avg size of released pool bufs
+    /// avg size of released pool bufs (bytes)
     pub avg_pool_buf_release_size: u64,
 }
 

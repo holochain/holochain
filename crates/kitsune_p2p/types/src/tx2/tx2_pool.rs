@@ -133,6 +133,22 @@ pub struct EpIncomingData {
     pub data: PoolBuf,
 }
 
+/// Data associated with an IncomingError EpEvent
+#[derive(Debug)]
+pub struct EpIncomingError {
+    /// handle to the remote connection that send this data
+    pub con: ConHnd,
+
+    /// the remote url from which this data originated
+    pub url: TxUrl,
+
+    /// message_id associated with this incoming data
+    pub msg_id: MsgId,
+
+    /// the actual bytes of incoming data
+    pub err: KitsuneError,
+}
+
 /// Data associated with a ConnectionClosed EpEvent
 #[derive(Debug)]
 pub struct EpConnectionClosed {
@@ -159,7 +175,7 @@ pub enum EpEvent {
     IncomingData(EpIncomingData),
 
     /// We've received incoming error on an open connection.
-    IncomingError(EpIncomingData),
+    IncomingError(EpIncomingError),
 
     /// A connection has closed (Url, Code, Reason).
     ConnectionClosed(EpConnectionClosed),

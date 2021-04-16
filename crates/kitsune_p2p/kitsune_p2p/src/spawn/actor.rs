@@ -161,14 +161,9 @@ impl KitsuneP2pActor {
                 async move {
                     let evt_sender = &evt_sender;
                     use tx2_api::Tx2EpEvent::*;
+                    #[allow(clippy::single_match)]
                     match event {
-                        Tick => (),
-                        IncomingRequest(Tx2EpIncomingRequest {
-                            con: _,
-                            url: _,
-                            data,
-                            respond,
-                        }) => {
+                        IncomingRequest(Tx2EpIncomingRequest { data, respond, .. }) => {
                             match data {
                                 wire::Wire::Call(wire::Call {
                                     space,
@@ -354,9 +349,7 @@ impl KitsuneP2pActor {
                                 data => unimplemented!("{:?}", data),
                             }
                         }
-                        evt => {
-                            tracing::error!("UNHANDLED EVENT: {:?}", evt);
-                        }
+                        _ => (),
                     }
                 }
             })
