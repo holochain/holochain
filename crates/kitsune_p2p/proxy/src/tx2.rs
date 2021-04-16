@@ -652,7 +652,7 @@ mod tests {
     async fn build_node(
         mut s_done: Option<tokio::sync::oneshot::Sender<()>>,
         expect_err: bool,
-    ) -> (tokio::task::JoinHandle<()>, TxUrl, EpHnd) {
+    ) -> (tokio::task::JoinHandle<KitsuneResult<()>>, TxUrl, EpHnd) {
         let t = KitsuneTimeout::from_millis(5000);
 
         let f = tx2_mem_adapter(MemConfig::default()).await.unwrap();
@@ -666,7 +666,7 @@ mod tests {
         let ephnd = ep.handle().clone();
         let addr = ephnd.local_addr().unwrap();
 
-        let join = tokio::task::spawn(async move {
+        let join = kitsune_p2p_types::metrics::metric_task(async move {
             while let Some(evt) = ep.next().await {
                 match evt {
                     EpEvent::IncomingData(EpIncomingData { con, mut data, .. }) => {
@@ -683,7 +683,7 @@ mod tests {
                         } else if data.as_ref() == b"world" {
                             if let Some(s_done) = s_done.take() {
                                 let _ = s_done.send(());
-                                return;
+                                return Ok(());
                             }
                         } else {
                             panic!("unexpected: {}", String::from_utf8_lossy(&data));
@@ -696,12 +696,13 @@ mod tests {
                         }
                         if let Some(s_done) = s_done.take() {
                             let _ = s_done.send(());
-                            return;
+                            return Ok(());
                         }
                     }
                     _ => (),
                 }
             }
+            KitsuneResult::Ok(())
         });
 
         (join, addr, ephnd)
@@ -743,7 +744,7 @@ mod tests {
         n_ep.write(fake_tgt, 0.into(), data, t).await.unwrap();
         r_done.await.unwrap();
         n_ep.close(0, "").await;
-        n_join.await.unwrap();
+        n_join.await.unwrap().unwrap();
 
         p_ep.close(0, "").await;
 
@@ -790,7 +791,7 @@ mod tests {
                 n_ep.write(t_addr_proxy, 0.into(), data, t).await.unwrap();
                 r_done.await.unwrap();
                 n_ep.close(0, "").await;
-                n_join.await.unwrap();
+                n_join.await.unwrap().unwrap();
             });
         }
 

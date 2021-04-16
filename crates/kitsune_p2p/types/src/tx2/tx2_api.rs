@@ -586,8 +586,8 @@ mod tests {
             }
         }
 
-        fn handle(mut ep: Tx2Ep<Test>) -> tokio::task::JoinHandle<()> {
-            tokio::task::spawn(async move {
+        fn handle(mut ep: Tx2Ep<Test>) -> tokio::task::JoinHandle<KitsuneResult<()>> {
+            metric_task(async move {
                 while let Some(evt) = ep.next().await {
                     if let Tx2EpEvent::IncomingRequest(Tx2EpIncomingRequest {
                         data, respond, ..
@@ -600,6 +600,7 @@ mod tests {
                         respond.respond(Test::one(val + 1), t).await.unwrap();
                     }
                 }
+                Ok(())
             })
         }
 
@@ -631,7 +632,7 @@ mod tests {
         ep1_hnd.close(0, "").await;
         ep2_hnd.close(0, "").await;
 
-        ep1_task.await.unwrap();
-        ep2_task.await.unwrap();
+        ep1_task.await.unwrap().unwrap();
+        ep2_task.await.unwrap().unwrap();
     }
 }

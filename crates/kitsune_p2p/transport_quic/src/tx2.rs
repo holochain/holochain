@@ -471,7 +471,7 @@ mod tests {
         let addr2 = ep2.local_addr().unwrap();
         println!("addr2: {}", addr2);
 
-        let rt = tokio::task::spawn(async move {
+        let rt = kitsune_p2p_types::metrics::metric_task(async move {
             if let Some(mc) = con_recv2.next().await {
                 let (_con, mut recv) = mc.await.unwrap();
                 if let Some(mc) = recv.next().await {
@@ -482,6 +482,7 @@ mod tests {
                     s_done.send(()).unwrap();
                 }
             }
+            KitsuneResult::Ok(())
         });
 
         let (c, _recv) = ep1.connect(addr2, t).await.unwrap();
@@ -499,6 +500,6 @@ mod tests {
         ep1.close(0, "").await;
         ep2.close(0, "").await;
 
-        rt.await.unwrap();
+        rt.await.unwrap().unwrap();
     }
 }

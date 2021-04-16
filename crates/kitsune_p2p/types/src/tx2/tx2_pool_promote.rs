@@ -80,7 +80,7 @@ async fn in_chan_recv_logic(
     write_chan_limit: Arc<Semaphore>,
     logic_hnd: LogicChanHandle<EpEvent>,
     in_chan_recv: Box<dyn InChanRecvAdapt>,
-) {
+) -> KitsuneResult<()> {
     let local_cert = &local_cert;
     let peer_cert = &peer_cert;
     let tuning_params = &tuning_params;
@@ -153,6 +153,7 @@ async fn in_chan_recv_logic(
                         break;
                     }
                 }
+                tracing::debug!(?local_cert, ?peer_cert, "channel recv loop end");
             },
         )
         .boxed();
@@ -192,10 +193,15 @@ async fn in_chan_recv_logic(
 
             tracing::debug!(?local_cert, ?peer_cert, "established outgoing channel");
         }
+        tracing::debug!(?local_cert, ?peer_cert, "channel create loop end");
     };
 
     // We can ignore errors, as they only happen on shutdown of the endpoint.
     let _ = futures::future::join(recv_fut, write_fut).await;
+
+    tracing::debug!(?local_cert, ?peer_cert, "channel logic end");
+
+    Ok(())
 }
 
 #[derive(Clone)]
@@ -309,6 +315,7 @@ impl ConItem {
 
     // register this connection
     pub async fn reg_con_inner(
+        con_init: std::time::Instant,
         local_cert: Tx2Cert,
         tuning_params: KitsuneP2pTuningParams,
         inner: Share<PromoteEpInner>,
@@ -355,7 +362,7 @@ impl ConItem {
         // logic channel, but then our system would be single threaded.
         // Instead, we spawn one task per connection, gathering
         // the incoming channel data to be processed.
-        tokio::task::spawn(in_chan_recv_logic(
+        metric_task(in_chan_recv_logic(
             local_cert.clone(),
             peer_cert,
             tuning_params,
@@ -369,9 +376,11 @@ impl ConItem {
 
         let con = Arc::new(con_item.clone());
         let peer_cert = con.peer_cert()?;
+        let elapsed_ns = con_init.elapsed().as_nanos();
 
         if is_outgoing {
             tracing::info!(
+                %elapsed_ns,
                 ?local_cert,
                 ?peer_cert,
                 %url,
@@ -385,6 +394,7 @@ impl ConItem {
                 .await;
         } else {
             tracing::info!(
+                %elapsed_ns,
                 ?local_cert,
                 ?peer_cert,
                 %url,
@@ -404,6 +414,7 @@ impl ConItem {
     // The raw fallible inner future
     // `inner_connect` must catch errors to delete the entry from pend_cons
     pub fn inner_con_inner(
+        con_init: std::time::Instant,
         local_cert: Tx2Cert,
         tuning_params: KitsuneP2pTuningParams,
         inner: Share<PromoteEpInner>,
@@ -430,6 +441,7 @@ impl ConItem {
                     Err(e) => tracing::warn!("connect error: {:?}", e),
                     Ok((con, in_chan_recv)) => {
                         return Self::reg_con_inner(
+                            con_init,
                             local_cert,
                             tuning_params,
                             inner,
@@ -462,8 +474,10 @@ impl ConItem {
         remote: TxUrl,
         timeout: KitsuneTimeout,
     ) -> Shared<BoxFuture<'static, KitsuneResult<Self>>> {
+        let con_init = std::time::Instant::now();
         async move {
             match Self::inner_con_inner(
+                con_init,
                 local_cert,
                 tuning_params,
                 inner.clone(),
@@ -693,6 +707,7 @@ async fn con_recv_logic(
     let tuning_params = &tuning_params;
     pend_stream
         .for_each_concurrent(None, move |r| async move {
+            let con_init = std::time::Instant::now();
             let (permit, r) = r;
             let (con, in_chan_recv) = match r.await {
                 Err(e) => {
@@ -709,6 +724,7 @@ async fn con_recv_logic(
                 Ok(r) => r,
             };
             if let Err(e) = ConItem::reg_con_inner(
+                con_init,
                 local_cert.clone(),
                 tuning_params.clone(),
                 inner.clone(),
@@ -831,7 +847,7 @@ mod tests {
         let tgt_addr = tgt_hnd.local_addr().unwrap();
 
         w_send
-            .send(tokio::task::spawn(async move {
+            .send(metric_task(async move {
                 while let Some(evt) = tgt.next().await {
                     match evt {
                         EpEvent::IncomingData(EpIncomingData { con, mut data, .. }) => {
@@ -843,6 +859,7 @@ mod tests {
                         _ => (),
                     }
                 }
+                KitsuneResult::Ok(())
             }))
             .await
             .unwrap();
@@ -859,7 +876,7 @@ mod tests {
                 let (s_done, r_done) = tokio::sync::oneshot::channel();
 
                 w_send
-                    .send(tokio::task::spawn(async move {
+                    .send(metric_task(async move {
                         while let Some(evt) = ep.next().await {
                             match evt {
                                 EpEvent::IncomingData(EpIncomingData { data, .. }) => {
@@ -870,6 +887,7 @@ mod tests {
                                 _ => (),
                             }
                         }
+                        KitsuneResult::Ok(())
                     }))
                     .await
                     .unwrap();

@@ -14,6 +14,26 @@ static PROC_CPU_USAGE_PCT_1000: AtomicUsize = AtomicUsize::new(0);
 static TX_BYTES_PER_SEC: AtomicU64 = AtomicU64::new(0);
 static RX_BYTES_PER_SEC: AtomicU64 = AtomicU64::new(0);
 
+static POOL_BUF_RELEASE_SIZE_TOT: AtomicU64 = AtomicU64::new(0);
+static POOL_BUF_RELEASE_SIZE_CNT: AtomicU64 = AtomicU64::new(0);
+
+pub(crate) fn metric_push_pool_buf_release_size(size: usize) {
+    POOL_BUF_RELEASE_SIZE_CNT.fetch_add(1, Ordering::SeqCst);
+    let tot = POOL_BUF_RELEASE_SIZE_TOT.fetch_add(size as u64, Ordering::SeqCst);
+
+    if tot > u64::MAX / 2 {
+        POOL_BUF_RELEASE_SIZE_TOT.store(0, Ordering::SeqCst);
+        POOL_BUF_RELEASE_SIZE_CNT.store(0, Ordering::SeqCst);
+    }
+}
+
+fn metric_pull_pool_buf_release_size() -> u64 {
+    let tot = POOL_BUF_RELEASE_SIZE_TOT.load(Ordering::SeqCst);
+    let cnt = POOL_BUF_RELEASE_SIZE_CNT.load(Ordering::SeqCst);
+
+    tot / cnt
+}
+
 /// Spawns a tokio task with given future/async block.
 /// Captures a new TaskCounter instance to track task count.
 pub fn metric_task<T, E, F>(f: F) -> tokio::task::JoinHandle<Result<T, E>>
@@ -40,10 +60,14 @@ pub struct MetricSysInfo {
     pub used_mem_kb: u64,
     /// Process CPU Usage % x1000.
     pub proc_cpu_usage_pct_1000: usize,
-    /// network bytes transmitted.
+    /// network bytes transmitted (5 sec avg).
     pub tx_bytes_per_sec: u64,
-    /// network bytes received.
+    /// network bytes received (5 sec avg).
     pub rx_bytes_per_sec: u64,
+    /// number of active tokio tasks
+    pub tokio_task_count: usize,
+    /// avg size of released pool bufs
+    pub avg_pool_buf_release_size: u64,
 }
 
 /// Initialize polling of system usage info
@@ -130,6 +154,8 @@ pub fn get_sys_info() -> MetricSysInfo {
         proc_cpu_usage_pct_1000: PROC_CPU_USAGE_PCT_1000.load(Ordering::Relaxed),
         tx_bytes_per_sec: TX_BYTES_PER_SEC.load(Ordering::Relaxed),
         rx_bytes_per_sec: RX_BYTES_PER_SEC.load(Ordering::Relaxed),
+        tokio_task_count: TASK_COUNT.load(Ordering::Relaxed),
+        avg_pool_buf_release_size: metric_pull_pool_buf_release_size(),
     }
 }
 
@@ -156,11 +182,6 @@ impl MetricTaskCounter {
     }
 }
 
-/// Fetch the count of running tokio::tasks started with `metric_task!()`.
-pub fn metric_task_count() -> usize {
-    TASK_COUNT.load(Ordering::Relaxed)
-}
-
 #[tokio::test(flavor = "multi_thread")]
 async fn test_metric_task() {
     for _ in 0..20 {
@@ -169,9 +190,9 @@ async fn test_metric_task() {
             <Result<(), ()>>::Ok(())
         });
     }
-    let gt_task_count = metric_task_count();
+    let gt_task_count = TASK_COUNT.load(Ordering::Relaxed);
     tokio::time::sleep(std::time::Duration::from_millis(5)).await;
-    let lt_task_count = metric_task_count();
+    let lt_task_count = TASK_COUNT.load(Ordering::Relaxed);
     assert!(lt_task_count < gt_task_count);
 }
 

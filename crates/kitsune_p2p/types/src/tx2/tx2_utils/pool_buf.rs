@@ -103,6 +103,7 @@ impl Drop for PoolBuf {
 
 /// reset used both for requeuing into thread local, and for clear()
 fn reset(v: &mut Vec<u8>, do_truncate: bool) {
+    crate::metrics::metric_push_pool_buf_release_size(v.capacity());
     if do_truncate && v.capacity() > POOL_BUF_SHRINK_TO_CAPACITY {
         v.truncate(POOL_BUF_SHRINK_TO_CAPACITY);
         v.shrink_to_fit();

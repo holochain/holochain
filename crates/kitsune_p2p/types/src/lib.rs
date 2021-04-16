@@ -273,6 +273,8 @@ pub mod transport_mem;
 pub mod transport_pool;
 pub mod tx2;
 
+use metrics::metric_task;
+
 #[cfg(test)]
 mod tests {
     use super::*;

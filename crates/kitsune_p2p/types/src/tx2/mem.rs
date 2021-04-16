@@ -430,14 +430,14 @@ mod tests {
     async fn hnd_con(
         c: Con,
         r_send: TSender<()>,
-        w_send: TSender<tokio::task::JoinHandle<()>>,
+        w_send: TSender<tokio::task::JoinHandle<KitsuneResult<()>>>,
     ) -> Arc<dyn ConAdapt> {
         let t = KitsuneTimeout::from_millis(5000);
 
         let (con, chan_recv) = c;
         let con2 = con.clone();
         w_send
-            .send(tokio::task::spawn(async move {
+            .send(metric_task(async move {
                 let con2 = &con2;
                 let r_send = &r_send;
                 chan_recv
@@ -459,6 +459,7 @@ mod tests {
                         }
                     })
                     .await;
+                KitsuneResult::Ok(())
             }))
             .await
             .unwrap();
@@ -468,14 +469,14 @@ mod tests {
     async fn mk_node(
         f: &AdapterFactory,
         r_send: TSender<()>,
-        w_send: TSender<tokio::task::JoinHandle<()>>,
+        w_send: TSender<tokio::task::JoinHandle<KitsuneResult<()>>>,
     ) -> (TxUrl, Arc<dyn EndpointAdapt>) {
         let t = KitsuneTimeout::from_millis(5000);
 
         let (ep, con_recv) = f.bind("none:".into(), t).await.unwrap();
         let w_send2 = w_send.clone();
         w_send
-            .send(tokio::task::spawn(async move {
+            .send(metric_task(async move {
                 let r_send = &r_send;
                 let w_send2 = &w_send2;
                 con_recv
@@ -483,6 +484,7 @@ mod tests {
                         hnd_con(c.await.unwrap(), r_send.clone(), w_send2.clone()).await;
                     })
                     .await;
+                KitsuneResult::Ok(())
             }))
             .await
             .unwrap();
@@ -557,7 +559,7 @@ mod tests {
         let (ep1, _con_recv1) = back.bind("none:".into(), t).await.unwrap();
         let (ep2, mut con_recv2) = back.bind("none:".into(), t).await.unwrap();
 
-        let rt = tokio::task::spawn(async move {
+        let rt = metric_task(async move {
             let mut all = Vec::new();
             while let Some(fut) = con_recv2.next().await {
                 println!("in-con-1");
@@ -565,7 +567,7 @@ mod tests {
                     println!("in-con-2");
 
                     let mut out_chan = con2.out_chan(t).await.unwrap();
-                    all.push(tokio::task::spawn(async move {
+                    all.push(metric_task(async move {
                         println!("in-chan-1");
                         while let Some(fut) = chan_recv2.next().await {
                             println!("in-chan-2");
@@ -578,11 +580,13 @@ mod tests {
                                 out_chan.write(0.into(), buf, t).await.unwrap();
                             }
                         }
+                        KitsuneResult::Ok(())
                     }));
                 }
             }
             futures::future::try_join_all(all).await.unwrap();
             println!("RECV LOOP ABORT");
+            KitsuneResult::Ok(())
         });
 
         let addr2 = ep2.local_addr().unwrap();
@@ -604,6 +608,6 @@ mod tests {
         ep1.close(0, "");
         ep2.close(0, "");
 
-        rt.await.unwrap();
+        rt.await.unwrap().unwrap();
     }
 }
