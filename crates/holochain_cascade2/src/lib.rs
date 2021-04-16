@@ -42,6 +42,8 @@ use tracing::*;
 pub mod authority;
 pub mod error;
 
+mod agent_activity;
+
 // FIXME: Make this test_utils feature once we update to
 // the real network.
 // #[cfg(any(test, feature = "test_utils"))]
@@ -68,10 +70,11 @@ macro_rules! ok_or_return {
     };
 }
 
+#[derive(Clone)]
 pub struct Cascade<Network = PassThroughNetwork> {
     vault: Option<EnvRead>,
     cache: Option<EnvWrite>,
-    scratch: Option<Scratch>,
+    scratch: Option<Arc<Scratch>>,
     network: Option<Network>,
 }
 
@@ -111,7 +114,7 @@ where
     /// Add the cache to the cascade.
     pub fn with_scratch(self, scratch: Scratch) -> Self {
         Self {
-            scratch: Some(scratch),
+            scratch: Some(Arc::new(scratch)),
             ..self
         }
     }
@@ -273,7 +276,7 @@ where
         let network = ok_or_return!(self.network.as_mut());
         let results = network
             .get(hash, options.clone())
-            .instrument(debug_span!("fetch_element_via_entry::network_get"))
+            .instrument(debug_span!("fetch_element::network_get"))
             .await?;
 
         for response in results {
@@ -391,7 +394,7 @@ where
             }
         }
         if let Some(scratch) = &self.scratch {
-            let r = f(scratch)?;
+            let r = f(scratch.as_ref())?;
             if r.is_some() {
                 return Ok(r);
             }
@@ -617,6 +620,26 @@ where
         Ok(results)
     }
 
+    pub async fn get_concurrent<I: IntoIterator<Item = AnyDhtHash>>(
+        &mut self,
+        hashes: I,
+        options: GetOptions,
+    ) -> CascadeResult<Vec<Option<Element>>> {
+        use futures::stream::StreamExt;
+        use futures::stream::TryStreamExt;
+        let iter = hashes.into_iter().map({
+            |hash| {
+                let options = options.clone();
+                let mut cascade = self.clone();
+                async move { cascade.dht_get(hash, options).await }
+            }
+        });
+        Ok(futures::stream::iter(iter)
+            .buffer_unordered(10)
+            .try_collect()
+            .await?)
+    }
+
     #[instrument(skip(self))]
     /// Updates the cache with the latest network authority data
     /// and returns what is in the cache.
@@ -688,12 +711,12 @@ where
     // TODO: The whole chain needs to be retrieved so we can
     // check if the headers match the filter but we could store
     // header types / entry types in the activity db to avoid this.
-    #[instrument(skip(self, _agent, _query, _options))]
+    #[instrument(skip(self, agent, query, options))]
     /// Get agent activity from agent activity authorities.
     /// Hashes are requested from the authority and cache for valid chains.
     /// Options:
     /// - include_valid_activity will include the valid chain hashes.
-    /// - include_rejected_activity will include the valid chain hashes. (unimplemented)
+    /// - include_rejected_activity will include the invalid chain hashes.
     /// - include_full_headers will fetch the valid headers in parallel (requires include_valid_activity)
     /// Query:
     /// - include_entries will also fetch the entries in parallel (requires include_full_headers)
@@ -701,11 +724,90 @@ where
     /// - header_type and entry_type will filter the activity (requires include_full_headers)
     pub async fn get_agent_activity(
         &mut self,
-        _agent: AgentPubKey,
-        _query: ChainQueryFilter,
-        _options: GetActivityOptions,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: GetActivityOptions,
     ) -> CascadeResult<AgentActivityResponse<Element>> {
-        todo!()
+        let status_only = !options.include_rejected_activity && !options.include_valid_activity;
+        let results = self
+            .fetch_agent_activity(agent.clone(), query.clone(), options.clone())
+            .await?;
+
+        let merged_response: AgentActivityResponse<HeaderHash> =
+            agent_activity::merge_activities(agent.clone(), &options, results)?;
+
+        // If the response is empty we can finish.
+        if let ChainStatus::Empty = &merged_response.status {
+            return Ok(AgentActivityResponse::from_empty(merged_response));
+        }
+
+        // If the request is just for the status then return.
+        if status_only {
+            return Ok(AgentActivityResponse::status_only(merged_response));
+        }
+
+        // If they don't want the full headers then just return the hashes.
+        if !options.include_full_headers {
+            return Ok(AgentActivityResponse::hashes_only(merged_response));
+        }
+
+        // If they need the full headers then we will do concurrent gets.
+        let AgentActivityResponse {
+            agent,
+            valid_activity,
+            rejected_activity,
+            status,
+            highest_observed,
+        } = merged_response;
+        let valid_activity = match valid_activity {
+            ChainItems::Hashes(hashes) => {
+                // If we can't get one of the headers then don't return any.
+                // TODO: Is this the correct choice?
+                let maybe_chain: Option<Vec<_>> = self
+                    .get_concurrent(
+                        hashes.into_iter().map(|(_, h)| h.into()),
+                        GetOptions::content(),
+                    )
+                    .await?
+                    .into_iter()
+                    .collect();
+                match maybe_chain {
+                    Some(chain) => ChainItems::Full(chain),
+                    None => ChainItems::Full(Vec::with_capacity(0)),
+                }
+            }
+            ChainItems::Full(_) => ChainItems::Full(Vec::with_capacity(0)),
+            ChainItems::NotRequested => ChainItems::NotRequested,
+        };
+        let rejected_activity = match rejected_activity {
+            ChainItems::Hashes(hashes) => {
+                // If we can't get one of the headers then don't return any.
+                // TODO: Is this the correct choice?
+                let maybe_chain: Option<Vec<_>> = self
+                    .get_concurrent(
+                        hashes.into_iter().map(|(_, h)| h.into()),
+                        GetOptions::content(),
+                    )
+                    .await?
+                    .into_iter()
+                    .collect();
+                match maybe_chain {
+                    Some(chain) => ChainItems::Full(chain),
+                    None => ChainItems::Full(Vec::with_capacity(0)),
+                }
+            }
+            ChainItems::Full(_) => ChainItems::Full(Vec::with_capacity(0)),
+            ChainItems::NotRequested => ChainItems::NotRequested,
+        };
+
+        let r = AgentActivityResponse {
+            agent,
+            valid_activity,
+            rejected_activity,
+            status,
+            highest_observed,
+        };
+        Ok(r)
     }
 
     /// Get the validation package if it is cached without going to the network

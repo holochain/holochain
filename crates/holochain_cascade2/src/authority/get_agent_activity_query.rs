@@ -1,2 +1,2 @@
 pub mod deterministic;
-pub mod normal;
+pub mod hashes;
