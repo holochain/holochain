@@ -275,3 +275,57 @@ async fn proxy_tls_inner(
 
     Ok(())
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_list_active_apps_for_cell_id() {
+    use crate::test_utils::sweetest::*;
+    use maplit::hashset;
+
+    let mk_dna = |name| async move {
+        let zome = InlineZome::new_unique(Vec::new());
+        SweetDnaFile::unique_from_inline_zome(name, zome)
+            .await
+            .unwrap()
+    };
+
+    // Create three unique DNAs
+    let (dna1, _) = mk_dna("zome1").await;
+    let (dna2, _) = mk_dna("zome2").await;
+    let (dna3, _) = mk_dna("zome3").await;
+
+    // Install two apps on the Conductor:
+    // Both share a CellId in common, and also include a distinct CellId each.
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let alice = SweetAgents::one(conductor.keystore()).await;
+    let app1 = conductor
+        .setup_app_for_agent("app1", alice.clone(), &[dna1.clone(), dna2])
+        .await;
+    let app2 = conductor
+        .setup_app_for_agent("app2", alice.clone(), &[dna1, dna3])
+        .await;
+
+    let (cell1, cell2) = app1.into_tuple();
+    let (_, cell3) = app2.into_tuple();
+
+    let list_apps = |conductor: Arc<SweetConductorHandle>, cell: SweetCell| async move {
+        conductor
+            .list_active_apps_for_cell_id(cell.cell_id())
+            .await
+            .unwrap()
+    };
+
+    // - Ensure that the first CellId is associated with both apps,
+    //   and the other two are only associated with one app each.
+    assert_eq!(
+        list_apps(conductor.clone(), cell1).await,
+        hashset!["app1".to_string(), "app2".to_string()]
+    );
+    assert_eq!(
+        list_apps(conductor.clone(), cell2).await,
+        hashset!["app1".to_string()]
+    );
+    assert_eq!(
+        list_apps(conductor.clone(), cell3).await,
+        hashset!["app2".to_string()]
+    );
+}

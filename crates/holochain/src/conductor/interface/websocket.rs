@@ -463,7 +463,7 @@ pub mod test {
         handle_incoming_message(msg, app_api).await.unwrap();
         // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
         // the overhead of a websocket request locally is small
-        let shutdown = handle.take_task_manager().await.unwrap();
+        let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
         shutdown.await.unwrap().unwrap();
     }
@@ -501,7 +501,7 @@ pub mod test {
             .return_const(());
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
-        let shutdown = conductor_handle.take_task_manager().await.unwrap();
+        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
 
         // Activate the app
         let msg = AdminRequest::ActivateApp {
@@ -605,7 +605,7 @@ pub mod test {
     async fn attach_app_interface() {
         observability::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
-        let shutdown = conductor_handle.take_task_manager().await.unwrap();
+        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface { port: None };
         let msg = msg.try_into().unwrap();
@@ -645,7 +645,7 @@ pub mod test {
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(vec![(cell_id.clone(), None)], dna_store).await;
         let conductor_handle = activate(conductor_handle).await;
-        let shutdown = conductor_handle.take_task_manager().await.unwrap();
+        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
         // Allow agents time to join
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 

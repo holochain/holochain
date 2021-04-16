@@ -173,7 +173,7 @@ async fn ser_regression_test() {
         _ => unreachable!(),
     };
 
-    let shutdown = handle.take_task_manager().await.unwrap();
+    let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
     shutdown.await.unwrap().unwrap();
 }

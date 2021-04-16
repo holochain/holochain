@@ -336,7 +336,7 @@ mod test {
         observability::test_run().ok();
         let envs = test_environments();
         let handle = Conductor::builder().test(&envs).await?;
-        let shutdown = handle.take_task_manager().await.unwrap();
+        let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();
         let dna = fake_dna_zomes(
@@ -468,7 +468,7 @@ mod test {
         observability::test_run().ok();
         let envs = test_environments();
         let handle = Conductor::builder().test(&envs).await?;
-        let shutdown = handle.take_task_manager().await.unwrap();
+        let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();
         let dna = fake_dna_zomes(

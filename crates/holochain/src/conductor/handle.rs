@@ -64,7 +64,7 @@ use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::*;
 
@@ -156,7 +156,7 @@ pub trait ConductorHandleT: Send + Sync {
     ///
     /// NB: The JoinHandle is not cloneable,
     /// so this can only ever be called successfully once.
-    async fn take_task_manager(&self) -> Option<TaskManagerRunHandle>;
+    async fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle>;
 
     /// Send a signal to all managed tasks asking them to end ASAP.
     async fn shutdown(&self);
@@ -210,7 +210,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn list_active_apps_for_cell_id(
         &self,
         cell_id: &CellId,
-    ) -> ConductorResult<Vec<InstalledAppId>>;
+    ) -> ConductorResult<HashSet<InstalledAppId>>;
 
     /// Deactivate all apps which touch the specified CellId.
     /// Used when a Cell causes an unrecoverable error, to allow other Cells
@@ -218,7 +218,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn deactivate_apps_with_cell_id(
         &self,
         cell_id: &CellId,
-    ) -> ConductorResult<Vec<InstalledAppId>>;
+    ) -> ConductorResult<HashSet<InstalledAppId>>;
 
     /// Dump the cells state
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
@@ -438,8 +438,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(())
     }
 
-    async fn take_task_manager(&self) -> Option<TaskManagerRunHandle> {
-        self.conductor.write().await.take_task_manager()
+    async fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle> {
+        self.conductor.write().await.take_shutdown_handle()
     }
 
     async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
@@ -640,7 +640,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn list_active_apps_for_cell_id(
         &self,
         cell_id: &CellId,
-    ) -> ConductorResult<Vec<InstalledAppId>> {
+    ) -> ConductorResult<HashSet<InstalledAppId>> {
         self.conductor
             .read()
             .await
@@ -651,7 +651,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn deactivate_apps_with_cell_id(
         &self,
         cell_id: &CellId,
-    ) -> ConductorResult<Vec<InstalledAppId>> {
+    ) -> ConductorResult<HashSet<InstalledAppId>> {
         let app_ids = self.list_active_apps_for_cell_id(&cell_id).await?;
         for app_id in app_ids.iter() {
             self.deactivate_app(app_id.to_owned()).await?;

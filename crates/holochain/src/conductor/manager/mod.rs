@@ -148,7 +148,7 @@ pub(crate) async fn keep_alive_task(mut die: broadcast::Receiver<()>) -> Managed
 }
 
 async fn run(
-    handle: ConductorHandle,
+    conductor: ConductorHandle,
     mut new_task_channel: mpsc::Receiver<ManagedTaskAdd>,
 ) -> TaskManagerResult {
     let mut task_manager = TaskManager::new();
@@ -187,7 +187,7 @@ async fn run(
                     return Err(TaskManagerError::Unrecoverable(error));
                 },
                 Some(TaskOutcome::FreezeCell(cell_id, error, context)) => {
-                    let app_ids = handle.deactivate_apps_with_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
+                    let app_ids = conductor.deactivate_apps_with_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
                     tracing::error!(
                         "Deactivating the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
                         app_ids,
@@ -252,7 +252,9 @@ pub struct TaskManagerClient {
 
     /// The main task join handle to await on.
     /// The conductor is intended to live as long as this task does.
-    run_handle: TaskManagerRunHandle,
+    /// It can be moved out, hence the Option. If this is None, then the
+    /// handle was already moved out.
+    run_handle: Option<TaskManagerRunHandle>,
 }
 
 impl TaskManagerClient {
@@ -265,7 +267,7 @@ impl TaskManagerClient {
         Self {
             task_add_sender,
             task_stop_broadcaster,
-            run_handle,
+            run_handle: Some(run_handle),
         }
     }
 
@@ -279,9 +281,10 @@ impl TaskManagerClient {
         &self.task_stop_broadcaster
     }
 
-    /// Consume self, return the handle to be joined
-    pub fn close(self) -> TaskManagerRunHandle {
-        self.run_handle
+    /// Return the handle to be joined.
+    /// This will return None if the handle was already taken.
+    pub fn take_handle(&mut self) -> Option<TaskManagerRunHandle> {
+        self.run_handle.take()
     }
 }
 

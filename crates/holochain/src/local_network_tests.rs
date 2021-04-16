@@ -490,7 +490,7 @@ struct TestHandle {
 
 impl TestHandle {
     async fn shutdown(self) {
-        let shutdown = self.handle.take_task_manager().await.unwrap();
+        let shutdown = self.handle.take_shutdown_handle().await.unwrap();
         self.handle.shutdown().await;
         shutdown.await.unwrap().unwrap();
     }

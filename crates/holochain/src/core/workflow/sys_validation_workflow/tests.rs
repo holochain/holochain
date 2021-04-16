@@ -61,7 +61,7 @@ async fn sys_validation_workflow_test() {
 
     run_test(alice_cell_id, bob_cell_id, handle.clone(), dna_file).await;
 
-    let shutdown = handle.take_task_manager().await.unwrap();
+    let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
     shutdown.await.unwrap().unwrap();
 }

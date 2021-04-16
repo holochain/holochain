@@ -71,7 +71,7 @@ use holochain_state::source_chain::SourceChainBuf;
 use holochain_state::wasm::WasmBuf;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
@@ -134,6 +134,7 @@ where
     app_interfaces: HashMap<AppInterfaceId, AppInterfaceRuntime>,
 
     /// The channels and handles needed to interact with the task_manager task.
+    /// If this is None, then the task manager has not yet been initialized.
     task_manager: Option<TaskManagerClient>,
 
     /// Placeholder for what will be the real DNA/Wasm cache
@@ -205,7 +206,7 @@ where
 
     /// Broadcasts the shutdown signal to all managed tasks.
     /// To actually wait for these tasks to complete, be sure to
-    /// `take_task_manager` to await for completion.
+    /// `take_shutdown_handle` to await for completion.
     pub(super) fn shutdown(&mut self) {
         self.shutting_down = true;
         if let Some(manager) = &self.task_manager {
@@ -224,8 +225,10 @@ where
     }
 
     /// Return the handle which waits for the task manager task to complete
-    pub(super) fn take_task_manager(&mut self) -> Option<TaskManagerRunHandle> {
-        self.task_manager.take().map(|manager| manager.close())
+    pub(super) fn take_shutdown_handle(&mut self) -> Option<TaskManagerRunHandle> {
+        self.task_manager
+            .as_mut()
+            .and_then(|manager| manager.take_handle())
     }
 
     /// Spawn all admin interface tasks, register them with the TaskManager,
@@ -844,7 +847,7 @@ where
     pub(super) async fn list_active_apps_for_cell_id(
         &self,
         cell_id: &CellId,
-    ) -> ConductorResult<Vec<InstalledAppId>> {
+    ) -> ConductorResult<HashSet<InstalledAppId>> {
         let active_apps = self.get_state().await?.active_apps;
         Ok(active_apps
             .iter()
