@@ -1,5 +1,6 @@
 #![allow(clippy::new_ret_no_self)]
 #![allow(clippy::manual_async_fn)]
+#![allow(clippy::too_many_arguments)]
 //! Promote a tx2 transport adapter to a tx2 transport frontend.
 
 use crate::tx2::tx2_adapter::*;
@@ -33,6 +34,7 @@ struct WriteChan {
 
 struct ConItemInner {
     _permit: OwnedSemaphorePermit,
+    local_cert: Tx2Cert,
     inner: Share<PromoteEpInner>,
     con: Arc<dyn ConAdapt>,
     url: TxUrl,
@@ -56,11 +58,21 @@ impl ConItemInner {
             };
             Ok(())
         });
+        let peer_cert = self.con.peer_cert();
+        tracing::info!(
+            local_cert = ?self.local_cert,
+            ?peer_cert,
+            %code,
+            %reason,
+            "closing connection (pool)",
+        );
         self.con.close(code, reason)
     }
 }
 
 async fn in_chan_recv_logic(
+    local_cert: Tx2Cert,
+    peer_cert: Tx2Cert,
     tuning_params: KitsuneP2pTuningParams,
     url: TxUrl,
     con_item: ConItem,
@@ -69,6 +81,8 @@ async fn in_chan_recv_logic(
     logic_hnd: LogicChanHandle<EpEvent>,
     in_chan_recv: Box<dyn InChanRecvAdapt>,
 ) {
+    let local_cert = &local_cert;
+    let peer_cert = &peer_cert;
     let tuning_params = &tuning_params;
     let url = &url;
     let con_item = &con_item;
@@ -93,6 +107,7 @@ async fn in_chan_recv_logic(
                     }
                     Ok(c) => c,
                 };
+                tracing::debug!(?local_cert, ?peer_cert, "accepted incoming channel");
                 loop {
                     let r = chan.read(tuning_params.implicit_timeout()).await;
 
@@ -115,6 +130,13 @@ async fn in_chan_recv_logic(
                         }
                         Ok(r) => r,
                     };
+
+                    tracing::trace!(
+                        ?local_cert,
+                        ?peer_cert,
+                        byte_count = %data.len(),
+                        "received bytes",
+                    );
 
                     let con: ConHnd = Arc::new(con_item.clone());
                     let data = EpIncomingData {
@@ -167,6 +189,8 @@ async fn in_chan_recv_logic(
                 _permit: permit,
                 writer,
             });
+
+            tracing::debug!(?local_cert, ?peer_cert, "established outgoing channel");
         }
     };
 
@@ -236,17 +260,33 @@ impl AsConHnd for ConItem {
         async move {
             let this = &this;
             let logic = move || async move {
-                let mut writer = this
-                    .item
-                    .share_mut(|i, _| Ok(i.writer_bucket.acquire(Some(timeout))))?
-                    .await?;
+                let len = data.len();
+
+                let (local_cert, peer_cert, writer_fut) = this.item.share_mut(|i, _| {
+                    Ok((
+                        i.local_cert.clone(),
+                        i.con.peer_cert()?,
+                        i.writer_bucket.acquire(Some(timeout)),
+                    ))
+                })?;
+
+                let mut writer = writer_fut.await?;
 
                 writer.writer.write(msg_id, data, timeout).await?;
 
-                this.item.share_mut(move |i, _| {
+                let res = this.item.share_mut(move |i, _| {
                     i.writer_bucket.release(writer);
                     Ok(())
-                })
+                });
+
+                tracing::trace!(
+                    ?local_cert,
+                    ?peer_cert,
+                    byte_count = %len,
+                    "transmitted bytes",
+                );
+
+                res
             };
 
             if let Err(e) = logic().await {
@@ -269,6 +309,7 @@ impl ConItem {
 
     // register this connection
     pub async fn reg_con_inner(
+        local_cert: Tx2Cert,
         tuning_params: KitsuneP2pTuningParams,
         inner: Share<PromoteEpInner>,
         permit: OwnedSemaphorePermit,
@@ -280,12 +321,15 @@ impl ConItem {
         let url = &url;
         let uniq = con.uniq();
 
+        let peer_cert = con.peer_cert()?;
+
         let writer_bucket = ResourceBucket::new();
         let write_chan_limit = Arc::new(Semaphore::new(
             tuning_params.tx2_channel_count_per_connection,
         ));
 
         let con_item = Share::new(ConItemInner {
+            local_cert: local_cert.clone(),
             _permit: permit,
             inner: inner.clone(),
             con,
@@ -312,6 +356,8 @@ impl ConItem {
         // Instead, we spawn one task per connection, gathering
         // the incoming channel data to be processed.
         tokio::task::spawn(in_chan_recv_logic(
+            local_cert.clone(),
+            peer_cert,
             tuning_params,
             url.clone(),
             con_item.clone(),
@@ -321,17 +367,32 @@ impl ConItem {
             in_chan_recv,
         ));
 
+        let con = Arc::new(con_item.clone());
+        let peer_cert = con.peer_cert()?;
+
         if is_outgoing {
+            tracing::info!(
+                ?local_cert,
+                ?peer_cert,
+                %url,
+                "establish outgoing connection (pool)",
+            );
             let _ = logic_hnd
                 .emit(EpEvent::OutgoingConnection(EpConnection {
-                    con: Arc::new(con_item.clone()),
+                    con,
                     url: url.clone(),
                 }))
                 .await;
         } else {
+            tracing::info!(
+                ?local_cert,
+                ?peer_cert,
+                %url,
+                "establish incoming connection (pool)",
+            );
             let _ = logic_hnd
                 .emit(EpEvent::IncomingConnection(EpConnection {
-                    con: Arc::new(con_item.clone()),
+                    con,
                     url: url.clone(),
                 }))
                 .await;
@@ -343,6 +404,7 @@ impl ConItem {
     // The raw fallible inner future
     // `inner_connect` must catch errors to delete the entry from pend_cons
     pub fn inner_con_inner(
+        local_cert: Tx2Cert,
         tuning_params: KitsuneP2pTuningParams,
         inner: Share<PromoteEpInner>,
         con_limit: Arc<Semaphore>,
@@ -368,6 +430,7 @@ impl ConItem {
                     Err(e) => tracing::warn!("connect error: {:?}", e),
                     Ok((con, in_chan_recv)) => {
                         return Self::reg_con_inner(
+                            local_cert,
                             tuning_params,
                             inner,
                             permit,
@@ -392,6 +455,7 @@ impl ConItem {
 
     // Build the future that goes in pend_cons
     fn inner_con(
+        local_cert: Tx2Cert,
         tuning_params: KitsuneP2pTuningParams,
         inner: Share<PromoteEpInner>,
         con_limit: Arc<Semaphore>,
@@ -400,6 +464,7 @@ impl ConItem {
     ) -> Shared<BoxFuture<'static, KitsuneResult<Self>>> {
         async move {
             match Self::inner_con_inner(
+                local_cert,
                 tuning_params,
                 inner.clone(),
                 con_limit,
@@ -441,7 +506,9 @@ impl ConItem {
                         return Ok(pend_con_fut.clone().boxed());
                     }
                     let con_limit = i.con_limit.clone();
+                    let local_cert = i.sub_ep.local_cert()?;
                     let pend_con_fut = Self::inner_con(
+                        local_cert,
                         i.tuning_params.clone(),
                         inner2,
                         con_limit,
@@ -526,6 +593,15 @@ impl AsEpHnd for PromoteEpHnd {
 
     fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
         if let Ok((cons, ep_close_fut, logic_hnd)) = self.0.share_mut(|i, c| {
+            let local_cert = i.sub_ep.local_cert();
+
+            tracing::warn!(
+                ?local_cert,
+                %code,
+                %reason,
+                "closing endpoint (pool)",
+            );
+
             *c = true;
             i.con_limit.close();
             let cons = i.cons.iter().map(|(_, c)| c.clone()).collect::<Vec<_>>();
@@ -574,6 +650,7 @@ struct PromoteEp {
 }
 
 async fn con_recv_logic(
+    local_cert: Tx2Cert,
     tuning_params: KitsuneP2pTuningParams,
     inner: Share<PromoteEpInner>,
     logic_hnd: LogicChanHandle<EpEvent>,
@@ -611,6 +688,7 @@ async fn con_recv_logic(
     // Iterate on the pend_stream, handshaking all connections in parallel.
     // This *is* actually bound, by the max connections semaphore.
     let inner = &inner;
+    let local_cert = &local_cert;
     let logic_hnd = &logic_hnd;
     let tuning_params = &tuning_params;
     pend_stream
@@ -631,6 +709,7 @@ async fn con_recv_logic(
                 Ok(r) => r,
             };
             if let Err(e) = ConItem::reg_con_inner(
+                local_cert.clone(),
                 tuning_params.clone(),
                 inner.clone(),
                 permit,
@@ -645,6 +724,8 @@ async fn con_recv_logic(
             }
         })
         .await;
+
+    tracing::warn!(?local_cert, "connection recv stream closed!");
 }
 
 impl PromoteEp {
@@ -656,6 +737,7 @@ impl PromoteEp {
     ) -> KitsuneResult<Self> {
         let (sub_ep, con_recv) = pair;
 
+        let local_cert = sub_ep.local_cert()?;
         let logic_chan = LogicChan::new(max_cons);
         let logic_hnd = logic_chan.handle().clone();
         let hnd = PromoteEpHnd::new(
@@ -667,6 +749,7 @@ impl PromoteEp {
 
         let hnd2 = logic_chan.handle().clone();
         hnd2.capture_logic(con_recv_logic(
+            local_cert,
             tuning_params,
             hnd.0.clone(),
             logic_hnd,

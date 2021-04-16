@@ -365,8 +365,13 @@ impl EndpointAdapt for MemEndpointAdapt {
                 .is_err()
             {
                 MEM_ENDPOINTS.lock().remove(&id);
-                return Err(format!("failed to establish connection: {}", url).into());
+                let err = format!("failed to establish connection: {}", url).into();
+                tracing::warn!("{}", err);
+                return Err(err);
             }
+
+            tracing::debug!(%this_url, "incoming connection (mem)");
+            tracing::debug!(%url, "outgoing connection (mem)");
 
             Ok((con, chan_recv))
         }
@@ -409,6 +414,8 @@ impl BindAdapt for MemBackendAdapt {
                     .lock()
                     .insert(id, (c_send, ep_active.clone(), local_cert));
                 let ep: Arc<dyn EndpointAdapt> = Arc::new(ep);
+                let url = ep.local_addr()?;
+                tracing::info!(%url, "bound local endpoint (mem)");
                 let rc: Box<dyn ConRecvAdapt> = Box::new(MemConRecvAdapt::new(c_recv, ep_active));
                 Ok((ep, rc))
             })

@@ -4,7 +4,7 @@
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::{BoxStream, StreamExt};
 use kitsune_p2p_types::config::*;
-use kitsune_p2p_types::dependencies::serde_json;
+use kitsune_p2p_types::dependencies::{ghost_actor::dependencies::tracing, serde_json};
 use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_adapter::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
@@ -166,6 +166,12 @@ impl ConAdapt for QuicConAdapt {
 
     fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
         let _ = self.0.share_mut(|i, c| {
+            tracing::info!(
+                cert=?i.local_cert,
+                %code,
+                %reason,
+                "close connection (quic)",
+            );
             *c = true;
             i.con.close(code.into(), reason.as_bytes());
             Ok(())
@@ -174,7 +180,7 @@ impl ConAdapt for QuicConAdapt {
     }
 }
 
-fn connecting(con_fut: quinn::Connecting) -> ConFut {
+fn connecting(con_fut: quinn::Connecting, local_cert: Tx2Cert, is_outgoing: bool) -> ConFut {
     async move {
         let quinn::NewConnection {
             connection,
@@ -185,6 +191,14 @@ fn connecting(con_fut: quinn::Connecting) -> ConFut {
         let con: Arc<dyn ConAdapt> = Arc::new(QuicConAdapt::new(connection)?);
         let chan_recv: Box<dyn InChanRecvAdapt> = Box::new(QuicInChanRecvAdapt::new(uni_streams));
 
+        let peer_cert = con.peer_cert()?;
+        let url = con.peer_addr()?;
+        if is_outgoing {
+            tracing::info!(?local_cert, ?peer_cert, %url, "established outgoing connection (quic)");
+        } else {
+            tracing::info!(?local_cert, ?peer_cert, %url, "established incoming connection (quic)");
+        }
+
         Ok((con, chan_recv))
     }
     .boxed()
@@ -193,14 +207,20 @@ fn connecting(con_fut: quinn::Connecting) -> ConFut {
 struct QuicConRecvAdapt(BoxStream<'static, ConFut>);
 
 impl QuicConRecvAdapt {
-    pub fn new(recv: quinn::Incoming) -> Self {
+    pub fn new(recv: quinn::Incoming, local_cert: Tx2Cert) -> Self {
         Self(
-            futures::stream::unfold(recv, move |mut recv| async move {
-                match recv.next().await {
-                    None => None,
-                    Some(con) => Some((connecting(con), recv)),
-                }
-            })
+            futures::stream::unfold(
+                (recv, local_cert),
+                move |(mut recv, local_cert)| async move {
+                    match recv.next().await {
+                        None => None,
+                        Some(con) => Some((
+                            connecting(con, local_cert.clone(), false),
+                            (recv, local_cert),
+                        )),
+                    }
+                },
+            )
             .boxed(),
         )
     }
@@ -264,6 +284,9 @@ impl EndpointAdapt for QuicEndpointAdapt {
         use kitsune_p2p_types::dependencies::url2;
         let mut url = url2::url2!("{}://{}", crate::SCHEME, addr);
 
+        // TODO - FIXME - not sure how slow `get_if_addrs` is
+        //                might be better to do this once on bind
+        //                and just cache the bound address
         if let Some(host) = url.host_str() {
             if host == "0.0.0.0" {
                 for iface in if_addrs::get_if_addrs().map_err(KitsuneError::other)? {
@@ -287,15 +310,23 @@ impl EndpointAdapt for QuicEndpointAdapt {
     }
 
     fn connect(&self, url: TxUrl, timeout: KitsuneTimeout) -> ConFut {
-        let maybe_ep = self.0.share_mut(|i, _| Ok(i.ep.clone()));
+        let maybe_ep = self
+            .0
+            .share_mut(|i, _| Ok((i.ep.clone(), i.local_cert.clone())));
         timeout
             .mix(async move {
-                let ep = maybe_ep?;
+                let (ep, local_cert) = maybe_ep?;
                 let addr = crate::url_to_addr(url.as_url2(), crate::SCHEME)
                     .await
                     .map_err(KitsuneError::other)?;
                 let con = ep.connect(&addr, "stub.stub").map_err(KitsuneError::other);
-                connecting(con?).await
+                match connecting(con?, local_cert, true).await {
+                    Ok(con) => Ok(con),
+                    Err(err) => {
+                        tracing::warn!(?err, "failed to establish outgoing connection (quic)");
+                        Err(err)
+                    }
+                }
             })
             .boxed()
     }
@@ -306,6 +337,10 @@ impl EndpointAdapt for QuicEndpointAdapt {
 
     fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
         let _ = self.0.share_mut(|i, c| {
+            tracing::warn!(
+                local_cert=?i.local_cert,
+                "CLOSING ENDPOINT"
+            );
             *c = true;
             i.ep.close(code.into(), reason.as_bytes());
             Ok(())
@@ -363,6 +398,8 @@ impl QuicBackendAdapt {
         quic_cli.transport = transport;
         quic_cli.crypto = tls_cli;
 
+        tracing::debug!(?quic_srv, ?quic_cli, "build quinn configs");
+
         let out: AdapterFactory = Arc::new(Self {
             local_cert,
             quic_srv,
@@ -390,8 +427,14 @@ impl BindAdapt for QuicBackendAdapt {
 
                 let (ep, inc) = builder.bind(&addr).map_err(KitsuneError::other)?;
 
-                let ep: Arc<dyn EndpointAdapt> = Arc::new(QuicEndpointAdapt::new(ep, local_cert));
-                let con_recv: Box<dyn ConRecvAdapt> = Box::new(QuicConRecvAdapt::new(inc));
+                let ep: Arc<dyn EndpointAdapt> =
+                    Arc::new(QuicEndpointAdapt::new(ep, local_cert.clone()));
+                let con_recv: Box<dyn ConRecvAdapt> =
+                    Box::new(QuicConRecvAdapt::new(inc, local_cert.clone()));
+
+                let url = ep.local_addr()?;
+
+                tracing::info!(?local_cert, %url, "bound local endpoint (quic)");
 
                 Ok((ep, con_recv))
             })
@@ -405,6 +448,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_quic_tx2() {
+        kitsune_p2p_types::dependencies::observability::test_run().ok();
+
         let t = KitsuneTimeout::from_millis(5000);
 
         let (s_done, r_done) = tokio::sync::oneshot::channel();

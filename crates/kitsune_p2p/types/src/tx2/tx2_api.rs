@@ -573,6 +573,9 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_api() {
+        observability::test_run().ok();
+        tracing::trace!("bob");
+
         let t = KitsuneTimeout::from_millis(5000);
 
         crate::write_codec_enum! {
@@ -600,15 +603,19 @@ mod tests {
             })
         }
 
-        let f = tx2_mem_adapter(MemConfig::default()).await.unwrap();
-        let f = tx2_pool_promote(f, Default::default());
-        let f = tx2_api(f, Default::default());
+        let mk_ep = || async {
+            let f = tx2_mem_adapter(MemConfig::default()).await.unwrap();
+            let f = tx2_pool_promote(f, Default::default());
+            let f = tx2_api(f, Default::default());
 
-        let ep1 = f.bind("none:", t).await.unwrap();
+            f.bind("none:", t).await.unwrap()
+        };
+
+        let ep1 = mk_ep().await;
         let ep1_hnd = ep1.handle().clone();
         let ep1_task = handle(ep1);
 
-        let ep2 = f.bind("none:", t).await.unwrap();
+        let ep2 = mk_ep().await;
         let ep2_hnd = ep2.handle().clone();
         let ep2_task = handle(ep2);
 

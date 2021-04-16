@@ -6,6 +6,7 @@ pub mod dependencies {
     pub use ::futures;
     pub use ::ghost_actor;
     pub use ::lair_keystore_api;
+    pub use ::observability;
     pub use ::paste;
     pub use ::rustls;
     pub use ::serde;
@@ -14,6 +15,8 @@ pub mod dependencies {
     pub use ::tokio;
     pub use ::url2;
 }
+
+use ::ghost_actor::dependencies::tracing;
 
 pub use ::lair_keystore_api::actor::CertDigest;
 
