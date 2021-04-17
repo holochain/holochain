@@ -41,15 +41,17 @@ pub fn spawn_app_validation_consumer(
             // Run the workflow
             let workspace = AppValidationWorkspace::new(env.clone().into())
                 .expect("Could not create Workspace");
-            match app_validation_workflow(
+            dbg!("pre panic");
+            let result = app_validation_workflow(
                 workspace,
                 env.clone().into(),
                 &mut trigger_integration,
                 conductor_api.clone(),
                 network.clone(),
             )
-            .await
-            {
+            .await;
+            dbg!("post panic: {:?}", &result);
+            match result {
                 Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
                 Err(err) => {
                     handle_workflow_error(
@@ -58,8 +60,7 @@ pub fn spawn_app_validation_consumer(
                         err,
                         "app_validation failure",
                     )
-                    .await?;
-                    break;
+                    .await?
                 }
                 _ => (),
             };

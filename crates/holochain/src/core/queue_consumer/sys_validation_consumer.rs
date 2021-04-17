@@ -58,8 +58,7 @@ pub fn spawn_sys_validation_consumer(
                         err,
                         "sys_validation failure",
                     )
-                    .await?;
-                    break;
+                    .await?
                 }
                 _ => (),
             };

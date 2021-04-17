@@ -169,6 +169,14 @@ async fn app_validation_workflow_inner(
                         workspace.put_val_limbo(hash, vlv)?;
                     }
                     Outcome::Rejected(_) => {
+                        if *op.header().author() == network.from_agent() {
+                            // If you author an invalid element, we have no graceful way to deal with this yet.
+                            // So, we use this error to put your app into an invalid state.
+                            return Err(WorkflowError::AuthoredValidationRejection(op.to_light()));
+                        } else {
+                            tracing::warn!("Received invalid op! Warrants aren't implemented yet, so we can't do anything about this right now, but be warned that somebody else on the network has maliciously hacked their node.\nOp: {:?}", op.to_light());
+                        }
+
                         let iv = IntegrationLimboValue {
                             op: vlv.op,
                             validation_status: ValidationStatus::Rejected,

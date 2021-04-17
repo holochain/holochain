@@ -44,8 +44,7 @@ pub fn spawn_validation_receipt_consumer(
                         err,
                         "validation_receipt_workflow failure",
                     )
-                    .await?;
-                    break;
+                    .await?
                 }
                 _ => (),
             };

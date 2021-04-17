@@ -93,7 +93,7 @@ impl Future for ManagedTaskAdd {
         match JoinHandle::poll(p, cx) {
             Poll::Ready(r) => Poll::Ready(handle_completed_task(
                 &self.kind,
-                r.unwrap_or_else(|e| Err(e.into())),
+                dbg!(r.unwrap_or_else(|e| Err(e.into()))),
                 self.name.clone(),
             )),
             Poll::Pending => Poll::Pending,
@@ -187,6 +187,7 @@ async fn run(
                     return Err(TaskManagerError::Unrecoverable(error));
                 },
                 Some(TaskOutcome::FreezeCell(cell_id, error, context)) => {
+                    tracing::error!("About to deactivate apps");
                     let app_ids = conductor.deactivate_apps_with_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
                     tracing::error!(
                         "Deactivating the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
@@ -201,8 +202,10 @@ async fn run(
     }
 }
 
+#[tracing::instrument(skip(kind))]
 fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: String) -> TaskOutcome {
     use TaskOutcome::*;
+    println!("name: {}, result: {:?}", name, result);
     match kind {
         TaskKind::Ignore => match result {
             Ok(_) => Ignore,

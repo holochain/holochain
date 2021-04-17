@@ -18,6 +18,18 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum WorkflowError {
+    #[error(
+        "You authored an invalid element! This either means:\n
+    - a DNA you're using has some faulty validation logic,\n
+    - Holochain has a serious bug,\n
+    - or you are using a modified conductor\n
+    We have no graceful way to deal with this for now,
+    so this app is now in an invalid state and will be disabled.\n
+
+    Rejected DhtOp: {0:?}"
+    )]
+    AuthoredValidationRejection(DhtOpLight),
+
     #[error(transparent)]
     AppValidationError(#[from] AppValidationError),
 

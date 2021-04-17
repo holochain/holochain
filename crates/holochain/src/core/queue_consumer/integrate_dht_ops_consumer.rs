@@ -52,8 +52,7 @@ pub fn spawn_integrate_dht_ops_consumer(
                         err,
                         "integrate_dht_ops failure",
                     )
-                    .await?;
-                    break;
+                    .await?
                 }
                 _ => (),
             };

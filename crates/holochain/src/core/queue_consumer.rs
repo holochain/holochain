@@ -49,7 +49,7 @@ use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
 use validation_receipt_consumer::*;
 mod validation_receipt_consumer;
-use crate::conductor::{api::CellConductorApiT, manager::ManagedTaskResult};
+use crate::conductor::{api::CellConductorApiT, error::ConductorError, manager::ManagedTaskResult};
 use crate::conductor::{manager::ManagedTaskAdd, ConductorHandle};
 use holochain_p2p::*;
 use holochain_state::workspace::WorkspaceError;
@@ -375,18 +375,12 @@ async fn next_job_or_exit(
     }
 }
 
+/// Does nothing.
 async fn handle_workflow_error(
     conductor: ConductorHandle,
     cell_id: CellId,
     err: WorkflowError,
     reason: &str,
 ) -> ManagedTaskResult {
-    let app_ids = conductor.deactivate_apps_with_cell_id(&cell_id).await?;
-    tracing::error!(
-        "Deactivating the following apps: {:?}\nReason: {}\nError: {:?}",
-        app_ids,
-        reason,
-        err
-    );
-    Ok(())
+    Err(ConductorError::from(err).into())
 }

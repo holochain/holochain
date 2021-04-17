@@ -42,8 +42,7 @@ pub fn spawn_publish_dht_ops_consumer(
                         err,
                         "publish_dht_ops failure",
                     )
-                    .await?;
-                    break;
+                    .await?
                 }
                 _ => (),
             };
