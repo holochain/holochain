@@ -29,9 +29,13 @@ impl DnaBundle {
     }
 
     /// Convert to a DnaFile
-    pub async fn into_dna_file(self) -> DnaResult<DnaFile> {
+    pub async fn into_dna_file(
+        self,
+        uid: Option<Uid>,
+        properties: Option<YamlProperties>,
+    ) -> DnaResult<DnaFile> {
         let (zomes, wasms) = self.inner_maps().await?;
-        let dna_def = self.to_dna_def(zomes)?;
+        let dna_def = self.to_dna_def(zomes, uid, properties)?;
 
         Ok(DnaFile::from_parts(dna_def, wasms))
     }
@@ -98,17 +102,23 @@ impl DnaBundle {
     }
 
     /// Convert to a DnaDef
-    pub fn to_dna_def(&self, zomes: Zomes) -> DnaResult<DnaDefHashed> {
+    pub fn to_dna_def(
+        &self,
+        zomes: Zomes,
+        uid: Option<Uid>,
+        properties: Option<YamlProperties>,
+    ) -> DnaResult<DnaDefHashed> {
         match self.manifest() {
             DnaManifest::V1(manifest) => {
-                let properties: SerializedBytes = manifest
-                    .properties
+                let properties: SerializedBytes = properties
                     .as_ref()
+                    .or(manifest.properties.as_ref())
                     .map(SerializedBytes::try_from)
                     .unwrap_or_else(|| SerializedBytes::try_from(()))?;
+                let uid = uid.or_else(|| manifest.uid.clone()).unwrap_or_default();
                 let dna_def = DnaDef {
                     name: manifest.name.clone(),
-                    uid: manifest.uid.clone().unwrap_or_default(),
+                    uid,
                     properties,
                     zomes,
                 };
@@ -183,8 +193,8 @@ mod tests {
         let hash2 = WasmHash::with_data(&DnaWasm::from(wasm2.clone())).await;
         let mut manifest = DnaManifestCurrent {
             name: "name".into(),
-            uid: None,
-            properties: None,
+            uid: Some("original uid".to_string()),
+            properties: Some(serde_yaml::Value::Null.into()),
             zomes: vec![
                 ZomeManifest {
                     name: "zome1".into(),
@@ -201,24 +211,40 @@ mod tests {
         };
         let resources = vec![(path1, wasm1), (path2, wasm2)];
 
-        // Show that conversion fails due to hash mismatch
+        // - Show that conversion fails due to hash mismatch
         let bad_bundle: DnaBundle =
             mr_bundle::Bundle::new_unchecked(manifest.clone().into(), resources.clone())
                 .unwrap()
                 .into();
         matches::assert_matches!(
-            bad_bundle.into_dna_file().await,
+            bad_bundle.into_dna_file(None, None).await,
             Err(DnaError::WasmHashMismatch(h1, h2))
             if h1 == hash1 && h2 == hash2
         );
 
-        // Correct the hash and try again
+        // - Correct the hash and try again
         manifest.zomes[1].hash = Some(hash2.into());
+        let bundle: DnaBundle =
+            mr_bundle::Bundle::new_unchecked(manifest.clone().into(), resources.clone())
+                .unwrap()
+                .into();
+        let dna_file: DnaFile = bundle.into_dna_file(None, None).await.unwrap();
+        assert_eq!(dna_file.dna_def().zomes.len(), 2);
+        assert_eq!(dna_file.code().len(), 2);
+
+        // - Check that properties and UUID can be overridden
+        let properties: YamlProperties = serde_yaml::Value::from(42).into();
         let bundle: DnaBundle = mr_bundle::Bundle::new_unchecked(manifest.into(), resources)
             .unwrap()
             .into();
-        let dna_file: DnaFile = bundle.into_dna_file().await.unwrap();
-        assert_eq!(dna_file.dna_def().zomes.len(), 2);
-        assert_eq!(dna_file.code().len(), 2);
+        let dna_file: DnaFile = bundle
+            .into_dna_file(Some("uid".into()), Some(properties.clone()))
+            .await
+            .unwrap();
+        assert_eq!(dna_file.dna.uid, "uid".to_string());
+        assert_eq!(
+            dna_file.dna.properties,
+            SerializedBytes::try_from(properties).unwrap()
+        );
     }
 }
