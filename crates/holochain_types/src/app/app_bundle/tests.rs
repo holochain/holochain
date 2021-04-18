@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::prelude::*;
 use ::fixt::prelude::*;
-use app_manifest_v1::tests::app_manifest_fixture;
+use app_manifest_v1::tests::{app_manifest_fixture, app_manifest_properties_fixture};
 
 use super::AppBundle;
 
@@ -38,6 +38,7 @@ async fn app_bundle_fixture() -> (AppBundle, DnaFile) {
 /// Test that an app with a single Created cell can be provisioned
 #[tokio::test]
 async fn provisioning_1_create() {
+    observability::test_run().ok();
     let agent = fixt!(AgentPubKey);
     let (bundle, dna) = app_bundle_fixture().await;
     let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
@@ -50,6 +51,15 @@ async fn provisioning_1_create() {
     // Build the expected output.
     // NB: this relies heavily on the particulars of the `app_manifest_fixture`
     let slot = AppSlot::new(cell_id, true, 50);
+
+    // Apply the phenotype overrides specified in the manifest fixture
+    let dna = dna
+        .with_uid("uid".to_string())
+        .await
+        .unwrap()
+        .with_properties(SerializedBytes::try_from(app_manifest_properties_fixture()).unwrap())
+        .await
+        .unwrap();
     let expected = CellSlotResolution {
         agent,
         dnas_to_register: vec![(dna, None)],

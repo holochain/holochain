@@ -297,13 +297,19 @@ pub mod tests {
         salad: String,
     }
 
+    pub fn app_manifest_properties_fixture() -> YamlProperties {
+        YamlProperties::new(
+            serde_yaml::to_value(Props {
+                salad: "bar".to_string(),
+            })
+            .unwrap(),
+        )
+    }
+
     pub async fn app_manifest_fixture<I: IntoIterator<Item = DnaDef>>(
         location: Option<mr_bundle::Location>,
         dnas: I,
     ) -> (AppManifest, Vec<DnaHashB64>) {
-        let props = Props {
-            salad: "bar".to_string(),
-        };
 
         let hashes = join_all(
             dnas.into_iter()
@@ -317,7 +323,7 @@ pub mod tests {
             id: "nick".into(),
             dna: AppSlotDnaManifest {
                 location,
-                properties: Some(YamlProperties::new(serde_yaml::to_value(props).unwrap())),
+                properties: Some(app_manifest_properties_fixture()),
                 uid: Some("uid".into()),
                 version: Some(version),
                 clone_limit: 50,

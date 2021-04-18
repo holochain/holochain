@@ -109,9 +109,15 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     DnaSource::Path(ref path) => {
                         let bundle = Bundle::read_from_file(path).await?;
                         let bundle: DnaBundle = bundle.into();
-                        bundle.into_dna_file(uid, properties).await?
+                        let (dna_file, _original_hash) =
+                            bundle.into_dna_file(uid, properties).await?;
+                        dna_file
                     }
-                    DnaSource::Bundle(bundle) => bundle.into_dna_file(uid, properties).await?,
+                    DnaSource::Bundle(bundle) => {
+                        let (dna_file, _original_hash) =
+                            bundle.into_dna_file(uid, properties).await?;
+                        dna_file
+                    }
                 };
 
                 let hash = dna.dna_hash().clone();

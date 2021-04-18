@@ -28,16 +28,17 @@ impl DnaBundle {
         Ok(mr_bundle::Bundle::new(manifest, resources, root_dir)?.into())
     }
 
-    /// Convert to a DnaFile
+    /// Convert to a DnaFile, and return what the hash of the Dna *would* have
+    /// been without the provided phenotype overrides
     pub async fn into_dna_file(
         self,
         uid: Option<Uid>,
         properties: Option<YamlProperties>,
-    ) -> DnaResult<DnaFile> {
+    ) -> DnaResult<(DnaFile, DnaHash)> {
         let (zomes, wasms) = self.inner_maps().await?;
-        let dna_def = self.to_dna_def(zomes, uid, properties)?;
+        let (dna_def, original_hash) = self.to_dna_def(zomes, uid, properties)?;
 
-        Ok(DnaFile::from_parts(dna_def, wasms))
+        Ok((DnaFile::from_parts(dna_def, wasms), original_hash))
     }
 
     /// Construct from raw bytes
@@ -107,23 +108,38 @@ impl DnaBundle {
         zomes: Zomes,
         uid: Option<Uid>,
         properties: Option<YamlProperties>,
-    ) -> DnaResult<DnaDefHashed> {
+    ) -> DnaResult<(DnaDefHashed, DnaHash)> {
         match self.manifest() {
             DnaManifest::V1(manifest) => {
-                let properties: SerializedBytes = properties
-                    .as_ref()
-                    .or_else(|| manifest.properties.as_ref())
-                    .map(SerializedBytes::try_from)
-                    .unwrap_or_else(|| SerializedBytes::try_from(()))?;
-                let uid = uid.or_else(|| manifest.uid.clone()).unwrap_or_default();
-                let dna_def = DnaDef {
+                let mut dna_def = DnaDef {
                     name: manifest.name.clone(),
-                    uid,
-                    properties,
+                    uid: manifest.uid.clone().unwrap_or_default(),
+                    properties: SerializedBytes::try_from(
+                        manifest.properties.clone().unwrap_or_default(),
+                    )?,
                     zomes,
                 };
 
-                Ok(DnaDefHashed::from_content_sync(dna_def))
+                if uid.is_none() && properties.is_none() {
+                    // If no phenotype overrides, then the original hash is the same as the current hash
+                    let ddh = DnaDefHashed::from_content_sync(dna_def);
+                    let original_hash = ddh.as_hash().clone();
+                    Ok((ddh, original_hash))
+                } else {
+                    // Otherwise, record the original hash first, for version comparisons.
+                    let original_hash = DnaHash::with_data_sync(&dna_def);
+
+                    let properties: SerializedBytes = properties
+                        .as_ref()
+                        .or_else(|| manifest.properties.as_ref())
+                        .map(SerializedBytes::try_from)
+                        .unwrap_or_else(|| SerializedBytes::try_from(()))?;
+                    let uid = uid.or_else(|| manifest.uid.clone()).unwrap_or_default();
+
+                    dna_def.uid = uid;
+                    dna_def.properties = properties;
+                    Ok((DnaDefHashed::from_content_sync(dna_def), original_hash))
+                }
             }
         }
     }
@@ -228,7 +244,7 @@ mod tests {
             mr_bundle::Bundle::new_unchecked(manifest.clone().into(), resources.clone())
                 .unwrap()
                 .into();
-        let dna_file: DnaFile = bundle.into_dna_file(None, None).await.unwrap();
+        let dna_file: DnaFile = bundle.into_dna_file(None, None).await.unwrap().0;
         assert_eq!(dna_file.dna_def().zomes.len(), 2);
         assert_eq!(dna_file.code().len(), 2);
 
@@ -240,7 +256,8 @@ mod tests {
         let dna_file: DnaFile = bundle
             .into_dna_file(Some("uid".into()), Some(properties.clone()))
             .await
-            .unwrap();
+            .unwrap()
+            .0;
         assert_eq!(dna_file.dna.uid, "uid".to_string());
         assert_eq!(
             dna_file.dna.properties,

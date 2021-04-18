@@ -88,7 +88,13 @@ impl AppBundle {
                                     .slots
                                     .push((slot_id, AppSlot::new(cell_id, false, clone_limit)));
                             }
-                            _ => todo!(),
+                            other => {
+                                tracing::error!(
+                                    "Encountered unexpected CellProvisioningOp: {:?}",
+                                    other
+                                );
+                                unimplemented!()
+                            }
                         }
                         Ok(resolution)
                     } else {
@@ -175,9 +181,9 @@ impl AppBundle {
     ) -> AppBundleResult<CellProvisioningOp> {
         let bytes = self.resolve(location).await?;
         let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(&bytes)?.into();
-        let dna_file = dna_bundle.into_dna_file(uid, properties).await?;
+        let (dna_file, original_dna_hash) = dna_bundle.into_dna_file(uid, properties).await?;
         if let Some(spec) = version {
-            if !spec.matches(dna_file.dna_hash().clone()) {
+            if !spec.matches(original_dna_hash) {
                 return Ok(CellProvisioningOp::NoMatch);
             }
         }
@@ -229,8 +235,9 @@ impl CellSlotResolution {
     }
 }
 
-#[warn(missing_docs)]
 /// Specifies what step should be taken to provision a cell while installing an App
+#[warn(missing_docs)]
+#[derive(Debug)]
 pub enum CellProvisioningOp {
     /// Create a new Cell
     Create(DnaFile, u32),
@@ -246,4 +253,5 @@ pub enum CellProvisioningOp {
 }
 
 /// Uninhabitable placeholder
+#[derive(Debug)]
 pub enum CellProvisioningConflict {}
