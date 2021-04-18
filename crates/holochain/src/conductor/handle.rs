@@ -60,12 +60,12 @@ use derive_more::From;
 use futures::future::FutureExt;
 use futures::StreamExt;
 use holochain_conductor_api::InstalledAppInfo;
+use holochain_lmdb::env::EnvironmentRead;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
-use std::sync::Arc;
 use std::{collections::HashSet, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::*;
@@ -192,6 +192,10 @@ pub trait ConductorHandleT: Send + Sync {
         payload: InstallAppBundlePayload,
     ) -> ConductorResult<InstalledApp>;
 
+    async fn uninstall_app(&mut self, app: &InstalledAppId) -> ConductorResult<()> {
+        todo!()
+    }
+
     /// Setup the cells from the database
     /// Only creates any cells that are not already created
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>>;
@@ -246,6 +250,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Print the current setup in a machine readable way.
     async fn print_setup(&self);
+
+    /// Retrieve the LMDB environment for this cell.
+    async fn get_cell_env_readonly(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentRead>;
 
     /// Retrieve the LMDB environment for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -695,6 +702,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn print_setup(&self) {
         self.conductor.read().await.print_setup()
+    }
+
+    async fn get_cell_env_readonly(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentRead> {
+        let cell = self.cell_by_id(cell_id).await?;
+        Ok(cell.env().clone().into())
     }
 
     #[cfg(any(test, feature = "test_utils"))]

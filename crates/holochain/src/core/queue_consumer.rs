@@ -377,10 +377,10 @@ async fn next_job_or_exit(
 
 /// Does nothing.
 async fn handle_workflow_error(
-    conductor: ConductorHandle,
-    cell_id: CellId,
+    _conductor: ConductorHandle,
+    _cell_id: CellId,
     err: WorkflowError,
-    reason: &str,
+    _reason: &str,
 ) -> ManagedTaskResult {
     Err(ConductorError::from(err).into())
 }

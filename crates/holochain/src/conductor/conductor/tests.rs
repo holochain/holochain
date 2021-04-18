@@ -1,12 +1,12 @@
 use super::Conductor;
 use super::ConductorState;
 use super::*;
+use crate::assert_eq_retry_10s;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
+use crate::test_utils::fake_valid_dna_file;
 use crate::test_utils::sweetest::*;
-use crate::test_utils::{fake_valid_dna_file, wait_for_integration_1m};
 use ::fixt::prelude::*;
 use holochain_lmdb::test_utils::test_environments;
-use holochain_types::prelude::*;
 use holochain_types::test_utils::fake_cell_id;
 use maplit::hashset;
 use matches::assert_matches;
@@ -333,16 +333,8 @@ async fn test_list_active_apps_for_cell_id() {
     );
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn test_cells_self_destruct_on_panic_during_genesis() {
-    observability::test_run().ok();
-    let zome_good = InlineZome::new_unique(Vec::new());
-    let zome_bad =
-        InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
-            panic!("intentional panic during validation");
-            Ok(ValidateResult::Valid)
-        });
-
+async fn common_genesis_test_app(bad_zome: InlineZome) -> (SweetConductor, SweetApp) {
+    let good_zome = InlineZome::new_unique(Vec::new());
     let mk_dna = |name, zome| async move {
         SweetDnaFile::unique_from_inline_zome(name, zome)
             .await
@@ -350,14 +342,25 @@ async fn test_cells_self_destruct_on_panic_during_genesis() {
     };
 
     // Create one DNA which works, and one which always panics on validation
-    let (dna_good, _) = mk_dna("good", zome_good).await;
-    let (dna_bad, _) = mk_dna("bad", zome_bad).await;
+    let (dna_good, _) = mk_dna("good", good_zome).await;
+    let (dna_bad, _) = mk_dna("bad", bad_zome).await;
 
     // Install both DNAs under the same app:
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("app", &[dna_good, dna_bad]).await;
+    (conductor, app)
+}
 
-    let (cell_good, cell_bad) = app.into_tuple();
+#[tokio::test(flavor = "multi_thread")]
+async fn test_cells_self_destruct_on_panic_during_genesis() {
+    observability::test_run().ok();
+    let bad_zome =
+        InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
+            panic!("intentional panic during validation");
+            Ok(ValidateResult::Valid)
+        });
+
+    let (conductor, _) = common_genesis_test_app(bad_zome).await;
 
     // - Ensure that the app was removed and both Cells were uninstalled
     //   because one Cell panicked during Genesis
@@ -367,73 +370,28 @@ async fn test_cells_self_destruct_on_panic_during_genesis() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_apps_deactivate_on_panic_after_genesis() {
     observability::test_run().ok();
-    let zome_good = InlineZome::new_unique(Vec::new());
-    let zome_bad =
-        InlineZome::new_unique(Vec::new()).callback("validate", |api, _data: ValidateData| {
-            panic!("intentional panic during validation");
-            Ok(ValidateResult::Valid)
-        });
-
-    let mk_dna = |name, zome| async move {
-        SweetDnaFile::unique_from_inline_zome(name, zome)
-            .await
-            .unwrap()
-    };
-
-    // Create one DNA which works, and one which always panics on validation
-    let (dna_good, _) = mk_dna("good", zome_good).await;
-    let (dna_bad, _) = mk_dna("bad", zome_bad).await;
-
-    // Install both DNAs under the same app:
-    let mut conductor = SweetConductor::from_standard_config().await;
-    let app = conductor.setup_app("app", &[dna_good, dna_bad]).await;
-
-    let (cell_good, cell_bad) = app.into_tuple();
-
-    // - Ensure that the app was deactivated due to a panic
-    assert_eq!(conductor.list_active_apps().await.unwrap().len(), 0);
-
-    // - Ensure that the cells were not removed
-    assert_eq!(conductor.list_cell_ids().await.unwrap().len(), 2);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_cells_self_destruct_on_bad_validation_during_genesis() {
     todo!()
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_apps_deactivate_on_bad_validation_after_genesis() {
+async fn test_cells_self_destruct_on_bad_validation_during_genesis() {
     observability::test_run().ok();
-    let zome_good = InlineZome::new_unique(Vec::new());
-    let zome_bad =
+    let bad_zome =
         InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
             Ok(ValidateResult::Invalid(
                 "intentional invalid result for testing".into(),
             ))
         });
 
-    let mk_dna = |name, zome| async move {
-        SweetDnaFile::unique_from_inline_zome(name, zome)
-            .await
-            .unwrap()
-    };
+    let (conductor, _) = common_genesis_test_app(bad_zome).await;
 
-    // Create one DNA which works, and one which always panics on validation
-    let (dna_good, _) = mk_dna("good", zome_good).await;
-    let (dna_bad, _) = mk_dna("bad", zome_bad).await;
-
-    // Install both DNAs under the same app:
-    let mut conductor = SweetConductor::from_standard_config().await;
-    let app = conductor.setup_app("app", &[dna_good, dna_bad]).await;
-
-    let (cell_good, cell_bad) = app.into_tuple();
-
-    wait_for_integration_1m(cell_bad.env(), 1).await;
-
-    // - Ensure that the app was deactivated due to bad validation
-    assert_eq!(conductor.list_active_apps().await.unwrap().len(), 0);
+    assert_eq_retry_10s!(conductor.list_active_apps().await.unwrap().len(), 0);
 
     // - Ensure that the cells were not removed
     assert_eq!(conductor.list_cell_ids().await.unwrap().len(), 2);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_apps_deactivate_on_bad_validation_after_genesis() {
+    todo!()
 }

@@ -188,6 +188,8 @@ async fn run(
                 },
                 Some(TaskOutcome::FreezeCell(cell_id, error, context)) => {
                     tracing::error!("About to deactivate apps");
+                    let env = conductor.get_cell_env_readonly(&cell_id).await.map_err(TaskManagerError::internal)?;
+                    let source_chain = holochain_state::source_chain::SourceChainBuf::new(env);
                     let app_ids = conductor.deactivate_apps_with_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
                     tracing::error!(
                         "Deactivating the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
