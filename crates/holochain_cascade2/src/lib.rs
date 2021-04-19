@@ -708,9 +708,6 @@ where
         Ok(results)
     }
 
-    // TODO: The whole chain needs to be retrieved so we can
-    // check if the headers match the filter but we could store
-    // header types / entry types in the activity db to avoid this.
     #[instrument(skip(self, agent, query, options))]
     /// Get agent activity from agent activity authorities.
     /// Hashes are requested from the authority and cache for valid chains.
@@ -815,7 +812,7 @@ where
         &self,
         _hash: &HeaderHash,
     ) -> CascadeResult<Option<Vec<Element>>> {
-        todo!()
+        Ok(None)
     }
 
     pub async fn get_validation_package(
@@ -823,7 +820,7 @@ where
         _agent: AgentPubKey,
         _header: &HeaderHashed,
     ) -> CascadeResult<Option<ValidationPackage>> {
-        todo!()
+        Ok(None)
     }
 
     fn am_i_authoring(&mut self, hash: &AnyDhtHash) -> CascadeResult<bool> {
