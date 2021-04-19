@@ -83,7 +83,7 @@ mod tests {
                 api.emit_signal(AppSignal::new(signal)).map_err(Into::into)
             })
             .callback("init", move |api, ()| {
-                let mut functions: GrantedFunctions = HashSet::new();
+                let mut functions: GrantedFunctions = BTreeSet::new();
                 functions.insert((
                     api.zome_info(()).unwrap().zome_name,
                     "recv_remote_signal".into(),
@@ -141,11 +141,7 @@ mod tests {
             .call(&cells[0].zome("zome1"), "signal_others", ())
             .await;
 
-        crate::wait_for_any_10s!(
-            num_signals.load(Ordering::SeqCst),
-            |&n| n == NUM_CONDUCTORS,
-            |n| assert_eq!(n, NUM_CONDUCTORS)
-        );
+        crate::assert_eq_retry_10s!(num_signals.load(Ordering::SeqCst), NUM_CONDUCTORS);
 
         for mut signal in signals {
             let r = signal.try_recv();
