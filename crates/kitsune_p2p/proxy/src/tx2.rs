@@ -67,7 +67,7 @@ struct ProxyConHnd {
     uniq: Uniq,
     sub_con: ConHnd,
     local_cert: Tx2Cert,
-    remote_cert: Tx2Cert,
+    peer_cert: Tx2Cert,
 }
 
 impl std::fmt::Debug for ProxyConHnd {
@@ -77,13 +77,13 @@ impl std::fmt::Debug for ProxyConHnd {
 }
 
 impl ProxyConHnd {
-    pub fn new(sub_con: ConHnd, local_cert: Tx2Cert, remote_cert: Tx2Cert) -> ConHnd {
+    pub fn new(sub_con: ConHnd, local_cert: Tx2Cert, peer_cert: Tx2Cert) -> ConHnd {
         let uniq = Uniq::default();
         let con = Self {
             uniq,
             sub_con,
             local_cert,
-            remote_cert,
+            peer_cert,
         };
         let con: ConHnd = Arc::new(con);
         con
@@ -109,11 +109,11 @@ impl AsConHnd for ProxyConHnd {
 
     fn peer_addr(&self) -> KitsuneResult<TxUrl> {
         let peer_addr = self.sub_con.peer_addr()?;
-        promote_addr(&peer_addr, &self.remote_cert)
+        promote_addr(&peer_addr, &self.peer_cert)
     }
 
-    fn peer_cert(&self) -> KitsuneResult<Tx2Cert> {
-        Ok(self.remote_cert.clone())
+    fn peer_cert(&self) -> Tx2Cert {
+        self.peer_cert.clone()
     }
 
     fn write(
@@ -124,7 +124,7 @@ impl AsConHnd for ProxyConHnd {
     ) -> BoxFuture<'static, KitsuneResult<()>> {
         data.reserve_front(PROXY_TYPE_BYTES + DIGEST_BYTES + DIGEST_BYTES);
         data.prepend_from_slice(&self.local_cert);
-        data.prepend_from_slice(&self.remote_cert);
+        data.prepend_from_slice(&self.peer_cert);
         data.prepend_from_slice(&[PROXY_FWD_MSG]);
         self.sub_con.write(msg_id, data, timeout).boxed()
     }
@@ -139,17 +139,15 @@ fn promote_addr(base_addr: &TxUrl, cert: &Tx2Cert) -> KitsuneResult<TxUrl> {
 
 #[allow(dead_code)]
 struct ProxyEpInner {
-    // we only proxy over *incoming* connections
-    // therefore it is a 1-to-1 relationship to remote digest
-    in_digest_to_sub_con: HashMap<Tx2Cert, ConHnd>,
-
-    // allows us to cleanup the digest to sub_con proxy mapping
-    // when a ConHnd close event is received
-    in_base_url_to_digest: HashMap<TxUrl, Tx2Cert>,
+    // map peer certs to connection handles
+    // so on proxy requests we know who to send to
+    // these are !SUB CONS! they should not be returned
+    digest_to_sub_con_map: HashMap<Tx2Cert, ConHnd>,
 
     // allows us to clone Tx2ConHnd items which will share
     // the same Uniq, rather than duplicating handles to the same connection.
-    base_url_to_uniq_out_con_hnd: HashMap<TxUrl, HashMap<Tx2Cert, ConHnd>>,
+    // these are !OUT CONS! they are returned from api requests / events.
+    direct_to_final_peer_con_map: HashMap<Tx2Cert, HashMap<Tx2Cert, ConHnd>>,
 }
 
 impl ProxyEpInner {
@@ -157,21 +155,21 @@ impl ProxyEpInner {
         &mut self,
         sub_con: ConHnd,
         local_cert: Tx2Cert,
-        remote_cert: Tx2Cert,
+        final_peer_cert: Tx2Cert,
     ) -> KitsuneResult<(bool, ConHnd)> {
-        let base_url = sub_con.peer_addr()?;
+        let direct_peer_cert = sub_con.peer_cert();
         let inner_map = self
-            .base_url_to_uniq_out_con_hnd
-            .entry(base_url)
+            .direct_to_final_peer_con_map
+            .entry(direct_peer_cert)
             .or_insert_with(HashMap::new);
         let mut did_insert = false;
         let con = {
             let did_insert = &mut did_insert;
             inner_map
-                .entry(remote_cert.clone())
+                .entry(final_peer_cert.clone())
                 .or_insert_with(move || {
                     *did_insert = true;
-                    ProxyConHnd::new(sub_con, local_cert, remote_cert)
+                    ProxyConHnd::new(sub_con, local_cert, final_peer_cert)
                 })
                 .clone()
         };
@@ -191,11 +189,11 @@ async fn get_con_hnd(
     logic_hnd: LogicChanHandle<EpEvent>,
     sub_con: ConHnd,
     local_cert: Tx2Cert,
-    remote_cert: Tx2Cert,
+    peer_cert: Tx2Cert,
     is_outgoing: bool,
 ) -> KitsuneResult<ConHnd> {
     let (did_insert, con) =
-        inner.share_mut(move |i, _| i.get_con_hnd(sub_con, local_cert, remote_cert))?;
+        inner.share_mut(move |i, _| i.get_con_hnd(sub_con, local_cert, peer_cert))?;
     if did_insert {
         let con = con.clone();
         let url = con.peer_addr()?;
@@ -214,15 +212,14 @@ impl ProxyEpHnd {
         sub_ep_hnd: EpHnd,
         logic_hnd: LogicChanHandle<EpEvent>,
     ) -> KitsuneResult<Arc<ProxyEpHnd>> {
-        let local_cert = sub_ep_hnd.local_cert()?;
+        let local_cert = sub_ep_hnd.local_cert();
         Ok(Arc::new(ProxyEpHnd {
             sub_ep_hnd,
             local_cert,
             logic_hnd,
             inner: Share::new(ProxyEpInner {
-                in_digest_to_sub_con: HashMap::new(),
-                in_base_url_to_digest: HashMap::new(),
-                base_url_to_uniq_out_con_hnd: HashMap::new(),
+                digest_to_sub_con_map: HashMap::new(),
+                direct_to_final_peer_con_map: HashMap::new(),
             }),
         }))
     }
@@ -232,11 +229,17 @@ impl AsEpHnd for ProxyEpHnd {
     fn debug(&self) -> serde_json::Value {
         let addr = self.local_addr();
         match self.inner.share_mut(|i, _| {
+            let proxy_list = i
+                .digest_to_sub_con_map
+                .keys()
+                .map(|k| format!("{:?}", k))
+                .collect::<Vec<_>>();
             Ok(serde_json::json!({
                 "type": "tx2_proxy",
                 "state": "open",
                 "addr": addr?,
-                "proxy_count": i.in_digest_to_sub_con.len(),
+                "proxy_count": i.digest_to_sub_con_map.len(),
+                "proxy_list": proxy_list,
                 "sub": self.sub_ep_hnd.debug(),
             }))
         }) {
@@ -262,7 +265,7 @@ impl AsEpHnd for ProxyEpHnd {
         Ok(proxy_addr)
     }
 
-    fn local_cert(&self) -> KitsuneResult<Tx2Cert> {
+    fn local_cert(&self) -> Tx2Cert {
         self.sub_ep_hnd.local_cert()
     }
 
@@ -293,8 +296,8 @@ impl AsEpHnd for ProxyEpHnd {
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<ConHnd>> {
         let purl = ProxyUrl::from(remote.as_str());
-        let remote_cert = purl.digest().into();
-        if remote_cert == self.local_cert {
+        let peer_cert = purl.digest().into();
+        if peer_cert == self.local_cert {
             tracing::warn!("refusing outgoing connection to node with same cert");
             return async move {
                 Err("refusing outgoing connection to node with same cert".into())
@@ -309,7 +312,7 @@ impl AsEpHnd for ProxyEpHnd {
         let inner = self.inner.clone();
         async move {
             let sub_con = con_fut.await?;
-            get_con_hnd(&inner, logic_hnd, sub_con, local_cert, remote_cert, true).await
+            get_con_hnd(&inner, logic_hnd, sub_con, local_cert, peer_cert, true).await
         }
         .boxed()
     }
@@ -331,16 +334,9 @@ async fn incoming_evt_logic(
     hnd: Arc<ProxyEpHnd>,
     logic_hnd: LogicChanHandle<EpEvent>,
 ) {
-    let maybe_cert = sub_ep.handle().local_cert();
-    let local_cert = match maybe_cert {
-        Err(_) => {
-            tracing::warn!("ep closed before evt handler launch");
-            close_ep(&hnd, &logic_hnd).await;
-            return;
-        }
-        Ok(d) => d,
-    };
+    let local_cert = sub_ep.handle().local_cert();
     let local_cert = &local_cert;
+    let tuning_params = &tuning_params;
 
     // use CHANNEL_COUNT concurrents because that is how many channels
     // we have for sending outgoing data... most everything else in here is sync
@@ -351,14 +347,48 @@ async fn incoming_evt_logic(
         .for_each_concurrent(
             tuning_params.tx2_channel_count_per_connection,
             |evt| async {
-                incoming_evt_handle(allow_proxy_fwd, evt, local_cert.clone(), &hnd, &logic_hnd)
-                    .await;
+                incoming_evt_handle(
+                    tuning_params,
+                    allow_proxy_fwd,
+                    evt,
+                    local_cert.clone(),
+                    &hnd,
+                    &logic_hnd,
+                )
+                .await;
             },
         )
         .await;
 }
 
+async fn ensure_proxy_register(
+    inner: &Share<ProxyEpInner>,
+    logic_hnd: &LogicChanHandle<EpEvent>,
+    local_cert: &Tx2Cert,
+    sub_con: ConHnd,
+) -> KitsuneResult<()> {
+    let peer_cert = sub_con.peer_cert();
+    if &peer_cert == local_cert {
+        close_connection(
+            inner,
+            logic_hnd,
+            sub_con,
+            500,
+            "refusing connection with matching cert",
+        )
+        .await;
+        tracing::warn!("refusing connection with matching cert");
+        return Err(().into());
+    }
+    let _ = inner.share_mut(move |i, _| {
+        i.digest_to_sub_con_map.insert(peer_cert, sub_con);
+        Ok(())
+    });
+    Ok(())
+}
+
 async fn incoming_evt_handle(
+    tuning_params: &KitsuneP2pTuningParams,
     allow_proxy_fwd: bool,
     evt: EpEvent,
     local_cert: Tx2Cert,
@@ -368,30 +398,11 @@ async fn incoming_evt_handle(
     //println!("EVT: {:?}", evt);
     use EpEvent::*;
     match evt {
-        OutgoingConnection(_) => (),
-        IncomingConnection(EpConnection {
-            con: sub_con,
-            url: base_url,
-        }) => {
-            let cert = match sub_con.peer_cert() {
-                Err(e) => {
-                    sub_con.close(500, &format!("{:?}", e)).await;
-                    return;
-                }
-                Ok(d) => d,
-            };
-            if cert == local_cert {
-                sub_con
-                    .close(500, "refusing connection with matching cert")
-                    .await;
-                tracing::warn!("refusing connection with matching cert");
-                return;
-            }
-            let _ = hnd.inner.share_mut(move |i, _| {
-                i.in_digest_to_sub_con.insert(cert.clone(), sub_con);
-                i.in_base_url_to_digest.insert(base_url, cert);
-                Ok(())
-            });
+        OutgoingConnection(EpConnection { con: sub_con, .. }) => {
+            let _ = ensure_proxy_register(&hnd.inner, logic_hnd, &local_cert, sub_con).await;
+        }
+        IncomingConnection(EpConnection { con: sub_con, .. }) => {
+            let _ = ensure_proxy_register(&hnd.inner, logic_hnd, &local_cert, sub_con).await;
         }
         IncomingError(_) => unreachable!(), // currently no lower layers invoke this
         IncomingData(EpIncomingData {
@@ -404,6 +415,12 @@ async fn incoming_evt_handle(
                 tracing::error!("Invalid EMPTY PROXY FRAME!");
                 return;
             }
+            if ensure_proxy_register(&hnd.inner, logic_hnd, &local_cert, sub_con.clone())
+                .await
+                .is_err()
+            {
+                return;
+            };
             match data[0] {
                 PROXY_FWD_MSG => {
                     const SRC_START: usize = PROXY_TYPE_BYTES + DIGEST_BYTES;
@@ -449,13 +466,20 @@ async fn incoming_evt_handle(
                         } else {
                             hnd.inner.share_mut(|i, _| {
                                 //println!("ALALA: {:?}", i.in_digest_to_sub_con);
-                                Ok(i.in_digest_to_sub_con.get(&dest_cert).cloned())
+                                Ok(i.digest_to_sub_con_map.get(&dest_cert).cloned())
                             })
                         };
                         if let Err(e) = match dest {
                             Ok(Some(d_sub_con)) => {
-                                let t = KitsuneTimeout::from_millis(1000 * 30);
-                                d_sub_con.write(msg_id, data, t).await
+                                write_to_sub_con(
+                                    tuning_params,
+                                    &hnd.inner,
+                                    logic_hnd,
+                                    d_sub_con,
+                                    msg_id,
+                                    data,
+                                )
+                                .await
                             }
                             Ok(None) => {
                                 Err(format!("Invalid Proxy Target: {:?}", dest_cert).into())
@@ -472,8 +496,15 @@ async fn incoming_evt_handle(
                             data.extend_from_slice(format!("{:?}", e).as_bytes());
                             data.prepend_from_slice(&local_cert);
                             data.prepend_from_slice(&[PROXY_ROUTE_ERR]);
-                            let t = KitsuneTimeout::from_millis(1000 * 30);
-                            let _ = sub_con.write(new_msg_id, data, t).await;
+                            let _ = write_to_sub_con(
+                                tuning_params,
+                                &hnd.inner,
+                                logic_hnd,
+                                sub_con,
+                                new_msg_id,
+                                data,
+                            )
+                            .await;
                         }
                     }
                 }
@@ -510,41 +541,17 @@ async fn incoming_evt_handle(
                 b => {
                     let reason = format!("Invalid Proxy Byte: {}, closing connection", b);
                     tracing::warn!("{}", reason);
-                    hnd.sub_ep_hnd
-                        .close_connection(base_url, 500, &reason)
-                        .await;
+                    close_connection(&hnd.inner, logic_hnd, sub_con, 500, &reason).await;
                 }
             }
         }
         ConnectionClosed(EpConnectionClosed {
-            url: base_url,
+            peer_cert,
             code,
             reason,
+            ..
         }) => {
-            let kill_cons = hnd.inner.share_mut(|i, _| {
-                if let Some(cert) = i.in_base_url_to_digest.remove(&base_url) {
-                    i.in_digest_to_sub_con.remove(&cert);
-                }
-                Ok(i.base_url_to_uniq_out_con_hnd.remove(&base_url))
-            });
-
-            let kill_cons = match kill_cons {
-                Ok(Some(c)) => c,
-                _ => return,
-            };
-
-            for (_, c) in kill_cons.into_iter() {
-                let url = match c.peer_addr() {
-                    Ok(url) => url,
-                    _ => continue,
-                };
-                let evt = ConnectionClosed(EpConnectionClosed {
-                    url,
-                    code,
-                    reason: reason.clone(),
-                });
-                let _ = logic_hnd.emit(evt).await;
-            }
+            close_connection_inner(&hnd.inner, logic_hnd, peer_cert, code, &reason).await;
         }
         Error(e) => {
             let _ = logic_hnd.emit(Error(e)).await;
@@ -552,6 +559,66 @@ async fn incoming_evt_handle(
         EndpointClosed => {
             close_ep(hnd, logic_hnd).await;
         }
+    }
+}
+
+async fn write_to_sub_con(
+    tuning_params: &KitsuneP2pTuningParams,
+    inner: &Share<ProxyEpInner>,
+    logic_hnd: &LogicChanHandle<EpEvent>,
+    sub_con: ConHnd,
+    msg_id: MsgId,
+    data: PoolBuf,
+) -> KitsuneResult<()> {
+    let t = tuning_params.implicit_timeout();
+    if let Err(e) = sub_con.write(msg_id, data, t).await {
+        let reason = format!("{:?}", e);
+        close_connection(inner, logic_hnd, sub_con, 500, &reason).await;
+        return Err(e);
+    }
+    Ok(())
+}
+
+async fn close_connection(
+    inner: &Share<ProxyEpInner>,
+    logic_hnd: &LogicChanHandle<EpEvent>,
+    sub_con: ConHnd,
+    code: u32,
+    reason: &str,
+) {
+    close_connection_inner(inner, logic_hnd, sub_con.peer_cert(), code, reason).await;
+    sub_con.close(code, reason).await;
+}
+
+async fn close_connection_inner(
+    inner: &Share<ProxyEpInner>,
+    logic_hnd: &LogicChanHandle<EpEvent>,
+    peer_cert: Tx2Cert,
+    code: u32,
+    reason: &str,
+) {
+    let kill_cons = inner.share_mut(|i, _| {
+        i.digest_to_sub_con_map.remove(&peer_cert);
+        Ok(i.direct_to_final_peer_con_map.remove(&peer_cert))
+    });
+
+    let kill_cons = match kill_cons {
+        Ok(Some(c)) => c,
+        _ => return,
+    };
+
+    for (_, c) in kill_cons.into_iter() {
+        let url = match c.peer_addr() {
+            Ok(url) => url,
+            _ => continue,
+        };
+        let evt = EpEvent::ConnectionClosed(EpConnectionClosed {
+            peer_cert: peer_cert.clone(),
+            url,
+            code,
+            reason: reason.to_string(),
+        });
+        let _ = logic_hnd.emit(evt).await;
     }
 }
 

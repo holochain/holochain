@@ -207,6 +207,7 @@ async fn in_chan_recv_logic(
 #[derive(Clone)]
 struct ConItem {
     pub uniq: Uniq,
+    pub peer_cert: Tx2Cert,
     pub logic_hnd: LogicChanHandle<EpEvent>,
     pub item: Share<ConItemInner>,
 }
@@ -226,8 +227,8 @@ impl AsConHnd for ConItem {
         self.item.share_mut(|i, _| Ok(i.url.clone()))
     }
 
-    fn peer_cert(&self) -> KitsuneResult<Tx2Cert> {
-        self.item.share_mut(|i, _| i.con.peer_cert())
+    fn peer_cert(&self) -> Tx2Cert {
+        self.peer_cert.clone()
     }
 
     fn is_closed(&self) -> bool {
@@ -235,11 +236,13 @@ impl AsConHnd for ConItem {
     }
 
     fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
-        let maybe = self.item.share_mut(|i, c| {
+        let peer_cert = self.peer_cert.clone();
+        let maybe = self.item.share_mut(move |i, c| {
             *c = true;
             let emit_fut = self
                 .logic_hnd
                 .emit(EpEvent::ConnectionClosed(EpConnectionClosed {
+                    peer_cert,
                     url: i.url.clone(),
                     code,
                     reason: reason.to_string(),
@@ -271,7 +274,7 @@ impl AsConHnd for ConItem {
                 let (local_cert, peer_cert, writer_fut) = this.item.share_mut(|i, _| {
                     Ok((
                         i.local_cert.clone(),
-                        i.con.peer_cert()?,
+                        i.con.peer_cert(),
                         i.writer_bucket.acquire(Some(timeout)),
                     ))
                 })?;
@@ -328,7 +331,7 @@ impl ConItem {
         let url = &url;
         let uniq = con.uniq();
 
-        let peer_cert = con.peer_cert()?;
+        let peer_cert = con.peer_cert();
 
         let writer_bucket = ResourceBucket::new();
         let write_chan_limit = Arc::new(Semaphore::new(
@@ -346,9 +349,11 @@ impl ConItem {
         });
 
         // move us to the full cons list
+        let peer_cert2 = peer_cert.clone();
         let (logic_hnd, con_item) = inner.share_mut(move |i, _| {
             let con_item = Self {
                 uniq,
+                peer_cert: peer_cert2,
                 logic_hnd: i.logic_hnd.clone(),
                 item: con_item,
             };
@@ -364,7 +369,7 @@ impl ConItem {
         // the incoming channel data to be processed.
         metric_task(in_chan_recv_logic(
             local_cert.clone(),
-            peer_cert,
+            peer_cert.clone(),
             tuning_params,
             url.clone(),
             con_item.clone(),
@@ -375,7 +380,6 @@ impl ConItem {
         ));
 
         let con = Arc::new(con_item.clone());
-        let peer_cert = con.peer_cert()?;
         let elapsed_ns = con_init.elapsed().as_nanos();
 
         if is_outgoing {
@@ -520,7 +524,7 @@ impl ConItem {
                         return Ok(pend_con_fut.clone().boxed());
                     }
                     let con_limit = i.con_limit.clone();
-                    let local_cert = i.sub_ep.local_cert()?;
+                    let local_cert = i.sub_ep.local_cert();
                     let pend_con_fut = Self::inner_con(
                         local_cert,
                         i.tuning_params.clone(),
@@ -546,10 +550,11 @@ struct PromoteEpInner {
     sub_ep: Arc<dyn EndpointAdapt>,
 }
 
-struct PromoteEpHnd(Share<PromoteEpInner>, Uniq);
+struct PromoteEpHnd(Share<PromoteEpInner>, Uniq, Tx2Cert);
 
 impl PromoteEpHnd {
     pub fn new(
+        local_cert: Tx2Cert,
         tuning_params: KitsuneP2pTuningParams,
         con_limit: Arc<Semaphore>,
         logic_hnd: LogicChanHandle<EpEvent>,
@@ -566,6 +571,7 @@ impl PromoteEpHnd {
                 sub_ep,
             }),
             uniq,
+            local_cert,
         )
     }
 }
@@ -597,8 +603,8 @@ impl AsEpHnd for PromoteEpHnd {
         self.0.share_mut(|i, _| i.sub_ep.local_addr())
     }
 
-    fn local_cert(&self) -> KitsuneResult<Tx2Cert> {
-        self.0.share_mut(|i, _| i.sub_ep.local_cert())
+    fn local_cert(&self) -> Tx2Cert {
+        self.2.clone()
     }
 
     fn is_closed(&self) -> bool {
@@ -753,10 +759,11 @@ impl PromoteEp {
     ) -> KitsuneResult<Self> {
         let (sub_ep, con_recv) = pair;
 
-        let local_cert = sub_ep.local_cert()?;
+        let local_cert = sub_ep.local_cert();
         let logic_chan = LogicChan::new(max_cons);
         let logic_hnd = logic_chan.handle().clone();
         let hnd = PromoteEpHnd::new(
+            local_cert.clone(),
             tuning_params.clone(),
             con_limit.clone(),
             logic_hnd.clone(),

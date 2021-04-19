@@ -203,7 +203,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
     }
 
     /// Get the certificate digest of the remote.
-    pub fn peer_cert(&self) -> KitsuneResult<Tx2Cert> {
+    pub fn peer_cert(&self) -> Tx2Cert {
         self.con.peer_cert()
     }
 
@@ -232,7 +232,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
             let msg_id = next_msg_id();
             let (s_res, r_res) = tokio::sync::oneshot::channel::<KitsuneResult<C>>();
 
-            let peer_cert = this.peer_cert()?;
+            let peer_cert = this.peer_cert();
 
             // insert our response receive handler
             // Cleanup our map when this future completes
@@ -320,7 +320,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
     }
 
     /// Get the local certificate digest.
-    pub fn local_cert(&self) -> KitsuneResult<Tx2Cert> {
+    pub fn local_cert(&self) -> Tx2Cert {
         self.0.local_cert()
     }
 
@@ -454,6 +454,9 @@ pub struct Tx2EpIncomingRequest<C: Codec + 'static + Send + Unpin> {
 /// Data associated with a ConnectionClosed EpEvent
 #[derive(Debug)]
 pub struct Tx2EpConnectionClosed {
+    /// the peer cert this used to be connected to
+    pub peer_cert: Tx2Cert,
+
     /// the remote url this used to be connected to
     pub url: TxUrl,
 
@@ -576,9 +579,17 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                             Tx2EpEvent::Tick
                         }
                     },
-                    EpEvent::ConnectionClosed(EpConnectionClosed { url, code, reason }) => {
-                        Tx2EpEvent::ConnectionClosed(Tx2EpConnectionClosed { url, code, reason })
-                    }
+                    EpEvent::ConnectionClosed(EpConnectionClosed {
+                        peer_cert,
+                        url,
+                        code,
+                        reason,
+                    }) => Tx2EpEvent::ConnectionClosed(Tx2EpConnectionClosed {
+                        peer_cert,
+                        url,
+                        code,
+                        reason,
+                    }),
                     EpEvent::Error(e) => Tx2EpEvent::Error(e),
                     EpEvent::EndpointClosed => Tx2EpEvent::EndpointClosed,
                 };
@@ -663,7 +674,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpFactory<C> {
         async move {
             let ep = fut.await?;
             let ep_hnd = ep.handle().clone();
-            let local_cert = ep_hnd.local_cert()?;
+            let local_cert = ep_hnd.local_cert();
             Ok(Tx2Ep(
                 Tx2EpHnd::new(local_cert.clone(), ep_hnd, metrics.clone()),
                 ep,

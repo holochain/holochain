@@ -99,11 +99,11 @@ impl futures::stream::Stream for QuicInChanRecvAdapt {
 impl InChanRecvAdapt for QuicInChanRecvAdapt {}
 
 struct QuicConAdaptInner {
-    local_cert: Tx2Cert,
+    peer_cert: Tx2Cert,
     con: quinn::Connection,
 }
 
-struct QuicConAdapt(Share<QuicConAdaptInner>, Uniq);
+struct QuicConAdapt(Share<QuicConAdaptInner>, Uniq, Tx2Cert);
 
 pub(crate) fn blake2b_32(data: &[u8]) -> Vec<u8> {
     blake2b_simd::Params::new()
@@ -117,7 +117,7 @@ pub(crate) fn blake2b_32(data: &[u8]) -> Vec<u8> {
 
 impl QuicConAdapt {
     pub fn new(con: quinn::Connection) -> KitsuneResult<Self> {
-        let local_cert = match con.peer_identity() {
+        let peer_cert: Tx2Cert = match con.peer_identity() {
             None => return Err("invalid peer certificate".into()),
             Some(chain) => match chain.iter().next() {
                 None => return Err("invalid peer certificate".into()),
@@ -125,8 +125,12 @@ impl QuicConAdapt {
             },
         };
         Ok(Self(
-            Share::new(QuicConAdaptInner { local_cert, con }),
+            Share::new(QuicConAdaptInner {
+                peer_cert: peer_cert.clone(),
+                con,
+            }),
             Uniq::default(),
+            peer_cert,
         ))
     }
 }
@@ -145,8 +149,8 @@ impl ConAdapt for QuicConAdapt {
         Ok(url.into())
     }
 
-    fn peer_cert(&self) -> KitsuneResult<Tx2Cert> {
-        self.0.share_mut(|i, _| Ok(i.local_cert.clone()))
+    fn peer_cert(&self) -> Tx2Cert {
+        self.2.clone()
     }
 
     fn out_chan(&self, timeout: KitsuneTimeout) -> OutChanFut {
@@ -167,7 +171,7 @@ impl ConAdapt for QuicConAdapt {
     fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
         let _ = self.0.share_mut(|i, c| {
             tracing::info!(
-                cert=?i.local_cert,
+                peer_cert=?i.peer_cert,
                 %code,
                 %reason,
                 "close connection (quic)",
@@ -191,7 +195,7 @@ fn connecting(con_fut: quinn::Connecting, local_cert: Tx2Cert, is_outgoing: bool
         let con: Arc<dyn ConAdapt> = Arc::new(QuicConAdapt::new(connection)?);
         let chan_recv: Box<dyn InChanRecvAdapt> = Box::new(QuicInChanRecvAdapt::new(uni_streams));
 
-        let peer_cert = con.peer_cert()?;
+        let peer_cert = con.peer_cert();
         let url = con.peer_addr()?;
         if is_outgoing {
             tracing::info!(?local_cert, ?peer_cert, %url, "established outgoing connection (quic)");
@@ -246,13 +250,17 @@ struct QuicEndpointAdaptInner {
     local_cert: Tx2Cert,
 }
 
-struct QuicEndpointAdapt(Share<QuicEndpointAdaptInner>, Uniq);
+struct QuicEndpointAdapt(Share<QuicEndpointAdaptInner>, Uniq, Tx2Cert);
 
 impl QuicEndpointAdapt {
     pub fn new(ep: quinn::Endpoint, local_cert: Tx2Cert) -> Self {
         Self(
-            Share::new(QuicEndpointAdaptInner { ep, local_cert }),
+            Share::new(QuicEndpointAdaptInner {
+                ep,
+                local_cert: local_cert.clone(),
+            }),
             Uniq::default(),
+            local_cert,
         )
     }
 }
@@ -305,8 +313,8 @@ impl EndpointAdapt for QuicEndpointAdapt {
         Ok(url.into())
     }
 
-    fn local_cert(&self) -> KitsuneResult<Tx2Cert> {
-        self.0.share_mut(|i, _| Ok(i.local_cert.clone()))
+    fn local_cert(&self) -> Tx2Cert {
+        self.2.clone()
     }
 
     fn connect(&self, url: TxUrl, timeout: KitsuneTimeout) -> ConFut {

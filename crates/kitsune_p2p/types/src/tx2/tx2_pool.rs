@@ -15,8 +15,8 @@ pub trait AsConHnd: std::fmt::Debug + 'static + Send + Sync + Unpin {
     /// Get the remote address of this connection.
     fn peer_addr(&self) -> KitsuneResult<TxUrl>;
 
-    /// Get the certificate digest of the remote.
-    fn peer_cert(&self) -> KitsuneResult<Tx2Cert>;
+    /// Get the certificate digest of the remote peer.
+    fn peer_cert(&self) -> Tx2Cert;
 
     /// Is this connection closed?
     fn is_closed(&self) -> bool;
@@ -48,7 +48,7 @@ pub trait AsEpHnd: 'static + Send + Sync + Unpin {
     fn local_addr(&self) -> KitsuneResult<TxUrl>;
 
     /// Get the local certificate digest.
-    fn local_cert(&self) -> KitsuneResult<Tx2Cert>;
+    fn local_cert(&self) -> Tx2Cert;
 
     /// Is this endpoint closed?
     fn is_closed(&self) -> bool;
@@ -152,6 +152,9 @@ pub struct EpIncomingError {
 /// Data associated with a ConnectionClosed EpEvent
 #[derive(Debug)]
 pub struct EpConnectionClosed {
+    /// the peer cert this used to be connected to
+    pub peer_cert: Tx2Cert,
+
     /// the remote url this used to be connected to
     pub url: TxUrl,
 

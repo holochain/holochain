@@ -148,8 +148,8 @@ impl ConAdapt for MemConAdapt {
         Ok(self.0.peer_addr.clone())
     }
 
-    fn peer_cert(&self) -> KitsuneResult<Tx2Cert> {
-        Ok(self.0.peer_cert.clone())
+    fn peer_cert(&self) -> Tx2Cert {
+        self.0.peer_cert.clone()
     }
 
     fn out_chan(&self, _timeout: KitsuneTimeout) -> OutChanFut {
@@ -229,7 +229,7 @@ impl Drop for MemEndpointAdaptInner {
     }
 }
 
-struct MemEndpointAdapt(Mutex<MemEndpointAdaptInner>, Uniq);
+struct MemEndpointAdapt(Mutex<MemEndpointAdaptInner>, Uniq, Tx2Cert);
 
 impl MemEndpointAdapt {
     pub fn new(c_send: ConSend, id: u64, local_cert: Tx2Cert) -> (Self, Active) {
@@ -239,12 +239,13 @@ impl MemEndpointAdapt {
             Self(
                 Mutex::new(MemEndpointAdaptInner {
                     id,
-                    local_cert,
+                    local_cert: local_cert.clone(),
                     url: url.into(),
                     ep_active: ep_active.clone(),
                     c_send,
                 }),
                 Uniq::default(),
+                local_cert,
             ),
             ep_active,
         )
@@ -280,12 +281,8 @@ impl EndpointAdapt for MemEndpointAdapt {
         Ok(inner.url.clone())
     }
 
-    fn local_cert(&self) -> KitsuneResult<Tx2Cert> {
-        let inner = self.0.lock();
-        if !inner.ep_active.is_active() {
-            return Err(KitsuneErrorKind::Closed.into());
-        }
-        Ok(inner.local_cert.clone())
+    fn local_cert(&self) -> Tx2Cert {
+        self.2.clone()
     }
 
     fn connect(&self, url: TxUrl, timeout: KitsuneTimeout) -> ConFut {
