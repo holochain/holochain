@@ -310,7 +310,6 @@ pub mod tests {
         location: Option<mr_bundle::Location>,
         dnas: I,
     ) -> (AppManifest, Vec<DnaHashB64>) {
-
         let hashes = join_all(
             dnas.into_iter()
                 .map(|dna| async move { DnaHash::with_data_sync(&dna).into() }),
