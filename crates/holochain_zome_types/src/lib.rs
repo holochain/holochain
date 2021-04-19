@@ -175,18 +175,29 @@ macro_rules! secure_primitive {
 
         impl Eq for $t {}
 
+        #[cfg(not(feature = "subtle-encoding"))]
         /// The only meaningful debug information for a cryptograhpic secret is the literal bytes.
         /// Also, encodings like base64 are not constant time so debugging could open some weird
         /// side channel issue trying to be 'human friendly'.
         /// It seems better to never try to encode secrets.
         ///
+        /// Note that using this crate with feature "subtle-encoding", a hex
+        /// representation will be used.
+        ///
         /// @todo maybe we want something like **HIDDEN** by default and putting the actual bytes
         ///       behind a feature flag?
-        ///
-        /// See https://docs.rs/subtle-encoding/0.5.1/subtle_encoding/
         impl std::fmt::Debug for $t {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 std::fmt::Debug::fmt(&self.0.to_vec(), f)
+            }
+        }
+
+        #[cfg(feature = "subtle-encoding")]
+        impl std::fmt::Debug for $t {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let str = String::from_utf8(subtle_encoding::hex::encode(self.0.to_vec()))
+                    .unwrap_or_else(|_| "<unparseable signature>".into());
+                f.write_str(&str)
             }
         }
 
