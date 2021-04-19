@@ -77,7 +77,7 @@ matches = {version = "0.1.8", optional = true }
 holochain_test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_common", optional = true  }
 unwrap_to = { version = "0.1.0", optional = true }
 itertools = { version = "0.10", optional = true }
-kitsune_p2p_types = { version = "0.0.1", path = "../kitsune_p2p/types", optional = true }
+kitsune_p2p_types = { version = "0.0.1", path = "../kitsune_p2p/types" }
 
 
 [dev-dependencies]
@@ -119,8 +119,6 @@ test_utils = [
   "holochain_state/test_utils",
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",
-  "kitsune_p2p_types",
-  "kitsune_p2p_types/test_utils",
   "itertools",
   "matches",
   "holochain_test_wasm_common",
