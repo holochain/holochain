@@ -28,7 +28,7 @@ pub enum WorkflowError {
 
     Rejected DhtOp: {0:?}"
     )]
-    AuthoredValidationRejection(DhtOpLight),
+    AuthoredGenesisValidationRejection(DhtOpLight),
 
     #[error(transparent)]
     AppValidationError(#[from] AppValidationError),

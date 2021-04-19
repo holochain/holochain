@@ -8,6 +8,8 @@
 mod error;
 pub use error::*;
 
+use crate::conductor::error::ConductorError;
+use crate::core::workflow::error::WorkflowError;
 use futures::stream::FuturesUnordered;
 use holochain_zome_types::CellId;
 use std::future::Future;
@@ -118,7 +120,7 @@ pub enum TaskOutcome {
     /// Close the conductor down because this is an unrecoverable error.
     ShutdownConductor(Box<ManagedTaskError>, String),
     /// Remove the Cell which caused the panic, but let all other Cells remain.
-    FreezeCell(CellId, Box<ManagedTaskError>, String),
+    UninstallApp(CellId, Box<ManagedTaskError>, String),
 }
 
 struct TaskManager {
@@ -186,34 +188,19 @@ async fn run(
                     error!("Shutting down conductor due to unrecoverable error: {:?}\nContext: {}", error, context);
                     return Err(TaskManagerError::Unrecoverable(error));
                 },
-                Some(TaskOutcome::FreezeCell(cell_id, error, context)) => {
+                Some(TaskOutcome::UninstallApp(cell_id, error, context)) => {
                     tracing::error!("About to deactivate apps");
-                    let env = conductor.get_cell_env_readonly(&cell_id).await.map_err(TaskManagerError::internal)?;
-                    let source_chain = holochain_state::source_chain::SourceChainBuf::new(env).map_err(TaskManagerError::internal)?;
                     let app_ids = conductor.list_active_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
-                    if source_chain.has_genesis() {
-                        tracing::error!(
-                            "Deactivating the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
-                            app_ids,
-                            error,
-                            context
-                        );
-                        for app_id in app_ids.iter() {
-                            conductor.deactivate_app(app_id.to_owned()).await.map_err(TaskManagerError::internal)?;
-                        }
-                        tracing::error!("Apps deactivated.");
-                    } else {
-                        tracing::error!(
-                            "UNINSTALLING the following apps due to an unrecoverable error during genesis: {:?}\nError: {:?}\nContext: {}",
-                            app_ids,
-                            error,
-                            context
-                        );
-                        for app_id in app_ids.iter() {
-                            conductor.uninstall_app(app_id).await.map_err(TaskManagerError::internal)?;
-                        }
-                        tracing::error!("Apps uninstalled.");
+                    tracing::error!(
+                        "UNINSTALLING the following apps due to an unrecoverable error during genesis: {:?}\nError: {:?}\nContext: {}",
+                        app_ids,
+                        error,
+                        context
+                    );
+                    for app_id in app_ids.iter() {
+                        conductor.uninstall_app(app_id).await.map_err(TaskManagerError::internal)?;
                     }
+                    tracing::error!("Apps uninstalled.");
                 },
                 None => return Ok(()),
             }
@@ -224,7 +211,6 @@ async fn run(
 #[tracing::instrument(skip(kind))]
 fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: String) -> TaskOutcome {
     use TaskOutcome::*;
-    println!("name: {}, result: {:?}", name, result);
     match kind {
         TaskKind::Ignore => match result {
             Ok(_) => Ignore,
@@ -236,7 +222,23 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
         },
         TaskKind::CellCritical(cell_id) => match result {
             Ok(_) => Ignore,
-            Err(err) => FreezeCell(cell_id.to_owned(), Box::new(err), name),
+            Err(err) => match &err {
+                ManagedTaskError::Conductor(conductor_err) => match conductor_err {
+                    // If the error was due to validation failure during genesis,
+                    // just uninstall the app.
+                    ConductorError::WorkflowError(
+                        WorkflowError::AuthoredGenesisValidationRejection(_),
+                    ) => UninstallApp(cell_id.to_owned(), Box::new(err), name),
+
+                    // For all other errors, shut down the conductor
+                    _ => ShutdownConductor(Box::new(err), name),
+                },
+                // If validation panicked, uninstall the app
+                ManagedTaskError::Join(_) => UninstallApp(cell_id.to_owned(), Box::new(err), name),
+
+                // For all others, shut down conductor
+                _ => ShutdownConductor(Box::new(err), name),
+            },
         },
         TaskKind::Generic(f) => f(result),
     }
