@@ -333,6 +333,7 @@ async fn test_list_active_apps_for_cell_id() {
     );
 }
 
+/// A function that sets up a SweetApp, used in several tests in this module
 async fn common_genesis_test_app(bad_zome: InlineZome) -> (SweetConductor, SweetApp) {
     let good_zome = InlineZome::new_unique(Vec::new());
     let mk_dna = |name, zome| async move {
@@ -340,6 +341,19 @@ async fn common_genesis_test_app(bad_zome: InlineZome) -> (SweetConductor, Sweet
             .await
             .unwrap()
     };
+
+    // Just a strong reminder that we need to be careful once we start using existing Cells:
+    // When a Cell panics or fails validation in general, we want to disable all Apps touching that Cell.
+    // However, if the panic/failure happens during Genesis, we want to completely
+    // destroy the app which is attempting to Create that Cell, but *NOT* any other apps
+    // which might be touching that Cell.
+    //
+    // It probably works out to be the same either way, since if we are creating a Cell,
+    // no other app could be possibly referencing it, but just in case we have some kind of complex
+    // behavior like installing two apps which reference each others' Cells at the same time,
+    // we need to be aware of this distinction.
+    holochain_types::app::we_must_remember_to_rework_cell_panic_handling_after_implementing_use_existing_cell_resolution(
+    );
 
     // Create one DNA which works, and one which always panics on validation
     let (dna_good, _) = mk_dna("good", good_zome).await;
@@ -352,11 +366,30 @@ async fn common_genesis_test_app(bad_zome: InlineZome) -> (SweetConductor, Sweet
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn sanity_check_that_app_starts_active() {
+    observability::test_run().ok();
+    let not_bad_zome = InlineZome::new_unique(Vec::new());
+
+    let (conductor, _) = common_genesis_test_app(not_bad_zome).await;
+
+    // - Ensure that the app was removed and both Cells were uninstalled
+    //   because one Cell panicked during Genesis
+    assert_eq_retry_10s!(
+        {
+            let state = conductor.get_state_from_handle().await.unwrap();
+            (state.active_apps.len(), state.inactive_apps.len())
+        },
+        (1, 0)
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_cells_self_destruct_on_panic_during_genesis() {
     observability::test_run().ok();
     let bad_zome =
         InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
             panic!("intentional panic during validation");
+            #[allow(unreachable_code)]
             Ok(ValidateResult::Valid)
         });
 
@@ -364,13 +397,13 @@ async fn test_cells_self_destruct_on_panic_during_genesis() {
 
     // - Ensure that the app was removed and both Cells were uninstalled
     //   because one Cell panicked during Genesis
-    assert_eq!(conductor.list_cell_ids().await.unwrap().len(), 0);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_apps_deactivate_on_panic_after_genesis() {
-    observability::test_run().ok();
-    todo!()
+    assert_eq_retry_10s!(
+        {
+            let state = conductor.get_state_from_handle().await.unwrap();
+            (state.active_apps.len(), state.inactive_apps.len())
+        },
+        (0, 0)
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -385,13 +418,82 @@ async fn test_cells_self_destruct_on_bad_validation_during_genesis() {
 
     let (conductor, _) = common_genesis_test_app(bad_zome).await;
 
-    assert_eq_retry_10s!(conductor.list_active_apps().await.unwrap().len(), 0);
-
-    // - Ensure that the cells were not removed
-    assert_eq!(conductor.list_cell_ids().await.unwrap().len(), 2);
+    assert_eq_retry_10s!(
+        {
+            let state = conductor.get_state_from_handle().await.unwrap();
+            (state.active_apps.len(), state.inactive_apps.len())
+        },
+        (0, 0)
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_apps_deactivate_on_bad_validation_after_genesis() {
-    todo!()
+async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
+    observability::test_run().ok();
+    let unit_entry_def = EntryDef::default_with_id("unit");
+    let bad_zome = InlineZome::new_unique(vec![unit_entry_def.clone()])
+        .callback("validate_create_entry", |_api, _data: ValidateData| {
+            Ok(ValidateResult::Invalid(
+                "intentional invalid result for testing".into(),
+            ))
+        })
+        .callback("create", move |api, ()| {
+            let entry_def_id: EntryDefId = unit_entry_def.id.clone();
+            let entry = Entry::app(().try_into().unwrap()).unwrap();
+            let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
+            Ok(hash)
+        });
+
+    let (conductor, app) = common_genesis_test_app(bad_zome).await;
+
+    let (_, cell_bad) = app.into_tuple();
+
+    let result: ConductorApiResult<HeaderHash> = conductor
+        .call_fallible(&cell_bad.zome("bad"), "create", ())
+        .await;
+
+    // - The failed validation simply causes the zome call to return an error
+    assert_matches!(result, Err(_));
+
+    // - The app is not deactivated
+    assert_eq_retry_10s!(
+        {
+            let state = conductor.get_state_from_handle().await.unwrap();
+            (state.active_apps.len(), state.inactive_apps.len())
+        },
+        (1, 0)
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Seems we want to test this, but actually it seems that panics in entry creation validation are unrecoverable"]
+async fn test_apps_deactivate_on_panic_after_genesis() {
+    observability::test_run().ok();
+    let unit_entry_def = EntryDef::default_with_id("unit");
+    let bad_zome = InlineZome::new_unique(vec![unit_entry_def.clone()])
+        .callback("validate_create_entry", |_api, _data: ValidateData| {
+            panic!("Intentional panic in validation");
+            #[allow(unreachable_code)]
+            Ok(ValidateResult::Valid)
+        })
+        .callback("create", move |api, ()| {
+            let entry_def_id: EntryDefId = unit_entry_def.id.clone();
+            let entry = Entry::app(().try_into().unwrap()).unwrap();
+            let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
+            Ok(hash)
+        });
+
+    let (conductor, app) = common_genesis_test_app(bad_zome).await;
+
+    let (_, cell_bad) = app.into_tuple();
+
+    let _: () = conductor.call(&cell_bad.zome("bad"), "create", ()).await;
+
+    assert_eq_retry_10s!(
+        {
+            let state = conductor.get_state_from_handle().await.unwrap();
+            (state.active_apps.len(), state.inactive_apps.len())
+        },
+        (0, 1)
+    );
 }

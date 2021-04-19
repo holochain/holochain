@@ -189,14 +189,31 @@ async fn run(
                 Some(TaskOutcome::FreezeCell(cell_id, error, context)) => {
                     tracing::error!("About to deactivate apps");
                     let env = conductor.get_cell_env_readonly(&cell_id).await.map_err(TaskManagerError::internal)?;
-                    let source_chain = holochain_state::source_chain::SourceChainBuf::new(env);
-                    let app_ids = conductor.deactivate_apps_with_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
-                    tracing::error!(
-                        "Deactivating the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
-                        app_ids,
-                        error,
-                        context
-                    );
+                    let source_chain = holochain_state::source_chain::SourceChainBuf::new(env).map_err(TaskManagerError::internal)?;
+                    let app_ids = conductor.list_active_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
+                    if source_chain.has_genesis() {
+                        tracing::error!(
+                            "Deactivating the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
+                            app_ids,
+                            error,
+                            context
+                        );
+                        for app_id in app_ids.iter() {
+                            conductor.deactivate_app(app_id.to_owned()).await.map_err(TaskManagerError::internal)?;
+                        }
+                        tracing::error!("Apps deactivated.");
+                    } else {
+                        tracing::error!(
+                            "UNINSTALLING the following apps due to an unrecoverable error during genesis: {:?}\nError: {:?}\nContext: {}",
+                            app_ids,
+                            error,
+                            context
+                        );
+                        for app_id in app_ids.iter() {
+                            conductor.uninstall_app(app_id).await.map_err(TaskManagerError::internal)?;
+                        }
+                        tracing::error!("Apps uninstalled.");
+                    }
                 },
                 None => return Ok(()),
             }

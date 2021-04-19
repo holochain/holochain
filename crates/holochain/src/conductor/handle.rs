@@ -1,5 +1,3 @@
-#![deny(missing_docs)]
-
 //! Defines [ConductorHandle], a lightweight cloneable reference to a Conductor
 //! with a limited public interface.
 //!
@@ -131,6 +129,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn load_dnas(&self) -> ConductorResult<()>;
 
     /// Dispatch a network event to the correct cell.
+    /// Warning: returning an error from this function kills the network for the conductor.
     async fn dispatch_holochain_p2p_event(
         &self,
         cell_id: &CellId,
@@ -192,9 +191,8 @@ pub trait ConductorHandleT: Send + Sync {
         payload: InstallAppBundlePayload,
     ) -> ConductorResult<InstalledApp>;
 
-    async fn uninstall_app(&mut self, app: &InstalledAppId) -> ConductorResult<()> {
-        todo!()
-    }
+    /// Uninstall an app from the state DB and remove all running Cells
+    async fn uninstall_app(&self, app: &InstalledAppId) -> ConductorResult<()>;
 
     /// Setup the cells from the database
     /// Only creates any cells that are not already created
@@ -214,14 +212,6 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Get the IDs of all active installed Apps which use this Cell
     async fn list_active_apps_for_cell_id(
-        &self,
-        cell_id: &CellId,
-    ) -> ConductorResult<HashSet<InstalledAppId>>;
-
-    /// Deactivate all apps which touch the specified CellId.
-    /// Used when a Cell causes an unrecoverable error, to allow other Cells
-    /// to continue functioning.
-    async fn deactivate_apps_with_cell_id(
         &self,
         cell_id: &CellId,
     ) -> ConductorResult<HashSet<InstalledAppId>>;
@@ -372,7 +362,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     #[instrument(skip(self))]
-    /// Warning: returning an error from this function kills the network for the conductor.
     async fn dispatch_holochain_p2p_event(
         &self,
         cell_id: &CellId,
@@ -638,6 +627,22 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(())
     }
 
+    async fn uninstall_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<()> {
+        if let Some(cell_ids_to_remove) = self
+            .conductor
+            .write()
+            .await
+            .remove_app_from_db(installed_app_id)
+            .await?
+        {
+            self.conductor
+                .write()
+                .await
+                .remove_cells(cell_ids_to_remove);
+        }
+        Ok(())
+    }
+
     async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>> {
         self.conductor.read().await.list_cell_ids().await
     }
@@ -655,17 +660,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
             .list_active_apps_for_cell_id(cell_id)
             .await
-    }
-
-    async fn deactivate_apps_with_cell_id(
-        &self,
-        cell_id: &CellId,
-    ) -> ConductorResult<HashSet<InstalledAppId>> {
-        let app_ids = self.list_active_apps_for_cell_id(&cell_id).await?;
-        for app_id in app_ids.iter() {
-            self.deactivate_app(app_id.to_owned()).await?;
-        }
-        Ok(app_ids)
     }
 
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {

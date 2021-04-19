@@ -662,6 +662,27 @@ where
             .collect())
     }
 
+    /// Entirely remove an app from the database
+    pub(super) async fn remove_app_from_db(
+        &mut self,
+        installed_app_id: &InstalledAppId,
+    ) -> ConductorResult<Option<Vec<CellId>>> {
+        let (_state, cells_to_remove) = self
+            .update_state_prime({
+                let installed_app_id = installed_app_id.clone();
+                move |mut state| {
+                    let active = state.active_apps.remove(&installed_app_id);
+                    let inactive = state.inactive_apps.remove(&installed_app_id);
+                    let cells = active
+                        .or(inactive)
+                        .map(|app| app.all_cells().cloned().collect());
+                    Ok((state, cells))
+                }
+            })
+            .await?;
+        Ok(cells_to_remove)
+    }
+
     /// Add fully constructed cells to the cell map in the Conductor
     pub(super) fn add_cells(&mut self, cells: Vec<Cell>) {
         for cell in cells {
