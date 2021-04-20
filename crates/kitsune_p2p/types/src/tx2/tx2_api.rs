@@ -89,6 +89,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
                     %resp_dbg_name,
                     ?local_cert,
                     ?peer_cert,
+                    %elapsed_ns,
                     "(api) req approaching timeout (> 75%)",
                 );
             }
