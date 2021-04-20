@@ -13,6 +13,7 @@ use holochain_sqlite::db::ReadManager;
 use holochain_state::query::Query;
 use holochain_state::query::Txn;
 use holochain_types::prelude::*;
+use holochain_zome_types::agent_activity::DeterministicGetAgentActivityFilter;
 use tracing::*;
 
 pub use get_entry_ops_query::WireDhtOp;
