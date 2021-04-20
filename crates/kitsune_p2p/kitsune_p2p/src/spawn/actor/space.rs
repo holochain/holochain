@@ -808,17 +808,17 @@ impl Space {
         let actor::RpcMulti {
             space,
             from_agent,
-            basis,
-            remote_agent_count,
-            timeout_ms,
+            //basis,
+            //remote_agent_count,
+            //timeout_ms,
             //as_race,
             //race_timeout_ms,
             payload,
             ..
         } = input;
-        let remote_agent_count = remote_agent_count.unwrap();
-        let timeout_ms = timeout_ms.unwrap();
-        let stage_1_timeout_ms = timeout_ms / 2;
+        //let remote_agent_count = remote_agent_count.unwrap();
+        //let timeout_ms = timeout_ms.unwrap();
+        //let stage_1_timeout_ms = 2000;
 
         // as an optimization - request to all local joins
         // but don't count that toward our request total
@@ -838,6 +838,7 @@ impl Space {
             })
             .collect::<Vec<_>>();
 
+        /*
         let remote_fut = discover::message_neighborhood(
             self,
             from_agent.clone(),
@@ -860,9 +861,10 @@ impl Space {
             },
         )
         .instrument(tracing::debug_span!("message_neighborhood", payload = ?payload.iter().take(5).collect::<Vec<_>>()));
+        */
 
         Ok(async move {
-            let mut out: Vec<actor::RpcMultiResponse> = futures::future::join_all(local_all)
+            let out: Vec<actor::RpcMultiResponse> = futures::future::join_all(local_all)
                 .await
                 .into_iter()
                 .filter_map(|(r, a)| {
@@ -876,8 +878,10 @@ impl Space {
                     }
                 })
                 .collect();
+            //tracing::warn!("local_all count: {}", out.len());
 
-            out.append(&mut remote_fut.await);
+            //out.append(&mut remote_fut.await);
+            //tracing::warn!("plus remote count: {}", out.len());
 
             Ok(out)
         }

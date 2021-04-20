@@ -41,6 +41,8 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // david.b disabled while we're full sync, not actually making
+              //         get requests
     async fn test_transport_multi_coms() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
         let (harness, _evt) = spawn_test_harness_mem().await?;
