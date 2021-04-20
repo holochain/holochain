@@ -222,7 +222,7 @@ impl SweetConductor {
     /// Install the dna first.
     /// This allows a big speed up when
     /// installing many apps with the same dna
-    async fn setup_app_part_1(&mut self, dna_files: &[DnaFile]) {
+    async fn setup_app_1_register_dna(&mut self, dna_files: &[DnaFile]) {
         for dna_file in dna_files {
             self.register_dna(dna_file.clone())
                 .await
@@ -234,7 +234,7 @@ impl SweetConductor {
     /// Install the app and activate it
     // TODO: make this take a more flexible config for specifying things like
     // membrane proofs
-    async fn setup_app_part_2(
+    async fn setup_app_2_install_and_activate(
         &mut self,
         installed_app_id: &str,
         agent: AgentPubKey,
@@ -267,7 +267,7 @@ impl SweetConductor {
     /// are not available until after `setup_cells` has run, and it is
     /// better to do that once for all apps in the case of multiple apps being
     /// set up at once.
-    async fn setup_app_part_3(
+    async fn setup_app_3_create_sweet_app(
         &self,
         installed_app_id: &str,
         agent: AgentPubKey,
@@ -297,8 +297,8 @@ impl SweetConductor {
         agent: AgentPubKey,
         dna_files: &[DnaFile],
     ) -> SweetApp {
-        self.setup_app_part_1(dna_files).await;
-        self.setup_app_part_2(installed_app_id, agent.clone(), dna_files)
+        self.setup_app_1_register_dna(dna_files).await;
+        self.setup_app_2_install_and_activate(installed_app_id, agent.clone(), dna_files)
             .await;
 
         self.handle()
@@ -309,7 +309,7 @@ impl SweetConductor {
             .expect("Could not setup cells");
 
         let dna_files = dna_files.iter().map(|d| d.dna_hash().clone());
-        self.setup_app_part_3(installed_app_id, agent, dna_files)
+        self.setup_app_3_create_sweet_app(installed_app_id, agent, dna_files)
             .await
     }
 
@@ -337,10 +337,10 @@ impl SweetConductor {
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
     ) -> SweetAppBatch {
-        self.setup_app_part_1(dna_files).await;
+        self.setup_app_1_register_dna(dna_files).await;
         for agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
-            self.setup_app_part_2(&installed_app_id, agent.clone(), dna_files)
+            self.setup_app_2_install_and_activate(&installed_app_id, agent.clone(), dna_files)
                 .await;
         }
 
@@ -355,7 +355,7 @@ impl SweetConductor {
         for agent in agents {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             apps.push(
-                self.setup_app_part_3(
+                self.setup_app_3_create_sweet_app(
                     &installed_app_id,
                     agent.clone(),
                     dna_files.iter().map(|d| d.dna_hash().clone()),

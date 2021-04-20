@@ -173,6 +173,7 @@ async fn run(
                     error!("Minor error during managed task: {:?}\nContext: {}", error, context)
                 }
                 Some(TaskOutcome::ShutdownConductor(error, context)) => {
+                    dbg!(&error, &context);
                     let error = match *error {
                         ManagedTaskError::Join(error) => {
                             match error.try_into_panic() {
@@ -189,6 +190,7 @@ async fn run(
                     return Err(TaskManagerError::Unrecoverable(error));
                 },
                 Some(TaskOutcome::UninstallApp(cell_id, error, context)) => {
+                    dbg!(&cell_id, &error, &context);
                     tracing::error!("About to deactivate apps");
                     let app_ids = conductor.list_active_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
                     tracing::error!(
@@ -211,6 +213,7 @@ async fn run(
 #[tracing::instrument(skip(kind))]
 fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: String) -> TaskOutcome {
     use TaskOutcome::*;
+    dbg!(&result);
     match kind {
         TaskKind::Ignore => match result {
             Ok(_) => Ignore,
@@ -233,7 +236,13 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
                     // For all other errors, shut down the conductor
                     _ => ShutdownConductor(Box::new(err), name),
                 },
-                // If validation panicked, uninstall the app
+                // If validation panicked, uninstall the app.
+                // TODO: BUT, do we need to restart the queue consumer too?
+                //       if so, try to find a general way to do this?
+                //       OR: is it OK since this task was cell-specific and the
+                //       Cell is going away? I think this is the case...
+                //       so we just need to make sure everything cleanly shuts
+                //       down, because currently this is causing everything to hang.
                 ManagedTaskError::Join(_) => UninstallApp(cell_id.to_owned(), Box::new(err), name),
 
                 // For all others, shut down conductor

@@ -786,9 +786,13 @@ where
     }
 
     /// Remove cells from the cell map in the Conductor
-    pub(super) fn remove_cells(&mut self, cell_ids: Vec<CellId>) {
+    pub(super) async fn remove_cells(&mut self, cell_ids: Vec<CellId>) {
         for cell_id in cell_ids {
-            self.cells.remove(&cell_id);
+            if let Some(item) = self.cells.remove(&cell_id) {
+                if let Err(err) = item.cell.destroy().await {
+                    tracing::error!("Error destroying Cell: {:?}\nCellId: {}", err, cell_id);
+                }
+            }
         }
     }
 

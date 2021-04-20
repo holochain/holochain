@@ -366,20 +366,30 @@ async fn common_genesis_test_app(bad_zome: InlineZome) -> (SweetConductor, Sweet
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn sanity_check_that_app_starts_active() {
+async fn test_uninstall_app() {
     observability::test_run().ok();
     let not_bad_zome = InlineZome::new_unique(Vec::new());
 
     let (conductor, _) = common_genesis_test_app(not_bad_zome).await;
 
-    // - Ensure that the app was removed and both Cells were uninstalled
-    //   because one Cell panicked during Genesis
+    // - Ensure that the app is active
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
             (state.active_apps.len(), state.inactive_apps.len())
         },
         (1, 0)
+    );
+
+    conductor.uninstall_app(&"app".to_string()).await.unwrap();
+
+    // - Ensure that the app is removed
+    assert_eq_retry_10s!(
+        {
+            let state = conductor.get_state_from_handle().await.unwrap();
+            (state.active_apps.len(), state.inactive_apps.len())
+        },
+        (0, 0)
     );
 }
 
