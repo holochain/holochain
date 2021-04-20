@@ -5,6 +5,20 @@ use crate::*;
 use holochain_zome_types::signature::Signature;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+/// The data required for a get request.
+pub enum GetRequest {
+    /// Get all the integrated data.
+    All,
+    /// Get only the integrated content.
+    Content,
+    /// Get only the metadata.
+    /// If you already have the content this is all you need.
+    Metadata,
+    /// Get the content even if it's still pending.
+    Pending,
+}
+
 /// Get options help control how the get is processed at various levels.
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct GetOptions {
@@ -14,6 +28,8 @@ pub struct GetOptions {
     /// Return all live headers even if there is deletes.
     /// Useful for metadata calls.
     pub all_live_headers_with_metadata: bool,
+    /// The type of data this get request requires.
+    pub request_type: GetRequest,
 }
 
 impl From<&actor::GetOptions> for GetOptions {
@@ -21,7 +37,14 @@ impl From<&actor::GetOptions> for GetOptions {
         Self {
             follow_redirects: a.follow_redirects,
             all_live_headers_with_metadata: a.all_live_headers_with_metadata,
+            request_type: a.request_type.clone(),
         }
+    }
+}
+
+impl Default for GetRequest {
+    fn default() -> Self {
+        GetRequest::All
     }
 }
 

@@ -57,15 +57,13 @@ impl Query for GetLiveElementQuery {
         let f = move |header: &QueryData<Self>| {
             if *header.header_address() == header_filter {
                 true
+            } else if let Header::Delete(Delete {
+                deletes_address, ..
+            }) = header.header()
+            {
+                *deletes_address == header_filter
             } else {
-                if let Header::Delete(Delete {
-                    deletes_address, ..
-                }) = header.header()
-                {
-                    *deletes_address == header_filter
-                } else {
-                    false
-                }
+                false
             }
         };
         Box::new(f)
@@ -82,16 +80,14 @@ impl Query for GetLiveElementQuery {
             if !state.1.contains(hash) {
                 state.0 = Some(shh);
             }
-        } else {
-            if let Header::Delete(delete) = shh.header() {
-                let header = state.0.take();
-                if let Some(h) = header {
-                    if *h.as_hash() != delete.deletes_address {
-                        state.0 = Some(h);
-                    }
+        } else if let Header::Delete(delete) = shh.header() {
+            let header = state.0.take();
+            if let Some(h) = header {
+                if *h.as_hash() != delete.deletes_address {
+                    state.0 = Some(h);
                 }
-                state.1.insert(delete.deletes_address.clone());
             }
+            state.1.insert(delete.deletes_address.clone());
         }
         Ok(state)
     }

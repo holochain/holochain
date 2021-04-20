@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use holo_hash::hash_type::AnyDht;
+use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_types::prelude::Judged;
 use holochain_types::EntryHashed;
+use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::SignedHeaderHashed;
 
@@ -23,7 +26,7 @@ use crate::query::Store;
 /// a simple filter on the scratch space, and then chaining that iterator
 /// onto the iterators over the Headers in the database(s) produced by the
 /// Cascade.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Scratch {
     headers: Vec<SignedHeaderHashed>,
     entries: HashMap<EntryHash, Arc<Entry>>,
@@ -36,10 +39,7 @@ pub struct FilteredScratch {
 
 impl Scratch {
     pub fn new() -> Self {
-        Self {
-            headers: Vec::new(),
-            entries: HashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn add_header(&mut self, item: SignedHeaderHashed) {
@@ -55,6 +55,39 @@ impl Scratch {
         let headers = self.headers.iter().filter(|&t| f(t)).cloned().collect();
         FilteredScratch { headers }
     }
+
+    fn get_exact_element(
+        &self,
+        hash: &HeaderHash,
+    ) -> StateQueryResult<Option<holochain_zome_types::Element>> {
+        Ok(self.get_header(hash)?.map(|shh| {
+            let entry = shh
+                .header()
+                .entry_hash()
+                .and_then(|eh| self.get_entry(eh).ok());
+            Element::new(shh, entry.flatten())
+        }))
+    }
+
+    fn get_any_element(
+        &self,
+        hash: &EntryHash,
+    ) -> StateQueryResult<Option<holochain_zome_types::Element>> {
+        let r = self.get_entry(hash)?.and_then(|entry| {
+            let shh = self
+                .headers
+                .iter()
+                .find(|h| {
+                    h.header()
+                        .entry_hash()
+                        .map(|eh| eh == hash)
+                        .unwrap_or(false)
+                })?
+                .clone();
+            Some(Element::new(shh, Some(entry)))
+        });
+        Ok(r)
+    }
 }
 
 impl Store for Scratch {
@@ -67,16 +100,27 @@ impl Store for Scratch {
     }
 
     fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
+        Ok(self.headers.iter().any(|h| h.header_address() == hash))
+    }
+
+    fn get_header(&self, hash: &HeaderHash) -> StateQueryResult<Option<SignedHeaderHashed>> {
         Ok(self
             .headers
             .iter()
             .find(|h| h.header_address() == hash)
-            .is_some())
+            .cloned())
+    }
+
+    fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>> {
+        match *hash.hash_type() {
+            AnyDht::Entry => self.get_any_element(&hash.clone().into()),
+            AnyDht::Header => self.get_exact_element(&hash.clone().into()),
+        }
     }
 }
 
 impl FilteredScratch {
-    pub fn into_iter<'iter>(&'iter mut self) -> impl Iterator<Item = SignedHeaderHashed> + 'iter {
+    pub fn drain(&mut self) -> impl Iterator<Item = SignedHeaderHashed> + '_ {
         self.headers.drain(..)
     }
 }
@@ -99,7 +143,7 @@ impl StoresIter<Judged<SignedHeaderHashed>> for FilteredScratch {
         // then this transaction will be rolled back.
         // TODO: Write test to prove this assumption.
         Ok(Box::new(fallible_iterator::convert(
-            self.into_iter().map(Judged::valid).map(Ok),
+            self.drain().map(Judged::valid).map(Ok),
         )))
     }
 }
@@ -132,7 +176,7 @@ CREATE TABLE mytable (
         .unwrap()
         .prepare_cached("SELECT x FROM mytable")
         .unwrap()
-        .query_map(NO_PARAMS, |row| Ok(dbg!(row.get(0))?))
+        .query_map(NO_PARAMS, |row| row.get(0))
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
@@ -142,7 +186,7 @@ CREATE TABLE mytable (
         .unwrap()
         .prepare_cached("SELECT * FROM mytable")
         .unwrap()
-        .query_map(NO_PARAMS, |row| Ok(row.get(0)?))
+        .query_map(NO_PARAMS, |row| row.get(0))
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
         .unwrap();

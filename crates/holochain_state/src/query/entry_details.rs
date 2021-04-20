@@ -1,6 +1,7 @@
 use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_types::dht_op::DhtOpType;
+use holochain_types::prelude::DhtOpError;
 use holochain_types::prelude::Judged;
 use holochain_zome_types::*;
 use std::fmt::Debug;
@@ -51,7 +52,7 @@ impl Query for GetEntryDetailsQuery {
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = |row: &Row| {
-            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?)?;
             let SignedHeader(header, signature) = header;
             let header = HeaderHashed::from_content_sync(header);
             let shh = SignedHeaderHashed::with_presigned(header, signature);
@@ -123,7 +124,11 @@ impl Query for GetEntryDetailsQuery {
                 let hash = delete.deletes_address.clone();
                 state.deletes.insert(hash, shh.clone());
             }
-            _ => panic!("TODO: Turn this into an error"),
+            _ => {
+                return Err(StateQueryError::UnexpectedHeader(
+                    shh.header().header_type(),
+                ))
+            }
         }
         Ok(state)
     }
@@ -141,21 +146,22 @@ impl Query for GetEntryDetailsQuery {
             .next();
         match header {
             Some(header) => {
-                // TODO: Handle error where header doesn't have entry hash.
-                let entry_hash = header.header().entry_hash().unwrap();
-                let entry = stores
-                    .get_entry(&entry_hash)?
-                    .expect("TODO: Handle case where entry wasn't found but we had headers");
-                let entry_dht_status = compute_entry_status(&state);
-                let details = EntryDetails {
-                    entry,
-                    headers: state.headers.into_iter().collect(),
-                    rejected_headers: state.rejected_headers.into_iter().collect(),
-                    deletes: state.deletes.into_iter().map(|(_, v)| v).collect(),
-                    updates: state.updates.into_iter().collect(),
-                    entry_dht_status: entry_dht_status,
-                };
-                Ok(Some(details))
+                let entry_hash = header
+                    .header()
+                    .entry_hash()
+                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.header().clone()))?;
+                let details = stores.get_entry(&entry_hash)?.map(|entry| {
+                    let entry_dht_status = compute_entry_status(&state);
+                    EntryDetails {
+                        entry,
+                        headers: state.headers.into_iter().collect(),
+                        rejected_headers: state.rejected_headers.into_iter().collect(),
+                        deletes: state.deletes.into_iter().map(|(_, v)| v).collect(),
+                        updates: state.updates.into_iter().collect(),
+                        entry_dht_status,
+                    }
+                });
+                Ok(details)
             }
             None => Ok(None),
         }

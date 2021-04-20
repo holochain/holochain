@@ -1,7 +1,8 @@
 use ghost_actor::dependencies::observability;
+use holo_hash::HasHash;
 use holochain_cascade2::test_utils::*;
 use holochain_cascade2::Cascade;
-use holochain_state::insert::insert_op_scratch;
+use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_cell_env;
 use holochain_state::scratch::Scratch;
 use holochain_zome_types::Details;
@@ -45,8 +46,12 @@ async fn assert_can_get<N: HolochainP2pCellT2 + Clone + Send + 'static>(
         .expect("Failed to get entry");
 
     let expected = Details::Entry(EntryDetails {
-        entry: td_entry.entry.clone(),
-        headers: vec![wire_op_to_shh(&td_entry.wire_create)],
+        entry: td_entry.entry.entry.clone(),
+        headers: vec![td_entry
+            .wire_create
+            .data
+            .clone()
+            .into_header(td_entry.entry.entry_type.clone(), td_entry.hash.clone())],
         rejected_headers: vec![],
         deletes: vec![],
         updates: vec![],
@@ -139,9 +144,13 @@ async fn assert_rejected<N: HolochainP2pCellT2 + Clone + Send + 'static>(
         .expect("Failed to get entry");
 
     let expected = Details::Entry(EntryDetails {
-        entry: td_entry.entry.clone(),
+        entry: td_entry.entry.entry.clone(),
         headers: vec![],
-        rejected_headers: vec![wire_op_to_shh(&td_entry.wire_create)],
+        rejected_headers: vec![td_entry
+            .wire_create
+            .data
+            .clone()
+            .into_header(td_entry.entry.entry_type.clone(), td_entry.hash.clone())],
         deletes: vec![],
         updates: vec![],
         entry_dht_status: EntryDhtStatus::Dead,
@@ -166,6 +175,50 @@ async fn assert_rejected<N: HolochainP2pCellT2 + Clone + Send + 'static>(
     });
 
     assert_eq!(r, expected);
+}
+
+async fn assert_can_retrieve<N: HolochainP2pCellT2 + Clone + Send + 'static>(
+    td_entry: &EntryTestData,
+    cascade: &mut Cascade<N>,
+    options: GetOptions,
+) {
+    // - Retrieve via entry hash
+    let r = cascade
+        .retrieve(td_entry.hash.clone().into(), options.clone().into())
+        .await
+        .unwrap()
+        .expect("Failed to retrieve element");
+
+    assert_eq!(*r.header_address(), td_entry.create_hash);
+    assert_eq!(r.header().entry_hash(), Some(&td_entry.hash));
+
+    // - Retrieve via header hash
+    let r = cascade
+        .retrieve(td_entry.create_hash.clone().into(), options.clone().into())
+        .await
+        .unwrap()
+        .expect("Failed to retrieve element");
+
+    assert_eq!(*r.header_address(), td_entry.create_hash);
+    assert_eq!(r.header().entry_hash(), Some(&td_entry.hash));
+
+    // - Retrieve entry
+    let r = cascade
+        .retrieve_entry(td_entry.hash.clone(), options.clone().into())
+        .await
+        .unwrap()
+        .expect("Failed to retrieve entry");
+
+    assert_eq!(*r.as_hash(), td_entry.hash);
+
+    // - Retrieve header
+    let r = cascade
+        .retrieve_header(td_entry.create_hash.clone(), options.clone().into())
+        .await
+        .unwrap()
+        .expect("Failed to retrieve header");
+
+    assert_eq!(*r.as_hash(), td_entry.create_hash);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -202,8 +255,8 @@ async fn entry_authoring() {
     // Data
     let td_entry = EntryTestData::new();
     let td_element = ElementTestData::new();
-    insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone());
-    insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone());
+    insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone()).unwrap();
+    insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone()).unwrap();
 
     // Network
     // - Not expecting any calls to the network.
@@ -286,8 +339,8 @@ async fn content_authoring() {
     // Data
     let td_entry = EntryTestData::new();
     let td_element = ElementTestData::new();
-    insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone());
-    insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone());
+    insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone()).unwrap();
+    insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone()).unwrap();
 
     // Network
     // - Not expecting any calls to the network.
@@ -419,10 +472,14 @@ async fn test_pending_data_isnt_returned() {
 
     assert_is_none(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
 
+    assert_can_retrieve(&td_entry, &mut cascade, GetOptions::latest()).await;
+
     let network = PassThroughNetwork::authority_for_all(vec![authority.env().clone().into()]);
 
     // Cascade
     let mut cascade = Cascade::<PassThroughNetwork>::empty().with_network(network, cache.env());
 
     assert_is_none(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
+
+    assert_can_retrieve(&td_entry, &mut cascade, GetOptions::latest()).await;
 }

@@ -38,6 +38,7 @@ mockall = { version = "0.9.1", optional = true }
 
 [dev-dependencies]
 matches = "0.1"
+pretty_assertions = "0.7.2"
 
 [features]
 default = ["test_utils"]

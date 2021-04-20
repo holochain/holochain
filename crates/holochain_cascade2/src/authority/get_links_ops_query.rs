@@ -1,13 +1,19 @@
 use holo_hash::EntryHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
-use holochain_state::query::{prelude::*, QueryData};
+use holochain_state::query::prelude::*;
+use holochain_state::query::StateQueryError;
 use holochain_types::dht_op::DhtOpType;
+use holochain_types::link::WireCreateLink;
+use holochain_types::link::WireDeleteLink;
+use holochain_types::link::WireLinkOps;
+use holochain_zome_types::HasValidationStatus;
+use holochain_zome_types::Header;
+use holochain_zome_types::Judged;
 use holochain_zome_types::LinkTag;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::ZomeId;
 
-use super::WireDhtOp;
 use super::WireLinkKey;
 
 #[derive(Debug, Clone)]
@@ -27,24 +33,13 @@ impl GetLinksOpsQuery {
     }
 }
 
-// TODO: Move this to holochain types.
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct WireLinkOps {
-    pub creates: Vec<WireDhtOp>,
-    pub deletes: Vec<WireDhtOp>,
-}
-
-impl WireLinkOps {
-    pub fn new() -> Self {
-        Self {
-            creates: Vec::new(),
-            deletes: Vec::new(),
-        }
-    }
+pub struct Item {
+    header: SignedHeader,
+    op_type: DhtOpType,
 }
 
 impl Query for GetLinksOpsQuery {
-    type Item = WireDhtOp;
+    type Item = Judged<Item>;
     type State = WireLinkOps;
     type Output = Self::State;
 
@@ -67,6 +62,7 @@ impl Query for GetLinksOpsQuery {
             AND 
             DhtOp.when_integrated IS NOT NULL
         ";
+        // TODO: This should not be = but should be a partial match.
         let tag = "
             AND
             Header.tag = :tag
@@ -113,16 +109,10 @@ impl Query for GetLinksOpsQuery {
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = |row: &Row| {
-            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
-            let SignedHeader(header, signature) = header;
+            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?)?;
             let op_type = row.get(row.column_index("dht_type")?)?;
             let validation_status = row.get(row.column_index("status")?)?;
-            Ok(WireDhtOp {
-                validation_status,
-                op_type,
-                header,
-                signature,
-            })
+            Ok(Judged::raw(Item { op_type, header }, validation_status))
         };
         Arc::new(f)
     }
@@ -131,19 +121,47 @@ impl Query for GetLinksOpsQuery {
         Ok(WireLinkOps::new())
     }
 
-    fn fold(
-        &self,
-        mut state: Self::State,
-        dht_op: QueryData<Self>,
-    ) -> StateQueryResult<Self::State> {
-        match &dht_op.op_type {
+    fn fold(&self, mut state: Self::State, dht_op: Self::Item) -> StateQueryResult<Self::State> {
+        match &dht_op.data.op_type {
             DhtOpType::RegisterAddLink => {
-                state.creates.push(dht_op);
+                let validation_status = dht_op.validation_status();
+                let item = dht_op.data.header;
+                if let (
+                    SignedHeader(Header::CreateLink(header), signature),
+                    Some(validation_status),
+                ) = (item, validation_status)
+                {
+                    if self.tag.is_some() {
+                        state.creates.push(WireCreateLink::condense_base_only(
+                            header,
+                            signature,
+                            validation_status,
+                        ));
+                    } else {
+                        state.creates.push(WireCreateLink::condense(
+                            header,
+                            signature,
+                            validation_status,
+                        ));
+                    }
+                }
             }
             DhtOpType::RegisterRemoveLink => {
-                state.deletes.push(dht_op);
+                let validation_status = dht_op.validation_status();
+                let item = dht_op.data.header;
+                if let (
+                    SignedHeader(Header::DeleteLink(header), signature),
+                    Some(validation_status),
+                ) = (item, validation_status)
+                {
+                    state.deletes.push(WireDeleteLink::condense(
+                        header,
+                        signature,
+                        validation_status,
+                    ));
+                }
             }
-            _ => panic!("TODO: Turn this into an error"),
+            _ => return Err(StateQueryError::UnexpectedOp(dht_op.data.op_type)),
         }
         Ok(state)
     }

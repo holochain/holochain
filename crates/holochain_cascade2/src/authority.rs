@@ -1,7 +1,8 @@
+use self::get_agent_activity_query::hashes::GetAgentActivityQuery;
 use self::get_entry_ops_query::GetEntryOpsQuery;
 use self::get_links_ops_query::GetLinksOpsQuery;
 use self::{
-    deterministic_get_agent_activity_query::DeterministicGetAgentActivityQuery,
+    get_agent_activity_query::deterministic::DeterministicGetAgentActivityQuery,
     get_element_query::GetElementOpsQuery,
 };
 
@@ -14,32 +15,15 @@ use holochain_state::query::Txn;
 use holochain_types::prelude::*;
 use tracing::*;
 
-pub use get_element_query::WireElementOps;
 pub use get_entry_ops_query::WireDhtOp;
-pub use get_entry_ops_query::WireEntryOps;
-pub use get_links_ops_query::WireLinkOps;
 
 #[cfg(test)]
 mod test;
 
-mod deterministic_get_agent_activity_query;
+mod get_agent_activity_query;
 mod get_element_query;
 mod get_entry_ops_query;
 mod get_links_ops_query;
-
-// TODO: Move this to holochain types.
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum WireOps {
-    Entry(WireEntryOps),
-    Element(WireElementOps),
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct WireLinkKey {
-    pub base: EntryHash,
-    pub zome_id: ZomeId,
-    pub tag: Option<LinkTag>,
-}
 
 #[instrument(skip(state_env))]
 pub fn handle_get_entry(
@@ -55,8 +39,12 @@ pub fn handle_get_entry(
 }
 
 #[tracing::instrument(skip(env))]
-pub fn handle_get_element(env: EnvRead, hash: HeaderHash) -> CascadeResult<WireElementOps> {
-    let query = GetElementOpsQuery::new(hash);
+pub fn handle_get_element(
+    env: EnvRead,
+    hash: HeaderHash,
+    options: holochain_p2p::event::GetOptions,
+) -> CascadeResult<WireElementOps> {
+    let query = GetElementOpsQuery::new(hash, options);
     let results = env
         .conn()?
         .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;
@@ -65,6 +53,20 @@ pub fn handle_get_element(env: EnvRead, hash: HeaderHash) -> CascadeResult<WireE
 
 #[instrument(skip(env))]
 pub fn handle_get_agent_activity(
+    env: EnvRead,
+    agent: AgentPubKey,
+    query: ChainQueryFilter,
+    options: holochain_p2p::event::GetActivityOptions,
+) -> CascadeResult<AgentActivityResponse<HeaderHash>> {
+    let query = GetAgentActivityQuery::new(agent, query, options);
+    let results = env
+        .conn()?
+        .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;
+    Ok(results)
+}
+
+#[instrument(skip(env))]
+pub fn handle_get_agent_activity_deterministic(
     env: EnvRead,
     agent: AgentPubKey,
     filter: DeterministicGetAgentActivityFilter,

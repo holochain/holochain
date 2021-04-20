@@ -1,8 +1,8 @@
 pub use crate::chain_sequence::*;
 pub use crate::dht_op_integration::*;
 pub use crate::element_buf::*;
-pub use crate::insert::*;
 pub use crate::metadata::*;
+pub use crate::mutations::*;
 pub use crate::query::prelude::*;
 pub use crate::source_chain::*;
 pub use crate::validation_db::*;

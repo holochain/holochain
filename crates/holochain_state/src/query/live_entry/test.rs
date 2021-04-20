@@ -2,9 +2,9 @@ use holochain_sqlite::rusqlite::Connection;
 use holochain_sqlite::rusqlite::TransactionBehavior;
 use holochain_sqlite::schema::SCHEMA_CELL;
 
-use crate::insert::insert_op;
-use crate::insert::insert_op_scratch;
-use crate::insert::update_op_validation_status;
+use crate::mutations::insert_op;
+use crate::mutations::insert_op_scratch;
+use crate::mutations::update_op_validation_status;
 use crate::query::test_data::EntryTestData;
 
 use super::*;
@@ -23,12 +23,13 @@ async fn can_handle_update_in_scratch() {
     let td = EntryTestData::new();
 
     // - Create an entry on main db.
-    insert_op(&mut txn, td.update_store_entry_op.clone(), false);
+    insert_op(&mut txn, td.update_store_entry_op.clone(), false).unwrap();
     update_op_validation_status(
         &mut txn,
         td.update_store_entry_op.as_hash().clone(),
         ValidationStatus::Valid,
-    );
+    )
+    .unwrap();
     let r = td
         .query
         .run(Txn::from(&txn))
@@ -38,7 +39,7 @@ async fn can_handle_update_in_scratch() {
     assert_eq!(*r.header(), *td.update_header.header());
 
     // - Add to the scratch
-    insert_op_scratch(&mut scratch, td.update_store_entry_op.clone());
+    insert_op_scratch(&mut scratch, td.update_store_entry_op.clone()).unwrap();
     let r = td
         .query
         .run(scratch.clone())

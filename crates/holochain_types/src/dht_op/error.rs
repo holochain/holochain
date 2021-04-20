@@ -16,6 +16,8 @@ pub enum DhtOpError {
     WrongHeaderError(#[from] WrongHeaderError),
     #[error("Tried to create DhtOp type {0} with header type {1}")]
     OpHeaderMismatch(DhtOpType, HeaderType),
+    #[error("Link requests without tags require a tag in the response")]
+    LinkKeyTagMissing,
 }
 
 pub type DhtOpResult<T> = Result<T, DhtOpError>;

@@ -11,8 +11,11 @@
 //! holds".
 
 use crate::ValidationStatus;
+use holochain_serialized_bytes::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::From, derive_more::Into)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, derive_more::From, derive_more::Into, Serialize, Deserialize,
+)]
 /// Data with an optional validation status.
 pub struct Judged<T> {
     /// The data that the status applies to.
@@ -28,6 +31,11 @@ impl<T> Judged<T> {
             data,
             status: Some(status),
         }
+    }
+
+    /// Create a Judged item where it's ok to not have a status.
+    pub fn raw(data: T, status: Option<ValidationStatus>) -> Self {
+        Self { data, status }
     }
 
     /// Create a valid status of T.
@@ -46,6 +54,17 @@ impl<T> Judged<T> {
     /// Move out the inner data type
     pub fn into_data(self) -> T {
         self.data
+    }
+
+    /// Map this type to another judged type with the same status.
+    pub fn map<B, F>(self, f: F) -> Judged<B>
+    where
+        F: FnOnce(T) -> B,
+    {
+        Judged::<B> {
+            data: f(self.data),
+            status: self.status,
+        }
     }
 }
 

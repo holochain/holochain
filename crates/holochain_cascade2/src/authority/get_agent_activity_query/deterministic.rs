@@ -20,10 +20,8 @@ use holochain_state::{
     prelude::*,
     query::{row_blob_and_hash_to_header, QueryData},
 };
-use holochain_zome_types::*;
+use holochain_types::prelude::*;
 use std::fmt::Debug;
-
-use super::*;
 
 #[derive(Debug, Clone)]
 pub struct DeterministicGetAgentActivityQuery {
@@ -185,7 +183,7 @@ mod tests {
         };
         let options = GetActivityOptions::default();
 
-        let results_full = handle_get_agent_activity(
+        let results_full = crate::authority::handle_get_agent_activity_deterministic(
             env.clone().into(),
             agents[2].clone(),
             filter_full,
@@ -193,7 +191,7 @@ mod tests {
         )
         .unwrap();
 
-        let results_partial = handle_get_agent_activity(
+        let results_partial = crate::authority::handle_get_agent_activity_deterministic(
             env.clone().into(),
             agents[2].clone(),
             filter_partial,

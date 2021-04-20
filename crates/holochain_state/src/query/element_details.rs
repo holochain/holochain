@@ -52,7 +52,7 @@ impl Query for GetElementDetailsQuery {
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = |row: &Row| {
-            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?)?;
             let SignedHeader(header, signature) = header;
             let header = HeaderHashed::from_content_sync(header);
             let shh = SignedHeaderHashed::with_presigned(header, signature);

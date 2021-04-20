@@ -87,7 +87,7 @@ impl Query for ChainHeadQuery {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::insert::{insert_header, insert_op_lite};
+    use crate::mutations::{insert_header, insert_op_lite};
     use ::fixt::prelude::*;
     use holochain_sqlite::schema::SCHEMA_CELL;
     use holochain_types::dht_op::DhtOpLight;
@@ -137,8 +137,8 @@ mod tests {
         for shh in &shhs[..6] {
             let hash = shh.header_address();
             let op = DhtOpLight::StoreElement(hash.clone(), None, hash.clone().into());
-            insert_header(&mut txn, shh.clone());
-            insert_op_lite(&mut txn, op, fixt!(DhtOpHash), true);
+            insert_header(&mut txn, shh.clone()).unwrap();
+            insert_op_lite(&mut txn, op, fixt!(DhtOpHash), true).unwrap();
         }
 
         let mut scratch = Scratch::new();
@@ -146,7 +146,7 @@ mod tests {
         // It's also totally invalid for a call_zome scratch to contain headers
         // from other authors, but it doesn't matter here
         for shh in &shhs[6..] {
-            scratch.add_header(shh.clone().into());
+            scratch.add_header(shh.clone());
         }
 
         let query = ChainHeadQuery::new(author);

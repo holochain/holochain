@@ -1,10 +1,10 @@
 use ghost_actor::dependencies::observability;
-use holochain_cascade2::authority::WireLinkOps;
 use holochain_cascade2::test_utils::*;
 use holochain_cascade2::Cascade;
-use holochain_state::insert::insert_op_scratch;
+use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_cell_env;
 use holochain_state::scratch::Scratch;
+use holochain_types::link::WireLinkOps;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_not_authority() {
@@ -32,6 +32,13 @@ async fn links_not_authority() {
 
     assert_eq!(r, td.links);
 
+    let r = cascade
+        .get_link_details(td.link_key.clone(), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(r, vec![(td.create_link_header.clone(), vec![]),]);
+
     fill_db(&authority.env(), td.delete_link_op.clone());
 
     let r = cascade
@@ -40,6 +47,19 @@ async fn links_not_authority() {
         .unwrap();
 
     assert!(r.is_empty());
+
+    let r = cascade
+        .get_link_details(td.link_key.clone(), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(
+        r,
+        vec![(
+            td.create_link_header.clone(),
+            vec![td.delete_link_header.clone()]
+        ),]
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -93,8 +113,8 @@ async fn links_authoring() {
 
     // Data
     let td = EntryTestData::new();
-    insert_op_scratch(&mut scratch, td.store_entry_op.clone());
-    insert_op_scratch(&mut scratch, td.create_link_op.clone());
+    insert_op_scratch(&mut scratch, td.store_entry_op.clone()).unwrap();
+    insert_op_scratch(&mut scratch, td.create_link_op.clone()).unwrap();
 
     // Network
     // - Not expecting any calls to the network.
@@ -120,7 +140,7 @@ async fn links_authoring() {
 
     assert_eq!(r, td.links);
 
-    insert_op_scratch(&mut scratch, td.delete_link_op.clone());
+    insert_op_scratch(&mut scratch, td.delete_link_op.clone()).unwrap();
 
     let mut cascade = Cascade::<MockNetwork>::empty()
         .with_network(mock, cache.env())
@@ -132,4 +152,9 @@ async fn links_authoring() {
         .unwrap();
 
     assert!(r.is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_links_can_match_a_partial_tag() {
+    todo!()
 }

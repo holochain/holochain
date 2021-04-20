@@ -1,6 +1,7 @@
 use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_types::dht_op::DhtOpType;
+use holochain_types::prelude::DhtOpError;
 use holochain_zome_types::*;
 use std::fmt::Debug;
 
@@ -81,25 +82,27 @@ impl Query for GetLiveEntryQuery {
             }
             Header::Update(update) => {
                 if update.original_entry_address == self.0 && update.entry_hash == self.0 {
+                    follow_update_chain(&state, &shh);
                     if !state.deletes.contains(&hash) {
                         state.creates.insert(hash, shh);
                     }
-                // TODO: This is where update chains will be followed
-                // when we add that functionality.
                 } else if update.entry_hash == self.0 {
                     if !state.deletes.contains(&hash) {
                         state.creates.insert(hash, shh);
                     }
                 } else if update.original_entry_address == self.0 {
-                    // TODO: This is where update chains will be followed
-                    // when we add that functionality.
+                    follow_update_chain(&state, &shh);
                 }
             }
             Header::Delete(delete) => {
                 state.creates.remove(&delete.deletes_address);
                 state.deletes.insert(delete.deletes_address.clone());
             }
-            _ => panic!("TODO: Turn this into an error"),
+            _ => {
+                return Err(StateQueryError::UnexpectedHeader(
+                    shh.header().header_type(),
+                ))
+            }
         }
         Ok(state)
     }
@@ -113,13 +116,21 @@ impl Query for GetLiveEntryQuery {
         match header {
             Some(header) => {
                 // TODO: Handle error where header doesn't have entry hash.
-                let entry_hash = header.header().entry_hash().unwrap();
-                let entry = stores
+                let entry_hash = header
+                    .header()
+                    .entry_hash()
+                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.header().clone()))?;
+                let element = stores
                     .get_entry(&entry_hash)?
-                    .expect("TODO: Handle case where entry wasn't found but we had headers");
-                Ok(Some(Element::new(header, Some(entry))))
+                    .map(|entry| Element::new(header, Some(entry)));
+                Ok(element)
             }
             None => Ok(None),
         }
     }
+}
+
+fn follow_update_chain(_state: &Maps<SignedHeaderHashed>, _shh: &SignedHeaderHashed) {
+    // TODO: This is where update chains will be followed
+    // when we add that functionality.
 }
