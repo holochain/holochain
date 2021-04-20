@@ -157,7 +157,7 @@ impl ElementEntry {
 /// A combination of a Header and its signature.
 ///
 /// Has implementations From and Into its tuple form.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub struct SignedHeader(pub Header, pub Signature);
 
 impl SignedHeader {

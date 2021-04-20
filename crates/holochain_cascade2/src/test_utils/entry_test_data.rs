@@ -3,35 +3,44 @@ use holo_hash::HeaderHash;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::header::NewEntryHeader;
+use holochain_types::header::WireDelete;
+use holochain_types::header::WireNewEntryHeader;
+use holochain_types::header::WireUpdateRelationship;
+use holochain_types::link::WireCreateLink;
+use holochain_types::link::WireDeleteLink;
+use holochain_types::link::WireLinkKey;
+use holochain_types::prelude::EntryData;
 use holochain_zome_types::fixt::*;
 use holochain_zome_types::Entry;
 use holochain_zome_types::Header;
 use holochain_zome_types::HeaderHashed;
+use holochain_zome_types::Judged;
 use holochain_zome_types::Link;
+use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::ValidationStatus;
+use std::convert::TryInto;
 
-use crate::authority::WireDhtOp;
-use crate::authority::WireLinkKey;
 use ::fixt::prelude::*;
 #[derive(Debug)]
 pub struct EntryTestData {
     pub store_entry_op: DhtOpHashed,
-    pub wire_create: WireDhtOp,
+    pub wire_create: Judged<WireNewEntryHeader>,
     pub create_hash: HeaderHash,
     pub delete_entry_header_op: DhtOpHashed,
-    pub wire_delete: WireDhtOp,
+    pub wire_delete: Judged<WireDelete>,
     pub delete_hash: HeaderHash,
     pub update_content_op: DhtOpHashed,
-    pub wire_update: WireDhtOp,
+    pub wire_update: Judged<WireUpdateRelationship>,
     pub update_hash: HeaderHash,
     pub hash: EntryHash,
-    pub entry: Entry,
+    pub entry: EntryData,
     // Links
     pub create_link_op: DhtOpHashed,
     pub delete_link_op: DhtOpHashed,
-    pub wire_create_link: WireDhtOp,
-    pub wire_delete_link: WireDhtOp,
+    pub wire_create_link: WireCreateLink,
+    pub wire_create_link_base: WireCreateLink,
+    pub wire_delete_link: WireDeleteLink,
     pub create_link_header: SignedHeaderHashed,
     pub delete_link_header: SignedHeaderHashed,
     pub link_key: WireLinkKey,
@@ -86,24 +95,22 @@ impl EntryTestData {
             Box::new(entry.clone()),
         ));
 
-        let wire_create = WireDhtOp {
-            op_type: store_entry_op.as_content().get_type(),
-            header: create_header.clone(),
-            signature: signature.clone(),
-            validation_status: Some(ValidationStatus::Valid),
-        };
+        let wire_create = Judged::valid(
+            SignedHeader(create_header.clone(), signature.clone())
+                .try_into()
+                .unwrap(),
+        );
 
         let signature = fixt!(Signature);
         let delete_entry_header_op = DhtOpHashed::from_content_sync(
             DhtOp::RegisterDeletedEntryHeader(signature.clone(), delete.clone()),
         );
 
-        let wire_delete = WireDhtOp {
-            op_type: delete_entry_header_op.as_content().get_type(),
-            header: delete_header.clone(),
-            signature: signature.clone(),
-            validation_status: Some(ValidationStatus::Valid),
-        };
+        let wire_delete = Judged::valid(
+            SignedHeader(delete_header.clone(), signature.clone())
+                .try_into()
+                .unwrap(),
+        );
 
         let signature = fixt!(Signature);
         let update_content_op = DhtOpHashed::from_content_sync(DhtOp::RegisterUpdatedContent(
@@ -111,24 +118,28 @@ impl EntryTestData {
             update.clone(),
             Some(Box::new(update_entry)),
         ));
-        let wire_update = WireDhtOp {
-            op_type: update_content_op.as_content().get_type(),
-            header: update_header.clone(),
-            signature: signature.clone(),
-            validation_status: Some(ValidationStatus::Valid),
-        };
+        let wire_update = Judged::valid(
+            SignedHeader(update_header.clone(), signature.clone())
+                .try_into()
+                .unwrap(),
+        );
 
         let signature = fixt!(Signature);
         let create_link_op = DhtOpHashed::from_content_sync(DhtOp::RegisterAddLink(
             signature.clone(),
             create_link.clone(),
         ));
-        let wire_create_link = WireDhtOp {
-            op_type: create_link_op.as_content().get_type(),
-            header: create_link_header.clone(),
-            signature: signature.clone(),
-            validation_status: Some(ValidationStatus::Valid),
-        };
+        let wire_create_link = WireCreateLink::condense(
+            create_link_header.clone().try_into().unwrap(),
+            signature.clone(),
+            ValidationStatus::Valid,
+        );
+        let wire_create_link_base = WireCreateLink::condense_base_only(
+            create_link_header.clone().try_into().unwrap(),
+            signature.clone(),
+            ValidationStatus::Valid,
+        );
+
         let create_link_header = SignedHeaderHashed::with_presigned(
             HeaderHashed::from_content_sync(Header::CreateLink(create_link.clone())),
             signature,
@@ -139,12 +150,11 @@ impl EntryTestData {
             signature.clone(),
             delete_link.clone(),
         ));
-        let wire_delete_link = WireDhtOp {
-            op_type: delete_link_op.as_content().get_type(),
-            header: delete_link_header.clone(),
-            signature: signature.clone(),
-            validation_status: Some(ValidationStatus::Valid),
-        };
+        let wire_delete_link = WireDeleteLink::condense(
+            delete_link_header.clone().try_into().unwrap(),
+            signature.clone(),
+            ValidationStatus::Valid,
+        );
         let delete_link_header = SignedHeaderHashed::with_presigned(
             HeaderHashed::from_content_sync(Header::DeleteLink(delete_link.clone())),
             signature,
@@ -168,6 +178,11 @@ impl EntryTestData {
             create_link_hash: create_link_hash.clone(),
         };
 
+        let entry = EntryData {
+            entry,
+            entry_type: create.entry_type.clone(),
+        };
+
         Self {
             store_entry_op,
             delete_entry_header_op,
@@ -189,6 +204,7 @@ impl EntryTestData {
             links: vec![link],
             create_link_header,
             delete_link_header,
+            wire_create_link_base,
         }
     }
 }

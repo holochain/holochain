@@ -46,8 +46,12 @@ async fn assert_can_get<N: HolochainP2pCellT2 + Clone + Send + 'static>(
         .expect("Failed to get entry");
 
     let expected = Details::Entry(EntryDetails {
-        entry: td_entry.entry.clone(),
-        headers: vec![wire_op_to_shh(&td_entry.wire_create)],
+        entry: td_entry.entry.entry.clone(),
+        headers: vec![td_entry
+            .wire_create
+            .data
+            .clone()
+            .into_header(td_entry.entry.entry_type.clone(), td_entry.hash.clone())],
         rejected_headers: vec![],
         deletes: vec![],
         updates: vec![],
@@ -140,9 +144,13 @@ async fn assert_rejected<N: HolochainP2pCellT2 + Clone + Send + 'static>(
         .expect("Failed to get entry");
 
     let expected = Details::Entry(EntryDetails {
-        entry: td_entry.entry.clone(),
+        entry: td_entry.entry.entry.clone(),
         headers: vec![],
-        rejected_headers: vec![wire_op_to_shh(&td_entry.wire_create)],
+        rejected_headers: vec![td_entry
+            .wire_create
+            .data
+            .clone()
+            .into_header(td_entry.entry.entry_type.clone(), td_entry.hash.clone())],
         deletes: vec![],
         updates: vec![],
         entry_dht_status: EntryDhtStatus::Dead,

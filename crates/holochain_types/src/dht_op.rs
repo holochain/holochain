@@ -788,3 +788,60 @@ impl HashableContent for UniqueForm<'_> {
         )
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+/// Condensed version of ops for sending across the wire.
+pub enum WireOps {
+    /// Response for get entry.
+    Entry(WireEntryOps),
+    /// Response for get element.
+    Element(WireElementOps),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+/// The data rendered from a wire op to place in the database.
+pub struct RenderedOp {
+    /// The header to insert into the database.
+    pub header: SignedHeaderHashed,
+    /// The header to insert into the database.
+    pub op_light: DhtOpLight,
+    /// The hash of the [`DhtOp`]
+    pub op_hash: DhtOpHash,
+    /// The validation status of the header.
+    pub validation_status: Option<ValidationStatus>,
+}
+
+impl RenderedOp {
+    /// Try to create a new rendered op from wire data.
+    /// This function computes all the hashes and
+    /// reconstructs the full headers.
+    pub fn new(
+        header: Header,
+        signature: Signature,
+        validation_status: Option<ValidationStatus>,
+        op_type: DhtOpType,
+    ) -> DhtOpResult<Self> {
+        let (header, op_hash) = UniqueForm::op_hash(op_type, header)?;
+        let header_hashed = HeaderHashed::from_content_sync(header);
+        // TODO: Verify signature?
+        let header = SignedHeaderHashed::with_presigned(header_hashed, signature);
+        let op_light = DhtOpLight::from_type(op_type, header.as_hash().clone(), header.header())?;
+        Ok(Self {
+            header,
+            op_light,
+            validation_status,
+            op_hash,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+/// The full data for insertion into the database.
+/// The reason we don't use [`DhtOp`] is because we don't
+/// want to clone the entry for every header.
+pub struct RenderedOps {
+    /// Entry for the ops if there is one.
+    pub entry: Option<EntryHashed>,
+    /// Op data to insert.
+    pub ops: Vec<RenderedOp>,
+}

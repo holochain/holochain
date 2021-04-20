@@ -1,15 +1,20 @@
 use holo_hash::EntryHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
+use holochain_state::query::prelude::*;
 use holochain_state::query::StateQueryError;
-use holochain_state::query::{prelude::*, QueryData};
 use holochain_types::dht_op::DhtOpType;
-use holochain_types::prelude::DhtOpError;
+use holochain_types::header::WireUpdateRelationship;
+use holochain_types::prelude::EntryData;
 use holochain_types::prelude::HasValidationStatus;
-use holochain_zome_types::Entry;
+use holochain_types::prelude::WireEntryOps;
+use holochain_zome_types::EntryType;
 use holochain_zome_types::Header;
+use holochain_zome_types::Judged;
 use holochain_zome_types::Signature;
 use holochain_zome_types::SignedHeader;
+use holochain_zome_types::TryFrom;
+use holochain_zome_types::TryInto;
 use holochain_zome_types::ValidationStatus;
 
 #[derive(Debug, Clone)]
@@ -26,19 +31,6 @@ impl GetEntryOpsQuery {
 // [`WireElementOps`] but there are more things
 // we can condense on entry ops due to sharing the
 // same entry hash.
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
-pub struct WireEntryOps {
-    pub creates: Vec<WireDhtOp>,
-    pub deletes: Vec<WireDhtOp>,
-    pub updates: Vec<WireDhtOp>,
-    pub entry: Option<Entry>,
-}
-
-impl WireEntryOps {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct WireDhtOp {
@@ -60,10 +52,21 @@ impl HasValidationStatus for WireDhtOp {
     }
 }
 
+pub struct Item {
+    op_type: DhtOpType,
+    header: SignedHeader,
+}
+
+#[derive(Debug, Default)]
+pub struct State {
+    ops: WireEntryOps,
+    entry_data: Option<(EntryHash, EntryType)>,
+}
+
 impl Query for GetEntryOpsQuery {
-    type Item = WireDhtOp;
-    type State = WireEntryOps;
-    type Output = Self::State;
+    type Item = Judged<Item>;
+    type State = State;
+    type Output = WireEntryOps;
 
     fn query(&self) -> String {
         "
@@ -93,39 +96,50 @@ impl Query for GetEntryOpsQuery {
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = |row: &Row| {
             let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?)?;
-            let SignedHeader(header, signature) = header;
             let op_type = row.get(row.column_index("dht_type")?)?;
             let validation_status = row.get(row.column_index("status")?)?;
-            Ok(WireDhtOp {
-                validation_status,
-                op_type,
-                header,
-                signature,
-            })
+            Ok(Judged::raw(Item { op_type, header }, validation_status))
         };
         Arc::new(f)
     }
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {
-        Ok(WireEntryOps::new())
+        Ok(Default::default())
     }
 
-    fn fold(
-        &self,
-        mut state: Self::State,
-        dht_op: QueryData<Self>,
-    ) -> StateQueryResult<Self::State> {
-        match &dht_op.op_type {
+    fn fold(&self, mut state: Self::State, dht_op: Self::Item) -> StateQueryResult<Self::State> {
+        match &dht_op.data.op_type {
             DhtOpType::StoreEntry => {
-                state.creates.push(dht_op);
+                let status = dht_op.validation_status();
+                if state.entry_data.is_none() {
+                    state.entry_data = dht_op
+                        .data
+                        .header
+                        .0
+                        .entry_data()
+                        .map(|(h, t)| (h.clone(), t.clone()));
+                }
+                state
+                    .ops
+                    .creates
+                    .push(Judged::raw(dht_op.data.header.try_into()?, status));
             }
             DhtOpType::RegisterDeletedEntryHeader => {
-                state.deletes.push(dht_op);
+                let status = dht_op.validation_status();
+                state
+                    .ops
+                    .deletes
+                    .push(Judged::raw(dht_op.data.header.try_into()?, status));
             }
             DhtOpType::RegisterUpdatedContent => {
-                state.updates.push(dht_op);
+                let status = dht_op.validation_status();
+                let header = dht_op.data.header;
+                state.ops.updates.push(Judged::raw(
+                    WireUpdateRelationship::try_from(header)?,
+                    status,
+                ));
             }
-            _ => return Err(StateQueryError::UnexpectedOp(dht_op.op_type)),
+            _ => return Err(StateQueryError::UnexpectedOp(dht_op.data.op_type)),
         }
         Ok(state)
     }
@@ -134,20 +148,10 @@ impl Query for GetEntryOpsQuery {
     where
         S: Store,
     {
-        let wire_op = state.creates.first();
-        let entry_hash = match wire_op {
-            Some(wire_op) => Some(
-                wire_op
-                    .header
-                    .entry_hash()
-                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(wire_op.header.clone()))?,
-            ),
-            None => None,
-        };
-        if let Some(entry_hash) = entry_hash {
-            let entry = stores.get_entry(entry_hash)?;
-            state.entry = entry;
+        if let Some((entry_hash, entry_type)) = state.entry_data {
+            let entry = stores.get_entry(&entry_hash)?;
+            state.ops.entry = entry.map(|entry| EntryData { entry, entry_type });
         }
-        Ok(state)
+        Ok(state.ops)
     }
 }

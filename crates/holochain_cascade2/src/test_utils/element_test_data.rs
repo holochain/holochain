@@ -2,33 +2,36 @@ use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
+use holochain_types::header::WireDelete;
+use holochain_types::header::WireUpdateRelationship;
 use holochain_zome_types::fixt::*;
 use holochain_zome_types::Create;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::Header;
 use holochain_zome_types::HeaderHashed;
+use holochain_zome_types::Judged;
+use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::Update;
-use holochain_zome_types::ValidationStatus;
+use std::convert::TryInto;
 
-use crate::authority::WireDhtOp;
 use ::fixt::prelude::*;
 #[derive(Debug)]
 pub struct ElementTestData {
     pub store_element_op: DhtOpHashed,
-    pub wire_create: WireDhtOp,
+    pub wire_create: Judged<SignedHeader>,
     pub create_hash: HeaderHash,
     pub deleted_by_op: DhtOpHashed,
-    pub wire_delete: WireDhtOp,
+    pub wire_delete: Judged<WireDelete>,
     pub delete_hash: HeaderHash,
     pub update_element_op: DhtOpHashed,
-    pub wire_update: WireDhtOp,
+    pub wire_update: Judged<WireUpdateRelationship>,
     pub update_hash: HeaderHash,
     pub hash: EntryHash,
     pub entry: Entry,
     pub any_store_element_op: DhtOpHashed,
-    pub any_header: WireDhtOp,
+    pub any_header: Judged<SignedHeader>,
     pub any_header_hash: HeaderHash,
     pub any_entry: Option<Entry>,
     pub any_entry_hash: Option<EntryHash>,
@@ -72,12 +75,7 @@ impl ElementTestData {
             Some(Box::new(entry.clone())),
         ));
 
-        let wire_create = WireDhtOp {
-            op_type: store_element_op.as_content().get_type(),
-            header: create_header.clone(),
-            signature: signature.clone(),
-            validation_status: Some(ValidationStatus::Valid),
-        };
+        let wire_create = Judged::valid(SignedHeader(create_header.clone(), signature.clone()));
 
         let signature = fixt!(Signature);
         let deleted_by_op = DhtOpHashed::from_content_sync(DhtOp::RegisterDeletedBy(
@@ -85,12 +83,11 @@ impl ElementTestData {
             delete.clone(),
         ));
 
-        let wire_delete = WireDhtOp {
-            op_type: deleted_by_op.as_content().get_type(),
-            header: delete_header.clone(),
-            signature: signature.clone(),
-            validation_status: Some(ValidationStatus::Valid),
-        };
+        let wire_delete = Judged::valid(
+            SignedHeader(delete_header.clone(), signature.clone())
+                .try_into()
+                .unwrap(),
+        );
 
         let signature = fixt!(Signature);
         let update_element_op = DhtOpHashed::from_content_sync(DhtOp::RegisterUpdatedElement(
@@ -98,12 +95,11 @@ impl ElementTestData {
             update.clone(),
             Some(Box::new(update_entry.clone())),
         ));
-        let wire_update = WireDhtOp {
-            op_type: update_element_op.as_content().get_type(),
-            header: update_header.clone(),
-            signature: signature.clone(),
-            validation_status: Some(ValidationStatus::Valid),
-        };
+        let wire_update = Judged::valid(
+            SignedHeader(update_header.clone(), signature.clone())
+                .try_into()
+                .unwrap(),
+        );
 
         let mut any_entry = None;
         let mut any_entry_hash = None;
@@ -138,12 +134,7 @@ impl ElementTestData {
             any_entry.clone().map(|i| *i),
         );
 
-        let any_header = WireDhtOp {
-            op_type: any_store_element_op.as_content().get_type(),
-            header: any_header.clone(),
-            signature: signature.clone(),
-            validation_status: Some(ValidationStatus::Valid),
-        };
+        let any_header = Judged::valid(SignedHeader(any_header.clone(), signature.clone()));
 
         Self {
             store_element_op,

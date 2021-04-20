@@ -17,6 +17,10 @@ pub enum StateQueryError {
     UnexpectedOp(DhtOpType),
     #[error("Unexpected header {0:?} for query")]
     UnexpectedHeader(HeaderType),
+    #[error(transparent)]
+    WrongHeaderError(#[from] holochain_zome_types::WrongHeaderError),
+    #[error(transparent)]
+    HeaderError(#[from] holochain_types::header::error::HeaderError),
 }
 
 pub type StateQueryResult<T> = Result<T, StateQueryError>;

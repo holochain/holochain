@@ -8,21 +8,22 @@ use holochain_state::mutations::set_when_integrated;
 use holochain_state::mutations::update_op_validation_status;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::dht_op::DhtOpHashed;
+use holochain_types::dht_op::WireOps;
 use holochain_types::env::EnvRead;
 use holochain_types::env::EnvWrite;
+use holochain_types::link::WireLinkKey;
+use holochain_types::link::WireLinkOps;
 use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::ValidationPackageResponse;
 use holochain_types::timestamp;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::QueryFilter;
+use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
+use holochain_zome_types::TryInto;
 use holochain_zome_types::ValidationStatus;
 
 use crate::authority;
-use crate::authority::WireDhtOp;
-use crate::authority::WireLinkKey;
-use crate::authority::WireLinkOps;
-use crate::authority::WireOps;
 use holochain_sqlite::db::WriteManager;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::mutations::insert_op;
@@ -303,9 +304,12 @@ impl HolochainP2pCellT2 for MockNetwork {
     }
 }
 
-pub fn wire_op_to_shh(op: &WireDhtOp) -> SignedHeaderHashed {
-    SignedHeaderHashed::with_presigned(
-        HeaderHashed::from_content_sync(op.header.clone()),
-        op.signature.clone(),
-    )
+pub fn wire_to_shh<T: TryInto<SignedHeader> + Clone>(op: &T) -> SignedHeaderHashed {
+    let r = op.clone().try_into();
+    match r {
+        Ok(SignedHeader(header, signature)) => {
+            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(header), signature)
+        }
+        Err(_) => unreachable!(),
+    }
 }

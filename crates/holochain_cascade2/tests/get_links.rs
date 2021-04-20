@@ -1,10 +1,10 @@
 use ghost_actor::dependencies::observability;
-use holochain_cascade2::authority::WireLinkOps;
 use holochain_cascade2::test_utils::*;
 use holochain_cascade2::Cascade;
 use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_cell_env;
 use holochain_state::scratch::Scratch;
+use holochain_types::link::WireLinkOps;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_not_authority() {
@@ -152,4 +152,9 @@ async fn links_authoring() {
         .unwrap();
 
     assert!(r.is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_links_can_match_a_partial_tag() {
+    todo!()
 }

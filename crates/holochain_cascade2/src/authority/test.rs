@@ -167,7 +167,7 @@ async fn get_links() {
     let result =
         handle_get_links(env.env().into(), td.link_key_tag.clone(), (&options).into()).unwrap();
     let expected = WireLinkOps {
-        creates: vec![td.wire_create_link.clone()],
+        creates: vec![td.wire_create_link_base.clone()],
         deletes: vec![td.wire_delete_link.clone()],
     };
     assert_eq!(result, expected);

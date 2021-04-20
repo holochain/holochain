@@ -15,10 +15,7 @@ use holochain_state::query::Txn;
 use holochain_types::prelude::*;
 use tracing::*;
 
-pub use get_element_query::WireElementOps;
 pub use get_entry_ops_query::WireDhtOp;
-pub use get_entry_ops_query::WireEntryOps;
-pub use get_links_ops_query::WireLinkOps;
 
 #[cfg(test)]
 mod test;
@@ -27,20 +24,6 @@ mod get_agent_activity_query;
 mod get_element_query;
 mod get_entry_ops_query;
 mod get_links_ops_query;
-
-// TODO: Move this to holochain types.
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum WireOps {
-    Entry(WireEntryOps),
-    Element(WireElementOps),
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct WireLinkKey {
-    pub base: EntryHash,
-    pub zome_id: ZomeId,
-    pub tag: Option<LinkTag>,
-}
 
 #[instrument(skip(state_env))]
 pub fn handle_get_entry(

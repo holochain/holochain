@@ -4,12 +4,6 @@
 //! where as retrieve only checks that where the data was found
 //! the appropriate validation has been run.
 
-use authority::WireDhtOp;
-use authority::WireElementOps;
-use authority::WireEntryOps;
-use authority::WireLinkKey;
-use authority::WireLinkOps;
-use authority::WireOps;
 use error::CascadeResult;
 use holo_hash::hash_type::AnyDht;
 use holo_hash::AgentPubKey;
@@ -138,24 +132,14 @@ impl<Network> Cascade<Network>
 where
     Network: HolochainP2pCellT2 + Clone + 'static + Send,
 {
-    fn insert_wire_op(txn: &mut Transaction, wire_op: WireDhtOp) -> CascadeResult<()> {
-        let WireDhtOp {
-            op_type,
+    fn insert_rendered_op(txn: &mut Transaction, op: RenderedOp) -> CascadeResult<()> {
+        let RenderedOp {
+            op_light,
+            op_hash,
             header,
-            signature,
             validation_status,
-        } = wire_op;
-        let (header, op_hash) = UniqueForm::op_hash(op_type, header)?;
-        let header_hashed = HeaderHashed::from_content_sync(header);
-        // TODO: Verify signature?
-        let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
-        let op_light = DhtOpLight::from_type(
-            op_type,
-            header_hashed.as_hash().clone(),
-            header_hashed.header(),
-        )?;
-
-        insert_header(txn, header_hashed)?;
+        } = op;
+        insert_header(txn, header)?;
         insert_op_lite(txn, op_light, op_hash.clone(), false)?;
         if let Some(status) = validation_status {
             update_op_validation_status(txn, op_hash.clone(), status)?;
@@ -166,104 +150,48 @@ where
         Ok(())
     }
 
-    fn verify_entry_hash(
-        header_entry_hash: Option<&EntryHash>,
-        entry_hash: &Option<EntryHash>,
-    ) -> bool {
-        match (header_entry_hash, entry_hash) {
-            (Some(a), Some(b)) => a == b,
-            _ => true,
+    fn insert_rendered_ops(txn: &mut Transaction, ops: RenderedOps) -> CascadeResult<()> {
+        let RenderedOps {
+            ops,
+            entry: entries,
+        } = ops;
+        for entry in entries {
+            insert_entry(txn, entry)?;
         }
+        for op in ops {
+            Self::insert_rendered_op(txn, op)?;
+        }
+        Ok(())
     }
 
     fn merge_entry_ops_into_cache(&mut self, response: WireEntryOps) -> CascadeResult<()> {
         let cache = ok_or_return!(self.cache.as_mut());
-        let WireEntryOps {
-            creates,
-            updates,
-            deletes,
-            entry,
-        } = response;
-        cache.conn()?.with_commit(|txn| {
-            let mut entry_hash = None;
-
-            if let Some(entry) = entry {
-                let entry_hashed = EntryHashed::from_content_sync(entry);
-                entry_hash = Some(entry_hashed.as_hash().clone());
-                insert_entry(txn, entry_hashed)?;
-            }
-            // Do we need to be able to handle creates without an entry.
-            // I think we do because we might already have the entry.
-            for op in creates {
-                if Self::verify_entry_hash(op.header.entry_hash(), &entry_hash) {
-                    Self::insert_wire_op(txn, op)?;
-                } else {
-                    tracing::info!(
-                        "Store entry op {:?} from the network entry hash does not match the header",
-                        op
-                    );
-                }
-            }
-            for op in updates {
-                Self::insert_wire_op(txn, op)?;
-            }
-            for op in deletes {
-                Self::insert_wire_op(txn, op)?;
-            }
-            CascadeResult::Ok(())
-        })?;
+        let ops = response.render()?;
+        cache
+            .conn()?
+            .with_commit(|txn| Self::insert_rendered_ops(txn, ops))?;
         Ok(())
     }
 
     fn merge_element_ops_into_cache(&mut self, response: WireElementOps) -> CascadeResult<()> {
         let cache = ok_or_return!(self.cache.as_mut());
-        let WireElementOps {
-            header,
-            updates,
-            deletes,
-            entry,
-        } = response;
-        cache.conn()?.with_commit(|txn| {
-            let mut entry_hash = None;
-
-            if let Some(entry) = entry {
-                let entry_hashed = EntryHashed::from_content_sync(entry);
-                entry_hash = Some(entry_hashed.as_hash().clone());
-                insert_entry(txn, entry_hashed)?;
-            }
-            if let Some(op) = header {
-                if Self::verify_entry_hash(op.header.entry_hash(), &entry_hash) {
-                    Self::insert_wire_op(txn, op)?;
-                } else {
-                    tracing::info!(
-                        "Store element op {:?} from the network entry hash does not match the header",
-                        op
-                    );
-                }
-            }
-            for op in updates {
-                Self::insert_wire_op(txn, op)?;
-            }
-            for op in deletes {
-                Self::insert_wire_op(txn, op)?;
-            }
-            CascadeResult::Ok(())
-        })?;
+        let ops = response.render()?;
+        cache
+            .conn()?
+            .with_commit(|txn| Self::insert_rendered_ops(txn, ops))?;
         Ok(())
     }
 
-    fn merge_link_ops_into_cache(&mut self, response: WireLinkOps) -> CascadeResult<()> {
+    fn merge_link_ops_into_cache(
+        &mut self,
+        response: WireLinkOps,
+        key: WireLinkKey,
+    ) -> CascadeResult<()> {
         let cache = ok_or_return!(self.cache.as_mut());
-        let WireLinkOps { creates, deletes } = response;
-        cache.conn()?.with_commit(|txn| {
-            for op in creates {
-                Self::insert_wire_op(txn, op)?;
-            }
-            for op in deletes {
-                Self::insert_wire_op(txn, op)?;
-            }
-            CascadeResult::Ok(())
-        })?;
+        let ops = response.render(key)?;
+        cache
+            .conn()?
+            .with_commit(|txn| Self::insert_rendered_ops(txn, ops))?;
         Ok(())
     }
 
@@ -295,10 +223,10 @@ where
         options: GetLinksOptions,
     ) -> CascadeResult<()> {
         let network = ok_or_return!(self.network.as_mut());
-        let results = network.get_links(link_key, options).await?;
+        let results = network.get_links(link_key.clone(), options).await?;
 
         for response in results {
-            self.merge_link_ops_into_cache(response)?;
+            self.merge_link_ops_into_cache(response, link_key.clone())?;
         }
         Ok(())
     }
