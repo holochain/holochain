@@ -6,6 +6,7 @@ use holochain::conductor::Conductor;
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use observability::Output;
+#[cfg(unix)]
 use sd_notify::{notify, NotifyState};
 use std::path::PathBuf;
 use structopt::StructOpt;
