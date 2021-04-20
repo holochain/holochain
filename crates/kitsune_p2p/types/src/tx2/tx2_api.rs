@@ -24,68 +24,99 @@ type ShareRMap<C> = Arc<Share<RMap<C>>>;
 struct RMapItem<C: Codec + 'static + Send + Unpin> {
     sender: RSend<C>,
     start: std::time::Instant,
+    timeout: std::time::Duration,
+    dbg_name: &'static str,
     local_cert: Tx2Cert,
     peer_cert: Tx2Cert,
 }
 
-struct RMap<C: Codec + 'static + Send + Unpin>(HashMap<(TxUrl, u64), RMapItem<C>>);
+struct RMap<C: Codec + 'static + Send + Unpin>(HashMap<(Uniq, u64), RMapItem<C>>);
 
 impl<C: Codec + 'static + Send + Unpin> RMap<C> {
     pub fn new() -> Self {
         Self(HashMap::new())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn insert(
         &mut self,
-        url: TxUrl,
+        uniq: Uniq,
+        timeout: KitsuneTimeout,
         msg_id: u64,
         s_res: RSend<C>,
+        dbg_name: &'static str,
         local_cert: Tx2Cert,
         peer_cert: Tx2Cert,
     ) {
+        let timeout = timeout.time_remaining();
         self.0.insert(
-            (url, msg_id),
+            (uniq, msg_id),
             RMapItem {
                 sender: s_res,
                 start: std::time::Instant::now(),
+                timeout,
+                dbg_name,
                 local_cert,
                 peer_cert,
             },
         );
     }
 
-    pub fn respond(&mut self, url: TxUrl, msg_id: u64, c: C) {
+    pub fn respond(&mut self, uniq: Uniq, msg_id: u64, c: C) {
+        let resp_dbg_name = c.variant_type();
         if let Some(RMapItem {
             sender,
             start,
+            timeout,
+            dbg_name,
             local_cert,
             peer_cert,
-        }) = self.0.remove(&(url, msg_id))
+        }) = self.0.remove(&(uniq, msg_id))
         {
             let elapsed_ns = start.elapsed().as_nanos();
             tracing::trace!(
+                %dbg_name,
+                %resp_dbg_name,
                 ?local_cert,
                 ?peer_cert,
                 %elapsed_ns,
                 "(api) req success",
             );
 
+            if elapsed_ns as f64 / timeout.as_nanos() as f64 > 0.75 {
+                tracing::warn!(
+                    %dbg_name,
+                    %resp_dbg_name,
+                    ?local_cert,
+                    ?peer_cert,
+                    "(api) req approaching timeout (> 75%)",
+                );
+            }
+
             // if the recv side is dropped, we no longer need to respond
             // so it's ok to ignore errors here.
             let _ = sender.send(Ok(c));
+        } else {
+            tracing::warn!(
+                %resp_dbg_name,
+                "(api) req UNMATCHED RESPONSE",
+            );
         }
     }
 
-    pub fn respond_err(&mut self, url: TxUrl, msg_id: u64, err: KitsuneError) {
+    pub fn respond_err(&mut self, uniq: Uniq, msg_id: u64, err: KitsuneError) {
         if let Some(RMapItem {
             sender,
             start,
+            dbg_name,
             local_cert,
             peer_cert,
-        }) = self.0.remove(&(url, msg_id))
+            ..
+        }) = self.0.remove(&(uniq, msg_id))
         {
             let elapsed_ns = start.elapsed().as_nanos();
             tracing::trace!(
+                %dbg_name,
                 ?local_cert,
                 ?peer_cert,
                 %elapsed_ns,
@@ -102,20 +133,22 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
 
 /// Cleanup our map when the request future completes
 /// either by recieving the response or timing out.
-struct RMapDropCleanup<C: Codec + 'static + Send + Unpin>(ShareRMap<C>, TxUrl, u64);
+struct RMapDropCleanup<C: Codec + 'static + Send + Unpin>(ShareRMap<C>, Uniq, u64);
 
 impl<C: Codec + 'static + Send + Unpin> Drop for RMapDropCleanup<C> {
     fn drop(&mut self) {
         let _ = self.0.share_mut(|i, _| {
             if let Some(RMapItem {
                 start,
+                dbg_name,
                 local_cert,
                 peer_cert,
                 ..
-            }) = i.0.remove(&(self.1.clone(), self.2))
+            }) = i.0.remove(&(self.1, self.2))
             {
                 let elapsed_ns = start.elapsed().as_nanos();
-                tracing::trace!(
+                tracing::warn!(
+                    %dbg_name,
                     ?local_cert,
                     ?peer_cert,
                     %elapsed_ns,
@@ -127,20 +160,24 @@ impl<C: Codec + 'static + Send + Unpin> Drop for RMapDropCleanup<C> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn rmap_insert<C: Codec + 'static + Send + Unpin>(
     rmap: ShareRMap<C>,
-    url: TxUrl,
+    uniq: Uniq,
+    timeout: KitsuneTimeout,
     msg_id: u64,
     s_res: RSend<C>,
+    dbg_name: &'static str,
     local_cert: Tx2Cert,
     peer_cert: Tx2Cert,
 ) -> KitsuneResult<RMapDropCleanup<C>> {
-    let url2 = url.clone();
     rmap.share_mut(move |i, _| {
-        i.insert(url2, msg_id, s_res, local_cert, peer_cert);
+        i.insert(
+            uniq, timeout, msg_id, s_res, dbg_name, local_cert, peer_cert,
+        );
         Ok(())
     })?;
-    Ok(RMapDropCleanup(rmap, url, msg_id))
+    Ok(RMapDropCleanup(rmap, uniq, msg_id))
 }
 
 /// A connection handle - use this to manage an open connection.
@@ -150,7 +187,7 @@ pub struct Tx2ConHnd<C: Codec + 'static + Send + Unpin> {
     con: ConHnd,
     url: TxUrl,
     rmap: ShareRMap<C>,
-    metrics: Arc<Tx2ApiMetrics<C>>,
+    metrics: Arc<Tx2ApiMetrics>,
 }
 
 impl<C: Codec + 'static + Send + Unpin> std::fmt::Debug for Tx2ConHnd<C> {
@@ -165,7 +202,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
         con: ConHnd,
         url: TxUrl,
         rmap: ShareRMap<C>,
-        metrics: Arc<Tx2ApiMetrics<C>>,
+        metrics: Arc<Tx2ApiMetrics>,
     ) -> Self {
         Self {
             local_cert,
@@ -225,7 +262,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
         &self,
         data: PoolBuf,
         timeout: KitsuneTimeout,
-        d: std::mem::Discriminant<C>,
+        dbg_name: &'static str,
     ) -> impl std::future::Future<Output = KitsuneResult<C>> + 'static + Send {
         let this = self.clone();
         async move {
@@ -239,9 +276,11 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
             // either by recieving the response or timing out.
             let _drop_cleanup = rmap_insert(
                 this.rmap.clone(),
-                this.url.clone(),
+                this.con.uniq(),
+                timeout,
                 msg_id,
                 s_res,
+                dbg_name,
                 peer_cert.clone(),
                 peer_cert,
             )?;
@@ -252,7 +291,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
                 .write(MsgId::new(msg_id).as_req(), data, timeout)
                 .await?;
 
-            this.metrics.write_len(d, len);
+            this.metrics.write_len(dbg_name, len);
 
             timeout.mix(r_res.map_err(KitsuneError::other)).await?
         }
@@ -264,12 +303,12 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
         data: &C,
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<C>> + 'static + Send {
-        let d = std::mem::discriminant(data);
+        let dbg_name = data.variant_type();
         let mut buf = PoolBuf::new();
         if let Err(e) = data.encode(&mut buf) {
             return async move { Err(KitsuneError::other(e)) }.boxed();
         }
-        self.priv_request(buf, timeout, d).boxed()
+        self.priv_request(buf, timeout, dbg_name).boxed()
     }
 }
 
@@ -278,12 +317,12 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
 pub struct Tx2EpHnd<C: Codec + 'static + Send + Unpin>(
     EpHnd,
     ShareRMap<C>,
-    Arc<Tx2ApiMetrics<C>>,
+    Arc<Tx2ApiMetrics>,
     Tx2Cert,
 );
 
 impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
-    fn new(local_cert: Tx2Cert, ep: EpHnd, metrics: Arc<Tx2ApiMetrics<C>>) -> Self {
+    fn new(local_cert: Tx2Cert, ep: EpHnd, metrics: Arc<Tx2ApiMetrics>) -> Self {
         let rmap = Arc::new(Share::new(RMap::new()));
         Self(ep, rmap, metrics, local_cert)
     }
@@ -373,14 +412,14 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
         data: &C,
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<C>> + 'static + Send {
-        let d = std::mem::discriminant(data);
+        let dbg_name = data.variant_type();
         let mut buf = PoolBuf::new();
         if let Err(e) = data.encode(&mut buf) {
             return async move { Err(KitsuneError::other(e)) }.boxed();
         }
         let con_fut = self.get_connection(remote.into(), timeout);
         futures::future::FutureExt::boxed(async move {
-            con_fut.await?.priv_request(buf, timeout, d).await
+            con_fut.await?.priv_request(buf, timeout, dbg_name).await
         })
     }
 }
@@ -453,9 +492,9 @@ pub struct Tx2EpIncomingRequest<C: Codec + 'static + Send + Unpin> {
 
 /// Data associated with a ConnectionClosed EpEvent
 #[derive(Debug)]
-pub struct Tx2EpConnectionClosed {
-    /// the peer cert this used to be connected to
-    pub peer_cert: Tx2Cert,
+pub struct Tx2EpConnectionClosed<C: Codec + 'static + Send + Unpin> {
+    /// the remote connection handle (could be closed)
+    pub con: Tx2ConHnd<C>,
 
     /// the remote url this used to be connected to
     pub url: TxUrl,
@@ -480,7 +519,7 @@ pub enum Tx2EpEvent<C: Codec + 'static + Send + Unpin> {
     IncomingRequest(Tx2EpIncomingRequest<C>),
 
     /// A connection has closed (Url, Code, Reason).
-    ConnectionClosed(Tx2EpConnectionClosed),
+    ConnectionClosed(Tx2EpConnectionClosed<C>),
 
     /// A non-fatal internal error.
     Error(KitsuneError),
@@ -495,12 +534,7 @@ pub enum Tx2EpEvent<C: Codec + 'static + Send + Unpin> {
 
 /// Represents a bound endpoint. To manage this endpoint, see handle()/Tx2EpHnd.
 /// To receive events from this endpoint, poll_next this instance as a Stream.
-pub struct Tx2Ep<C: Codec + 'static + Send + Unpin>(
-    Tx2EpHnd<C>,
-    Ep,
-    Arc<Tx2ApiMetrics<C>>,
-    Tx2Cert,
-);
+pub struct Tx2Ep<C: Codec + 'static + Send + Unpin>(Tx2EpHnd<C>, Ep, Arc<Tx2ApiMetrics>, Tx2Cert);
 
 impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
     type Item = Tx2EpEvent<C>;
@@ -559,7 +593,7 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                             }),
                             MsgIdType::Res => {
                                 let _ = rmap.share_mut(move |i, _| {
-                                    i.respond(url, msg_id.as_id(), c);
+                                    i.respond(con.uniq(), msg_id.as_id(), c);
                                     Ok(())
                                 });
                                 Tx2EpEvent::Tick
@@ -567,25 +601,25 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                         }
                     }
                     EpEvent::IncomingError(EpIncomingError {
-                        url, msg_id, err, ..
+                        con, msg_id, err, ..
                     }) => match msg_id.get_type() {
                         MsgIdType::Notify => unimplemented!(),
                         MsgIdType::Req => unimplemented!(),
                         MsgIdType::Res => {
                             let _ = rmap.share_mut(move |i, _| {
-                                i.respond_err(url, msg_id.as_id(), err);
+                                i.respond_err(con.uniq(), msg_id.as_id(), err);
                                 Ok(())
                             });
                             Tx2EpEvent::Tick
                         }
                     },
                     EpEvent::ConnectionClosed(EpConnectionClosed {
-                        peer_cert,
+                        con,
                         url,
                         code,
                         reason,
                     }) => Tx2EpEvent::ConnectionClosed(Tx2EpConnectionClosed {
-                        peer_cert,
+                        con: Tx2ConHnd::new(local_cert, con, url.clone(), rmap, self.2.clone()),
                         url,
                         code,
                         reason,
@@ -608,20 +642,20 @@ impl<C: Codec + 'static + Send + Unpin> Tx2Ep<C> {
     }
 }
 
-type WriteLenCb<C> = Box<dyn Fn(std::mem::Discriminant<C>, usize) + 'static + Send + Sync>;
+type WriteLenCb = Box<dyn Fn(&'static str, usize) + 'static + Send + Sync>;
 
 /// Metrics callback manager to be injected into the endpoint
-pub struct Tx2ApiMetrics<C: Codec + 'static + Send + Unpin> {
-    write_len: Option<WriteLenCb<C>>,
+pub struct Tx2ApiMetrics {
+    write_len: Option<WriteLenCb>,
 }
 
-impl<C: Codec + 'static + Send + Unpin> Default for Tx2ApiMetrics<C> {
+impl Default for Tx2ApiMetrics {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<C: Codec + 'static + Send + Unpin> Tx2ApiMetrics<C> {
+impl Tx2ApiMetrics {
     /// Construct a new default Tx2ApiMetrics with no set callbacks
     pub fn new() -> Self {
         Self { write_len: None }
@@ -631,14 +665,14 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ApiMetrics<C> {
     /// to a transport connection.
     pub fn set_write_len<F>(mut self, f: F) -> Self
     where
-        F: Fn(std::mem::Discriminant<C>, usize) + 'static + Send + Sync,
+        F: Fn(&'static str, usize) + 'static + Send + Sync,
     {
-        let f: WriteLenCb<C> = Box::new(f);
+        let f: WriteLenCb = Box::new(f);
         self.write_len = Some(f);
         self
     }
 
-    fn write_len(&self, d: std::mem::Discriminant<C>, l: usize) {
+    fn write_len(&self, d: &'static str, l: usize) {
         if let Some(cb) = &self.write_len {
             cb(d, l)
         }
@@ -648,19 +682,23 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ApiMetrics<C> {
 /// Construct a new Tx2EpFactory instance from a pool EpFactory
 pub fn tx2_api<C: Codec + 'static + Send + Unpin>(
     factory: EpFactory,
-    metrics: Tx2ApiMetrics<C>,
+    metrics: Tx2ApiMetrics,
 ) -> Tx2EpFactory<C> {
     Tx2EpFactory::new(factory, metrics)
 }
 
 /// Endpoint binding factory - lets us easily pass around logic
 /// for later binding network transports.
-pub struct Tx2EpFactory<C: Codec + 'static + Send + Unpin>(EpFactory, Arc<Tx2ApiMetrics<C>>);
+pub struct Tx2EpFactory<C: Codec + 'static + Send + Unpin>(
+    EpFactory,
+    Arc<Tx2ApiMetrics>,
+    std::marker::PhantomData<C>,
+);
 
 impl<C: Codec + 'static + Send + Unpin> Tx2EpFactory<C> {
     /// Construct a new Tx2EpFactory instance from a frontend EpFactory
-    pub fn new(factory: EpFactory, metrics: Tx2ApiMetrics<C>) -> Self {
-        Self(factory, Arc::new(metrics))
+    pub fn new(factory: EpFactory, metrics: Tx2ApiMetrics) -> Self {
+        Self(factory, Arc::new(metrics), std::marker::PhantomData)
     }
 
     /// Bind a new local transport endpoint.

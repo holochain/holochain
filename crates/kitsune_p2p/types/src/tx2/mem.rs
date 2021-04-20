@@ -111,6 +111,7 @@ impl InChanRecvAdapt for MemInChanRecvAdapt {}
 
 struct MemConAdaptInner {
     uniq: Uniq,
+    dir: Tx2ConDir,
     peer_addr: TxUrl,
     peer_cert: Tx2Cert,
     chan_send: ChanSend,
@@ -122,6 +123,7 @@ struct MemConAdapt(MemConAdaptInner);
 
 impl MemConAdapt {
     fn new(
+        dir: Tx2ConDir,
         peer_addr: TxUrl,
         peer_cert: Tx2Cert,
         chan_send: ChanSend,
@@ -130,6 +132,7 @@ impl MemConAdapt {
     ) -> Self {
         Self(MemConAdaptInner {
             uniq: Uniq::default(),
+            dir,
             peer_addr,
             peer_cert,
             chan_send,
@@ -142,6 +145,10 @@ impl MemConAdapt {
 impl ConAdapt for MemConAdapt {
     fn uniq(&self) -> Uniq {
         self.0.uniq
+    }
+
+    fn dir(&self) -> Tx2ConDir {
+        self.0.dir
     }
 
     fn peer_addr(&self) -> KitsuneResult<TxUrl> {
@@ -329,6 +336,7 @@ impl EndpointAdapt for MemEndpointAdapt {
             let (oth_send, recv) = t_chan(1);
 
             let oth_con = MemConAdapt::new(
+                Tx2ConDir::Incoming,
                 format!("{}/{}", this_url, con_id).into(),
                 local_cert,
                 oth_send,
@@ -338,6 +346,7 @@ impl EndpointAdapt for MemEndpointAdapt {
             let oth_con: Arc<dyn ConAdapt> = Arc::new(oth_con);
 
             let con = MemConAdapt::new(
+                Tx2ConDir::Outgoing,
                 format!("{}/{}", url, con_id).into(),
                 remote_cert,
                 send,

@@ -1,6 +1,6 @@
 //! Abstraction traits / types for tx2 networking transport.
 
-use crate::tx2::tx2_adapter::Uniq;
+use crate::tx2::tx2_adapter::{Tx2ConDir, Uniq};
 use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
 use crate::*;
@@ -11,6 +11,9 @@ use futures::stream::Stream;
 pub trait AsConHnd: std::fmt::Debug + 'static + Send + Sync + Unpin {
     /// Get the opaque Uniq identifier for this connection.
     fn uniq(&self) -> Uniq;
+
+    /// Get the directionality of this connection.
+    fn dir(&self) -> Tx2ConDir;
 
     /// Get the remote address of this connection.
     fn peer_addr(&self) -> KitsuneResult<TxUrl>;
@@ -152,8 +155,8 @@ pub struct EpIncomingError {
 /// Data associated with a ConnectionClosed EpEvent
 #[derive(Debug)]
 pub struct EpConnectionClosed {
-    /// the peer cert this used to be connected to
-    pub peer_cert: Tx2Cert,
+    /// handle to the closed connection
+    pub con: ConHnd,
 
     /// the remote url this used to be connected to
     pub url: TxUrl,

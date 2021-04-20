@@ -103,7 +103,7 @@ struct QuicConAdaptInner {
     con: quinn::Connection,
 }
 
-struct QuicConAdapt(Share<QuicConAdaptInner>, Uniq, Tx2Cert);
+struct QuicConAdapt(Share<QuicConAdaptInner>, Uniq, Tx2Cert, Tx2ConDir);
 
 pub(crate) fn blake2b_32(data: &[u8]) -> Vec<u8> {
     blake2b_simd::Params::new()
@@ -116,7 +116,7 @@ pub(crate) fn blake2b_32(data: &[u8]) -> Vec<u8> {
 }
 
 impl QuicConAdapt {
-    pub fn new(con: quinn::Connection) -> KitsuneResult<Self> {
+    pub fn new(con: quinn::Connection, dir: Tx2ConDir) -> KitsuneResult<Self> {
         let peer_cert: Tx2Cert = match con.peer_identity() {
             None => return Err("invalid peer certificate".into()),
             Some(chain) => match chain.iter().next() {
@@ -131,6 +131,7 @@ impl QuicConAdapt {
             }),
             Uniq::default(),
             peer_cert,
+            dir,
         ))
     }
 }
@@ -138,6 +139,10 @@ impl QuicConAdapt {
 impl ConAdapt for QuicConAdapt {
     fn uniq(&self) -> Uniq {
         self.1
+    }
+
+    fn dir(&self) -> Tx2ConDir {
+        self.3
     }
 
     fn peer_addr(&self) -> KitsuneResult<TxUrl> {
@@ -184,7 +189,7 @@ impl ConAdapt for QuicConAdapt {
     }
 }
 
-fn connecting(con_fut: quinn::Connecting, local_cert: Tx2Cert, is_outgoing: bool) -> ConFut {
+fn connecting(con_fut: quinn::Connecting, local_cert: Tx2Cert, dir: Tx2ConDir) -> ConFut {
     async move {
         let quinn::NewConnection {
             connection,
@@ -192,15 +197,18 @@ fn connecting(con_fut: quinn::Connecting, local_cert: Tx2Cert, is_outgoing: bool
             ..
         } = con_fut.await.map_err(KitsuneError::other)?;
 
-        let con: Arc<dyn ConAdapt> = Arc::new(QuicConAdapt::new(connection)?);
+        let con: Arc<dyn ConAdapt> = Arc::new(QuicConAdapt::new(connection, dir)?);
         let chan_recv: Box<dyn InChanRecvAdapt> = Box::new(QuicInChanRecvAdapt::new(uni_streams));
 
         let peer_cert = con.peer_cert();
         let url = con.peer_addr()?;
-        if is_outgoing {
-            tracing::info!(?local_cert, ?peer_cert, %url, "established outgoing connection (quic)");
-        } else {
-            tracing::info!(?local_cert, ?peer_cert, %url, "established incoming connection (quic)");
+        match dir {
+            Tx2ConDir::Outgoing => {
+                tracing::info!(?local_cert, ?peer_cert, %url, "established outgoing connection (quic)");
+            }
+            Tx2ConDir::Incoming => {
+                tracing::info!(?local_cert, ?peer_cert, %url, "established incoming connection (quic)");
+            }
         }
 
         Ok((con, chan_recv))
@@ -219,7 +227,7 @@ impl QuicConRecvAdapt {
                     match recv.next().await {
                         None => None,
                         Some(con) => Some((
-                            connecting(con, local_cert.clone(), false),
+                            connecting(con, local_cert.clone(), Tx2ConDir::Incoming),
                             (recv, local_cert),
                         )),
                     }
@@ -328,7 +336,7 @@ impl EndpointAdapt for QuicEndpointAdapt {
                     .await
                     .map_err(KitsuneError::other)?;
                 let con = ep.connect(&addr, "stub.stub").map_err(KitsuneError::other);
-                match connecting(con?, local_cert, true).await {
+                match connecting(con?, local_cert, Tx2ConDir::Outgoing).await {
                     Ok(con) => Ok(con),
                     Err(err) => {
                         tracing::warn!(?err, "failed to establish outgoing connection (quic)");

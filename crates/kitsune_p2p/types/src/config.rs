@@ -83,17 +83,17 @@ pub mod tuning_params_struct {
         /// Default agent count for remote notify. [Default: 5]
         default_notify_remote_agent_count: u32 = 5,
 
-        /// Default timeout for remote notify. [Default: 1000ms]
-        default_notify_timeout_ms: u32 = 1000,
+        /// Default timeout for remote notify. [Default: 30s]
+        default_notify_timeout_ms: u32 = 1000 * 30,
 
-        /// Default timeout for rpc single. [Default: 2000]
-        default_rpc_single_timeout_ms: u32 = 2000,
+        /// Default timeout for rpc single. [Default: 30s]
+        default_rpc_single_timeout_ms: u32 = 1000 * 30,
 
         /// Default agent count for rpc multi. [Default: 2]
         default_rpc_multi_remote_agent_count: u32 = 2,
 
-        /// Default timeout for rpc multi. [Default: 2000]
-        default_rpc_multi_timeout_ms: u32 = 2000,
+        /// Default timeout for rpc multi. [Default: 30s]
+        default_rpc_multi_timeout_ms: u32 = 1000 * 30,
 
         /// Default agent expires after milliseconds. [Default: 20 minutes]
         agent_info_expires_after_ms: u32 = 1000 * 60 * 20,

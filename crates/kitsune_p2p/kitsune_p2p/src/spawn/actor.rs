@@ -93,9 +93,23 @@ impl KitsuneP2pActor {
         let f = tx2_proxy(f, conf)?;
 
         let metrics = Tx2ApiMetrics::default().set_write_len(|d, l| {
-            if let Some(t) = wire::DISC_MAP.get(&d) {
-                KitsuneMetrics::count(*t, l);
-            }
+            let t = match d {
+                "Wire::Failure" => KitsuneMetrics::Fail,
+                "Wire::Call" => KitsuneMetrics::Call,
+                "Wire::CallResp" => KitsuneMetrics::CallResp,
+                "Wire::Notify" => KitsuneMetrics::Notify,
+                "Wire::NotifyResp" => KitsuneMetrics::NotifyResp,
+                "Wire::FetchOpHashes" => KitsuneMetrics::FetchOpHashes,
+                "Wire::FetchOpHashesResponse" => KitsuneMetrics::FetchOpHashesResp,
+                "Wire::FetchOpData" => KitsuneMetrics::FetchOpData,
+                "Wire::FetchOpDataResponse" => KitsuneMetrics::FetchOpDataResp,
+                "Wire::AgentInfoQuery" => KitsuneMetrics::AgentInfoQuery,
+                "Wire::AgentInfoQueryResp" => KitsuneMetrics::AgentInfoQueryResp,
+                "Wire::Gossip" => KitsuneMetrics::Gossip,
+                "Wire::GossipResp" => KitsuneMetrics::GossipResp,
+                _ => return,
+            };
+            KitsuneMetrics::count(t, l);
         });
 
         // wrap in api

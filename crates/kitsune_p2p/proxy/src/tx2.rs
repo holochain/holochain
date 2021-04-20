@@ -65,6 +65,7 @@ const PROXY_ROUTE_ERR: u8 = 0xc0;
 
 struct ProxyConHnd {
     uniq: Uniq,
+    dir: Tx2ConDir,
     sub_con: ConHnd,
     local_cert: Tx2Cert,
     peer_cert: Tx2Cert,
@@ -79,8 +80,10 @@ impl std::fmt::Debug for ProxyConHnd {
 impl ProxyConHnd {
     pub fn new(sub_con: ConHnd, local_cert: Tx2Cert, peer_cert: Tx2Cert) -> ConHnd {
         let uniq = Uniq::default();
+        let dir = sub_con.dir();
         let con = Self {
             uniq,
+            dir,
             sub_con,
             local_cert,
             peer_cert,
@@ -93,6 +96,10 @@ impl ProxyConHnd {
 impl AsConHnd for ProxyConHnd {
     fn uniq(&self) -> Uniq {
         self.uniq
+    }
+
+    fn dir(&self) -> Tx2ConDir {
+        self.dir
     }
 
     fn is_closed(&self) -> bool {
@@ -142,12 +149,15 @@ struct ProxyEpInner {
     // map peer certs to connection handles
     // so on proxy requests we know who to send to
     // these are !SUB CONS! they should not be returned
+    // only store INCOMING connections here
+    // outgoing connections should not proxy
     digest_to_sub_con_map: HashMap<Tx2Cert, ConHnd>,
 
     // allows us to clone Tx2ConHnd items which will share
     // the same Uniq, rather than duplicating handles to the same connection.
     // these are !OUT CONS! they are returned from api requests / events.
-    direct_to_final_peer_con_map: HashMap<Tx2Cert, HashMap<Tx2Cert, ConHnd>>,
+    // these are both INCOMING and OUTGOING
+    direct_to_final_peer_con_map: HashMap<Uniq, HashMap<Tx2Cert, ConHnd>>,
 }
 
 impl ProxyEpInner {
@@ -157,10 +167,10 @@ impl ProxyEpInner {
         local_cert: Tx2Cert,
         final_peer_cert: Tx2Cert,
     ) -> KitsuneResult<(bool, ConHnd)> {
-        let direct_peer_cert = sub_con.peer_cert();
+        let direct_peer = sub_con.uniq();
         let inner_map = self
             .direct_to_final_peer_con_map
-            .entry(direct_peer_cert)
+            .entry(direct_peer)
             .or_insert_with(HashMap::new);
         let mut did_insert = false;
         let con = {
@@ -367,6 +377,8 @@ async fn ensure_proxy_register(
     local_cert: &Tx2Cert,
     sub_con: ConHnd,
 ) -> KitsuneResult<()> {
+    // first make sure we are not connecting to ourselves
+    // (or some node that somehow insecurely is using the same cert)
     let peer_cert = sub_con.peer_cert();
     if &peer_cert == local_cert {
         close_connection(
@@ -380,8 +392,25 @@ async fn ensure_proxy_register(
         tracing::warn!("refusing connection with matching cert");
         return Err(().into());
     }
+
+    // we don't register outgoing connections for proxy-ing
+    // that doesn't make any sense.
+    if let Tx2ConDir::Outgoing = sub_con.dir() {
+        return Ok(());
+    }
+
     let _ = inner.share_mut(move |i, _| {
-        i.digest_to_sub_con_map.insert(peer_cert, sub_con);
+        match i.digest_to_sub_con_map.entry(peer_cert.clone()) {
+            std::collections::hash_map::Entry::Occupied(mut e) => {
+                if e.get().uniq() != sub_con.uniq() {
+                    tracing::warn!(?peer_cert, "REPLACE EXISTING CONNECTION!");
+                    e.insert(sub_con);
+                }
+            }
+            std::collections::hash_map::Entry::Vacant(e) => {
+                e.insert(sub_con);
+            }
+        }
         Ok(())
     });
     Ok(())
@@ -546,12 +575,9 @@ async fn incoming_evt_handle(
             }
         }
         ConnectionClosed(EpConnectionClosed {
-            peer_cert,
-            code,
-            reason,
-            ..
+            con, code, reason, ..
         }) => {
-            close_connection_inner(&hnd.inner, logic_hnd, peer_cert, code, &reason).await;
+            close_connection_inner(&hnd.inner, logic_hnd, con, code, &reason).await;
         }
         Error(e) => {
             let _ = logic_hnd.emit(Error(e)).await;
@@ -586,20 +612,30 @@ async fn close_connection(
     code: u32,
     reason: &str,
 ) {
-    close_connection_inner(inner, logic_hnd, sub_con.peer_cert(), code, reason).await;
-    sub_con.close(code, reason).await;
+    let c_fut = sub_con.close(code, reason);
+    close_connection_inner(inner, logic_hnd, sub_con, code, reason).await;
+    c_fut.await;
 }
 
 async fn close_connection_inner(
     inner: &Share<ProxyEpInner>,
     logic_hnd: &LogicChanHandle<EpEvent>,
-    peer_cert: Tx2Cert,
+    sub_con: ConHnd,
     code: u32,
     reason: &str,
 ) {
+    let peer_dir = sub_con.dir();
+    let peer_cert = sub_con.peer_cert();
+    let direct_peer = sub_con.uniq();
+
     let kill_cons = inner.share_mut(|i, _| {
-        i.digest_to_sub_con_map.remove(&peer_cert);
-        Ok(i.direct_to_final_peer_con_map.remove(&peer_cert))
+        // if this is an INCOMING connection, remove it from our proxy list
+        if let Tx2ConDir::Incoming = peer_dir {
+            i.digest_to_sub_con_map.remove(&peer_cert);
+        }
+
+        // remove all out cons associated with this exact connection
+        Ok(i.direct_to_final_peer_con_map.remove(&direct_peer))
     });
 
     let kill_cons = match kill_cons {
@@ -613,7 +649,7 @@ async fn close_connection_inner(
             _ => continue,
         };
         let evt = EpEvent::ConnectionClosed(EpConnectionClosed {
-            peer_cert: peer_cert.clone(),
+            con: c,
             url,
             code,
             reason: reason.to_string(),

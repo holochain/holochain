@@ -19,6 +19,17 @@ impl Default for Uniq {
     }
 }
 
+/// The directionality of this connection.
+/// Did we establish it? Was it an incoming connection?
+#[derive(Debug, Clone, Copy)]
+pub enum Tx2ConDir {
+    /// This connection was initiated by a remote peer.
+    Incoming,
+
+    /// A local endpoint established this outgoing connection.
+    Outgoing,
+}
+
 /// Tx backend read stream type.
 pub type InChan = Box<dyn AsFramedReader>;
 
@@ -39,6 +50,9 @@ pub type OutChanFut = BoxFuture<'static, KitsuneResult<OutChan>>;
 pub trait ConAdapt: 'static + Send + Sync + Unpin {
     /// Get the opaque Uniq identifier for this connection.
     fn uniq(&self) -> Uniq;
+
+    /// Get the directionality of this connection.
+    fn dir(&self) -> Tx2ConDir;
 
     /// Get the string address (url) of the remote.
     fn peer_addr(&self) -> KitsuneResult<TxUrl>;

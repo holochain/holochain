@@ -207,6 +207,7 @@ async fn in_chan_recv_logic(
 #[derive(Clone)]
 struct ConItem {
     pub uniq: Uniq,
+    pub dir: Tx2ConDir,
     pub peer_cert: Tx2Cert,
     pub logic_hnd: LogicChanHandle<EpEvent>,
     pub item: Share<ConItemInner>,
@@ -223,6 +224,10 @@ impl AsConHnd for ConItem {
         self.uniq
     }
 
+    fn dir(&self) -> Tx2ConDir {
+        self.dir
+    }
+
     fn peer_addr(&self) -> KitsuneResult<TxUrl> {
         self.item.share_mut(|i, _| Ok(i.url.clone()))
     }
@@ -236,13 +241,13 @@ impl AsConHnd for ConItem {
     }
 
     fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
-        let peer_cert = self.peer_cert.clone();
+        let this: ConHnd = Arc::new(self.clone());
         let maybe = self.item.share_mut(move |i, c| {
             *c = true;
             let emit_fut = self
                 .logic_hnd
                 .emit(EpEvent::ConnectionClosed(EpConnectionClosed {
-                    peer_cert,
+                    con: this,
                     url: i.url.clone(),
                     code,
                     reason: reason.to_string(),
@@ -331,6 +336,7 @@ impl ConItem {
         let url = &url;
         let uniq = con.uniq();
 
+        let dir = con.dir();
         let peer_cert = con.peer_cert();
 
         let writer_bucket = ResourceBucket::new();
@@ -353,6 +359,7 @@ impl ConItem {
         let (logic_hnd, con_item) = inner.share_mut(move |i, _| {
             let con_item = Self {
                 uniq,
+                dir,
                 peer_cert: peer_cert2,
                 logic_hnd: i.logic_hnd.clone(),
                 item: con_item,
