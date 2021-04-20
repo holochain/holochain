@@ -6,6 +6,8 @@ use holochain::conductor::Conductor;
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use observability::Output;
+#[cfg(unix)]
+use sd_notify::{notify, NotifyState};
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::*;
@@ -68,6 +70,12 @@ async fn async_main() {
     // that the conductor has been initialized, in particular that the admin
     // interfaces are running, and can be connected to.
     println!("{}", MAGIC_CONDUCTOR_READY_STRING);
+
+    // Lets systemd units know that holochain is ready via sd_notify socket
+    // Requires NotifyAccess=all and Type=notify attributes on holochain systemd unit
+    // and NotifyAccess=all on dependant systemd unit
+    #[cfg(unix)]
+    let _ = notify(true, &[NotifyState::Ready]);
 
     // Await on the main JoinHandle, keeping the process alive until all
     // Conductor activity has ceased

@@ -79,6 +79,9 @@ holochain_test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_com
 unwrap_to = { version = "0.1.0", optional = true }
 itertools = { version = "0.10", optional = true }
 
+[target.'cfg(unix)'.dependencies]
+sd-notify = "0.3.0"
+
 
 [dev-dependencies]
 anyhow = "1.0.26"
