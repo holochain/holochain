@@ -83,7 +83,7 @@ impl ManagedTaskAdd {
 
     /// Handle a task's completion with a generic callback
     pub fn generic(handle: ManagedTaskHandle, f: OnDeath) -> Self {
-        Self::new(handle, TaskKind::Generic(f), "unnamed".into())
+        Self::new(handle, TaskKind::Generic(f), "unnamed")
     }
 }
 
@@ -95,7 +95,7 @@ impl Future for ManagedTaskAdd {
         match JoinHandle::poll(p, cx) {
             Poll::Ready(r) => Poll::Ready(handle_completed_task(
                 &self.kind,
-                dbg!(r.unwrap_or_else(|e| Err(e.into()))),
+                r.unwrap_or_else(|e| Err(e.into())),
                 self.name.clone(),
             )),
             Poll::Pending => Poll::Pending,
@@ -173,7 +173,6 @@ async fn run(
                     error!("Minor error during managed task: {:?}\nContext: {}", error, context)
                 }
                 Some(TaskOutcome::ShutdownConductor(error, context)) => {
-                    dbg!(&error, &context);
                     let error = match *error {
                         ManagedTaskError::Join(error) => {
                             match error.try_into_panic() {
@@ -190,7 +189,6 @@ async fn run(
                     return Err(TaskManagerError::Unrecoverable(error));
                 },
                 Some(TaskOutcome::UninstallApp(cell_id, error, context)) => {
-                    dbg!(&cell_id, &error, &context);
                     tracing::error!("About to deactivate apps");
                     let app_ids = conductor.list_active_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
                     tracing::error!(
@@ -213,7 +211,6 @@ async fn run(
 #[tracing::instrument(skip(kind))]
 fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: String) -> TaskOutcome {
     use TaskOutcome::*;
-    dbg!(&result);
     match kind {
         TaskKind::Ignore => match result {
             Ok(_) => Ignore,
@@ -280,7 +277,8 @@ pub struct TaskManagerClient {
     /// Channel on which to send info about tasks we want to manage
     task_add_sender: mpsc::Sender<ManagedTaskAdd>,
 
-    /// By sending on this channel,
+    /// Sending a message on this channel will broadcast to all managed tasks,
+    /// telling them to shut down
     task_stop_broadcaster: StopBroadcaster,
 
     /// The main task join handle to await on.

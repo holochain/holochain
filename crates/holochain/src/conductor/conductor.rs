@@ -788,7 +788,6 @@ where
     /// Remove cells from the cell map in the Conductor
     pub(super) async fn remove_cells(&mut self, cell_ids: Vec<CellId>) {
         for cell_id in cell_ids {
-            dbg!(&cell_id);
             if let Some(item) = self.cells.remove(&cell_id) {
                 if let Err(err) = item.cell.destroy().await {
                     tracing::error!("Error destroying Cell: {:?}\nCellId: {}", err, cell_id);
@@ -877,7 +876,7 @@ where
         let active_apps = self.get_state().await?.active_apps;
         Ok(active_apps
             .iter()
-            .filter(|(_, v)| v.all_cells().find(|i| *i == cell_id).is_some())
+            .filter(|(_, v)| v.all_cells().any(|i| i == cell_id))
             .map(|(k, _)| k)
             .cloned()
             .collect())

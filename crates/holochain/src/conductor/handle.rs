@@ -609,23 +609,17 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn deactivate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()> {
         let mut conductor = self.conductor.write().await;
-        let cell_ids_to_remove = conductor
-            .deactivate_app_in_db(installed_app_id)
-            .await?;
+        let cell_ids_to_remove = conductor.deactivate_app_in_db(installed_app_id).await?;
         // MD: I'm not sure about this. We never add the cells back in after re-activating an app,
         //     so it seems either we shouldn't remove them here, or we should be sure to add them
         //     back in when re-activating.
-        conductor
-            .remove_cells(cell_ids_to_remove)
-            .await;
+        conductor.remove_cells(cell_ids_to_remove).await;
         Ok(())
     }
 
     async fn uninstall_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<()> {
-        dbg!();
         let mut conductor = self.conductor.write().await;
         if let Some(cell_ids_to_remove) = conductor.remove_app_from_db(installed_app_id).await? {
-            dbg!(&cell_ids_to_remove);
             conductor.remove_cells(cell_ids_to_remove).await;
         }
         Ok(())

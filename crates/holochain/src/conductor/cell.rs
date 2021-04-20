@@ -767,10 +767,18 @@ impl Cell {
 
     /// Delete all data associated with this Cell by deleting the associated
     /// LMDB environment. Completely reverses Cell creation.
+    // FIXME: this should also ensure that the long-running managed tasks,
+    //        i.e. the queue consumers, are stopped as well. Currently, they
+    //        will continue running because we have no way to target a specific
+    //        Cell's tasks for shutdown.
+    //
+    //        Consider using a separate TaskManager for each Cell, so that all
+    //        of a Cell's tasks can be shut down at once. Perhaps the Conductor
+    //        TaskManager can have these Cell TaskManagers as children.
+    //        [ B-04176 ]
     #[tracing::instrument(skip(self))]
     pub async fn destroy(self) -> CellResult<()> {
         let path = self.env.path().clone();
-        // Remove db from global map
         // Delete directory
         self.env
             .remove()
