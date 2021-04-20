@@ -75,52 +75,51 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             }
             RegisterDna(payload) => {
                 trace!(register_dna_payload = ?payload);
+                let RegisterDnaPayload {
+                    uid,
+                    properties,
+                    source,
+                } = *payload;
                 // uid and properties from the register call will override any in the bundle
-                let (mut dna, maybe_uid, maybe_properties) = match payload.source {
+                let dna = match source {
                     DnaSource::Hash(ref hash) => {
-                        if payload.properties.is_none() && payload.uid.is_none() {
+                        if properties.is_none() && uid.is_none() {
                             return Err(ConductorApiError::DnaReadError(
                                 "Hash Dna source requires properties or uid to create a derived Dna"
                                     .to_string(),
                             ));
                         }
-                        let dna = self.conductor_handle.get_dna(hash).await.ok_or_else(|| {
-                            ConductorApiError::DnaReadError(format!(
-                                "Unable to create derived Dna: {} not registered",
-                                hash
-                            ))
-                        })?;
-                        (dna, payload.uid.clone(), payload.properties.clone())
+                        let mut dna =
+                            self.conductor_handle.get_dna(hash).await.ok_or_else(|| {
+                                ConductorApiError::DnaReadError(format!(
+                                    "Unable to create derived Dna: {} not registered",
+                                    hash
+                                ))
+                            })?;
+                        if let Some(props) = properties {
+                            let properties = SerializedBytes::try_from(props)
+                                .map_err(SerializationError::from)?;
+                            dna = dna.with_properties(properties).await?;
+                        }
+                        if let Some(uid) = uid {
+                            dna = dna.with_uid(uid).await?;
+                        }
+                        dna
                     }
                     DnaSource::Path(ref path) => {
                         let bundle = Bundle::read_from_file(path).await?;
                         let bundle: DnaBundle = bundle.into();
-                        let (uid, properties) = resolve_phenotype(
-                            bundle.manifest(),
-                            payload.uid.as_ref(),
-                            payload.properties.as_ref(),
-                        );
-                        let dna = bundle.into_dna_file().await?;
-                        (dna, uid, properties)
+                        let (dna_file, _original_hash) =
+                            bundle.into_dna_file(uid, properties).await?;
+                        dna_file
                     }
                     DnaSource::Bundle(bundle) => {
-                        let (uid, properties) = resolve_phenotype(
-                            bundle.manifest(),
-                            payload.uid.as_ref(),
-                            payload.properties.as_ref(),
-                        );
-                        let dna = bundle.into_dna_file().await?;
-                        (dna, uid, properties)
+                        let (dna_file, _original_hash) =
+                            bundle.into_dna_file(uid, properties).await?;
+                        dna_file
                     }
                 };
-                if let Some(props) = maybe_properties {
-                    let properties =
-                        SerializedBytes::try_from(props).map_err(SerializationError::from)?;
-                    dna = dna.with_properties(properties).await?;
-                }
-                if let Some(uid) = maybe_uid {
-                    dna = dna.with_uid(uid).await?;
-                }
+
                 let hash = dna.dna_hash().clone();
                 let dna_list = self.conductor_handle.list_dnas().await?;
                 if !dna_list.contains(&hash) {
@@ -272,7 +271,9 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
     }
 }
 
-fn resolve_phenotype(
+/// Return the proper phenotype for a Dna, given a manifest and some optional
+/// overrides
+fn _resolve_phenotype(
     manifest: &DnaManifest,
     payload_uid: Option<&Uid>,
     payload_properties: Option<&YamlProperties>,
