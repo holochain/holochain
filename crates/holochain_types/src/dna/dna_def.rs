@@ -38,6 +38,12 @@ impl From<()> for YamlProperties {
     }
 }
 
+impl Default for YamlProperties {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
 /// Not a great implementation: always returns null
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for YamlProperties {
