@@ -93,7 +93,7 @@ struct CellItem<CA>
 where
     CA: CellConductorApiT,
 {
-    cell: Arc<Cell<CA>>,
+    cell: Cell<CA>,
     _state: CellState,
 }
 
@@ -178,12 +178,12 @@ impl<DS> Conductor<DS>
 where
     DS: DnaStore + 'static,
 {
-    pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
+    pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<&Cell> {
         let item = self
             .cells
             .get(cell_id)
             .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
-        Ok(item.cell.clone())
+        Ok(&item.cell)
     }
 
     /// A gate to put at the top of public functions to ensure that work is not
@@ -560,7 +560,7 @@ where
                     // unwrap safe because of the partition
                     let success = success.into_iter().map(Result::unwrap);
 
-                    // If there was errors, cleanup and return the errors
+                    // If there were errors, cleanup and return the errors
                     if !errors.is_empty() {
                         for cell in success {
                             // Error needs to capture which app failed
@@ -691,7 +691,7 @@ where
             self.cells.insert(
                 cell_id,
                 CellItem {
-                    cell: Arc::new(cell),
+                    cell,
                     _state: CellState { _active: false },
                 },
             );
@@ -788,6 +788,7 @@ where
     /// Remove cells from the cell map in the Conductor
     pub(super) async fn remove_cells(&mut self, cell_ids: Vec<CellId>) {
         for cell_id in cell_ids {
+            dbg!(&cell_id);
             if let Some(item) = self.cells.remove(&cell_id) {
                 if let Err(err) = item.cell.destroy().await {
                     tracing::error!("Error destroying Cell: {:?}\nCellId: {}", err, cell_id);

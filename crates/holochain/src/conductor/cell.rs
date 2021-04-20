@@ -649,16 +649,6 @@ impl Cell {
         Ok([0; 64].into())
     }
 
-    /// When the Conductor determines that it's time to execute some [AutonomicProcess],
-    /// whether scheduled or through an [AutonomicCue], this function gets called
-    #[tracing::instrument(skip(self, process))]
-    pub async fn handle_autonomic_process(&self, process: AutonomicProcess) -> CellResult<()> {
-        match process {
-            AutonomicProcess::SlowHeal => unimplemented!(),
-            AutonomicProcess::HealthCheck => unimplemented!(),
-        }
-    }
-
     #[instrument(skip(self, from_agent, fn_name, cap, payload))]
     /// a remote agent is attempting a "call_remote" on this cell.
     async fn handle_call_remote(

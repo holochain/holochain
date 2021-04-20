@@ -56,7 +56,7 @@ use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
-use futures::StreamExt;
+use futures::{future::BoxFuture, StreamExt};
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_lmdb::env::EnvironmentRead;
 use holochain_p2p::event::HolochainP2pEvent::*;
@@ -145,9 +145,6 @@ pub trait ConductorHandleT: Send + Sync {
         invocation: ZomeCall,
         workspace_lock: CallZomeWorkspaceLock,
     ) -> ConductorApiResult<ZomeCallResult>;
-
-    /// Cue the autonomic system to perform some action early (experimental)
-    async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
 
     /// Get a Websocket port which will
     async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16>;
@@ -408,16 +405,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
             _ => {
-                let cell = self.cell_by_id(cell_id).await?;
-                cell.handle_holochain_p2p_event(event).await?;
+                self.with_cell(cell_id, |cell| {
+                    async move { Ok(cell.handle_holochain_p2p_event(event).await?) }.boxed()
+                })
+                .await?
             }
         }
         Ok(())
     }
 
     async fn call_zome(&self, call: ZomeCall) -> ConductorApiResult<ZomeCallResult> {
-        let cell = self.cell_by_id(&call.cell_id).await?;
-        Ok(cell.call_zome(call, None).await?)
+        self.with_cell(&call.cell_id.clone(), |cell| {
+            async move { Ok(cell.call_zome(call, None).await?) }.boxed()
+        })
+        .await
     }
 
     async fn call_zome_with_workspace(
@@ -426,14 +427,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         workspace_lock: CallZomeWorkspaceLock,
     ) -> ConductorApiResult<ZomeCallResult> {
         debug!(cell_id = ?call.cell_id);
-        let cell = self.cell_by_id(&call.cell_id).await?;
-        Ok(cell.call_zome(call, Some(workspace_lock)).await?)
-    }
-
-    async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()> {
-        let cell = self.cell_by_id(cell_id).await?;
-        let _ = cell.handle_autonomic_process(cue.into()).await;
-        Ok(())
+        self.with_cell(&call.cell_id.clone(), |cell| {
+            async move { Ok(cell.call_zome(call, Some(workspace_lock)).await?) }.boxed()
+        })
+        .await
     }
 
     async fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle> {
@@ -611,34 +608,25 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn deactivate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()> {
-        let cell_ids_to_remove = self
-            .conductor
-            .write()
-            .await
+        let mut conductor = self.conductor.write().await;
+        let cell_ids_to_remove = conductor
             .deactivate_app_in_db(installed_app_id)
             .await?;
         // MD: I'm not sure about this. We never add the cells back in after re-activating an app,
         //     so it seems either we shouldn't remove them here, or we should be sure to add them
         //     back in when re-activating.
-        self.conductor
-            .write()
-            .await
-            .remove_cells(cell_ids_to_remove);
+        conductor
+            .remove_cells(cell_ids_to_remove)
+            .await;
         Ok(())
     }
 
     async fn uninstall_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<()> {
-        if let Some(cell_ids_to_remove) = self
-            .conductor
-            .write()
-            .await
-            .remove_app_from_db(installed_app_id)
-            .await?
-        {
-            self.conductor
-                .write()
-                .await
-                .remove_cells(cell_ids_to_remove);
+        dbg!();
+        let mut conductor = self.conductor.write().await;
+        if let Some(cell_ids_to_remove) = conductor.remove_app_from_db(installed_app_id).await? {
+            dbg!(&cell_ids_to_remove);
+            conductor.remove_cells(cell_ids_to_remove).await;
         }
         Ok(())
     }
@@ -699,14 +687,18 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn get_cell_env_readonly(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentRead> {
-        let cell = self.cell_by_id(cell_id).await?;
-        Ok(cell.env().clone().into())
+        self.with_cell(cell_id, |cell| {
+            async move { Ok(cell.env().clone().into()) }.boxed()
+        })
+        .await
     }
 
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
-        let cell = self.cell_by_id(cell_id).await?;
-        Ok(cell.env().clone())
+        self.with_cell(cell_id, |cell| {
+            async move { Ok(cell.env().clone()) }.boxed()
+        })
+        .await
     }
 
     #[cfg(any(test, feature = "test_utils"))]
@@ -717,8 +709,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_triggers(&self, cell_id: &CellId) -> ConductorApiResult<QueueTriggers> {
-        let cell = self.cell_by_id(cell_id).await?;
-        Ok(cell.triggers().clone())
+        self.with_cell(cell_id, |cell| {
+            async move { Ok(cell.triggers().clone()) }.boxed()
+        })
+        .await
     }
 
     #[cfg(any(test, feature = "test_utils"))]
@@ -738,9 +732,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 }
 
 impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
-    async fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<Arc<Cell>> {
+    async fn with_cell<'a, Func, O>(&'a self, cell_id: &'a CellId, f: Func) -> ConductorApiResult<O>
+    where
+        // Fut: Future<Output = ConductorApiResult<O>> + 'static,
+        Func: FnOnce(&Cell) -> BoxFuture<ConductorApiResult<O>>,
+    {
         let lock = self.conductor.read().await;
-        Ok(lock.cell_by_id(cell_id)?)
+        f(lock.cell_by_id(cell_id)?).await
     }
 
     /// Add cells to the map then join the network then initialize workflows.
