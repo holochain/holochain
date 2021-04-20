@@ -97,7 +97,6 @@ async fn test_validation_receipt() {
     // Check alice has 2 receipts in their authored dht ops table.
     let db = env.get_table(TableName::AuthoredDhtOps).unwrap();
     let authored_dht_ops: AuthoredDhtOpsStore = KvBufFresh::new(env.clone(), db);
-
     crate::assert_eq_retry_1m!(
         {
             fresh_reader_test!(env, |mut r| authored_dht_ops
