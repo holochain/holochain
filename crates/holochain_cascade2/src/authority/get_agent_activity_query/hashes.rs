@@ -57,7 +57,7 @@ impl Query for GetAgentActivityQuery {
         .to_string()
     }
 
-    fn params(&self) -> Vec<Params> {
+    fn params(&self) -> Vec<holochain_state::query::Params> {
         (named_params! {
             ":author": self.agent,
             ":op_type": DhtOpType::RegisterAgentActivity,

@@ -36,6 +36,8 @@ use types::Outcome;
 
 pub mod types;
 
+mod query;
+
 #[cfg(test)]
 mod chain_test;
 #[cfg(test)]

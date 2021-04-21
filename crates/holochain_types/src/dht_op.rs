@@ -359,6 +359,43 @@ impl DhtOp {
             DhtOp::RegisterRemoveLink(_, _) => DhtOpType::RegisterRemoveLink,
         }
     }
+
+    /// From a type, header and an entry (if there is one)
+    pub fn from_type(
+        op_type: DhtOpType,
+        header: SignedHeader,
+        entry: Option<Entry>,
+    ) -> DhtOpResult<Self> {
+        let SignedHeader(header, signature) = header;
+        let r = match op_type {
+            DhtOpType::StoreElement => DhtOp::StoreElement(signature, header, entry.map(Box::new)),
+            DhtOpType::StoreEntry => {
+                let entry = entry.ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?;
+                let header = match header {
+                    Header::Create(c) => NewEntryHeader::Create(c),
+                    Header::Update(c) => NewEntryHeader::Update(c),
+                    _ => return Err(DhtOpError::OpHeaderMismatch(op_type, header.header_type())),
+                };
+                DhtOp::StoreEntry(signature, header, Box::new(entry))
+            }
+            DhtOpType::RegisterAgentActivity => DhtOp::RegisterAgentActivity(signature, header),
+            DhtOpType::RegisterUpdatedContent => {
+                DhtOp::RegisterUpdatedContent(signature, header.try_into()?, entry.map(Box::new))
+            }
+            DhtOpType::RegisterUpdatedElement => {
+                DhtOp::RegisterUpdatedElement(signature, header.try_into()?, entry.map(Box::new))
+            }
+            DhtOpType::RegisterDeletedBy => DhtOp::RegisterDeletedBy(signature, header.try_into()?),
+            DhtOpType::RegisterDeletedEntryHeader => {
+                DhtOp::RegisterDeletedBy(signature, header.try_into()?)
+            }
+            DhtOpType::RegisterAddLink => DhtOp::RegisterAddLink(signature, header.try_into()?),
+            DhtOpType::RegisterRemoveLink => {
+                DhtOp::RegisterRemoveLink(signature, header.try_into()?)
+            }
+        };
+        Ok(r)
+    }
 }
 
 impl DhtOpLight {

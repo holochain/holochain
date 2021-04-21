@@ -75,6 +75,12 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     KeystoreError(#[from] KeystoreError),
+
+    #[error(transparent)]
+    SqlError(#[from] holochain_sqlite::rusqlite::Error),
+
+    #[error(transparent)]
+    StateQueryError(#[from] holochain_state::query::StateQueryError),
 }
 
 /// Internal type to handle running workflows

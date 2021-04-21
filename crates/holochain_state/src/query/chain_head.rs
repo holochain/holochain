@@ -3,6 +3,7 @@ use holochain_sqlite::rusqlite::*;
 use holochain_zome_types::*;
 use std::fmt::Debug;
 
+use super::Params;
 use super::*;
 
 #[derive(Debug, Clone)]

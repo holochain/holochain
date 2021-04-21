@@ -30,6 +30,8 @@ use std::collections::HashMap;
 use std::time;
 use tracing::*;
 
+mod query;
+
 /// Default redundancy factor for validation receipts
 // TODO: Pull this from the wasm entry def and only use this if it's missing
 // TODO: Put a default in the DnaBundle
@@ -67,6 +69,8 @@ pub async fn publish_dht_ops_workflow(
     //
     //        so, TODO: make publishing come before this, after self-publishing
     //        is abolished [ B-04053 ]
+    // @freesig I think the correct thing to do here is not wait for a response from the
+    // publish.
     tracing::warn!("Committing local state before publishing to network! TODO: circle back ");
     writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 

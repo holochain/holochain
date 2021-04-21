@@ -32,10 +32,13 @@ CREATE TABLE Header (
     author           BLOB           NOT NULL,
 
     blob             BLOB           NOT NULL,
+    timestamp_s      INTEGER        NOT NULL, -- Unix Epoch seconds
+    timestamp_ns     INTEGER        NOT NULL, -- Unix Epoch nano-second component
 
     -- Create / Update
     entry_hash       BLOB           NULL,
     entry_type       VARCHAR(64)    NULL,  -- The opaque EntryType
+    private_entry    INTEGER        NULL,  -- BOOLEAN
 
     -- Update
     original_entry_hash   BLOB      NULL,
@@ -94,7 +97,20 @@ CREATE TABLE DhtOp (
     -- an INTEGER.
     when_integrated_ns  BLOB NULL,          -- DATETIME
 
+    receipt_count       INTEGER     NULL,
+    last_publish_time   INTEGER     NULL,   -- UNIX TIMESTAMP SECONDS
+
     blob             BLOB           NOT NULL,
+
+    -- 0: Awaiting System Validation Dependencies.
+    -- 1: Successfully System Validated (And ready for app validation).
+    -- 2: Awaiting System Validation Dependencies.
+    -- Don't need the other stages (pending, awaiting itntegration) because:
+    -- - pending = validation_stage null && validation_status null.
+    -- - awaiting integrated = validation_status not null.
+    -- We could make this an enum and use a Blob so we can capture which 
+    -- deps are being awaited for debugging.
+    validation_stage    INTEGER     NULL,
 
     -- NB: I removed this because when_integrated covers it
     -- TODO: @freesig: Might be hard to index on various timestamps?

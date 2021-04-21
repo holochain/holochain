@@ -72,7 +72,7 @@ impl Query for DeterministicGetAgentActivityQuery {
         )
     }
 
-    fn params(&self) -> Vec<Params> {
+    fn params(&self) -> Vec<holochain_state::query::Params> {
         (named_params! {
             ":author": self.agent,
             ":hash_low": self.filter.range.0,
