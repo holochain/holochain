@@ -116,7 +116,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
         }) = self.0.remove(&(uniq, msg_id))
         {
             let elapsed_ns = start.elapsed().as_nanos();
-            tracing::trace!(
+            tracing::debug!(
                 %dbg_name,
                 ?local_cert,
                 ?peer_cert,
