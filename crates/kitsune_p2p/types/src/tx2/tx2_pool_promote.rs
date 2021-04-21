@@ -156,6 +156,8 @@ async fn in_chan_recv_logic(
                         // no longer care about the error.
                         break;
                     }
+
+                    crate::metrics::metric_push_raw_recv_count(1);
                 }
                 tracing::debug!(?local_cert, ?peer_cert, "channel recv loop end");
             },
@@ -303,6 +305,8 @@ impl AsConHnd for ConItem {
                     byte_count = %len,
                     "transmitted bytes",
                 );
+
+                crate::metrics::metric_push_raw_send_count(1);
 
                 res
             };

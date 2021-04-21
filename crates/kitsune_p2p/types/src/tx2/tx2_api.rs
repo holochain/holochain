@@ -77,7 +77,10 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
             peer_cert,
         }) = self.0.remove(&(uniq, msg_id))
         {
-            let elapsed_ns = start.elapsed().as_nanos();
+            let elapsed = start.elapsed();
+            crate::metrics::metric_push_api_req_res_elapsed_ms(elapsed.as_millis() as u64);
+            let elapsed_ns = elapsed.as_nanos();
+
             tracing::debug!(
                 %dbg_name,
                 %req_byte_count,
