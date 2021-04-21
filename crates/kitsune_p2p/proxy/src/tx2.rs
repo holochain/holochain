@@ -348,27 +348,23 @@ async fn incoming_evt_logic(
     let local_cert = &local_cert;
     let tuning_params = &tuning_params;
 
-    // use CHANNEL_COUNT concurrents because that is how many channels
-    // we have for sending outgoing data... most everything else in here is sync
-    // and so will be processed serially anyways.
     // Benchmarks showed a slight slowdown when using semaphore count tasks
     // instead of for_each_concurrent... but maybe other problems caused that?
     sub_ep
-        .for_each_concurrent(
-            tuning_params.tx2_channel_count_per_connection,
-            |evt| async {
-                incoming_evt_handle(
-                    tuning_params,
-                    allow_proxy_fwd,
-                    evt,
-                    local_cert.clone(),
-                    &hnd,
-                    &logic_hnd,
-                )
-                .await;
-            },
-        )
+        .for_each_concurrent(tuning_params.concurrent_limit_per_thread, |evt| async {
+            incoming_evt_handle(
+                tuning_params,
+                allow_proxy_fwd,
+                evt,
+                local_cert.clone(),
+                &hnd,
+                &logic_hnd,
+            )
+            .await;
+        })
         .await;
+
+    tracing::warn!("proxy loop end");
 }
 
 async fn ensure_proxy_register(

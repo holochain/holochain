@@ -90,7 +90,11 @@ async fn in_chan_recv_logic(
 
     let recv_fut = in_chan_recv
         .for_each_concurrent(
-            tuning_params.tx2_channel_count_per_connection,
+            // currently setting this to the concurrent limit (default: 32)
+            // so we'll accept up to 32 incoming channels
+            // but we're only establishign 3 outgoing channels, should
+            // we set this to tx2_channel_count_per_connection?
+            tuning_params.concurrent_limit_per_thread,
             move |chan| async move {
                 let mut chan = match chan.await {
                     Err(e) => {
@@ -439,40 +443,22 @@ impl ConItem {
                 .await
                 .map_err(KitsuneError::other)?;
 
-            let mut next_wait_ms = tuning_params.tx2_initial_connect_retry_delay_ms as u64;
+            let (con, in_chan_recv) = inner
+                .share_mut(|i, _| Ok(i.sub_ep.connect(remote.clone(), timeout)))?
+                .await?;
 
-            let try_connect = || async {
-                inner
-                    .share_mut(|i, _| Ok(i.sub_ep.connect(remote.clone(), timeout)))?
-                    .await
-            };
-
-            loop {
-                match try_connect().await {
-                    Err(e) => tracing::warn!("connect error: {:?}", e),
-                    Ok((con, in_chan_recv)) => {
-                        return Self::reg_con_inner(
-                            con_init,
-                            local_cert,
-                            tuning_params,
-                            inner,
-                            permit,
-                            con,
-                            remote,
-                            in_chan_recv,
-                            true,
-                        )
-                        .await;
-                    }
-                }
-
-                tokio::time::sleep(std::time::Duration::from_millis(next_wait_ms)).await;
-
-                next_wait_ms *= 2;
-                if next_wait_ms >= timeout.time_remaining().as_millis() as u64 {
-                    return Err(KitsuneErrorKind::TimedOut.into());
-                }
-            }
+            Self::reg_con_inner(
+                con_init,
+                local_cert,
+                tuning_params,
+                inner,
+                permit,
+                con,
+                remote,
+                in_chan_recv,
+                true,
+            )
+            .await
         })
     }
 
@@ -712,12 +698,13 @@ async fn con_recv_logic(
         }
     });
 
-    // Iterate on the pend_stream, handshaking all connections in parallel.
-    // This *is* actually bound, by the max connections semaphore.
     let inner = &inner;
     let local_cert = &local_cert;
     let logic_hnd = &logic_hnd;
     let tuning_params = &tuning_params;
+
+    // Iterate on the pend_stream, handshaking all connections in parallel.
+    // This *is* actually bound, by the max connections semaphore.
     pend_stream
         .for_each_concurrent(None, move |r| async move {
             let con_init = std::time::Instant::now();

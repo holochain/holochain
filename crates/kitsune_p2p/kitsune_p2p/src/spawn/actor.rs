@@ -169,7 +169,7 @@ impl KitsuneP2pActor {
         tokio::task::spawn({
             let evt_sender = evt_sender.clone();
             let tuning_params = config.tuning_params.clone();
-            ep.for_each_concurrent(/* limit */ 10, move |event| {
+            ep.for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
                 let evt_sender = evt_sender.clone();
                 let tuning_params = tuning_params.clone();
                 async move {
@@ -344,8 +344,13 @@ impl KitsuneP2pActor {
                                         ops.into_iter().map(|(k, v)| (k, v.into())).collect(),
                                         agents,
                                     );
-                                    if let Err(err) =
-                                        local_gossip_ops(&evt_sender, space, input).await
+                                    if let Err(err) = local_gossip_ops(
+                                        tuning_params.clone(),
+                                        &evt_sender,
+                                        space,
+                                        input,
+                                    )
+                                    .await
                                     {
                                         let reason = format!("{:?}", err);
                                         tracing::error!("got err: {}", reason);

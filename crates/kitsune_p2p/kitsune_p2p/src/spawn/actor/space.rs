@@ -212,8 +212,9 @@ impl gossip::GossipEventHandler for Space {
     }
 
     fn handle_gossip_ops(&mut self, input: GossipEvt) -> gossip::GossipEventHandlerResult<()> {
+        let tuning_params = self.config.tuning_params.clone();
         if self.local_joined_agents.contains(&input.to_agent) {
-            let fut = local_gossip_ops(&self.evt_sender, self.space.clone(), input);
+            let fut = local_gossip_ops(tuning_params, &self.evt_sender, self.space.clone(), input);
             Ok(async move { fut.await }.boxed().into())
         } else {
             let GossipEvt {
@@ -336,6 +337,7 @@ pub fn local_req_op_data(
 }
 
 pub fn local_gossip_ops(
+    tuning_params: kitsune_p2p_types::config::KitsuneP2pTuningParams,
     evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     space: Arc<KitsuneSpace>,
     input: GossipEvt,
@@ -372,14 +374,14 @@ pub fn local_gossip_ops(
         let to_agent = &to_agent;
         let from_agent = &from_agent;
         futures::stream::iter(all)
-                .for_each_concurrent(10, |res| async move {
+                .for_each_concurrent(tuning_params.concurrent_limit_per_thread, |res| async move {
                     if let Err(e) = res.await {
                         ghost_actor::dependencies::tracing::error!(failed_to_gossip_ops = ?e, ?from_agent, ?to_agent);
                     }
                 })
                 .await;
         futures::stream::iter(all_agents)
-                .for_each_concurrent(10, |res| async move {
+                .for_each_concurrent(tuning_params.concurrent_limit_per_thread, |res| async move {
                     if let Err(e) = res.await {
                         ghost_actor::dependencies::tracing::error!(failed_to_gossip_peer_info = ?e, ?from_agent, ?to_agent);
                     }

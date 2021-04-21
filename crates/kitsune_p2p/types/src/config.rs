@@ -110,6 +110,11 @@ pub mod tuning_params_struct {
         /// [Default: 5 minutes]
         proxy_to_expire_ms: u32 = 1000 * 60 * 5,
 
+        /// Mainly used as the for_each_concurrent limit,
+        /// this restricts the number of active polled futures
+        /// on a single thread.
+        concurrent_limit_per_thread: usize = 32,
+
         /// tx2 quic max_idle_timeout
         /// [Default: 30 seconds]
         tx2_quic_max_idle_timeout_ms: u32 = 1000 * 30,

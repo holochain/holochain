@@ -74,7 +74,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
         }) = self.0.remove(&(uniq, msg_id))
         {
             let elapsed_ns = start.elapsed().as_nanos();
-            tracing::trace!(
+            tracing::debug!(
                 %dbg_name,
                 %resp_dbg_name,
                 ?local_cert,
@@ -282,7 +282,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
                 msg_id,
                 s_res,
                 dbg_name,
-                peer_cert.clone(),
+                this.local_cert.clone(),
                 peer_cert,
             )?;
 
