@@ -26,6 +26,7 @@ struct RMapItem<C: Codec + 'static + Send + Unpin> {
     start: std::time::Instant,
     timeout: std::time::Duration,
     dbg_name: &'static str,
+    req_byte_count: usize,
     local_cert: Tx2Cert,
     peer_cert: Tx2Cert,
 }
@@ -45,6 +46,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
         msg_id: u64,
         s_res: RSend<C>,
         dbg_name: &'static str,
+        req_byte_count: usize,
         local_cert: Tx2Cert,
         peer_cert: Tx2Cert,
     ) {
@@ -56,19 +58,21 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
                 start: std::time::Instant::now(),
                 timeout,
                 dbg_name,
+                req_byte_count,
                 local_cert,
                 peer_cert,
             },
         );
     }
 
-    pub fn respond(&mut self, uniq: Uniq, msg_id: u64, c: C) {
+    pub fn respond(&mut self, uniq: Uniq, resp_byte_count: usize, msg_id: u64, c: C) {
         let resp_dbg_name = c.variant_type();
         if let Some(RMapItem {
             sender,
             start,
             timeout,
             dbg_name,
+            req_byte_count,
             local_cert,
             peer_cert,
         }) = self.0.remove(&(uniq, msg_id))
@@ -76,7 +80,9 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
             let elapsed_ns = start.elapsed().as_nanos();
             tracing::debug!(
                 %dbg_name,
+                %req_byte_count,
                 %resp_dbg_name,
+                %resp_byte_count,
                 ?local_cert,
                 ?peer_cert,
                 %elapsed_ns,
@@ -86,7 +92,9 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
             if elapsed_ns as f64 / timeout.as_nanos() as f64 > 0.75 {
                 tracing::warn!(
                     %dbg_name,
+                    %req_byte_count,
                     %resp_dbg_name,
+                    %resp_byte_count,
                     ?local_cert,
                     ?peer_cert,
                     %elapsed_ns,
@@ -100,6 +108,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
         } else {
             tracing::warn!(
                 %resp_dbg_name,
+                %resp_byte_count,
                 "(api) req UNMATCHED RESPONSE",
             );
         }
@@ -110,6 +119,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
             sender,
             start,
             dbg_name,
+            req_byte_count,
             local_cert,
             peer_cert,
             ..
@@ -118,6 +128,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
             let elapsed_ns = start.elapsed().as_nanos();
             tracing::debug!(
                 %dbg_name,
+                %req_byte_count,
                 ?local_cert,
                 ?peer_cert,
                 %elapsed_ns,
@@ -169,12 +180,20 @@ fn rmap_insert<C: Codec + 'static + Send + Unpin>(
     msg_id: u64,
     s_res: RSend<C>,
     dbg_name: &'static str,
+    req_byte_count: usize,
     local_cert: Tx2Cert,
     peer_cert: Tx2Cert,
 ) -> KitsuneResult<RMapDropCleanup<C>> {
     rmap.share_mut(move |i, _| {
         i.insert(
-            uniq, timeout, msg_id, s_res, dbg_name, local_cert, peer_cert,
+            uniq,
+            timeout,
+            msg_id,
+            s_res,
+            dbg_name,
+            req_byte_count,
+            local_cert,
+            peer_cert,
         );
         Ok(())
     })?;
@@ -272,6 +291,8 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
 
             let peer_cert = this.peer_cert();
 
+            let len = data.len();
+
             // insert our response receive handler
             // Cleanup our map when this future completes
             // either by recieving the response or timing out.
@@ -282,11 +303,10 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
                 msg_id,
                 s_res,
                 dbg_name,
+                len,
                 this.local_cert.clone(),
                 peer_cert,
             )?;
-
-            let len = data.len();
 
             this.con
                 .write(MsgId::new(msg_id).as_req(), data, timeout)
@@ -569,6 +589,7 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                         msg_id,
                         data,
                     }) => {
+                        let len = data.len();
                         let (_, c) = match C::decode_ref(&data) {
                             Err(e) => {
                                 // TODO - close connection?
@@ -594,7 +615,7 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                             }),
                             MsgIdType::Res => {
                                 let _ = rmap.share_mut(move |i, _| {
-                                    i.respond(con.uniq(), msg_id.as_id(), c);
+                                    i.respond(con.uniq(), len, msg_id.as_id(), c);
                                     Ok(())
                                 });
                                 Tx2EpEvent::Tick
