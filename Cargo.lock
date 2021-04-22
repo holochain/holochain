@@ -1880,9 +1880,9 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.50"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e77d1f384e8c8908f12d12301d5fc7861779fa68e6f74078d8876ed6aedf7eab"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=arbitrary#797b4de2e33ea5018eac19c88d549febea9f6ab9"
 dependencies = [
+ "arbitrary",
  "holochain_serialized_bytes_derive",
  "rmp-serde",
  "serde",
@@ -1895,8 +1895,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes_derive"
 version = "0.0.50"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "085fe272d95591beeffe3e37c2996372c399baf33bc60ca88ae0906ce4d52207"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=arbitrary#797b4de2e33ea5018eac19c88d549febea9f6ab9"
 dependencies = [
  "quote",
  "syn",
@@ -2079,6 +2078,7 @@ dependencies = [
 name = "holochain_zome_types"
 version = "0.0.2-alpha.1"
 dependencies = [
+ "arbitrary",
  "chrono",
  "fixt",
  "holo_hash",

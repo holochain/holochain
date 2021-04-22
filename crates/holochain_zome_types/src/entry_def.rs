@@ -27,6 +27,7 @@ impl From<&str> for EntryDefId {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Copy, Hash)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum EntryVisibility {
     Public,
     Private,

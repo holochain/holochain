@@ -6,6 +6,7 @@ use holochain_serialized_bytes::prelude::*;
 /// Stored by a claimant so they can remember what's necessary to exercise
 /// this capability by sending the secret to the grantor.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CapClaim {
     /// A string by which to later query for saved claims.
     /// This does not need to be unique within a source chain.

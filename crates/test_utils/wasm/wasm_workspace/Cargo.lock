@@ -19,6 +19,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "arbitrary"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "698b65a961a9d730fb45b6b0327e20207810c9f61ee421b082b27ba003f49e2b"
+dependencies = [
+ "derive_arbitrary",
+]
+
+[[package]]
 name = "arrayref"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -104,6 +113,17 @@ name = "constant_time_eq"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
+
+[[package]]
+name = "derive_arbitrary"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df89dd0d075dea5cc5fdd6d5df6b8a61172a710b3efac1d6bdb9dd8b78f82c1a"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "derive_more"
@@ -217,6 +237,7 @@ dependencies = [
 name = "holo_hash"
 version = "0.0.2-alpha.1"
 dependencies = [
+ "arbitrary",
  "base64",
  "blake2b_simd",
  "derive_more",
@@ -231,9 +252,9 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.50"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e77d1f384e8c8908f12d12301d5fc7861779fa68e6f74078d8876ed6aedf7eab"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=arbitrary#797b4de2e33ea5018eac19c88d549febea9f6ab9"
 dependencies = [
+ "arbitrary",
  "holochain_serialized_bytes_derive",
  "rmp-serde",
  "serde",
@@ -246,8 +267,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes_derive"
 version = "0.0.50"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "085fe272d95591beeffe3e37c2996372c399baf33bc60ca88ae0906ce4d52207"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=arbitrary#797b4de2e33ea5018eac19c88d549febea9f6ab9"
 dependencies = [
  "quote",
  "syn",

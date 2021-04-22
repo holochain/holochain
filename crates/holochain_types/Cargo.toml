@@ -61,4 +61,10 @@ tokio = { version = "1.3", features = [ "full" ] }
 [features]
 default = ["fixturators", "test_utils"]
 fixturators = ["holochain_zome_types/fixturators"]
-test_utils = ["holochain_zome_types/test_utils", "arbitrary", "holo_hash/arbitrary", "mr_bundle/arbitrary"]
+test_utils = [
+  "arbitrary",
+  "holochain_zome_types/arbitrary",
+  "holo_hash/arbitrary",
+  "mr_bundle/arbitrary",
+  "holochain_zome_types/test_utils",
+]

@@ -49,5 +49,5 @@ opt-level = "z"
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
-# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
-# holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
+holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "arbitrary" }
+holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "arbitrary" }
