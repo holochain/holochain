@@ -1,5 +1,6 @@
 use super::*;
 use crate::error::HoloHashError;
+use crate::hash::{HOLO_HASH_FULL_LEN, HOLO_HASH_PREFIX_LEN};
 use crate::hash_type;
 use crate::AgentPubKey;
 use crate::EntryHash;
@@ -76,9 +77,11 @@ macro_rules! primitive_hash_type {
             fn new() -> Self {
                 Self
             }
+
             fn static_prefix() -> &'static [u8] {
                 &$prefix
             }
+
             fn hash_name(self) -> &'static str {
                 stringify!($display)
             }
