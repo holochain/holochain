@@ -1,7 +1,6 @@
 use crate::query::to_blob;
 use crate::scratch::Scratch;
 use holo_hash::*;
-use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpLight;
@@ -22,6 +21,24 @@ macro_rules! sql_insert {
         let fieldvars = &[ $( { format!(":{}", $field) } ,)+ ].join(",");
         let sql = format!("INSERT INTO {} ({}) VALUES ({})", table, fieldnames, fieldvars);
         $txn.execute_named(&sql, &[$(
+            (format!(":{}", $field).as_str(), &$val as &dyn holochain_sqlite::rusqlite::ToSql),
+        )+])
+    }};
+}
+
+#[macro_export]
+macro_rules! dht_op_update {
+    ($txn:expr, $hash:expr, { $($field:literal : $val:expr , )+ $(,)? }) => {{
+        let fieldvars = &[ $( { format!("{} = :{}", $field, $field) } ,)+ ].join(",");
+        let sql = format!(
+            "
+            UPDATE DhtOp 
+            SET {}
+            WHERE DhtOp.hash = :hash
+            ", fieldvars);
+        $txn.execute(&sql, &[
+            (":hash", &$hash as &dyn holochain_sqlite::rusqlite::ToSql),
+            $(
             (format!(":{}", $field).as_str(), &$val as &dyn holochain_sqlite::rusqlite::ToSql),
         )+])
     }};
@@ -106,17 +123,9 @@ pub fn update_op_validation_status(
     hash: DhtOpHash,
     status: ValidationStatus,
 ) -> StateMutationResult<()> {
-    txn.execute_named(
-        "
-        UPDATE DhtOp
-        SET validation_status = :validation_status
-        WHERE hash = :hash
-        ",
-        named_params! {
-            ":validation_status": status,
-            ":hash": hash,
-        },
-    )?;
+    dht_op_update!(txn, hash, {
+        ":validation_status": status,
+    })?;
     Ok(())
 }
 
@@ -126,19 +135,34 @@ pub fn set_when_integrated(
     hash: DhtOpHash,
     time: Timestamp,
 ) -> StateMutationResult<()> {
-    txn.execute_named(
-        "
-        UPDATE DhtOp
-        SET when_integrated = :when_integrated,
-        when_integrated_ns = :when_integrated_ns
-        WHERE hash = :hash
-        ",
-        named_params! {
-            ":when_integrated_ns": to_blob(time)?,
-            ":when_integrated": time,
-            ":hash": hash,
-        },
-    )?;
+    dht_op_update!(txn, hash, {
+        "when_integrated_ns": to_blob(time)?,
+        ":when_integrated": time,
+    })?;
+    Ok(())
+}
+
+/// Set when a [`DhtOp`] was last publish time
+pub fn set_last_publish_time(
+    txn: &mut Transaction,
+    hash: DhtOpHash,
+    unix_epoch: std::time::Duration,
+) -> StateMutationResult<()> {
+    dht_op_update!(txn, hash, {
+        "last_publish_time": unix_epoch.as_secs(),
+    })?;
+    Ok(())
+}
+
+/// Set when a [`DhtOp`] was last publish time
+pub fn set_receipt_count(
+    txn: &mut Transaction,
+    hash: DhtOpHash,
+    count: u32,
+) -> StateMutationResult<()> {
+    dht_op_update!(txn, hash, {
+        "receipt_count": count,
+    })?;
     Ok(())
 }
 
@@ -149,6 +173,11 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
     let header_type = header.header_type();
     let header_seq = header.header_seq();
     let author = header.author().clone();
+    let private = match header.entry_type().map(|et| et.visibility()) {
+        Some(EntryVisibility::Private) => true,
+        Some(EntryVisibility::Public) => false,
+        None => false,
+    };
     match header {
         Header::CreateLink(create_link) => {
             sql_insert!(txn, Header, {
@@ -179,6 +208,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
                 "seq": header_seq,
                 "author": author,
                 "entry_hash": create.entry_hash,
+                "private_entry": private,
                 "blob": to_blob(SignedHeader::from((Header::Create(create.clone()), signature)))?,
             })?;
         }
@@ -201,6 +231,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
                 "author": author,
                 "original_entry_hash": update.original_entry_address,
                 "original_header_hash": update.original_header_address,
+                "private_entry": private,
                 "blob": to_blob(SignedHeader::from((Header::Update(update.clone()), signature)))?,
             })?;
         }

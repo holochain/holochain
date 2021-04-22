@@ -89,52 +89,15 @@ pub async fn publish_dht_ops_workflow(
 pub async fn publish_dht_ops_workflow_inner(
     workspace: &mut PublishDhtOpsWorkspace,
 ) -> WorkflowResult<HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>> {
-    // TODO: PERF: We need to check all ops every time this runs
-    // instead we could have a queue of ops where count < R and a kv for count > R.
-    // Then if the count for an ops reduces below R move it to the queue.
-    let now = timestamp::now();
-    // chrono cannot create const durations
-    let interval =
-        chrono::Duration::from_std(MIN_PUBLISH_INTERVAL).expect("const interval must be positive");
-
-    // one of many ways to access the env
-    let env = workspace.elements.headers().env().clone();
-
-    let values = fresh_reader!(env, |mut r| workspace
-        .authored()
-        .iter(&mut r)?
-        .filter_map(|(k, mut r)| {
-            Ok(if r.receipt_count < DEFAULT_RECEIPT_BUNDLE_SIZE {
-                let needs_publish = r
-                    .last_publish_time
-                    .and_then(|last| now.checked_difference_signed(&last))
-                    .map(|duration| duration > interval)
-                    .unwrap_or(true);
-                if needs_publish {
-                    r.last_publish_time = Some(now);
-                    Some((DhtOpHash::from_raw_39_panicky(k.to_vec()), r))
-                } else {
-                    None
-                }
-            } else {
-                None
-            })
-        })
-        .collect::<Vec<_>>())?;
-
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for (op_hash, value) in values {
-        // Insert updated values into database for items about to be published
-        let op = value.op.clone();
-        workspace.authored().put(op_hash.clone(), value)?;
+    let agent = todo!();
+    let env = todo!();
 
-        let op = match light_to_op(op, workspace.elements()) {
-            // Ignore StoreEntry ops on private
-            Err(DhtOpConvertError::StoreEntryOnPrivate) => continue,
-            r => r?,
-        };
+    for op_hashed in query::get_ops_to_publish(agent, env, DEFAULT_RECEIPT_BUNDLE_SIZE)? {
+        let (op, op_hash) = op_hashed.into_inner();
+
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
