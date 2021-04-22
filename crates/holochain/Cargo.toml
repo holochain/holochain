@@ -112,8 +112,6 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-# TODO: consider changing "no-deps" to "db-encryption" if we decide to add
-# sqlcipher to the nix env
 default = ["slow_tests", "test_utils", "only_check_wasms", "no-deps"]
 
 # Exposes additional functionality only needed for integration tests.

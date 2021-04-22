@@ -677,8 +677,7 @@ async fn too_many_open() {
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
-    for i in 0..1000 {
-        dbg!(i);
+    for _i in 0..1000 {
         holochain_websocket::connect(
             url2!("ws://127.0.0.1:{}", port),
             Arc::new(WebsocketConfig {

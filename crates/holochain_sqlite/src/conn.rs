@@ -75,14 +75,16 @@ fn initialize_connection(
     {
         use std::io::Write;
         let key = get_encryption_key_shim();
-        let mut cmd =
-            *br#"PRAGMA key = "x'0000000000000000000000000000000000000000000000000000000000000000'";"#;
-        let mut c = std::io::Cursor::new(&mut cmd[16..80]);
+        let mut hex = *br#"0000000000000000000000000000000000000000000000000000000000000000"#;
+        let mut c = std::io::Cursor::new(&mut hex[..]);
         for b in &key {
             write!(c, "{:02X}", b)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
         }
-        conn.execute(std::str::from_utf8(&cmd).unwrap(), NO_PARAMS)?;
+        let _keyval = std::str::from_utf8(&hex).unwrap();
+        const FAKE_KEY: &str = "x'98483C6EB40B6C31A448C22A66DED3B5E5E8D5119CAC8327B655C8B5C483648101010101010101010101010101010101'";
+        // conn.pragma_update(None, "key", &keyval)?;
+        conn.pragma_update(None, "key", &FAKE_KEY)?;
     }
 
     // set to faster write-ahead-log mode
