@@ -32,8 +32,6 @@ CREATE TABLE Header (
     author           BLOB           NOT NULL,
 
     blob             BLOB           NOT NULL,
-    timestamp_s      INTEGER        NOT NULL, -- Unix Epoch seconds
-    timestamp_ns     INTEGER        NOT NULL, -- Unix Epoch nano-second component
 
     -- Create / Update
     entry_hash       BLOB           NULL,
@@ -89,6 +87,11 @@ CREATE TABLE DhtOp (
     is_authored      INTEGER        NOT NULL,      -- BOOLEAN
     require_receipt  INTEGER        NOT NULL,      -- BOOLEAN
 
+    -- This is the order that process ops should result 
+    -- in dependencies before dependants.
+    -- See OpOrder.
+    op_order        TEXT           NOT NULL,
+
     -- If this is null then validation is still in progress.
     validation_status INTEGER       NULL,
 
@@ -104,7 +107,7 @@ CREATE TABLE DhtOp (
 
     -- 0: Awaiting System Validation Dependencies.
     -- 1: Successfully System Validated (And ready for app validation).
-    -- 2: Awaiting System Validation Dependencies.
+    -- 2: Awaiting App Validation Dependencies.
     -- Don't need the other stages (pending, awaiting itntegration) because:
     -- - pending = validation_stage null && validation_status null.
     -- - awaiting integrated = validation_status not null.

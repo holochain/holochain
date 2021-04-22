@@ -31,6 +31,7 @@ macro_rules! from_sub_error {
 /// Type for deriving ordering of DhtOps
 /// Don't change the order of this enum unless
 /// you mean to change the order we process ops
+// TODO: We can probably remove this now?
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum DhtOpOrder {

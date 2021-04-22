@@ -5,6 +5,7 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpLight;
+use holochain_types::dht_op::OpOrder;
 use holochain_types::prelude::DhtOpError;
 use holochain_types::EntryHashed;
 use holochain_zome_types::*;
@@ -70,8 +71,9 @@ pub fn insert_op(
     }
     let header_hashed = HeaderHashed::with_pre_hashed(header, op_light.header_hash().to_owned());
     let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
+    let op_order = OpOrder::new(op_light.get_type(), header_hashed.header().timestamp());
     insert_header(txn, header_hashed)?;
-    insert_op_lite(txn, op_light, hash, is_authored)?;
+    insert_op_lite(txn, op_light, hash, is_authored, op_order)?;
     Ok(())
 }
 
@@ -81,6 +83,7 @@ pub fn insert_op_lite(
     op_lite: DhtOpLight,
     hash: DhtOpHash,
     is_authored: bool,
+    order: OpOrder,
 ) -> StateMutationResult<()> {
     let header_hash = op_lite.header_hash().clone();
     let basis = op_lite.dht_basis().to_owned();
@@ -92,6 +95,7 @@ pub fn insert_op_lite(
         "is_authored": is_authored,
         "require_receipt": 0,
         "blob": to_blob(op_lite)?,
+        "op_order": order,
     })?;
     Ok(())
 }

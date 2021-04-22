@@ -5,6 +5,7 @@ use holochain_sqlite::rusqlite::TransactionBehavior;
 use holochain_sqlite::rusqlite::{Transaction, NO_PARAMS};
 use holochain_sqlite::{rusqlite::Connection, schema::SCHEMA_CELL};
 use holochain_types::dht_op::DhtOpHashed;
+use holochain_types::dht_op::OpOrder;
 use holochain_types::EntryHashed;
 use holochain_types::{dht_op::DhtOp, header::NewEntryHeader};
 use holochain_zome_types::*;
@@ -177,6 +178,7 @@ async fn insert_op_equivalence() {
         .unwrap();
 
     insert_entry(&mut txn1, EntryHashed::from_content_sync(create_entry)).unwrap();
+    let op_order = OpOrder::new(op.get_type(), create_header.timestamp);
     insert_header(
         &mut txn1,
         SignedHeaderHashed::with_presigned(
@@ -185,7 +187,14 @@ async fn insert_op_equivalence() {
         ),
     )
     .unwrap();
-    insert_op_lite(&mut txn1, op.to_light(), op.as_hash().clone(), false).unwrap();
+    insert_op_lite(
+        &mut txn1,
+        op.to_light(),
+        op.as_hash().clone(),
+        false,
+        op_order,
+    )
+    .unwrap();
 
     // Insert the op in a single step on conn2
     insert_op(&mut txn2, op, false).unwrap();

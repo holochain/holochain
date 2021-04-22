@@ -31,19 +31,7 @@ pub fn get_ops_to_sys_validate(env: EnvRead) -> WorkflowResult<Vec<DhtOp>> {
             WHERE
             (DhtOp.validation_status IS NULL OR DhtOp.validation_stage = 1)
             ORDER BY 
-            CASE DhtOp.type
-              WHEN :activity                THEN 0
-              WHEN :store_entry             THEN 1
-              WHEN :store_element           THEN 2
-              WHEN :updated_content         THEN 3
-              WHEN :updated_element         THEN 4
-              WHEN :deleted_by              THEN 5
-              WHEN :deleted_entry_header    THEN 6
-              WHEN :add_link                THEN 7
-              WHEN :remove_link             THEN 8
-            END,
-            Header.timestamp_s ASC,
-            Header.timestamp_ns ASC
+            DhtOp.op_order ASC
             ",
         )?;
         let r = stmt.query_and_then(

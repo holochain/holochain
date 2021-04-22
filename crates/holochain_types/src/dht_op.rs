@@ -882,3 +882,67 @@ pub struct RenderedOps {
     /// Op data to insert.
     pub ops: Vec<RenderedOp>,
 }
+
+/// Type for deriving ordering of DhtOps
+/// Don't change the order of this enum unless
+/// you mean to change the order we process ops
+#[allow(missing_docs)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum OpNumericalOrder {
+    RegisterAgentActivity = 0,
+    StoreEntry,
+    StoreElement,
+    RegisterUpdatedContent,
+    RegisterUpdatedElement,
+    RegisterDeletedBy,
+    RegisterDeletedEntryHeader,
+    RegisterAddLink,
+    RegisterRemoveLink,
+}
+
+/// This is used as an index for ordering ops in our database.
+/// It gives the most likely ordering where dependencies will come
+/// first.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct OpOrder {
+    order: OpNumericalOrder,
+    timestamp: holochain_zome_types::timestamp::Timestamp,
+}
+
+impl std::fmt::Display for OpOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{}{}",
+            self.order as u8, self.timestamp.0, self.timestamp.1
+        )
+    }
+}
+
+impl OpOrder {
+    /// Create a new ordering from a op type and timestamp.
+    pub fn new(op_type: DhtOpType, timestamp: holochain_zome_types::timestamp::Timestamp) -> Self {
+        let order = match op_type {
+            DhtOpType::StoreElement => OpNumericalOrder::StoreElement,
+            DhtOpType::StoreEntry => OpNumericalOrder::StoreEntry,
+            DhtOpType::RegisterAgentActivity => OpNumericalOrder::RegisterAgentActivity,
+            DhtOpType::RegisterUpdatedContent => OpNumericalOrder::RegisterUpdatedContent,
+            DhtOpType::RegisterUpdatedElement => OpNumericalOrder::RegisterUpdatedElement,
+            DhtOpType::RegisterDeletedBy => OpNumericalOrder::RegisterDeletedBy,
+            DhtOpType::RegisterDeletedEntryHeader => OpNumericalOrder::RegisterDeletedEntryHeader,
+            DhtOpType::RegisterAddLink => OpNumericalOrder::RegisterAddLink,
+            DhtOpType::RegisterRemoveLink => OpNumericalOrder::RegisterRemoveLink,
+        };
+        Self { order, timestamp }
+    }
+}
+
+impl holochain_sqlite::rusqlite::ToSql for OpOrder {
+    fn to_sql(
+        &self,
+    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput> {
+        Ok(holochain_sqlite::rusqlite::types::ToSqlOutput::Owned(
+            self.to_string().into(),
+        ))
+    }
+}
