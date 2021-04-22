@@ -103,21 +103,21 @@ impl From<Vec<(ZomeName, ValidateCallbackResult)>> for ValidateResult {
     }
 }
 
-/// if any ValidateCallbackResult is Invalid, then ValidateResult::Invalid 
+/// if any ValidateCallbackResult is Invalid, then ValidateResult::Invalid
 /// If none are Invalid and there is an UnresolvedDependencies, then ValidateResult::UnresolvedDependencies
 /// If all ValidateCallbackResult are Valid, then ValidateResult::Valid
 impl From<Vec<ValidateCallbackResult>> for ValidateResult {
     fn from(callback_results: Vec<ValidateCallbackResult>) -> Self {
-        callback_results.into_iter().fold(Self::Valid, |acc, x| {
-            match x {
+        callback_results
+            .into_iter()
+            .fold(Self::Valid, |acc, x| match x {
                 ValidateCallbackResult::Invalid(i) => Self::Invalid(i),
                 ValidateCallbackResult::UnresolvedDependencies(ud) => match acc {
                     Self::Invalid(_) => acc,
                     _ => Self::UnresolvedDependencies(ud),
                 },
                 ValidateCallbackResult::Valid => acc,
-            }
-        })
+            })
     }
 }
 
