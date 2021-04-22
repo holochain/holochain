@@ -395,11 +395,11 @@ impl ConItem {
         ));
 
         let con = Arc::new(con_item.clone());
-        let elapsed_ns = con_init.elapsed().as_nanos();
+        let elapsed_s = con_init.elapsed().as_secs_f64();
 
         if is_outgoing {
             tracing::info!(
-                %elapsed_ns,
+                %elapsed_s,
                 ?local_cert,
                 ?peer_cert,
                 %url,
@@ -413,7 +413,7 @@ impl ConItem {
                 .await;
         } else {
             tracing::info!(
-                %elapsed_ns,
+                %elapsed_s,
                 ?local_cert,
                 ?peer_cert,
                 %url,

@@ -79,7 +79,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
         {
             let elapsed = start.elapsed();
             crate::metrics::metric_push_api_req_res_elapsed_ms(elapsed.as_millis() as u64);
-            let elapsed_ns = elapsed.as_nanos();
+            let elapsed_s = elapsed.as_secs_f64();
 
             tracing::debug!(
                 %dbg_name,
@@ -88,11 +88,11 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
                 %resp_byte_count,
                 ?local_cert,
                 ?peer_cert,
-                %elapsed_ns,
+                %elapsed_s,
                 "(api) req success",
             );
 
-            if elapsed_ns as f64 / timeout.as_nanos() as f64 > 0.75 {
+            if elapsed_s / timeout.as_secs_f64() > 0.75 {
                 tracing::warn!(
                     %dbg_name,
                     %req_byte_count,
@@ -100,7 +100,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
                     %resp_byte_count,
                     ?local_cert,
                     ?peer_cert,
-                    %elapsed_ns,
+                    %elapsed_s,
                     "(api) req approaching timeout (> 75%)",
                 );
             }
@@ -128,13 +128,13 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
             ..
         }) = self.0.remove(&(uniq, msg_id))
         {
-            let elapsed_ns = start.elapsed().as_nanos();
+            let elapsed_s = start.elapsed().as_secs_f64();
             tracing::debug!(
                 %dbg_name,
                 %req_byte_count,
                 ?local_cert,
                 ?peer_cert,
-                %elapsed_ns,
+                %elapsed_s,
                 ?err,
                 "(api) req err",
             );
@@ -161,12 +161,12 @@ impl<C: Codec + 'static + Send + Unpin> Drop for RMapDropCleanup<C> {
                 ..
             }) = i.0.remove(&(self.1, self.2))
             {
-                let elapsed_ns = start.elapsed().as_nanos();
+                let elapsed_s = start.elapsed().as_secs_f64();
                 tracing::warn!(
                     %dbg_name,
                     ?local_cert,
                     ?peer_cert,
-                    %elapsed_ns,
+                    %elapsed_s,
                     "(api) req dropped",
                 );
             }
@@ -450,6 +450,11 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
 
 /// Respond to a Tx2EpIncomingRequest
 pub struct Tx2Respond<C: Codec + 'static + Send + Unpin> {
+    local_cert: Tx2Cert,
+    peer_cert: Tx2Cert,
+    time: std::time::Instant,
+    dbg_name: &'static str,
+    req_byte_count: usize,
     con: ConHnd,
     msg_id: u64,
     _p: std::marker::PhantomData<C>,
@@ -462,8 +467,21 @@ impl<C: Codec + 'static + Send + Unpin> std::fmt::Debug for Tx2Respond<C> {
 }
 
 impl<C: Codec + 'static + Send + Unpin> Tx2Respond<C> {
-    fn new(con: ConHnd, msg_id: u64) -> Self {
+    fn new(
+        local_cert: Tx2Cert,
+        peer_cert: Tx2Cert,
+        dbg_name: &'static str,
+        req_byte_count: usize,
+        con: ConHnd,
+        msg_id: u64,
+    ) -> Self {
+        let time = std::time::Instant::now();
         Self {
+            local_cert,
+            peer_cert,
+            time,
+            dbg_name,
+            req_byte_count,
             con,
             msg_id,
             _p: std::marker::PhantomData,
@@ -476,10 +494,33 @@ impl<C: Codec + 'static + Send + Unpin> Tx2Respond<C> {
         data: C,
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<()>> + 'static + Send {
-        let Tx2Respond { con, msg_id, .. } = self;
+        let Tx2Respond {
+            local_cert,
+            peer_cert,
+            time,
+            dbg_name,
+            req_byte_count,
+            con,
+            msg_id,
+            ..
+        } = self;
         async move {
             let mut buf = PoolBuf::new();
             data.encode(&mut buf).map_err(KitsuneError::other)?;
+
+            let elapsed_s = time.elapsed().as_secs_f64();
+            let resp_dbg_name = data.variant_type();
+            let resp_byte_count = buf.len();
+            tracing::debug!(
+                %dbg_name,
+                %req_byte_count,
+                %resp_dbg_name,
+                %resp_byte_count,
+                ?local_cert,
+                ?peer_cert,
+                %elapsed_s,
+                "(api) res",
+            );
 
             con.write(MsgId::new(msg_id).as_res(), buf, timeout).await
         }
@@ -592,6 +633,7 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                         msg_id,
                         data,
                     }) => {
+                        let peer_cert = con.peer_cert();
                         let len = data.len();
                         let (_, c) = match C::decode_ref(&data) {
                             Err(e) => {
@@ -602,11 +644,12 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                             }
                             Ok(c) => c,
                         };
+                        let dbg_name = c.variant_type();
                         match msg_id.get_type() {
                             MsgIdType::Notify => unimplemented!(),
                             MsgIdType::Req => Tx2EpEvent::IncomingRequest(Tx2EpIncomingRequest {
                                 con: Tx2ConHnd::new(
-                                    local_cert,
+                                    local_cert.clone(),
                                     con.clone(),
                                     url.clone(),
                                     rmap,
@@ -614,7 +657,14 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                                 ),
                                 url,
                                 data: c,
-                                respond: Tx2Respond::new(con, msg_id.as_id()),
+                                respond: Tx2Respond::new(
+                                    local_cert,
+                                    peer_cert,
+                                    dbg_name,
+                                    len,
+                                    con,
+                                    msg_id.as_id(),
+                                ),
                             }),
                             MsgIdType::Res => {
                                 let _ = rmap.share_mut(move |i, _| {
