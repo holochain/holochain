@@ -92,7 +92,15 @@ pub enum ValidateResult {
 }
 
 impl From<Vec<(ZomeName, ValidateCallbackResult)>> for ValidateResult {
+    /// This function is called after multiple app validation callbacks
+    /// have been run by a Ribosome and it is necessary to return one
+    /// decisive result to the host, even if that "decisive" result
+    /// is UnresolvedDependencies variant
     fn from(a: Vec<(ZomeName, ValidateCallbackResult)>) -> Self {
+        /// drop the zome name and fallback to the conversion from
+        /// a Vec<ValidateCallbackResults> -> ValidateResult
+        /// which has the core logic for reducing from a collection
+        /// of results down to just one
         a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
     }
 }
