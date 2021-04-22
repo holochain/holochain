@@ -95,28 +95,26 @@ impl From<Vec<(ZomeName, ValidateCallbackResult)>> for ValidateResult {
     /// This function is called after multiple app validation callbacks
     /// have been run by a Ribosome and it is necessary to return one
     /// decisive result to the host, even if that "decisive" result
-    /// is UnresolvedDependencies variant
+    /// is the UnresolvedDependencies variant.
+    /// It drops the irrelevant zome names and falls back to the conversion from
+    /// a Vec<ValidateCallbackResults> -> ValidateResult
     fn from(a: Vec<(ZomeName, ValidateCallbackResult)>) -> Self {
-        /// drop the zome name and fallback to the conversion from
-        /// a Vec<ValidateCallbackResults> -> ValidateResult
-        /// which has the core logic for reducing from a collection
-        /// of results down to just one
         a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
     }
 }
 
+/// if any ValidateCallbackResult is Invalid, then ValidateResult::Invalid 
+/// If none are Invalid and there is an UnresolvedDependencies, then ValidateResult::UnresolvedDependencies
+/// If all ValidateCallbackResult are Valid, then ValidateResult::Valid
 impl From<Vec<ValidateCallbackResult>> for ValidateResult {
     fn from(callback_results: Vec<ValidateCallbackResult>) -> Self {
         callback_results.into_iter().fold(Self::Valid, |acc, x| {
             match x {
-                // validation is invalid if any x is invalid
                 ValidateCallbackResult::Invalid(i) => Self::Invalid(i),
-                // return unresolved dependencies if it's otherwise valid
                 ValidateCallbackResult::UnresolvedDependencies(ud) => match acc {
                     Self::Invalid(_) => acc,
                     _ => Self::UnresolvedDependencies(ud),
                 },
-                // valid x allows validation to continue
                 ValidateCallbackResult::Valid => acc,
             }
         })
