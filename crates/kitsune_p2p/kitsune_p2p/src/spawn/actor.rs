@@ -3,7 +3,6 @@
 use crate::actor;
 use crate::actor::*;
 use crate::event::*;
-use crate::gossip::*;
 use crate::metrics::KitsuneMetrics;
 use crate::*;
 use futures::future::FutureExt;
@@ -24,7 +23,6 @@ use std::sync::Arc;
 /// See https://github.com/holochain/bootstrap
 mod bootstrap;
 mod discover;
-mod gossip;
 mod space;
 use ghost_actor::dependencies::tracing;
 use space::*;
@@ -177,45 +175,19 @@ impl KitsuneP2pActor {
                     use tx2_api::Tx2EpEvent::*;
                     #[allow(clippy::single_match)]
                     match event {
-                        IncomingRequest(Tx2EpIncomingRequest { data, respond, .. }) => {
-                            match data {
-                                wire::Wire::Call(wire::Call {
-                                    space,
-                                    from_agent,
-                                    to_agent,
-                                    data,
-                                    ..
-                                }) => {
-                                    let res = match evt_sender
-                                        .call(space, to_agent, from_agent, data.into())
-                                        .await
-                                    {
-                                        Err(err) => {
-                                            let reason = format!("{:?}", err);
-                                            let fail = wire::Wire::failure(reason);
-                                            let _ = respond
-                                                .respond(fail, tuning_params.implicit_timeout())
-                                                .await;
-                                            return;
-                                        }
-                                        Ok(r) => r,
-                                    };
-                                    let resp = wire::Wire::call_resp(res.into());
-                                    let _ = respond
-                                        .respond(resp, tuning_params.implicit_timeout())
-                                        .await;
-                                }
-                                wire::Wire::Notify(wire::Notify {
-                                    space,
-                                    from_agent,
-                                    to_agent,
-                                    data,
-                                    ..
-                                }) => {
-                                    if let Err(err) = evt_sender
-                                        .notify(space, to_agent, from_agent, data.into())
-                                        .await
-                                    {
+                        IncomingRequest(Tx2EpIncomingRequest { data, respond, .. }) => match data {
+                            wire::Wire::Call(wire::Call {
+                                space,
+                                from_agent,
+                                to_agent,
+                                data,
+                                ..
+                            }) => {
+                                let res = match evt_sender
+                                    .call(space, to_agent, from_agent, data.into())
+                                    .await
+                                {
+                                    Err(err) => {
                                         let reason = format!("{:?}", err);
                                         let fail = wire::Wire::failure(reason);
                                         let _ = respond
@@ -223,151 +195,38 @@ impl KitsuneP2pActor {
                                             .await;
                                         return;
                                     }
-                                    let resp = wire::Wire::notify_resp();
-                                    let _ = respond
-                                        .respond(resp, tuning_params.implicit_timeout())
-                                        .await;
-                                }
-                                wire::Wire::FetchOpHashes(wire::FetchOpHashes {
-                                    space,
-                                    from_agent,
-                                    to_agent,
-                                    dht_arc,
-                                    since_utc_epoch_s,
-                                    until_utc_epoch_s,
-                                    last_count,
-                                }) => {
-                                    let input = ReqOpHashesEvt::new(
-                                        from_agent,
-                                        to_agent,
-                                        dht_arc,
-                                        since_utc_epoch_s,
-                                        until_utc_epoch_s,
-                                        Default::default(),
-                                    );
-                                    let (hashes, agent_hashes) = match local_req_op_hashes(
-                                        &evt_sender,
-                                        space,
-                                        input,
-                                    )
-                                    .await
-                                    {
-                                        Err(err) => {
-                                            let reason = format!("{:?}", err);
-                                            let fail = wire::Wire::failure(reason);
-                                            let _ = respond
-                                                .respond(fail, tuning_params.implicit_timeout())
-                                                .await;
-                                            return;
-                                        }
-                                        Ok(r) => r,
-                                    };
-                                    let hashes = match last_count {
-                                        OpCount::Consistent(last_count) => {
-                                            // Requester is consistent,
-                                            // now check if we are consistent.
-                                            if last_count == hashes.len() as u64 {
-                                                OpConsistency::Consistent
-                                            } else {
-                                                OpConsistency::Variance(hashes)
-                                            }
-                                        }
-                                        // Requester has a variance so we must return hashes.
-                                        OpCount::Variance => OpConsistency::Variance(hashes),
-                                    };
-                                    let resp =
-                                        wire::Wire::fetch_op_hashes_response(hashes, agent_hashes);
-                                    let _ = respond
-                                        .respond(resp, tuning_params.implicit_timeout())
-                                        .await;
-                                }
-                                wire::Wire::FetchOpData(wire::FetchOpData {
-                                    space,
-                                    from_agent,
-                                    to_agent,
-                                    op_hashes,
-                                    peer_hashes,
-                                }) => {
-                                    let input = ReqOpDataEvt::new(
-                                        from_agent,
-                                        to_agent,
-                                        op_hashes,
-                                        peer_hashes,
-                                    );
-                                    let (op_data, agent_infos) =
-                                        match local_req_op_data(&evt_sender, space, input).await {
-                                            Err(err) => {
-                                                let reason = format!("{:?}", err);
-                                                let fail = wire::Wire::failure(reason);
-                                                let _ = respond
-                                                    .respond(fail, tuning_params.implicit_timeout())
-                                                    .await;
-                                                return;
-                                            }
-                                            Ok(r) => r,
-                                        };
-                                    let op_data =
-                                        op_data.into_iter().map(|(h, op)| (h, op.into())).collect();
-                                    let resp =
-                                        wire::Wire::fetch_op_data_response(op_data, agent_infos);
-                                    let _ = respond
-                                        .respond(resp, tuning_params.implicit_timeout())
-                                        .await;
-                                }
-                                wire::Wire::AgentInfoQuery(q) => {
-                                    match agent_info_query(q, evt_sender.clone()).await {
-                                        Ok(r) => {
-                                            let resp = wire::Wire::agent_info_query_resp(r);
-                                            let _ = respond
-                                                .respond(resp, tuning_params.implicit_timeout())
-                                                .await;
-                                        }
-                                        Err(err) => {
-                                            let reason = format!("{:?}", err);
-                                            let fail = wire::Wire::failure(reason);
-                                            let _ = respond
-                                                .respond(fail, tuning_params.implicit_timeout())
-                                                .await;
-                                        }
-                                    }
-                                }
-                                wire::Wire::Gossip(wire::Gossip {
-                                    space,
-                                    from_agent,
-                                    to_agent,
-                                    ops,
-                                    agents,
-                                }) => {
-                                    let input = GossipEvt::new(
-                                        from_agent,
-                                        to_agent,
-                                        ops.into_iter().map(|(k, v)| (k, v.into())).collect(),
-                                        agents,
-                                    );
-                                    if let Err(err) = local_gossip_ops(
-                                        tuning_params.clone(),
-                                        &evt_sender,
-                                        space,
-                                        input,
-                                    )
-                                    .await
-                                    {
-                                        let reason = format!("{:?}", err);
-                                        tracing::error!("got err: {}", reason);
-                                        let fail = wire::Wire::failure(reason);
-                                        let _ = respond
-                                            .respond(fail, tuning_params.implicit_timeout())
-                                            .await;
-                                        return;
-                                    }
-                                    let resp = wire::Wire::gossip_resp();
-                                    let _ = respond
-                                        .respond(resp, tuning_params.implicit_timeout())
-                                        .await;
-                                }
-                                data => unimplemented!("{:?}", data),
+                                    Ok(r) => r,
+                                };
+                                let resp = wire::Wire::call_resp(res.into());
+                                let _ = respond
+                                    .respond(resp, tuning_params.implicit_timeout())
+                                    .await;
                             }
-                        }
+                            wire::Wire::Notify(wire::Notify {
+                                space,
+                                from_agent,
+                                to_agent,
+                                data,
+                                ..
+                            }) => {
+                                if let Err(err) = evt_sender
+                                    .notify(space, to_agent, from_agent, data.into())
+                                    .await
+                                {
+                                    let reason = format!("{:?}", err);
+                                    let fail = wire::Wire::failure(reason);
+                                    let _ = respond
+                                        .respond(fail, tuning_params.implicit_timeout())
+                                        .await;
+                                    return;
+                                }
+                                let resp = wire::Wire::notify_resp();
+                                let _ = respond
+                                    .respond(resp, tuning_params.implicit_timeout())
+                                    .await;
+                            }
+                            data => unimplemented!("{:?}", data),
+                        },
                         _ => (),
                     }
                 }
@@ -383,41 +242,6 @@ impl KitsuneP2pActor {
             spaces: HashMap::new(),
             config: Arc::new(config),
         })
-    }
-}
-
-async fn agent_info_query(
-    q: wire::AgentInfoQuery,
-    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-) -> Result<Vec<crate::types::agent_store::AgentInfoSigned>, KitsuneP2pError> {
-    let wire::AgentInfoQuery {
-        space,
-        to_agent,
-        by_agent,
-        by_basis_arc,
-    } = q;
-
-    if let Some(by_agent) = by_agent {
-        if let Some(agent) = evt_sender
-            .get_agent_info_signed(GetAgentInfoSignedEvt {
-                space,
-                agent: by_agent,
-            })
-            .await?
-        {
-            Ok(vec![agent])
-        } else {
-            Ok(vec![])
-        }
-    } else if let Some(_by_basis_arc) = by_basis_arc {
-        Ok(evt_sender
-            .query_agent_info_signed(QueryAgentInfoSignedEvt {
-                space,
-                agent: to_agent,
-            })
-            .await?)
-    } else {
-        Err("must specify by_agent or by_basis_arc".into())
     }
 }
 
