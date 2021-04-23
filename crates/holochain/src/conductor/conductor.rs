@@ -595,7 +595,7 @@ where
         Ok(futures::future::join_all(tasks).await)
     }
 
-    /// Register an app inactive in the database
+    /// Register an app as inactive in the database
     pub(super) async fn add_inactive_app_to_db(
         &mut self,
         app: InstalledApp,
@@ -678,7 +678,7 @@ where
                     let active = state.active_apps.remove(&installed_app_id);
                     let inactive = state.inactive_apps.remove(&installed_app_id);
                     let cells = active
-                        .or(inactive.map(|a| a.into()))
+                        .or_else(|| inactive.map(|a| a.into()))
                         .map(|app| app.all_cells().cloned().collect());
                     Ok((state, cells))
                 }
