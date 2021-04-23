@@ -365,13 +365,14 @@ mod tests {
         let mut send = FramedWriter::new(send);
         let mut recv = FramedReader::new(recv);
 
-        let wt = tokio::task::spawn(async move {
+        let wt = metric_task(async move {
             let mut buf = PoolBuf::new();
             buf.extend_from_slice(&[0xd0; 512]);
             send.write(1.into(), buf, t).await.unwrap();
             let mut buf = PoolBuf::new();
             buf.extend_from_slice(&[0xd1; 8000]);
             send.write(2.into(), buf, t).await.unwrap();
+            KitsuneResult::Ok(())
         });
 
         for _ in 0..2 {
@@ -379,6 +380,6 @@ mod tests {
             println!("got {} - {} bytes", msg_id.as_id(), data.len());
         }
 
-        wt.await.unwrap();
+        wt.await.unwrap().unwrap();
     }
 }

@@ -532,7 +532,6 @@ impl TransportListenerHandler for InnerListen {
                 "sub_transport": sub,
                 "url": url,
                 "proxy_count": proxy_count,
-                "tokio_task_count": kitsune_p2p_types::metrics::metric_task_count(),
                 "sys_info": kitsune_p2p_types::metrics::get_sys_info(),
             }})
         }

@@ -339,6 +339,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_workflow() {
+        observability::test_run().ok();
+
         let (dna, a1, a2, _a3) = test_setup();
 
         let (p2p, mut evt) = spawn_holochain_p2p(
@@ -389,6 +391,7 @@ mod tests {
                         } else {
                             panic!("too many requests!")
                         };
+                        tracing::info!("test - get respond");
                         respond.r(Ok(async move { Ok(resp) }.boxed().into()));
                     }
                     SignNetworkData { respond, .. } => {
@@ -397,12 +400,20 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
-                    _ => {}
+                    QueryAgentInfoSigned { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    }
+                    FetchOpHashesForConstraints { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    }
+                    evt => println!("unhandled: {:?}", evt),
                 }
             }
         });
 
+        tracing::info!("test - join1");
         p2p.join(dna.clone(), a1.clone()).await.unwrap();
+        tracing::info!("test - join2");
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
 
         let hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
@@ -410,19 +421,24 @@ mod tests {
             holo_hash::hash_type::AnyDht::Header,
         );
 
+        tracing::info!("test - get");
         let res = p2p
             .get(dna, a1, hash, actor::GetOptions::default())
             .await
             .unwrap();
 
+        tracing::info!("test - check res");
         assert_eq!(2, res.len());
 
         for r in res {
             assert!(r == test_1 || r == test_2);
         }
 
+        tracing::info!("test - end of test shutdown p2p");
         p2p.ghost_actor_shutdown().await.unwrap();
+        tracing::info!("test - end of test await task end");
         r_task.await.unwrap();
+        tracing::info!("test - end of test - final done.");
     }
 
     #[tokio::test(flavor = "multi_thread")]
