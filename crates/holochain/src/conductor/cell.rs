@@ -765,10 +765,10 @@ impl Cell {
         Ok(())
     }
 
-    /// Delete all data associated with this Cell by deleting the associated
-    /// LMDB environment. Completely reverses Cell creation.
-    // FIXME: this should also ensure that the long-running managed tasks,
-    //        i.e. the queue consumers, are stopped as well. Currently, they
+    /// Clean up long-running managed tasks.
+    //
+    // FIXME: this should ensure that the long-running managed tasks,
+    //        i.e. the queue consumers, are stopped. Currently, they
     //        will continue running because we have no way to target a specific
     //        Cell's tasks for shutdown.
     //
@@ -776,8 +776,20 @@ impl Cell {
     //        of a Cell's tasks can be shut down at once. Perhaps the Conductor
     //        TaskManager can have these Cell TaskManagers as children.
     //        [ B-04176 ]
+    pub async fn cleanup(&self) -> CellResult<()> {
+        tracing::info!("Cell removed, but cleanup is not yet implemented.");
+        Ok(())
+    }
+
+    /// Delete all data associated with this Cell by DELETING the associated
+    /// LMDB environment. Completely reverses Cell creation.
+    /// NB: This is NOT meant to be a Drop impl! This destroys all data
+    ///     associated with a Cell, i.e. this Cell can never be instantiated again!
+    //
+
     #[tracing::instrument(skip(self))]
     pub async fn destroy(self) -> CellResult<()> {
+        self.cleanup().await?;
         let path = self.env.path().clone();
         // Delete directory
         self.env

@@ -789,8 +789,8 @@ where
     pub(super) async fn remove_cells(&mut self, cell_ids: Vec<CellId>) {
         for cell_id in cell_ids {
             if let Some(item) = self.cells.remove(&cell_id) {
-                if let Err(err) = item.cell.destroy().await {
-                    tracing::error!("Error destroying Cell: {:?}\nCellId: {}", err, cell_id);
+                if let Err(err) = item.cell.cleanup().await {
+                    tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
                 }
             }
         }

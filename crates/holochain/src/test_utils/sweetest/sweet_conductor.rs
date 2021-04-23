@@ -15,7 +15,6 @@ use holochain_keystore::KeystoreSender;
 use holochain_lmdb::test_utils::{test_environments, TestEnvironments};
 use holochain_types::prelude::*;
 use kitsune_p2p::KitsuneP2pConfig;
-use std::sync::Arc;
 use unwrap_to::unwrap_to;
 
 /// A collection of SweetConductors, with methods for operating on the entire collection
@@ -130,7 +129,7 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 /// If you need multiple references to a SweetConductor, put it in an Arc
 #[derive(derive_more::From)]
 pub struct SweetConductor {
-    handle: Option<Arc<SweetConductorHandle>>,
+    handle: Option<SweetConductorHandle>,
     envs: TestEnvironments,
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
@@ -170,7 +169,7 @@ impl SweetConductor {
         let signal_stream = handle.signal_broadcaster().await.subscribe_merged();
 
         Self {
-            handle: Some(Arc::new(SweetConductorHandle(handle))),
+            handle: Some(SweetConductorHandle(handle)),
             envs,
             config,
             dnas: Vec::new(),
@@ -394,9 +393,9 @@ impl SweetConductor {
     /// Start up this conductor if it's not already running.
     pub async fn startup(&mut self) {
         if self.handle.is_none() {
-            self.handle = Some(Arc::new(SweetConductorHandle(
+            self.handle = Some(SweetConductorHandle(
                 Self::from_existing(&self.envs, &self.config).await,
-            )));
+            ));
 
             // MD: this feels wrong, why should we have to reinstall DNAs on restart?
 
@@ -416,9 +415,20 @@ impl SweetConductor {
     }
 
     // NB: keep this private to prevent leaking out owned references
-    fn handle(&self) -> Arc<SweetConductorHandle> {
+    fn handle(&self) -> SweetConductorHandle {
         self.handle
-            .clone()
+            .as_ref()
+            .map(|h| h.clone_privately())
+            .expect("Tried to use a conductor that is offline")
+    }
+
+    /// Get the ConductorHandle within this Conductor.
+    /// Be careful when using this, because this leaks out handles, which may
+    /// make it harder to shut down the conductor during tests.
+    pub fn inner_handle(&self) -> ConductorHandle {
+        self.handle
+            .as_ref()
+            .map(|h| h.0.clone())
             .expect("Tried to use a conductor that is offline")
     }
 }
@@ -523,6 +533,11 @@ impl SweetConductorHandle {
                 .expect("Conductor shutdown error");
         }
     }
+
+    /// Intentionally private clone function, only to be used internally
+    fn clone_privately(&self) -> Self {
+        Self(self.0.clone())
+    }
 }
 
 impl Drop for SweetConductor {
@@ -541,8 +556,8 @@ impl Drop for SweetConductor {
     }
 }
 
-impl AsRef<Arc<SweetConductorHandle>> for SweetConductor {
-    fn as_ref(&self) -> &Arc<SweetConductorHandle> {
+impl AsRef<SweetConductorHandle> for SweetConductor {
+    fn as_ref(&self) -> &SweetConductorHandle {
         self.handle
             .as_ref()
             .expect("Tried to use a conductor that is offline")
@@ -550,7 +565,7 @@ impl AsRef<Arc<SweetConductorHandle>> for SweetConductor {
 }
 
 impl std::ops::Deref for SweetConductor {
-    type Target = Arc<SweetConductorHandle>;
+    type Target = SweetConductorHandle;
 
     fn deref(&self) -> &Self::Target {
         self.handle
@@ -559,8 +574,8 @@ impl std::ops::Deref for SweetConductor {
     }
 }
 
-impl std::borrow::Borrow<Arc<SweetConductorHandle>> for SweetConductor {
-    fn borrow(&self) -> &Arc<SweetConductorHandle> {
+impl std::borrow::Borrow<SweetConductorHandle> for SweetConductor {
+    fn borrow(&self) -> &SweetConductorHandle {
         self.handle
             .as_ref()
             .expect("Tried to use a conductor that is offline")
