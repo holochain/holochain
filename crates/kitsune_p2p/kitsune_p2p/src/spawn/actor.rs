@@ -31,6 +31,9 @@ ghost_actor::ghost_chan! {
     pub(crate) chan Internal<crate::KitsuneP2pError> {
         /// Register space event handler
         fn register_space_event_handler(recv: futures::channel::mpsc::Receiver<KitsuneP2pEvent>) -> ();
+
+        /// Incoming Gossip
+        fn incoming_gossip(space: Arc<KitsuneSpace>, data: Box<[u8]>) -> ();
     }
 }
 
@@ -40,7 +43,14 @@ pub(crate) struct KitsuneP2pActor {
     internal_sender: ghost_actor::GhostSender<Internal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ep_hnd: Tx2EpHnd<wire::Wire>,
-    spaces: HashMap<Arc<KitsuneSpace>, AsyncLazy<ghost_actor::GhostSender<KitsuneP2p>>>,
+    #[allow(clippy::type_complexity)]
+    spaces: HashMap<
+        Arc<KitsuneSpace>,
+        AsyncLazy<(
+            ghost_actor::GhostSender<KitsuneP2p>,
+            ghost_actor::GhostSender<space::SpaceInternal>,
+        )>,
+    >,
     config: Arc<KitsuneP2pConfig>,
 }
 
@@ -164,12 +174,14 @@ impl KitsuneP2pActor {
 
         tracing::info!("this_addr: {}", this_addr);
 
+        let i_s = internal_sender.clone();
         tokio::task::spawn({
             let evt_sender = evt_sender.clone();
             let tuning_params = config.tuning_params.clone();
             ep.for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
                 let evt_sender = evt_sender.clone();
                 let tuning_params = tuning_params.clone();
+                let i_s = i_s.clone();
                 async move {
                     let evt_sender = &evt_sender;
                     use tx2_api::Tx2EpEvent::*;
@@ -225,6 +237,13 @@ impl KitsuneP2pActor {
                                     .respond(resp, tuning_params.implicit_timeout())
                                     .await;
                             }
+                            wire::Wire::Gossip(wire::Gossip { space, data }) => {
+                                let data: Vec<u8> = data.into();
+                                let data: Box<[u8]> = data.into_boxed_slice();
+                                if let Err(e) = i_s.incoming_gossip(space, data).await {
+                                    tracing::warn!("failed to handle incoming gossip: {:?}", e);
+                                }
+                            }
                             data => unimplemented!("{:?}", data),
                         },
                         _ => (),
@@ -258,6 +277,26 @@ impl InternalHandler for KitsuneP2pActor {
         Ok(async move {
             f.await?;
             Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_incoming_gossip(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        data: Box<[u8]>,
+    ) -> InternalHandlerResult<()> {
+        let space_sender = match self.spaces.get_mut(&space) {
+            None => {
+                tracing::warn!("received gossip for unhandled space: {:?}", space);
+                return Ok(async move { Ok(()) }.boxed().into());
+            }
+            Some(space) => space.get(),
+        };
+        Ok(async move {
+            let (_, space_inner) = space_sender.await;
+            space_inner.incoming_gossip(space, data).await
         }
         .boxed()
         .into())
@@ -364,20 +403,23 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let space_sender = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(AsyncLazy::new(async move {
-                let (send, evt_recv) = spawn_space(space2, this_addr, ep_hnd, config)
+                let (send, send_inner, evt_recv) = spawn_space(space2, this_addr, ep_hnd, config)
                     .await
                     .expect("cannot fail to create space");
                 internal_sender
                     .register_space_event_handler(evt_recv)
                     .await
                     .expect("FAIL");
-                send
+                (send, send_inner)
             })),
         };
         let space_sender = space_sender.get();
-        Ok(async move { space_sender.await.join(space, agent).await }
-            .boxed()
-            .into())
+        Ok(async move {
+            let (space_sender, _) = space_sender.await;
+            space_sender.join(space, agent).await
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_leave(
@@ -390,7 +432,8 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
             Some(space) => space.get(),
         };
         Ok(async move {
-            space_sender.await.leave(space.clone(), agent).await?;
+            let (space_sender, _) = space_sender.await;
+            space_sender.leave(space.clone(), agent).await?;
             Ok(())
         }
         .boxed()
@@ -410,8 +453,8 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
             Some(space) => space.get(),
         };
         Ok(async move {
+            let (space_sender, _) = space_sender.await;
             space_sender
-                .await
                 .rpc_single(space, to_agent, from_agent, payload, timeout_ms)
                 .await
         }
@@ -428,9 +471,12 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
             None => return Err(KitsuneP2pError::RoutingSpaceError(input.space)),
             Some(space) => space.get(),
         };
-        Ok(async move { space_sender.await.rpc_multi(input).await }
-            .boxed()
-            .into())
+        Ok(async move {
+            let (space_sender, _) = space_sender.await;
+            space_sender.rpc_multi(input).await
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_notify_multi(&mut self, input: actor::NotifyMulti) -> KitsuneP2pHandlerResult<u8> {
@@ -438,8 +484,11 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
             None => return Err(KitsuneP2pError::RoutingSpaceError(input.space)),
             Some(space) => space.get(),
         };
-        Ok(async move { space_sender.await.notify_multi(input).await }
-            .boxed()
-            .into())
+        Ok(async move {
+            let (space_sender, _) = space_sender.await;
+            space_sender.notify_multi(input).await
+        }
+        .boxed()
+        .into())
     }
 }

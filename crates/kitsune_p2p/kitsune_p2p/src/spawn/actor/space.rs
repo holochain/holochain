@@ -1,4 +1,5 @@
 use super::*;
+use crate::types::gossip::GossipModule;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
 use kitsune_p2p_mdns::*;
@@ -20,6 +21,9 @@ ghost_actor::ghost_chan! {
 
         /// see if an agent is locally joined
         fn is_agent_local(agent: Arc<KitsuneAgent>) -> bool;
+
+        /// Incoming Gossip
+        fn incoming_gossip(space: Arc<KitsuneSpace>, data: Box<[u8]>) -> ();
     }
 }
 
@@ -30,6 +34,7 @@ pub(crate) async fn spawn_space(
     config: Arc<KitsuneP2pConfig>,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
+    ghost_actor::GhostSender<SpaceInternal>,
     KitsuneP2pEventReceiver,
 )> {
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
@@ -46,9 +51,16 @@ pub(crate) async fn spawn_space(
         .create_channel::<KitsuneP2p>()
         .await?;
 
-    tokio::task::spawn(builder.spawn(Space::new(space, this_addr, i_s, evt_send, ep_hnd, config)));
+    tokio::task::spawn(builder.spawn(Space::new(
+        space,
+        this_addr,
+        i_s.clone(),
+        evt_send,
+        ep_hnd,
+        config,
+    )));
 
-    Ok((sender, evt_recv))
+    Ok((sender, i_s, evt_recv))
 }
 
 impl ghost_actor::GhostHandler<SpaceInternal> for Space {}
@@ -172,6 +184,15 @@ impl SpaceInternalHandler for Space {
         let res = self.local_joined_agents.contains(&agent);
         Ok(async move { Ok(res) }.boxed().into())
     }
+
+    fn handle_incoming_gossip(
+        &mut self,
+        _space: Arc<KitsuneSpace>,
+        data: Box<[u8]>,
+    ) -> InternalHandlerResult<()> {
+        self.gossip_mod.incoming_gossip(data);
+        Ok(async move { Ok(()) }.boxed().into())
+    }
 }
 
 impl ghost_actor::GhostControlHandler for Space {}
@@ -191,6 +212,7 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.insert(agent.clone());
+        self.gossip_mod.local_agent_join(agent.clone());
         let fut = self.i_s.update_agent_info();
         let i_s = self.i_s.clone();
         let evt_sender = self.evt_sender.clone();
@@ -283,6 +305,7 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.remove(&agent);
+        self.gossip_mod.local_agent_leave(agent);
         Ok(async move { Ok(()) }.boxed().into())
     }
 
@@ -425,6 +448,7 @@ pub(crate) struct Space {
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
     mdns_listened_spaces: HashSet<String>,
+    gossip_mod: GossipModule,
 }
 
 impl Space {
@@ -437,6 +461,21 @@ impl Space {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         config: Arc<KitsuneP2pConfig>,
     ) -> Self {
+        let gossip_mod_fact = if &config.tuning_params.gossip_strategy == "simple-bloom" {
+            crate::gossip::simple_bloom::factory()
+        } else {
+            panic!(
+                "unknown gossip strategy: {}",
+                config.tuning_params.gossip_strategy
+            );
+        };
+        let gossip_mod = gossip_mod_fact.spawn_gossip_task(
+            config.tuning_params.clone(),
+            space.clone(),
+            ep_hnd.clone(),
+            evt_sender.clone(),
+        );
+
         let i_s_c = i_s.clone();
         tokio::task::spawn(async move {
             loop {
@@ -457,6 +496,7 @@ impl Space {
             config,
             mdns_handles: HashMap::new(),
             mdns_listened_spaces: HashSet::new(),
+            gossip_mod,
         }
     }
 
