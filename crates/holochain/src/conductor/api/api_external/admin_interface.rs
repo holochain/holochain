@@ -238,7 +238,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             DeactivateApp { installed_app_id } => {
                 // Activate app
                 self.conductor_handle
-                    .deactivate_app(installed_app_id.clone())
+                    .deactivate_app(installed_app_id.clone(), DeactivationReason::Normal)
                     .await?;
                 Ok(AdminResponse::AppDeactivated)
             }

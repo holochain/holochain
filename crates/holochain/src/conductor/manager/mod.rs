@@ -189,7 +189,7 @@ async fn run(
                     return Err(TaskManagerError::Unrecoverable(error));
                 },
                 Some(TaskOutcome::UninstallApp(cell_id, error, context)) => {
-                    tracing::error!("About to deactivate apps");
+                    tracing::error!("About to uninstall apps");
                     let app_ids = conductor.list_active_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
                     tracing::error!(
                         "UNINSTALLING the following apps due to an unrecoverable error during genesis: {:?}\nError: {:?}\nContext: {}",

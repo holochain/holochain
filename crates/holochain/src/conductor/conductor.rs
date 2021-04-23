@@ -604,7 +604,10 @@ where
         self.update_state(move |mut state| {
             debug!(?app);
             let is_active = state.active_apps.contains_key(app.installed_app_id());
-            let is_inactive = state.inactive_apps.insert(app.clone()).is_some();
+            let is_inactive = state
+                .inactive_apps
+                .insert(app.clone().deactivated(DeactivationReason::NeverActivated))
+                .is_some();
             if is_active || is_inactive {
                 Err(ConductorError::AppAlreadyInstalled(
                     app.installed_app_id().clone(),
@@ -627,7 +630,7 @@ where
                 .inactive_apps
                 .remove(&installed_app_id)
                 .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
-            state.active_apps.insert(app);
+            state.active_apps.insert(app.into());
             Ok(state)
         })
         .await?;
@@ -638,6 +641,7 @@ where
     pub(super) async fn deactivate_app_in_db(
         &mut self,
         installed_app_id: InstalledAppId,
+        reason: DeactivationReason,
     ) -> ConductorResult<Vec<CellId>> {
         let state = self
             .update_state({
@@ -647,7 +651,7 @@ where
                         .active_apps
                         .remove(&installed_app_id)
                         .ok_or_else(|| ConductorError::AppNotActive(installed_app_id.clone()))?;
-                    state.inactive_apps.insert(app);
+                    state.inactive_apps.insert(app.deactivated(reason));
                     Ok(state)
                 }
             })
@@ -674,7 +678,7 @@ where
                     let active = state.active_apps.remove(&installed_app_id);
                     let inactive = state.inactive_apps.remove(&installed_app_id);
                     let cells = active
-                        .or(inactive)
+                        .or(inactive.map(|a| a.into()))
                         .map(|app| app.all_cells().cloned().collect());
                     Ok((state, cells))
                 }

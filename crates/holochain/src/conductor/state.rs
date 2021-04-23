@@ -18,7 +18,7 @@ use std::collections::HashMap;
 pub struct ConductorState {
     /// Apps that are ready to be activated
     #[serde(default)]
-    pub inactive_apps: InstalledAppMap,
+    pub inactive_apps: DeactivatedAppMap,
     /// Apps that are active and will be loaded
     #[serde(default)]
     pub active_apps: InstalledAppMap,

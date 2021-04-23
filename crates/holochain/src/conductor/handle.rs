@@ -199,7 +199,11 @@ pub trait ConductorHandleT: Send + Sync {
     async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()>;
 
     /// Deactivate an app
-    async fn deactivate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()>;
+    async fn deactivate_app(
+        &self,
+        installed_app_id: InstalledAppId,
+        reason: DeactivationReason,
+    ) -> ConductorResult<()>;
 
     /// List Cell Ids
     async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>>;
@@ -607,9 +611,15 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         // MD: Should we be doing `Conductor::add_cells()` here? (see below comment)
     }
 
-    async fn deactivate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()> {
+    async fn deactivate_app(
+        &self,
+        installed_app_id: InstalledAppId,
+        reason: DeactivationReason,
+    ) -> ConductorResult<()> {
         let mut conductor = self.conductor.write().await;
-        let cell_ids_to_remove = conductor.deactivate_app_in_db(installed_app_id).await?;
+        let cell_ids_to_remove = conductor
+            .deactivate_app_in_db(installed_app_id, reason)
+            .await?;
         // MD: I'm not sure about this. We never add the cells back in after re-activating an app,
         //     so it seems either we shouldn't remove them here, or we should be sure to add them
         //     back in when re-activating.

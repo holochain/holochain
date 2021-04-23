@@ -227,6 +227,13 @@ pub struct InstalledApp {
     slots: HashMap<CellNick, AppSlot>,
 }
 
+impl InstalledApp {
+    /// Convert to a DeactivatedApp with the given reason
+    pub fn deactivated(self, reason: DeactivationReason) -> DeactivatedApp {
+        DeactivatedApp::new(self, reason)
+    }
+}
+
 impl automap::AutoMapped for InstalledApp {
     type Key = InstalledAppId;
 
@@ -235,8 +242,55 @@ impl automap::AutoMapped for InstalledApp {
     }
 }
 
+/// An installed App which is in the deactivated state.
+/// Note that `InstalledApp` should probably be renamed "ActiveApp" to show
+/// the distinction to this type, but didn't do that renaming yet.
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, shrinkwraprs::Shrinkwrap,
+)]
+pub struct DeactivatedApp {
+    #[shrinkwrap(main_field)]
+    app: InstalledApp,
+    reason: DeactivationReason,
+}
+
+impl DeactivatedApp {
+    /// Constructor
+    pub fn new(app: InstalledApp, reason: DeactivationReason) -> Self {
+        Self { app, reason }
+    }
+}
+
+impl automap::AutoMapped for DeactivatedApp {
+    type Key = InstalledAppId;
+
+    fn key(&self) -> &Self::Key {
+        &self.app.installed_app_id
+    }
+}
+
+impl From<DeactivatedApp> for InstalledApp {
+    fn from(d: DeactivatedApp) -> Self {
+        d.app
+    }
+}
+
+/// The possible reasons for an app being deactivated
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum DeactivationReason {
+    /// The app has never been fully activated, and is just awaiting genesis
+    NeverActivated,
+    /// The app was deactivated by the user normally
+    Normal,
+    /// The app was automatically deactivated due to an unrecoverable error by
+    /// one of its Cells
+    Quarantined,
+}
+
 /// A map from InstalledAppId -> InstalledApp
 pub type InstalledAppMap = automap::AutoHashMap<InstalledApp>;
+/// A map from InstalledAppId -> DeactivatedApp
+pub type DeactivatedAppMap = automap::AutoHashMap<DeactivatedApp>;
 
 impl InstalledApp {
     /// Constructor

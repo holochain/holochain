@@ -37,7 +37,9 @@ async fn can_update_state() {
 
     conductor
         .update_state(|mut state| {
-            state.inactive_apps.insert(app);
+            state
+                .inactive_apps
+                .insert(app.deactivated(DeactivationReason::NeverActivated));
             Ok(state)
         })
         .await
@@ -424,7 +426,10 @@ async fn test_reactivate_app() {
     let zome = simple_zome();
     let (conductor, app) = common_genesis_test_app(zome).await;
 
-    conductor.deactivate_app("app".to_string()).await.unwrap();
+    conductor
+        .deactivate_app("app".to_string(), DeactivationReason::Normal)
+        .await
+        .unwrap();
     conductor.activate_app("app".to_string()).await.unwrap();
     conductor.inner_handle().setup_cells().await.unwrap();
 
