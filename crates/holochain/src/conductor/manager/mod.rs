@@ -11,7 +11,7 @@ pub use error::*;
 use crate::conductor::error::ConductorError;
 use crate::core::workflow::error::WorkflowError;
 use futures::stream::FuturesUnordered;
-use holochain_zome_types::CellId;
+use holochain_types::prelude::*;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::Context;
@@ -119,8 +119,10 @@ pub enum TaskOutcome {
     MinorError(ManagedTaskError, String),
     /// Close the conductor down because this is an unrecoverable error.
     ShutdownConductor(Box<ManagedTaskError>, String),
-    /// Remove the Cell which caused the panic, but let all other Cells remain.
+    /// Remove the App which caused the panic, but let all other apps remain.
     UninstallApp(CellId, Box<ManagedTaskError>, String),
+    /// Deactivate all apps which contain the problematic Cell.
+    DeactivateApps(CellId, Box<ManagedTaskError>, String),
 }
 
 struct TaskManager {
@@ -202,6 +204,20 @@ async fn run(
                     }
                     tracing::error!("Apps uninstalled.");
                 },
+                Some(TaskOutcome::DeactivateApps(cell_id, error, context)) => {
+                    tracing::error!("About to deactivate apps");
+                    let app_ids = conductor.list_active_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
+                    tracing::error!(
+                        "DEACTIVATING the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
+                        app_ids,
+                        error,
+                        context
+                    );
+                    for app_id in app_ids.iter() {
+                        conductor.deactivate_app(app_id.to_string(), DeactivationReason::Quarantined).await.map_err(TaskManagerError::internal)?;
+                    }
+                    tracing::error!("Apps quarantined via deactivation.");
+                },
                 None => return Ok(()),
             }
         };
@@ -233,14 +249,16 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
                     // For all other errors, shut down the conductor
                     _ => ShutdownConductor(Box::new(err), name),
                 },
-                // If validation panicked, uninstall the app.
-                // TODO: BUT, do we need to restart the queue consumer too?
-                //       if so, try to find a general way to do this?
-                //       OR: is it OK since this task was cell-specific and the
-                //       Cell is going away? I think this is the case...
-                //       so we just need to make sure everything cleanly shuts
-                //       down, because currently this is causing everything to hang.
-                ManagedTaskError::Join(_) => UninstallApp(cell_id.to_owned(), Box::new(err), name),
+                // If the task panicked, deactivate the app.
+                // TODO: ideally, we could differentiate between the case of
+                //   pre- and post-genesis failure, using UninstallApp for
+                //   the former and DeactivateApps for the latter. However,
+                //   there is no easy way to do this, so we simply deactivate
+                //   in both cases, so we don't lose data.
+                //   I think B-04188 would make this distinction possible.
+                ManagedTaskError::Join(_) => {
+                    DeactivateApps(cell_id.to_owned(), Box::new(err), name)
+                }
 
                 // For all others, shut down conductor
                 _ => ShutdownConductor(Box::new(err), name),

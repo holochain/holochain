@@ -446,7 +446,7 @@ async fn test_reactivate_app() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_cells_self_destruct_on_panic_during_genesis() {
+async fn test_cells_self_deactivate_on_panic_during_genesis() {
     observability::test_run().ok();
     let bad_zome =
         InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
@@ -464,7 +464,7 @@ async fn test_cells_self_destruct_on_panic_during_genesis() {
             let state = conductor.get_state_from_handle().await.unwrap();
             (state.active_apps.len(), state.inactive_apps.len())
         },
-        (0, 0)
+        (0, 1)
     );
 }
 
@@ -530,6 +530,11 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
 // TODO: we need a test with a failure during a validation callback that happens
 //       *inline*. It's not enough to have a failing validate_create_entry for
 //       instance, because that failure will be returned by the zome call.
+//
+// NB: currently the pre-genesis and post-genesis handling of panics is the same.
+//   If we implement [ B-04188 ], then this test will be made more possible.
+//   Otherwise, we have to devise a way to discover whether a panic happened
+//   during genesis or not.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "need to figure out how to write this test"]
 async fn test_apps_deactivate_on_panic_after_genesis() {
