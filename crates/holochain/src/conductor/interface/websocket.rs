@@ -592,7 +592,7 @@ pub mod test {
         let maybe_info = state.get_app_info(&"test app".to_string());
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, "test app");
-            assert_matches!(info.status, InstalledAppStatus::Inactive(_));
+            assert_matches!(info.status, InstalledAppStatus::Inactive {..});
         } else {
             assert!(false);
         }

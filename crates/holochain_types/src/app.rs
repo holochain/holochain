@@ -229,7 +229,7 @@ impl InstalledApp {
     /// Constructor for freshly installed app
     pub fn new_inactive(app: InstalledAppCommon) -> Self {
         Self::Inactive(InactiveApp {
-            app: app.into(),
+            app,
             reason: DeactivationReason::NeverActivated,
         })
     }
@@ -245,7 +245,7 @@ impl InstalledApp {
         match self {
             Self::Active(app) => (app.into_common(), InstalledAppStatus::Active),
             Self::Inactive(InactiveApp { app, reason, .. }) => {
-                (app, InstalledAppStatus::Inactive(reason))
+                (app, InstalledAppStatus::Inactive { reason })
             }
         }
     }
@@ -254,9 +254,9 @@ impl InstalledApp {
     pub fn status(&self) -> InstalledAppStatus {
         match self {
             Self::Active(_) => InstalledAppStatus::Active,
-            Self::Inactive(InactiveApp { reason, .. }) => {
-                InstalledAppStatus::Inactive(reason.clone())
-            }
+            Self::Inactive(InactiveApp { reason, .. }) => InstalledAppStatus::Inactive {
+                reason: reason.clone(),
+            },
         }
     }
 }
@@ -383,6 +383,7 @@ impl From<InactiveApp> for InstalledAppCommon {
 
 /// The possible reasons for an app being deactivated
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DeactivationReason {
     /// The app has never been fully activated, and is just awaiting genesis
     NeverActivated,
@@ -390,7 +391,10 @@ pub enum DeactivationReason {
     Normal,
     /// The app was automatically deactivated due to an unrecoverable error by
     /// one of its Cells
-    Quarantined,
+    Quarantined {
+        /// The error which necessitated the quarantine
+        error: String,
+    },
 }
 
 /// The common data between apps of any status
@@ -418,7 +422,6 @@ impl InstalledAppCommon {
             _agent_key,
             slots: slots.into_iter().collect(),
         }
-        .into()
     }
 
     /// Accessor
@@ -538,11 +541,15 @@ impl InstalledAppCommon {
 
 /// The information in an InstalledApp which is not captured by InstalledAppCommon
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(rename_all = "snake_case")]
 pub enum InstalledAppStatus {
     /// Indicates the app is active
     Active,
     /// Indicates the app is inactive, and why
-    Inactive(DeactivationReason),
+    Inactive {
+        /// The reason for deactivation
+        reason: DeactivationReason,
+    },
 }
 
 /// A map from InstalledAppId -> ActiveApp
@@ -667,5 +674,17 @@ mod tests {
             app.cloned_cells().collect::<HashSet<_>>(),
             app.all_cells().collect::<HashSet<_>>()
         );
+    }
+
+    #[test]
+    fn status_serialization() {
+        let status = InstalledAppStatus::Inactive {
+            reason: DeactivationReason::Quarantined {
+                error: "because".into(),
+            },
+        };
+
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "{\"inactive\":{\"reason\":{\"quarantined\":{\"error\":\"because\"}}}}");
     }
 }
