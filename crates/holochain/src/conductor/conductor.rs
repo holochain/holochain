@@ -502,7 +502,7 @@ where
 
         // Closure for creating all cells in an app
         let tasks = active_apps.into_iter().map(
-            move |(installed_app_id, app): (InstalledAppId, InstalledApp)| {
+            move |(installed_app_id, app): (InstalledAppId, ActiveApp)| {
                 // Clone data for async block
                 let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
                 let conductor_handle = conductor_handle.clone();
@@ -598,16 +598,13 @@ where
     /// Register an app as inactive in the database
     pub(super) async fn add_inactive_app_to_db(
         &mut self,
-        app: InstalledApp,
-    ) -> ConductorResult<()> {
-        trace!(?app);
+        app: InstalledAppCommon,
+    ) -> ConductorResult<InactiveApp> {
+        let app = InactiveApp::new(app, DeactivationReason::NeverActivated);
+        let ret = app.clone();
         self.update_state(move |mut state| {
-            debug!(?app);
             let is_active = state.active_apps.contains_key(app.installed_app_id());
-            let is_inactive = state
-                .inactive_apps
-                .insert(app.clone().deactivated(DeactivationReason::NeverActivated))
-                .is_some();
+            let is_inactive = state.inactive_apps.insert(app.clone()).is_some();
             if is_active || is_inactive {
                 Err(ConductorError::AppAlreadyInstalled(
                     app.installed_app_id().clone(),
@@ -617,7 +614,7 @@ where
             }
         })
         .await?;
-        Ok(())
+        Ok(ret)
     }
 
     /// Activate an app in the database
@@ -630,7 +627,7 @@ where
                 .inactive_apps
                 .remove(&installed_app_id)
                 .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
-            state.active_apps.insert(app.into());
+            state.active_apps.insert(app.into_active());
             Ok(state)
         })
         .await?;
@@ -651,7 +648,7 @@ where
                         .active_apps
                         .remove(&installed_app_id)
                         .ok_or_else(|| ConductorError::AppNotActive(installed_app_id.clone()))?;
-                    state.inactive_apps.insert(app.deactivated(reason));
+                    state.inactive_apps.insert(app.into_inactive(reason));
                     Ok(state)
                 }
             })
@@ -678,7 +675,8 @@ where
                     let active = state.active_apps.remove(&installed_app_id);
                     let inactive = state.inactive_apps.remove(&installed_app_id);
                     let cells = active
-                        .or_else(|| inactive.map(|a| a.into()))
+                        .map(|a| a.into_common())
+                        .or_else(|| inactive.map(|a| a.into_common()))
                         .map(|app| app.all_cells().cloned().collect());
                     Ok((state, cells))
                 }

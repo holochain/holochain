@@ -33,13 +33,13 @@ async fn can_update_state() {
 
     let cell_id = fake_cell_id(1);
     let installed_cell = InstalledCell::new(cell_id.clone(), "nick".to_string());
-    let app = InstalledApp::new_legacy("fake app", vec![installed_cell]).unwrap();
+    let app = InactiveApp::new_fresh(
+        InstalledAppCommon::new_legacy("fake app", vec![installed_cell]).unwrap(),
+    );
 
     conductor
         .update_state(|mut state| {
-            state
-                .inactive_apps
-                .insert(app.deactivated(DeactivationReason::NeverActivated));
+            state.inactive_apps.insert(app);
             Ok(state)
         })
         .await
@@ -80,14 +80,14 @@ async fn can_add_clone_cell_to_app() {
 
     let installed_cell = InstalledCell::new(cell_id.clone(), "nick".to_string());
     let slot = AppSlot::new(cell_id.clone(), true, 1);
-    let app1 = InstalledApp::new_legacy("no clone", vec![installed_cell.clone()]).unwrap();
-    let app2 = InstalledApp::new("yes clone", agent, vec![("nick".into(), slot.clone())]);
+    let app1 = InstalledAppCommon::new_legacy("no clone", vec![installed_cell.clone()]).unwrap();
+    let app2 = InstalledAppCommon::new("yes clone", agent, vec![("nick".into(), slot.clone())]);
 
     conductor.register_phenotype(dna).await.unwrap();
     conductor
         .update_state(|mut state| {
-            state.active_apps.insert(app1.clone());
-            state.active_apps.insert(app2.clone());
+            state.active_apps.insert(app1.clone().into());
+            state.active_apps.insert(app2.clone().into());
             Ok(state)
         })
         .await
@@ -139,12 +139,15 @@ async fn app_ids_are_unique() {
 
     let cell_id = fake_cell_id(1);
     let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
-    let app = InstalledApp::new_legacy("id".to_string(), vec![installed_cell]).unwrap();
+    let app = InstalledAppCommon::new_legacy("id".to_string(), vec![installed_cell]).unwrap();
 
-    conductor.add_inactive_app_to_db(app.clone()).await.unwrap();
+    conductor
+        .add_inactive_app_to_db(app.clone().into())
+        .await
+        .unwrap();
 
     assert_matches!(
-        conductor.add_inactive_app_to_db(app.clone()).await,
+        conductor.add_inactive_app_to_db(app.clone().into()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
         if id == "id".to_string()
     );
@@ -156,7 +159,7 @@ async fn app_ids_are_unique() {
         .unwrap();
 
     assert_matches!(
-        conductor.add_inactive_app_to_db(app.clone()).await,
+        conductor.add_inactive_app_to_db(app.clone().into()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
         if id == "id".to_string()
     );
@@ -170,7 +173,7 @@ async fn cell_nicks_are_unique() {
         InstalledCell::new(fixt!(CellId), "1".into()),
         InstalledCell::new(fixt!(CellId), "2".into()),
     ];
-    let result = InstalledApp::new_legacy("id", cells.into_iter());
+    let result = InstalledAppCommon::new_legacy("id", cells.into_iter());
     matches::assert_matches!(
         result,
         Err(AppError::DuplicateSlotIds(_, nicks)) if nicks == vec!["1".to_string()]
