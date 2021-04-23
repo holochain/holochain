@@ -50,9 +50,9 @@ pub fn get_ops_to_publish(
             AND
             Header.author = :author
             AND
-            Header.private_entry = 0
+            (DhtOp.type != :store_entry OR Header.private_entry = 0)
             AND
-            DhtOp.last_publish_time < :earliest_allowed_time
+            DhtOp.last_publish_time <= :earliest_allowed_time
             AND
             DhtOp.receipt_count < :required_receipt_count
             ",
@@ -62,6 +62,7 @@ pub fn get_ops_to_publish(
                 ":author": agent,
                 ":earliest_allowed_time": earliest_allowed_time,
                 ":required_receipt_count": required_receipt_count,
+                ":store_entry": DhtOpType::StoreEntry,
             },
             |row| {
                 let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
@@ -243,7 +244,7 @@ mod tests {
         // - StoreEntry: false.
         let mut f = facts;
         f.private = true;
-        f.store_entry = true;
+        f.store_entry = false;
         let op = create_and_insert_op(env, f, &cd);
         results.push(op);
 

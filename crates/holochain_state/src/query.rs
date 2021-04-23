@@ -660,3 +660,33 @@ pub fn get_entry_from_db(
         Ok(Some(entry??))
     }
 }
+
+pub fn dump(txn: &Transaction) {
+    let mut stmt = txn.prepare("SELECT * FROM Header").unwrap();
+    tracing::debug!("Headers:");
+    let mut rows = stmt.query([]).unwrap();
+    while let Some(row) = rows.next().unwrap() {
+        for column in row.column_names() {
+            let row = row.get_ref_unwrap(column);
+            tracing::debug!(?column, ?row);
+        }
+    }
+    let mut stmt = txn.prepare("SELECT * FROM Entry").unwrap();
+    tracing::debug!("Entries:");
+    let mut rows = stmt.query([]).unwrap();
+    while let Some(row) = rows.next().unwrap() {
+        for column in row.column_names() {
+            let row = row.get_ref_unwrap(column);
+            tracing::debug!(?column, ?row);
+        }
+    }
+    let mut stmt = txn.prepare("SELECT * FROM DhtOp").unwrap();
+    tracing::debug!("DhtOps:");
+    let mut rows = stmt.query([]).unwrap();
+    while let Some(row) = rows.next().unwrap() {
+        for column in row.column_names() {
+            let row = row.get_ref_unwrap(column);
+            tracing::debug!(?column, ?row);
+        }
+    }
+}

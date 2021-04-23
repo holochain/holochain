@@ -11,19 +11,11 @@
 //!
 
 use super::error::WorkflowResult;
-use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
-use super::produce_dht_ops_workflow::dht_op_light::light_to_op;
 use crate::core::queue_consumer::OneshotWriter;
 use crate::core::queue_consumer::WorkComplete;
-use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
-use holochain_sqlite::buffer::BufferedStore;
-use holochain_sqlite::buffer::KvBufFresh;
-use holochain_sqlite::fresh_reader;
-use holochain_sqlite::prelude::*;
-use holochain_sqlite::transaction::Writer;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use std::collections::HashMap;
@@ -44,6 +36,8 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u32 = 5;
 pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(5);
 
 /// Database buffers required for publishing [DhtOp]s
+#[cfg(test)]
+#[deprecated = "Remove when updating publish tests for sql"]
 pub struct PublishDhtOpsWorkspace {
     /// Database of authored DhtOps, with data about prior publishing
     authored_dht_ops: AuthoredDhtOpsStore,
@@ -51,13 +45,13 @@ pub struct PublishDhtOpsWorkspace {
     elements: ElementBuf<AuthoredPrefix>,
 }
 
-#[instrument(skip(workspace, writer, network))]
+#[instrument(skip(env, writer, network))]
 pub async fn publish_dht_ops_workflow(
-    mut workspace: PublishDhtOpsWorkspace,
+    env: EnvRead,
     writer: OneshotWriter,
     mut network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
-    let to_publish = publish_dht_ops_workflow_inner(&mut workspace).await?;
+    let (to_publish, hashes) = publish_dht_ops_workflow_inner(env, network.from_agent()).await?;
 
     // commit the workspace
     //
@@ -72,7 +66,7 @@ pub async fn publish_dht_ops_workflow(
     // @freesig I think the correct thing to do here is not wait for a response from the
     // publish.
     tracing::warn!("Committing local state before publishing to network! TODO: circle back ");
-    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
+    // writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     // Commit to the network
     for (basis, ops) in to_publish {
@@ -80,6 +74,13 @@ pub async fn publish_dht_ops_workflow(
             tracing::info!(failed_to_send_publish = ?e);
         }
     }
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
+    writer.with_writer(|writer| {
+        for hash in hashes {
+            mutations::set_last_publish_time(writer, hash, now)?;
+        }
+        Ok(())
+    })?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     Ok(WorkComplete::Complete)
@@ -87,16 +88,16 @@ pub async fn publish_dht_ops_workflow(
 
 /// Read the authored for ops with receipt count < R
 pub async fn publish_dht_ops_workflow_inner(
-    workspace: &mut PublishDhtOpsWorkspace,
-) -> WorkflowResult<HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>> {
+    env: EnvRead,
+    agent: AgentPubKey,
+) -> WorkflowResult<(HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>, Vec<DhtOpHash>)> {
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
+    let mut hashes = Vec::new();
 
-    let agent = todo!();
-    let env = todo!();
-
-    for op_hashed in query::get_ops_to_publish(agent, env, DEFAULT_RECEIPT_BUNDLE_SIZE)? {
+    for op_hashed in query::get_ops_to_publish(&agent, &env, DEFAULT_RECEIPT_BUNDLE_SIZE)? {
         let (op, op_hash) = op_hashed.into_inner();
+        hashes.push(op_hash.clone());
 
         // For every op publish a request
         // Collect and sort ops by basis
@@ -106,9 +107,10 @@ pub async fn publish_dht_ops_workflow_inner(
             .push((op_hash, op));
     }
 
-    Ok(to_publish)
+    Ok((to_publish, hashes))
 }
 
+#[cfg(test)]
 impl Workspace for PublishDhtOpsWorkspace {
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.authored_dht_ops.flush_to_txn_ref(writer)?;
@@ -116,6 +118,7 @@ impl Workspace for PublishDhtOpsWorkspace {
     }
 }
 
+#[cfg(test)]
 impl PublishDhtOpsWorkspace {
     pub fn new(env: EnvRead) -> WorkspaceResult<Self> {
         let db = env.get_table(TableName::AuthoredDhtOps)?;
@@ -130,10 +133,6 @@ impl PublishDhtOpsWorkspace {
 
     fn authored(&mut self) -> &mut AuthoredDhtOpsStore {
         &mut self.authored_dht_ops
-    }
-
-    fn elements(&self) -> &ElementBuf<AuthoredPrefix> {
-        &self.elements
     }
 }
 
@@ -153,6 +152,7 @@ mod tests {
     use futures::future::FutureExt;
     use holochain_p2p::actor::HolochainP2pSender;
     use holochain_p2p::HolochainP2pRef;
+    use holochain_sqlite::buffer::BufferedStore;
     use matches::assert_matches;
     use observability;
     use std::collections::HashMap;
@@ -290,8 +290,7 @@ mod tests {
 
     /// Call the workflow
     async fn call_workflow(env: EnvWrite, cell_network: HolochainP2pCell) {
-        let workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
-        publish_dht_ops_workflow(workspace, env.clone().into(), cell_network)
+        publish_dht_ops_workflow(env.clone().into(), env.clone().into(), cell_network)
             .await
             .unwrap();
     }

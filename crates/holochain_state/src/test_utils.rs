@@ -4,6 +4,7 @@ use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::test_utils::fake_cell_id;
 use shrinkwraprs::Shrinkwrap;
+use std::path::Path;
 use std::sync::Arc;
 use tempdir::TempDir;
 
@@ -88,6 +89,21 @@ impl TestEnv {
     /// Accessor
     pub fn tmpdir(&self) -> Arc<TempDir> {
         self.tmpdir.clone()
+    }
+
+    /// Dump db to a location.
+    pub fn dump(&self, out: &Path) -> std::io::Result<()> {
+        std::fs::create_dir(&out).ok();
+        for entry in std::fs::read_dir(self.tmpdir.path())? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                let mut out = out.to_owned();
+                out.push(path.file_name().unwrap());
+                std::fs::copy(path, out)?;
+            }
+        }
+        Ok(())
     }
 }
 

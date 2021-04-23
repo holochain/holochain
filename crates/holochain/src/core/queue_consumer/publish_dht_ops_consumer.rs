@@ -3,7 +3,6 @@
 use super::*;
 
 use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
-use crate::core::workflow::publish_dht_ops_workflow::PublishDhtOpsWorkspace;
 use crate::{conductor::manager::ManagedTaskResult, core::workflow::error::WorkflowResult};
 use tokio::task::JoinHandle;
 use tracing::*;
@@ -29,10 +28,12 @@ pub fn spawn_publish_dht_ops_consumer(
 
             holochain_sqlite::db::optimistic_retry_async("publish_dht_ops_consumer", || async {
                 // Run the workflow
-                let workspace = PublishDhtOpsWorkspace::new(env.clone().into())?;
-                if let WorkComplete::Incomplete =
-                    publish_dht_ops_workflow(workspace, env.clone().into(), cell_network.clone())
-                        .await?
+                if let WorkComplete::Incomplete = publish_dht_ops_workflow(
+                    env.clone().into(),
+                    env.clone().into(),
+                    cell_network.clone(),
+                )
+                .await?
                 {
                     trigger_self.clone().trigger()
                 };

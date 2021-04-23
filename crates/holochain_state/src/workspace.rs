@@ -16,6 +16,12 @@ pub enum WorkspaceError {
 
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
+
+    #[error(transparent)]
+    StateQueryError(#[from] crate::query::StateQueryError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] crate::mutations::StateMutationError),
 }
 
 #[allow(missing_docs)]

@@ -81,6 +81,12 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     StateQueryError(#[from] holochain_state::query::StateQueryError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] holochain_state::mutations::StateMutationError),
+
+    #[error(transparent)]
+    SystemTimeError(#[from] std::time::SystemTimeError),
 }
 
 /// Internal type to handle running workflows
