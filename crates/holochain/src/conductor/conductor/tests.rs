@@ -394,6 +394,25 @@ async fn test_uninstall_app() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_reactivate_app() {
+    observability::test_run().ok();
+    let not_bad_zome = InlineZome::new_unique(Vec::new());
+
+    let (conductor, _) = common_genesis_test_app(not_bad_zome).await;
+
+    conductor.deactivate_app("app".to_string()).await.unwrap();
+    conductor.activate_app("app".to_string()).await.unwrap();
+
+    // - Ensure that the app is reactivated
+    assert_eq_retry_10s!(
+        {
+            let state = conductor.get_state_from_handle().await.unwrap();
+            (state.active_apps.len(), state.inactive_apps.len())
+        },
+        (1, 0)
+    );
+}
+#[tokio::test(flavor = "multi_thread")]
 async fn test_cells_self_destruct_on_panic_during_genesis() {
     observability::test_run().ok();
     let bad_zome =
@@ -476,14 +495,16 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Seems we want to test this, but actually it seems that panics in entry creation validation are unrecoverable"]
 async fn test_apps_deactivate_on_panic_after_genesis() {
     observability::test_run().ok();
     let unit_entry_def = EntryDef::default_with_id("unit");
     let bad_zome = InlineZome::new_unique(vec![unit_entry_def.clone()])
-        .callback("validate_create_entry", |_api, _data: ValidateData| {
-            panic!("Intentional panic in validation");
-            #[allow(unreachable_code)]
+        .callback("validate_create_entry", |api, _data: ValidateData| {
+            // Calling agent_info during validation should cause a panic in a wasm zome,
+            // but here it only returns an error. Either way, the TaskManager
+            // will have an error to handle.
+            let _info = api.agent_info(())?;
+            dbg!(&_info);
             Ok(ValidateResult::Valid)
         })
         .callback("create", move |api, ()| {
@@ -497,7 +518,7 @@ async fn test_apps_deactivate_on_panic_after_genesis() {
 
     let (_, cell_bad) = app.into_tuple();
 
-    let _: () = conductor.call(&cell_bad.zome("bad"), "create", ()).await;
+    let _: HeaderHash = conductor.call(&cell_bad.zome("bad"), "create", ()).await;
 
     assert_eq_retry_10s!(
         {
