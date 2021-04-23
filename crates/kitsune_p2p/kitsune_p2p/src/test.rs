@@ -8,32 +8,41 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_transport_coms() -> Result<(), KitsuneP2pError> {
+    async fn test_transport_coms() {
         observability::test_run().ok();
         observability::metrics::init();
-        let (harness, _evt) = spawn_test_harness_mem().await?;
+        let (harness, _evt) = spawn_test_harness_mem().await.unwrap();
 
-        let space = harness.add_space().await?;
-        let (a1, p2p1) = harness.add_direct_agent("one".into()).await?;
-        let (a2, p2p2) = harness.add_direct_agent("two".into()).await?;
+        let space = harness.add_space().await.unwrap();
+        let (a1, p2p1) = harness.add_direct_agent("one".into()).await.unwrap();
+        let (a2, p2p2) = harness.add_direct_agent("two".into()).await.unwrap();
 
         // needed until we have some way of bootstrapping
-        harness.magic_peer_info_exchange().await?;
+        harness.magic_peer_info_exchange().await.unwrap();
 
         let r1 = p2p1
             .rpc_single(space.clone(), a2.clone(), a1.clone(), b"m1".to_vec(), None)
-            .await?;
-        let r2 = p2p2
+            .await
+            .unwrap();
+        let s = std::time::Instant::now();
+        let r2 = match p2p2
             .rpc_single(space.clone(), a1, a2, b"m2".to_vec(), None)
-            .await?;
+            .await
+        {
+            Err(_) => {
+                panic!("TIMEOUT AFTER: {} ms", s.elapsed().as_millis());
+            }
+            Ok(r) => r,
+        };
         assert_eq!(b"echo: m1".to_vec(), r1);
         assert_eq!(b"echo: m2".to_vec(), r2);
-        harness.ghost_actor_shutdown().await?;
+        harness.ghost_actor_shutdown().await.unwrap();
         crate::types::metrics::print_all_metrics();
-        Ok(())
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // david.b disabled while we're full sync, not actually making
+              //         get requests
     async fn test_transport_multi_coms() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
         let (harness, _evt) = spawn_test_harness_mem().await?;

@@ -212,8 +212,9 @@ impl gossip::GossipEventHandler for Space {
     }
 
     fn handle_gossip_ops(&mut self, input: GossipEvt) -> gossip::GossipEventHandlerResult<()> {
+        let tuning_params = self.config.tuning_params.clone();
         if self.local_joined_agents.contains(&input.to_agent) {
-            let fut = local_gossip_ops(&self.evt_sender, self.space.clone(), input);
+            let fut = local_gossip_ops(tuning_params, &self.evt_sender, self.space.clone(), input);
             Ok(async move { fut.await }.boxed().into())
         } else {
             let GossipEvt {
@@ -336,6 +337,7 @@ pub fn local_req_op_data(
 }
 
 pub fn local_gossip_ops(
+    tuning_params: kitsune_p2p_types::config::KitsuneP2pTuningParams,
     evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     space: Arc<KitsuneSpace>,
     input: GossipEvt,
@@ -372,14 +374,14 @@ pub fn local_gossip_ops(
         let to_agent = &to_agent;
         let from_agent = &from_agent;
         futures::stream::iter(all)
-                .for_each_concurrent(10, |res| async move {
+                .for_each_concurrent(tuning_params.concurrent_limit_per_thread, |res| async move {
                     if let Err(e) = res.await {
                         ghost_actor::dependencies::tracing::error!(failed_to_gossip_ops = ?e, ?from_agent, ?to_agent);
                     }
                 })
                 .await;
         futures::stream::iter(all_agents)
-                .for_each_concurrent(10, |res| async move {
+                .for_each_concurrent(tuning_params.concurrent_limit_per_thread, |res| async move {
                     if let Err(e) = res.await {
                         ghost_actor::dependencies::tracing::error!(failed_to_gossip_peer_info = ?e, ?from_agent, ?to_agent);
                     }
@@ -808,17 +810,25 @@ impl Space {
         let actor::RpcMulti {
             space,
             from_agent,
-            basis,
-            remote_agent_count,
-            timeout_ms,
+            //basis,
+            //remote_agent_count,
+            //timeout_ms,
             //as_race,
             //race_timeout_ms,
             payload,
             ..
         } = input;
-        let remote_agent_count = remote_agent_count.unwrap();
-        let timeout_ms = timeout_ms.unwrap();
-        let stage_1_timeout_ms = timeout_ms / 2;
+
+        // TODO - FIXME - david.b - removing the parts of this that
+        // actually make remote requests. We can get this data locally
+        // while we are still full sync after gossip, and the timeouts
+        // are not structured correctly.
+        //
+        // Better to re-write as part of sharding.
+
+        //let remote_agent_count = remote_agent_count.unwrap();
+        //let timeout_ms = timeout_ms.unwrap();
+        //let stage_1_timeout_ms = timeout_ms / 2;
 
         // as an optimization - request to all local joins
         // but don't count that toward our request total
@@ -838,6 +848,7 @@ impl Space {
             })
             .collect::<Vec<_>>();
 
+        /*
         let remote_fut = discover::message_neighborhood(
             self,
             from_agent.clone(),
@@ -860,9 +871,10 @@ impl Space {
             },
         )
         .instrument(tracing::debug_span!("message_neighborhood", payload = ?payload.iter().take(5).collect::<Vec<_>>()));
+        */
 
         Ok(async move {
-            let mut out: Vec<actor::RpcMultiResponse> = futures::future::join_all(local_all)
+            let out: Vec<actor::RpcMultiResponse> = futures::future::join_all(local_all)
                 .await
                 .into_iter()
                 .filter_map(|(r, a)| {
@@ -877,7 +889,7 @@ impl Space {
                 })
                 .collect();
 
-            out.append(&mut remote_fut.await);
+            //out.append(&mut remote_fut.await);
 
             Ok(out)
         }

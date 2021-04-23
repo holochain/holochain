@@ -99,7 +99,7 @@ async fn main() {
     let conf = QuicConfig::default();
     let f = tx2_quic_adapter(conf).await.unwrap();
     let f = tx2_pool_promote(f, Default::default());
-    let f = tx2_proxy(f, Default::default());
+    let f = tx2_proxy(f, Default::default()).unwrap();
     let f = tx2_api::<Wire>(f, Default::default());
 
     let ep = f

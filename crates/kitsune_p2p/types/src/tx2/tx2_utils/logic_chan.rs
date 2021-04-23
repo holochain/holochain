@@ -250,13 +250,14 @@ mod tests {
         let count = Arc::new(atomic::AtomicUsize::new(0));
 
         let count2 = count.clone();
-        let rt = tokio::task::spawn(async move {
+        let rt = metric_task(async move {
             while let Some(_res) = futures::stream::StreamExt::next(&mut logic_chan).await {
                 count2.fetch_add(1, atomic::Ordering::SeqCst);
             }
+            KitsuneResult::Ok(())
         });
 
-        let wt = tokio::task::spawn(async move {
+        let wt = metric_task(async move {
             a.emit("a1").await.unwrap();
             let b = a.clone();
             a.capture_logic(async move {
@@ -268,13 +269,14 @@ mod tests {
             .unwrap();
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
             a.emit("a2").await.unwrap();
+            KitsuneResult::Ok(())
         });
 
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         h.close();
 
-        wt.await.unwrap();
-        rt.await.unwrap();
+        wt.await.unwrap().unwrap();
+        rt.await.unwrap().unwrap();
 
         assert_eq!(4, count.load(atomic::Ordering::SeqCst));
     }

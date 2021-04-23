@@ -88,12 +88,28 @@ impl KitsuneP2pActor {
         let f = tx2_pool_promote(f, config.tuning_params.clone());
 
         // wrap in proxy
-        let f = tx2_proxy(f, config.tuning_params.clone());
+        let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
+        conf.tuning_params = Some(config.tuning_params.clone());
+        let f = tx2_proxy(f, conf)?;
 
         let metrics = Tx2ApiMetrics::default().set_write_len(|d, l| {
-            if let Some(t) = wire::DISC_MAP.get(&d) {
-                KitsuneMetrics::count(*t, l);
-            }
+            let t = match d {
+                "Wire::Failure" => KitsuneMetrics::Fail,
+                "Wire::Call" => KitsuneMetrics::Call,
+                "Wire::CallResp" => KitsuneMetrics::CallResp,
+                "Wire::Notify" => KitsuneMetrics::Notify,
+                "Wire::NotifyResp" => KitsuneMetrics::NotifyResp,
+                "Wire::FetchOpHashes" => KitsuneMetrics::FetchOpHashes,
+                "Wire::FetchOpHashesResponse" => KitsuneMetrics::FetchOpHashesResp,
+                "Wire::FetchOpData" => KitsuneMetrics::FetchOpData,
+                "Wire::FetchOpDataResponse" => KitsuneMetrics::FetchOpDataResp,
+                "Wire::AgentInfoQuery" => KitsuneMetrics::AgentInfoQuery,
+                "Wire::AgentInfoQueryResp" => KitsuneMetrics::AgentInfoQueryResp,
+                "Wire::Gossip" => KitsuneMetrics::Gossip,
+                "Wire::GossipResp" => KitsuneMetrics::GossipResp,
+                _ => return,
+            };
+            KitsuneMetrics::count(t, l);
         });
 
         // wrap in api
@@ -153,20 +169,15 @@ impl KitsuneP2pActor {
         tokio::task::spawn({
             let evt_sender = evt_sender.clone();
             let tuning_params = config.tuning_params.clone();
-            ep.for_each_concurrent(/* limit */ 10, move |event| {
+            ep.for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
                 let evt_sender = evt_sender.clone();
                 let tuning_params = tuning_params.clone();
                 async move {
                     let evt_sender = &evt_sender;
                     use tx2_api::Tx2EpEvent::*;
+                    #[allow(clippy::single_match)]
                     match event {
-                        Tick => (),
-                        IncomingRequest(Tx2EpIncomingRequest {
-                            con: _,
-                            url: _,
-                            data,
-                            respond,
-                        }) => {
+                        IncomingRequest(Tx2EpIncomingRequest { data, respond, .. }) => {
                             match data {
                                 wire::Wire::Call(wire::Call {
                                     space,
@@ -333,8 +344,13 @@ impl KitsuneP2pActor {
                                         ops.into_iter().map(|(k, v)| (k, v.into())).collect(),
                                         agents,
                                     );
-                                    if let Err(err) =
-                                        local_gossip_ops(&evt_sender, space, input).await
+                                    if let Err(err) = local_gossip_ops(
+                                        tuning_params.clone(),
+                                        &evt_sender,
+                                        space,
+                                        input,
+                                    )
+                                    .await
                                     {
                                         let reason = format!("{:?}", err);
                                         tracing::error!("got err: {}", reason);
@@ -352,9 +368,7 @@ impl KitsuneP2pActor {
                                 data => unimplemented!("{:?}", data),
                             }
                         }
-                        evt => {
-                            tracing::error!("UNHANDLED EVENT: {:?}", evt);
-                        }
+                        _ => (),
                     }
                 }
             })
