@@ -455,13 +455,9 @@ async fn incoming_evt_handle(
                     const DEST_END: usize = DEST_START + DIGEST_BYTES;
                     let src_cert = data[SRC_START..SRC_END].to_vec().into();
                     let dest_cert = data[DEST_START..DEST_END].to_vec().into();
-                    //println!("src: {:?}", src_cert);
-                    //println!("dst: {:?}", dest_cert);
-                    //println!("loc: {:?}", hnd.local_cert);
                     if dest_cert == hnd.local_cert {
                         // this data is destined for US!
                         data.cheap_move_start(SRC_END);
-                        //println!("got data for US: {}", String::from_utf8_lossy(data.as_ref()));
                         let url = promote_addr(&base_url, &src_cert).unwrap();
                         let con = match get_con_hnd(
                             &hnd.inner,
@@ -484,13 +480,11 @@ async fn incoming_evt_handle(
                         });
                         let _ = logic_hnd.emit(evt).await;
                     } else {
-                        //println!("data to forward");
                         let dest = if !allow_proxy_fwd {
                             tracing::error!("received fwd request on, but proxy fwd is disallowed");
                             Err("proxy fwd disallowed".into())
                         } else {
                             hnd.inner.share_mut(|i, _| {
-                                //println!("ALALA: {:?}", i.in_digest_to_sub_con);
                                 Ok(i.digest_to_sub_con_map.get(&dest_cert).cloned())
                             })
                         };

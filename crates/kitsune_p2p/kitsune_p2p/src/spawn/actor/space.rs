@@ -818,9 +818,17 @@ impl Space {
             payload,
             ..
         } = input;
+
+        // TODO - FIXME - david.b - removing the parts of this that
+        // actually make remote requests. We can get this data locally
+        // while we are still full sync after gossip, and the timeouts
+        // are not structured correctly.
+        //
+        // Better to re-write as part of sharding.
+
         //let remote_agent_count = remote_agent_count.unwrap();
         //let timeout_ms = timeout_ms.unwrap();
-        //let stage_1_timeout_ms = 2000;
+        //let stage_1_timeout_ms = timeout_ms / 2;
 
         // as an optimization - request to all local joins
         // but don't count that toward our request total
@@ -880,10 +888,8 @@ impl Space {
                     }
                 })
                 .collect();
-            //tracing::warn!("local_all count: {}", out.len());
 
             //out.append(&mut remote_fut.await);
-            //tracing::warn!("plus remote count: {}", out.len());
 
             Ok(out)
         }
