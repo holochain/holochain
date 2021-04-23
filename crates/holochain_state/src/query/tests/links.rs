@@ -11,14 +11,14 @@ async fn link_queries_are_ordered_by_timestamp() {
 
     let td = LinkTestData::new();
     insert_op(&mut txn, td.create_link_op.clone(), true).unwrap();
-    update_op_validation_status(
+    set_validation_status(
         &mut txn,
         td.create_link_op.as_hash().clone(),
         ValidationStatus::Valid,
     )
     .unwrap();
     insert_op(&mut txn, td.later_create_link_op.clone(), true).unwrap();
-    update_op_validation_status(
+    set_validation_status(
         &mut txn,
         td.later_create_link_op.as_hash().clone(),
         ValidationStatus::Valid,

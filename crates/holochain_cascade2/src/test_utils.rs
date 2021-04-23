@@ -8,8 +8,8 @@ use holochain_p2p::HolochainP2pError;
 use holochain_sqlite::db::WriteManager;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::mutations::insert_op;
+use holochain_state::mutations::set_validation_status;
 use holochain_state::mutations::set_when_integrated;
-use holochain_state::mutations::update_op_validation_status;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::WireOps;
@@ -202,7 +202,7 @@ pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
         .with_commit(|txn| {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false).unwrap();
-            update_op_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
+            set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
             set_when_integrated(txn, hash, timestamp::now()).unwrap();
             DatabaseResult::Ok(())
         })
@@ -215,7 +215,7 @@ pub fn fill_db_rejected(env: &EnvWrite, op: DhtOpHashed) {
         .with_commit(|txn| {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false).unwrap();
-            update_op_validation_status(txn, hash.clone(), ValidationStatus::Rejected).unwrap();
+            set_validation_status(txn, hash.clone(), ValidationStatus::Rejected).unwrap();
             set_when_integrated(txn, hash, timestamp::now()).unwrap();
             DatabaseResult::Ok(())
         })
@@ -228,7 +228,7 @@ pub fn fill_db_pending(env: &EnvWrite, op: DhtOpHashed) {
         .with_commit(|txn| {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false).unwrap();
-            update_op_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
+            set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
             DatabaseResult::Ok(())
         })
         .unwrap();

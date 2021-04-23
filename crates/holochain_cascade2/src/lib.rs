@@ -14,7 +14,7 @@ use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_state::mutations::update_op_validation_status;
+use holochain_state::mutations::set_validation_status;
 use holochain_state::prelude::*;
 use holochain_state::query::element_details::GetElementDetailsQuery;
 use holochain_state::query::entry_details::GetEntryDetailsQuery;
@@ -143,7 +143,7 @@ where
         insert_header(txn, header)?;
         insert_op_lite(txn, op_light, op_hash.clone(), false, op_order)?;
         if let Some(status) = validation_status {
-            update_op_validation_status(txn, op_hash.clone(), status)?;
+            set_validation_status(txn, op_hash.clone(), status)?;
         }
         // We set the integrated to for the cache so it can match the
         // same query as the vault. This can also be used for garbage collection.

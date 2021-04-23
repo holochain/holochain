@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::time;
 use tracing::*;
 
-mod query;
+mod publish_query;
 
 /// Default redundancy factor for validation receipts
 // TODO: Pull this from the wasm entry def and only use this if it's missing
@@ -95,7 +95,7 @@ pub async fn publish_dht_ops_workflow_inner(
     let mut to_publish = HashMap::new();
     let mut hashes = Vec::new();
 
-    for op_hashed in query::get_ops_to_publish(&agent, &env, DEFAULT_RECEIPT_BUNDLE_SIZE)? {
+    for op_hashed in publish_query::get_ops_to_publish(&agent, &env, DEFAULT_RECEIPT_BUNDLE_SIZE)? {
         let (op, op_hash) = op_hashed.into_inner();
         hashes.push(op_hash.clone());
 

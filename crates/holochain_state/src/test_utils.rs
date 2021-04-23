@@ -105,6 +105,13 @@ impl TestEnv {
         }
         Ok(())
     }
+
+    /// Dump db into `/tmp/test_dbs`.
+    pub fn dump_tmp(&self) -> std::io::Result<()> {
+        let mut tmp = std::env::temp_dir();
+        tmp.push("test_dbs");
+        self.dump(&tmp)
+    }
 }
 
 #[derive(Clone)]

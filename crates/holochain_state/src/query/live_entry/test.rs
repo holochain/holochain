@@ -4,7 +4,7 @@ use holochain_sqlite::schema::SCHEMA_CELL;
 
 use crate::mutations::insert_op;
 use crate::mutations::insert_op_scratch;
-use crate::mutations::update_op_validation_status;
+use crate::mutations::set_validation_status;
 use crate::query::test_data::EntryTestData;
 
 use super::*;
@@ -24,7 +24,7 @@ async fn can_handle_update_in_scratch() {
 
     // - Create an entry on main db.
     insert_op(&mut txn, td.update_store_entry_op.clone(), false).unwrap();
-    update_op_validation_status(
+    set_validation_status(
         &mut txn,
         td.update_store_entry_op.as_hash().clone(),
         ValidationStatus::Valid,

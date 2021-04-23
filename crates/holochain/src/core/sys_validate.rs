@@ -4,6 +4,7 @@
 use super::queue_consumer::TriggerSender;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
+use super::workflow::sys_validation_workflow::SysValidationWorkspace2;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::entry_def_store::get_entry_def;
 use fallible_iterator::FallibleIterator;
@@ -80,19 +81,18 @@ pub fn check_prev_header(header: &Header) -> SysValidationResult<()> {
 /// Check that Dna headers are only added to empty source chains
 pub async fn check_valid_if_dna(
     header: &Header,
-    meta_vault: &impl MetadataBufT,
+    workspace: &SysValidationWorkspace2,
 ) -> SysValidationResult<()> {
-    fresh_reader!(meta_vault.env(), |mut r| {
-        match header {
-            Header::Dna(_) => meta_vault
-                .get_activity(&mut r, ChainItemKey::Agent(header.author().clone()))?
-                .next()?
-                .map_or(Ok(()), |_| {
-                    Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
-                }),
-            _ => Ok(()),
+    match header {
+        Header::Dna(_) => {
+            if workspace.is_chain_empty(header.author())? {
+                Ok(())
+            } else {
+                Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
+            }
         }
-    })
+        _ => Ok(()),
+    }
 }
 
 // TODO: I think this can be removed now as rollbacks are detected when inserting
@@ -101,7 +101,7 @@ pub async fn check_valid_if_dna(
 /// sequence number
 pub async fn check_chain_rollback(
     header: &Header,
-    workspace: &SysValidationWorkspace,
+    workspace: &SysValidationWorkspace2,
 ) -> SysValidationResult<()> {
     let header_hash = HeaderHash::with_data_sync(header);
     let k = ChainItemKey::AgentStatusSequence(
@@ -327,7 +327,7 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_register_agent_activity<F>(
     hash: &HeaderHash,
-    workspace: &mut SysValidationWorkspace,
+    workspace: &mut SysValidationWorkspace2,
     network: HolochainP2pCell,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,

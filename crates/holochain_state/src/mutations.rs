@@ -1,5 +1,6 @@
 use crate::query::to_blob;
 use crate::scratch::Scratch;
+use crate::validation_db::ValidationLimboStatus;
 use holo_hash::*;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::DhtOpHashed;
@@ -117,14 +118,33 @@ pub fn insert_op_lite(
     Ok(())
 }
 
-/// Update the validation status of a [`DhtOp`] in the database.
-pub fn update_op_validation_status(
+/// Set the validation status of a [`DhtOp`] in the database.
+pub fn set_validation_status(
     txn: &mut Transaction,
     hash: DhtOpHash,
     status: ValidationStatus,
 ) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
-        ":validation_status": status,
+        "validation_status": status,
+    })?;
+    Ok(())
+}
+
+/// Set the validation stage of a [`DhtOp`] in the database.
+pub fn set_validation_stage(
+    txn: &mut Transaction,
+    hash: DhtOpHash,
+    status: ValidationLimboStatus,
+) -> StateMutationResult<()> {
+    let stage = match status {
+        ValidationLimboStatus::Pending => return Ok(()),
+        ValidationLimboStatus::AwaitingSysDeps(_) => 0,
+        ValidationLimboStatus::SysValidated => 1,
+        ValidationLimboStatus::AwaitingAppDeps(_) => 2,
+        ValidationLimboStatus::AwaitingIntegration => 3,
+    };
+    dht_op_update!(txn, hash, {
+        "validation_stage": stage,
     })?;
     Ok(())
 }
@@ -137,7 +157,7 @@ pub fn set_when_integrated(
 ) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
         "when_integrated_ns": to_blob(time)?,
-        ":when_integrated": time,
+        "when_integrated": time,
     })?;
     Ok(())
 }

@@ -108,9 +108,9 @@ CREATE TABLE DhtOp (
     -- 0: Awaiting System Validation Dependencies.
     -- 1: Successfully System Validated (And ready for app validation).
     -- 2: Awaiting App Validation Dependencies.
+    -- 3: Awaiting integration.
     -- Don't need the other stages (pending, awaiting itntegration) because:
     -- - pending = validation_stage null && validation_status null.
-    -- - awaiting integrated = validation_status not null.
     -- We could make this an enum and use a Blob so we can capture which 
     -- deps are being awaited for debugging.
     validation_stage    INTEGER     NULL,
