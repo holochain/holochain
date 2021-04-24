@@ -685,6 +685,9 @@ mod tests {
         };
 
         let json = serde_json::to_string(&status).unwrap();
-        assert_eq!(json, "{\"inactive\":{\"reason\":{\"quarantined\":{\"error\":\"because\"}}}}");
+        assert_eq!(
+            json,
+            "{\"inactive\":{\"reason\":{\"quarantined\":{\"error\":\"because\"}}}}"
+        );
     }
 }
