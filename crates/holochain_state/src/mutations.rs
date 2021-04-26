@@ -131,6 +131,18 @@ pub fn set_validation_status(
     Ok(())
 }
 
+/// Set the whether or not a receipt is required of a [`DhtOp`] in the database.
+pub fn set_require_receipt(
+    txn: &mut Transaction,
+    hash: DhtOpHash,
+    require_receipt: bool,
+) -> StateMutationResult<()> {
+    dht_op_update!(txn, hash, {
+        "require_receipt": require_receipt,
+    })?;
+    Ok(())
+}
+
 /// Set the validation stage of a [`DhtOp`] in the database.
 pub fn set_validation_stage(
     txn: &mut Transaction,

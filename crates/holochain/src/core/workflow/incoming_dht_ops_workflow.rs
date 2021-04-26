@@ -20,28 +20,21 @@ use tracing::instrument;
 #[cfg(test)]
 mod test;
 
-#[instrument(skip(state_env, sys_validation_trigger, ops))]
+#[instrument(skip(vault, sys_validation_trigger, ops))]
 pub async fn incoming_dht_ops_workflow(
-    state_env: &EnvWrite,
+    vault: &EnvWrite,
     mut sys_validation_trigger: TriggerSender,
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     from_agent: Option<AgentPubKey>,
     request_validation_receipt: bool,
 ) -> WorkflowResult<()> {
-    // set up our workspace
-    let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into())?;
-
     // add incoming ops to the validation limbo
     for (hash, op) in ops {
-        if !workspace.op_exists(&hash)? {
+        if !op_exists(&vault, &hash)? {
             tracing::debug!(?hash, ?op);
             if should_keep(&op).await? {
-                workspace.add_to_pending(
-                    hash,
-                    op,
-                    from_agent.clone(),
-                    request_validation_receipt,
-                )?;
+                let op = DhtOpHashed::from_content_sync(op);
+                add_to_pending(&vault, op, from_agent.clone(), request_validation_receipt)?;
             } else {
                 tracing::warn!(
                     msg = "Dropping op because it failed counterfeit checks",
@@ -51,15 +44,10 @@ pub async fn incoming_dht_ops_workflow(
         } else {
             // Check if we should set receipt to send.
             if needs_receipt(&op, &from_agent) && request_validation_receipt {
-                workspace.set_send_receipt(hash)?;
+                set_send_receipt(&vault, hash)?;
             }
         }
     }
-
-    // commit our transaction
-    let writer: crate::core::queue_consumer::OneshotWriter = state_env.clone().into();
-
-    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     // trigger validation of queued ops
     sys_validation_trigger.trigger();
@@ -82,7 +70,52 @@ async fn should_keep(op: &DhtOp) -> WorkflowResult<bool> {
     Ok(counterfeit_check(signature, &header).await?)
 }
 
+fn add_to_pending(
+    env: &EnvWrite,
+    op: DhtOpHashed,
+    from_agent: Option<AgentPubKey>,
+    request_validation_receipt: bool,
+) -> StateMutationResult<()> {
+    let send_receipt = needs_receipt(&op, &from_agent) && request_validation_receipt;
+    tracing::debug!(?op);
+
+    let op_hash = op.as_hash().clone();
+    env.conn()?.with_commit(|txn| {
+        insert_op(txn, op, false)?;
+        set_require_receipt(txn, op_hash, send_receipt)?;
+        StateMutationResult::Ok(())
+    })?;
+    Ok(())
+}
+
+fn op_exists(vault: &EnvWrite, hash: &DhtOpHash) -> DatabaseResult<bool> {
+    let exists = vault.conn()?.with_reader(|txn| {
+        let mut stmt = txn.prepare(
+            "
+            SELECT 
+            *
+            FROM DhtOp
+            WHERE
+            DhtOp.hash = :hash
+            ",
+        )?;
+        DatabaseResult::Ok(stmt.exists(named_params! {
+            ":hash": hash,
+        })?)
+    })?;
+    Ok(exists)
+}
+
+fn set_send_receipt(vault: &EnvWrite, hash: DhtOpHash) -> StateMutationResult<()> {
+    vault.conn()?.with_commit(|txn| {
+        set_require_receipt(txn, hash, true)?;
+        StateMutationResult::Ok(())
+    })?;
+    Ok(())
+}
+
 #[allow(missing_docs)]
+#[deprecated = "This workspace is no longer required"]
 pub struct IncomingDhtOpsWorkspace {
     pub integration_limbo: IntegrationLimboStore,
     pub integrated_dht_ops: IntegratedDhtOpsStore,
@@ -127,7 +160,7 @@ impl IncomingDhtOpsWorkspace {
         })
     }
 
-    fn add_to_pending(
+    fn _add_to_pending(
         &mut self,
         hash: DhtOpHash,
         op: DhtOp,
