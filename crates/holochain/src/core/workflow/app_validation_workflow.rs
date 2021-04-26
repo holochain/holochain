@@ -106,6 +106,7 @@ async fn app_validation_workflow_inner(
                         ValidationLimboStatus::SysValidated
                         | ValidationLimboStatus::AwaitingAppDeps(_) => Ok(true),
                         ValidationLimboStatus::Pending
+                        | ValidationLimboStatus::AwaitingIntegration
                         | ValidationLimboStatus::AwaitingSysDeps(_) => Ok(false),
                     }
                 })?

@@ -1,16 +1,12 @@
 use holo_hash::DhtOpHash;
 use holochain_sqlite::db::ReadManager;
-use holochain_sqlite::db::WriteManager;
 use holochain_state::query::prelude::*;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpType;
 use holochain_types::env::EnvRead;
-use holochain_types::env::EnvWrite;
 use holochain_zome_types::Entry;
 use holochain_zome_types::SignedHeader;
-use holochain_zome_types::ValidationStatus;
-use rusqlite::named_params;
 
 use crate::core::workflow::error::WorkflowResult;
 
@@ -56,25 +52,6 @@ pub fn get_ops_to_sys_validate(env: &EnvRead) -> WorkflowResult<Vec<DhtOpHashed>
     results
 }
 
-fn put_int_limbo(env: EnvWrite, hash: DhtOpHash, status: ValidationStatus) -> WorkflowResult<()> {
-    env.conn()?.with_commit(|txn| {
-        txn.execute(
-            "
-            UPDATE DhtOp
-            SET 
-            validation_status = :status,
-            validation_stage = NULL,
-            WHERE hash = :hash
-            ",
-            named_params! {
-                ":status": status,
-                ":hash": hash,
-            },
-        )?;
-        WorkflowResult::Ok(())
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use fixt::prelude::*;
@@ -86,6 +63,7 @@ mod tests {
     use holochain_types::dht_op::DhtOpHashed;
     use holochain_types::dht_op::OpOrder;
     use holochain_zome_types::fixt::*;
+    use holochain_zome_types::ValidationStatus;
 
     use super::*;
 

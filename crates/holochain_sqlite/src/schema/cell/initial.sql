@@ -113,7 +113,9 @@ CREATE TABLE DhtOp (
     -- - pending = validation_stage null && validation_status null.
     -- We could make this an enum and use a Blob so we can capture which 
     -- deps are being awaited for debugging.
-    validation_stage    INTEGER     NULL,
+    validation_stage            INTEGER     NULL,
+    num_validation_attempts     INTEGER     NULL,
+    last_validation_attempt     INTEGER     NULL,
 
     -- NB: I removed this because when_integrated covers it
     -- TODO: @freesig: Might be hard to index on various timestamps?

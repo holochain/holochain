@@ -8,7 +8,6 @@ use crate::core::workflow::error::WorkflowError;
 use crate::from_sub_error;
 use holo_hash::AnyDhtHash;
 use holo_hash::HeaderHash;
-use holochain_cascade::error::CascadeError;
 use holochain_keystore::KeystoreError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::workspace::WorkspaceError;
@@ -26,7 +25,9 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum SysValidationError {
     #[error(transparent)]
-    CascadeError(#[from] CascadeError),
+    CascadeError(#[from] holochain_cascade::error::CascadeError),
+    #[error(transparent)]
+    CascadeError2(#[from] holochain_cascade2::error::CascadeError),
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
     #[error(transparent)]

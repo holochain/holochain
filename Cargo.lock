@@ -1664,6 +1664,7 @@ dependencies = [
  "hdk",
  "holo_hash",
  "holochain_cascade",
+ "holochain_cascade2",
  "holochain_conductor_api",
  "holochain_keystore",
  "holochain_p2p",

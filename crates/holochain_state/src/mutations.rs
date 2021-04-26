@@ -2,6 +2,7 @@ use crate::query::to_blob;
 use crate::scratch::Scratch;
 use crate::validation_db::ValidationLimboStatus;
 use holo_hash::*;
+use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpLight;
@@ -137,15 +138,29 @@ pub fn set_validation_stage(
     status: ValidationLimboStatus,
 ) -> StateMutationResult<()> {
     let stage = match status {
-        ValidationLimboStatus::Pending => return Ok(()),
-        ValidationLimboStatus::AwaitingSysDeps(_) => 0,
-        ValidationLimboStatus::SysValidated => 1,
-        ValidationLimboStatus::AwaitingAppDeps(_) => 2,
-        ValidationLimboStatus::AwaitingIntegration => 3,
+        ValidationLimboStatus::Pending => None,
+        ValidationLimboStatus::AwaitingSysDeps(_) => Some(0),
+        ValidationLimboStatus::SysValidated => Some(1),
+        ValidationLimboStatus::AwaitingAppDeps(_) => Some(2),
+        ValidationLimboStatus::AwaitingIntegration => Some(3),
     };
-    dht_op_update!(txn, hash, {
-        "validation_stage": stage,
-    })?;
+    let now = holochain_types::timestamp::now().0;
+    txn.execute(
+        "
+        UPDATE DhtOp
+        SET
+        num_validation_attempts = num_validation_attempts + 1
+        last_validation_attempt = :last_validation_attempt
+        validation_stage = :validation_stage
+        WHERE
+        DhtOp.hash = :hash
+        ",
+        named_params! {
+            "last_validation_attempt": now,
+            "validation_stage": stage,
+            "hash": hash,
+        },
+    )?;
     Ok(())
 }
 

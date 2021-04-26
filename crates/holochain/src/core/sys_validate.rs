@@ -3,17 +3,11 @@
 
 use super::queue_consumer::TriggerSender;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
-use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace2;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::entry_def_store::get_entry_def;
-use fallible_iterator::FallibleIterator;
+use holochain_cascade2::test_utils::PassThroughNetwork;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_p2p::HolochainP2pCell;
-use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::fresh_reader;
-use holochain_state::metadata::ChainItemKey;
-use holochain_state::metadata::MetadataBufT;
 use holochain_types::prelude::*;
 use std::convert::TryInto;
 
@@ -95,54 +89,27 @@ pub async fn check_valid_if_dna(
     }
 }
 
-// TODO: I think this can be removed now as rollbacks are detected when inserting
-// metadata into the metadata buf.
 /// Check if there are other headers at this
 /// sequence number
 pub async fn check_chain_rollback(
     header: &Header,
     workspace: &SysValidationWorkspace2,
 ) -> SysValidationResult<()> {
-    let header_hash = HeaderHash::with_data_sync(header);
-    let k = ChainItemKey::AgentStatusSequence(
-        header.author().clone(),
-        ValidationStatus::Valid,
-        header.header_seq(),
-    );
-    let env = workspace.meta_vault.env();
-    // Check there are no conflicting chain items
-    // at any valid or potentially valid stores.
-    let count = fresh_reader!(env, |mut r| {
-        let vault_count = workspace
-            .meta_vault
-            .get_activity(&mut r, k.clone())?
-            .filter(|thh| Ok(thh.header_hash != header_hash))
-            .count()?;
-        let pending_count = workspace
-            .meta_pending
-            .get_activity(&mut r, k.clone())?
-            .filter(|thh| Ok(thh.header_hash != header_hash))
-            .count()?;
-        DatabaseResult::Ok(vault_count + pending_count)
-    })?;
+    let empty = workspace.header_seq_is_empty(header)?;
 
     // Ok or log warning
-    if count == 0 {
-        return Ok(());
+    if empty {
+        Ok(())
     } else {
-        let s = tracing::warn_span!("agent_activity");
-        let _g = s.enter();
         // TODO: implement real rollback detection once we know what that looks like
         tracing::error!(
-            "Chain rollback detected at position {} for agent {:?} from header {:?}
-            There were {} headers at this position",
+            "Chain rollback detected at position {} for agent {:?} from header {:?}",
             header.header_seq(),
             header.author(),
             header,
-            count,
         );
+        Ok(())
     }
-    Ok(())
 }
 
 /// Placeholder for future spam check.
@@ -297,8 +264,9 @@ pub fn check_update_reference(
 /// run again if we weren't holding it.
 pub async fn check_and_hold_register_add_link<F>(
     hash: &HeaderHash,
-    workspace: &mut SysValidationWorkspace,
-    network: HolochainP2pCell,
+    workspace: &mut SysValidationWorkspace2,
+    // network: HolochainP2pCell,
+    network: PassThroughNetwork,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -328,7 +296,8 @@ where
 pub async fn check_and_hold_register_agent_activity<F>(
     hash: &HeaderHash,
     workspace: &mut SysValidationWorkspace2,
-    network: HolochainP2pCell,
+    // network: HolochainP2pCell,
+    network: PassThroughNetwork,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -357,8 +326,9 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_store_entry<F>(
     hash: &HeaderHash,
-    workspace: &mut SysValidationWorkspace,
-    network: HolochainP2pCell,
+    workspace: &mut SysValidationWorkspace2,
+    // network: HolochainP2pCell,
+    network: PassThroughNetwork,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -390,8 +360,9 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_any_store_entry<F>(
     hash: &EntryHash,
-    workspace: &mut SysValidationWorkspace,
-    network: HolochainP2pCell,
+    workspace: &mut SysValidationWorkspace2,
+    // network: HolochainP2pCell,
+    network: PassThroughNetwork,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -418,8 +389,9 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_store_element<F>(
     hash: &HeaderHash,
-    workspace: &mut SysValidationWorkspace,
-    network: HolochainP2pCell,
+    workspace: &mut SysValidationWorkspace2,
+    // network: HolochainP2pCell,
+    network: PassThroughNetwork,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -501,8 +473,9 @@ impl AsRef<Element> for Source {
 /// it to the incoming ops.
 async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
     hash: &I,
-    workspace: &mut SysValidationWorkspace,
-    network: HolochainP2pCell,
+    workspace: &mut SysValidationWorkspace2,
+    // network: HolochainP2pCell,
+    network: PassThroughNetwork,
 ) -> SysValidationResult<Source> {
     let hash: AnyDhtHash = hash.clone().into();
     // Create a workspace with just the local stores
@@ -514,7 +487,7 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
         return Ok(Source::Local(el));
     }
     // Create a workspace with just the network
-    let mut network_only_cascade = workspace.network_only_cascade(network);
+    let mut network_only_cascade = workspace.full_cascade(network);
     match network_only_cascade
         .retrieve(hash.clone(), Default::default())
         .await?
