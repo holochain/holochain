@@ -7,14 +7,15 @@ use crate::core::ribosome::error::RibosomeError;
 use crate::core::validation::OutcomeOrError;
 use crate::core::SourceChainError;
 use crate::from_sub_error;
-use holochain_cascade::error::CascadeError;
 
 use super::types::Outcome;
 
 #[derive(Error, Debug)]
 pub enum AppValidationError {
     #[error(transparent)]
-    CascadeError(#[from] CascadeError),
+    CascadeError(#[from] holochain_cascade::error::CascadeError),
+    #[error(transparent)]
+    CascadeError2(#[from] holochain_cascade2::error::CascadeError),
     #[error("Dna is missing for this cell {0:?}. Cannot validate without dna.")]
     DnaMissing(CellId),
     #[error(transparent)]
@@ -41,9 +42,11 @@ impl<T> From<AppValidationError> for OutcomeOrError<T, AppValidationError> {
         OutcomeOrError::Err(e)
     }
 }
-
+use holochain_cascade::error::CascadeError;
+use holochain_cascade2::error::CascadeError as CascadeError2;
 // These need to match the #[from] in AppValidationError
 from_sub_error!(AppValidationError, RibosomeError);
 from_sub_error!(AppValidationError, CascadeError);
+from_sub_error!(AppValidationError, CascadeError2);
 from_sub_error!(AppValidationError, EntryDefStoreError);
 from_sub_error!(AppValidationError, SourceChainError);

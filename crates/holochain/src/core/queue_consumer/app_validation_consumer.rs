@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::core::workflow::app_validation_workflow::app_validation_workflow;
-use crate::core::workflow::app_validation_workflow::AppValidationWorkspace;
+use crate::core::workflow::app_validation_workflow::AppValidationWorkspace2;
 use crate::{conductor::manager::ManagedTaskResult, core::workflow::error::WorkflowResult};
 use tokio::task::JoinHandle;
 use tracing::*;
@@ -30,7 +30,7 @@ pub fn spawn_app_validation_consumer(
 
             holochain_sqlite::db::optimistic_retry_async("app_validation_consumer", || async {
                 // Run the workflow
-                let workspace = AppValidationWorkspace::new(env.clone().into())?;
+                let workspace = AppValidationWorkspace2::new(env.clone().into());
                 if let WorkComplete::Incomplete = app_validation_workflow(
                     workspace,
                     env.clone().into(),

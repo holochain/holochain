@@ -35,7 +35,7 @@ use types::Outcome;
 
 pub mod types;
 
-mod sys_validation_query;
+pub mod validation_query;
 
 #[cfg(test)]
 mod chain_test;
@@ -89,7 +89,7 @@ async fn sys_validation_workflow_inner(
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.vault.clone();
-    let sorted_ops = sys_validation_query::get_ops_to_sys_validate(&env)?;
+    let sorted_ops = validation_query::get_ops_to_sys_validate(&env)?;
 
     // Process each op
     for so in sorted_ops {

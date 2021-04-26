@@ -10,27 +10,59 @@ use holochain_zome_types::SignedHeader;
 
 use crate::core::workflow::error::WorkflowResult;
 
-/// Get all ops that need to sys validated in order.
+/// Get all ops that need to sys or app validated in order.
+/// - Sys validated or awaiting app dependencies.
+/// - Ordered by type then timestamp (See [`DhtOpOrder`])
+pub fn get_ops_to_app_validate(env: &EnvRead) -> WorkflowResult<Vec<DhtOpHashed>> {
+    get_ops_to_validate(env, false)
+}
+
+/// Get all ops that need to sys or app validated in order.
 /// - Pending or awaiting sys dependencies.
 /// - Ordered by type then timestamp (See [`DhtOpOrder`])
 pub fn get_ops_to_sys_validate(env: &EnvRead) -> WorkflowResult<Vec<DhtOpHashed>> {
+    get_ops_to_validate(env, true)
+}
+
+fn get_ops_to_validate(env: &EnvRead, system: bool) -> WorkflowResult<Vec<DhtOpHashed>> {
+    let mut sql = format!(
+        "
+        SELECT 
+        Header.blob as header_blob,
+        Entry.blob as entry_blob,
+        DhtOp.type as dht_type,
+        DhtOp.hash as dht_hash
+        FROM Header
+        JOIN
+        DhtOp ON DhtOp.header_hash = Header.hash
+        LEFT JOIN
+        Entry ON (Header.entry_hash IS NULL OR Header.entry_hash = Entry.hash)
+        "
+    );
+    if system {
+        sql.push_str(
+            "
+            WHERE
+            (DhtOp.validation_status IS NULL OR DhtOp.validation_stage = 1 OR DhtOp.validation_stage = 2)
+            "
+        );
+    } else {
+        sql.push_str(
+            "
+            WHERE
+            (DhtOp.validation_status IS NULL OR DhtOp.validation_stage = 0)
+            ",
+        );
+    }
+    sql.push_str(
+        "
+        ORDER BY 
+        DhtOp.op_order ASC
+        ",
+    );
     let results = env.conn()?.with_reader(|txn| {
         let mut stmt = txn.prepare(
             "
-            SELECT 
-            Header.blob as header_blob,
-            Entry.blob as entry_blob,
-            DhtOp.type as dht_type,
-            DhtOp.hash as dht_hash
-            FROM Header
-            JOIN
-            DhtOp ON DhtOp.header_hash = Header.hash
-            LEFT JOIN
-            Entry ON (Header.entry_hash IS NULL OR Header.entry_hash = Entry.hash)
-            WHERE
-            (DhtOp.validation_status IS NULL OR DhtOp.validation_stage = 0)
-            ORDER BY 
-            DhtOp.op_order ASC
             ",
         )?;
         let r = stmt.query_and_then([], |row| {
@@ -84,7 +116,7 @@ mod tests {
         let env = test_cell_env();
         let expected = test_data(&env.env().into());
         env.dump_tmp().unwrap();
-        let r = get_ops_to_sys_validate(&env.env().into()).unwrap();
+        let r = get_ops_to_validate(&env.env().into(), true).unwrap();
         let mut r_sorted = r.clone();
         // Sorted by OpOrder
         r_sorted.sort_by_key(|d| {

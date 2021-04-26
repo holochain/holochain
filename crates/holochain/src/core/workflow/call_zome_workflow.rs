@@ -15,6 +15,7 @@ use either::Either;
 use holochain_cascade::Cascade;
 use holochain_cascade::DbPair;
 use holochain_cascade::DbPairMut;
+use holochain_cascade2::test_utils::PassThroughNetwork;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_sqlite::prelude::*;
@@ -158,6 +159,8 @@ async fn call_zome_workflow_inner<
     };
 
     {
+        let network: PassThroughNetwork =
+            todo!("Pass real network in when holochain p2p is updated");
         for chain_element in to_app_validate {
             let outcome = match chain_element.header() {
                 Header::Dna(_)
@@ -171,6 +174,8 @@ async fn call_zome_workflow_inner<
                 Header::CreateLink(link_add) => {
                     let (base, target) = {
                         let mut workspace = workspace_lock.write().await;
+                        let network: HolochainP2pCell =
+                            todo!("Pass real network in when holochain p2p is updated");
                         let mut cascade = workspace.cascade(network.clone());
                         let base_address = &link_add.base_address;
                         let base = cascade
@@ -194,6 +199,7 @@ async fn call_zome_workflow_inner<
                         (base, target)
                     };
                     let link_add = Arc::new(link_add.clone());
+
                     Either::Left(
                         app_validation_workflow::run_create_link_validation_callback(
                             zome.clone(),

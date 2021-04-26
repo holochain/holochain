@@ -112,6 +112,7 @@ pub(super) async fn get_as_author(
             }
 
             let workspace_lock = CallZomeWorkspaceLock::new(CallZomeWorkspace::new(env)?);
+            let network = todo!("Pass real network in when holochain p2p is updated");
             let result =
                 match get_as_author_custom(&header_hashed, ribosome, network, workspace_lock)? {
                     Some(result) => result,
