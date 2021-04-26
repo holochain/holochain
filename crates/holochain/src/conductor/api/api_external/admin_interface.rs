@@ -521,13 +521,14 @@ mod test {
         let agent_key2 = fake_agent_pubkey_2();
         let path_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
         let cell_id2 = CellId::new(dna_hash.clone(), agent_key2.clone());
-        let expected_installed_app = InstalledApp::new_active(
+        let expected_installed_app = InstalledApp::new_inactive(
             InstalledAppCommon::new_legacy(
                 "test-by-path".to_string(),
                 vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
             )
             .unwrap(),
         );
+        let expected_installed_app_info: InstalledAppInfo = (&expected_installed_app).into();
         let path_install_payload = InstallAppPayload {
             dnas: vec![path_payload],
             installed_app_id: "test-by-path".to_string(),
@@ -537,9 +538,11 @@ mod test {
         let install_response = admin_api
             .handle_admin_request(AdminRequest::InstallApp(Box::new(path_install_payload)))
             .await;
+        dbg!(&install_response);
+        dbg!(&expected_installed_app_info);
         assert_matches!(
             install_response,
-            AdminResponse::AppInstalled(info) if info == (&expected_installed_app).into()
+            AdminResponse::AppInstalled(info) if info == expected_installed_app_info
         );
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
         let expects = vec![dna_hash.clone()];
