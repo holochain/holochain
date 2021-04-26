@@ -236,7 +236,7 @@ impl InstalledApp {
 
     /// Constructor for freshly installed app
     pub fn new_active(app: InstalledAppCommon) -> Self {
-        Self::Active(ActiveApp(app.into()))
+        Self::Active(ActiveApp(app))
     }
 
     /// Return the common app info, as well as a status which encodes the remaining
