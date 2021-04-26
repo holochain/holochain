@@ -122,8 +122,8 @@ mod tests {
     async fn test_async_bucket_timeout() {
         let t = Some(KitsuneTimeout::from_millis(10));
         let bucket = <ResourceBucket<&'static str>>::new();
-        let j1 = tokio::task::spawn(bucket.acquire(t));
-        let j2 = tokio::task::spawn(bucket.acquire(t));
+        let j1 = metric_task(bucket.acquire(t));
+        let j2 = metric_task(bucket.acquire(t));
         assert!(j1.await.unwrap().is_err());
         assert!(j2.await.unwrap().is_err());
     }
@@ -131,8 +131,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_async_bucket() {
         let bucket = <ResourceBucket<&'static str>>::new();
-        let j1 = tokio::task::spawn(bucket.acquire(None));
-        let j2 = tokio::task::spawn(bucket.acquire(None));
+        let j1 = metric_task(bucket.acquire(None));
+        let j2 = metric_task(bucket.acquire(None));
         bucket.release("1");
         bucket.release("2");
         let j1 = j1.await.unwrap().unwrap();
@@ -143,7 +143,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_async_bucket_acquire_or_else() {
         let bucket = <ResourceBucket<&'static str>>::new();
-        let j1 = tokio::task::spawn(bucket.acquire(None));
+        let j1 = metric_task(bucket.acquire(None));
         let j2 = bucket.acquire_or_else(|| "2");
         bucket.release("1");
         let j1 = j1.await.unwrap().unwrap();
