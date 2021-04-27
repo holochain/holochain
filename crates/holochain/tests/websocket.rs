@@ -440,7 +440,8 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let apps = conductors
         .setup_app_for_zipped_agents("app", &all_agents, &[dna_file])
-        .await;
+        .await
+        .unwrap();
 
     conductors.exchange_peer_info().await;
 

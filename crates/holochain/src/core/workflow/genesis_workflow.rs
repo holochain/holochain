@@ -172,11 +172,15 @@ pub mod tests {
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
+            let mut ribosome = MockRibosomeT::new();
+            ribosome
+                .expect_run_genesis_self_check()
+                .returning(|_, _| Ok(GenesisSelfCheckResult::Valid));
             let args = GenesisWorkflowArgs {
                 dna_file: dna.clone(),
                 agent_pubkey: agent_pubkey.clone(),
                 membrane_proof: None,
-                ribosome: MockRibosomeT::new(),
+                ribosome,
             };
             let _: () = genesis_workflow(workspace, arc.clone().into(), api, args).await?;
         }

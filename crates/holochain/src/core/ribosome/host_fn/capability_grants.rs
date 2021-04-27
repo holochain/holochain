@@ -117,7 +117,8 @@ pub mod wasm_test {
                 &[alice_agent_id.clone(), bob_agent_id.clone()],
                 &[dna_file.into()],
             )
-            .await;
+            .await
+            .unwrap();
 
         let ((alice,), (bobbo,)) = apps.into_tuples();
         // There's only one zome to call, so let's peel that off now.

@@ -1,10 +1,12 @@
 use super::Conductor;
 use super::ConductorState;
 use super::*;
-use crate::assert_eq_retry_10s;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::test_utils::fake_valid_dna_file;
 use crate::test_utils::sweetest::*;
+use crate::{
+    assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
+};
 use ::fixt::prelude::*;
 use holochain_lmdb::test_utils::test_environments;
 use holochain_types::test_utils::fake_cell_id;
@@ -307,10 +309,12 @@ async fn test_list_active_apps_for_cell_id() {
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app1 = conductor
         .setup_app_for_agent("app1", alice.clone(), &[dna1.clone(), dna2])
-        .await;
+        .await
+        .unwrap();
     let app2 = conductor
         .setup_app_for_agent("app2", alice.clone(), &[dna1, dna3])
-        .await;
+        .await
+        .unwrap();
 
     let (cell1, cell2) = app1.into_tuple();
     let (_, cell3) = app2.into_tuple();
@@ -338,14 +342,15 @@ async fn test_list_active_apps_for_cell_id() {
     );
 }
 
+async fn mk_dna(name: &str, zome: InlineZome) -> DnaResult<(DnaFile, Zome)> {
+    SweetDnaFile::unique_from_inline_zome(name, zome).await
+}
+
 /// A function that sets up a SweetApp, used in several tests in this module
-async fn common_genesis_test_app(custom_zome: InlineZome) -> (SweetConductor, SweetApp) {
+async fn common_genesis_test_app(
+    custom_zome: InlineZome,
+) -> ConductorResult<(SweetConductor, SweetApp)> {
     let hardcoded_zome = InlineZome::new_unique(Vec::new());
-    let mk_dna = |name, zome| async move {
-        SweetDnaFile::unique_from_inline_zome(name, zome)
-            .await
-            .unwrap()
-    };
 
     // Just a strong reminder that we need to be careful once we start using existing Cells:
     // When a Cell panics or fails validation in general, we want to disable all Apps touching that Cell.
@@ -361,15 +366,15 @@ async fn common_genesis_test_app(custom_zome: InlineZome) -> (SweetConductor, Sw
     );
 
     // Create one DNA which works, and one which always panics on validation
-    let (dna_hardcoded, _) = mk_dna("hardcoded", hardcoded_zome).await;
-    let (dna_custom, _) = mk_dna("custom", custom_zome).await;
+    let (dna_hardcoded, _) = mk_dna("hardcoded", hardcoded_zome).await?;
+    let (dna_custom, _) = mk_dna("custom", custom_zome).await?;
 
     // Install both DNAs under the same app:
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor
         .setup_app("app", &[dna_hardcoded, dna_custom])
-        .await;
-    (conductor, app)
+        .await?;
+    Ok((conductor, app))
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -377,7 +382,7 @@ async fn test_uninstall_app() {
     observability::test_run().ok();
     let zome = InlineZome::new_unique(Vec::new());
 
-    let (conductor, _) = common_genesis_test_app(zome).await;
+    let (conductor, _) = common_genesis_test_app(zome).await.unwrap();
 
     // - Ensure that the app is active
     assert_eq_retry_10s!(
@@ -404,7 +409,7 @@ async fn test_uninstall_app() {
 async fn test_setup_cells_idempotency() {
     observability::test_run().ok();
     let zome = InlineZome::new_unique(Vec::new());
-    let (conductor, _) = common_genesis_test_app(zome).await;
+    let (conductor, _) = common_genesis_test_app(zome).await.unwrap();
 
     conductor.inner_handle().setup_cells().await.unwrap();
     conductor.inner_handle().setup_cells().await.unwrap();
@@ -427,7 +432,7 @@ fn simple_zome() -> InlineZome {
 async fn test_reactivate_app() {
     observability::test_run().ok();
     let zome = simple_zome();
-    let (conductor, app) = common_genesis_test_app(zome).await;
+    let (conductor, app) = common_genesis_test_app(zome).await.unwrap();
 
     conductor
         .deactivate_app("app".to_string(), DeactivationReason::Normal)
@@ -449,7 +454,7 @@ async fn test_reactivate_app() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_cells_self_deactivate_on_panic_during_genesis() {
+async fn test_cells_self_deactivate_on_validation_panic() {
     observability::test_run().ok();
     let bad_zome =
         InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
@@ -458,10 +463,9 @@ async fn test_cells_self_deactivate_on_panic_during_genesis() {
             Ok(ValidateResult::Valid)
         });
 
-    let (conductor, _) = common_genesis_test_app(bad_zome).await;
+    let (conductor, _) = common_genesis_test_app(bad_zome).await.unwrap();
 
-    // - Ensure that the app was removed and both Cells were uninstalled
-    //   because one Cell panicked during Genesis
+    // - Ensure that the app was deactivated because one Cell panicked during validation
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
@@ -472,24 +476,46 @@ async fn test_cells_self_deactivate_on_panic_during_genesis() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_cells_self_destruct_on_bad_validation_during_genesis() {
+async fn test_cells_proceed_on_validation_error() {
     observability::test_run().ok();
     let bad_zome =
         InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
-            Ok(ValidateResult::Invalid(
-                "intentional invalid result for testing".into(),
+            InlineZomeResult::<ValidateResult>::Err(InlineZomeError::TestError(
+                "intentional error".into(),
             ))
         });
 
-    let (conductor, _) = common_genesis_test_app(bad_zome).await;
+    let (conductor, _) = common_genesis_test_app(bad_zome).await.unwrap();
 
+    // - Ensure that the app continues to run even with a validation error
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
             (state.active_apps.len(), state.inactive_apps.len())
         },
-        (0, 0)
+        (1, 0)
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_installation_fails_if_genesis_self_check_is_invalid() {
+    observability::test_run().ok();
+    let bad_zome = InlineZome::new_unique(Vec::new()).callback(
+        "genesis_self_check",
+        |_api, _data: GenesisSelfCheckData| {
+            Ok(GenesisSelfCheckResult::Invalid(
+                "intentional invalid result for testing".into(),
+            ))
+        },
+    );
+
+    let err = if let Err(err) = common_genesis_test_app(bad_zome).await {
+        err
+    } else {
+        panic!("this should have been an error")
+    };
+
+    assert_matches!(err, ConductorError::GenesisFailed { errors } if errors.len() == 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -509,7 +535,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
             Ok(hash)
         });
 
-    let (conductor, app) = common_genesis_test_app(bad_zome).await;
+    let (conductor, app) = common_genesis_test_app(bad_zome).await.unwrap();
 
     let (_, cell_bad) = app.into_tuple();
 
@@ -558,7 +584,7 @@ async fn test_apps_deactivate_on_panic_after_genesis() {
             Ok(hash)
         });
 
-    let (conductor, app) = common_genesis_test_app(bad_zome).await;
+    let (conductor, app) = common_genesis_test_app(bad_zome).await.unwrap();
 
     let (_, cell_bad) = app.into_tuple();
 
