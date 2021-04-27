@@ -22,8 +22,7 @@ impl From<GenesisSelfCheckHostAccess> for HostAccess {
 
 impl From<&GenesisSelfCheckHostAccess> for HostFnAccess {
     fn from(_: &GenesisSelfCheckHostAccess) -> Self {
-        let access = Self::none();
-        access
+        Self::none()
     }
 }
 
