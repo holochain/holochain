@@ -33,7 +33,7 @@ ghost_actor::ghost_chan! {
         fn register_space_event_handler(recv: futures::channel::mpsc::Receiver<KitsuneP2pEvent>) -> ();
 
         /// Incoming Gossip
-        fn incoming_gossip(space: Arc<KitsuneSpace>, data: Box<[u8]>) -> ();
+        fn incoming_gossip(space: Arc<KitsuneSpace>, con: Tx2ConHnd<wire::Wire>, data: Box<[u8]>) -> ();
     }
 }
 
@@ -237,10 +237,13 @@ impl KitsuneP2pActor {
                                     .respond(resp, tuning_params.implicit_timeout())
                                     .await;
                             }
+                            data => unimplemented!("{:?}", data),
+                        },
+                        IncomingNotify(Tx2EpIncomingNotify { con, data, .. }) => match data {
                             wire::Wire::Gossip(wire::Gossip { space, data }) => {
                                 let data: Vec<u8> = data.into();
                                 let data: Box<[u8]> = data.into_boxed_slice();
-                                if let Err(e) = i_s.incoming_gossip(space, data).await {
+                                if let Err(e) = i_s.incoming_gossip(space, con, data).await {
                                     tracing::warn!("failed to handle incoming gossip: {:?}", e);
                                 }
                             }
@@ -285,6 +288,7 @@ impl InternalHandler for KitsuneP2pActor {
     fn handle_incoming_gossip(
         &mut self,
         space: Arc<KitsuneSpace>,
+        con: Tx2ConHnd<wire::Wire>,
         data: Box<[u8]>,
     ) -> InternalHandlerResult<()> {
         let space_sender = match self.spaces.get_mut(&space) {
@@ -296,7 +300,7 @@ impl InternalHandler for KitsuneP2pActor {
         };
         Ok(async move {
             let (_, space_inner) = space_sender.await;
-            space_inner.incoming_gossip(space, data).await
+            space_inner.incoming_gossip(space, con, data).await
         }
         .boxed()
         .into())

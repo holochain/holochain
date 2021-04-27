@@ -281,6 +281,27 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
         self.con.close(code, reason)
     }
 
+    fn priv_notify(
+        &self,
+        data: PoolBuf,
+        timeout: KitsuneTimeout,
+        dbg_name: &'static str,
+    ) -> impl std::future::Future<Output = KitsuneResult<()>> + 'static + Send {
+        let this = self.clone();
+        async move {
+            let msg_id = MsgId::new_notify();
+            let len = data.len();
+            this
+                .con
+                .write(msg_id, data, timeout)
+                .await?;
+
+            this.metrics.write_len(dbg_name, len);
+
+            Ok(())
+        }
+    }
+
     fn priv_request(
         &self,
         data: PoolBuf,
@@ -319,6 +340,20 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
 
             timeout.mix(r_res.map_err(KitsuneError::other)).await?
         }
+    }
+
+    /// Write a notify to this connection.
+    pub fn notify(
+        &self,
+        data: &C,
+        timeout: KitsuneTimeout,
+    ) -> impl std::future::Future<Output = KitsuneResult<()>> + 'static + Send {
+        let dbg_name = data.variant_type();
+        let mut buf = PoolBuf::new();
+        if let Err(e) = data.encode(&mut buf) {
+            return async move { Err(KitsuneError::other(e)) }.boxed();
+        }
+        self.priv_notify(buf, timeout, dbg_name).boxed()
     }
 
     /// Write a request to this connection.
@@ -427,6 +462,24 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
             let con = fut.await?;
             Ok(Tx2ConHnd::new(local_cert, con, remote, rmap, metrics))
         }
+    }
+
+    /// Write a notify to this connection.
+    pub fn notify<U: Into<TxUrl>>(
+        &self,
+        remote: U,
+        data: &C,
+        timeout: KitsuneTimeout,
+    ) -> impl std::future::Future<Output = KitsuneResult<()>> + 'static + Send {
+        let dbg_name = data.variant_type();
+        let mut buf = PoolBuf::new();
+        if let Err(e) = data.encode(&mut buf) {
+            return async move { Err(KitsuneError::other(e)) }.boxed();
+        }
+        let con_fut = self.get_connection(remote.into(), timeout);
+        futures::future::FutureExt::boxed(async move {
+            con_fut.await?.priv_notify(buf, timeout, dbg_name).await
+        })
     }
 
     /// Write a request to this connection.
@@ -555,6 +608,20 @@ pub struct Tx2EpIncomingRequest<C: Codec + 'static + Send + Unpin> {
     pub respond: Tx2Respond<C>,
 }
 
+/// Data associated with an IncomingNotify EpEvent
+#[derive(Debug)]
+pub struct Tx2EpIncomingNotify<C: Codec + 'static + Send + Unpin> {
+    /// the remote connection handle (could be closed)
+    pub con: Tx2ConHnd<C>,
+
+    /// the remote url from which this data originated
+    /// this is included incase the con is closed
+    pub url: TxUrl,
+
+    /// the actual incoming message data
+    pub data: C,
+}
+
 /// Data associated with a ConnectionClosed EpEvent
 #[derive(Debug)]
 pub struct Tx2EpConnectionClosed<C: Codec + 'static + Send + Unpin> {
@@ -582,6 +649,9 @@ pub enum Tx2EpEvent<C: Codec + 'static + Send + Unpin> {
 
     /// We've received an incoming request on an open connection.
     IncomingRequest(Tx2EpIncomingRequest<C>),
+
+    /// We've received an incoming notification on an open connection.
+    IncomingNotify(Tx2EpIncomingNotify<C>),
 
     /// A connection has closed (Url, Code, Reason).
     ConnectionClosed(Tx2EpConnectionClosed<C>),
@@ -646,7 +716,17 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                         };
                         let dbg_name = c.variant_type();
                         match msg_id.get_type() {
-                            MsgIdType::Notify => unimplemented!(),
+                            MsgIdType::Notify => Tx2EpEvent::IncomingNotify(Tx2EpIncomingNotify {
+                                con: Tx2ConHnd::new(
+                                    local_cert.clone(),
+                                    con.clone(),
+                                    url.clone(),
+                                    rmap,
+                                    self.2.clone(),
+                                ),
+                                url,
+                                data: c,
+                            }),
                             MsgIdType::Req => Tx2EpEvent::IncomingRequest(Tx2EpIncomingRequest {
                                 con: Tx2ConHnd::new(
                                     local_cert.clone(),

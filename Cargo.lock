@@ -373,6 +373,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bit-vec"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bitflags"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -431,6 +440,17 @@ dependencies = [
  "fastrand",
  "futures-lite",
  "once_cell",
+]
+
+[[package]]
+name = "bloomfilter"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1cffe85a8b173164000edb6570ff7cf429acc9460b41d963e797df413f1765b4"
+dependencies = [
+ "bit-vec",
+ "rand 0.8.3",
+ "siphasher",
 ]
 
 [[package]]
@@ -2368,7 +2388,9 @@ dependencies = [
 name = "kitsune_p2p"
 version = "0.0.1"
 dependencies = [
+ "arrayref",
  "base64",
+ "bloomfilter",
  "derive_more",
  "fixt",
  "futures",
@@ -4325,9 +4347,12 @@ dependencies = [
 
 [[package]]
 name = "siphasher"
-version = "0.3.3"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa8f3741c7372e75519bd9346068370c9cdaabcc1f9599cbcf2a2719352286b7"
+checksum = "cbce6d4507c7e4a3962091436e56e95290cb71fa302d0d270e32130b75fbff27"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "slab"

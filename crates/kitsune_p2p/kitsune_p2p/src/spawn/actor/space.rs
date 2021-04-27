@@ -23,7 +23,7 @@ ghost_actor::ghost_chan! {
         fn is_agent_local(agent: Arc<KitsuneAgent>) -> bool;
 
         /// Incoming Gossip
-        fn incoming_gossip(space: Arc<KitsuneSpace>, data: Box<[u8]>) -> ();
+        fn incoming_gossip(space: Arc<KitsuneSpace>, con: Tx2ConHnd<wire::Wire>, data: Box<[u8]>) -> ();
     }
 }
 
@@ -188,10 +188,11 @@ impl SpaceInternalHandler for Space {
     fn handle_incoming_gossip(
         &mut self,
         _space: Arc<KitsuneSpace>,
+        con: Tx2ConHnd<wire::Wire>,
         data: Box<[u8]>,
     ) -> InternalHandlerResult<()> {
-        self.gossip_mod.incoming_gossip(data);
-        Ok(async move { Ok(()) }.boxed().into())
+        let fut = self.gossip_mod.incoming_gossip(con, data);
+        Ok(async move { fut.await.map_err(KitsuneP2pError::other) }.boxed().into())
     }
 }
 
