@@ -48,7 +48,9 @@ use holochain_types::prelude::*;
 use mockall::automock;
 use std::iter::Iterator;
 
-use self::guest_callback::entry_defs::EntryDefsInvocation;
+use self::guest_callback::{
+    entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
+};
 use self::{
     error::RibosomeError,
     guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation},
@@ -456,7 +458,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         &self,
         access: GenesisSelfCheckHostAccess,
         invocation: GenesisSelfCheckInvocation,
-    ) -> RibosomeResult<ValidateResult>;
+    ) -> RibosomeResult<GenesisSelfCheckResult>;
 
     fn run_init(
         &self,

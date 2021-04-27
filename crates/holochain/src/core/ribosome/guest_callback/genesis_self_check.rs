@@ -49,14 +49,53 @@ impl From<GenesisSelfCheckInvocation> for GenesisSelfCheckData {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub enum GenesisSelfCheckResult {
+    Valid,
+    Invalid(String),
+}
+
+impl CallbackResult for GenesisSelfCheckResult {
+    fn is_definitive(&self) -> bool {
+        matches!(self, Self::Invalid(_))
+    }
+}
+
+impl From<ExternIO> for GenesisSelfCheckResult {
+    fn from(guest_output: ExternIO) -> Self {
+        match guest_output.decode() {
+            Ok(v) => v,
+            Err(e) => Self::Invalid(format!("{:?}", e)),
+        }
+    }
+}
+
+impl From<Vec<(ZomeName, GenesisSelfCheckResult)>> for GenesisSelfCheckResult {
+    fn from(a: Vec<(ZomeName, GenesisSelfCheckResult)>) -> Self {
+        a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
+    }
+}
+
+impl From<Vec<GenesisSelfCheckResult>> for GenesisSelfCheckResult {
+    fn from(callback_results: Vec<GenesisSelfCheckResult>) -> Self {
+        callback_results.into_iter().fold(Self::Valid, |acc, x| {
+            match x {
+                // validation is invalid if any x is invalid
+                GenesisSelfCheckResult::Invalid(i) => Self::Invalid(i),
+
+                // valid x allows validation to continue
+                GenesisSelfCheckResult::Valid => acc,
+            }
+        })
+    }
+}
+
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::GenesisSelfCheckInvocation;
     use crate::core::ribosome::{
-        guest_callback::{
-            genesis_self_check::GenesisSelfCheckHostAccess, validate::ValidateResult,
-        },
+        guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckResult},
         RibosomeT,
     };
     use crate::fixt::curve::Zomes;
@@ -85,7 +124,7 @@ mod slow_tests {
         let result = ribosome
             .run_genesis_self_check(GenesisSelfCheckHostAccess, invocation)
             .unwrap();
-        assert_eq!(result, ValidateResult::Valid,);
+        assert_eq!(result, GenesisSelfCheckResult::Valid,);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -98,7 +137,7 @@ mod slow_tests {
         let result = ribosome
             .run_genesis_self_check(GenesisSelfCheckHostAccess, invocation)
             .unwrap();
-        assert_eq!(result, ValidateResult::Valid,);
+        assert_eq!(result, GenesisSelfCheckResult::Valid,);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -112,6 +151,9 @@ mod slow_tests {
         let result = ribosome
             .run_genesis_self_check(GenesisSelfCheckHostAccess, invocation)
             .unwrap();
-        assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()),);
+        assert_eq!(
+            result,
+            GenesisSelfCheckResult::Invalid("esoteric edge case".into()),
+        );
     }
 }
