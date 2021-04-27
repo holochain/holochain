@@ -50,7 +50,7 @@ impl From<GenesisSelfCheckInvocation> for GenesisSelfCheckData {
 }
 
 #[cfg(test)]
-// #[cfg(feature = "slow_tests")]
+#[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::GenesisSelfCheckInvocation;
     use crate::core::ribosome::{
@@ -59,19 +59,17 @@ mod slow_tests {
         },
         RibosomeT,
     };
-    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
-    use holochain_state::source_chain::SourceChainResult;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
     fn invocation_fixture() -> GenesisSelfCheckInvocation {
         GenesisSelfCheckInvocation {
             payload: GenesisSelfCheckData {
-                membrane_proof: ().try_into().unwrap(),
+                membrane_proof: Some(().try_into().unwrap()),
                 agent_key: fixt!(AgentPubKey),
             },
         }

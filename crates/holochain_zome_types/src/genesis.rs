@@ -16,7 +16,7 @@ pub type MembraneProof = SerializedBytes;
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct GenesisSelfCheckData {
     /// The proof of membership provided by the AgentValidationPkg (2nd element)
-    pub membrane_proof: MembraneProof,
+    pub membrane_proof: Option<MembraneProof>,
 
     /// The 3rd element of the chain, the agent key
     pub agent_key: AgentPubKey,

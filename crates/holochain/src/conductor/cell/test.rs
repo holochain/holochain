@@ -1,4 +1,5 @@
 use crate::conductor::manager::spawn_task_manager;
+use crate::core::ribosome::MockRibosomeT;
 use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
 use crate::fixt::DnaFileFixturator;
 use crate::fixt::SignatureFixturator;
@@ -30,10 +31,17 @@ async fn test_cell_handle_publish() {
         .returning(|_| Some(fixt!(DnaFile)));
 
     let mock_handle: crate::conductor::handle::ConductorHandle = Arc::new(mock_handle);
+    let mock_ribosome = MockRibosomeT::new();
 
-    super::Cell::genesis(cell_id.clone(), mock_handle.clone(), env.clone(), None)
-        .await
-        .unwrap();
+    super::Cell::genesis(
+        cell_id.clone(),
+        mock_handle.clone(),
+        env.clone(),
+        mock_ribosome,
+        None,
+    )
+    .await
+    .unwrap();
 
     let (add_task_sender, shutdown) = spawn_task_manager(mock_handle.clone());
     let (stop_tx, _) = sync::broadcast::channel(1);
