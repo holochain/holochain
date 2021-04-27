@@ -2,13 +2,9 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
-use holo_hash::AnyDhtHash;
-use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct GenesisSelfCheckInvocation {
