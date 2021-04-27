@@ -12,6 +12,8 @@ use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckHostAccess;
+use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckInvocation;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
@@ -496,6 +498,14 @@ impl RibosomeT for RealRibosome {
                 invocation.provenance.clone(),
             )
         })
+    }
+
+    fn run_genesis_self_check(
+        &self,
+        access: GenesisSelfCheckHostAccess,
+        invocation: GenesisSelfCheckInvocation,
+    ) -> RibosomeResult<ValidateResult> {
+        do_callback!(self, access, invocation, ValidateCallbackResult)
     }
 
     fn run_validate(

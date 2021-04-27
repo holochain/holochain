@@ -19,7 +19,7 @@ use derive_more::Into;
 pub use dna_gamut::*;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::cell::CellId;
+use holochain_zome_types::prelude::*;
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
@@ -169,9 +169,6 @@ impl InstallAppDnaPayload {
         }
     }
 }
-
-/// App-specific payload for proving membership in the membrane of the app
-pub type MembraneProof = SerializedBytes;
 
 /// Data about an installed Cell. It's deprecated because it is not used in
 /// the new installation scheme using AppBundles.
