@@ -13,10 +13,14 @@ use crate::conductor::api::CellConductorApiT;
 use crate::core::queue_consumer::OneshotWriter;
 use derive_more::Constructor;
 use holochain_sqlite::prelude::*;
-use holochain_state::source_chain::SourceChainBuf;
-use holochain_state::workspace::Workspace;
+use holochain_state::prelude::insert_entry;
+use holochain_state::prelude::insert_header;
+use holochain_state::prelude::insert_op_lite;
+use holochain_state::prelude::StateMutationResult;
 use holochain_state::workspace::WorkspaceResult;
 use holochain_types::prelude::*;
+use rusqlite::named_params;
+use rusqlite::Transaction;
 use tracing::*;
 
 /// The struct which implements the genesis Workflow
@@ -35,12 +39,6 @@ pub async fn genesis_workflow<'env, Api: CellConductorApiT>(
     args: GenesisWorkflowArgs,
 ) -> WorkflowResult<()> {
     genesis_workflow_inner(&mut workspace, args, api).await?;
-
-    // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
-
-    // commit the workspace
-    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
-
     Ok(())
 }
 
@@ -55,7 +53,7 @@ async fn genesis_workflow_inner<Api: CellConductorApiT>(
         membrane_proof,
     } = args;
 
-    if workspace.source_chain.has_genesis() {
+    if workspace.has_genesis(&agent_pubkey)? {
         return Ok(());
     }
 
@@ -69,38 +67,127 @@ async fn genesis_workflow_inner<Api: CellConductorApiT>(
         return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
     }
 
-    workspace
-        .source_chain
-        .genesis(
-            dna_file.dna_hash().clone(),
-            agent_pubkey.clone(),
-            membrane_proof,
-        )
-        .await
-        .map_err(WorkflowError::from)?;
+    let keystore = api.keystore();
+
+    let dna_header = Header::Dna(header::Dna {
+        author: agent_pubkey.clone(),
+        timestamp: timestamp::now(),
+        hash: dna_file.dna_hash().clone(),
+    });
+    let dna_header = HeaderHashed::from_content_sync(dna_header);
+    let dna_header = SignedHeaderHashed::new(&keystore, dna_header).await?;
+    let dna_header_address = dna_header.as_hash().clone();
+    let element = Element::new(dna_header, None);
+    let dna_ops = produce_op_lights_from_elements(vec![&element])?;
+    let (dna_header, _) = element.into_inner();
+
+    // create the agent validation entry and add it directly to the store
+    let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
+        author: agent_pubkey.clone(),
+        timestamp: timestamp::now(),
+        header_seq: 1,
+        prev_header: dna_header_address,
+        membrane_proof,
+    });
+    let agent_validation_header = HeaderHashed::from_content_sync(agent_validation_header);
+    let agent_validation_header =
+        SignedHeaderHashed::new(&keystore, agent_validation_header).await?;
+    let avh_addr = agent_validation_header.as_hash().clone();
+    let element = Element::new(agent_validation_header, None);
+    let avh_ops = produce_op_lights_from_elements(vec![&element])?;
+    let (agent_validation_header, _) = element.into_inner();
+
+    // create a agent chain element and add it directly to the store
+    let agent_header = Header::Create(header::Create {
+        author: agent_pubkey.clone(),
+        timestamp: timestamp::now(),
+        header_seq: 2,
+        prev_header: avh_addr,
+        entry_type: header::EntryType::AgentPubKey,
+        entry_hash: agent_pubkey.clone().into(),
+    });
+    let agent_header = HeaderHashed::from_content_sync(agent_header);
+    let agent_header = SignedHeaderHashed::new(&keystore, agent_header).await?;
+    let element = Element::new(agent_header, Some(Entry::Agent(agent_pubkey)));
+    let agent_ops = produce_op_lights_from_elements(vec![&element])?;
+    let (agent_header, agent_entry) = element.into_inner();
+    let agent_entry = agent_entry.into_option();
+
+    workspace.vault.conn()?.with_commit(|txn| {
+        put_raw(txn, dna_header, dna_ops, None)?;
+        put_raw(txn, agent_validation_header, avh_ops, None)?;
+        put_raw(txn, agent_header, agent_ops, agent_entry)?;
+        WorkflowResult::Ok(())
+    })?;
 
     Ok(())
 }
 
 /// The workspace for Genesis
 pub struct GenesisWorkspace {
-    source_chain: SourceChainBuf,
+    vault: EnvWrite,
 }
 
 impl GenesisWorkspace {
     /// Constructor
-    pub async fn new(env: EnvRead) -> WorkspaceResult<Self> {
-        Ok(Self {
-            source_chain: SourceChainBuf::new(env)?,
-        })
+    pub async fn new(env: EnvWrite) -> WorkspaceResult<Self> {
+        Ok(Self { vault: env.clone() })
+    }
+
+    pub fn has_genesis(&self, author: &AgentPubKey) -> DatabaseResult<bool> {
+        let count = self.vault.conn()?.with_reader(|txn| {
+            let count: u32 = txn.query_row(
+                "
+                SELECT 
+                COUNT(Header.hash)
+                FROM Header
+                JOIN DhtOp ON DhtOp.header_hash = Header.hash
+                WHERE
+                DhtOp.is_authored = 1
+                AND
+                Header.author = :author
+                ",
+                named_params! {
+                    ":author": author,
+                },
+                |row| row.get(0),
+            )?;
+            DatabaseResult::Ok(count)
+        })?;
+        Ok(count >= 3)
     }
 }
 
-impl Workspace for GenesisWorkspace {
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.source_chain.flush_to_txn_ref(writer)?;
-        Ok(())
+fn put_raw(
+    txn: &mut Transaction,
+    shh: SignedHeaderHashed,
+    ops: Vec<DhtOpLight>,
+    entry: Option<Entry>,
+) -> StateMutationResult<()> {
+    let (header, signature) = shh.into_header_and_signature();
+    let (header, hash) = header.into_inner();
+    let mut header = Some(header);
+    let mut hashes = Vec::with_capacity(ops.len());
+    for op in &ops {
+        let op_type = op.get_type();
+        let (h, op_hash) =
+            UniqueForm::op_hash(op_type, header.take().expect("This can't be empty"))?;
+        let op_order = OpOrder::new(op_type, h.timestamp());
+        header = Some(h);
+        hashes.push((op_hash, op_order));
     }
+    let shh = SignedHeaderHashed::with_presigned(
+        HeaderHashed::with_pre_hashed(header.expect("This can't be empty"), hash),
+        signature,
+    );
+    if let Some(entry) = entry {
+        insert_entry(txn, EntryHashed::from_content_sync(entry))?;
+    }
+    insert_header(txn, shh)?;
+    for (op, (op_hash, op_order)) in ops.into_iter().zip(hashes) {
+        insert_op_lite(txn, op, op_hash, true, op_order)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
