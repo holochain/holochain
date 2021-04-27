@@ -186,7 +186,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn install_app_bundle(
         self: Arc<Self>,
         payload: InstallAppBundlePayload,
-    ) -> ConductorResult<InstalledApp>;
+    ) -> ConductorResult<InactiveApp>;
 
     /// Uninstall an app from the state DB and remove all running Cells
     async fn uninstall_app(&self, app: &InstalledAppId) -> ConductorResult<()>;
@@ -510,7 +510,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await?;
 
         let cell_data = cell_data.into_iter().map(|(c, _)| c);
-        let app = InstalledApp::new_legacy(installed_app_id, cell_data)?;
+        let app = InstalledAppCommon::new_legacy(installed_app_id, cell_data)?;
 
         // Update the db
         let _ = self
@@ -526,7 +526,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn install_app_bundle(
         self: Arc<Self>,
         payload: InstallAppBundlePayload,
-    ) -> ConductorResult<InstalledApp> {
+    ) -> ConductorResult<InactiveApp> {
         let InstallAppBundlePayload {
             source,
             agent_key,
@@ -565,10 +565,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await?;
 
         let slots = ops.slots;
-        let app = InstalledApp::new(installed_app_id, agent_key, slots);
+        let app = InstalledAppCommon::new(installed_app_id, agent_key, slots);
 
         // Update the db
-        self.conductor
+        let app = self
+            .conductor
             .write()
             .await
             .add_inactive_app_to_db(app.clone())

@@ -214,7 +214,7 @@ async fn run(
                         context
                     );
                     for app_id in app_ids.iter() {
-                        conductor.deactivate_app(app_id.to_string(), DeactivationReason::Quarantined).await.map_err(TaskManagerError::internal)?;
+                        conductor.deactivate_app(app_id.to_string(), DeactivationReason::Quarantined { error: error.to_string() } ).await.map_err(TaskManagerError::internal)?;
                     }
                     tracing::error!("Apps quarantined via deactivation.");
                 },

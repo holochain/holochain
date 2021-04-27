@@ -65,11 +65,11 @@ impl ConductorState {
     pub fn get_app_info(&self, installed_app_id: &InstalledAppId) -> Option<InstalledAppInfo> {
         self.active_apps
             .get(installed_app_id)
-            .map(|app| InstalledAppInfo::from_installed_app(app, true))
+            .map(|app| InstalledAppInfo::from_installed_app(&app.clone().into()))
             .or_else(|| {
                 self.inactive_apps
                     .get(installed_app_id)
-                    .map(|app| InstalledAppInfo::from_installed_app(app, false))
+                    .map(|app| InstalledAppInfo::from_installed_app(&app.clone().into()))
             })
     }
 
