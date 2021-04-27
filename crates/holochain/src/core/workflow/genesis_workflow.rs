@@ -12,7 +12,7 @@ use super::error::WorkflowResult;
 use crate::core::{
     queue_consumer::OneshotWriter,
     ribosome::guest_callback::genesis_self_check::{
-        GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation,
+        GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation, GenesisSelfCheckResult,
     },
 };
 use crate::{conductor::api::CellConductorApiT, core::ribosome::RibosomeT};
@@ -75,7 +75,7 @@ where
         return Ok(());
     }
 
-    let validation = ribosome.run_genesis_self_check(
+    let result = ribosome.run_genesis_self_check(
         GenesisSelfCheckHostAccess,
         GenesisSelfCheckInvocation {
             payload: GenesisSelfCheckData {
@@ -86,7 +86,10 @@ where
         },
     )?;
 
-    todo!("check validation result");
+    // If the self-check fails, fail genesis, and don't create the source chain.
+    if let GenesisSelfCheckResult::Invalid(reason) = result {
+        return Err(WorkflowError::GenesisFailure(reason));
+    }
 
     // TODO: this is a placeholder for a real DPKI request to show intent
     if api
