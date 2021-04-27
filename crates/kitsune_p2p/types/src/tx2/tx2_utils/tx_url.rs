@@ -34,6 +34,12 @@ impl From<TxUrl> for Arc<url2::Url2> {
     }
 }
 
+impl From<TxUrl> for url2::Url2 {
+    fn from(u: TxUrl) -> Self {
+        (*u.0).clone()
+    }
+}
+
 impl From<Arc<url2::Url2>> for TxUrl {
     fn from(r: Arc<url2::Url2>) -> Self {
         Self(r)
