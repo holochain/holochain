@@ -161,16 +161,16 @@ pub fn set_validation_stage(
         "
         UPDATE DhtOp
         SET
-        num_validation_attempts = num_validation_attempts + 1
-        last_validation_attempt = :last_validation_attempt
+        num_validation_attempts = num_validation_attempts + 1,
+        last_validation_attempt = :last_validation_attempt,
         validation_stage = :validation_stage
         WHERE
         DhtOp.hash = :hash
         ",
         named_params! {
-            "last_validation_attempt": now,
-            "validation_stage": stage,
-            "hash": hash,
+            ":last_validation_attempt": now,
+            ":validation_stage": stage,
+            ":hash": hash,
         },
     )?;
     Ok(())
@@ -220,6 +220,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
     let header_type = header.header_type();
     let header_seq = header.header_seq();
     let author = header.author().clone();
+    let prev_hash = header.prev_header().cloned();
     let private = match header.entry_type().map(|et| et.visibility()) {
         Some(EntryVisibility::Private) => true,
         Some(EntryVisibility::Public) => false,
@@ -232,6 +233,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
                 "type": header_type ,
                 "seq": header_seq,
                 "author": author,
+                "prev_hash": prev_hash,
                 "base_hash": create_link.base_address,
                 "zome_id": create_link.zome_id.index() as u32,
                 "tag": create_link.tag,
@@ -244,6 +246,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
                 "type": header_type ,
                 "seq": header_seq,
                 "author": author,
+                "prev_hash": prev_hash,
                 "create_link_hash": delete_link.link_add_address,
                 "blob": to_blob(SignedHeader::from((Header::DeleteLink(delete_link.clone()), signature)))?,
             })?;
@@ -254,6 +257,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
                 "type": header_type ,
                 "seq": header_seq,
                 "author": author,
+                "prev_hash": prev_hash,
                 "entry_hash": create.entry_hash,
                 "private_entry": private,
                 "blob": to_blob(SignedHeader::from((Header::Create(create.clone()), signature)))?,
@@ -265,6 +269,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
                 "type": header_type ,
                 "seq": header_seq,
                 "author": author,
+                "prev_hash": prev_hash,
                 "deletes_entry_hash": delete.deletes_entry_address,
                 "deletes_header_hash": delete.deletes_address,
                 "blob": to_blob(SignedHeader::from((Header::Delete(delete.clone()), signature)))?,
@@ -276,6 +281,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
                 "type": header_type ,
                 "seq": header_seq,
                 "author": author,
+                "prev_hash": prev_hash,
                 "original_entry_hash": update.original_entry_address,
                 "original_header_hash": update.original_header_address,
                 "private_entry": private,
@@ -288,6 +294,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
                 "type": header_type ,
                 "seq": header_seq,
                 "author": author,
+                "prev_hash": prev_hash,
                 "blob": to_blob(SignedHeader::from((Header::InitZomesComplete(izc), signature)))?,
             })?;
         }
@@ -297,6 +304,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
                 "type": header_type ,
                 "seq": header_seq,
                 "author": author,
+                "prev_hash": prev_hash,
                 "blob": to_blob(SignedHeader::from((Header::Dna(dna), signature)))?,
             })?;
         }
@@ -306,6 +314,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
                 "type": header_type ,
                 "seq": header_seq,
                 "author": author,
+                "prev_hash": prev_hash,
                 "blob": to_blob(SignedHeader::from((Header::AgentValidationPkg(avp), signature)))?,
             })?;
         }
@@ -315,6 +324,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
                 "type": header_type ,
                 "seq": header_seq,
                 "author": author,
+                "prev_hash": prev_hash,
                 "blob": to_blob(SignedHeader::from((Header::OpenChain(open), signature)))?,
             })?;
         }
@@ -324,6 +334,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
                 "type": header_type ,
                 "seq": header_seq,
                 "author": author,
+                "prev_hash": prev_hash,
                 "blob": to_blob(SignedHeader::from((Header::CloseChain(close), signature)))?,
             })?;
         }

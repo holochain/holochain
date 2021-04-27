@@ -530,10 +530,9 @@ impl Db {
 }
 
 async fn call_workflow<'env>(env: EnvWrite) {
-    let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
     let (qt, _rx) = TriggerSender::new();
     let (qt2, _rx) = TriggerSender::new();
-    integrate_dht_ops_workflow(workspace, env.clone().into(), qt, qt2)
+    integrate_dht_ops_workflow(env.clone(), qt, qt2)
         .await
         .unwrap();
 }

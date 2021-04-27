@@ -32,6 +32,7 @@ CREATE TABLE Header (
     author           BLOB           NOT NULL,
 
     blob             BLOB           NOT NULL,
+    prev_hash        BLOB           NULL,
 
     -- Create / Update
     entry_hash       BLOB           NULL,

@@ -2,7 +2,6 @@
 
 use super::*;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_dht_ops_workflow;
-use crate::core::workflow::integrate_dht_ops_workflow::IntegrateDhtOpsWorkspace;
 use crate::{conductor::manager::ManagedTaskResult, core::workflow::error::WorkflowResult};
 use tokio::task::JoinHandle;
 use tracing::*;
@@ -30,10 +29,8 @@ pub fn spawn_integrate_dht_ops_consumer(
 
             holochain_sqlite::db::optimistic_retry_async("integrate_dht_ops_consumer", || async {
                 // Run the workflow
-                let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into())?;
                 if let WorkComplete::Incomplete = integrate_dht_ops_workflow(
-                    workspace,
-                    env.clone().into(),
+                    env.clone(),
                     trigger_sys.clone(),
                     trigger_receipt.clone(),
                 )
