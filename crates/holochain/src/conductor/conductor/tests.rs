@@ -8,8 +8,10 @@ use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };
 use ::fixt::prelude::*;
+use holochain_keystore::crude_mock_keystore::spawn_crude_mock_keystore;
 use holochain_lmdb::test_utils::test_environments;
 use holochain_types::test_utils::fake_cell_id;
+use kitsune_p2p_types::dependencies::lair_keystore_api::LairError;
 use maplit::hashset;
 use matches::assert_matches;
 
@@ -416,6 +418,33 @@ async fn test_setup_cells_idempotency() {
 
     // - Ensure that the app is active
     assert_eq_retry_10s!(conductor.list_active_apps().await.unwrap().len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_keystore_error_during_genesis() {
+    observability::test_run().ok();
+    let keystore = spawn_crude_mock_keystore(|| LairError::other("test error"))
+        .await
+        .unwrap();
+    let envs = test_environments_with_keystore(keystore);
+    let config = ConductorConfig::default();
+    let mut conductor = SweetConductor::new(
+        SweetConductor::handle_from_existing(&envs, &config).await,
+        envs,
+        config,
+    )
+    .await;
+
+    let zome = InlineZome::new_unique(Vec::new());
+    let (dna, _) = mk_dna("zome", zome).await.unwrap();
+
+    let result = conductor
+        .setup_app_for_agents("app", &[fixt!(AgentPubKey)], &[dna])
+        .await;
+    todo!(
+        "Assert this is the right kind of error. But, how useful was this really?
+        Need to run this in a full integration test to test the resilience of the admin interface."
+    );
 }
 
 fn simple_zome() -> InlineZome {
