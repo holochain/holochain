@@ -77,9 +77,6 @@ fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
         }]),
         environment_path: environment_path.into(),
         network: None,
-        signing_service_uri: None,
-        encryption_service_uri: None,
-        decryption_service_uri: None,
         dpki: None,
         passphrase_service: Some(PassphraseServiceConfig::FromConfig {
             passphrase: "password".into(),
