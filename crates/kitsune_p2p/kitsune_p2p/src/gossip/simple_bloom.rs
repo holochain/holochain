@@ -85,6 +85,10 @@ mod sparse_data_map;
 use sparse_data_map::*;
 mod sync_local_agents;
 use sync_local_agents::*;
+mod step_2_local_sync_inner;
+use step_2_local_sync_inner::*;
+mod step_3_initiate_inner;
+use step_3_initiate_inner::*;
 
 kitsune_p2p_types::write_codec_enum! {
     /// SimpleBloom Gossip Wire Protocol Codec
@@ -113,9 +117,8 @@ kitsune_p2p_types::write_codec_enum! {
 
 #[allow(dead_code)]
 struct NodeInfo {
-    last_ok: std::time::Instant,
-    last_err: std::time::Instant,
-    squelch_until: std::time::Instant,
+    last_touch: std::time::Instant,
+    was_err: bool,
 }
 
 #[allow(dead_code)]
@@ -130,13 +133,14 @@ pub(crate) struct SimpleBloomModInner2 {
     local_data_map: DataMap,
     local_key_set: KeySet,
 
-    agents: HashMap<Tx2Cert, NodeInfo>,
+    remote_metrics: HashMap<Tx2Cert, NodeInfo>,
+    initiate_tgt: Option<Tx2Cert>,
 
     incoming: Vec<(Tx2ConHnd<wire::Wire>, GossipWire)>,
 
     send_interval_ms: u64,
     last_outgoing: std::time::Instant,
-    outgoing: Vec<(Tx2ConHnd<wire::Wire>, GossipWire)>,
+    outgoing: Vec<(TxUrl, GossipWire)>,
 }
 
 impl SimpleBloomModInner2 {
@@ -146,12 +150,15 @@ impl SimpleBloomModInner2 {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
     ) -> Self {
-        let send_interval_ms: u64 = (16384.0    // max bytes in a gossip msg
+        let send_interval_ms: u64 = (
+            // !*)&^$# cargo fmt...
+            16384.0    // max bytes in a gossip msg
             * 8.0      // bits per byte
             * 1000.0   // milliseconds
             / 1024.0   // kbps
             / 1024.0   // mbps
-            / tuning_params.gossip_output_target_mbps) as u64;
+            / tuning_params.gossip_output_target_mbps
+        ) as u64;
 
         Self {
             tuning_params,
@@ -164,7 +171,8 @@ impl SimpleBloomModInner2 {
             local_data_map: HashMap::new(),
             local_key_set: HashSet::new(),
 
-            agents: HashMap::new(),
+            remote_metrics: HashMap::new(),
+            initiate_tgt: None,
 
             incoming: Vec::new(),
 
@@ -186,20 +194,17 @@ impl SimpleBloomMod2 {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
     ) -> Arc<Self> {
-        let inner = SimpleBloomModInner2::new(tuning_params, space, ep_hnd, evt_sender);
-
-        let send_interval_ms = inner.send_interval_ms;
-
-        // this value isn't hugely important,
-        // since the cert communication timings are also tracked individually
-        let task_interval_ms = std::cmp::max(send_interval_ms / 5, 100);
+        let inner = SimpleBloomModInner2::new(tuning_params.clone(), space, ep_hnd, evt_sender);
 
         let this = Arc::new(Self(Share::new(inner)));
 
         let gossip = this.clone();
         metric_task(async move {
             loop {
-                tokio::time::sleep(std::time::Duration::from_millis(task_interval_ms)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    tuning_params.gossip_loop_iteration_delay_ms as u64,
+                ))
+                .await;
 
                 if let GossipIterationResult::Close = gossip.run_one_iteration().await {
                     tracing::warn!("gossip loop ending");
@@ -217,12 +222,27 @@ impl SimpleBloomMod2 {
         // # Step 1 - check state
         //   - if closed, send GossipIterationResult::Close
         //   - if not ready, exit early
+        match self.step_1_check() {
+            Err(_) => return GossipIterationResult::Close,
+            Ok(false) => return GossipIterationResult::Good,
+            Ok(true) => (),
+        }
 
-        // # Step 2 - run a local sync, updating bloom / key_set etc
+        // # Step 2 - run a local sync, updating bloom / data_map / key_set
+        match self.step_2_local_sync().await {
+            Err(_) => return GossipIterationResult::Close,
+            Ok(false) => return GossipIterationResult::Good,
+            Ok(true) => (),
+        }
 
         // # Step 3 - check target for initiation
         //   - if we don't have a current initiation target, pick one
         //   - send the initiate message
+        match self.step_3_initiate().await {
+            Err(_) => return GossipIterationResult::Close,
+            Ok(false) => return GossipIterationResult::Good,
+            Ok(true) => (),
+        }
 
         // # Step 4 - loop on incoming/outgoing data in parallel
         //   - if processing incoming data is slow we want to keep
@@ -232,8 +252,56 @@ impl SimpleBloomMod2 {
         //   - if we get through all incoming/outgoing, move on
         //   - if there are no outgoing msgs and we have spent
         //     > 4 * send_interval_ms, move on
+        match self.step_4_com_loop().await {
+            Err(_) => return GossipIterationResult::Close,
+            Ok(false) => return GossipIterationResult::Good,
+            Ok(true) => (),
+        }
 
         GossipIterationResult::Good
+    }
+
+    fn step_1_check(&self) -> KitsuneResult<bool> {
+        self.0.share_mut(|i, _| Ok(!i.local_agents.is_empty()))
+    }
+
+    async fn step_2_local_sync(&self) -> KitsuneResult<bool> {
+        let (space, evt_sender, local_agents) = self.0.share_mut(|i, _| {
+            Ok((
+                i.space.clone(),
+                i.evt_sender.clone(),
+                i.local_agents.clone(),
+            ))
+        })?;
+
+        let (data_map, key_set, bloom) =
+            match step_2_local_sync_inner(space, evt_sender, local_agents).await {
+                Err(e) => {
+                    tracing::warn!("gossip error: {:?}", e);
+                    return Ok(false);
+                }
+                Ok(r) => r,
+            };
+
+        self.0.share_mut(move |i, _| {
+            i.local_data_map = data_map;
+            i.local_key_set = key_set;
+            i.local_bloom = bloom;
+            Ok(())
+        })?;
+
+        Ok(true)
+    }
+
+    async fn step_3_initiate(&self) -> KitsuneResult<bool> {
+        self.0
+            .share_mut(|i, _| danger_mutex_locked_sync_step_3_initiate_inner(i))?;
+
+        Ok(true)
+    }
+
+    async fn step_4_com_loop(&self) -> KitsuneResult<bool> {
+        Ok(true)
     }
 }
 
@@ -249,6 +317,12 @@ impl SimpleBloomMod2 {
         let (_, gossip) = GossipWire::decode_ref(&gossip_data).map_err(KitsuneError::other)?;
         self.0.share_mut(move |i, _| {
             i.incoming.push((con, gossip));
+            if i.incoming.len() > 20 {
+                tracing::warn!(
+                    "Overloaded with incoming gossip.. {} messages",
+                    i.incoming.len()
+                );
+            }
             Ok(())
         })
     }

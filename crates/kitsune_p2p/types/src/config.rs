@@ -87,6 +87,16 @@ pub mod tuning_params_struct {
         /// to this count mega bits per second. [Default: 0.5]
         gossip_output_target_mbps: f64 = 0.5,
 
+        /// How long should we hold off talking to a peer
+        /// we've previously spoken successfully to.
+        /// [Default: 1 minute]
+        gossip_peer_on_success_next_gossip_delay_ms: u32 = 1000 * 60,
+
+        /// How long should we hold off talking to a peer
+        /// we've previously gotten errors speaking to.
+        /// [Default: 5 minute]
+        gossip_peer_on_error_next_gossip_delay_ms: u32 = 1000 * 60 * 5,
+
         /// Default agent count for remote notify. [Default: 5]
         default_notify_remote_agent_count: u32 = 5,
 
