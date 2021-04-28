@@ -5,7 +5,14 @@ use super::*;
 pub(crate) fn danger_mutex_locked_sync_step_3_initiate_inner(
     inner: &mut SimpleBloomModInner2,
 ) -> KitsuneResult<()> {
-    // first check to see if we should time out any current initiate_tgt
+    // first, check to see if we've run an initiate check too recently
+    if (inner.last_initiate_check.elapsed().as_millis() as u32)
+        < inner.tuning_params.gossip_loop_iteration_delay_ms
+    {
+        return Ok(());
+    }
+
+    // second check to see if we should time out any current initiate_tgt
     if let Some(initiate_tgt) = inner.initiate_tgt.clone() {
         if let Some(metric) = inner.remote_metrics.get(&initiate_tgt) {
             if metric.was_err

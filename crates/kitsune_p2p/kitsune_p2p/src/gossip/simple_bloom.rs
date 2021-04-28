@@ -89,6 +89,8 @@ mod step_2_local_sync_inner;
 use step_2_local_sync_inner::*;
 mod step_3_initiate_inner;
 use step_3_initiate_inner::*;
+mod step_4_com_loop_inner;
+use step_4_com_loop_inner::*;
 
 kitsune_p2p_types::write_codec_enum! {
     /// SimpleBloom Gossip Wire Protocol Codec
@@ -128,18 +130,21 @@ pub(crate) struct SimpleBloomModInner2 {
     ep_hnd: Tx2EpHnd<wire::Wire>,
     evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
 
+    last_local_sync: std::time::Instant,
     local_agents: HashSet<Arc<KitsuneAgent>>,
     local_bloom: BloomFilter,
     local_data_map: DataMap,
     local_key_set: KeySet,
 
     remote_metrics: HashMap<Tx2Cert, NodeInfo>,
+
+    last_initiate_check: std::time::Instant,
     initiate_tgt: Option<Tx2Cert>,
 
     incoming: Vec<(Tx2ConHnd<wire::Wire>, GossipWire)>,
 
-    send_interval_ms: u64,
     last_outgoing: std::time::Instant,
+    send_interval_ms: u64,
     outgoing: Vec<(TxUrl, GossipWire)>,
 }
 
@@ -160,24 +165,32 @@ impl SimpleBloomModInner2 {
             / tuning_params.gossip_output_target_mbps
         ) as u64;
 
+        // pick an old instant for initialization
+        let old = std::time::Instant::now()
+            .checked_sub(std::time::Duration::from_secs(60 * 24))
+            .unwrap();
+
         Self {
             tuning_params,
             space,
             ep_hnd,
             evt_sender,
 
+            last_local_sync: old,
             local_agents: HashSet::new(),
             local_bloom: bloomfilter::Bloom::new(1, 1),
             local_data_map: HashMap::new(),
             local_key_set: HashSet::new(),
 
             remote_metrics: HashMap::new(),
+
+            last_initiate_check: old,
             initiate_tgt: None,
 
             incoming: Vec::new(),
 
+            last_outgoing: old,
             send_interval_ms,
-            last_outgoing: std::time::Instant::now(),
             outgoing: Vec::new(),
         }
     }
@@ -194,15 +207,20 @@ impl SimpleBloomMod2 {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
     ) -> Arc<Self> {
-        let inner = SimpleBloomModInner2::new(tuning_params.clone(), space, ep_hnd, evt_sender);
+        let inner = SimpleBloomModInner2::new(tuning_params, space, ep_hnd, evt_sender);
+
+        let send_interval_ms = inner.send_interval_ms;
 
         let this = Arc::new(Self(Share::new(inner)));
+
+        // this value needs to be somewhat frequent to support send timing
+        let loop_check_interval_ms = std::cmp::max(send_interval_ms / 3, 100);
 
         let gossip = this.clone();
         metric_task(async move {
             loop {
                 tokio::time::sleep(std::time::Duration::from_millis(
-                    tuning_params.gossip_loop_iteration_delay_ms as u64,
+                    loop_check_interval_ms as u64,
                 ))
                 .await;
 
@@ -250,8 +268,7 @@ impl SimpleBloomMod2 {
         //   - if we get a "finished" chunk from our initaite target,
         //     clear the initiate target
         //   - if we get through all incoming/outgoing, move on
-        //   - if there are no outgoing msgs and we have spent
-        //     > 4 * send_interval_ms, move on
+        //   - if we take > gossip_interval, move on
         match self.step_4_com_loop().await {
             Err(_) => return GossipIterationResult::Close,
             Ok(false) => return GossipIterationResult::Good,
@@ -266,13 +283,20 @@ impl SimpleBloomMod2 {
     }
 
     async fn step_2_local_sync(&self) -> KitsuneResult<bool> {
-        let (space, evt_sender, local_agents) = self.0.share_mut(|i, _| {
-            Ok((
-                i.space.clone(),
-                i.evt_sender.clone(),
-                i.local_agents.clone(),
-            ))
-        })?;
+        let (it_delay, last_local_sync, space, evt_sender, local_agents) =
+            self.0.share_mut(|i, _| {
+                Ok((
+                    i.tuning_params.gossip_loop_iteration_delay_ms,
+                    i.last_local_sync,
+                    i.space.clone(),
+                    i.evt_sender.clone(),
+                    i.local_agents.clone(),
+                ))
+            })?;
+
+        if (last_local_sync.elapsed().as_millis() as u32) < it_delay {
+            return Ok(true);
+        }
 
         let (data_map, key_set, bloom) =
             match step_2_local_sync_inner(space, evt_sender, local_agents).await {
@@ -301,6 +325,56 @@ impl SimpleBloomMod2 {
     }
 
     async fn step_4_com_loop(&self) -> KitsuneResult<bool> {
+        let loop_start = std::time::Instant::now();
+
+        loop {
+            let (it_delay, space, ep_hnd, evt_sender, mut maybe_outgoing, mut maybe_incoming) =
+                self.0.share_mut(|i, _| {
+                    let maybe_outgoing = if !i.outgoing.is_empty()
+                        && i.last_outgoing.elapsed().as_millis() as u64 > i.send_interval_ms
+                    {
+                        i.last_outgoing = std::time::Instant::now();
+                        Some(i.outgoing.remove(0))
+                    } else {
+                        None
+                    };
+                    let maybe_incoming = if !i.incoming.is_empty() {
+                        Some(i.incoming.remove(0))
+                    } else {
+                        None
+                    };
+                    Ok((
+                        i.tuning_params.gossip_loop_iteration_delay_ms,
+                        i.space.clone(),
+                        i.ep_hnd.clone(),
+                        i.evt_sender.clone(),
+                        maybe_outgoing,
+                        maybe_incoming,
+                    ))
+                })?;
+
+            let will_break = (maybe_outgoing.is_none() && maybe_incoming.is_none())
+                || loop_start.elapsed().as_millis() as u32 > it_delay;
+
+            if let Some(outgoing) = maybe_outgoing.take() {
+                if let Err(e) =
+                    step_4_com_loop_inner_outgoing(space.clone(), ep_hnd, outgoing).await
+                {
+                    tracing::warn!("failed to send outgoing: {:?}", e);
+                }
+            }
+
+            if let Some(incoming) = maybe_incoming.take() {
+                if let Err(e) = step_4_com_loop_inner_incoming(space, evt_sender, incoming).await {
+                    tracing::warn!("failed to process incoming: {:?}", e);
+                }
+            }
+
+            if will_break {
+                break;
+            }
+        }
+
         Ok(true)
     }
 }
