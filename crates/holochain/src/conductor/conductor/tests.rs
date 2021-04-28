@@ -420,6 +420,7 @@ async fn test_setup_cells_idempotency() {
     assert_eq_retry_10s!(conductor.list_active_apps().await.unwrap().len(), 1);
 }
 
+// TODO: this test is pretty useless and can probably be ignored.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_keystore_error_during_genesis() {
     observability::test_run().ok();
@@ -441,10 +442,17 @@ async fn test_keystore_error_during_genesis() {
     let result = conductor
         .setup_app_for_agents("app", &[fixt!(AgentPubKey)], &[dna])
         .await;
-    todo!(
-        "Assert this is the right kind of error. But, how useful was this really?
-        Need to run this in a full integration test to test the resilience of the admin interface."
-    );
+
+    // - Assert that we got an error during Genesis. However, this test is
+    //   pretty useless. What we really want is to ensure that the system is
+    //   resilient when this type of error comes up in a real setting.
+    let err = if let Err(err) = result {
+        err
+    } else {
+        panic!("this should have been an error")
+    };
+
+    assert_matches!(err, ConductorError::GenesisFailed { errors } if errors.len() == 1);
 }
 
 fn simple_zome() -> InlineZome {

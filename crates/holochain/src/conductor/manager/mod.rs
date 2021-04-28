@@ -113,9 +113,12 @@ impl std::fmt::Debug for ManagedTaskAdd {
 pub enum TaskOutcome {
     /// Spawn a new managed task.
     NewTask(ManagedTaskAdd),
-    /// Ignore the exit and do nothing.
-    Ignore,
-    /// Ignore the exit and do nothing.
+    // /// Ignore the exit and do nothing.
+    // (let's not allow this for now, while we are dealing with tricky errors)
+    // Ignore,
+    /// Log an info trace and take no other action.
+    LogInfo(String),
+    /// Log an error and take no other action.
     MinorError(ManagedTaskError, String),
     /// Close the conductor down because this is an unrecoverable error.
     ShutdownConductor(Box<ManagedTaskError>, String),
@@ -170,7 +173,10 @@ async fn run(
             }
             result = task_manager.stream.next() => match result {
                 Some(TaskOutcome::NewTask(new_task)) => task_manager.stream.push(new_task),
-                Some(TaskOutcome::Ignore) => (),
+                // Some(TaskOutcome::Ignore) => (),
+                Some(TaskOutcome::LogInfo(context)) => {
+                    info!("Managed task completed: {}", context)
+                }
                 Some(TaskOutcome::MinorError(error, context)) => {
                     error!("Minor error during managed task: {:?}\nContext: {}", error, context)
                 }
@@ -229,15 +235,15 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
     use TaskOutcome::*;
     match kind {
         TaskKind::Ignore => match result {
-            Ok(_) => Ignore,
+            Ok(_) => LogInfo(name),
             Err(err) => MinorError(err, name),
         },
         TaskKind::Unrecoverable => match result {
-            Ok(_) => Ignore,
+            Ok(_) => LogInfo(name),
             Err(err) => ShutdownConductor(Box::new(err), name),
         },
         TaskKind::CellCritical(cell_id) => match result {
-            Ok(_) => Ignore,
+            Ok(_) => LogInfo(name),
             Err(err) => match &err {
                 ManagedTaskError::Conductor(conductor_err) => match conductor_err {
                     // If the error was due to validation failure during genesis,
@@ -364,7 +370,7 @@ mod test {
                     let handle = ManagedTaskAdd::ignore(handle, "respawned task");
                     TaskOutcome::NewTask(handle)
                 }
-                _ => TaskOutcome::Ignore,
+                Err(_) => unreachable!("This is not the error you're looking for"),
             }),
         );
         // Check that the main task doesn't close straight away
