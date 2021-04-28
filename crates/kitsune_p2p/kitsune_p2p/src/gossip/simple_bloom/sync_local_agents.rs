@@ -7,7 +7,9 @@ pub(crate) struct SyncLocalAgents {
 }
 
 impl SyncLocalAgents {
-    pub(crate) async fn exec(inner: SimpleBloomModInner) -> KitsuneResult<(SparseDataMap, KeySet, BloomFilter)> {
+    pub(crate) async fn exec(
+        inner: SimpleBloomModInner,
+    ) -> KitsuneResult<(SparseDataMap, KeySet, BloomFilter)> {
         let data_map = SparseDataMap::new(inner.space.clone(), inner.evt_sender.clone());
 
         let mut this = Self {
@@ -28,18 +30,22 @@ impl SyncLocalAgents {
             has_hash,
         } = self;
 
-        use crate::event::*;
         use crate::dht_arc::*;
+        use crate::event::*;
 
         // collect all local agents' ops
         for agent in inner.local_agents.iter() {
-            if let Ok(ops) = inner.evt_sender.fetch_op_hashes_for_constraints(FetchOpHashesForConstraintsEvt {
-                space: inner.space.clone(),
-                agent: agent.clone(),
-                dht_arc: DhtArc::new(0, u32::MAX),
-                since_utc_epoch_s: i64::MIN,
-                until_utc_epoch_s: i64::MAX,
-            }).await {
+            if let Ok(ops) = inner
+                .evt_sender
+                .fetch_op_hashes_for_constraints(FetchOpHashesForConstraintsEvt {
+                    space: inner.space.clone(),
+                    agent: agent.clone(),
+                    dht_arc: DhtArc::new(0, u32::MAX),
+                    since_utc_epoch_s: i64::MIN,
+                    until_utc_epoch_s: i64::MAX,
+                })
+                .await
+            {
                 for op in ops {
                     let key = Arc::new(MetaOpKey::Op(op));
                     has_hash
@@ -53,10 +59,15 @@ impl SyncLocalAgents {
         // agent store is shared between agents in one space
         // we only have to query it once for all local_agents
         if let Some(agent) = self.inner.local_agents.iter().next() {
-            if let Ok(agent_infos) = self.inner.evt_sender.query_agent_info_signed(QueryAgentInfoSignedEvt {
-                space: self.inner.space.clone(),
-                agent: agent.clone(),
-            }).await {
+            if let Ok(agent_infos) = self
+                .inner
+                .evt_sender
+                .query_agent_info_signed(QueryAgentInfoSignedEvt {
+                    space: self.inner.space.clone(),
+                    agent: agent.clone(),
+                })
+                .await
+            {
                 for agent_info in agent_infos {
                     let key = data_map.inject_agent_info(agent_info);
                     for (_agent, has) in has_hash.iter_mut() {
@@ -67,9 +78,7 @@ impl SyncLocalAgents {
         }
     }
 
-    async fn local_sync(
-        &mut self,
-    ) -> KitsuneResult<()> {
+    async fn local_sync(&mut self) -> KitsuneResult<()> {
         let mut new_has_map = self.has_hash.clone();
 
         {
@@ -92,13 +101,17 @@ impl SyncLocalAgents {
 
                             match &*op_data {
                                 MetaOpData::Op(key, data) => {
-                                    inner.evt_sender.gossip(
-                                        inner.space.clone(),
-                                        new_agent.clone(),
-                                        old_agent.clone(),
-                                        key.clone(),
-                                        data.clone(),
-                                    ).await.map_err(KitsuneError::other)?;
+                                    inner
+                                        .evt_sender
+                                        .gossip(
+                                            inner.space.clone(),
+                                            new_agent.clone(),
+                                            old_agent.clone(),
+                                            key.clone(),
+                                            data.clone(),
+                                        )
+                                        .await
+                                        .map_err(KitsuneError::other)?;
                                 }
                                 // this should be impossible right now
                                 // due to the shared agent store
@@ -119,9 +132,7 @@ impl SyncLocalAgents {
 
     fn finish(self) -> KitsuneResult<(SparseDataMap, KeySet, BloomFilter)> {
         let Self {
-            data_map,
-            has_hash,
-            ..
+            data_map, has_hash, ..
         } = self;
 
         // 1 in 100 false positives...

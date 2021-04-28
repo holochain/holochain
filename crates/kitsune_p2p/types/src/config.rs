@@ -83,6 +83,10 @@ pub mod tuning_params_struct {
         /// Delay between gossip loop iteration. [Default: 1s]
         gossip_loop_iteration_delay_ms: u32 = 1000,
 
+        /// The gossip loop will attempt to rate-limit output
+        /// to this count mega bits per second. [Default: 0.5]
+        gossip_output_target_mbps: f64 = 0.5,
+
         /// Default agent count for remote notify. [Default: 5]
         default_notify_remote_agent_count: u32 = 5,
 

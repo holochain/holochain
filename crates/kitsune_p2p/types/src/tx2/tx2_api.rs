@@ -291,10 +291,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
         async move {
             let msg_id = MsgId::new_notify();
             let len = data.len();
-            this
-                .con
-                .write(msg_id, data, timeout)
-                .await?;
+            this.con.write(msg_id, data, timeout).await?;
 
             this.metrics.write_len(dbg_name, len);
 
@@ -718,7 +715,7 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                         match msg_id.get_type() {
                             MsgIdType::Notify => Tx2EpEvent::IncomingNotify(Tx2EpIncomingNotify {
                                 con: Tx2ConHnd::new(
-                                    local_cert.clone(),
+                                    local_cert,
                                     con.clone(),
                                     url.clone(),
                                     rmap,

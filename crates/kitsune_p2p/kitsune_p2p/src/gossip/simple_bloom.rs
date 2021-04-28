@@ -1,15 +1,21 @@
 use crate::agent_store::AgentInfoSigned;
 use crate::types::gossip::*;
 use crate::types::*;
+use futures::future::{BoxFuture, FutureExt};
 use ghost_actor::dependencies::tracing;
-use kitsune_p2p_types::*;
-use kitsune_p2p_types::metrics::*;
 use kitsune_p2p_types::config::*;
+use kitsune_p2p_types::metrics::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
+use kitsune_p2p_types::*;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use futures::future::{BoxFuture, FutureExt};
+
+/// max send buffer size (keep it under 16384 with a little room for overhead)
+/// (this is not a tuning_param because it must be coordinated
+/// with the constant in PoolBuf which cannot be set at runtime)
+#[allow(dead_code)]
+const MAX_SEND_BUF_BYTES: usize = 16000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum MetaOpKey {
@@ -65,19 +71,14 @@ pub(crate) fn encode_bloom_filter(bloom: &BloomFilter) -> PoolBuf {
 }
 
 pub(crate) fn decode_bloom_filter(bloom: &[u8]) -> BloomFilter {
-    let bitmap_bits = u64::from_le_bytes(arrayref::array_ref![bloom, 0, 8].clone());
-    let k_num = u32::from_le_bytes(arrayref::array_ref![bloom, 8, 4].clone());
-    let k1 = u64::from_le_bytes(arrayref::array_ref![bloom, 12, 8].clone());
-    let k2 = u64::from_le_bytes(arrayref::array_ref![bloom, 20, 8].clone());
-    let k3 = u64::from_le_bytes(arrayref::array_ref![bloom, 28, 8].clone());
-    let k4 = u64::from_le_bytes(arrayref::array_ref![bloom, 36, 8].clone());
+    let bitmap_bits = u64::from_le_bytes(*arrayref::array_ref![bloom, 0, 8]);
+    let k_num = u32::from_le_bytes(*arrayref::array_ref![bloom, 8, 4]);
+    let k1 = u64::from_le_bytes(*arrayref::array_ref![bloom, 12, 8]);
+    let k2 = u64::from_le_bytes(*arrayref::array_ref![bloom, 20, 8]);
+    let k3 = u64::from_le_bytes(*arrayref::array_ref![bloom, 28, 8]);
+    let k4 = u64::from_le_bytes(*arrayref::array_ref![bloom, 36, 8]);
     let sip_keys = [(k1, k2), (k3, k4)];
-    bloomfilter::Bloom::from_existing(
-        &bloom[44..],
-        bitmap_bits,
-        k_num,
-        sip_keys,
-    )
+    bloomfilter::Bloom::from_existing(&bloom[44..], bitmap_bits, k_num, sip_keys)
 }
 
 mod sparse_data_map;
@@ -98,6 +99,9 @@ kitsune_p2p_types::write_codec_enum! {
             filter.0: PoolBuf,
         },
 
+        /// Reject an incoming round of gossip from a remote node
+        Reject(0x21) {},
+
         /// Send a chunks of gossip meta op data,
         /// if "finished" this will be the final chunk.
         Chunk(0x30) {
@@ -111,7 +115,6 @@ kitsune_p2p_types::write_codec_enum! {
 struct NodeInfo {
     last_ok: std::time::Instant,
     last_err: std::time::Instant,
-    pause_until: std::time::Instant,
     squelch_until: std::time::Instant,
 }
 
@@ -127,8 +130,49 @@ pub(crate) struct SimpleBloomModInner2 {
     local_data_map: DataMap,
     local_key_set: KeySet,
 
-    agents: HashMap<TxUrl, NodeInfo>,
+    agents: HashMap<Tx2Cert, NodeInfo>,
+
     incoming: Vec<(Tx2ConHnd<wire::Wire>, GossipWire)>,
+
+    send_interval_ms: u64,
+    last_outgoing: std::time::Instant,
+    outgoing: Vec<(Tx2ConHnd<wire::Wire>, GossipWire)>,
+}
+
+impl SimpleBloomModInner2 {
+    pub fn new(
+        tuning_params: KitsuneP2pTuningParams,
+        space: Arc<KitsuneSpace>,
+        ep_hnd: Tx2EpHnd<wire::Wire>,
+        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+    ) -> Self {
+        let send_interval_ms: u64 = (16384.0    // max bytes in a gossip msg
+            * 8.0      // bits per byte
+            * 1000.0   // milliseconds
+            / 1024.0   // kbps
+            / 1024.0   // mbps
+            / tuning_params.gossip_output_target_mbps) as u64;
+
+        Self {
+            tuning_params,
+            space,
+            ep_hnd,
+            evt_sender,
+
+            local_agents: HashSet::new(),
+            local_bloom: bloomfilter::Bloom::new(1, 1),
+            local_data_map: HashMap::new(),
+            local_key_set: HashSet::new(),
+
+            agents: HashMap::new(),
+
+            incoming: Vec::new(),
+
+            send_interval_ms,
+            last_outgoing: std::time::Instant::now(),
+            outgoing: Vec::new(),
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -136,13 +180,93 @@ struct SimpleBloomMod2(Share<SimpleBloomModInner2>);
 
 impl SimpleBloomMod2 {
     #[allow(dead_code)]
-    fn incoming_gossip(&self, con: Tx2ConHnd<wire::Wire>, gossip_data: Box<[u8]>) -> KitsuneResult<()> {
+    pub fn new(
+        tuning_params: KitsuneP2pTuningParams,
+        space: Arc<KitsuneSpace>,
+        ep_hnd: Tx2EpHnd<wire::Wire>,
+        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+    ) -> Arc<Self> {
+        let inner = SimpleBloomModInner2::new(tuning_params, space, ep_hnd, evt_sender);
+
+        let send_interval_ms = inner.send_interval_ms;
+
+        // this value isn't hugely important,
+        // since the cert communication timings are also tracked individually
+        let task_interval_ms = std::cmp::max(send_interval_ms / 5, 100);
+
+        let this = Arc::new(Self(Share::new(inner)));
+
+        let gossip = this.clone();
+        metric_task(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_millis(task_interval_ms)).await;
+
+                if let GossipIterationResult::Close = gossip.run_one_iteration().await {
+                    tracing::warn!("gossip loop ending");
+                    break;
+                }
+            }
+
+            KitsuneResult::Ok(())
+        });
+
+        this
+    }
+
+    async fn run_one_iteration(&self) -> GossipIterationResult {
+        // # Step 1 - check state
+        //   - if closed, send GossipIterationResult::Close
+        //   - if not ready, exit early
+
+        // # Step 2 - run a local sync, updating bloom / key_set etc
+
+        // # Step 3 - check target for initiation
+        //   - if we don't have a current initiation target, pick one
+        //   - send the initiate message
+
+        // # Step 4 - loop on incoming/outgoing data in parallel
+        //   - if processing incoming data is slow we want to keep
+        //     sending outgoing data at appropriate times
+        //   - if we get a "finished" chunk from our initaite target,
+        //     clear the initiate target
+        //   - if we get through all incoming/outgoing, move on
+        //   - if there are no outgoing msgs and we have spent
+        //     > 4 * send_interval_ms, move on
+
+        GossipIterationResult::Good
+    }
+}
+
+// TODO - impl AsGossipModule
+impl SimpleBloomMod2 {
+    #[allow(dead_code)]
+    fn incoming_gossip(
+        &self,
+        con: Tx2ConHnd<wire::Wire>,
+        gossip_data: Box<[u8]>,
+    ) -> KitsuneResult<()> {
         use kitsune_p2p_types::codec::*;
         let (_, gossip) = GossipWire::decode_ref(&gossip_data).map_err(KitsuneError::other)?;
         self.0.share_mut(move |i, _| {
             i.incoming.push((con, gossip));
             Ok(())
         })
+    }
+
+    #[allow(dead_code)]
+    fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
+        let _ = self.0.share_mut(move |i, _| {
+            i.local_agents.insert(a);
+            Ok(())
+        });
+    }
+
+    #[allow(dead_code)]
+    fn local_agent_leave(&self, a: Arc<KitsuneAgent>) {
+        let _ = self.0.share_mut(move |i, _| {
+            i.local_agents.remove(&a);
+            Ok(())
+        });
     }
 }
 
@@ -159,10 +283,7 @@ pub(crate) struct SimpleBloomModInner {
 
 impl Clone for SimpleBloomModInner {
     fn clone(&self) -> Self {
-        let data_map = SparseDataMap::new(
-            self.space.clone(),
-            self.evt_sender.clone(),
-        );
+        let data_map = SparseDataMap::new(self.space.clone(), self.evt_sender.clone());
         Self {
             tuning_params: self.tuning_params.clone(),
             space: self.space.clone(),
@@ -183,15 +304,12 @@ impl SimpleBloomModInner {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
     ) -> Self {
-        let data_map = SparseDataMap::new(
-            space.clone(),
-            evt_sender.clone(),
-        );
+        let data_map = SparseDataMap::new(space.clone(), evt_sender.clone());
         Self {
-            tuning_params: tuning_params,
-            space: space,
-            ep_hnd: ep_hnd,
-            evt_sender: evt_sender,
+            tuning_params,
+            space,
+            ep_hnd,
+            evt_sender,
             local_agents: HashSet::new(),
             bloom: bloomfilter::Bloom::new(1, 1),
             data_map,
@@ -219,9 +337,7 @@ impl SimpleBloomMod {
     }
 
     fn clone_inner(&self) -> KitsuneResult<SimpleBloomModInner> {
-        self.0.share_mut(|i, _| {
-            Ok(i.clone())
-        })
+        self.0.share_mut(|i, _| Ok(i.clone()))
     }
 
     async fn run_one_iteration(&self) -> KitsuneResult<GossipIterationResult> {
@@ -246,7 +362,11 @@ impl SimpleBloomMod {
 impl AsGossipModule for SimpleBloomMod {
     // TODO FIXME - This is slowing our event processing loop...
     //              Find a way to run the actual processing in the gossip task
-    fn incoming_gossip(&self, con: Tx2ConHnd<wire::Wire>, gossip_data: Box<[u8]>) -> BoxFuture<'static, KitsuneResult<()>> {
+    fn incoming_gossip(
+        &self,
+        con: Tx2ConHnd<wire::Wire>,
+        gossip_data: Box<[u8]>,
+    ) -> BoxFuture<'static, KitsuneResult<()>> {
         use kitsune_p2p_types::codec::*;
         let inner = self.0.clone();
         async move {
@@ -254,34 +374,47 @@ impl AsGossipModule for SimpleBloomMod {
 
             let (key_set, remote_filter) = match gossip {
                 GossipWire::Initiate(Initiate { filter }) => {
-                    let (tuning_params, key_set, _ep_hnd, space, local_filter) = inner.share_mut(|i, _| {
-                        let local_filter = encode_bloom_filter(&i.bloom);
-                        Ok((i.tuning_params.clone(), i.key_set.clone(), i.ep_hnd.clone(), i.space.clone(), local_filter))
-                    })?;
+                    let (tuning_params, key_set, _ep_hnd, space, local_filter) =
+                        inner.share_mut(|i, _| {
+                            let local_filter = encode_bloom_filter(&i.bloom);
+                            Ok((
+                                i.tuning_params.clone(),
+                                i.key_set.clone(),
+                                i.ep_hnd.clone(),
+                                i.space.clone(),
+                                local_filter,
+                            ))
+                        })?;
                     let gossip = GossipWire::accept(local_filter);
                     let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
                     let gossip = wire::Wire::gossip(space, wire::WireData(gossip));
-                    con.notify(&gossip, tuning_params.implicit_timeout()).await?;
+                    con.notify(&gossip, tuning_params.implicit_timeout())
+                        .await?;
                     (key_set, decode_bloom_filter(&filter))
                 }
                 GossipWire::Accept(Accept { filter }) => {
-                    let key_set = inner.share_mut(|i, _| {
-                        Ok(i.key_set.clone())
-                    })?;
+                    let key_set = inner.share_mut(|i, _| Ok(i.key_set.clone()))?;
                     (key_set, decode_bloom_filter(&filter))
                 }
-                GossipWire::Chunk(Chunk { finished: _, chunks }) => {
-                    let chunks = chunks.into_iter().map(|chunk| {
-                        let key = match &chunk {
-                            MetaOpData::Op(key, _) => {
-                                MetaOpKey::Op(key.clone())
-                            }
-                            MetaOpData::Agent(s) => {
-                                MetaOpKey::Agent(Arc::new(s.as_agent_ref().clone()))
-                            }
-                        };
-                        (Arc::new(key), Arc::new(chunk))
-                    }).collect::<Vec<_>>();
+                GossipWire::Reject(_) => {
+                    return Ok(());
+                }
+                GossipWire::Chunk(Chunk {
+                    finished: _,
+                    chunks,
+                }) => {
+                    let chunks = chunks
+                        .into_iter()
+                        .map(|chunk| {
+                            let key = match &chunk {
+                                MetaOpData::Op(key, _) => MetaOpKey::Op(key.clone()),
+                                MetaOpData::Agent(s) => {
+                                    MetaOpKey::Agent(Arc::new(s.as_agent_ref().clone()))
+                                }
+                            };
+                            (Arc::new(key), Arc::new(chunk))
+                        })
+                        .collect::<Vec<_>>();
                     let (space, evt_sender, local_agents) = inner.share_mut(|i, _| {
                         // go ahead and mark these as received in the filter
                         // even if we get an error accepting,
@@ -290,29 +423,39 @@ impl AsGossipModule for SimpleBloomMod {
                             i.bloom.set(key);
                             i.data_map.inject_meta(key.clone(), data.clone());
                         }
-                        Ok((i.space.clone(), i.evt_sender.clone(), i.local_agents.clone()))
+                        Ok((
+                            i.space.clone(),
+                            i.evt_sender.clone(),
+                            i.local_agents.clone(),
+                        ))
                     })?;
                     use crate::types::event::*;
                     for agent in local_agents {
                         for (_, data) in chunks.iter() {
                             match &**data {
                                 MetaOpData::Op(key, data) => {
-                                    evt_sender.gossip(
-                                        space.clone(),
-                                        agent.clone(),
-                                        agent.clone(), // TODO - from agent??
-                                        key.clone(),
-                                        data.clone(),
-                                    ).await.map_err(KitsuneError::other)?
+                                    evt_sender
+                                        .gossip(
+                                            space.clone(),
+                                            agent.clone(),
+                                            agent.clone(), // TODO - from agent??
+                                            key.clone(),
+                                            data.clone(),
+                                        )
+                                        .await
+                                        .map_err(KitsuneError::other)?
                                 }
                                 MetaOpData::Agent(agent_info_signed) => {
                                     // TODO - we only need to do this
                                     //        for one single local agent
-                                    evt_sender.put_agent_info_signed(PutAgentInfoSignedEvt {
-                                        space: space.clone(),
-                                        agent: agent.clone(),
-                                        agent_info_signed: agent_info_signed.clone(),
-                                    }).await.map_err(KitsuneError::other)?
+                                    evt_sender
+                                        .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                            space: space.clone(),
+                                            agent: agent.clone(),
+                                            agent_info_signed: agent_info_signed.clone(),
+                                        })
+                                        .await
+                                        .map_err(KitsuneError::other)?
                                 }
                             }
                         }
@@ -328,7 +471,8 @@ impl AsGossipModule for SimpleBloomMod {
             }
 
             Ok(())
-        }.boxed()
+        }
+        .boxed()
     }
 
     fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
@@ -362,7 +506,10 @@ async fn gossip_loop(
             Ok(GossipIterationResult::Good) => (),
         }
 
-        tokio::time::sleep(std::time::Duration::from_millis(tuning_params.gossip_loop_iteration_delay_ms as u64)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(
+            tuning_params.gossip_loop_iteration_delay_ms as u64,
+        ))
+        .await;
     }
 
     Ok(())

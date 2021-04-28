@@ -1,13 +1,17 @@
 use crate::types::*;
-use kitsune_p2p_types::*;
+use futures::future::BoxFuture;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
+use kitsune_p2p_types::*;
 use std::sync::Arc;
-use futures::future::BoxFuture;
 
 /// Represents an interchangeable gossip strategy module
 pub trait AsGossipModule: 'static + Send + Sync {
-    fn incoming_gossip(&self, con: Tx2ConHnd<wire::Wire>, gossip_data: Box<[u8]>) -> BoxFuture<'static, KitsuneResult<()>>;
+    fn incoming_gossip(
+        &self,
+        con: Tx2ConHnd<wire::Wire>,
+        gossip_data: Box<[u8]>,
+    ) -> BoxFuture<'static, KitsuneResult<()>>;
     fn local_agent_join(&self, a: Arc<KitsuneAgent>);
     fn local_agent_leave(&self, a: Arc<KitsuneAgent>);
 }
@@ -15,7 +19,11 @@ pub trait AsGossipModule: 'static + Send + Sync {
 pub struct GossipModule(pub Arc<dyn AsGossipModule>);
 
 impl GossipModule {
-    pub fn incoming_gossip(&self, con: Tx2ConHnd<wire::Wire>, gossip_data: Box<[u8]>) -> BoxFuture<'static, KitsuneResult<()>> {
+    pub fn incoming_gossip(
+        &self,
+        con: Tx2ConHnd<wire::Wire>,
+        gossip_data: Box<[u8]>,
+    ) -> BoxFuture<'static, KitsuneResult<()>> {
         self.0.incoming_gossip(con, gossip_data)
     }
 
