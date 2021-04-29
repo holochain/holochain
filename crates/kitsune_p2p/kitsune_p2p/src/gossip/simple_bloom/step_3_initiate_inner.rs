@@ -29,47 +29,43 @@ pub(crate) fn danger_mutex_locked_sync_step_3_initiate_inner(
     // we have decided to do an initiate check, mark the time
     inner.last_initiate_check = std::time::Instant::now();
 
-    // get the agent-type keys
-    let mut keys = inner
-        .local_key_set
-        .iter()
-        .filter(|k| matches!(&***k, MetaOpKey::Agent(_)))
-        .collect::<Vec<_>>();
+    // get the remote certs we might want to speak to
+    let certs: HashMap<Tx2Cert, TxUrl> = inner
+        .local_data_map
+        .values()
+        .filter_map(|v| {
+            if let MetaOpData::Agent(agent_info_signed) = &**v {
+                // this is for remote gossip, we've already sync local agents
+                if inner
+                    .local_agents
+                    .contains(agent_info_signed.as_agent_ref())
+                {
+                    return None;
+                }
 
-    // randomize the keys
-    use rand::prelude::*;
-    let mut rng = thread_rng();
-    keys.shuffle(&mut rng);
-
-    // pick the first one that matches our criteria
-    // or just proceed without a gossip initiate.
-    let mut initiate_url = None;
-    let mut initiate_cert = None;
-    for key in keys {
-        let (url, cert) = match (|| {
-            if let Some(data) = inner.local_data_map.get(&**key) {
-                if let MetaOpData::Agent(agent_info_signed) = &**data {
-                    use std::convert::TryFrom;
-                    if let Ok(agent_info) =
-                        crate::agent_store::AgentInfo::try_from(agent_info_signed)
-                    {
-                        if let Some(url) = agent_info.as_urls_ref().get(0) {
-                            if let Ok(url) = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()) {
-                                return Some((
-                                    TxUrl::from(url.as_str()),
-                                    Tx2Cert::from(url.digest()),
-                                ));
-                            }
+                use std::convert::TryFrom;
+                if let Ok(agent_info) = crate::agent_store::AgentInfo::try_from(agent_info_signed) {
+                    if let Some(url) = agent_info.as_urls_ref().get(0) {
+                        if let Ok(purl) = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()) {
+                            return Some((Tx2Cert::from(purl.digest()), TxUrl::from(url.as_str())));
                         }
                     }
                 }
             }
             None
-        })() {
-            Some((url, cert)) => (url, cert),
-            None => continue,
-        };
+        })
+        .collect();
+    let mut certs: Vec<(Tx2Cert, TxUrl)> = certs.into_iter().collect();
 
+    // randomize the keys
+    use rand::prelude::*;
+    let mut rng = thread_rng();
+    certs.shuffle(&mut rng);
+
+    // pick the first one that matches our criteria
+    // or just proceed without a gossip initiate.
+    let mut initiate = None;
+    for (cert, url) in certs {
         match inner.remote_metrics.entry(cert.clone()) {
             std::collections::hash_map::Entry::Occupied(mut e) => {
                 // we've seen this node before, let's see if it's been too long
@@ -96,8 +92,7 @@ pub(crate) fn danger_mutex_locked_sync_step_3_initiate_inner(
                 // talk to them
                 e.last_touch = std::time::Instant::now();
                 e.was_err = false;
-                initiate_url = Some(url);
-                initiate_cert = Some(cert);
+                initiate = Some((cert, url));
                 break;
             }
             std::collections::hash_map::Entry::Vacant(e) => {
@@ -107,18 +102,17 @@ pub(crate) fn danger_mutex_locked_sync_step_3_initiate_inner(
                     was_err: false,
                 });
                 inner.initiate_tgt = Some(cert.clone());
-                initiate_url = Some(url);
-                initiate_cert = Some(cert);
+                initiate = Some((cert, url));
                 break;
             }
         }
     }
 
-    if let (Some(url), Some(cert)) = (initiate_url, initiate_cert) {
-        tracing::info!(?url, ?cert, "initiating gossip");
+    if let Some((cert, url)) = initiate {
+        tracing::info!(?cert, "initiating gossip");
         let gossip = encode_bloom_filter(&inner.local_bloom);
         let gossip = GossipWire::initiate(gossip);
-        inner.outgoing.push((url, cert, gossip));
+        inner.outgoing.push((cert, HowToConnect::Url(url), gossip));
     }
 
     Ok(())

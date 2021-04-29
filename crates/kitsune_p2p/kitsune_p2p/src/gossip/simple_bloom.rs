@@ -120,6 +120,11 @@ struct NodeInfo {
     was_err: bool,
 }
 
+pub(crate) enum HowToConnect {
+    Con(Tx2ConHnd<wire::Wire>),
+    Url(TxUrl),
+}
+
 #[allow(dead_code)]
 pub(crate) struct SimpleBloomModInner2 {
     tuning_params: KitsuneP2pTuningParams,
@@ -141,7 +146,7 @@ pub(crate) struct SimpleBloomModInner2 {
 
     last_outgoing: std::time::Instant,
     send_interval_ms: u64,
-    outgoing: Vec<(TxUrl, Tx2Cert, GossipWire)>,
+    outgoing: Vec<(Tx2Cert, HowToConnect, GossipWire)>,
 }
 
 impl SimpleBloomModInner2 {
@@ -345,8 +350,19 @@ impl SimpleBloomMod2 {
                     let maybe_outgoing = if !i.outgoing.is_empty()
                         && i.last_outgoing.elapsed().as_millis() as u64 > i.send_interval_ms
                     {
-                        i.last_outgoing = std::time::Instant::now();
-                        Some(i.outgoing.remove(0))
+                        let (cert, how, gossip) = i.outgoing.remove(0);
+
+                        // set this to a time in the future
+                        // so we don't accidentally double up if sending
+                        // is slow... we'll set this more reasonably
+                        // when we get a success or failure below.
+                        i.last_outgoing = std::time::Instant::now()
+                            .checked_add(std::time::Duration::from_millis(
+                                i.tuning_params.tx2_implicit_timeout_ms as u64,
+                            ))
+                            .unwrap();
+
+                        Some((cert, how, gossip))
                     } else {
                         None
                     };
@@ -369,18 +385,19 @@ impl SimpleBloomMod2 {
                     > tuning_params.gossip_loop_iteration_delay_ms;
 
             if let Some(outgoing) = maybe_outgoing.take() {
-                let (url, cert, gossip) = outgoing;
+                let (cert, how, gossip) = outgoing;
                 if let Err(e) = step_4_com_loop_inner_outgoing(
                     tuning_params.clone(),
                     space.clone(),
                     ep_hnd,
-                    url,
+                    how,
                     gossip,
                 )
                 .await
                 {
                     tracing::warn!("failed to send outgoing: {:?} {:?}", cert, e);
                     self.0.share_mut(move |i, _| {
+                        i.last_outgoing = std::time::Instant::now();
                         i.remote_metrics.insert(
                             cert,
                             NodeInfo {
@@ -392,6 +409,7 @@ impl SimpleBloomMod2 {
                     })?;
                 } else {
                     self.0.share_mut(move |i, _| {
+                        i.last_outgoing = std::time::Instant::now();
                         i.remote_metrics.insert(
                             cert,
                             NodeInfo {
