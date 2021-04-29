@@ -20,6 +20,7 @@ use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_sqlite::prelude::*;
 use holochain_state::element_buf::ElementBuf;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::metadata::MetadataBuf;
 use holochain_state::metadata::MetadataBufT;
 use holochain_state::source_chain::SourceChain;
@@ -49,26 +50,20 @@ pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT + Send, C: CellConductorApiT
     pub is_root_zome_call: bool,
 }
 
-#[instrument(skip(
-    workspace_lock,
-    network,
-    keystore,
-    writer,
-    args,
-    trigger_produce_dht_ops
-))]
+#[instrument(skip(workspace, network, keystore, writer, args, trigger_produce_dht_ops))]
 pub async fn call_zome_workflow<
     'env,
     Ribosome: RibosomeT + Send + 'static,
     C: CellConductorApiT,
 >(
-    workspace_lock: CallZomeWorkspaceLock,
+    workspace: HostFnWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     writer: OneshotWriter,
     args: CallZomeWorkflowArgs<Ribosome, C>,
     mut trigger_produce_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult> {
+    let workspace_lock: CallZomeWorkspaceLock = todo!();
     let should_write = args.is_root_zome_call;
     let result = call_zome_workflow_inner(workspace_lock.clone(), network, keystore, args).await?;
 
@@ -117,7 +112,7 @@ async fn call_zome_workflow_inner<
         let network = network.clone();
         move || {
             let host_access = ZomeCallHostAccess::new(
-                workspace_lock,
+                todo!(),
                 keystore,
                 network,
                 signal_tx,
@@ -207,7 +202,7 @@ async fn call_zome_workflow_inner<
                             base,
                             target,
                             &ribosome,
-                            workspace_lock.clone(),
+                            todo!(),
                             network.clone(),
                         )?,
                     )
@@ -217,7 +212,7 @@ async fn call_zome_workflow_inner<
                         zome.clone(),
                         delete_link.clone(),
                         &ribosome,
-                        workspace_lock.clone(),
+                        todo!(),
                         network.clone(),
                     )?,
                 ),
@@ -226,7 +221,7 @@ async fn call_zome_workflow_inner<
                         zome.clone(),
                         chain_element,
                         &ribosome,
-                        workspace_lock.clone(),
+                        todo!(),
                         network.clone(),
                         &conductor_api,
                     )

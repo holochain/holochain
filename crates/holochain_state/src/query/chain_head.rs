@@ -7,10 +7,10 @@ use super::Params;
 use super::*;
 
 #[derive(Debug, Clone)]
-pub struct ChainHeadQuery(AgentPubKey);
+pub struct ChainHeadQuery(Arc<AgentPubKey>);
 
 impl ChainHeadQuery {
-    pub fn new(agent: AgentPubKey) -> Self {
+    pub fn new(agent: Arc<AgentPubKey>) -> Self {
         Self(agent)
     }
 }
@@ -18,7 +18,7 @@ impl ChainHeadQuery {
 impl Query for ChainHeadQuery {
     type Item = Judged<SignedHeaderHashed>;
     type State = Option<SignedHeaderHashed>;
-    type Output = Option<HeaderHash>;
+    type Output = Option<(HeaderHash, u32)>;
 
     fn query(&self) -> String {
         "
@@ -51,7 +51,7 @@ impl Query for ChainHeadQuery {
         // NB: it's a little redundant to filter on author, since we should never
         // be putting any headers by other authors in our scratch, but it
         // certainly doesn't hurt to be consistent.
-        let f = move |header: &SignedHeaderHashed| *header.header().author() == author;
+        let f = move |header: &SignedHeaderHashed| *header.header().author() == *author;
         Box::new(f)
     }
 
@@ -75,7 +75,11 @@ impl Query for ChainHeadQuery {
     where
         S: Store,
     {
-        Ok(state.map(|sh| HeaderHash::with_data_sync(sh.header())))
+        Ok(state.map(|sh| {
+            let seq = sh.header().header_seq();
+            let hash = sh.into_inner().1;
+            (hash, seq)
+        }))
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
@@ -152,10 +156,16 @@ mod tests {
             scratch.add_header(shh.clone());
         }
 
-        let query = ChainHeadQuery::new(author);
+        let query = ChainHeadQuery::new(Arc::new(author));
 
         let head = query.run(DbScratch::new(&[&mut txn], &scratch)).unwrap();
         // let head = query.run(Txn::from(&txn)).unwrap();
-        assert_eq!(head.as_ref(), Some(expected_head.as_hash()));
+        assert_eq!(
+            head.unwrap(),
+            (
+                expected_head.as_hash().clone(),
+                expected_head.header().header_seq()
+            )
+        );
     }
 }

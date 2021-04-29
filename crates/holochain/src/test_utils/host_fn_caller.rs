@@ -13,7 +13,6 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::CallZomeWorkspace;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use hdk::prelude::EntryError;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
@@ -24,9 +23,8 @@ use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_sqlite::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::metadata::LinkMetaKey;
-use holochain_state::workspace::Workspace;
 use holochain_types::prelude::*;
 use holochain_zome_types::AgentActivity;
 use std::sync::Arc;
@@ -150,7 +148,7 @@ impl HostFnCaller {
         EnvWrite,
         Arc<RealRibosome>,
         Arc<CallContext>,
-        CallZomeWorkspaceLock,
+        HostFnWorkspace,
     ) {
         let HostFnCaller {
             env,
@@ -164,8 +162,12 @@ impl HostFnCaller {
 
         let (cell_id, zome_name) = zome_path.into();
 
-        let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-        let workspace_lock = CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock = HostFnWorkspace::new(
+            env.clone(),
+            todo!("make cache"),
+            cell_id.agent_pubkey().clone(),
+        )
+        .unwrap();
         let host_access = ZomeCallHostAccess::new(
             workspace_lock.clone(),
             keystore,
@@ -192,12 +194,7 @@ impl HostFnCaller {
         let output = host_fn::create::create(ribosome, call_context, input).unwrap();
 
         // Write
-        let mut guard = workspace_lock.write().await;
-        let workspace = &mut guard;
-        env.conn()
-            .unwrap()
-            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
-            .unwrap();
+        workspace_lock.flush().unwrap();
 
         output
     }
@@ -214,12 +211,7 @@ impl HostFnCaller {
         };
 
         // Write
-        let mut guard = workspace_lock.write().await;
-        let workspace = &mut guard;
-        env.conn()
-            .unwrap()
-            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
-            .unwrap();
+        workspace_lock.flush().unwrap();
 
         output
     }
@@ -238,12 +230,7 @@ impl HostFnCaller {
         let output = { host_fn::update::update(ribosome, call_context, input).unwrap() };
 
         // Write
-        let mut guard = workspace_lock.write().await;
-        let workspace = &mut guard;
-        env.conn()
-            .unwrap()
-            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
-            .unwrap();
+        workspace_lock.flush().unwrap();
 
         output
     }
@@ -275,12 +262,7 @@ impl HostFnCaller {
         let output = { host_fn::create_link::create_link(ribosome, call_context, input).unwrap() };
 
         // Write
-        let mut guard = workspace_lock.write().await;
-        let workspace = &mut guard;
-        env.conn()
-            .unwrap()
-            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
-            .unwrap();
+        workspace_lock.flush().unwrap();
 
         output
     }
@@ -291,12 +273,7 @@ impl HostFnCaller {
             { host_fn::delete_link::delete_link(ribosome, call_context, link_add_hash).unwrap() };
 
         // Write
-        let mut guard = workspace_lock.write().await;
-        let workspace = &mut guard;
-        env.conn()
-            .unwrap()
-            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
-            .unwrap();
+        workspace_lock.flush().unwrap();
 
         output
     }
@@ -312,12 +289,7 @@ impl HostFnCaller {
         let output = { host_fn::get_links::get_links(ribosome, call_context, input).unwrap() };
 
         // Write
-        let mut guard = workspace_lock.write().await;
-        let workspace = &mut guard;
-        env.conn()
-            .unwrap()
-            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
-            .unwrap();
+        workspace_lock.flush().unwrap();
 
         output.into()
     }
@@ -355,12 +327,7 @@ impl HostFnCaller {
         };
 
         // Write
-        let mut guard = workspace_lock.write().await;
-        let workspace = &mut guard;
-        env.conn()
-            .unwrap()
-            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
-            .unwrap();
+        workspace_lock.flush().unwrap();
         unwrap_to!(output => ZomeCallResponse::Ok).to_owned()
     }
 }

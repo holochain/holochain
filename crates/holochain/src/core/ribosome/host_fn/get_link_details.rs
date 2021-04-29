@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
+use holochain_cascade2::Cascade;
 use holochain_p2p::actor::GetLinksOptions;
-use holochain_state::metadata::LinkMetaKey;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
@@ -24,23 +24,24 @@ pub fn get_link_details<'a>(
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
+    let network: holochain_cascade2::test_utils::PassThroughNetwork =
+        todo!("remove when holochain p2p is updated");
 
     tokio_helper::block_forever_on(async move {
         // Create the key
-        let key = match tag_prefix.as_ref() {
-            Some(tag_prefix) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag_prefix),
-            None => LinkMetaKey::BaseZome(&base_address, zome_id),
+        let key = WireLinkKey {
+            base: base_address,
+            zome_id,
+            tag: tag_prefix,
         };
 
+        let workspace = call_context.host_access.workspace();
+        let mut cascade = Cascade::from_workspace_network(workspace, network)
+            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
         // Get the links from the dht
         let link_details = LinkDetails::from(
-            call_context
-                .host_access
-                .workspace()
-                .write()
-                .await
-                .cascade(network)
-                .get_link_details(&key, GetLinksOptions::default())
+            cascade
+                .get_link_details(key, GetLinksOptions::default())
                 .await
                 .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?,
         );

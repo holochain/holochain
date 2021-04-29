@@ -36,6 +36,7 @@ use holo_hash::HeaderHash;
 use holo_hash::WasmHash;
 use holochain_keystore::keystore_actor::KeystoreSender;
 use holochain_p2p::HolochainP2pCellFixturator;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::metadata::LinkMetaVal;
 use holochain_state::test_utils::test_keystore;
 use holochain_types::fixt::TimestampFixturator;
@@ -287,6 +288,29 @@ fixturator!(
     };
 );
 
+fixturator!(
+    HostFnWorkspace;
+    curve Empty {
+        // XXX: This may not be great to just grab an environment for this purpose.
+        //      It is assumed that this value is never really used in any "real"
+        //      way, because previously, it was implemented as a null pointer
+        //      wrapped in an UnsafeZomeCallWorkspace
+        let vault = holochain_state::test_utils::test_cell_env();
+        let cache = holochain_state::test_utils::test_cell_env();
+        HostFnWorkspace::new(vault.env().into(), cache.env().into(), fixt!(AgentPubKey)).unwrap()
+    };
+    curve Unpredictable {
+        HostFnWorkspaceFixturator::new(Empty)
+            .next()
+            .unwrap()
+    };
+    curve Predictable {
+        HostFnWorkspaceFixturator::new(Empty)
+            .next()
+            .unwrap()
+    };
+);
+
 fn make_call_zome_handle(cell_id: CellId) -> CellConductorReadHandle {
     let handle = Arc::new(MockConductorHandleT::new());
     let cell_conductor_api = CellConductorApi::new(handle, cell_id);
@@ -300,7 +324,7 @@ fixturator!(
 
 fixturator!(
     ZomeCallHostAccess;
-    constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell, SignalBroadcaster, CellConductorReadHandle, CellId);
+    constructor fn new(HostFnWorkspace, KeystoreSender, HolochainP2pCell, SignalBroadcaster, CellConductorReadHandle, CellId);
 );
 
 fixturator!(
@@ -320,7 +344,7 @@ fixturator!(
 
 fixturator!(
     InitHostAccess;
-    constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, KeystoreSender, HolochainP2pCell);
 );
 
 fixturator!(
@@ -330,7 +354,7 @@ fixturator!(
 
 fixturator!(
     MigrateAgentHostAccess;
-    constructor fn new(CallZomeWorkspaceLock);
+    constructor fn new(HostFnWorkspace);
 );
 
 fixturator!(
@@ -340,7 +364,7 @@ fixturator!(
 
 fixturator!(
     PostCommitHostAccess;
-    constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, KeystoreSender, HolochainP2pCell);
 );
 
 fixturator!(
@@ -400,12 +424,12 @@ fixturator!(
 
 fixturator!(
     ValidateLinkHostAccess;
-    constructor fn new(CallZomeWorkspaceLock, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, HolochainP2pCell);
 );
 
 fixturator!(
     ValidateHostAccess;
-    constructor fn new(CallZomeWorkspaceLock, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, HolochainP2pCell);
 );
 
 fixturator!(
@@ -415,7 +439,7 @@ fixturator!(
 
 fixturator!(
     ValidationPackageHostAccess;
-    constructor fn new(CallZomeWorkspaceLock, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, HolochainP2pCell);
 );
 
 fixturator!(

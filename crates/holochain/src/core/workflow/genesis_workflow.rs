@@ -10,17 +10,12 @@
 use super::error::WorkflowError;
 use super::error::WorkflowResult;
 use crate::conductor::api::CellConductorApiT;
-use crate::core::queue_consumer::OneshotWriter;
 use derive_more::Constructor;
 use holochain_sqlite::prelude::*;
-use holochain_state::prelude::insert_entry;
-use holochain_state::prelude::insert_header;
-use holochain_state::prelude::insert_op_lite;
-use holochain_state::prelude::StateMutationResult;
+use holochain_state::source_chain2;
 use holochain_state::workspace::WorkspaceResult;
 use holochain_types::prelude::*;
 use rusqlite::named_params;
-use rusqlite::Transaction;
 use tracing::*;
 
 /// The struct which implements the genesis Workflow
@@ -31,10 +26,9 @@ pub struct GenesisWorkflowArgs {
     membrane_proof: Option<SerializedBytes>,
 }
 
-#[instrument(skip(workspace, writer, api))]
+#[instrument(skip(workspace, api))]
 pub async fn genesis_workflow<'env, Api: CellConductorApiT>(
     mut workspace: GenesisWorkspace,
-    writer: OneshotWriter,
     api: Api,
     args: GenesisWorkflowArgs,
 ) -> WorkflowResult<()> {
@@ -114,9 +108,9 @@ async fn genesis_workflow_inner<Api: CellConductorApiT>(
     let agent_entry = agent_entry.into_option();
 
     workspace.vault.conn()?.with_commit(|txn| {
-        put_raw(txn, dna_header, dna_ops, None)?;
-        put_raw(txn, agent_validation_header, avh_ops, None)?;
-        put_raw(txn, agent_header, agent_ops, agent_entry)?;
+        source_chain2::put_raw(txn, dna_header, dna_ops, None)?;
+        source_chain2::put_raw(txn, agent_validation_header, avh_ops, None)?;
+        source_chain2::put_raw(txn, agent_header, agent_ops, agent_entry)?;
         WorkflowResult::Ok(())
     })?;
 
@@ -156,38 +150,6 @@ impl GenesisWorkspace {
         })?;
         Ok(count >= 3)
     }
-}
-
-fn put_raw(
-    txn: &mut Transaction,
-    shh: SignedHeaderHashed,
-    ops: Vec<DhtOpLight>,
-    entry: Option<Entry>,
-) -> StateMutationResult<()> {
-    let (header, signature) = shh.into_header_and_signature();
-    let (header, hash) = header.into_inner();
-    let mut header = Some(header);
-    let mut hashes = Vec::with_capacity(ops.len());
-    for op in &ops {
-        let op_type = op.get_type();
-        let (h, op_hash) =
-            UniqueForm::op_hash(op_type, header.take().expect("This can't be empty"))?;
-        let op_order = OpOrder::new(op_type, h.timestamp());
-        header = Some(h);
-        hashes.push((op_hash, op_order));
-    }
-    let shh = SignedHeaderHashed::with_presigned(
-        HeaderHashed::with_pre_hashed(header.expect("This can't be empty"), hash),
-        signature,
-    );
-    if let Some(entry) = entry {
-        insert_entry(txn, EntryHashed::from_content_sync(entry))?;
-    }
-    insert_header(txn, shh)?;
-    for (op, (op_hash, op_order)) in ops.into_iter().zip(hashes) {
-        insert_op_lite(txn, op, op_hash, true, op_order)?;
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -230,9 +192,7 @@ pub mod tests {
                 agent_pubkey: agent_pubkey.clone(),
                 membrane_proof: None,
             };
-            let _: () = genesis_workflow(workspace, arc.clone().into(), api, args)
-                .await
-                .unwrap();
+            let _: () = genesis_workflow(workspace, api, args).await.unwrap();
         }
 
         {

@@ -2,11 +2,11 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
@@ -75,7 +75,7 @@ impl From<ValidateDeleteLinkInvocation> for ValidateDeleteLinkData {
 }
 #[derive(Clone, Constructor)]
 pub struct ValidateLinkHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
+    pub workspace: HostFnWorkspace,
     pub network: HolochainP2pCell,
 }
 
@@ -287,6 +287,7 @@ mod slow_tests {
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_state::source_chain::SourceChainResult;
     use holochain_types::dna::zome::Zome;
     use holochain_wasm_test_utils::TestWasm;
@@ -362,7 +363,12 @@ mod slow_tests {
 
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        host_access.workspace = HostFnWorkspace::new(
+            test_env.env(),
+            todo!("make cache"),
+            test_env.cell_id().unwrap().agent_pubkey().clone(),
+        )
+        .unwrap();
 
         let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_valid_link", ());

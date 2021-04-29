@@ -14,6 +14,8 @@ use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_state::host_fn_workspace::HostFnStores;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::mutations::set_validation_status;
 use holochain_state::prelude::*;
 use holochain_state::query::element_details::GetElementDetailsQuery;
@@ -125,6 +127,37 @@ where
             cache: Some(cache_env),
             network: Some(network),
         }
+    }
+}
+impl Cascade<PassThroughNetwork> {
+    pub fn from_workspace_network<N: HolochainP2pCellT2 + Clone>(
+        workspace: &HostFnWorkspace,
+        network: N,
+    ) -> CascadeResult<Cascade<N>> {
+        let HostFnStores {
+            vault,
+            cache,
+            scratch,
+        } = workspace.stores()?;
+        Ok(Cascade::<N> {
+            vault: Some(vault),
+            cache: Some(cache),
+            scratch: Some(scratch),
+            network: Some(network),
+        })
+    }
+    pub fn from_workspace(workspace: &HostFnWorkspace) -> CascadeResult<Self> {
+        let HostFnStores {
+            vault,
+            cache,
+            scratch,
+        } = workspace.stores()?;
+        Ok(Self {
+            vault: Some(vault),
+            cache: Some(cache),
+            scratch: Some(scratch),
+            network: None,
+        })
     }
 }
 

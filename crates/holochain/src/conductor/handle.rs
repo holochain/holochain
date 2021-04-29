@@ -62,6 +62,7 @@ use futures::StreamExt;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::sync::Arc;
@@ -137,7 +138,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn call_zome_with_workspace(
         &self,
         invocation: ZomeCall,
-        workspace_lock: CallZomeWorkspaceLock,
+        workspace_lock: HostFnWorkspace,
     ) -> ConductorApiResult<ZomeCallResult>;
 
     /// Cue the autonomic system to perform some action early (experimental)
@@ -401,7 +402,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn call_zome_with_workspace(
         &self,
         call: ZomeCall,
-        workspace_lock: CallZomeWorkspaceLock,
+        workspace_lock: HostFnWorkspace,
     ) -> ConductorApiResult<ZomeCallResult> {
         debug!(cell_id = ?call.cell_id);
         let cell = self.cell_by_id(&call.cell_id).await?;

@@ -535,6 +535,12 @@ impl<'borrow, 'txn> From<&'borrow Transaction<'txn>> for Txn<'borrow, 'txn> {
     }
 }
 
+impl<'borrow, 'txn> From<&'borrow mut Transaction<'txn>> for Txn<'borrow, 'txn> {
+    fn from(txn: &'borrow mut Transaction<'txn>) -> Self {
+        Self { txn }
+    }
+}
+
 impl<'borrow, 'txn> From<&'borrow Transactions<'borrow, 'txn>> for Txns<'borrow, 'txn> {
     fn from(txns: &'borrow Transactions<'borrow, 'txn>) -> Self {
         let txns = txns.iter().map(|&txn| Txn::from(txn)).collect();
@@ -604,7 +610,7 @@ pub fn row_blob_and_hash_to_header(
     hash_index: &'static str,
 ) -> impl Fn(&Row) -> StateQueryResult<SignedHeaderHashed> {
     move |row| {
-        let header = from_blob::<SignedHeader>(row.get(row.column_index(blob_index)?)?)?;
+        let header = from_blob::<SignedHeader>(row.get(blob_index)?)?;
         let SignedHeader(header, signature) = header;
         let hash: HeaderHash = row.get(row.column_index(hash_index)?)?;
         let header = HeaderHashed::with_pre_hashed(header, hash);
@@ -617,7 +623,7 @@ pub fn row_blob_to_header(
     blob_index: &'static str,
 ) -> impl Fn(&Row) -> StateQueryResult<SignedHeaderHashed> {
     move |row| {
-        let header = from_blob::<SignedHeader>(row.get(row.column_index(blob_index)?)?)?;
+        let header = from_blob::<SignedHeader>(row.get(blob_index)?)?;
         let SignedHeader(header, signature) = header;
         let header = HeaderHashed::from_content_sync(header);
         let shh = SignedHeaderHashed::with_presigned(header, signature);

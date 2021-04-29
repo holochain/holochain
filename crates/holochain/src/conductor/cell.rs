@@ -40,6 +40,7 @@ use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::{fresh_reader, prelude::*};
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use observability::OpenSpanExt;
@@ -174,7 +175,7 @@ impl Cell {
             .map_err(Box::new)?;
         let args = GenesisWorkflowArgs::new(dna_file, id.agent_pubkey().clone(), membrane_proof);
 
-        genesis_workflow(workspace, cell_env.clone().into(), conductor_api, args)
+        genesis_workflow(workspace, conductor_api, args)
             .await
             .map_err(Box::new)
             .map_err(ConductorApiError::from)
@@ -681,7 +682,7 @@ impl Cell {
     pub async fn call_zome(
         &self,
         call: ZomeCall,
-        workspace_lock: Option<CallZomeWorkspaceLock>,
+        workspace_lock: Option<HostFnWorkspace>,
     ) -> CellResult<ZomeCallResult> {
         // Check if init has run if not run it
         self.check_or_run_zome_init().await?;
@@ -693,7 +694,11 @@ impl Cell {
         let is_root_zome_call = workspace_lock.is_none();
         let workspace_lock = match workspace_lock {
             Some(l) => l,
-            None => CallZomeWorkspaceLock::new(CallZomeWorkspace::new(arc.clone().into())?),
+            None => HostFnWorkspace::new(
+                self.env().clone(),
+                self.cache().clone(),
+                self.id.agent_pubkey().clone(),
+            )?,
         };
 
         let conductor_api = self.conductor_api.clone();
@@ -729,12 +734,14 @@ impl Cell {
         let id = self.id.clone();
         let conductor_api = self.conductor_api.clone();
         // Create the workspace
-        let workspace = CallZomeWorkspace::new(self.env().clone().into())
-            .map_err(WorkflowError::from)
-            .map_err(Box::new)?;
+        let workspace = HostFnWorkspace::new(
+            self.env().clone(),
+            self.cache().clone(),
+            id.agent_pubkey().clone(),
+        )?;
 
         // Check if initialization has run
-        if workspace.source_chain.has_initialized() {
+        if workspace.source_chain().has_initialized()? {
             return Ok(());
         }
         trace!("running init");
@@ -795,6 +802,10 @@ impl Cell {
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) fn env(&self) -> &EnvWrite {
         &self.env
+    }
+
+    pub(crate) fn cache(&self) -> &EnvWrite {
+        todo!("Make cache")
     }
 
     #[cfg(any(test, feature = "test_utils"))]

@@ -56,6 +56,24 @@ impl Scratch {
         FilteredScratch { headers }
     }
 
+    pub fn headers(&self) -> impl Iterator<Item = &SignedHeaderHashed> {
+        self.headers.iter()
+    }
+
+    pub fn elements<'iter>(&'iter self) -> impl Iterator<Item = Element> + 'iter {
+        self.headers.iter().cloned().map(move |shh| {
+            let entry = shh
+                .header()
+                .entry_hash()
+                .and_then(|eh| self.entries.get(eh).map(|e| (**e).clone()));
+            Element::new(shh, entry)
+        })
+    }
+
+    pub fn num_headers(&self) -> usize {
+        self.headers.len()
+    }
+
     fn get_exact_element(
         &self,
         hash: &HeaderHash,
@@ -87,6 +105,23 @@ impl Scratch {
             Some(Element::new(shh, Some(entry)))
         });
         Ok(r)
+    }
+
+    /// Drain out all the headers.
+    pub fn drain_headers<'iter>(
+        &'iter mut self,
+    ) -> impl Iterator<Item = SignedHeaderHashed> + 'iter {
+        self.headers.drain(..)
+    }
+
+    /// Drain out all the entries.
+    pub fn drain_entries<'iter>(&'iter mut self) -> impl Iterator<Item = EntryHashed> + 'iter {
+        self.entries.drain().map(|(hash, entry)| {
+            EntryHashed::with_pre_hashed(
+                Arc::try_unwrap(entry).unwrap_or_else(|e| (*e).clone()),
+                hash,
+            )
+        })
     }
 }
 

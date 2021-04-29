@@ -1,9 +1,9 @@
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
-use holochain_cascade::error::CascadeResult;
+use holochain_cascade2::error::CascadeResult;
+use holochain_cascade2::test_utils::PassThroughNetwork;
+use holochain_cascade2::Cascade;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
@@ -20,19 +20,15 @@ pub fn delete_link<'a>(
     // the subconscious will validate the base address match but we need to fetch it here to
     // include it in the remove link header
     let network = call_context.host_access.network().clone();
+    let network: PassThroughNetwork = todo!("remove when holochain p2p is updated");
     let address = input.clone();
     let call_context_2 = call_context.clone();
 
     // handle timeouts at the network layer
     let maybe_add_link: Option<SignedHeaderHashed> = tokio_helper::block_forever_on(async move {
+        let workspace = call_context_2.host_access.workspace();
         CascadeResult::Ok(
-            call_context_2
-                .clone()
-                .host_access
-                .workspace()
-                .write()
-                .await
-                .cascade(network)
+            Cascade::from_workspace_network(workspace, network)?
                 .dht_get(address.into(), GetOptions::content())
                 .await?
                 .map(|el| el.into_inner().0),
@@ -58,15 +54,12 @@ pub fn delete_link<'a>(
     }
     .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
 
-    let workspace_lock = call_context.host_access.workspace();
+    let source_chain = call_context.host_access.workspace().source_chain();
 
     // handle timeouts at the source chain layer
 
     // add a DeleteLink to the source chain
     tokio_helper::block_forever_on(async move {
-        let mut guard = workspace_lock.write().await;
-        let workspace: &mut CallZomeWorkspace = &mut guard;
-        let source_chain = &mut workspace.source_chain;
         let header_builder = builder::DeleteLink {
             link_add_address: input,
             base_address,
@@ -75,16 +68,6 @@ pub fn delete_link<'a>(
             .put(header_builder, None)
             .await
             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
-        let element = source_chain
-            .get_element(&header_hash)
-            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?
-            .expect("Element we just put in SourceChain must be gettable");
-        integrate_to_authored(
-            &element,
-            workspace.source_chain.elements(),
-            &mut workspace.meta_authored,
-        )
-        .map_err(|dht_op_convert_error| WasmError::Host(dht_op_convert_error.to_string()))?;
         Ok(header_hash)
     })
 }

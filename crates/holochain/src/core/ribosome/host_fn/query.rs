@@ -13,9 +13,7 @@ pub fn query(
         let elements: Vec<Element> = call_context
             .host_access
             .workspace()
-            .write()
-            .await
-            .source_chain
+            .source_chain()
             .query(&input)
             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
         Ok(elements)

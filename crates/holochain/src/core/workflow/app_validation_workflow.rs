@@ -46,6 +46,7 @@ use holochain_p2p::HolochainP2pCellT;
 use holochain_sqlite::buffer::BufferedStore;
 use holochain_sqlite::buffer::KvBufFresh;
 use holochain_sqlite::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::Entry;
@@ -463,7 +464,7 @@ async fn get_validation_package(
     // from_agent: Option<AgentPubKey>,
     workspace: Option<&mut AppValidationWorkspace2>,
     ribosome: &impl RibosomeT,
-    workspace_lock: &CallZomeWorkspaceLock,
+    workspace_lock: &HostFnWorkspace,
     // network: &HolochainP2pCell,
     network: &PassThroughNetwork,
 ) -> AppValidationOutcome<Option<ValidationPackage>> {
@@ -503,7 +504,7 @@ async fn get_validation_package_local(
     element: &Element,
     required_validation_type: RequiredValidationType,
     ribosome: &impl RibosomeT,
-    workspace_lock: &CallZomeWorkspaceLock,
+    workspace_lock: &HostFnWorkspace,
     // network: &HolochainP2pCell,
     network: &PassThroughNetwork,
 ) -> AppValidationOutcome<Option<ValidationPackage>> {
@@ -515,21 +516,19 @@ async fn get_validation_package_local(
                 Some(EntryType::App(aet)) => aet,
                 _ => return Ok(None),
             };
-            let lock = workspace_lock.write().await;
             Ok(Some(get_as_author_sub_chain(
                 header_seq,
                 app_entry_type,
-                &lock.source_chain,
+                workspace_lock.source_chain(),
             )?))
         }
-        RequiredValidationType::Full => {
-            let lock = workspace_lock.write().await;
-            Ok(Some(get_as_author_full(header_seq, &lock.source_chain)?))
-        }
+        RequiredValidationType::Full => Ok(Some(get_as_author_full(
+            header_seq,
+            workspace_lock.source_chain(),
+        )?)),
         RequiredValidationType::Custom => {
             {
-                let mut lock = workspace_lock.write().await;
-                let cascade = lock.cascade_local();
+                let cascade = Cascade2::from_workspace(workspace_lock)?;
                 if let Some(elements) =
                     cascade.get_validation_package_local(element.header_address())?
                 {
@@ -568,7 +567,7 @@ async fn get_validation_package_remote(
     // from_agent: Option<AgentPubKey>,
     workspace: &mut AppValidationWorkspace2,
     ribosome: &impl RibosomeT,
-    workspace_lock: &CallZomeWorkspaceLock,
+    workspace_lock: &HostFnWorkspace,
     // network: &HolochainP2pCell,
     network: &PassThroughNetwork,
 ) -> AppValidationOutcome<Option<ValidationPackage>> {
@@ -724,15 +723,13 @@ pub async fn run_validation_callback_direct(
     zome: Zome,
     element: Element,
     ribosome: &impl RibosomeT,
-    workspace_lock: CallZomeWorkspaceLock,
+    workspace: HostFnWorkspace,
     // network: HolochainP2pCell,
     network: PassThroughNetwork,
     conductor_api: &impl CellConductorApiT,
 ) -> AppValidationResult<Outcome> {
     let outcome = {
-        // let mut workspace = workspace_lock.write().await;
-        let mut workspace = AppValidationWorkspace2::new(workspace_lock.env().await);
-        let cascade = workspace.full_cascade(network.clone());
+        let cascade = Cascade2::from_workspace_network(&workspace, network.clone())?;
         get_associated_entry_def(&element, ribosome.dna_def(), conductor_api, cascade).await
     };
 
@@ -745,13 +742,8 @@ pub async fn run_validation_callback_direct(
 
     let validation_package = {
         let outcome = get_validation_package(
-            &element,
-            &entry_def,
-            // None,
-            None,
-            ribosome,
-            &workspace_lock,
-            &network,
+            &element, &entry_def, // None,
+            None, ribosome, &workspace, &network,
         )
         .await;
         match outcome {
@@ -769,7 +761,7 @@ pub async fn run_validation_callback_direct(
         validation_package,
         entry_def_id,
         ribosome,
-        workspace_lock,
+        workspace,
         network,
     )
 }
@@ -780,7 +772,7 @@ fn run_validation_callback_inner(
     validation_package: Option<Arc<ValidationPackage>>,
     entry_def_id: Option<EntryDefId>,
     ribosome: &impl RibosomeT,
-    workspace_lock: CallZomeWorkspaceLock,
+    workspace_lock: HostFnWorkspace,
     // network: HolochainP2pCell,
     network: PassThroughNetwork,
 ) -> AppValidationResult<Outcome> {
@@ -807,7 +799,7 @@ pub fn run_create_link_validation_callback(
     base: Arc<Entry>,
     target: Arc<Entry>,
     ribosome: &impl RibosomeT,
-    workspace_lock: CallZomeWorkspaceLock,
+    workspace_lock: HostFnWorkspace,
     // network: HolochainP2pCell,
     network: PassThroughNetwork,
 ) -> AppValidationResult<Outcome> {
@@ -825,7 +817,7 @@ pub fn run_delete_link_validation_callback(
     zome: Zome,
     delete_link: DeleteLink,
     ribosome: &impl RibosomeT,
-    workspace_lock: CallZomeWorkspaceLock,
+    workspace_lock: HostFnWorkspace,
     // network: HolochainP2pCell,
     network: PassThroughNetwork,
 ) -> AppValidationResult<Outcome> {
@@ -837,7 +829,7 @@ pub fn run_delete_link_validation_callback(
 pub fn run_link_validation_callback<I: Invocation + 'static>(
     invocation: ValidateLinkInvocation<I>,
     ribosome: &impl RibosomeT,
-    workspace_lock: CallZomeWorkspaceLock,
+    workspace_lock: HostFnWorkspace,
     // network: HolochainP2pCell,
     network: PassThroughNetwork,
 ) -> AppValidationResult<Outcome> {
@@ -886,7 +878,7 @@ impl AppValidationWorkspace2 {
         })?;
         Ok(())
     }
-    pub fn validation_workspace(&self) -> CallZomeWorkspaceLock {
+    pub fn validation_workspace(&self) -> HostFnWorkspace {
         todo!("Make validation workspace")
     }
 
@@ -904,6 +896,16 @@ impl Workspace for AppValidationWorkspace2 {
     fn flush_to_txn_ref(&mut self, _writer: &mut Writer) -> WorkspaceResult<()> {
         todo!("Flush scratch");
         Ok(())
+    }
+}
+
+impl From<&HostFnWorkspace> for AppValidationWorkspace2 {
+    fn from(h: &HostFnWorkspace) -> Self {
+        let (vault, cache) = h.databases();
+        Self {
+            vault,
+            cache: cache.into(),
+        }
     }
 }
 

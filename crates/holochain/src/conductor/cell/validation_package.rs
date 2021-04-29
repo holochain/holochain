@@ -10,6 +10,7 @@ use holochain_cascade::DbPair;
 use holochain_cascade::DbPairMut;
 use holochain_p2p::HolochainP2pCell;
 use holochain_sqlite::error::DatabaseResult;
+use holochain_state::source_chain2::SourceChain;
 use holochain_types::dna::DnaFile;
 use holochain_zome_types::HeaderHashed;
 
@@ -54,7 +55,10 @@ pub(super) async fn get_as_author(
     let header = header_hashed.as_content();
 
     // Get the source chain with public data only
-    let source_chain = SourceChain::public_only(env.clone())?;
+    // TODO: evaluate if we even need to use a source chain here
+    // vs directly querying the database.
+    let mut source_chain = SourceChain::new(env.clone(), header.author().clone())?;
+    source_chain.public_only();
 
     // Get the header data
     let (app_entry_type, header_seq) = match header
@@ -111,7 +115,11 @@ pub(super) async fn get_as_author(
                 return Ok(Some(ValidationPackage::new(elements)).into());
             }
 
-            let workspace_lock = CallZomeWorkspaceLock::new(CallZomeWorkspace::new(env)?);
+            let workspace_lock = HostFnWorkspace::new(
+                env.into(),
+                todo!("make cache"),
+                conductor_api.cell_id().agent_pubkey().clone(),
+            )?;
             let network = todo!("Pass real network in when holochain p2p is updated");
             let result =
                 match get_as_author_custom(&header_hashed, ribosome, network, workspace_lock)? {

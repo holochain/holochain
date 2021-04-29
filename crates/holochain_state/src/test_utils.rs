@@ -112,6 +112,13 @@ impl TestEnv {
         tmp.push("test_dbs");
         self.dump(&tmp)
     }
+
+    pub fn cell_id(&self) -> Option<CellId> {
+        match self.env.kind() {
+            DbKind::Cell(cell_id) => Some(cell_id.clone()),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone)]

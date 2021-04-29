@@ -3,8 +3,6 @@ use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use holochain_wasmer_host::prelude::WasmError;
 
 use holo_hash::HasHash;
@@ -56,25 +54,14 @@ pub fn create<'a>(
     // being atomic
     let entry = AsRef::<Entry>::as_ref(&input).to_owned();
     tokio_helper::block_forever_on(async move {
-        let mut guard = call_context.host_access.workspace().write().await;
-        let workspace: &mut CallZomeWorkspace = &mut guard;
-        let source_chain = &mut workspace.source_chain;
         // push the header and the entry into the source chain
-        let header_hash = source_chain
+        let header_hash = call_context
+            .host_access
+            .workspace()
+            .source_chain()
             .put(header_builder, Some(entry))
             .await
             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
-        // fetch the element we just added so we can integrate its DhtOps
-        let element = source_chain
-            .get_element(&header_hash)
-            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?
-            .expect("Element we just put in SourceChain must be gettable");
-        integrate_to_authored(
-            &element,
-            workspace.source_chain.elements(),
-            &mut workspace.meta_authored,
-        )
-        .map_err(|dht_op_convert_error| WasmError::Host(dht_op_convert_error.to_string()))?;
         Ok(header_hash)
     })
 }

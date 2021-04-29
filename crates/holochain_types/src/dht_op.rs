@@ -699,7 +699,9 @@ fn produce_op_lights_from_parts<'a>(
     let iter = headers_and_hashes.map(|(head, hash)| (head, hash, maybe_entry_hash.cloned()));
     produce_op_lights_from_iter(iter, length)
 }
-fn produce_op_lights_from_iter<'a>(
+
+/// Produce op lights from iter of (header hash, header, maybe entry).
+pub fn produce_op_lights_from_iter<'a>(
     iter: impl Iterator<Item = (&'a HeaderHash, &'a Header, Option<EntryHash>)>,
     length: usize,
 ) -> DhtOpResult<Vec<DhtOpLight>> {

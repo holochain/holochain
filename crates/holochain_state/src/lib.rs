@@ -39,6 +39,7 @@ pub mod chain_sequence;
 pub mod dht_op_integration;
 #[allow(missing_docs)]
 pub mod element_buf;
+pub mod host_fn_workspace;
 pub mod metadata;
 pub mod mutations;
 #[allow(missing_docs)]
@@ -47,6 +48,7 @@ pub mod query;
 pub mod scratch;
 #[allow(missing_docs)]
 pub mod source_chain;
+pub mod source_chain2;
 pub mod validation_db;
 pub mod validation_receipts_db;
 #[allow(missing_docs)]
