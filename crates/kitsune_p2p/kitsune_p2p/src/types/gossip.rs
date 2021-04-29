@@ -1,5 +1,4 @@
 use crate::types::*;
-use futures::future::BoxFuture;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::*;
@@ -11,7 +10,7 @@ pub trait AsGossipModule: 'static + Send + Sync {
         &self,
         con: Tx2ConHnd<wire::Wire>,
         gossip_data: Box<[u8]>,
-    ) -> BoxFuture<'static, KitsuneResult<()>>;
+    ) -> KitsuneResult<()>;
     fn local_agent_join(&self, a: Arc<KitsuneAgent>);
     fn local_agent_leave(&self, a: Arc<KitsuneAgent>);
 }
@@ -23,7 +22,7 @@ impl GossipModule {
         &self,
         con: Tx2ConHnd<wire::Wire>,
         gossip_data: Box<[u8]>,
-    ) -> BoxFuture<'static, KitsuneResult<()>> {
+    ) -> KitsuneResult<()> {
         self.0.incoming_gossip(con, gossip_data)
     }
 

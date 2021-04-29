@@ -191,10 +191,8 @@ impl SpaceInternalHandler for Space {
         con: Tx2ConHnd<wire::Wire>,
         data: Box<[u8]>,
     ) -> InternalHandlerResult<()> {
-        let fut = self.gossip_mod.incoming_gossip(con, data);
-        Ok(async move { fut.await.map_err(KitsuneP2pError::other) }
-            .boxed()
-            .into())
+        self.gossip_mod.incoming_gossip(con, data)?;
+        Ok(async move { Ok(()) }.boxed().into())
     }
 }
 

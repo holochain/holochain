@@ -3,7 +3,7 @@ use super::*;
 // !WARNING! - this should be sync and as fast as possible
 //             the gossip mutex is locked for the duration of this fn!
 pub(crate) fn danger_mutex_locked_sync_step_3_initiate_inner(
-    inner: &mut SimpleBloomModInner2,
+    inner: &mut SimpleBloomModInner,
 ) -> KitsuneResult<()> {
     // first check to see if we should time out any current initiate_tgt
     if let Some(initiate_tgt) = inner.initiate_tgt.clone() {
