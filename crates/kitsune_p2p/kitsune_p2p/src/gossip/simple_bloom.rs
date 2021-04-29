@@ -105,9 +105,6 @@ kitsune_p2p_types::write_codec_enum! {
             filter.0: PoolBuf,
         },
 
-        /// Reject an incoming round of gossip from a remote node
-        Reject(0x21) {},
-
         /// Send a chunks of gossip meta op data,
         /// if "finished" this will be the final chunk.
         Chunk(0x30) {
@@ -130,7 +127,6 @@ pub(crate) struct SimpleBloomModInner2 {
     ep_hnd: Tx2EpHnd<wire::Wire>,
     evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
 
-    last_local_sync: std::time::Instant,
     local_agents: HashSet<Arc<KitsuneAgent>>,
     local_bloom: BloomFilter,
     local_data_map: DataMap,
@@ -145,7 +141,7 @@ pub(crate) struct SimpleBloomModInner2 {
 
     last_outgoing: std::time::Instant,
     send_interval_ms: u64,
-    outgoing: Vec<(TxUrl, GossipWire)>,
+    outgoing: Vec<(TxUrl, Tx2Cert, GossipWire)>,
 }
 
 impl SimpleBloomModInner2 {
@@ -176,7 +172,6 @@ impl SimpleBloomModInner2 {
             ep_hnd,
             evt_sender,
 
-            last_local_sync: old,
             local_agents: HashSet::new(),
             local_bloom: bloomfilter::Bloom::new(1, 1),
             local_data_map: HashMap::new(),
@@ -194,6 +189,13 @@ impl SimpleBloomModInner2 {
             outgoing: Vec::new(),
         }
     }
+}
+
+enum CheckResult {
+    Close,
+    NotReady,
+    SyncAndInitiate,
+    SkipSyncAndInitiate,
 }
 
 #[allow(dead_code)]
@@ -240,26 +242,29 @@ impl SimpleBloomMod2 {
         // # Step 1 - check state
         //   - if closed, send GossipIterationResult::Close
         //   - if not ready, exit early
-        match self.step_1_check() {
-            Err(_) => return GossipIterationResult::Close,
-            Ok(false) => return GossipIterationResult::Good,
-            Ok(true) => (),
-        }
+        let sync_and_initiate = match self.step_1_check() {
+            CheckResult::Close => return GossipIterationResult::Close,
+            CheckResult::NotReady => return GossipIterationResult::Good,
+            CheckResult::SyncAndInitiate => true,
+            CheckResult::SkipSyncAndInitiate => false,
+        };
 
-        // # Step 2 - run a local sync, updating bloom / data_map / key_set
-        match self.step_2_local_sync().await {
-            Err(_) => return GossipIterationResult::Close,
-            Ok(false) => return GossipIterationResult::Good,
-            Ok(true) => (),
-        }
+        if sync_and_initiate {
+            // # Step 2 - run a local sync, updating bloom / data_map / key_set
+            match self.step_2_local_sync().await {
+                Err(_) => return GossipIterationResult::Close,
+                Ok(false) => return GossipIterationResult::Good,
+                Ok(true) => (),
+            }
 
-        // # Step 3 - check target for initiation
-        //   - if we don't have a current initiation target, pick one
-        //   - send the initiate message
-        match self.step_3_initiate().await {
-            Err(_) => return GossipIterationResult::Close,
-            Ok(false) => return GossipIterationResult::Good,
-            Ok(true) => (),
+            // # Step 3 - check target for initiation
+            //   - if we don't have a current initiation target, pick one
+            //   - send the initiate message
+            match self.step_3_initiate().await {
+                Err(_) => return GossipIterationResult::Close,
+                Ok(false) => return GossipIterationResult::Good,
+                Ok(true) => (),
+            }
         }
 
         // # Step 4 - loop on incoming/outgoing data in parallel
@@ -278,25 +283,32 @@ impl SimpleBloomMod2 {
         GossipIterationResult::Good
     }
 
-    fn step_1_check(&self) -> KitsuneResult<bool> {
-        self.0.share_mut(|i, _| Ok(!i.local_agents.is_empty()))
+    fn step_1_check(&self) -> CheckResult {
+        match self.0.share_mut(|i, _| {
+            if i.local_agents.is_empty() {
+                return Ok(CheckResult::NotReady);
+            }
+            if i.initiate_tgt.is_none()
+                && i.last_initiate_check.elapsed().as_millis() as u32
+                    > i.tuning_params.gossip_loop_iteration_delay_ms
+            {
+                return Ok(CheckResult::SyncAndInitiate);
+            }
+            Ok(CheckResult::SkipSyncAndInitiate)
+        }) {
+            Err(_) => CheckResult::Close,
+            Ok(r) => r,
+        }
     }
 
     async fn step_2_local_sync(&self) -> KitsuneResult<bool> {
-        let (it_delay, last_local_sync, space, evt_sender, local_agents) =
-            self.0.share_mut(|i, _| {
-                Ok((
-                    i.tuning_params.gossip_loop_iteration_delay_ms,
-                    i.last_local_sync,
-                    i.space.clone(),
-                    i.evt_sender.clone(),
-                    i.local_agents.clone(),
-                ))
-            })?;
-
-        if (last_local_sync.elapsed().as_millis() as u32) < it_delay {
-            return Ok(true);
-        }
+        let (space, evt_sender, local_agents) = self.0.share_mut(|i, _| {
+            Ok((
+                i.space.clone(),
+                i.evt_sender.clone(),
+                i.local_agents.clone(),
+            ))
+        })?;
 
         let (data_map, key_set, bloom) =
             match step_2_local_sync_inner(space, evt_sender, local_agents).await {
@@ -328,7 +340,7 @@ impl SimpleBloomMod2 {
         let loop_start = std::time::Instant::now();
 
         loop {
-            let (it_delay, space, ep_hnd, evt_sender, mut maybe_outgoing, mut maybe_incoming) =
+            let (tuning_params, space, ep_hnd, mut maybe_outgoing, mut maybe_incoming) =
                 self.0.share_mut(|i, _| {
                     let maybe_outgoing = if !i.outgoing.is_empty()
                         && i.last_outgoing.elapsed().as_millis() as u64 > i.send_interval_ms
@@ -344,28 +356,57 @@ impl SimpleBloomMod2 {
                         None
                     };
                     Ok((
-                        i.tuning_params.gossip_loop_iteration_delay_ms,
+                        i.tuning_params.clone(),
                         i.space.clone(),
                         i.ep_hnd.clone(),
-                        i.evt_sender.clone(),
                         maybe_outgoing,
                         maybe_incoming,
                     ))
                 })?;
 
             let will_break = (maybe_outgoing.is_none() && maybe_incoming.is_none())
-                || loop_start.elapsed().as_millis() as u32 > it_delay;
+                || loop_start.elapsed().as_millis() as u32
+                    > tuning_params.gossip_loop_iteration_delay_ms;
 
             if let Some(outgoing) = maybe_outgoing.take() {
-                if let Err(e) =
-                    step_4_com_loop_inner_outgoing(space.clone(), ep_hnd, outgoing).await
+                let (url, cert, gossip) = outgoing;
+                if let Err(e) = step_4_com_loop_inner_outgoing(
+                    tuning_params.clone(),
+                    space.clone(),
+                    ep_hnd,
+                    url,
+                    gossip,
+                )
+                .await
                 {
-                    tracing::warn!("failed to send outgoing: {:?}", e);
+                    tracing::warn!("failed to send outgoing: {:?} {:?}", cert, e);
+                    self.0.share_mut(move |i, _| {
+                        i.remote_metrics.insert(
+                            cert,
+                            NodeInfo {
+                                last_touch: std::time::Instant::now(),
+                                was_err: true,
+                            },
+                        );
+                        Ok(())
+                    })?;
+                } else {
+                    self.0.share_mut(move |i, _| {
+                        i.remote_metrics.insert(
+                            cert,
+                            NodeInfo {
+                                last_touch: std::time::Instant::now(),
+                                was_err: false,
+                            },
+                        );
+                        Ok(())
+                    })?;
                 }
             }
 
             if let Some(incoming) = maybe_incoming.take() {
-                if let Err(e) = step_4_com_loop_inner_incoming(space, evt_sender, incoming).await {
+                let (con, gossip) = incoming;
+                if let Err(e) = step_4_com_loop_inner_incoming(&self.0, con, gossip).await {
                     tracing::warn!("failed to process incoming: {:?}", e);
                 }
             }
@@ -543,9 +584,6 @@ impl AsGossipModule for SimpleBloomMod {
                 GossipWire::Accept(Accept { filter }) => {
                     let key_set = inner.share_mut(|i, _| Ok(i.key_set.clone()))?;
                     (key_set, decode_bloom_filter(&filter))
-                }
-                GossipWire::Reject(_) => {
-                    return Ok(());
                 }
                 GossipWire::Chunk(Chunk {
                     finished: _,
