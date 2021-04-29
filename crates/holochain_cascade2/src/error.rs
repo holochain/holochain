@@ -53,6 +53,9 @@ pub enum CascadeError {
 
     #[error(transparent)]
     StateMutationError(#[from] holochain_state::mutations::StateMutationError),
+
+    #[error(transparent)]
+    SyncScratchError(#[from] holochain_state::scratch::SyncScratchError),
 }
 
 pub type CascadeResult<T> = Result<T, CascadeError>;

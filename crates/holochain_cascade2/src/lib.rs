@@ -26,7 +26,7 @@ use holochain_state::query::live_element::GetLiveElementQuery;
 use holochain_state::query::live_entry::GetLiveEntryQuery;
 use holochain_state::query::DbScratch;
 use holochain_state::query::StateQueryError;
-use holochain_state::scratch::Scratch;
+use holochain_state::scratch::SyncScratch;
 use holochain_types::prelude::*;
 use mutations::insert_entry;
 use mutations::insert_header;
@@ -70,7 +70,7 @@ macro_rules! ok_or_return {
 pub struct Cascade<Network = PassThroughNetwork> {
     vault: Option<EnvRead>,
     cache: Option<EnvWrite>,
-    scratch: Option<Arc<Scratch>>,
+    scratch: Option<SyncScratch>,
     network: Option<Network>,
 }
 
@@ -108,9 +108,9 @@ where
     }
 
     /// Add the cache to the cascade.
-    pub fn with_scratch(self, scratch: Scratch) -> Self {
+    pub fn with_scratch(self, scratch: SyncScratch) -> Self {
         Self {
-            scratch: Some(Arc::new(scratch)),
+            scratch: Some(scratch),
             ..self
         }
     }
@@ -133,31 +133,31 @@ impl Cascade<PassThroughNetwork> {
     pub fn from_workspace_network<N: HolochainP2pCellT2 + Clone>(
         workspace: &HostFnWorkspace,
         network: N,
-    ) -> CascadeResult<Cascade<N>> {
+    ) -> Cascade<N> {
         let HostFnStores {
             vault,
             cache,
             scratch,
-        } = workspace.stores()?;
-        Ok(Cascade::<N> {
+        } = workspace.stores();
+        Cascade::<N> {
             vault: Some(vault),
             cache: Some(cache),
             scratch: Some(scratch),
             network: Some(network),
-        })
+        }
     }
-    pub fn from_workspace(workspace: &HostFnWorkspace) -> CascadeResult<Self> {
+    pub fn from_workspace(workspace: &HostFnWorkspace) -> Self {
         let HostFnStores {
             vault,
             cache,
             scratch,
-        } = workspace.stores()?;
-        Ok(Self {
+        } = workspace.stores();
+        Self {
             vault: Some(vault),
             cache: Some(cache),
             scratch: Some(scratch),
             network: None,
-        })
+        }
     }
 }
 
@@ -326,7 +326,9 @@ where
         }
         let txns_ref: Vec<_> = txns.iter().collect();
         let results = match &self.scratch {
-            Some(scratch) => query.run(DbScratch::new(&txns_ref, scratch))?,
+            Some(scratch) => {
+                scratch.apply_and_then(|scratch| query.run(DbScratch::new(&txns_ref, scratch)))?
+            }
             None => query.run(Txns::from(&txns_ref[..]))?,
         };
         Ok(results)
@@ -356,7 +358,7 @@ where
             }
         }
         if let Some(scratch) = &self.scratch {
-            let r = f(scratch.as_ref())?;
+            let r = scratch.apply_and_then(|scratch| f(scratch))?;
             if r.is_some() {
                 return Ok(r);
             }
@@ -787,7 +789,7 @@ where
 
     fn am_i_authoring(&mut self, hash: &AnyDhtHash) -> CascadeResult<bool> {
         let scratch = ok_or_return!(self.scratch.as_ref(), false);
-        Ok(scratch.contains_hash(hash)?)
+        Ok(scratch.apply_and_then(|scratch| scratch.contains_hash(hash))?)
     }
 
     async fn am_i_an_authority(&mut self, hash: AnyDhtHash) -> CascadeResult<bool> {

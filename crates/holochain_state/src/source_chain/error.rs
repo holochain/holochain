@@ -8,6 +8,7 @@ use thiserror::Error;
 
 use crate::prelude::StateMutationError;
 use crate::query::StateQueryError;
+use crate::scratch::SyncScratchError;
 
 #[derive(Error, Debug)]
 pub enum SourceChainError {
@@ -75,8 +76,8 @@ pub enum SourceChainError {
     #[error(transparent)]
     StateQueryError(#[from] StateQueryError),
 
-    #[error("Scratch lock was poisoned")]
-    ScratchLockPoison,
+    #[error(transparent)]
+    SyncScratchError(#[from] SyncScratchError),
 }
 
 // serde_json::Error does not implement PartialEq - why is that a requirement??

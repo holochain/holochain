@@ -1,6 +1,8 @@
 use holochain_types::dht_op::DhtOpType;
 use holochain_zome_types::HeaderType;
 use thiserror::Error;
+
+use crate::scratch::SyncScratchError;
 #[derive(Error, Debug)]
 pub enum StateQueryError {
     #[error(transparent)]
@@ -21,6 +23,8 @@ pub enum StateQueryError {
     WrongHeaderError(#[from] holochain_zome_types::WrongHeaderError),
     #[error(transparent)]
     HeaderError(#[from] holochain_types::header::error::HeaderError),
+    #[error(transparent)]
+    SyncScratchError(#[from] SyncScratchError),
 }
 
 pub type StateQueryResult<T> = Result<T, StateQueryError>;

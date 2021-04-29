@@ -46,7 +46,7 @@ pub(crate) fn get_original_address<'a>(
     let workspace = call_context.host_access.workspace();
 
     tokio_helper::block_forever_on(async move {
-        let mut cascade = Cascade::from_workspace_network(workspace, network)?;
+        let mut cascade = Cascade::from_workspace_network(workspace, network);
         // TODO: Think about what options to use here
         let maybe_original_element: Option<SignedHeaderHashed> = cascade
             .get_details(address.clone().into(), GetOptions::content())

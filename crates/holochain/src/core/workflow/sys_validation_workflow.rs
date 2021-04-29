@@ -23,7 +23,10 @@ use holochain_sqlite::buffer::KvBufFresh;
 use holochain_sqlite::prelude::*;
 
 use holochain_sqlite::db::ReadManager;
+use holochain_state::host_fn_workspace::HostFnStores;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
+use holochain_state::scratch::SyncScratch;
 use holochain_types::prelude::*;
 use holochain_zome_types::Entry;
 use holochain_zome_types::ValidationStatus;
@@ -71,9 +74,6 @@ pub async fn sys_validation_workflow(
     .await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
-
-    // commit the workspace
-    writer.with_writer(|writer| Ok(workspace.flush_to_txn_ref(writer)?))?;
 
     // trigger other workflows
     trigger_app_validation.trigger();
@@ -318,15 +318,13 @@ async fn validate_op_inner(
 /// that outcome immediately.
 pub async fn sys_validate_element(
     element: &Element,
-    call_zome_workspace: &mut CallZomeWorkspace,
+    call_zome_workspace: &HostFnWorkspace,
     _network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
 ) -> SysValidationOutcome<()> {
     trace!(?element);
     // Create a SysValidationWorkspace with the scratches from the CallZomeWorkspace
-    let workspace = SysValidationWorkspace::try_from(&*call_zome_workspace)?;
-    // TODO: Remove this
-    let mut workspace: SysValidationWorkspace2 = workspace.into();
+    let mut workspace = SysValidationWorkspace2::from(call_zome_workspace);
     let network = PassThroughNetwork::authority_for_all(vec![workspace.vault.clone()]);
     let result =
         match sys_validate_element_inner(element, &mut workspace, network, conductor_api).await {
@@ -656,8 +654,9 @@ fn update_check(entry_update: &Update, original_header: &Header) -> SysValidatio
 }
 
 pub struct SysValidationWorkspace2 {
+    scratch: Option<SyncScratch>,
     vault: EnvRead,
-    cache: EnvRead,
+    cache: EnvWrite,
 }
 
 impl SysValidationWorkspace2 {
@@ -665,6 +664,7 @@ impl SysValidationWorkspace2 {
         Self {
             vault,
             cache: todo!("Make cache db"),
+            scratch: None,
         }
     }
     pub fn put_validation_limbo(
@@ -690,7 +690,7 @@ impl SysValidationWorkspace2 {
         })?;
         Ok(())
     }
-    pub fn is_chain_empty(&self, author: &AgentPubKey) -> DatabaseResult<bool> {
+    pub fn is_chain_empty(&self, author: &AgentPubKey) -> SourceChainResult<bool> {
         let chain_not_empty = self.vault.conn()?.with_reader(|txn| {
             let mut stmt = txn.prepare(
                 "
@@ -709,9 +709,13 @@ impl SysValidationWorkspace2 {
                 ":author": author,
             })?)
         })?;
+        let chain_not_empty = match &self.scratch {
+            Some(scratch) => scratch.apply(|scratch| !scratch.is_empty())? || chain_not_empty,
+            None => chain_not_empty,
+        };
         Ok(!chain_not_empty)
     }
-    pub fn header_seq_is_empty(&self, header: &Header) -> DatabaseResult<bool> {
+    pub fn header_seq_is_empty(&self, header: &Header) -> SourceChainResult<bool> {
         let author = header.author();
         let seq = header.header_seq();
         let hash = HeaderHash::with_data_sync(header);
@@ -733,35 +737,55 @@ impl SysValidationWorkspace2 {
                 ":hash": hash,
             })?)
         })?;
+        let header_seq_is_not_empty = match &self.scratch {
+            Some(scratch) => {
+                scratch.apply(|scratch| {
+                    scratch.headers().any(|shh| {
+                        shh.header().header_seq() == seq && *shh.header_address() != hash
+                    })
+                })? || header_seq_is_not_empty
+            }
+            None => header_seq_is_not_empty,
+        };
         Ok(!header_seq_is_not_empty)
     }
     /// Create a cascade with local data only
     pub fn local_cascade(&mut self) -> Cascade2 {
-        Cascade2::empty()
+        let cascade = Cascade2::empty()
             .with_vault(self.vault.clone())
             // TODO: Does the cache count as local?
-            .with_cache(self.cache.clone().into())
+            .with_cache(self.cache.clone().into());
+        match &self.scratch {
+            Some(scratch) => cascade.with_scratch(scratch.clone()),
+            None => cascade,
+        }
     }
     pub fn full_cascade<Network: HolochainP2pCellT2 + Clone + 'static + Send>(
         &mut self,
         network: Network,
     ) -> Cascade2<Network> {
-        Cascade2::<Network>::empty()
+        let cascade = Cascade2::<Network>::empty()
             .with_vault(self.vault.clone())
-            .with_network(network, self.cache.clone().into())
+            .with_network(network, self.cache.clone().into());
+        match &self.scratch {
+            Some(scratch) => cascade.with_scratch(scratch.clone()),
+            None => cascade,
+        }
     }
 }
 
-impl Workspace for SysValidationWorkspace2 {
-    fn flush_to_txn_ref(&mut self, _writer: &mut Writer) -> WorkspaceResult<()> {
-        todo!("Flush scratch");
-        Ok(())
-    }
-}
-
-impl From<SysValidationWorkspace> for SysValidationWorkspace2 {
-    fn from(old: SysValidationWorkspace) -> Self {
-        Self::new(old.env)
+impl From<&HostFnWorkspace> for SysValidationWorkspace2 {
+    fn from(h: &HostFnWorkspace) -> Self {
+        let HostFnStores {
+            vault,
+            cache,
+            scratch,
+        } = h.stores();
+        Self {
+            scratch: Some(scratch),
+            vault,
+            cache,
+        }
     }
 }
 

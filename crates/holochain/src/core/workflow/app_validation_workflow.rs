@@ -528,7 +528,7 @@ async fn get_validation_package_local(
         )?)),
         RequiredValidationType::Custom => {
             {
-                let cascade = Cascade2::from_workspace(workspace_lock)?;
+                let cascade = Cascade2::from_workspace(workspace_lock);
                 if let Some(elements) =
                     cascade.get_validation_package_local(element.header_address())?
                 {
@@ -729,7 +729,7 @@ pub async fn run_validation_callback_direct(
     conductor_api: &impl CellConductorApiT,
 ) -> AppValidationResult<Outcome> {
     let outcome = {
-        let cascade = Cascade2::from_workspace_network(&workspace, network.clone())?;
+        let cascade = Cascade2::from_workspace_network(&workspace, network.clone());
         get_associated_entry_def(&element, ribosome.dna_def(), conductor_api, cascade).await
     };
 

@@ -35,8 +35,7 @@ pub fn get_links<'a>(
             tag: tag_prefix,
         };
         let workspace = call_context.host_access.workspace();
-        let mut cascade = Cascade::from_workspace_network(workspace, network)
-            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
+        let mut cascade = Cascade::from_workspace_network(workspace, network);
 
         // Get the links from the dht
         let links = cascade

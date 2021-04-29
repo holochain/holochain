@@ -1,8 +1,4 @@
-use std::sync::Mutex;
-use std::sync::MutexGuard;
-
 use holo_hash::AgentPubKey;
-use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 use holochain_keystore::KeystoreSender;
@@ -32,6 +28,7 @@ use holochain_zome_types::SignedHeaderHashed;
 use crate::prelude::*;
 use crate::query::chain_head::ChainHeadQuery;
 use crate::scratch::Scratch;
+use crate::scratch::SyncScratch;
 
 #[derive(Clone)]
 pub struct SourceChain {
@@ -43,11 +40,9 @@ pub struct SourceChain {
     public_only: bool,
 }
 
-type SyncScratch = Arc<Mutex<Scratch>>;
-
 impl SourceChain {
     pub fn new(vault: EnvRead, author: AgentPubKey) -> SourceChainResult<Self> {
-        let scratch = Arc::new(Mutex::new(Scratch::new()));
+        let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
         let (persisted_head, persisted_len) = vault
             .conn()?
@@ -64,20 +59,25 @@ impl SourceChain {
     pub fn public_only(&mut self) {
         self.public_only = true;
     }
-    fn lock(&self) -> SourceChainResult<MutexGuard<Scratch>> {
-        self.scratch
-            .lock()
-            .map_err(|_| SourceChainError::ScratchLockPoison)
-    }
     /// Take a snapshot of the scratch space that will
     /// not remain in sync with future updates.
     pub fn snapshot(&self) -> SourceChainResult<Scratch> {
-        let scratch = self.lock()?;
-        Ok(scratch.clone())
+        Ok(self.scratch.apply(|scratch| scratch.clone())?)
+    }
+
+    pub fn scratch(&self) -> SyncScratch {
+        self.scratch.clone()
     }
 
     pub fn agent_pubkey(&self) -> &AgentPubKey {
         self.author.as_ref()
+    }
+
+    /// This has to clone all the data because we can't return
+    /// references to constructed data.
+    // TODO: Maybe we should store data as elements in the scratch?
+    pub fn elements(&self) -> SourceChainResult<Vec<Element>> {
+        Ok(self.scratch.apply(|scratch| scratch.elements().collect())?)
     }
 
     pub async fn put<H: HeaderInner, B: HeaderBuilder<H>>(
@@ -86,14 +86,13 @@ impl SourceChain {
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<HeaderHash> {
         // Check scratch for newer head.
-        let (prev_header, header_seq) = {
-            let scratch = self.lock()?;
+        let (prev_header, header_seq) = self.scratch.apply(|scratch| {
             let chain_head = chain_head_scratch(&(*scratch), self.author.as_ref());
             let (prev_header, chain_len) =
                 chain_head.unwrap_or_else(|| (self.persisted_head.clone(), self.persisted_len));
             let header_seq = chain_len + 1;
             (prev_header, header_seq)
-        };
+        })?;
 
         // Build the header.
         let common = HeaderBuilderCommon {
@@ -111,8 +110,8 @@ impl SourceChain {
         let element = Element::new(header, maybe_entry);
 
         // Put into scratch.
-        let mut scratch = self.lock()?;
-        insert_element_scratch(&mut (*scratch), element);
+        self.scratch
+            .apply(|scratch| insert_element_scratch(scratch, element))?;
         Ok(hash)
     }
 
@@ -121,11 +120,12 @@ impl SourceChain {
     }
 
     pub fn len(&self) -> SourceChainResult<u32> {
-        let scratch = self.lock()?;
-        let scratch_max = chain_head_scratch(&(*scratch), self.author.as_ref()).map(|(_, s)| s);
-        Ok(scratch_max
-            .map(|s| std::cmp::max(s, self.persisted_len))
-            .unwrap_or(self.persisted_len))
+        Ok(self.scratch.apply(|scratch| {
+            let scratch_max = chain_head_scratch(&(*scratch), self.author.as_ref()).map(|(_, s)| s);
+            scratch_max
+                .map(|s| std::cmp::max(s, self.persisted_len))
+                .unwrap_or(self.persisted_len)
+        })?)
     }
     pub fn valid_cap_grant(
         &self,
@@ -215,72 +215,94 @@ impl SourceChain {
                 .collect::<StateQueryResult<Vec<_>>>();
             elements
         })?;
-        let scratch = self.lock()?;
-        let scratch_iter = (*scratch)
-            .headers()
-            .filter(|shh| query.check(shh.header()))
-            .filter_map(|shh| {
-                let entry = match shh.header().entry_hash() {
-                    Some(eh) if query.include_entries => scratch.get_entry(eh).ok()?,
-                    _ => None,
-                };
-                Some(Element::new(shh.clone(), entry))
-            });
-        elements.extend(scratch_iter);
+        self.scratch.apply(|scratch| {
+            let scratch_iter = scratch
+                .headers()
+                .filter(|shh| query.check(shh.header()))
+                .filter_map(|shh| {
+                    let entry = match shh.header().entry_hash() {
+                        Some(eh) if query.include_entries => scratch.get_entry(eh).ok()?,
+                        _ => None,
+                    };
+                    Some(Element::new(shh.clone(), entry))
+                });
+            elements.extend(scratch_iter);
+        })?;
         Ok(elements)
     }
 
     pub fn flush(&self) -> SourceChainResult<()> {
-        let mut scratch = self.lock()?;
-        let length = scratch.num_headers();
+        // Nothing to write
+        if self.scratch.apply(|s| s.is_empty())? {
+            return Ok(());
+        }
+        let (headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
+            let length = scratch.num_headers();
 
-        // The op related data ends up here.
-        let mut ops = Vec::with_capacity(length);
+            // The op related data ends up here.
+            let mut ops = Vec::with_capacity(length);
 
-        // Drain out the headers.
-        let signed_headers = scratch.drain_headers().collect::<Vec<_>>();
-        // Headers end up back in here.
-        let mut headers = Vec::with_capacity(signed_headers.len());
+            // Drain out the headers.
+            let signed_headers = scratch.drain_headers().collect::<Vec<_>>();
+            // Headers end up back in here.
+            let mut headers = Vec::with_capacity(signed_headers.len());
 
-        // Loop through each header and produce op related data.
-        for shh in signed_headers {
-            // &HeaderHash, &Header, EntryHash are needed to produce the ops.
-            let entry_hash = shh.header().entry_hash().cloned();
-            let item = (shh.as_hash(), shh.header(), entry_hash);
-            let ops_inner = produce_op_lights_from_iter(vec![item].into_iter(), 1)?;
+            // Loop through each header and produce op related data.
+            for shh in signed_headers {
+                // &HeaderHash, &Header, EntryHash are needed to produce the ops.
+                let entry_hash = shh.header().entry_hash().cloned();
+                let item = (shh.as_hash(), shh.header(), entry_hash);
+                let ops_inner = produce_op_lights_from_iter(vec![item].into_iter(), 1)?;
 
-            // Break apart the SignedHeaderHashed.
-            let (header, sig) = shh.into_header_and_signature();
-            let (header, hash) = header.into_inner();
+                // Break apart the SignedHeaderHashed.
+                let (header, sig) = shh.into_header_and_signature();
+                let (header, hash) = header.into_inner();
 
-            // We need to take the header by value and put it back each loop.
-            let mut h = Some(header);
-            for op in ops_inner {
-                let op_type = op.get_type();
-                // Header is required by value to produce the DhtOpHash.
-                let (header, op_hash) =
-                    UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
-                let op_order = OpOrder::new(op_type, header.timestamp());
-                // Put the header back by value.
-                h = Some(header);
-                // Collect the DhtOpLight, DhtOpHash and OpOrder.
-                ops.push((op, op_hash, op_order));
+                // We need to take the header by value and put it back each loop.
+                let mut h = Some(header);
+                for op in ops_inner {
+                    let op_type = op.get_type();
+                    // Header is required by value to produce the DhtOpHash.
+                    let (header, op_hash) =
+                        UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
+                    let op_order = OpOrder::new(op_type, header.timestamp());
+                    // Put the header back by value.
+                    h = Some(header);
+                    // Collect the DhtOpLight, DhtOpHash and OpOrder.
+                    ops.push((op, op_hash, op_order));
+                }
+
+                // Put the SignedHeaderHashed back together.
+                let shh = SignedHeaderHashed::with_presigned(
+                    HeaderHashed::with_pre_hashed(h.expect("This can't be empty"), hash),
+                    sig,
+                );
+                // Put the header back in the list.
+                headers.push(shh);
             }
 
-            // Put the SignedHeaderHashed back together.
-            let shh = SignedHeaderHashed::with_presigned(
-                HeaderHashed::with_pre_hashed(h.expect("This can't be empty"), hash),
-                sig,
-            );
-            // Put the header back in the list.
-            headers.push(shh);
-        }
-
-        // Drain out any entries.
-        let entries = scratch.drain_entries().collect::<Vec<_>>();
+            // Drain out any entries.
+            let entries = scratch.drain_entries().collect::<Vec<_>>();
+            SourceChainResult::Ok((headers, ops, entries))
+        })?;
 
         // Write the entries, headers and ops to the database in one transaction.
         self.vault.conn()?.with_commit(|txn| {
+            // As at check.
+            let (new_persisted_head, _) = chain_head_db(&txn, self.author.clone())?;
+            match headers.last().map(|shh| shh.header_address()) {
+                Some(scratch_head) => {
+                    if self.persisted_head != new_persisted_head {
+                        return Err(SourceChainError::HeadMoved(
+                            Some(self.persisted_head.clone()),
+                            Some(new_persisted_head),
+                        ));
+                    }
+                }
+                // Nothing to write
+                None => return Ok(()),
+            }
+
             for entry in entries {
                 insert_entry(txn, entry)?;
             }
@@ -290,7 +312,7 @@ impl SourceChain {
             for (op, op_hash, op_order) in ops {
                 insert_op_lite(txn, op, op_hash, true, op_order)?;
             }
-            StateMutationResult::Ok(())
+            SourceChainResult::Ok(())
         })?;
         Ok(())
     }

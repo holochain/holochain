@@ -63,17 +63,14 @@ pub async fn call_zome_workflow<
     args: CallZomeWorkflowArgs<Ribosome, C>,
     mut trigger_produce_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult> {
-    let workspace_lock: CallZomeWorkspaceLock = todo!();
     let should_write = args.is_root_zome_call;
-    let result = call_zome_workflow_inner(workspace_lock.clone(), network, keystore, args).await?;
+    let result = call_zome_workflow_inner(workspace.clone(), network, keystore, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
     if should_write {
-        let mut guard = workspace_lock.write().await;
-        let workspace = &mut guard;
-        writer.with_writer(|writer| Ok(workspace.flush_to_txn_ref(writer)?))?;
+        workspace.flush()?;
     }
 
     trigger_produce_dht_ops.trigger();
@@ -86,7 +83,7 @@ async fn call_zome_workflow_inner<
     Ribosome: RibosomeT + Send + 'static,
     C: CellConductorApiT,
 >(
-    workspace_lock: CallZomeWorkspaceLock,
+    mut workspace: HostFnWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     args: CallZomeWorkflowArgs<Ribosome, C>,
@@ -103,16 +100,16 @@ async fn call_zome_workflow_inner<
     let zome = invocation.zome.clone();
 
     // Get the current head
-    let chain_head_start_len = workspace_lock.read().await.source_chain.len();
+    let chain_head_start_len = workspace.source_chain().len()?;
 
-    tracing::trace!(line = line!());
+    tracing::trace!("Before zome call");
     // Create the unsafe sourcechain for use with wasm closure
     let (ribosome, result) = tokio::task::spawn_blocking({
-        let workspace_lock = workspace_lock.clone();
+        let workspace = workspace.clone();
         let network = network.clone();
         move || {
             let host_access = ZomeCallHostAccess::new(
-                todo!(),
+                workspace,
                 keystore,
                 network,
                 signal_tx,
@@ -124,32 +121,23 @@ async fn call_zome_workflow_inner<
         }
     })
     .await?;
-    tracing::trace!(line = line!());
+    tracing::trace!("After zome call");
 
     let to_app_validate = {
-        let mut workspace = workspace_lock.write().await;
-        // Get the new head
-        let chain_head_end_len = workspace.source_chain.len();
-        let new_elements_len = chain_head_end_len - chain_head_start_len;
-
         // collect all the elements we need to validate in wasm
-        let mut to_app_validate: Vec<Element> = Vec::with_capacity(new_elements_len);
-
-        // Has there been changes?
-        if new_elements_len > 0 {
-            // Loop forwards through all the new elements
-            let mut i = chain_head_start_len;
-            while let Some(element) = workspace.source_chain.get_at_index(i as u32)? {
-                sys_validate_element(&element, &mut workspace, network.clone(), &conductor_api)
-                    .await
-                    // If the was en error exit
-                    // If the validation failed, exit with an InvalidCommit
-                    // If it was ok continue
-                    .or_else(|outcome_or_err| outcome_or_err.invalid_call_zome_commit())?;
-                to_app_validate.push(element);
-                i += 1;
-            }
+        let mut to_app_validate: Vec<Element> =
+            Vec::with_capacity(workspace.source_chain().len()? as usize);
+        // Loop forwards through all the new elements
+        for element in workspace.source_chain().elements()? {
+            sys_validate_element(&element, &mut workspace, network.clone(), &conductor_api)
+                .await
+                // If the was en error exit
+                // If the validation failed, exit with an InvalidCommit
+                // If it was ok continue
+                .or_else(|outcome_or_err| outcome_or_err.invalid_call_zome_commit())?;
+            to_app_validate.push(element);
         }
+
         to_app_validate
     };
 
@@ -168,10 +156,10 @@ async fn call_zome_workflow_inner<
                 }
                 Header::CreateLink(link_add) => {
                     let (base, target) = {
-                        let mut workspace = workspace_lock.write().await;
-                        let network: HolochainP2pCell =
-                            todo!("Pass real network in when holochain p2p is updated");
-                        let mut cascade = workspace.cascade(network.clone());
+                        let mut cascade = holochain_cascade2::Cascade::from_workspace_network(
+                            &workspace,
+                            network.clone(),
+                        );
                         let base_address = &link_add.base_address;
                         let base = cascade
                             .retrieve_entry(base_address.clone(), Default::default())
@@ -202,7 +190,7 @@ async fn call_zome_workflow_inner<
                             base,
                             target,
                             &ribosome,
-                            todo!(),
+                            workspace.clone(),
                             network.clone(),
                         )?,
                     )
@@ -212,7 +200,7 @@ async fn call_zome_workflow_inner<
                         zome.clone(),
                         delete_link.clone(),
                         &ribosome,
-                        todo!(),
+                        workspace.clone(),
                         network.clone(),
                     )?,
                 ),
@@ -221,7 +209,7 @@ async fn call_zome_workflow_inner<
                         zome.clone(),
                         chain_element,
                         &ribosome,
-                        todo!(),
+                        workspace.clone(),
                         network.clone(),
                         &conductor_api,
                     )
@@ -261,6 +249,7 @@ async fn call_zome_workflow_inner<
     Ok(result)
 }
 
+#[deprecated = "Remove when updating sys validation tests for sql"]
 pub struct CallZomeWorkspace {
     pub source_chain: SourceChain,
     pub meta_authored: MetadataBuf<AuthoredPrefix>,

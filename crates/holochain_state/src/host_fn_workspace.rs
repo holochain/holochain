@@ -5,8 +5,7 @@ use holochain_types::env::EnvRead;
 use holochain_types::env::EnvWrite;
 
 use crate::prelude::SourceChainResult;
-use crate::prelude::StateMutationResult;
-use crate::scratch::Scratch;
+use crate::scratch::SyncScratch;
 
 #[derive(Clone)]
 pub struct HostFnWorkspace {
@@ -18,7 +17,7 @@ pub struct HostFnWorkspace {
 pub struct HostFnStores {
     pub vault: EnvRead,
     pub cache: EnvWrite,
-    pub scratch: Arc<Scratch>,
+    pub scratch: SyncScratch,
 }
 pub type Vault = EnvRead;
 pub type Cache = EnvWrite;
@@ -41,12 +40,12 @@ impl HostFnWorkspace {
         &self.source_chain
     }
 
-    pub fn stores(&self) -> SourceChainResult<HostFnStores> {
-        Ok(HostFnStores {
+    pub fn stores(&self) -> HostFnStores {
+        HostFnStores {
             vault: self.vault.clone().into(),
             cache: self.cache.clone(),
-            scratch: Arc::new(self.source_chain.snapshot()?),
-        })
+            scratch: self.source_chain.scratch(),
+        }
     }
 
     pub fn databases(&self) -> (Vault, Cache) {

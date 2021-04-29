@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use holo_hash::hash_type::AnyDht;
 use holo_hash::AnyDhtHash;
@@ -10,6 +11,7 @@ use holochain_types::EntryHashed;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::SignedHeaderHashed;
+use thiserror::Error;
 
 use crate::prelude::Query;
 use crate::prelude::Stores;
@@ -31,6 +33,9 @@ pub struct Scratch {
     headers: Vec<SignedHeaderHashed>,
     entries: HashMap<EntryHash, Arc<Entry>>,
 }
+
+#[derive(Debug, Clone)]
+pub struct SyncScratch(Arc<Mutex<Scratch>>);
 
 // MD: hmm, why does this need to be a separate type? Why collect into this?
 pub struct FilteredScratch {
@@ -54,6 +59,14 @@ impl Scratch {
     pub fn as_filter(&self, f: impl Fn(&SignedHeaderHashed) -> bool) -> FilteredScratch {
         let headers = self.headers.iter().filter(|&t| f(t)).cloned().collect();
         FilteredScratch { headers }
+    }
+
+    pub fn into_sync(self) -> SyncScratch {
+        SyncScratch(Arc::new(Mutex::new(self)))
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.headers.is_empty()
     }
 
     pub fn headers(&self) -> impl Iterator<Item = &SignedHeaderHashed> {
@@ -125,6 +138,25 @@ impl Scratch {
     }
 }
 
+impl SyncScratch {
+    pub fn apply<T, F: FnOnce(&mut Scratch) -> T>(&self, f: F) -> Result<T, SyncScratchError> {
+        Ok(f(&mut *self
+            .0
+            .lock()
+            .map_err(|_| SyncScratchError::ScratchLockPoison)?))
+    }
+    pub fn apply_and_then<T, E, F>(&self, f: F) -> Result<T, E>
+    where
+        E: From<SyncScratchError>,
+        F: FnOnce(&mut Scratch) -> Result<T, E>,
+    {
+        f(&mut *self
+            .0
+            .lock()
+            .map_err(|_| SyncScratchError::ScratchLockPoison)?)
+    }
+}
+
 impl Store for Scratch {
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
         Ok(self.entries.get(hash).map(|arc| (**arc).clone()))
@@ -181,6 +213,12 @@ impl StoresIter<Judged<SignedHeaderHashed>> for FilteredScratch {
             self.drain().map(Judged::valid).map(Ok),
         )))
     }
+}
+
+#[derive(Error, Debug)]
+pub enum SyncScratchError {
+    #[error("Scratch lock was poisoned")]
+    ScratchLockPoison,
 }
 
 #[test]
