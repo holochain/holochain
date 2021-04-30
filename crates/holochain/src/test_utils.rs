@@ -46,11 +46,11 @@ use tokio::sync::mpsc;
 
 pub use itertools;
 
-use self::sweetest::SweetCell;
+use self::sweettest::SweetCell;
 
 pub mod conductor_setup;
 pub mod host_fn_caller;
-pub mod sweetest;
+pub mod sweettest;
 
 mod wait_for_any;
 pub use wait_for_any::*;

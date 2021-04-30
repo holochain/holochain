@@ -1,5 +1,5 @@
 use crate::test_utils::consistency_10s;
-use crate::test_utils::sweetest::*;
+use crate::test_utils::sweettest::*;
 use fallible_iterator::FallibleIterator;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;

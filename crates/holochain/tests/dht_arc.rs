@@ -1,5 +1,5 @@
-use holochain::test_utils::sweetest::SweetAgents;
-use holochain::test_utils::sweetest::SweetConductor;
+use holochain::test_utils::sweettest::SweetAgents;
+use holochain::test_utils::sweettest::SweetConductor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::dht_arc::MAX_HALF_LENGTH;
 use holochain_p2p::dht_arc::MIN_PEERS;
