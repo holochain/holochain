@@ -3,7 +3,7 @@ use super::ConductorState;
 use super::*;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::test_utils::fake_valid_dna_file;
-use crate::test_utils::sweetest::*;
+use crate::test_utils::sweettest::*;
 use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };
