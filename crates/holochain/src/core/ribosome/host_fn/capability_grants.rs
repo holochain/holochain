@@ -17,9 +17,9 @@ pub fn capability_grants(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::{conductor::ConductorBuilder, test_utils::sweetest::SweetConductor};
+    use crate::{conductor::ConductorBuilder, test_utils::sweettest::SweetConductor};
     use crate::{
-        core::workflow::call_zome_workflow::CallZomeWorkspace, test_utils::sweetest::SweetDnaFile,
+        core::workflow::call_zome_workflow::CallZomeWorkspace, test_utils::sweettest::SweetDnaFile,
     };
     use ::fixt::prelude::*;
     use hdk::prelude::*;

@@ -55,8 +55,8 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use super::*;
-    use crate::test_utils::sweetest::SweetDnaFile;
-    use crate::test_utils::sweetest::{SweetAgents, SweetConductorBatch};
+    use crate::test_utils::sweettest::SweetDnaFile;
+    use crate::test_utils::sweettest::{SweetAgents, SweetConductorBatch};
     use futures::future;
     use hdk::prelude::*;
     use holochain_types::dna::zome::inline_zome::InlineZome;
