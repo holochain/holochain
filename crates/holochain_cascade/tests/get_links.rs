@@ -1,6 +1,6 @@
 use ghost_actor::dependencies::observability;
-use holochain_cascade2::test_utils::*;
-use holochain_cascade2::Cascade;
+use holochain_cascade::test_utils::*;
+use holochain_cascade::Cascade;
 use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_cell_env;
 use holochain_state::scratch::Scratch;

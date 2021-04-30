@@ -17,7 +17,6 @@ use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
 use holochain_cascade::Cascade;
-use holochain_cascade::DbPair;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_p2p::actor::HolochainP2pRefToCell;
@@ -608,16 +607,7 @@ pub async fn show_authored_ops(envs: &[&EnvWrite]) {
 }
 
 async fn show_data(env: &EnvWrite, op: &DhtOpLight) {
-    let element_integrated = ElementBuf::vault(env.clone().into(), true).unwrap();
-    let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
-    let element_authored = ElementBuf::authored(env.clone().into(), true).unwrap();
-    let meta_authored = MetadataBuf::authored(env.clone().into()).unwrap();
-    let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
-    let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
-    let mut cascade = Cascade::empty()
-        .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
-        .with_authored(DbPair::new(&element_authored, &meta_authored))
-        .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
+    let mut cascade = Cascade::empty().with_vault(env.clone().into());
     if let Some(el) = cascade
         .retrieve(op.header_hash().clone().into(), Default::default())
         .await
@@ -681,13 +671,7 @@ async fn display_integration(env: &EnvWrite) -> usize {
     {
         let s = tracing::trace_span!("wait_for_integration_deep");
         let _g = s.enter();
-        let element_integrated = ElementBuf::vault(env.clone().into(), false).unwrap();
-        let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
-        let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
-        let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
-        let mut cascade = Cascade::empty()
-            .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
-            .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
+        let mut cascade = Cascade::empty().with_vault(env.clone().into());
         let mut headers_to_display = Vec::with_capacity(int.len());
         for iv in int {
             let el = cascade

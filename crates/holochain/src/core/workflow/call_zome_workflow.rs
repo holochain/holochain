@@ -12,10 +12,6 @@ use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 pub use call_zome_workspace_lock::CallZomeWorkspaceLock;
 use either::Either;
-use holochain_cascade::Cascade;
-use holochain_cascade::DbPair;
-use holochain_cascade::DbPairMut;
-use holochain_cascade2::test_utils::PassThroughNetwork;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_sqlite::prelude::*;
@@ -142,8 +138,6 @@ async fn call_zome_workflow_inner<
     };
 
     {
-        let network: PassThroughNetwork =
-            todo!("Pass real network in when holochain p2p is updated");
         for chain_element in to_app_validate {
             let outcome = match chain_element.header() {
                 Header::Dna(_)
@@ -156,7 +150,7 @@ async fn call_zome_workflow_inner<
                 }
                 Header::CreateLink(link_add) => {
                     let (base, target) = {
-                        let mut cascade = holochain_cascade2::Cascade::from_workspace_network(
+                        let mut cascade = holochain_cascade::Cascade::from_workspace_network(
                             &workspace,
                             network.clone(),
                         );
@@ -282,32 +276,6 @@ impl<'a> CallZomeWorkspace {
             element_cache,
             meta_cache,
         })
-    }
-
-    pub fn cascade(&'a mut self, network: HolochainP2pCell) -> Cascade<'a> {
-        Cascade::new(
-            self.source_chain.env().clone(),
-            &self.source_chain.elements(),
-            &self.meta_authored,
-            &self.element_integrated,
-            &self.meta_integrated,
-            &self.element_rejected,
-            &self.meta_rejected,
-            &mut self.element_cache,
-            &mut self.meta_cache,
-            network,
-        )
-    }
-
-    /// Cascade without a network connection
-    pub fn cascade_local(&'a mut self) -> Cascade<'a> {
-        let authored_data = DbPair::new(&self.source_chain.elements(), &self.meta_authored);
-        let cache_data = DbPairMut::new(&mut self.element_cache, &mut self.meta_cache);
-        let integrated_data = DbPair::new(&self.element_integrated, &self.meta_integrated);
-        Cascade::empty()
-            .with_authored(authored_data)
-            .with_cache(cache_data)
-            .with_integrated(integrated_data)
     }
 
     pub fn env(&self) -> &EnvRead {

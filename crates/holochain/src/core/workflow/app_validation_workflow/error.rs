@@ -14,8 +14,6 @@ use super::types::Outcome;
 pub enum AppValidationError {
     #[error(transparent)]
     CascadeError(#[from] holochain_cascade::error::CascadeError),
-    #[error(transparent)]
-    CascadeError2(#[from] holochain_cascade2::error::CascadeError),
     #[error("Dna is missing for this cell {0:?}. Cannot validate without dna.")]
     DnaMissing(CellId),
     #[error(transparent)]
@@ -43,10 +41,9 @@ impl<T> From<AppValidationError> for OutcomeOrError<T, AppValidationError> {
     }
 }
 use holochain_cascade::error::CascadeError;
-use holochain_cascade2::error::CascadeError as CascadeError2;
+use holochain_cascade::error::CascadeError as CascadeError2;
 // These need to match the #[from] in AppValidationError
 from_sub_error!(AppValidationError, RibosomeError);
 from_sub_error!(AppValidationError, CascadeError);
-from_sub_error!(AppValidationError, CascadeError2);
 from_sub_error!(AppValidationError, EntryDefStoreError);
 from_sub_error!(AppValidationError, SourceChainError);

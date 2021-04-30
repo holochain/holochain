@@ -27,8 +27,6 @@ pub enum SysValidationError {
     #[error(transparent)]
     CascadeError(#[from] holochain_cascade::error::CascadeError),
     #[error(transparent)]
-    CascadeError2(#[from] holochain_cascade2::error::CascadeError),
-    #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
     #[error(transparent)]
     EntryDefStoreError(#[from] EntryDefStoreError),

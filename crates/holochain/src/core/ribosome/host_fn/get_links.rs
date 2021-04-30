@@ -1,6 +1,6 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_cascade2::Cascade;
+use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
@@ -24,8 +24,6 @@ pub fn get_links<'a>(
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
-    let network: holochain_cascade2::test_utils::PassThroughNetwork =
-        todo!("remove when holochain p2p is updated");
 
     tokio_helper::block_forever_on(async move {
         // Create the key

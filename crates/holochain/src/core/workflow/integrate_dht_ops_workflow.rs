@@ -7,9 +7,6 @@ use crate::core::queue_consumer::WorkComplete;
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::DhtOpHash;
-use holo_hash::HeaderHash;
-use holochain_cascade::Cascade;
-use holochain_cascade::DbPair;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_sqlite::buffer::BufferedStore;
 use holochain_sqlite::buffer::KvBufFresh;
@@ -19,9 +16,6 @@ use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 
-use holochain_zome_types::ValidationStatus;
-
-use std::convert::TryInto;
 use tracing::*;
 
 #[cfg(test)]
@@ -242,23 +236,6 @@ impl IntegrateDhtOpsWorkspace {
 
     pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
         Ok(self.integrated_dht_ops.contains(&hash)? || self.integration_limbo.contains(&hash)?)
-    }
-
-    /// Create a cascade through the integrated and rejected stores
-    // TODO: Might need to add abandoned here but will need some
-    // thought as abandoned entries are not stored.
-    pub fn cascade(&self) -> Cascade<'_> {
-        let integrated_data = DbPair {
-            element: &self.elements,
-            meta: &self.meta,
-        };
-        let rejected_data = DbPair {
-            element: &self.element_rejected,
-            meta: &self.meta_rejected,
-        };
-        Cascade::empty()
-            .with_integrated(integrated_data)
-            .with_rejected(rejected_data)
     }
 }
 

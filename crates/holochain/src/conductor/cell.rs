@@ -33,6 +33,7 @@ use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
+use holochain_cascade::Cascade;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -44,7 +45,6 @@ use std::hash::Hasher;
 use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
-use validation_package::ValidationPackageDb;
 
 mod validation_package;
 
@@ -438,8 +438,7 @@ impl Cell {
         let env: EnvRead = self.env.clone().into();
 
         // Get the header
-        let databases = ValidationPackageDb::create(env.clone())?;
-        let mut cascade = databases.cascade();
+        let mut cascade = Cascade::empty().with_vault(env.clone());
         let header = match cascade
             .retrieve_header(header_hash, Default::default())
             .await?
@@ -477,15 +476,21 @@ impl Cell {
         &self,
         dht_hash: holo_hash::AnyDhtHash,
         options: holochain_p2p::event::GetOptions,
-    ) -> CellResult<GetElementResponse> {
+    ) -> CellResult<WireOps> {
         debug!("handling get");
         // TODO: Later we will need more get types but for now
         // we can just have these defaults depending on whether or not
         // the hash is an entry or header.
         // In the future we should use GetOptions to choose which get to run.
         let mut r = match *dht_hash.hash_type() {
-            AnyDht::Entry => self.handle_get_entry(dht_hash.into(), options).await,
-            AnyDht::Header => self.handle_get_element(dht_hash.into()).await,
+            AnyDht::Entry => self
+                .handle_get_entry(dht_hash.into(), options)
+                .await
+                .map(|r| WireOps::Entry(r)),
+            AnyDht::Header => self
+                .handle_get_element(dht_hash.into(), options)
+                .await
+                .map(|r| WireOps::Element(r)),
         };
         if let Err(e) = &mut r {
             error!(msg = "Error handling a get", ?e, agent = ?self.id.agent_pubkey());
@@ -498,15 +503,19 @@ impl Cell {
         &self,
         hash: EntryHash,
         options: holochain_p2p::event::GetOptions,
-    ) -> CellResult<GetElementResponse> {
+    ) -> CellResult<WireEntryOps> {
         let env = self.env.clone();
         authority::handle_get_entry(env.into(), hash, options).map_err(Into::into)
     }
 
     #[tracing::instrument(skip(self))]
-    async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
+    async fn handle_get_element(
+        &self,
+        hash: HeaderHash,
+        options: holochain_p2p::event::GetOptions,
+    ) -> CellResult<WireElementOps> {
         let env = self.env.clone();
-        authority::handle_get_element(env.into(), hash).map_err(Into::into)
+        authority::handle_get_element(env.into(), hash, options).map_err(Into::into)
     }
 
     #[instrument(skip(self, _dht_hash, _options))]
@@ -526,9 +535,9 @@ impl Cell {
     // if we are careful.
     fn handle_get_links(
         &self,
-        link_key: WireLinkMetaKey,
+        link_key: WireLinkKey,
         options: holochain_p2p::event::GetLinksOptions,
-    ) -> CellResult<GetLinksResponse> {
+    ) -> CellResult<WireLinkOps> {
         debug!(id = ?self.id());
         let env = self.env.clone();
         authority::handle_get_links(env.into(), link_key, options).map_err(Into::into)
@@ -540,7 +549,7 @@ impl Cell {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: holochain_p2p::event::GetActivityOptions,
-    ) -> CellResult<AgentActivityResponse> {
+    ) -> CellResult<AgentActivityResponse<HeaderHash>> {
         let env = self.env.clone();
         authority::handle_get_agent_activity(env.into(), agent, query, options).map_err(Into::into)
     }

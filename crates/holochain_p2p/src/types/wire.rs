@@ -47,7 +47,7 @@ pub(crate) enum WireMessage {
         options: event::GetMetaOptions,
     },
     GetLinks {
-        link_key: WireLinkMetaKey,
+        link_key: WireLinkKey,
         options: event::GetLinksOptions,
     },
     GetAgentActivity {
@@ -112,7 +112,7 @@ impl WireMessage {
         Self::GetMeta { dht_hash, options }
     }
 
-    pub fn get_links(link_key: WireLinkMetaKey, options: event::GetLinksOptions) -> WireMessage {
+    pub fn get_links(link_key: WireLinkKey, options: event::GetLinksOptions) -> WireMessage {
         Self::GetLinks { link_key, options }
     }
 

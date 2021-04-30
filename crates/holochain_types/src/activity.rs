@@ -22,6 +22,8 @@ pub struct AgentActivityResponse<T = SignedHeaderHashed> {
     pub highest_observed: Option<HighestObserved>,
 }
 
+holochain_serial!(AgentActivityResponse<HeaderHash>);
+
 impl<A> AgentActivityResponse<A> {
     /// Convert an empty response to a different type.
     pub fn from_empty<B>(other: AgentActivityResponse<B>) -> Self {

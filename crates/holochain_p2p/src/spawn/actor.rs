@@ -118,7 +118,7 @@ impl HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        link_key: WireLinkMetaKey,
+        link_key: WireLinkKey,
         options: event::GetLinksOptions,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
         let evt_sender = self.evt_sender.clone();
@@ -638,7 +638,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         from_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
-    ) -> HolochainP2pHandlerResult<Vec<GetElementResponse>> {
+    ) -> HolochainP2pHandlerResult<Vec<WireOps>> {
         let space = dna_hash.into_kitsune();
         let from_agent = from_agent.into_kitsune();
         let basis = dht_hash.to_kitsune();
@@ -721,12 +721,12 @@ impl HolochainP2pHandler for HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
-        link_key: WireLinkMetaKey,
+        link_key: WireLinkKey,
         options: actor::GetLinksOptions,
-    ) -> HolochainP2pHandlerResult<Vec<GetLinksResponse>> {
+    ) -> HolochainP2pHandlerResult<Vec<WireLinkOps>> {
         let space = dna_hash.into_kitsune();
         let from_agent = from_agent.into_kitsune();
-        let basis = link_key.basis().to_kitsune();
+        let basis = AnyDhtHash::from(link_key.base.clone()).to_kitsune();
         let r_options: event::GetLinksOptions = (&options).into();
 
         let payload = crate::wire::WireMessage::get_links(link_key, r_options).encode()?;
@@ -769,7 +769,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse>> {
+    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse<HeaderHash>>> {
         let space = dna_hash.into_kitsune();
         let from_agent = from_agent.into_kitsune();
         // Convert the agent key to an any dht hash so it can be used

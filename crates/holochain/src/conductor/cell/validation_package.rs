@@ -4,45 +4,11 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_custom;
 use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_full;
 use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_sub_chain;
-use call_zome_workflow::CallZomeWorkspaceLock;
 use holochain_cascade::Cascade;
-use holochain_cascade::DbPair;
-use holochain_cascade::DbPairMut;
 use holochain_p2p::HolochainP2pCell;
-use holochain_sqlite::error::DatabaseResult;
 use holochain_state::source_chain2::SourceChain;
 use holochain_types::dna::DnaFile;
 use holochain_zome_types::HeaderHashed;
-
-/// Databases to search for validation package
-pub(super) struct ValidationPackageDb {
-    element_integrated: ElementBuf<IntegratedPrefix>,
-    meta_integrated: MetadataBuf<IntegratedPrefix>,
-    element_rejected: ElementBuf<RejectedPrefix>,
-    meta_rejected: MetadataBuf<RejectedPrefix>,
-    element_authored: ElementBuf<AuthoredPrefix>,
-    meta_authored: MetadataBuf<AuthoredPrefix>,
-}
-
-impl ValidationPackageDb {
-    pub(super) fn create(env: EnvRead) -> DatabaseResult<Self> {
-        Ok(Self {
-            element_integrated: ElementBuf::vault(env.clone(), false)?,
-            element_rejected: ElementBuf::rejected(env.clone())?,
-            element_authored: ElementBuf::authored(env.clone(), false)?,
-            meta_integrated: MetadataBuf::vault(env.clone())?,
-            meta_rejected: MetadataBuf::rejected(env.clone())?,
-            meta_authored: MetadataBuf::authored(env)?,
-        })
-    }
-
-    pub(super) fn cascade(&self) -> Cascade {
-        Cascade::empty()
-            .with_integrated(DbPair::new(&self.element_integrated, &self.meta_integrated))
-            .with_rejected(DbPair::new(&self.element_rejected, &self.meta_rejected))
-            .with_authored(DbPair::new(&self.element_authored, &self.meta_authored))
-    }
-}
 
 #[instrument(skip(header_hashed, env, ribosome, conductor_api, network))]
 pub(super) async fn get_as_author(
@@ -101,13 +67,7 @@ pub(super) async fn get_as_author(
             Ok(Some(get_as_author_full(header_seq, &source_chain)?).into())
         }
         RequiredValidationType::Custom => {
-            let element_authored = ElementBuf::authored(env.clone(), false)?;
-            let meta_authored = MetadataBuf::authored(env.clone())?;
-            let mut element_cache = ElementBuf::cache(env.clone())?;
-            let mut meta_cache = MetadataBuf::cache(env.clone())?;
-            let cascade = Cascade::empty()
-                .with_cache(DbPairMut::new(&mut element_cache, &mut meta_cache))
-                .with_authored(DbPair::new(&element_authored, &meta_authored));
+            let cascade = Cascade::empty().with_vault(env.clone());
 
             if let Some(elements) =
                 cascade.get_validation_package_local(&header_hashed.as_hash())?
@@ -128,14 +88,7 @@ pub(super) async fn get_as_author(
                 };
             match result {
                 ValidationPackageResult::Success(validation_package) => {
-                    // Cache the package for future calls
-                    meta_cache.register_validation_package(
-                        header_hashed.as_hash(),
-                        validation_package
-                            .0
-                            .iter()
-                            .map(|el| el.header_address().clone()),
-                    );
+                    // TODO: Cache the package for future calls
 
                     Ok(Some(validation_package).into())
                 }
@@ -201,13 +154,7 @@ pub(super) async fn get_as_authority(
         None => return Ok(None.into()),
     };
 
-    let element_integrated = ElementBuf::vault(env.clone(), false)?;
-    let meta_integrated = MetadataBuf::vault(env.clone())?;
-    let mut element_cache = ElementBuf::cache(env.clone())?;
-    let mut meta_cache = MetadataBuf::cache(env.clone())?;
-    let cascade = Cascade::empty()
-        .with_cache(DbPairMut::new(&mut element_cache, &mut meta_cache))
-        .with_integrated(DbPair::new(&element_integrated, &meta_integrated));
+    let cascade = Cascade::empty().with_vault(env.clone());
 
     // Gather the package
     match required_validation_type {

@@ -64,10 +64,6 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
-    CascadeError2(#[from] holochain_cascade2::error::CascadeError),
-
-    /// ident
-    #[error(transparent)]
     ConductorApiError(#[from] Box<ConductorApiError>),
 
     /// ident

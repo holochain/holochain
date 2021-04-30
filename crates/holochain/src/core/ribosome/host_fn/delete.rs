@@ -1,9 +1,8 @@
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_cascade2::error::CascadeError;
-use holochain_cascade2::test_utils::PassThroughNetwork;
-use holochain_cascade2::Cascade;
+use holochain_cascade::error::CascadeError;
+use holochain_cascade::Cascade;
 use holochain_wasmer_host::prelude::WasmError;
 
 use holo_hash::EntryHash;
@@ -42,7 +41,6 @@ pub(crate) fn get_original_address<'a>(
     address: HeaderHash,
 ) -> Result<EntryHash, WasmError> {
     let network = call_context.host_access.network().clone();
-    let network: PassThroughNetwork = todo!("remove when holochain p2p is updated");
     let workspace = call_context.host_access.workspace();
 
     tokio_helper::block_forever_on(async move {

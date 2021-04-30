@@ -1,7 +1,6 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_cascade2::test_utils::PassThroughNetwork;
-use holochain_cascade2::Cascade;
+use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
@@ -32,7 +31,6 @@ pub fn get_agent_activity(
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
-    let network: PassThroughNetwork = todo!("remove when holochain p2p is updated");
 
     // timeouts must be handled by the network
     tokio_helper::block_forever_on(async move {

@@ -233,7 +233,7 @@ ghost_actor::ghost_chan! {
             from_agent: AgentPubKey,
             dht_hash: holo_hash::AnyDhtHash,
             options: GetOptions,
-        ) -> Vec<GetElementResponse>;
+        ) -> Vec<WireOps>;
 
         /// Get metadata from the DHT.
         fn get_meta(
@@ -247,9 +247,9 @@ ghost_actor::ghost_chan! {
         fn get_links(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
-            link_key: WireLinkMetaKey,
+            link_key: WireLinkKey,
             options: GetLinksOptions,
-        ) -> Vec<GetLinksResponse>;
+        ) -> Vec<WireLinkOps>;
 
         /// Get agent activity from the DHT.
         fn get_agent_activity(
@@ -258,7 +258,7 @@ ghost_actor::ghost_chan! {
             agent: AgentPubKey,
             query: ChainQueryFilter,
             options: GetActivityOptions,
-        ) -> Vec<AgentActivityResponse>;
+        ) -> Vec<AgentActivityResponse<HeaderHash>>;
 
         /// Send a validation receipt to a remote node.
         fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, from_agent: AgentPubKey, receipt: SerializedBytes) -> ();

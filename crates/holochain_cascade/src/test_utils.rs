@@ -4,7 +4,9 @@ use holo_hash::AgentPubKey;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 use holochain_p2p::actor;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_p2p::HolochainP2pError;
+use holochain_p2p::MockHolochainP2pCellT;
 use holochain_sqlite::db::WriteManager;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::mutations::insert_op;
@@ -58,56 +60,16 @@ impl PassThroughNetwork {
 }
 
 #[derive(Clone)]
-pub struct MockNetwork(std::sync::Arc<tokio::sync::Mutex<MockHolochainP2pCellT2>>);
+pub struct MockNetwork(std::sync::Arc<tokio::sync::Mutex<MockHolochainP2pCellT>>);
 
 impl MockNetwork {
-    pub fn new(mock: MockHolochainP2pCellT2) -> Self {
+    pub fn new(mock: MockHolochainP2pCellT) -> Self {
         Self(std::sync::Arc::new(tokio::sync::Mutex::new(mock)))
     }
 }
 
-#[mockall::automock]
 #[async_trait::async_trait]
-pub trait HolochainP2pCellT2 {
-    async fn get_validation_package(
-        &mut self,
-        request_from: AgentPubKey,
-        header_hash: HeaderHash,
-    ) -> actor::HolochainP2pResult<ValidationPackageResponse>;
-
-    async fn get(
-        &mut self,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: actor::GetOptions,
-    ) -> actor::HolochainP2pResult<Vec<WireOps>>;
-
-    async fn get_meta(
-        &mut self,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: actor::GetMetaOptions,
-    ) -> actor::HolochainP2pResult<Vec<MetadataSet>>;
-
-    async fn get_links(
-        &mut self,
-        link_key: WireLinkKey,
-        options: actor::GetLinksOptions,
-    ) -> actor::HolochainP2pResult<Vec<WireLinkOps>>;
-
-    async fn get_agent_activity(
-        &mut self,
-        agent: AgentPubKey,
-        query: QueryFilter,
-        options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<HeaderHash>>>;
-
-    async fn authority_for_hash(
-        &mut self,
-        dht_hash: holo_hash::AnyDhtHash,
-    ) -> actor::HolochainP2pResult<bool>;
-}
-
-#[async_trait::async_trait]
-impl HolochainP2pCellT2 for PassThroughNetwork {
+impl HolochainP2pCellT for PassThroughNetwork {
     async fn get_validation_package(
         &mut self,
         _request_from: AgentPubKey,
@@ -194,6 +156,51 @@ impl HolochainP2pCellT2 for PassThroughNetwork {
     ) -> actor::HolochainP2pResult<bool> {
         Ok(self.authority)
     }
+
+    fn dna_hash(&self) -> holo_hash::DnaHash {
+        todo!()
+    }
+
+    fn from_agent(&self) -> AgentPubKey {
+        todo!()
+    }
+
+    async fn join(&mut self) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
+
+    async fn leave(&mut self) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
+
+    async fn call_remote(
+        &mut self,
+        _to_agent: AgentPubKey,
+        _zome_name: holochain_zome_types::ZomeName,
+        _fn_name: holochain_zome_types::FunctionName,
+        _cap: Option<holochain_zome_types::CapSecret>,
+        _payload: holochain_zome_types::ExternIO,
+    ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
+        todo!()
+    }
+
+    async fn publish(
+        &mut self,
+        _request_validation_receipt: bool,
+        _dht_hash: holo_hash::AnyDhtHash,
+        _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        _timeout_ms: Option<u64>,
+    ) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
+
+    async fn send_validation_receipt(
+        &mut self,
+        _to_agent: AgentPubKey,
+        _receipt: holochain_serialized_bytes::SerializedBytes,
+    ) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
 }
 
 pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
@@ -245,7 +252,7 @@ pub fn fill_db_as_author(env: &EnvWrite, op: DhtOpHashed) {
 }
 
 #[async_trait::async_trait]
-impl HolochainP2pCellT2 for MockNetwork {
+impl HolochainP2pCellT for MockNetwork {
     async fn get_validation_package(
         &mut self,
         request_from: AgentPubKey,
@@ -300,6 +307,51 @@ impl HolochainP2pCellT2 for MockNetwork {
         dht_hash: holo_hash::AnyDhtHash,
     ) -> actor::HolochainP2pResult<bool> {
         self.0.lock().await.authority_for_hash(dht_hash).await
+    }
+
+    fn dna_hash(&self) -> holo_hash::DnaHash {
+        todo!()
+    }
+
+    fn from_agent(&self) -> AgentPubKey {
+        todo!()
+    }
+
+    async fn join(&mut self) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
+
+    async fn leave(&mut self) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
+
+    async fn call_remote(
+        &mut self,
+        _to_agent: AgentPubKey,
+        _zome_name: holochain_zome_types::ZomeName,
+        _fn_name: holochain_zome_types::FunctionName,
+        _cap: Option<holochain_zome_types::CapSecret>,
+        _payload: holochain_zome_types::ExternIO,
+    ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
+        todo!()
+    }
+
+    async fn publish(
+        &mut self,
+        _request_validation_receipt: bool,
+        _dht_hash: holo_hash::AnyDhtHash,
+        _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        _timeout_ms: Option<u64>,
+    ) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
+
+    async fn send_validation_receipt(
+        &mut self,
+        _to_agent: AgentPubKey,
+        _receipt: holochain_serialized_bytes::SerializedBytes,
+    ) -> actor::HolochainP2pResult<()> {
+        todo!()
     }
 }
 

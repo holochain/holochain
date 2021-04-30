@@ -35,11 +35,6 @@ use error::AppValidationResult;
 pub use error::*;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
-use holochain_cascade::DbPair;
-use holochain_cascade::DbPairMut;
-use holochain_cascade2::test_utils::HolochainP2pCellT2;
-use holochain_cascade2::test_utils::PassThroughNetwork;
-use holochain_cascade2::Cascade as Cascade2;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
@@ -64,16 +59,14 @@ mod error;
 mod types;
 pub mod validation_package;
 
-#[instrument(skip(workspace, writer, trigger_integration, conductor_api, _network))]
+#[instrument(skip(workspace, writer, trigger_integration, conductor_api, network))]
 pub async fn app_validation_workflow(
     mut workspace: AppValidationWorkspace2,
     writer: OneshotWriter,
     mut trigger_integration: TriggerSender,
     conductor_api: impl CellConductorApiT,
-    // TODO: Update HolochainP2p to reflect changes to pass through network.
-    _network: HolochainP2pCell,
+    network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
-    let network = PassThroughNetwork::authority_for_all(vec![workspace.vault.clone()]);
     let complete = app_validation_workflow_inner(&mut workspace, conductor_api, &network).await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -89,8 +82,7 @@ pub async fn app_validation_workflow(
 async fn app_validation_workflow_inner(
     workspace: &mut AppValidationWorkspace2,
     conductor_api: impl CellConductorApiT,
-    // network: &HolochainP2pCell,
-    network: &PassThroughNetwork,
+    network: &HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.vault.clone();
     let sorted_ops = validation_query::get_ops_to_app_validate(&env)?;
@@ -133,8 +125,7 @@ async fn validate_op(
     // from_agent: Option<AgentPubKey>,
     conductor_api: &impl CellConductorApiT,
     workspace: &mut AppValidationWorkspace2,
-    // network: &HolochainP2pCell,
-    network: &PassThroughNetwork,
+    network: &HolochainP2pCell,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
     let workspace_lock = workspace.validation_workspace();
@@ -263,7 +254,7 @@ async fn get_associated_entry_def(
     element: &Element,
     dna_def: &DnaDefHashed,
     conductor_api: &impl CellConductorApiT,
-    cascade: Cascade2,
+    cascade: Cascade,
 ) -> AppValidationOutcome<Option<EntryDef>> {
     match get_app_entry_type(element, cascade).await? {
         Some(aet) => {
@@ -337,8 +328,7 @@ async fn get_zomes_to_invoke(
     element: &Element,
     dna_def: &DnaDef,
     workspace: &mut AppValidationWorkspace2,
-    // network: &HolochainP2pCell,
-    network: &PassThroughNetwork,
+    network: &HolochainP2pCell,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     let aet = {
         let cascade = workspace.full_cascade(network.clone());
@@ -384,7 +374,7 @@ fn zome_id_to_zome(zome_id: ZomeId, dna_def: &DnaDef) -> AppValidationResult<Zom
 /// from this entry or from the dependency.
 async fn get_app_entry_type(
     element: &Element,
-    cascade: Cascade2,
+    cascade: Cascade,
 ) -> AppValidationOutcome<Option<AppEntryType>> {
     match element.header().entry_data() {
         Some((_, et)) => match et.clone() {
@@ -399,8 +389,7 @@ async fn get_link_zome(
     element: &Element,
     dna_def: &DnaDef,
     workspace: &mut AppValidationWorkspace2,
-    // network: &HolochainP2pCell,
-    network: &PassThroughNetwork,
+    network: &HolochainP2pCell,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     match element.header() {
         Header::CreateLink(cl) => {
@@ -432,7 +421,7 @@ async fn get_link_zome(
 /// the app entry type so we know which zome to call
 async fn get_app_entry_type_from_dep(
     element: &Element,
-    mut cascade: Cascade2,
+    mut cascade: Cascade,
 ) -> AppValidationOutcome<Option<AppEntryType>> {
     match element.header() {
         Header::Delete(ed) => {
@@ -465,8 +454,7 @@ async fn get_validation_package(
     workspace: Option<&mut AppValidationWorkspace2>,
     ribosome: &impl RibosomeT,
     workspace_lock: &HostFnWorkspace,
-    // network: &HolochainP2pCell,
-    network: &PassThroughNetwork,
+    network: &HolochainP2pCell,
 ) -> AppValidationOutcome<Option<ValidationPackage>> {
     match entry_def {
         Some(entry_def) => match workspace {
@@ -505,8 +493,7 @@ async fn get_validation_package_local(
     required_validation_type: RequiredValidationType,
     ribosome: &impl RibosomeT,
     workspace_lock: &HostFnWorkspace,
-    // network: &HolochainP2pCell,
-    network: &PassThroughNetwork,
+    network: &HolochainP2pCell,
 ) -> AppValidationOutcome<Option<ValidationPackage>> {
     let header_seq = element.header().header_seq();
     match required_validation_type {
@@ -528,7 +515,7 @@ async fn get_validation_package_local(
         )?)),
         RequiredValidationType::Custom => {
             {
-                let cascade = Cascade2::from_workspace(workspace_lock);
+                let cascade = Cascade::from_workspace(workspace_lock);
                 if let Some(elements) =
                     cascade.get_validation_package_local(element.header_address())?
                 {
@@ -568,8 +555,7 @@ async fn get_validation_package_remote(
     workspace: &mut AppValidationWorkspace2,
     ribosome: &impl RibosomeT,
     workspace_lock: &HostFnWorkspace,
-    // network: &HolochainP2pCell,
-    network: &PassThroughNetwork,
+    network: &HolochainP2pCell,
 ) -> AppValidationOutcome<Option<ValidationPackage>> {
     match entry_def.required_validation_type {
         // Only needs the element
@@ -680,8 +666,6 @@ async fn get_validation_package_remote(
             match &validation_package {
                 Some(_) => Ok(validation_package),
                 None => {
-                    let network: HolochainP2pCell =
-                        todo!("Pass real network in when holochain p2p is updated");
                     let access =
                         ValidationPackageHostAccess::new(workspace_lock.clone(), network.clone());
                     let app_entry_type = match element.header().entry_type() {
@@ -724,12 +708,11 @@ pub async fn run_validation_callback_direct(
     element: Element,
     ribosome: &impl RibosomeT,
     workspace: HostFnWorkspace,
-    // network: HolochainP2pCell,
-    network: PassThroughNetwork,
+    network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
 ) -> AppValidationResult<Outcome> {
     let outcome = {
-        let cascade = Cascade2::from_workspace_network(&workspace, network.clone());
+        let cascade = Cascade::from_workspace_network(&workspace, network.clone());
         get_associated_entry_def(&element, ribosome.dna_def(), conductor_api, cascade).await
     };
 
@@ -773,10 +756,8 @@ fn run_validation_callback_inner(
     entry_def_id: Option<EntryDefId>,
     ribosome: &impl RibosomeT,
     workspace_lock: HostFnWorkspace,
-    // network: HolochainP2pCell,
-    network: PassThroughNetwork,
+    network: HolochainP2pCell,
 ) -> AppValidationResult<Outcome> {
-    let network: HolochainP2pCell = todo!("Pass real network in when holochain p2p is updated");
     let validate: ValidateResult = ribosome.run_validate(
         ValidateHostAccess::new(workspace_lock, network),
         ValidateInvocation {
@@ -800,8 +781,7 @@ pub fn run_create_link_validation_callback(
     target: Arc<Entry>,
     ribosome: &impl RibosomeT,
     workspace_lock: HostFnWorkspace,
-    // network: HolochainP2pCell,
-    network: PassThroughNetwork,
+    network: HolochainP2pCell,
 ) -> AppValidationResult<Outcome> {
     let invocation = ValidateCreateLinkInvocation {
         zome,
@@ -818,8 +798,7 @@ pub fn run_delete_link_validation_callback(
     delete_link: DeleteLink,
     ribosome: &impl RibosomeT,
     workspace_lock: HostFnWorkspace,
-    // network: HolochainP2pCell,
-    network: PassThroughNetwork,
+    network: HolochainP2pCell,
 ) -> AppValidationResult<Outcome> {
     let invocation = ValidateDeleteLinkInvocation { zome, delete_link };
     let invocation = ValidateLinkInvocation::<ValidateDeleteLinkInvocation>::new(invocation);
@@ -830,10 +809,8 @@ pub fn run_link_validation_callback<I: Invocation + 'static>(
     invocation: ValidateLinkInvocation<I>,
     ribosome: &impl RibosomeT,
     workspace_lock: HostFnWorkspace,
-    // network: HolochainP2pCell,
-    network: PassThroughNetwork,
+    network: HolochainP2pCell,
 ) -> AppValidationResult<Outcome> {
-    let network: HolochainP2pCell = todo!("Pass real network in when holochain p2p is updated");
     let access = ValidateLinkHostAccess::new(workspace_lock, network);
     let validate = ribosome.run_validate_link(access, invocation)?;
     match validate {
@@ -882,11 +859,11 @@ impl AppValidationWorkspace2 {
         todo!("Make validation workspace")
     }
 
-    pub fn full_cascade<Network: HolochainP2pCellT2 + Clone + 'static + Send>(
+    pub fn full_cascade<Network: HolochainP2pCellT + Clone + 'static + Send>(
         &mut self,
         network: Network,
-    ) -> Cascade2<Network> {
-        Cascade2::<Network>::empty()
+    ) -> Cascade<Network> {
+        Cascade::empty()
             .with_vault(self.vault.clone())
             .with_network(network, self.cache.clone().into())
     }
@@ -1005,40 +982,6 @@ impl AppValidationWorkspace {
     ) -> WorkflowResult<()> {
         self.integration_limbo.put(hash, iv)?;
         Ok(())
-    }
-
-    /// Get a cascade over all local databases and the network
-    fn full_cascade<Network: HolochainP2pCellT + Clone>(
-        &mut self,
-        network: Network,
-    ) -> Cascade<'_, Network> {
-        let integrated_data = DbPair {
-            element: &self.element_vault,
-            meta: &self.meta_vault,
-        };
-        let authored_data = DbPair {
-            element: &self.element_authored,
-            meta: &self.meta_authored,
-        };
-        let pending_data = DbPair {
-            element: &self.element_pending,
-            meta: &self.meta_pending,
-        };
-        let rejected_data = DbPair {
-            element: &self.element_rejected,
-            meta: &self.meta_rejected,
-        };
-        let cache_data = DbPairMut {
-            element: &mut self.element_cache,
-            meta: &mut self.meta_cache,
-        };
-        Cascade::empty()
-            .with_integrated(integrated_data)
-            .with_authored(authored_data)
-            .with_pending(pending_data)
-            .with_cache(cache_data)
-            .with_rejected(rejected_data)
-            .with_network(network)
     }
 }
 

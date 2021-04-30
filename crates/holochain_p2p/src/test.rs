@@ -63,7 +63,7 @@ impl HolochainP2pHandler for StubNetwork {
         from_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
-    ) -> HolochainP2pHandlerResult<Vec<GetElementResponse>> {
+    ) -> HolochainP2pHandlerResult<Vec<WireOps>> {
         Err("stub".into())
     }
     fn handle_get_meta(
@@ -79,9 +79,9 @@ impl HolochainP2pHandler for StubNetwork {
         &mut self,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
-        link_key: WireLinkMetaKey,
+        link_key: WireLinkKey,
         options: actor::GetLinksOptions,
-    ) -> HolochainP2pHandlerResult<Vec<GetLinksResponse>> {
+    ) -> HolochainP2pHandlerResult<Vec<WireLinkOps>> {
         Err("stub".into())
     }
     fn handle_get_agent_activity(
@@ -91,7 +91,7 @@ impl HolochainP2pHandler for StubNetwork {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse>> {
+    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse<HeaderHash>>> {
         Err("stub".into())
     }
     fn handle_send_validation_receipt(

@@ -149,7 +149,7 @@ ghost_actor::ghost_chan! {
             to_agent: AgentPubKey,
             dht_hash: holo_hash::AnyDhtHash,
             options: GetOptions,
-        ) -> GetElementResponse;
+        ) -> WireOps;
 
         /// A remote node is requesting metadata from us.
         fn get_meta(
@@ -163,9 +163,9 @@ ghost_actor::ghost_chan! {
         fn get_links(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            link_key: WireLinkMetaKey,
+            link_key: WireLinkKey,
             options: GetLinksOptions,
-        ) -> GetLinksResponse;
+        ) -> WireLinkOps;
 
         /// A remote node is requesting agent activity from us.
         fn get_agent_activity(
@@ -174,7 +174,7 @@ ghost_actor::ghost_chan! {
             agent: AgentPubKey,
             query: ChainQueryFilter,
             options: GetActivityOptions,
-        ) -> AgentActivityResponse;
+        ) -> AgentActivityResponse<HeaderHash>;
 
         /// A remote node has sent us a validation receipt.
         fn validation_receipt_received(

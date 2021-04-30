@@ -1,9 +1,8 @@
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_cascade2::error::CascadeResult;
-use holochain_cascade2::test_utils::PassThroughNetwork;
-use holochain_cascade2::Cascade;
+use holochain_cascade::error::CascadeResult;
+use holochain_cascade::Cascade;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
@@ -20,7 +19,6 @@ pub fn delete_link<'a>(
     // the subconscious will validate the base address match but we need to fetch it here to
     // include it in the remove link header
     let network = call_context.host_access.network().clone();
-    let network: PassThroughNetwork = todo!("remove when holochain p2p is updated");
     let address = input.clone();
     let call_context_2 = call_context.clone();
 
