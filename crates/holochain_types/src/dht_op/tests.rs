@@ -10,15 +10,13 @@ use crate::fixt::EntryTypeFixturator;
 use crate::fixt::InitZomesCompleteFixturator;
 use crate::fixt::OpenChainFixturator;
 use crate::fixt::UpdateFixturator;
+use crate::prelude::*;
 use ::fixt::prelude::*;
 use holo_hash::fixt::HeaderHashFixturator;
 use holo_hash::*;
-use holochain_state::{element_buf::ElementBuf, prelude::test_cell_env};
-use holochain_types::prelude::*;
 use holochain_zome_types::Entry;
 use holochain_zome_types::HeaderHashed;
 use observability;
-use pretty_assertions::assert_eq;
 use tracing::*;
 
 struct ElementTest {

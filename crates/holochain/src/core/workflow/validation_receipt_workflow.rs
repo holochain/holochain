@@ -28,6 +28,7 @@ pub async fn validation_receipt_workflow(
     let validator = network.from_agent();
 
     // Get out all ops that are marked for sending receipt.
+    // FIXME: Test this query.
     let receipts = vault.conn()?.with_reader(|txn| {
         let mut stmt = txn.prepare(
             "

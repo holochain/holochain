@@ -20,26 +20,21 @@ use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::call_zome_workflow;
-use crate::core::workflow::error::WorkflowError;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
 use crate::core::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use crate::core::workflow::initialize_zomes_workflow;
-use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op;
 use crate::core::workflow::CallZomeWorkflowArgs;
-use crate::core::workflow::CallZomeWorkspace;
 use crate::core::workflow::GenesisWorkflowArgs;
 use crate::core::workflow::GenesisWorkspace;
 use crate::core::workflow::InitializeZomesWorkflowArgs;
 use crate::core::workflow::ZomeCallResult;
-use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
 use error::CellError;
-use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_sqlite::{fresh_reader, prelude::*};
+use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
@@ -594,11 +589,45 @@ impl Cell {
         since: Timestamp,
         until: Timestamp,
     ) -> CellResult<Vec<DhtOpHash>> {
-        let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into())?;
-        let result: Vec<DhtOpHash> = fresh_reader!(self.env(), |mut reader| integrated_dht_ops
-            .query(&mut reader, Some(since), Some(until), Some(dht_arc))?
-            .map(|(k, _)| Ok(k))
-            .collect())?;
+        // FIXME: Test this query.
+        // TODO: Figure out how to make DhtArc.contains()
+        // into a WHERE constraint.
+        let result = self.env().conn()?.with_reader(|txn| {
+            let mut stmt = txn.prepare(
+                "
+                SELECT DhtOp.hash, DhtOp.basis_hash
+                FROM DHtOp
+                WHERE
+                DhtOp.when_integrated >= :from
+                AND 
+                DhtOp.when_integrated < :to
+                ",
+            )?;
+            let r = stmt
+                .query_map(
+                    named_params! {
+                        ":from": since,
+                        ":to": until,
+                    },
+                    |row| {
+                        let hash: DhtOpHash = row.get("hash")?;
+                        let basis_hash: AnyDhtHash = row.get("basis_hash")?;
+                        Ok((hash, basis_hash))
+                    },
+                )?
+                .filter_map(|r| match r {
+                    Ok((hash, basis)) => {
+                        if dht_arc.contains(basis.get_loc()) {
+                            Some(Ok(hash))
+                        } else {
+                            None
+                        }
+                    }
+                    Err(e) => Some(Err(e)),
+                })
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            DatabaseResult::Ok(r)
+        })?;
         Ok(result)
     }
 
@@ -614,27 +643,42 @@ impl Cell {
             holochain_types::dht_op::DhtOp,
         )>,
     > {
+        // FIXME: Test this query.
+        let results = self.env().conn()?.with_reader(|txn| {
+            let sql = format!(
+                "
+                SELECT DhtOp.hash, DhtOp.basis_hash, DhtOp.type
+                Header.blob AS header_blob, Entry.blob AS entry_blob
+                FROM DHtOp
+                JOIN Header ON DhtOp.header_hash = Header.hash
+                LEFT JOIN Entry ON Header.entry_hash = Entry.hash
+                WHERE
+                DhtOp.when_integrated IS NOT NULL
+                AND
+                DhtOp.hash in ({})
+                ",
+                "?,".repeat(op_hashes.len())
+            );
+            let mut stmt = txn.prepare(&sql)?;
+            let r = stmt
+                .query_and_then(rusqlite::params_from_iter(op_hashes.into_iter()), |row| {
+                    let basis_hash: AnyDhtHash = row.get("basis_hash")?;
+                    let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+                    let op_type: DhtOpType = row.get("dht_type")?;
+                    let hash: DhtOpHash = row.get("hash")?;
+                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                    let entry = match entry {
+                        Some(entry) => Some(from_blob::<Entry>(entry)?),
+                        None => None,
+                    };
+                    let op = DhtOp::from_type(op_type, header, entry)?;
+                    StateQueryResult::Ok((basis_hash, hash, op))
+                })?
+                .collect::<StateQueryResult<Vec<_>>>()?;
+            StateQueryResult::Ok(r)
+        })?;
         let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into())?;
-        let mut out = vec![];
-        for op_hash in op_hashes {
-            let val = integrated_dht_ops.get(&op_hash)?;
-            if let Some(val) = val {
-                let full_op = match &val.validation_status {
-                    ValidationStatus::Valid => {
-                        let cas = ElementBuf::vault(self.env.clone().into(), false)?;
-                        light_to_op(val.op, &cas)?
-                    }
-                    ValidationStatus::Rejected => {
-                        let cas = ElementBuf::rejected(self.env.clone().into())?;
-                        light_to_op(val.op, &cas)?
-                    }
-                    ValidationStatus::Abandoned => todo!("Add when abandoned store is added"),
-                };
-                let basis = full_op.dht_basis();
-                out.push((basis, op_hash, full_op));
-            }
-        }
-        Ok(out)
+        Ok(results)
     }
 
     /// the network module would like this cell/agent to sign some data
@@ -719,7 +763,7 @@ impl Cell {
             keystore,
             arc.clone().into(),
             args,
-            self.queue_triggers.produce_dht_ops.clone(),
+            self.queue_triggers.publish_dht_ops.clone(),
         )
         .await
         .map_err(Box::new)?)

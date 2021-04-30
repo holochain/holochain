@@ -43,8 +43,6 @@ mod sys_validation_consumer;
 use sys_validation_consumer::*;
 mod app_validation_consumer;
 use app_validation_consumer::*;
-mod produce_dht_ops_consumer;
-use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
 use validation_receipt_consumer::*;
 mod validation_receipt_consumer;
@@ -125,24 +123,9 @@ pub async fn spawn_queue_consumer_tasks(
         panic!("Failed to send tx_sys");
     }
 
-    // Produce
-    let (tx_produce, handle) =
-        spawn_produce_dht_ops_consumer(env.clone(), stop.subscribe(), tx_publish.clone());
-    task_sender
-        .send(ManagedTaskAdd::unrecoverable(handle))
-        .await
-        .expect("Failed to manage workflow handle");
-
     (
-        QueueTriggers::new(tx_sys.clone(), tx_produce.clone()),
-        InitialQueueTriggers::new(
-            tx_sys,
-            tx_produce,
-            tx_publish,
-            tx_app,
-            tx_integration,
-            tx_receipt,
-        ),
+        QueueTriggers::new(tx_sys.clone(), tx_publish.clone()),
+        InitialQueueTriggers::new(tx_sys, tx_publish, tx_app, tx_integration, tx_receipt),
     )
 }
 
@@ -152,7 +135,7 @@ pub struct QueueTriggers {
     /// Notify the SysValidation workflow to run, i.e. after handling gossip
     pub sys_validation: TriggerSender,
     /// Notify the ProduceDhtOps workflow to run, i.e. after InvokeCallZome
-    pub produce_dht_ops: TriggerSender,
+    pub publish_dht_ops: TriggerSender,
 }
 
 /// The triggers to run once at the start of a cell
@@ -160,7 +143,6 @@ pub struct InitialQueueTriggers {
     /// These triggers can only be run once
     /// so they are private
     sys_validation: TriggerSender,
-    produce_dht_ops: TriggerSender,
     publish_dht_ops: TriggerSender,
     app_validation: TriggerSender,
     integrate_dht_ops: TriggerSender,
@@ -169,10 +151,10 @@ pub struct InitialQueueTriggers {
 
 impl QueueTriggers {
     /// Create a new queue trigger
-    pub fn new(sys_validation: TriggerSender, produce_dht_ops: TriggerSender) -> Self {
+    pub fn new(sys_validation: TriggerSender, publish_dht_ops: TriggerSender) -> Self {
         Self {
             sys_validation,
-            produce_dht_ops,
+            publish_dht_ops,
         }
     }
 }
@@ -180,7 +162,6 @@ impl QueueTriggers {
 impl InitialQueueTriggers {
     fn new(
         sys_validation: TriggerSender,
-        produce_dht_ops: TriggerSender,
         publish_dht_ops: TriggerSender,
         app_validation: TriggerSender,
         integrate_dht_ops: TriggerSender,
@@ -188,7 +169,6 @@ impl InitialQueueTriggers {
     ) -> Self {
         Self {
             sys_validation,
-            produce_dht_ops,
             publish_dht_ops,
             app_validation,
             integrate_dht_ops,
@@ -200,9 +180,8 @@ impl InitialQueueTriggers {
     pub fn initialize_workflows(mut self) {
         self.sys_validation.trigger();
         self.app_validation.trigger();
-        self.publish_dht_ops.trigger();
         self.integrate_dht_ops.trigger();
-        self.produce_dht_ops.trigger();
+        self.publish_dht_ops.trigger();
         self.validation_receipt.trigger();
     }
 }

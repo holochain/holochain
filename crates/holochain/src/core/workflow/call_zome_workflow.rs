@@ -50,7 +50,7 @@ pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT + Send, C: CellConductorApiT
     pub is_root_zome_call: bool,
 }
 
-#[instrument(skip(workspace, network, keystore, writer, args, trigger_produce_dht_ops))]
+#[instrument(skip(workspace, network, keystore, writer, args, trigger_publish_dht_ops))]
 pub async fn call_zome_workflow<
     'env,
     Ribosome: RibosomeT + Send + 'static,
@@ -61,7 +61,7 @@ pub async fn call_zome_workflow<
     keystore: KeystoreSender,
     writer: OneshotWriter,
     args: CallZomeWorkflowArgs<Ribosome, C>,
-    mut trigger_produce_dht_ops: TriggerSender,
+    mut trigger_publish_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult> {
     let should_write = args.is_root_zome_call;
     let result = call_zome_workflow_inner(workspace.clone(), network, keystore, args).await?;
@@ -73,7 +73,7 @@ pub async fn call_zome_workflow<
         workspace.flush()?;
     }
 
-    trigger_produce_dht_ops.trigger();
+    trigger_publish_dht_ops.trigger();
 
     Ok(result)
 }

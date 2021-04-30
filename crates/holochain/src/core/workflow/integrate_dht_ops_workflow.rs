@@ -21,13 +21,8 @@ use holochain_types::prelude::*;
 
 use holochain_zome_types::ValidationStatus;
 
-use produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
 use std::convert::TryInto;
 use tracing::*;
-
-pub use disintegrate::*;
-
-mod disintegrate;
 
 #[cfg(test)]
 mod query_tests;
@@ -170,26 +165,6 @@ pub async fn integrate_dht_ops_workflow(
     }
 }
 
-/// Store a DhtOp's data in an element buf
-pub fn integrate_single_data<P: PrefixType>(
-    op: DhtOp,
-    element_store: &mut ElementBuf<P>,
-) -> DhtOpConvertResult<()> {
-    todo!("remove this")
-}
-
-/// After writing an Element to our chain, we want to integrate the meta ops
-/// inline, so that they are immediately available in the authored metadata.
-/// NB: We skip integrating the element data, since it is already available in
-/// our source chain.
-pub fn integrate_to_authored<C: MetadataBufT<AuthoredPrefix>>(
-    element: &Element,
-    element_store: &ElementBuf<AuthoredPrefix>,
-    meta_store: &mut C,
-) -> DhtOpConvertResult<()> {
-    todo!("remove this")
-}
-
 #[deprecated = "This is no longer needed, remove when updating tests"]
 pub struct IntegrateDhtOpsWorkspace {
     /// integration queue
@@ -215,7 +190,6 @@ pub struct IntegrateDhtOpsWorkspace {
 
 impl Workspace for IntegrateDhtOpsWorkspace {
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.update_element_stores(writer)?;
         // flush elements
         self.elements.flush_to_txn_ref(writer)?;
         // flush metadata store
@@ -266,14 +240,6 @@ impl IntegrateDhtOpsWorkspace {
         })
     }
 
-    #[tracing::instrument(skip(self, hash))]
-    fn integrate(&mut self, hash: DhtOpHash, v: IntegratedDhtOpsValue) -> DhtOpConvertResult<()> {
-        disintegrate_single_metadata(v.op.clone(), &self.element_pending, &mut self.meta_pending)?;
-        self.to_disintegrate_pending.push(v.op.clone());
-        self.integrated_dht_ops.put(hash, v)?;
-        Ok(())
-    }
-
     pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
         Ok(self.integrated_dht_ops.contains(&hash)? || self.integration_limbo.contains(&hash)?)
     }
@@ -293,24 +259,6 @@ impl IntegrateDhtOpsWorkspace {
         Cascade::empty()
             .with_integrated(integrated_data)
             .with_rejected(rejected_data)
-    }
-
-    #[tracing::instrument(skip(self, writer))]
-    /// We need to cancel any deletes for the judged data
-    /// where the ops still in integration limbo reference that data
-    fn update_element_stores(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        for op in self.to_disintegrate_pending.drain(..) {
-            disintegrate_single_data(op, &mut self.element_pending);
-        }
-        let mut int_iter = self.integration_limbo.iter(writer)?;
-        while let Some((_, vlv)) = int_iter.next()? {
-            reintegrate_single_data(vlv.op, &mut self.element_pending);
-        }
-        let mut val_iter = self.validation_limbo.iter(writer)?;
-        while let Some((_, vlv)) = val_iter.next()? {
-            reintegrate_single_data(vlv.op, &mut self.element_pending);
-        }
-        Ok(())
     }
 }
 

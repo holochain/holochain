@@ -22,6 +22,9 @@ use serde::Serialize;
 #[allow(missing_docs)]
 pub mod error;
 
+#[cfg(test)]
+pub mod tests;
+
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
 /// as well as changes to the status of already held data.
 #[derive(

@@ -3,7 +3,6 @@ use crate::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::workflow::error::WorkflowError;
-use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use crate::core::SourceChainError;
 use holochain_cascade::error::CascadeError;
 use holochain_p2p::HolochainP2pError;
@@ -52,12 +51,12 @@ pub enum CellError {
     ConductorApiError(#[from] Box<ConductorApiError>),
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
-    #[error(transparent)]
-    DhtOpConvertError(#[from] DhtOpConvertError),
     #[error("Todo")]
     Todo,
     #[error("The op: {0:?} is missing for this receipt")]
     OpMissingForReceipt(DhtOpHash),
+    #[error(transparent)]
+    StateQueryError(#[from] holochain_state::query::StateQueryError),
 }
 
 pub type CellResult<T> = Result<T, CellError>;

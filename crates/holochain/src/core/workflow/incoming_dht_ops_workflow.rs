@@ -1,20 +1,16 @@
 //! The workflow and queue consumer for DhtOp integration
 
 use super::error::WorkflowResult;
-use super::integrate_dht_ops_workflow::integrate_single_data;
-use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
 use super::sys_validation_workflow::counterfeit_check;
 use crate::core::queue_consumer::TriggerSender;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
-use holochain_cascade::integrate_single_metadata;
 use holochain_sqlite::buffer::BufferedStore;
 use holochain_sqlite::buffer::KvBufFresh;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
-use holochain_zome_types::query::HighestObserved;
 use tracing::instrument;
 
 #[cfg(test)]
@@ -158,49 +154,6 @@ impl IncomingDhtOpsWorkspace {
             meta_pending,
             meta_integrated,
         })
-    }
-
-    fn _add_to_pending(
-        &mut self,
-        hash: DhtOpHash,
-        op: DhtOp,
-        from_agent: Option<AgentPubKey>,
-        request_validation_receipt: bool,
-    ) -> DhtOpConvertResult<()> {
-        let send_receipt = needs_receipt(&op, &from_agent) && request_validation_receipt;
-        let basis = op.dht_basis();
-        let op_light = op.to_light();
-        tracing::debug!(?op_light);
-
-        // register the highest observed header in an agents chain
-        if let DhtOp::RegisterAgentActivity(_, header) = &op {
-            self.meta_integrated.register_activity_observed(
-                header.author(),
-                HighestObserved {
-                    header_seq: header.header_seq(),
-                    hash: vec![op_light.header_hash().clone()],
-                },
-            )?;
-        }
-
-        integrate_single_data(op, &mut self.element_pending)?;
-        integrate_single_metadata(
-            op_light.clone(),
-            &self.element_pending,
-            &mut self.meta_pending,
-        )?;
-        let vlv = ValidationLimboValue {
-            status: ValidationLimboStatus::Pending,
-            op: op_light,
-            basis,
-            time_added: timestamp::now(),
-            last_try: None,
-            num_tries: 0,
-            from_agent,
-            send_receipt,
-        };
-        self.validation_limbo.put(hash, vlv)?;
-        Ok(())
     }
 
     pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {

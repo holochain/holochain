@@ -2,7 +2,6 @@
 #![allow(missing_docs)]
 
 use super::app_validation_workflow::AppValidationError;
-use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::CellError;
 use crate::core::queue_consumer::QueueTriggerClosedError;
@@ -48,9 +47,6 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     SerializedBytesError(#[from] SerializedBytesError),
-
-    #[error(transparent)]
-    DhtOpConvertError(#[from] DhtOpConvertError),
 
     #[error(transparent)]
     CellError(#[from] CellError),
