@@ -17,4 +17,4 @@ pub async fn websocket_client(
     Ok(websocket_client_by_port(port).await?)
 }
 
-pub use holochain::test_utils::sweettest::websocket_client_by_port;
+pub use holochain::sweettest::websocket_client_by_port;

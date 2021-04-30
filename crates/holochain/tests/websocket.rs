@@ -4,9 +4,9 @@ use assert_cmd::prelude::*;
 use futures::future;
 use futures::Future;
 use hdk::prelude::RemoteSignal;
-use holochain::test_utils::sweettest::SweetAgents;
-use holochain::test_utils::sweettest::SweetConductorBatch;
-use holochain::test_utils::sweettest::SweetDnaFile;
+use holochain::sweettest::SweetAgents;
+use holochain::sweettest::SweetConductorBatch;
+use holochain::sweettest::SweetDnaFile;
 use holochain::{
     conductor::api::ZomeCall,
     conductor::{
