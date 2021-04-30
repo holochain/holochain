@@ -28,9 +28,9 @@ use holochain_p2p::HolochainP2pSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::fresh_reader_test;
+use holochain_state::prelude::test_environments;
+use holochain_state::prelude::SourceChain;
 use holochain_state::test_utils::TestEnvs;
-use holochain_state::{element_buf::ElementBuf, prelude::SourceChain};
-use holochain_state::{metadata::MetadataBuf, prelude::test_environments};
 use holochain_types::prelude::*;
 
 use holochain_wasm_test_utils::TestWasm;

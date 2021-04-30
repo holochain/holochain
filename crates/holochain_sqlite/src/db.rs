@@ -6,6 +6,7 @@ use crate::{
 };
 use derive_more::Into;
 use futures::Future;
+use holo_hash::DnaHash;
 use holochain_zome_types::cell::CellId;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
@@ -111,6 +112,8 @@ impl DbWrite {
 pub enum DbKind {
     /// Specifies the environment used by each Cell
     Cell(CellId),
+    /// Specifies the environment used by each Cache (one per dna).
+    Cache(DnaHash),
     /// Specifies the environment used by a Conductor
     Conductor,
     /// Specifies the environment used to save wasm
@@ -124,6 +127,7 @@ impl DbKind {
     fn filename(&self) -> PathBuf {
         let mut path = match self {
             DbKind::Cell(cell_id) => PathBuf::from(cell_id.to_string()),
+            DbKind::Cache(dna) => PathBuf::from(format!("cache-{}", dna)),
             DbKind::Conductor => PathBuf::from("conductor"),
             DbKind::Wasm => PathBuf::from("wasm"),
             DbKind::P2p => PathBuf::from("p2p"),

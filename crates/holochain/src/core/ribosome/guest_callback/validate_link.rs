@@ -353,7 +353,9 @@ mod slow_tests {
     async fn pass_validate_link_add_test<'a>() {
         // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
+        let cache = test_cache.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
         // commits fail validation if we don't do genesis
@@ -365,7 +367,7 @@ mod slow_tests {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = HostFnWorkspace::new(
             test_env.env(),
-            todo!("make cache"),
+            cache,
             test_env.cell_id().unwrap().agent_pubkey().clone(),
         )
         .unwrap();

@@ -9,11 +9,8 @@ use self::validation_package::get_as_author_sub_chain;
 
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
-use super::CallZomeWorkspace;
-use super::CallZomeWorkspaceLock;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::entry_def_store::get_entry_def;
-use crate::core::queue_consumer::OneshotWriter;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
@@ -38,8 +35,6 @@ use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
-use holochain_sqlite::buffer::BufferedStore;
-use holochain_sqlite::buffer::KvBufFresh;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
@@ -59,19 +54,15 @@ mod error;
 mod types;
 pub mod validation_package;
 
-#[instrument(skip(workspace, writer, trigger_integration, conductor_api, network))]
+#[instrument(skip(workspace, trigger_integration, conductor_api, network))]
 pub async fn app_validation_workflow(
-    mut workspace: AppValidationWorkspace2,
-    writer: OneshotWriter,
+    mut workspace: AppValidationWorkspace,
     mut trigger_integration: TriggerSender,
     conductor_api: impl CellConductorApiT,
     network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
     let complete = app_validation_workflow_inner(&mut workspace, conductor_api, &network).await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
-
-    // commit the workspace
-    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     // trigger other workflows
     trigger_integration.trigger();
@@ -80,7 +71,7 @@ pub async fn app_validation_workflow(
 }
 
 async fn app_validation_workflow_inner(
-    workspace: &mut AppValidationWorkspace2,
+    workspace: &mut AppValidationWorkspace,
     conductor_api: impl CellConductorApiT,
     network: &HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
@@ -124,11 +115,11 @@ async fn validate_op(
     op: DhtOp,
     // from_agent: Option<AgentPubKey>,
     conductor_api: &impl CellConductorApiT,
-    workspace: &mut AppValidationWorkspace2,
+    workspace: &mut AppValidationWorkspace,
     network: &HolochainP2pCell,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
-    let workspace_lock = workspace.validation_workspace();
+    let workspace_lock = workspace.validation_workspace(network.from_agent())?;
 
     // Create the element
     let element = get_element(op)?;
@@ -327,7 +318,7 @@ fn check_for_caps(element: &Element) -> AppValidationOutcome<()> {
 async fn get_zomes_to_invoke(
     element: &Element,
     dna_def: &DnaDef,
-    workspace: &mut AppValidationWorkspace2,
+    workspace: &mut AppValidationWorkspace,
     network: &HolochainP2pCell,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     let aet = {
@@ -388,7 +379,7 @@ async fn get_app_entry_type(
 async fn get_link_zome(
     element: &Element,
     dna_def: &DnaDef,
-    workspace: &mut AppValidationWorkspace2,
+    workspace: &mut AppValidationWorkspace,
     network: &HolochainP2pCell,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     match element.header() {
@@ -451,7 +442,7 @@ async fn get_validation_package(
     element: &Element,
     entry_def: &Option<EntryDef>,
     // from_agent: Option<AgentPubKey>,
-    workspace: Option<&mut AppValidationWorkspace2>,
+    workspace: Option<&mut AppValidationWorkspace>,
     ribosome: &impl RibosomeT,
     workspace_lock: &HostFnWorkspace,
     network: &HolochainP2pCell,
@@ -552,7 +543,7 @@ async fn get_validation_package_remote(
     element: &Element,
     entry_def: &EntryDef,
     // from_agent: Option<AgentPubKey>,
-    workspace: &mut AppValidationWorkspace2,
+    workspace: &mut AppValidationWorkspace,
     ribosome: &impl RibosomeT,
     workspace_lock: &HostFnWorkspace,
     network: &HolochainP2pCell,
@@ -820,17 +811,14 @@ pub fn run_link_validation_callback<I: Invocation + 'static>(
     }
 }
 
-pub struct AppValidationWorkspace2 {
+pub struct AppValidationWorkspace {
     vault: EnvRead,
-    cache: EnvRead,
+    cache: EnvWrite,
 }
 
-impl AppValidationWorkspace2 {
-    pub fn new(vault: EnvRead) -> Self {
-        Self {
-            vault,
-            cache: todo!("Make cache db"),
-        }
+impl AppValidationWorkspace {
+    pub fn new(vault: EnvRead, cache: EnvWrite) -> Self {
+        Self { vault, cache }
     }
     pub fn put_validation_limbo(
         &self,
@@ -855,8 +843,15 @@ impl AppValidationWorkspace2 {
         })?;
         Ok(())
     }
-    pub fn validation_workspace(&self) -> HostFnWorkspace {
-        todo!("Make validation workspace")
+    pub fn validation_workspace(
+        &self,
+        author: AgentPubKey,
+    ) -> AppValidationResult<HostFnWorkspace> {
+        Ok(HostFnWorkspace::new(
+            self.vault.clone().into(),
+            self.cache.clone(),
+            author,
+        )?)
     }
 
     pub fn full_cascade<Network: HolochainP2pCellT + Clone + 'static + Send>(
@@ -869,143 +864,12 @@ impl AppValidationWorkspace2 {
     }
 }
 
-impl Workspace for AppValidationWorkspace2 {
-    fn flush_to_txn_ref(&mut self, _writer: &mut Writer) -> WorkspaceResult<()> {
-        todo!("Flush scratch");
-        Ok(())
-    }
-}
-
-impl From<&HostFnWorkspace> for AppValidationWorkspace2 {
+impl From<&HostFnWorkspace> for AppValidationWorkspace {
     fn from(h: &HostFnWorkspace) -> Self {
         let (vault, cache) = h.databases();
         Self {
             vault,
             cache: cache.into(),
         }
-    }
-}
-
-pub struct AppValidationWorkspace {
-    pub integrated_dht_ops: IntegratedDhtOpsStore,
-    pub integration_limbo: IntegrationLimboStore,
-    pub validation_limbo: ValidationLimboStore,
-    // Integrated data
-    pub element_vault: ElementBuf,
-    pub meta_vault: MetadataBuf,
-    // Data pending validation
-    pub element_pending: ElementBuf<PendingPrefix>,
-    pub meta_pending: MetadataBuf<PendingPrefix>,
-    // Read only rejected store for finding dependency data
-    pub element_rejected: ElementBuf<RejectedPrefix>,
-    pub meta_rejected: MetadataBuf<RejectedPrefix>,
-    // Read only authored store for finding dependency data
-    pub element_authored: ElementBuf<AuthoredPrefix>,
-    pub meta_authored: MetadataBuf<AuthoredPrefix>,
-    // Cached data
-    pub element_cache: ElementBuf,
-    pub meta_cache: MetadataBuf,
-    pub call_zome_workspace_lock: Option<CallZomeWorkspaceLock>,
-}
-
-impl AppValidationWorkspace {
-    pub fn new(env: EnvRead) -> WorkspaceResult<Self> {
-        let db = env.get_table(TableName::IntegratedDhtOps)?;
-        let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
-        let db = env.get_table(TableName::IntegrationLimbo)?;
-        let integration_limbo = KvBufFresh::new(env.clone(), db);
-
-        let validation_limbo = ValidationLimboStore::new(env.clone())?;
-
-        let element_vault = ElementBuf::vault(env.clone(), false)?;
-        let meta_vault = MetadataBuf::vault(env.clone())?;
-        let element_cache = ElementBuf::cache(env.clone())?;
-        let meta_cache = MetadataBuf::cache(env.clone())?;
-
-        let element_pending = ElementBuf::pending(env.clone())?;
-        let meta_pending = MetadataBuf::pending(env.clone())?;
-
-        // TODO: We probably want to use the app validation workspace instead of the call zome workspace
-        // but we don't have a lock for that.
-        // If we decide to allow app validation callbacks to be able to get dependencies from the
-        // pending / judged stores then this will be needed as well.
-        let call_zome_workspace = CallZomeWorkspace::new(env.clone())?;
-        let call_zome_workspace_lock = Some(CallZomeWorkspaceLock::new(call_zome_workspace));
-
-        // READ ONLY
-        let element_authored = ElementBuf::authored(env.clone(), false)?;
-        let meta_authored = MetadataBuf::authored(env.clone())?;
-        let element_rejected = ElementBuf::rejected(env.clone())?;
-        let meta_rejected = MetadataBuf::rejected(env)?;
-
-        Ok(Self {
-            integrated_dht_ops,
-            integration_limbo,
-            validation_limbo,
-            element_vault,
-            meta_vault,
-            element_authored,
-            meta_authored,
-            element_pending,
-            meta_pending,
-            element_rejected,
-            meta_rejected,
-            element_cache,
-            meta_cache,
-            call_zome_workspace_lock,
-        })
-    }
-
-    fn validation_workspace(&self) -> CallZomeWorkspaceLock {
-        self.call_zome_workspace_lock
-            .clone()
-            .expect("Tried to use the validation workspace after it was flushed")
-    }
-
-    fn put_val_limbo(
-        &mut self,
-        hash: DhtOpHash,
-        mut vlv: ValidationLimboValue,
-    ) -> WorkflowResult<()> {
-        vlv.last_try = Some(timestamp::now());
-        vlv.num_tries += 1;
-        self.validation_limbo.put(hash, vlv)?;
-        Ok(())
-    }
-
-    #[tracing::instrument(skip(self, hash))]
-    fn put_int_limbo(
-        &mut self,
-        hash: DhtOpHash,
-        iv: IntegrationLimboValue,
-        op: DhtOp,
-    ) -> WorkflowResult<()> {
-        self.integration_limbo.put(hash, iv)?;
-        Ok(())
-    }
-}
-
-impl Workspace for AppValidationWorkspace {
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.validation_limbo.0.flush_to_txn_ref(writer)?;
-        self.integration_limbo.flush_to_txn_ref(writer)?;
-        self.element_pending.flush_to_txn_ref(writer)?;
-        self.meta_pending.flush_to_txn_ref(writer)?;
-
-        // Flush for cascade
-        self.element_cache.flush_to_txn_ref(writer)?;
-        self.meta_cache.flush_to_txn_ref(writer)?;
-
-        // Need to flush the call zome workspace because of the cache.
-        // TODO: If cache becomes a separate env then remove this
-        if let Some(czws) = self
-            .call_zome_workspace_lock
-            .take()
-            .and_then(|o| Arc::try_unwrap(o.into_inner()).ok())
-        {
-            let mut czws: CallZomeWorkspace = czws.into_inner();
-            czws.flush_to_txn_ref(writer)?;
-        }
-        Ok(())
     }
 }

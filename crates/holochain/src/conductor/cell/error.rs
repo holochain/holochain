@@ -1,5 +1,6 @@
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::entry_def_store::error::EntryDefStoreError;
+use crate::conductor::error::ConductorError;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::workflow::error::WorkflowError;
@@ -45,6 +46,8 @@ pub enum CellError {
     SourceChainError(#[from] SourceChainError),
     #[error("The cell tried to run the initialize zomes callback but failed because {0:?}")]
     InitFailed(InitResult),
+    #[error("Failed to get or create the cache for this dna {0:?}")]
+    FailedToCreateCache(Box<ConductorError>),
     #[error(transparent)]
     HolochainP2pError(#[from] HolochainP2pError),
     #[error(transparent)]

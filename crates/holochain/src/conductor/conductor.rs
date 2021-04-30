@@ -112,6 +112,10 @@ where
     /// The database for persisting state related to this Conductor
     env: EnvWrite,
 
+    /// The caches databases. These are shared across cells.
+    /// There is one per unique Dna.
+    caches: std::sync::Mutex<HashMap<DnaHash, EnvWrite>>,
+
     /// A database for storing wasm
     wasm_env: EnvWrite,
 
@@ -470,6 +474,26 @@ where
         }
     }
 
+    fn get_or_create_cache(&self, dna_hash: &DnaHash) -> ConductorResult<EnvWrite> {
+        let mut caches = self
+            .caches
+            .lock()
+            .map_err(|_| ConductorError::CachesLockPoisoned)?;
+        match caches.get(dna_hash) {
+            Some(env) => Ok(env.clone()),
+            None => {
+                let dir = self.root_env_dir.clone();
+                let env = EnvWrite::open(
+                    dir.as_ref(),
+                    DbKind::Cache(dna_hash.clone()),
+                    self.keystore.clone(),
+                )?;
+                caches.insert(dna_hash.clone(), env.clone());
+                Ok(env)
+            }
+        }
+    }
+
     /// Create Cells for each CellId marked active in the ConductorState db
     pub(super) async fn create_active_app_cells(
         &self,
@@ -520,10 +544,14 @@ where
                                 DbKind::Cell(cell_id.clone()),
                                 keystore.clone(),
                             )?;
+                            let cache = self
+                                .get_or_create_cache(cell_id.dna_hash())
+                                .map_err(|e| CellError::FailedToCreateCache(e.into()))?;
                             Cell::create(
                                 cell_id.clone(),
                                 conductor_handle.clone(),
                                 env,
+                                cache,
                                 holochain_p2p_cell,
                                 self.managed_task_add_sender.clone(),
                                 self.managed_task_stop_broadcaster.clone(),
@@ -913,6 +941,7 @@ where
             env,
             wasm_env,
             p2p_env,
+            caches: std::sync::Mutex::new(HashMap::new()),
             state_db: KvStore::new(db),
             cells: HashMap::new(),
             shutting_down: false,

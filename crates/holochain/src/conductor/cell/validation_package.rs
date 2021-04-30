@@ -10,10 +10,11 @@ use holochain_state::source_chain2::SourceChain;
 use holochain_types::dna::DnaFile;
 use holochain_zome_types::HeaderHashed;
 
-#[instrument(skip(header_hashed, env, ribosome, conductor_api, network))]
+#[instrument(skip(header_hashed, env, cache, ribosome, conductor_api, network))]
 pub(super) async fn get_as_author(
     header_hashed: HeaderHashed,
     env: EnvRead,
+    cache: EnvWrite,
     ribosome: &impl RibosomeT,
     conductor_api: &impl CellConductorApiT,
     network: &HolochainP2pCell,
@@ -77,10 +78,9 @@ pub(super) async fn get_as_author(
 
             let workspace_lock = HostFnWorkspace::new(
                 env.into(),
-                todo!("make cache"),
+                cache,
                 conductor_api.cell_id().agent_pubkey().clone(),
             )?;
-            let network = todo!("Pass real network in when holochain p2p is updated");
             let result =
                 match get_as_author_custom(&header_hashed, ribosome, network, workspace_lock)? {
                     Some(result) => result,

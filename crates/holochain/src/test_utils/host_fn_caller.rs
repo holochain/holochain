@@ -84,6 +84,7 @@ pub enum MaybeLinkable {
 #[derive(Clone)]
 pub struct HostFnCaller {
     pub env: EnvWrite,
+    pub cache: EnvWrite,
     pub ribosome: RealRibosome,
     pub zome_path: ZomePath,
     pub network: HolochainP2pCell,
@@ -111,6 +112,7 @@ impl HostFnCaller {
         zome_index: usize,
     ) -> HostFnCaller {
         let env = handle.get_cell_env(cell_id).await.unwrap();
+        let cache = handle.get_cache_env(cell_id).await.unwrap();
         let keystore = env.keystore().clone();
         let network = handle
             .holochain_p2p()
@@ -127,6 +129,7 @@ impl HostFnCaller {
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
         HostFnCaller {
             env,
+            cache,
             ribosome,
             zome_path,
             network,
@@ -150,6 +153,7 @@ impl HostFnCaller {
     ) {
         let HostFnCaller {
             env,
+            cache,
             network,
             keystore,
             ribosome,
@@ -160,12 +164,9 @@ impl HostFnCaller {
 
         let (cell_id, zome_name) = zome_path.into();
 
-        let workspace_lock = HostFnWorkspace::new(
-            env.clone(),
-            todo!("make cache"),
-            cell_id.agent_pubkey().clone(),
-        )
-        .unwrap();
+        let workspace_lock =
+            HostFnWorkspace::new(env.clone(), cache.clone(), cell_id.agent_pubkey().clone())
+                .unwrap();
         let host_access = ZomeCallHostAccess::new(
             workspace_lock.clone(),
             keystore,

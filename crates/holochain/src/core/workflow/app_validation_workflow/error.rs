@@ -41,7 +41,6 @@ impl<T> From<AppValidationError> for OutcomeOrError<T, AppValidationError> {
     }
 }
 use holochain_cascade::error::CascadeError;
-use holochain_cascade::error::CascadeError as CascadeError2;
 // These need to match the #[from] in AppValidationError
 from_sub_error!(AppValidationError, RibosomeError);
 from_sub_error!(AppValidationError, CascadeError);

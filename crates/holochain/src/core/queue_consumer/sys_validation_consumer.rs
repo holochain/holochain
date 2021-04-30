@@ -8,9 +8,10 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for SysValidation workflow
-#[instrument(skip(env, stop, trigger_app_validation, network, conductor_api))]
+#[instrument(skip(env, cache, stop, trigger_app_validation, network, conductor_api))]
 pub fn spawn_sys_validation_consumer(
     env: EnvWrite,
+    cache: EnvWrite,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_app_validation: TriggerSender,
     network: HolochainP2pCell,
@@ -30,10 +31,9 @@ pub fn spawn_sys_validation_consumer(
 
             holochain_sqlite::db::optimistic_retry_async("sys_validation_consumer", || async {
                 // Run the workflow
-                let workspace = SysValidationWorkspace::new(env.clone().into());
+                let workspace = SysValidationWorkspace::new(env.clone().into(), cache.clone());
                 if let WorkComplete::Incomplete = sys_validation_workflow(
                     workspace,
-                    env.clone().into(),
                     trigger_app_validation.clone(),
                     trigger_self.clone(),
                     network.clone(),

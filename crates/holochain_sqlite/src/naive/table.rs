@@ -219,6 +219,9 @@ pub(crate) fn initialize_database(conn: &mut Connection, db_kind: &DbKind) -> ru
 
             // crate::schema::SCHEMA_P2P.initialize(conn, Some(db_kind))?;
         }
+        DbKind::Cache(_) => {
+            crate::schema::SCHEMA_CELL.initialize(conn, Some(db_kind))?;
+        }
     }
     Ok(())
 }

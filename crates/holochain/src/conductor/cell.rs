@@ -92,6 +92,7 @@ where
     id: CellId,
     conductor_api: Api,
     env: EnvWrite,
+    cache: EnvWrite,
     holochain_p2p_cell: P2pCell,
     queue_triggers: QueueTriggers,
 }
@@ -109,6 +110,7 @@ impl Cell {
         id: CellId,
         conductor_handle: ConductorHandle,
         env: EnvWrite,
+        cache: EnvWrite,
         holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
@@ -124,6 +126,7 @@ impl Cell {
         if has_genesis {
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 &env,
+                &cache,
                 holochain_p2p_cell.clone(),
                 conductor_api.clone(),
                 managed_task_add_sender,
@@ -136,6 +139,7 @@ impl Cell {
                     id,
                     conductor_api,
                     env,
+                    cache,
                     holochain_p2p_cell,
                     queue_triggers,
                 },
@@ -454,6 +458,7 @@ impl Cell {
             validation_package::get_as_author(
                 header,
                 env,
+                self.cache.clone(),
                 &ribosome,
                 &self.conductor_api,
                 &self.holochain_p2p_cell,
@@ -770,7 +775,6 @@ impl Cell {
             workspace_lock,
             self.holochain_p2p_cell.clone(),
             keystore,
-            arc.clone().into(),
             args,
             self.queue_triggers.publish_dht_ops.clone(),
         )
@@ -811,15 +815,10 @@ impl Cell {
 
         // Run the workflow
         let args = InitializeZomesWorkflowArgs { dna_def, ribosome };
-        let init_result = initialize_zomes_workflow(
-            workspace,
-            self.holochain_p2p_cell.clone(),
-            keystore,
-            env.clone().into(),
-            args,
-        )
-        .await
-        .map_err(Box::new)?;
+        let init_result =
+            initialize_zomes_workflow(workspace, self.holochain_p2p_cell.clone(), keystore, args)
+                .await
+                .map_err(Box::new)?;
         trace!(?init_result);
         match init_result {
             InitResult::Pass => {}
@@ -858,7 +857,7 @@ impl Cell {
     }
 
     pub(crate) fn cache(&self) -> &EnvWrite {
-        todo!("Make cache")
+        &self.cache
     }
 
     #[cfg(any(test, feature = "test_utils"))]

@@ -33,6 +33,9 @@ pub enum ConductorError {
     #[error("Cell is not initialized.")]
     CellNotInitialized,
 
+    #[error("The lock for the caches has been poisoned.")]
+    CachesLockPoisoned,
+
     #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
     CellMissing(CellId),
 

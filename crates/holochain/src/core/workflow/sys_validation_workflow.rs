@@ -3,7 +3,6 @@
 
 use super::*;
 use crate::conductor::api::CellConductorApiT;
-use crate::core::queue_consumer::OneshotWriter;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::sys_validate::*;
@@ -13,8 +12,6 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
-use holochain_sqlite::buffer::BufferedStore;
-use holochain_sqlite::buffer::KvBufFresh;
 use holochain_sqlite::prelude::*;
 
 use holochain_sqlite::db::ReadManager;
@@ -25,7 +22,6 @@ use holochain_state::scratch::SyncScratch;
 use holochain_types::prelude::*;
 use holochain_zome_types::Entry;
 use holochain_zome_types::ValidationStatus;
-use std::convert::TryFrom;
 use std::convert::TryInto;
 use tracing::*;
 
@@ -44,7 +40,6 @@ mod tests;
 
 #[instrument(skip(
     workspace,
-    writer,
     trigger_app_validation,
     sys_validation_trigger,
     network,
@@ -52,7 +47,6 @@ mod tests;
 ))]
 pub async fn sys_validation_workflow(
     mut workspace: SysValidationWorkspace,
-    writer: OneshotWriter,
     mut trigger_app_validation: TriggerSender,
     sys_validation_trigger: TriggerSender,
     // TODO: Update HolochainP2p to reflect changes to pass through network.
@@ -640,10 +634,10 @@ pub struct SysValidationWorkspace {
 }
 
 impl SysValidationWorkspace {
-    pub fn new(vault: EnvRead) -> Self {
+    pub fn new(vault: EnvRead, cache: EnvWrite) -> Self {
         Self {
             vault,
-            cache: todo!("Make cache db"),
+            cache,
             scratch: None,
         }
     }

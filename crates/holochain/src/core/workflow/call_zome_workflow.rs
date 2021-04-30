@@ -3,7 +3,6 @@ use super::error::WorkflowResult;
 use super::sys_validation_workflow::sys_validate_element;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::interface::SignalBroadcaster;
-use crate::core::queue_consumer::OneshotWriter;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
@@ -46,7 +45,7 @@ pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT + Send, C: CellConductorApiT
     pub is_root_zome_call: bool,
 }
 
-#[instrument(skip(workspace, network, keystore, writer, args, trigger_publish_dht_ops))]
+#[instrument(skip(workspace, network, keystore, args, trigger_publish_dht_ops))]
 pub async fn call_zome_workflow<
     'env,
     Ribosome: RibosomeT + Send + 'static,
@@ -55,7 +54,6 @@ pub async fn call_zome_workflow<
     workspace: HostFnWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
-    writer: OneshotWriter,
     args: CallZomeWorkflowArgs<Ribosome, C>,
     mut trigger_publish_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult> {
@@ -94,9 +92,6 @@ async fn call_zome_workflow_inner<
 
     let call_zome_handle = conductor_api.clone().into_call_zome_handle();
     let zome = invocation.zome.clone();
-
-    // Get the current head
-    let chain_head_start_len = workspace.source_chain().len()?;
 
     tracing::trace!("Before zome call");
     // Create the unsafe sourcechain for use with wasm closure

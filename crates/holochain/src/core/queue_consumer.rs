@@ -59,6 +59,7 @@ use publish_dht_ops_consumer::*;
 /// a race condition by trying to run a workflow too soon after cell creation.
 pub async fn spawn_queue_consumer_tasks(
     env: &EnvWrite,
+    cache: &EnvWrite,
     cell_network: HolochainP2pCell,
     conductor_api: impl CellConductorApiT + 'static,
     task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
@@ -97,6 +98,7 @@ pub async fn spawn_queue_consumer_tasks(
     // App validation
     let (tx_app, handle) = spawn_app_validation_consumer(
         env.clone(),
+        cache.clone(),
         stop.subscribe(),
         tx_integration.clone(),
         conductor_api.clone(),
@@ -110,6 +112,7 @@ pub async fn spawn_queue_consumer_tasks(
     // Sys validation
     let (tx_sys, handle) = spawn_sys_validation_consumer(
         env.clone(),
+        cache.clone(),
         stop.subscribe(),
         tx_app.clone(),
         cell_network,

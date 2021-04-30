@@ -31,7 +31,6 @@ use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use error::RibosomeResult;
 use guest_callback::entry_defs::EntryDefsHostAccess;

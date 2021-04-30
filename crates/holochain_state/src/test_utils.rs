@@ -14,6 +14,12 @@ pub fn test_cell_env() -> TestEnv {
     test_env(DbKind::Cell(cell_id))
 }
 
+/// Create a [TestEnv] of [DbKind::Cache], backed by a temp directory.
+pub fn test_cache_env() -> TestEnv {
+    let dna = fake_cell_id(1).dna_hash().clone();
+    test_env(DbKind::Cache(dna))
+}
+
 /// Create a [TestEnv] of [DbKind::Conductor], backed by a temp directory.
 pub fn test_conductor_env() -> TestEnv {
     test_env(DbKind::Conductor)

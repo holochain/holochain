@@ -54,7 +54,6 @@ use super::p2p_store::query_agent_info_signed;
 use super::Cell;
 use super::Conductor;
 use crate::core::queue_consumer::InitialQueueTriggers;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
@@ -230,6 +229,10 @@ pub trait ConductorHandleT: Send + Sync {
     /// Retrieve the database for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite>;
+
+    /// Retrieve the database for this cell. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn get_cache_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite>;
 
     /// Retrieve the database for networking. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -654,6 +657,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite> {
         let cell = self.cell_by_id(cell_id).await?;
         Ok(cell.env().clone())
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn get_cache_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite> {
+        let cell = self.cell_by_id(cell_id).await?;
+        Ok(cell.cache().clone())
     }
 
     #[cfg(any(test, feature = "test_utils"))]

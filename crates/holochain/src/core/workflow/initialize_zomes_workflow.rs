@@ -1,7 +1,5 @@
 use super::error::WorkflowResult;
 use super::CallZomeWorkspace;
-use super::CallZomeWorkspaceLock;
-use crate::core::queue_consumer::OneshotWriter;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
@@ -10,7 +8,6 @@ use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
-use holochain_state::workspace::Workspace;
 use holochain_types::dna::DnaDef;
 use holochain_zome_types::header::builder;
 use tracing::*;
@@ -23,12 +20,11 @@ pub struct InitializeZomesWorkflowArgs<Ribosome: RibosomeT> {
 
 pub type InitializeZomesWorkspace = CallZomeWorkspace;
 
-#[instrument(skip(network, keystore, workspace, writer))]
+#[instrument(skip(network, keystore, workspace))]
 pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
     workspace: HostFnWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
-    writer: OneshotWriter,
     args: InitializeZomesWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<InitResult> {
     let result =
