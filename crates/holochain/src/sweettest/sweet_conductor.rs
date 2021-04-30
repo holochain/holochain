@@ -8,9 +8,11 @@ use crate::conductor::{
 };
 use hdk::prelude::*;
 use holo_hash::DnaHash;
+use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_keystore::KeystoreSender;
 use holochain_lmdb::test_utils::{test_environments, TestEnvironments};
 use holochain_types::prelude::*;
+use holochain_websocket::*;
 use kitsune_p2p::KitsuneP2pConfig;
 
 /// A stream of signals.
@@ -38,8 +40,12 @@ pub(super) fn standard_config() -> ConductorConfig {
         override_host: None,
         override_port: None,
     }];
+    let admin_interface = AdminInterfaceConfig {
+        driver: InterfaceDriver::Websocket { port: 0 },
+    };
     ConductorConfig {
         network: Some(network),
+        admin_interfaces: Some(vec![admin_interface]),
         ..Default::default()
     }
 }
@@ -261,6 +267,17 @@ impl SweetConductor {
             .expect("Can't take the SweetConductor signal stream twice")
     }
 
+    /// Get a new websocket client which can send requests over the admin
+    /// interface. It presupposes that an admin interface has been configured.
+    /// (The standard_config includes an admin interface at port 0.)
+    pub async fn admin_ws_client(&self) -> (WebsocketSender, WebsocketReceiver) {
+        let port = self
+            .get_arbitrary_admin_websocket_port()
+            .await
+            .expect("No admin port open on conductor");
+        websocket_client_by_port(port).await.unwrap()
+    }
+
     /// Shutdown this conductor.
     /// This will wait for the conductor to shutdown but
     /// keep the inner state to restart it.
@@ -315,6 +332,17 @@ impl SweetConductor {
             .map(|h| h.0.clone())
             .expect("Tried to use a conductor that is offline")
     }
+}
+
+/// Get a websocket client on localhost at the specified port
+pub async fn websocket_client_by_port(
+    port: u16,
+) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
+    Ok(holochain_websocket::connect(
+        url2::url2!("ws://127.0.0.1:{}", port),
+        Arc::new(WebsocketConfig::default()),
+    )
+    .await?)
 }
 
 impl Drop for SweetConductor {

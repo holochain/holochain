@@ -2,9 +2,9 @@
 
 use hdk::prelude::Links;
 use holochain::test_utils::consistency_10s;
-use holochain::test_utils::sweettest::SweetAgents;
-use holochain::test_utils::sweettest::SweetConductor;
-use holochain::test_utils::sweettest::SweetDnaFile;
+use holochain::sweettest::SweetAgents;
+use holochain::sweettest::SweetConductor;
+use holochain::sweettest::SweetDnaFile;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
