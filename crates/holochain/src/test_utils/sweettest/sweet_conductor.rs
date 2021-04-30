@@ -1,14 +1,10 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
 // TODO [ B-03669 ] move to own crate
 
-use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetZome};
+use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorHandle};
 use crate::conductor::{
-    api::{error::ConductorApiResult, ZomeCall},
-    config::ConductorConfig,
-    handle::ConductorHandle,
-    Conductor, ConductorBuilder,
+    config::ConductorConfig, handle::ConductorHandle, Conductor, ConductorBuilder,
 };
-use futures::future;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
@@ -16,108 +12,6 @@ use holochain_lmdb::test_utils::{test_environments, TestEnvironments};
 use holochain_types::prelude::*;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::sync::Arc;
-use unwrap_to::unwrap_to;
-
-/// A collection of SweetConductors, with methods for operating on the entire collection
-#[derive(derive_more::From, derive_more::Into, derive_more::IntoIterator)]
-pub struct SweetConductorBatch(Vec<SweetConductor>);
-
-impl SweetConductorBatch {
-    /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
-    pub async fn from_configs<I: IntoIterator<Item = ConductorConfig>>(
-        configs: I,
-    ) -> SweetConductorBatch {
-        future::join_all(configs.into_iter().map(SweetConductor::from_config))
-            .await
-            .into()
-    }
-
-    /// Create the given number of new SweetConductors, each with its own new TestEnvironments
-    pub async fn from_config(num: usize, config: ConductorConfig) -> SweetConductorBatch {
-        Self::from_configs(std::iter::repeat(config).take(num)).await
-    }
-
-    /// Create the given number of new SweetConductors, each with its own new TestEnvironments
-    pub async fn from_standard_config(num: usize) -> SweetConductorBatch {
-        Self::from_configs(std::iter::repeat_with(standard_config).take(num)).await
-    }
-
-    /// Get the underlying data
-    pub fn iter(&self) -> impl Iterator<Item = &SweetConductor> {
-        self.0.iter()
-    }
-
-    /// Get the underlying data
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut SweetConductor> {
-        self.0.iter_mut()
-    }
-
-    /// Get the underlying data
-    pub fn into_inner(self) -> Vec<SweetConductor> {
-        self.0
-    }
-
-    /// Opinionated app setup.
-    /// Creates one app on each Conductor in this batch, creating a new AgentPubKey for each.
-    /// The created AgentPubKeys can be retrieved via each SweetApp.
-    pub async fn setup_app(
-        &mut self,
-        installed_app_id: &str,
-        dna_files: &[DnaFile],
-    ) -> SweetAppBatch {
-        let apps = self
-            .0
-            .iter_mut()
-            .map(|conductor| async move {
-                let agent = SweetAgents::one(conductor.keystore()).await;
-                conductor
-                    .setup_app_for_agent(installed_app_id, agent, dna_files)
-                    .await
-            })
-            .collect::<Vec<_>>();
-
-        future::join_all(apps).await.into()
-    }
-
-    /// Opinionated app setup. Creates one app on each Conductor in this batch,
-    /// using the given agents and DnaFiles.
-    ///
-    /// The number of Agents passed in must be the same as the number of Conductors
-    /// in this batch. Each Agent will be used to create one app on one Conductor,
-    /// hence the "zipped" in the function name
-    ///
-    /// Returns a batch of SweetApps, sorted in the same order as the Conductors in
-    /// this batch.
-    pub async fn setup_app_for_zipped_agents(
-        &mut self,
-        installed_app_id: &str,
-        agents: &[AgentPubKey],
-        dna_files: &[DnaFile],
-    ) -> SweetAppBatch {
-        if agents.len() != self.0.len() {
-            panic!(
-                "setup_app_for_zipped_agents must take as many Agents as there are Conductors in this batch."
-            )
-        }
-
-        let apps = self
-            .0
-            .iter_mut()
-            .zip(agents.iter())
-            .map(|(conductor, agent)| {
-                conductor.setup_app_for_agent(installed_app_id, agent.clone(), dna_files)
-            })
-            .collect::<Vec<_>>();
-
-        future::join_all(apps).await.into()
-    }
-
-    /// Let each conductor know about each others' agents so they can do networking
-    pub async fn exchange_peer_info(&self) {
-        let envs = self.0.iter().map(|c| c.envs().p2p()).collect();
-        crate::conductor::p2p_store::exchange_peer_info(envs);
-    }
-}
 
 /// A stream of signals.
 pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>;
@@ -137,7 +31,7 @@ pub struct SweetConductor {
     signal_stream: Option<SignalStream>,
 }
 
-fn standard_config() -> ConductorConfig {
+pub(super) fn standard_config() -> ConductorConfig {
     let mut network = KitsuneP2pConfig::default();
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
         bind_to: None,
@@ -422,108 +316,6 @@ impl SweetConductor {
             .expect("Tried to use a conductor that is offline")
     }
 }
-/// A wrapper around ConductorHandle with more convenient methods for testing
-/// and a cleanup drop
-#[derive(shrinkwraprs::Shrinkwrap, derive_more::From)]
-pub struct SweetConductorHandle(pub(crate) ConductorHandle);
-
-impl SweetConductorHandle {
-    /// Make a zome call to a Cell, as if that Cell were the caller. Most common case.
-    /// No capability is necessary, since the authorship capability is automatically granted.
-    pub async fn call<I, O, F>(&self, zome: &SweetZome, fn_name: F, payload: I) -> O
-    where
-        FunctionName: From<F>,
-        I: serde::Serialize + std::fmt::Debug,
-        O: serde::de::DeserializeOwned + std::fmt::Debug,
-    {
-        self.call_fallible(zome, fn_name, payload).await.unwrap()
-    }
-
-    /// Like `call`, but without the unwrap
-    pub async fn call_fallible<I, O, F>(
-        &self,
-        zome: &SweetZome,
-        fn_name: F,
-        payload: I,
-    ) -> ConductorApiResult<O>
-    where
-        FunctionName: From<F>,
-        I: serde::Serialize + std::fmt::Debug,
-        O: serde::de::DeserializeOwned + std::fmt::Debug,
-    {
-        self.call_from_fallible(zome.cell_id().agent_pubkey(), None, zome, fn_name, payload)
-            .await
-    }
-
-    /// Make a zome call to a Cell, as if some other Cell were the caller. More general case.
-    /// Can optionally provide a capability.
-    pub async fn call_from<I, O, F>(
-        &self,
-        provenance: &AgentPubKey,
-        cap: Option<CapSecret>,
-        zome: &SweetZome,
-        fn_name: F,
-        payload: I,
-    ) -> O
-    where
-        FunctionName: From<F>,
-        I: Serialize + std::fmt::Debug,
-        O: serde::de::DeserializeOwned + std::fmt::Debug,
-    {
-        self.call_from_fallible(provenance, cap, zome, fn_name, payload)
-            .await
-            .unwrap()
-    }
-
-    /// Like `call_from`, but without the unwrap
-    pub async fn call_from_fallible<I, O, F>(
-        &self,
-        provenance: &AgentPubKey,
-        cap: Option<CapSecret>,
-        zome: &SweetZome,
-        fn_name: F,
-        payload: I,
-    ) -> ConductorApiResult<O>
-    where
-        FunctionName: From<F>,
-        I: Serialize + std::fmt::Debug,
-        O: serde::de::DeserializeOwned + std::fmt::Debug,
-    {
-        let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
-        let call = ZomeCall {
-            cell_id: zome.cell_id().clone(),
-            zome_name: zome.name().clone(),
-            fn_name: fn_name.into(),
-            cap,
-            provenance: provenance.clone(),
-            payload,
-        };
-        self.0.call_zome(call).await.map(|r| {
-            unwrap_to!(r.unwrap() => ZomeCallResponse::Ok)
-                .decode()
-                .expect("Couldn't deserialize zome call output")
-        })
-    }
-
-    // /// Get a stream of all Signals emitted since the time of this function call.
-    // pub async fn signal_stream(&self) -> impl tokio_stream::Stream<Item = Signal> {
-    //     self.0.signal_broadcaster().await.subscribe_merged()
-    // }
-
-    /// Manually await shutting down the conductor.
-    /// Conductors are already cleaned up on drop but this
-    /// is useful if you need to know when it's finished cleaning up.
-    pub async fn shutdown_and_wait(&self) {
-        let c = &self.0;
-        if let Some(shutdown) = c.take_shutdown_handle().await {
-            c.shutdown().await;
-            shutdown
-                .await
-                .expect("Failed to await shutdown handle")
-                .expect("Conductor shutdown error");
-        }
-    }
-}
 
 impl Drop for SweetConductor {
     fn drop(&mut self) {
@@ -564,19 +356,5 @@ impl std::borrow::Borrow<Arc<SweetConductorHandle>> for SweetConductor {
         self.handle
             .as_ref()
             .expect("Tried to use a conductor that is offline")
-    }
-}
-
-impl std::ops::Index<usize> for SweetConductorBatch {
-    type Output = SweetConductor;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
-    }
-}
-
-impl std::ops::IndexMut<usize> for SweetConductorBatch {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.0[index]
     }
 }
