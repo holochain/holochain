@@ -210,15 +210,6 @@ pub async fn start_holochain(config_path: PathBuf) -> Child {
     child
 }
 
-pub async fn start_lair() -> Child {
-    tracing::info!("\n\n----\nstarting lair\n----\n\n");
-    let mut cmd = tokio::process::Command::new("lair-keystore");
-    let mut child = cmd.spawn().expect("Failed to spawn lair");
-    spawn_output(&mut child);
-    check_started(&mut child).await;
-    child
-}
-
 pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &mut Child) {
     // Connect to App Interface
     let (mut app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
@@ -402,119 +393,6 @@ async fn call_zome() {
 
     // Call Zome
     call_foo_fn(app_port, original_dna_hash.clone(), &mut holochain).await;
-
-    // Ensure that the other client does not receive any messages, i.e. that
-    // responses are not broadcast to all connected clients, only the one
-    // that made the request.
-    // Err means the timeout elapsed
-    assert!(Box::pin(receiver2.timeout(Duration::from_millis(500)))
-        .next()
-        .await
-        .unwrap()
-        .is_err());
-
-    // Shutdown holochain
-    holochain.kill().await.expect("Failed to kill holochain");
-    std::mem::drop(client);
-
-    // Call zome after resart
-    let mut holochain = start_holochain(config_path).await;
-
-    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
-
-    // Call Zome again on the existing app interface port
-    call_foo_fn(app_port, original_dna_hash, &mut holochain).await;
-
-    // Shutdown holochain
-    holochain.kill().await.expect("Failed to kill holochain");
-}
-
-#[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "slow_tests")]
-async fn call_zome_with_keystore_failure() {
-    todo!(
-        "remove this test, it's not going to work unless there's a way to
-        make lair-keystore start failing spontaneously
-        (the test is too high-level)"
-    );
-    observability::test_run().ok();
-    // NOTE: This is a full integration test that
-    // actually runs the holochain binary
-
-    // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
-    let admin_port = 9910;
-    let app_port = 9913;
-
-    let tmp_dir = TempDir::new("conductor_cfg_2").unwrap();
-    let path = tmp_dir.path().to_path_buf();
-    let environment_path = path.clone();
-    let config = create_config(admin_port, environment_path);
-    let config_path = write_config(path, &config);
-
-    let mut holochain = start_holochain(config_path.clone()).await;
-    let mut lair = start_lair().await;
-
-    let (mut client, _) = websocket_client_by_port(admin_port).await.unwrap();
-    let (_, receiver2) = websocket_client_by_port(admin_port).await.unwrap();
-
-    let uuid = uuid::Uuid::new_v4();
-    let dna = fake_dna_zomes(
-        &uuid.to_string(),
-        vec![(TestWasm::Create.into(), TestWasm::Create.into())],
-    );
-    let original_dna_hash = dna.dna_hash().clone();
-    let agent1 = fake_agent_pubkey_1();
-    let agent2 = fake_agent_pubkey_2();
-
-    // Install Dna
-    let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let _dna_hash = register_and_install_dna(
-        &mut holochain,
-        &mut client,
-        original_dna_hash.clone(),
-        agent1.clone(),
-        fake_dna_path,
-        None,
-        "".into(),
-    )
-    .await;
-
-    // List Dnas
-    let request = AdminRequest::ListDnas;
-    let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 1000).await;
-
-    let expects = vec![original_dna_hash.clone()];
-    assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
-
-    // Activate cells
-    let request = AdminRequest::ActivateApp {
-        installed_app_id: "test".to_string(),
-    };
-    let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 1000).await;
-    assert_matches!(response, AdminResponse::AppActivated);
-
-    // Attach App Interface
-    let app_port_rcvd = attach_app_interface(&mut client, &mut holochain, Some(app_port)).await;
-    assert_eq!(app_port, app_port_rcvd);
-
-    // Kill Lair so that signing fails
-    lair.kill().await.unwrap();
-    let lair = start_lair().await;
-
-    // Call Zome
-    let (mut app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
-    let cell_id = CellId::new(original_dna_hash.clone(), agent1.clone());
-    call_zome_fn(
-        &mut holochain,
-        &mut app_tx,
-        cell_id,
-        TestWasm::Create,
-        "create_entry".into(),
-        (),
-    )
-    .await;
 
     // Ensure that the other client does not receive any messages, i.e. that
     // responses are not broadcast to all connected clients, only the one
