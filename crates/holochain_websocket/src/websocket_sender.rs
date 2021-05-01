@@ -1,6 +1,7 @@
 use futures::FutureExt;
 use futures::StreamExt;
-use holochain_serialized_bytes::SerializedBytes;
+use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
+use serde::{de::DeserializeOwned, Serialize};
 use stream_cancel::Valve;
 use websocket::PairShutdown;
 use websocket::TxToWebsocket;
@@ -115,7 +116,7 @@ impl WebsocketSender {
 
     #[tracing::instrument(skip(self))]
     /// Make a request to for the other side to respond to.
-    pub async fn request_timeout<I, O, E, E2>(
+    pub async fn request_timeout<I, O>(
         &mut self,
         msg: I,
         timeout: std::time::Duration,
@@ -123,10 +124,9 @@ impl WebsocketSender {
     where
         I: std::fmt::Debug,
         O: std::fmt::Debug,
-        WebsocketError: From<E>,
-        WebsocketError: From<E2>,
-        SerializedBytes: TryFrom<I, Error = E>,
-        O: TryFrom<SerializedBytes, Error = E2>,
+        WebsocketError: From<SerializedBytesError>,
+        I: Serialize,
+        O: DeserializeOwned,
     {
         match tokio::time::timeout(timeout, self.request(msg)).await {
             Ok(r) => r,
@@ -140,22 +140,26 @@ impl WebsocketSender {
     /// Note:
     /// There is no timeouts in this code. You either need to wrap
     /// this future in a timeout or use [`WebsocketSender::request_timeout`].
-    pub async fn request<I, O, E, E2>(&mut self, msg: I) -> WebsocketResult<O>
+    pub async fn request<I, O>(&mut self, msg: I) -> WebsocketResult<O>
     where
         I: std::fmt::Debug,
         O: std::fmt::Debug,
-        WebsocketError: From<E>,
-        WebsocketError: From<E2>,
-        SerializedBytes: TryFrom<I, Error = E>,
-        O: TryFrom<SerializedBytes, Error = E2>,
+        WebsocketError: From<SerializedBytesError>,
+        I: Serialize,
+        O: DeserializeOwned,
     {
+        use holochain_serialized_bytes as hsb;
         tracing::trace!("Sending");
 
         let (tx_resp, rx_resp) = tokio::sync::oneshot::channel();
         let (tx_stale_resp, rx_stale_resp) = tokio::sync::oneshot::channel();
         let mut rx_resp = self.listener_shutdown.wrap(rx_resp.into_stream());
         let resp = RegisterResponse::new(tx_resp);
-        let msg = OutgoingMessage::Request(msg.try_into()?, resp, tx_stale_resp);
+        let msg = OutgoingMessage::Request(
+            hsb::UnsafeBytes::from(hsb::encode(&msg)?).try_into()?,
+            resp,
+            tx_stale_resp,
+        );
 
         self.tx_to_websocket
             .send(msg)
@@ -166,13 +170,15 @@ impl WebsocketSender {
         let id = rx_stale_resp.await.map_err(|_| WebsocketError::Shutdown)?;
         let stale_request_guard = StaleRequest::new(self.tx_to_websocket.clone(), id);
 
-        let resp: O = rx_resp
+        let sb: SerializedBytes = rx_resp
             .next()
             .await
             .ok_or(WebsocketError::Shutdown)?
             .map_err(|_| WebsocketError::FailedToRecvResp)?
             .ok_or(WebsocketError::FailedToRecvResp)?
             .try_into()?;
+        dbg!(&sb);
+        let resp: O = hsb::decode(&Vec::from(hsb::UnsafeBytes::from(sb)))?;
         stale_request_guard.response_received();
         Ok(resp)
     }

@@ -122,6 +122,13 @@ impl EnvironmentRead {
     pub fn path(&self) -> &PathBuf {
         &self.path
     }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    /// Swap out the KeystoreSender. Only used to test faulty keystores
+    /// in tests.
+    pub fn set_keystore_sender(&mut self, keystore: KeystoreSender) {
+        self.keystore = keystore;
+    }
 }
 
 impl GetDb for EnvironmentWrite {
@@ -148,6 +155,7 @@ impl GetDb for EnvironmentRead {
 /// The wrapper contains methods for managing transactions
 /// and database connections,
 #[derive(Clone, Shrinkwrap, Into, derive_more::From)]
+#[cfg_attr(feature = "test_utils", shrinkwrap(mutable, unsafe_ignore_visibility))]
 pub struct EnvironmentWrite(EnvironmentRead);
 
 impl EnvironmentWrite {

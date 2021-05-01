@@ -2,15 +2,18 @@ use super::Conductor;
 use super::ConductorState;
 use super::*;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
+use crate::sweettest::*;
 use crate::test_utils::fake_valid_dna_file;
-use crate::test_utils::sweettest::*;
 use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };
 use ::fixt::prelude::*;
+use holochain_conductor_api::{AppRequest, AppResponse, ZomeCall};
 use holochain_keystore::crude_mock_keystore::spawn_crude_mock_keystore;
 use holochain_lmdb::test_utils::test_environments;
 use holochain_types::test_utils::fake_cell_id;
+use holochain_wasm_test_utils::TestWasm;
+use holochain_websocket::WebsocketSender;
 use kitsune_p2p_types::dependencies::lair_keystore_api::LairError;
 use maplit::hashset;
 use matches::assert_matches;
@@ -420,14 +423,14 @@ async fn test_setup_cells_idempotency() {
     assert_eq_retry_10s!(conductor.list_active_apps().await.unwrap().len(), 1);
 }
 
-// TODO: this test is pretty useless and can probably be ignored.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_keystore_error_during_genesis() {
+async fn test_signing_error_during_genesis() {
     observability::test_run().ok();
-    let keystore = spawn_crude_mock_keystore(|| LairError::other("test error"))
+    let bad_keystore = spawn_crude_mock_keystore(|| LairError::other("test error"))
         .await
         .unwrap();
-    let envs = test_environments_with_keystore(keystore);
+
+    let envs = test_environments_with_keystore(bad_keystore);
     let config = ConductorConfig::default();
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(&envs, &config).await,
@@ -436,8 +439,9 @@ async fn test_keystore_error_during_genesis() {
     )
     .await;
 
-    let zome = InlineZome::new_unique(Vec::new());
-    let (dna, _) = mk_dna("zome", zome).await.unwrap();
+    let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign])
+        .await
+        .unwrap();
 
     let result = conductor
         .setup_app_for_agents("app", &[fixt!(AgentPubKey)], &[dna])
@@ -453,6 +457,91 @@ async fn test_keystore_error_during_genesis() {
     };
 
     assert_matches!(err, ConductorError::GenesisFailed { errors } if errors.len() == 1);
+}
+
+async fn make_signing_call(client: &mut WebsocketSender, cell: &SweetCell) -> AppResponse {
+    client
+        .request(AppRequest::ZomeCall(Box::new(ZomeCall {
+            cell_id: cell.cell_id().clone(),
+            zome_name: "sign".into(),
+            fn_name: "sign_ephemeral".into(),
+            payload: ExternIO::encode(()).unwrap(),
+            cap: None,
+            provenance: cell.agent_pubkey().clone(),
+        })))
+        .await
+        .unwrap()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
+    observability::test_run().ok();
+    let good_keystore = spawn_test_keystore().await.unwrap();
+    let bad_keystore = spawn_crude_mock_keystore(|| LairError::other("test error"))
+        .await
+        .unwrap();
+
+    let envs = test_environments_with_keystore(good_keystore.clone());
+    let config = ConductorConfig::default();
+    let mut conductor = SweetConductor::new(
+        SweetConductor::handle_from_existing(&envs, &config).await,
+        envs,
+        config,
+    )
+    .await;
+
+    let (agent1, agent2, agent3) = SweetAgents::three(good_keystore.clone()).await;
+
+    let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign])
+        .await
+        .unwrap();
+
+    let app1 = conductor
+        .setup_app_for_agent("app1", agent1.clone(), &[dna.clone()])
+        .await
+        .unwrap();
+
+    let app2 = conductor
+        .setup_app_for_agent("app2", agent2.clone(), &[dna.clone()])
+        .await
+        .unwrap();
+
+    let (cell1,) = app1.into_tuple();
+    let (cell2,) = app2.into_tuple();
+
+    let app_port = conductor.inner_handle().add_app_interface(0).await.unwrap();
+    let (mut app_client, _) = websocket_client_by_port(app_port).await.unwrap();
+
+    // Now use the bad keystore to cause a signing error on the next zome call
+    conductor.set_keystore_sender(bad_keystore.clone()).await;
+
+    // let response: Result<AppResponse, _> = app_client
+    //     .request(AppRequest::ZomeCall(Box::new(ZomeCall {
+    //         cell_id: cell2.cell_id().clone(),
+    //         zome_name: "sign".into(),
+    //         fn_name: "sign_ephemeral".into(),
+    //         payload: ExternIO::encode(()).unwrap(),
+    //         cap: None,
+    //         provenance: agent2.clone(),
+    //     })))
+    //     .await;
+    let response = make_signing_call(&mut app_client, &cell2).await;
+
+    assert_matches!(response, AppResponse::Error(_));
+
+    // Go back to the good keystore, see if we can proceed
+    conductor.set_keystore_sender(good_keystore.clone()).await;
+
+    let response = make_signing_call(&mut app_client, &cell2).await;
+    assert_matches!(response, AppResponse::ZomeCall(_));
+
+    let response = make_signing_call(&mut app_client, &cell1).await;
+    assert_matches!(response, AppResponse::ZomeCall(_));
+
+    conductor
+        .setup_app_for_agent("app3", agent3, &[dna.clone()])
+        .await
+        .unwrap();
 }
 
 fn simple_zome() -> InlineZome {

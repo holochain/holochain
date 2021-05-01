@@ -1,6 +1,8 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
 // TODO [ B-03669 ] move to own crate
 
+use std::sync::Arc;
+
 use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorHandle};
 use crate::conductor::{
     config::ConductorConfig, error::ConductorResult, handle::ConductorHandle, Conductor,

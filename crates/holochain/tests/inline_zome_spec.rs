@@ -1,5 +1,7 @@
 #![cfg(feature = "test_utils")]
 
+use std::sync::Arc;
+
 use hdk::prelude::*;
 use holochain::{
     conductor::api::error::ConductorApiResult,
@@ -14,7 +16,8 @@ use holochain::{
     core::ribosome::guest_callback::validate::ValidateResult, test_utils::wait_for_integration_1m,
 };
 use holochain::{core::SourceChainError, test_utils::display_agent_infos};
-use holochain_types::{dna::zome::inline_zome::InlineZome, signal::Signal};
+use holochain_types::{dna::zome::inline_zome::InlineZome, prelude::ZomeDef, signal::Signal};
+use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::element::ElementEntry;
 use tokio_stream::StreamExt;
 
@@ -380,4 +383,38 @@ async fn simple_validation() -> anyhow::Result<()> {
     assert!(correct);
 
     Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn can_call_real_zomes_too() {
+    observability::test_run().ok();
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    let inline_zome = simple_crud_zome();
+    let (dna, _) = SweetDnaFile::unique_from_zomes(
+        vec![
+            ("inline".into(), ZomeDef::Inline(Arc::new(inline_zome))),
+            TestWasm::Create.into(),
+        ],
+        vec![TestWasm::Create.into()],
+    )
+    .await
+    .unwrap();
+
+    let app = conductor
+        .setup_app_for_agent("app1", agent.clone(), &[dna.clone()])
+        .await
+        .unwrap();
+
+    let (cell,) = app.into_tuple();
+
+    let hash: HeaderHash = conductor
+        .call(&cell.zome("inline"), "create_unit", ())
+        .await;
+
+    let el: Option<Element> = conductor
+        .call(&cell.zome("create_entry"), "get_post", hash.clone())
+        .await;
+    assert_eq!(el.unwrap().header_address(), &hash)
 }

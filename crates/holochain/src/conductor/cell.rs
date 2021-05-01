@@ -831,4 +831,11 @@ impl Cell {
     pub(crate) fn triggers(&self) -> &QueueTriggers {
         &self.queue_triggers
     }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    /// Swap out the KeystoreSender. Only used to test faulty keystores
+    /// in tests.
+    pub(super) fn set_keystore_sender(&mut self, keystore: KeystoreSender) {
+        self.env.set_keystore_sender(keystore);
+    }
 }
