@@ -8,7 +8,7 @@ use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };
 use ::fixt::prelude::*;
-use holochain_conductor_api::{AppRequest, AppResponse, ZomeCall};
+use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppResponse, ZomeCall};
 use holochain_keystore::crude_mock_keystore::spawn_crude_mock_keystore;
 use holochain_lmdb::test_utils::test_environments;
 use holochain_types::test_utils::fake_cell_id;
@@ -482,7 +482,7 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
         .unwrap();
 
     let envs = test_environments_with_keystore(good_keystore.clone());
-    let config = ConductorConfig::default();
+    let config = standard_config();
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(&envs, &config).await,
         envs,
@@ -511,21 +511,28 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
 
     let app_port = conductor.inner_handle().add_app_interface(0).await.unwrap();
     let (mut app_client, _) = websocket_client_by_port(app_port).await.unwrap();
+    let (mut admin_client, _) = conductor.admin_ws_client().await;
 
     // Now use the bad keystore to cause a signing error on the next zome call
     conductor.set_keystore_sender(bad_keystore.clone()).await;
 
-    // let response: Result<AppResponse, _> = app_client
-    //     .request(AppRequest::ZomeCall(Box::new(ZomeCall {
-    //         cell_id: cell2.cell_id().clone(),
-    //         zome_name: "sign".into(),
-    //         fn_name: "sign_ephemeral".into(),
-    //         payload: ExternIO::encode(()).unwrap(),
-    //         cap: None,
-    //         provenance: agent2.clone(),
-    //     })))
-    //     .await;
+    let response: AdminResponse = admin_client
+        .request(AdminRequest::InstallApp(Box::new(InstallAppPayload {
+            installed_app_id: "app3".into(),
+            agent_key: agent3.clone(),
+            dnas: vec![InstallAppDnaPayload {
+                nick: "whatever".into(),
+                hash: dna.dna_hash().clone(),
+                membrane_proof: None,
+            }],
+        })))
+        .await
+        .unwrap();
+    dbg!(&response);
+    // TODO: match the errors more tightly
+    assert_matches!(response, AdminResponse::Error(_));
     let response = make_signing_call(&mut app_client, &cell2).await;
+    dbg!(&response);
 
     assert_matches!(response, AppResponse::Error(_));
 
@@ -538,10 +545,10 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     let response = make_signing_call(&mut app_client, &cell1).await;
     assert_matches!(response, AppResponse::ZomeCall(_));
 
-    conductor
-        .setup_app_for_agent("app3", agent3, &[dna.clone()])
-        .await
-        .unwrap();
+    // conductor
+    //     .setup_app_for_agent("app3", agent3, &[dna.clone()])
+    //     .await
+    //     .unwrap();
 }
 
 fn simple_zome() -> InlineZome {

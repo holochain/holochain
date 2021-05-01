@@ -35,7 +35,8 @@ pub struct SweetConductor {
     signal_stream: Option<SignalStream>,
 }
 
-pub(super) fn standard_config() -> ConductorConfig {
+/// Standard config for SweetConductors
+pub fn standard_config() -> ConductorConfig {
     let mut network = KitsuneP2pConfig::default();
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
         bind_to: None,
