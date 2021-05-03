@@ -9,17 +9,10 @@ use crate::core::ribosome::RibosomeT;
 use super::api::CellConductorApiT;
 use error::EntryDefStoreError;
 use error::EntryDefStoreResult;
-use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_serialized_bytes::SerializedBytes;
-use holochain_sqlite::buffer::KvBufFresh;
-use holochain_sqlite::error::DatabaseError;
-use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use std::collections::HashMap;
-use std::convert::TryInto;
 
 pub mod error;
 

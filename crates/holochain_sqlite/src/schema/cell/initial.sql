@@ -154,3 +154,9 @@ CREATE TABLE IF NOT EXISTS EntryDef (
     key             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     blob            BLOB           NOT NULL,
 );
+
+-- TODO Move this to a different non-cell schema
+CREATE TABLE IF NOT EXISTS ConductorState (
+    id              INTEGER        PRIMARY KEY ON CONFLICT REPLACE,
+    blob            BLOB           NOT NULL,
+);

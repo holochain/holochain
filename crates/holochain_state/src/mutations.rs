@@ -1,3 +1,4 @@
+use crate::agent_info::AgentKvKey;
 use crate::entry_def::EntryDefStoreKey;
 use crate::prelude::SignedValidationReceipt;
 use crate::query::to_blob;
@@ -197,6 +198,33 @@ pub fn insert_entry_def(
     sql_insert!(txn, Wasm, {
         "key": key,
         "blob": to_blob(entry_def)?,
+    })?;
+    Ok(())
+}
+
+/// Insert [`ConductorState`] into the database.
+pub fn insert_conductor_state(
+    txn: &mut Transaction,
+    bytes: SerializedBytes,
+) -> StateMutationResult<()> {
+    let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
+    sql_insert!(txn, ConductorState, {
+        "id": 1,
+        "blob": bytes,
+    })?;
+    Ok(())
+}
+
+/// Insert [`AgentInfoSigned`] into the database.
+pub fn insert_agent_info(
+    txn: &mut Transaction,
+    key: AgentKvKey,
+    bytes: SerializedBytes,
+) -> StateMutationResult<()> {
+    let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
+    sql_insert!(txn, ConductorState, {
+        "key": key.as_ref(),
+        "blob": bytes,
     })?;
     Ok(())
 }

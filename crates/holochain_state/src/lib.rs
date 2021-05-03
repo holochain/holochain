@@ -35,14 +35,15 @@
 #![allow(deprecated)]
 
 #[allow(missing_docs)]
-pub mod chain_sequence;
+pub mod agent_info;
+// pub mod chain_sequence;
 // pub mod dht_op_integration;
 pub mod dna_def;
-#[allow(missing_docs)]
-pub mod element_buf;
+// #[allow(missing_docs)]
+// pub mod element_buf;
 pub mod entry_def;
 pub mod host_fn_workspace;
-pub mod metadata;
+// pub mod metadata;
 pub mod mutations;
 #[allow(missing_docs)]
 pub mod prelude;

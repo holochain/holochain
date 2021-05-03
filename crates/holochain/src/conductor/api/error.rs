@@ -94,6 +94,15 @@ pub enum ConductorApiError {
 
     #[error(transparent)]
     JsonDumpError(#[from] serde_json::Error),
+
+    #[error(transparent)]
+    StateQueryError(#[from] holochain_state::query::StateQueryError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] holochain_state::mutations::StateMutationError),
+
+    #[error(transparent)]
+    RusqliteError(#[from] rusqlite::Error),
 }
 
 /// All the serialization errors that can occur

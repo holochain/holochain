@@ -61,10 +61,13 @@ use holochain_sqlite::db::DbKind;
 use holochain_sqlite::exports::SingleTable;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
+use holochain_state::mutations;
+use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::source_chain;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use rusqlite::OptionalExtension;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -118,7 +121,7 @@ where
     p2p_env: EnvWrite,
 
     /// The database for persisting [ConductorState]
-    state_db: ConductorStateDb,
+    // state_db: ConductorStateDb,
 
     /// Set to true when `conductor.shutdown()` has been called, so that other
     /// tasks can check on the shutdown status
@@ -902,7 +905,6 @@ where
         root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
     ) -> ConductorResult<Self> {
-        let db: SingleTable = env.get_table(TableName::ConductorState)?;
         let (task_tx, task_manager_run_handle) = spawn_task_manager();
         let task_manager_run_handle = Some(task_manager_run_handle);
         let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);
@@ -911,7 +913,6 @@ where
             wasm_env,
             p2p_env,
             caches: std::sync::Mutex::new(HashMap::new()),
-            state_db: KvStore::new(db),
             cells: HashMap::new(),
             shutting_down: false,
             app_interfaces: HashMap::new(),
@@ -927,10 +928,17 @@ where
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        fresh_reader!(self.env, |mut reader| Ok(self
-            .state_db
-            .get(&mut reader, &UnitDbKey)?
-            .unwrap_or_default()))
+        self.env.conn()?.with_reader(|txn| {
+            let state = txn.query_row_and_then(
+                "SELECT blob FROM ConductorState WHERE id = 1",
+                [],
+                |row| {
+                    let item: ConductorState = from_blob(row.get("blob")?)?;
+                    ConductorResult::Ok(item)
+                },
+            )?;
+            Ok(state)
+        })
     }
 
     /// Update the internal state with a pure function mapping old state to new
@@ -952,9 +960,17 @@ where
         self.check_running()?;
         let mut guard = self.env.conn()?;
         let output = guard.with_commit(|txn| {
-            let state: ConductorState = self.state_db.get(txn, &UnitDbKey)?.unwrap_or_default();
+            let state = txn
+                .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                    row.get("blob")
+                })
+                .optional()?;
+            let state = match state {
+                Some(state) => from_blob(state)?,
+                None => ConductorState::default(),
+            };
             let (new_state, output) = f(state)?;
-            self.state_db.put(txn, &UnitDbKey, &new_state)?;
+            mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
             Result::<_, ConductorError>::Ok((new_state, output))
         })?;
         Ok(output)
@@ -972,9 +988,6 @@ where
             .map_err(|e| ConductorError::SubmitTaskError(format!("{}", e)))
     }
 }
-
-/// The database used to store ConductorState. It has only one key-value pair.
-pub type ConductorStateDb = KvStore<UnitDbKey, ConductorState>;
 
 mod builder {
     use super::*;

@@ -114,6 +114,9 @@ pub enum ConductorError {
 
     #[error(transparent)]
     StateMutationError(#[from] holochain_state::mutations::StateMutationError),
+
+    #[error(transparent)]
+    RusqliteError(#[from] rusqlite::Error),
 }
 
 #[derive(Error, Debug)]

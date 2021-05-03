@@ -1,8 +1,5 @@
 use holochain_types::prelude::*;
 use holochain_zome_types::entry_def::EntryDef;
-use rusqlite::named_params;
-use rusqlite::OptionalExtension;
-use rusqlite::Transaction;
 use std::collections::HashMap;
 use tracing::*;
 

@@ -35,7 +35,6 @@ use holo_hash::WasmHash;
 use holochain_keystore::keystore_actor::KeystoreSender;
 use holochain_p2p::HolochainP2pCellFixturator;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
-use holochain_state::metadata::LinkMetaVal;
 use holochain_state::test_utils::test_keystore;
 use holochain_types::fixt::TimestampFixturator;
 use holochain_types::prelude::*;
@@ -193,20 +192,20 @@ fixturator!(
     }
 );
 
-fixturator!(
-    LinkMetaVal;
-    constructor fn new(HeaderHash, EntryHash, Timestamp, u8, LinkTag);
-);
+// fixturator!(
+//     LinkMetaVal;
+//     constructor fn new(HeaderHash, EntryHash, Timestamp, u8, LinkTag);
+// );
 
-impl Iterator for LinkMetaValFixturator<(EntryHash, LinkTag)> {
-    type Item = LinkMetaVal;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut f = fixt!(LinkMetaVal);
-        f.target = self.0.curve.0.clone();
-        f.tag = self.0.curve.1.clone();
-        Some(f)
-    }
-}
+// impl Iterator for LinkMetaValFixturator<(EntryHash, LinkTag)> {
+//     type Item = LinkMetaVal;
+//     fn next(&mut self) -> Option<Self::Item> {
+//         let mut f = fixt!(LinkMetaVal);
+//         f.target = self.0.curve.0.clone();
+//         f.tag = self.0.curve.1.clone();
+//         Some(f)
+//     }
+// }
 
 fixturator!(
     HeaderHashes,
