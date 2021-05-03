@@ -9,6 +9,7 @@ use holo_hash::HeaderHash;
 use holochain_sqlite::db::ReadManager;
 use holochain_types::prelude::*;
 use holochain_zome_types::test_utils::fake_agent_pubkey_1;
+use ChainStatus::*;
 
 fn setup() -> (TestEnv, MetadataBuf, Create, Create, AgentPubKey) {
     observability::test_run().ok();
@@ -20,6 +21,155 @@ fn setup() -> (TestEnv, MetadataBuf, Create, Create, AgentPubKey) {
     h1.author = agent_pubkey.clone();
     h2.author = agent_pubkey.clone();
     (test_env, meta_buf, h1, h2, agent_pubkey)
+}
+
+/// TEST: The following chain status transitions have the proper precedence
+#[test]
+fn add_chain_status_test() {
+    // - Invalid overwrites valid
+    let prev_status = Valid(ChainHead {
+        header_seq: 1,
+        hash: fixt!(HeaderHash),
+    });
+    let incoming_status = Invalid(ChainHead {
+        header_seq: 1,
+        hash: fixt!(HeaderHash),
+    });
+    assert_eq!(
+        add_chain_status(prev_status, incoming_status.clone()),
+        Some(incoming_status.clone())
+    );
+
+    // - Invalid overwrites any invalids later in the chain.
+    let prev_status = Invalid(ChainHead {
+        header_seq: 2,
+        hash: fixt!(HeaderHash),
+    });
+    assert_eq!(
+        add_chain_status(prev_status.clone(), incoming_status.clone()),
+        Some(incoming_status.clone())
+    );
+    // Reverse and expect reverse result
+    assert_eq!(
+        add_chain_status(incoming_status.clone(), prev_status.clone()),
+        None
+    );
+
+    // - Invalid overwrites any forks later in the chain.
+    let prev_status = Forked(ChainFork {
+        fork_seq: 2,
+        first_header: fixt!(HeaderHash),
+        second_header: fixt!(HeaderHash),
+    });
+    assert_eq!(
+        add_chain_status(prev_status.clone(), incoming_status.clone()),
+        Some(incoming_status.clone())
+    );
+    // Reverse and expect reverse result
+    assert_eq!(
+        add_chain_status(incoming_status.clone(), prev_status.clone()),
+        None
+    );
+
+    // - Forked overwrites any forks later in the chain.
+    let prev_status = Forked(ChainFork {
+        fork_seq: 2,
+        first_header: fixt!(HeaderHash),
+        second_header: fixt!(HeaderHash),
+    });
+    let incoming_status = Forked(ChainFork {
+        fork_seq: 1,
+        first_header: fixt!(HeaderHash),
+        second_header: fixt!(HeaderHash),
+    });
+    assert_eq!(
+        add_chain_status(prev_status.clone(), incoming_status.clone()),
+        Some(incoming_status.clone())
+    );
+    // Reverse and expect reverse result
+    assert_eq!(
+        add_chain_status(incoming_status.clone(), prev_status.clone()),
+        None
+    );
+
+    // - Forked overwrites any invalid later in the chain.
+    let prev_status = Invalid(ChainHead {
+        header_seq: 2,
+        hash: fixt!(HeaderHash),
+    });
+    let incoming_status = Forked(ChainFork {
+        fork_seq: 1,
+        first_header: fixt!(HeaderHash),
+        second_header: fixt!(HeaderHash),
+    });
+    assert_eq!(
+        add_chain_status(prev_status.clone(), incoming_status.clone()),
+        Some(incoming_status.clone())
+    );
+    // Reverse and expect reverse result
+    assert_eq!(
+        add_chain_status(incoming_status.clone(), prev_status.clone()),
+        None
+    );
+
+    // - Later Valid headers overwrite earlier Valid.
+    let prev_status = Valid(ChainHead {
+        header_seq: 1,
+        hash: fixt!(HeaderHash),
+    });
+    let incoming_status = Valid(ChainHead {
+        header_seq: 2,
+        hash: fixt!(HeaderHash),
+    });
+    assert_eq!(
+        add_chain_status(prev_status, incoming_status.clone()),
+        Some(incoming_status)
+    );
+
+    // - If there are two Valid status at the same seq num then insert an Fork.
+    let hashes: Vec<_> = HeaderHashFixturator::new(Predictable).take(2).collect();
+    let prev_status = Valid(ChainHead {
+        header_seq: 1,
+        hash: hashes[0].clone(),
+    });
+    let incoming_status = Valid(ChainHead {
+        header_seq: 1,
+        hash: hashes[1].clone(),
+    });
+    let expected = Forked(ChainFork {
+        fork_seq: 1,
+        first_header: hashes[0].clone(),
+        second_header: hashes[1].clone(),
+    });
+    assert_eq!(
+        add_chain_status(prev_status, incoming_status),
+        Some(expected)
+    );
+
+    // Empty doesn't overwrite
+    let prev_status = Valid(ChainHead {
+        header_seq: 1,
+        hash: fixt!(HeaderHash),
+    });
+    assert_eq!(add_chain_status(prev_status, ChainStatus::Empty), None);
+
+    // Same doesn't overwrite
+    let prev_status = Valid(ChainHead {
+        header_seq: 1,
+        hash: fixt!(HeaderHash),
+    });
+    assert_eq!(add_chain_status(prev_status.clone(), prev_status), None);
+    let prev_status = Forked(ChainFork {
+        fork_seq: 2,
+        first_header: fixt!(HeaderHash),
+        second_header: fixt!(HeaderHash),
+    });
+    assert_eq!(add_chain_status(prev_status.clone(), prev_status), None);
+    let prev_status = Invalid(ChainHead {
+        header_seq: 2,
+        hash: fixt!(HeaderHash),
+    });
+    assert_eq!(add_chain_status(prev_status.clone(), prev_status), None);
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -16,9 +16,14 @@ use super::test_data::*;
 use super::*;
 use crate::mutations::*;
 
+mod chain_sequence;
+mod chain_test;
 mod details;
+mod dht_op;
 mod links;
+mod links_test;
 mod store;
+mod sys_meta;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_links() {

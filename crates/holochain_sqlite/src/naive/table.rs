@@ -135,7 +135,7 @@ pub(crate) fn initialize_table_single(
             );",
             table_name
         ),
-        NO_PARAMS,
+        [],
     )?;
 
     Ok(())
@@ -155,7 +155,7 @@ pub(crate) fn initialize_table_multi(
             );",
             table_name,
         ),
-        NO_PARAMS,
+        [],
     )?;
 
     // create two indexes, one unique
@@ -165,7 +165,7 @@ pub(crate) fn initialize_table_multi(
             "CREATE INDEX IF NOT EXISTS {} ON {} ( key );",
             key_index_name, table_name
         ),
-        NO_PARAMS,
+        [],
     )?;
     Ok(())
 }
@@ -309,7 +309,7 @@ impl Table {
     #[cfg(feature = "test_utils")]
     pub fn clear(&mut self, txn: &mut Writer) -> DatabaseResult<()> {
         let mut stmt = txn.prepare_cached(&format!("DELETE FROM {}", self.name()))?;
-        let _ = stmt.execute(NO_PARAMS)?;
+        let _ = stmt.execute([])?;
         Ok(())
     }
 }

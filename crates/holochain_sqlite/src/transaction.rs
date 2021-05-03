@@ -177,7 +177,7 @@ impl<'env> Readable for Reader<'env> {
                 "SELECT key, val FROM {} ORDER BY key ASC",
                 table.name()
             ))?
-            .query_map(NO_PARAMS, |row| {
+            .query_map([], |row| {
                 Ok((row.get(0)?, Some(row.get(1)?)))
             })?)))
     }
@@ -189,7 +189,7 @@ impl<'env> Readable for Reader<'env> {
                 "SELECT key, val FROM {} ORDER BY key DESC",
                 table.name()
             ))?
-            .query_map(NO_PARAMS, |row| {
+            .query_map([], |row| {
                 Ok((row.get(0)?, Some(row.get(1)?)))
             })?)))
     }
@@ -238,7 +238,7 @@ impl<'env> Readable for Writer<'env> {
                 "SELECT key, val FROM {} ORDER BY key ASC",
                 table.name()
             ))?
-            .query_map(NO_PARAMS, |row| {
+            .query_map([], |row| {
                 Ok((row.get(0)?, Some(row.get(1)?)))
             })?)))
     }
@@ -249,7 +249,7 @@ impl<'env> Readable for Writer<'env> {
                 "SELECT key, val FROM {} ORDER BY key DESC",
                 table.name()
             ))?
-            .query_map(NO_PARAMS, |row| {
+            .query_map([], |row| {
                 Ok((row.get(0)?, Some(row.get(1)?)))
             })?)))
     }

@@ -312,17 +312,15 @@ impl SourceChain {
         self.vault.conn()?.with_commit(|txn| {
             // As at check.
             let (new_persisted_head, _) = chain_head_db(&txn, self.author.clone())?;
-            match headers.last().map(|shh| shh.header_address()) {
-                Some(scratch_head) => {
-                    if self.persisted_head != new_persisted_head {
-                        return Err(SourceChainError::HeadMoved(
-                            Some(self.persisted_head.clone()),
-                            Some(new_persisted_head),
-                        ));
-                    }
-                }
+            if headers.last().is_none() {
                 // Nothing to write
-                None => return Ok(()),
+                return Ok(());
+            }
+            if self.persisted_head != new_persisted_head {
+                return Err(SourceChainError::HeadMoved(
+                    Some(self.persisted_head.clone()),
+                    Some(new_persisted_head),
+                ));
             }
 
             for entry in entries {
@@ -483,6 +481,15 @@ pub mod tests {
 
     use std::collections::HashSet;
 
+    use crate::source_chain::SourceChainResult;
+    use fallible_iterator::FallibleIterator;
+    use holochain_types::prelude::*;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::test_utils::fake_dna_file;
+    use holochain_zome_types::header;
+    use holochain_zome_types::Entry;
+    use holochain_zome_types::Header;
+    use holochain_zome_types::HeaderHashed;
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         todo!("re-write as sql test");
@@ -687,5 +694,180 @@ pub mod tests {
         //     }
         //
         //     Ok(())
+    }
+
+    fn fixtures() -> (
+        AgentPubKey,
+        HeaderHashed,
+        Option<Entry>,
+        HeaderHashed,
+        Option<Entry>,
+    ) {
+        let dna = fake_dna_file("a");
+        let agent_pubkey = fake_agent_pubkey_1();
+
+        let agent_entry = Entry::Agent(agent_pubkey.clone().into());
+
+        let (dna_header, agent_header) = tokio_helper::block_on(
+            async {
+                let dna_header = Header::Dna(header::Dna {
+                    author: agent_pubkey.clone(),
+                    timestamp: Timestamp(0, 0).into(),
+                    hash: dna.dna_hash().clone(),
+                });
+                let dna_header = HeaderHashed::from_content_sync(dna_header);
+
+                let agent_header = Header::Create(header::Create {
+                    author: agent_pubkey.clone(),
+                    timestamp: Timestamp(1, 0).into(),
+                    header_seq: 1,
+                    prev_header: dna_header.as_hash().to_owned().into(),
+                    entry_type: header::EntryType::AgentPubKey,
+                    entry_hash: agent_pubkey.clone().into(),
+                });
+                let agent_header = HeaderHashed::from_content_sync(agent_header);
+
+                (dna_header, agent_header)
+            },
+            std::time::Duration::from_secs(1),
+        )
+        .expect("timeout elapsed");
+
+        (
+            agent_pubkey,
+            dna_header,
+            None,
+            agent_header,
+            Some(agent_entry),
+        )
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
+        let test_env = test_cell_env();
+        let arc = test_env.env();
+
+        let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
+
+        {
+            let mut store = SourceChainBuf::new(arc.clone().into()).unwrap();
+            assert!(store.chain_head().is_none());
+            store
+                .put_raw(dna_header.as_content().clone(), dna_entry.clone())
+                .await?;
+            store
+                .put_raw(agent_header.as_content().clone(), agent_entry.clone())
+                .await?;
+            arc.conn()
+                .unwrap()
+                .with_commit(|writer| store.flush_to_txn(writer))?;
+        };
+
+        {
+            let store = SourceChainBuf::new(arc.clone().into()).unwrap();
+            assert!(store.chain_head().is_some());
+
+            // get the full element
+            let dna_element_fetched = store
+                .get_element(dna_header.as_hash())
+                .expect("error retrieving")
+                .expect("entry not found");
+            let agent_element_fetched = store
+                .get_element(agent_header.as_hash())
+                .expect("error retrieving")
+                .expect("entry not found");
+            assert_eq!(dna_header.as_content(), dna_element_fetched.header());
+            assert_eq!(dna_entry.as_ref(), dna_element_fetched.entry().as_option());
+            assert_eq!(agent_header.as_content(), agent_element_fetched.header());
+            assert_eq!(
+                agent_entry.as_ref(),
+                agent_element_fetched.entry().as_option()
+            );
+
+            // check that you can iterate on the chain
+            let mut iter = store.iter_back();
+            let mut res = Vec::new();
+
+            while let Some(h) = iter.next()? {
+                res.push(
+                    store
+                        .get_element(h.header_address())
+                        .unwrap()
+                        .unwrap()
+                        .header()
+                        .clone(),
+                );
+            }
+            assert_eq!(
+                vec![
+                    agent_header.as_content().clone(),
+                    dna_header.as_content().clone(),
+                ],
+                res
+            );
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
+        let test_env = test_cell_env();
+        let arc = test_env.env();
+
+        let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
+
+        {
+            let mut store = SourceChainBuf::new(arc.clone().into()).unwrap();
+            store
+                .put_raw(dna_header.as_content().clone(), dna_entry)
+                .await?;
+            store
+                .put_raw(agent_header.as_content().clone(), agent_entry)
+                .await?;
+
+            arc.conn()
+                .unwrap()
+                .with_commit(|writer| store.flush_to_txn(writer))?;
+        }
+
+        {
+            let store = SourceChainBuf::new(arc.clone().into()).unwrap();
+            let json = store.dump_state().await?;
+            let json = serde_json::to_string_pretty(&json)?;
+            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+            assert_eq!(parsed["elements"][0]["header"]["type"], "Create");
+            assert_eq!(parsed["elements"][0]["header"]["entry_type"], "AgentPubKey");
+            assert_eq!(parsed["elements"][0]["entry"]["entry_type"], "Agent");
+            assert_ne!(
+                parsed["elements"][0]["entry"]["entry"],
+                serde_json::Value::Null
+            );
+
+            assert_eq!(parsed["elements"][1]["header"]["type"], "Dna");
+            assert_eq!(parsed["elements"][1]["entry"], serde_json::Value::Null);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_header_cas_roundtrip() {
+        let test_env = test_cell_env();
+        let arc = test_env.env();
+        let mut store = SourceChainBuf::new(arc.clone().into()).unwrap();
+
+        let (_, hashed, _, _, _) = fixtures();
+        let header = hashed.into_content();
+        let hash = HeaderHash::with_data_sync(&header);
+        let hashed = HeaderHashed::from_content_sync(header.clone());
+        assert_eq!(hash, *hashed.as_hash());
+
+        store.put_raw(header, None).await.unwrap();
+        let signed_header = store.get_header(&hash).unwrap().unwrap();
+
+        assert_eq!(signed_header.as_hash(), hashed.as_hash());
+        assert_eq!(signed_header.as_hash(), signed_header.header_address());
     }
 }
