@@ -93,7 +93,7 @@ struct CellItem<CA>
 where
     CA: CellConductorApiT,
 {
-    cell: Cell<CA>,
+    cell: Arc<Cell<CA>>,
     _state: CellState,
 }
 
@@ -178,12 +178,12 @@ impl<DS> Conductor<DS>
 where
     DS: DnaStore + 'static,
 {
-    pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<&Cell> {
+    pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
         let item = self
             .cells
             .get(cell_id)
             .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
-        Ok(&item.cell)
+        Ok(item.cell.clone())
     }
 
     /// A gate to put at the top of public functions to ensure that work is not
@@ -693,7 +693,7 @@ where
             self.cells.insert(
                 cell_id,
                 CellItem {
-                    cell,
+                    cell: Arc::new(cell),
                     _state: CellState { _active: false },
                 },
             );
