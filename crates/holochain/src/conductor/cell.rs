@@ -119,8 +119,8 @@ impl Cell {
 
         // check if genesis has been run
         let has_genesis = {
-            // check if genesis ran on source chain buf
-            SourceChainBuf::new(env.clone().into())?.has_genesis()
+            // check if genesis ran.
+            GenesisWorkspace::new(env.clone())?.has_genesis(id.agent_pubkey())?
         };
 
         if has_genesis {
@@ -169,7 +169,6 @@ impl Cell {
 
         // run genesis
         let workspace = GenesisWorkspace::new(cell_env.clone().into())
-            .await
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
         let args = GenesisWorkflowArgs::new(dna_file, id.agent_pubkey().clone(), membrane_proof);
@@ -564,32 +563,11 @@ impl Cell {
     async fn handle_validation_receipt(&self, receipt: SerializedBytes) -> CellResult<()> {
         let receipt: SignedValidationReceipt = receipt.try_into()?;
 
-        // Add to authored
-        let db = self.env.get_table(TableName::AuthoredDhtOps)?;
-        let mut authored_dht_ops: AuthoredDhtOpsStore = KvBufFresh::new(self.env.clone(), db);
-        match authored_dht_ops.get(&receipt.receipt.dht_op_hash)? {
-            Some(mut auth) => {
-                auth.receipt_count += 1;
-                authored_dht_ops.put(receipt.receipt.dht_op_hash.clone(), auth)?;
-            }
-            None => {
-                warn!(
-                    "Got receipt {:?} but it's missing from authored db so throwing receipt away",
-                    receipt
-                );
-                return Err(CellError::OpMissingForReceipt(receipt.receipt.dht_op_hash));
-            }
-        }
-
-        // Add to receipts db
-        let mut receipts_db = ValidationReceiptsBuf::new(&self.env)?;
-        receipts_db.add_if_unique(receipt)?;
-
-        // Write to db
-        self.env.conn().unwrap().with_commit(|w| {
-            authored_dht_ops.flush_to_txn_ref(w)?;
-            receipts_db.flush_to_txn_ref(w)?;
-            DatabaseResult::Ok(())
+        self.env.conn()?.with_commit(|txn| {
+            // Update receipt count.
+            add_one_receipt_count(txn, &receipt.receipt.dht_op_hash)?;
+            // Add to receipts db
+            validation_receipts::add_if_unique(txn, receipt)
         })?;
 
         Ok(())
@@ -691,7 +669,6 @@ impl Cell {
                 .collect::<StateQueryResult<Vec<_>>>()?;
             StateQueryResult::Ok(r)
         })?;
-        let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into())?;
         Ok(results)
     }
 

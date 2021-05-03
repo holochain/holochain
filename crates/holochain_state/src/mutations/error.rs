@@ -13,6 +13,8 @@ pub enum StateMutationError {
     DhtOpError(#[from] holochain_types::dht_op::error::DhtOpError),
     #[error(transparent)]
     StateQueryError(#[from] StateQueryError),
+    #[error(transparent)]
+    SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
 }
 
 pub type StateMutationResult<T> = Result<T, StateMutationError>;

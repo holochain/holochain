@@ -1,17 +1,9 @@
 //! The workflow and queue consumer for DhtOp integration
 
-use super::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
 use super::*;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use error::WorkflowResult;
-use fallible_iterator::FallibleIterator;
-use holo_hash::DhtOpHash;
-use holochain_conductor_api::IntegrationStateDump;
-use holochain_sqlite::buffer::BufferedStore;
-use holochain_sqlite::buffer::KvBufFresh;
-use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
@@ -157,100 +149,4 @@ pub async fn integrate_dht_ops_workflow(
     } else {
         Ok(WorkComplete::Complete)
     }
-}
-
-#[deprecated = "This is no longer needed, remove when updating tests"]
-pub struct IntegrateDhtOpsWorkspace {
-    /// integration queue
-    pub integration_limbo: IntegrationLimboStore,
-    /// integrated ops
-    pub integrated_dht_ops: IntegratedDhtOpsStore,
-    /// Cas for storing
-    pub elements: ElementBuf,
-    /// metadata store
-    pub meta: MetadataBuf,
-    /// Data that has progressed past validation and is pending Integration
-    pub element_pending: ElementBuf<PendingPrefix>,
-    pub meta_pending: MetadataBuf<PendingPrefix>,
-    pub element_rejected: ElementBuf<RejectedPrefix>,
-    pub meta_rejected: MetadataBuf<RejectedPrefix>,
-    /// Ops to disintegrate
-    pub to_disintegrate_pending: Vec<DhtOpLight>,
-    /// READ ONLY
-    /// Need the validation limbo to make sure we don't
-    /// remove data that is in this limbo
-    pub validation_limbo: ValidationLimboStore,
-}
-
-impl Workspace for IntegrateDhtOpsWorkspace {
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        // flush elements
-        self.elements.flush_to_txn_ref(writer)?;
-        // flush metadata store
-        self.meta.flush_to_txn_ref(writer)?;
-        // flush integrated
-        self.integrated_dht_ops.flush_to_txn_ref(writer)?;
-        // flush integration queue
-        self.integration_limbo.flush_to_txn_ref(writer)?;
-        self.element_pending.flush_to_txn_ref(writer)?;
-        self.meta_pending.flush_to_txn_ref(writer)?;
-        self.element_rejected.flush_to_txn_ref(writer)?;
-        self.meta_rejected.flush_to_txn_ref(writer)?;
-        Ok(())
-    }
-}
-
-impl IntegrateDhtOpsWorkspace {
-    /// Constructor
-    pub fn new(env: EnvRead) -> WorkspaceResult<Self> {
-        let db = env.get_table(TableName::IntegratedDhtOps)?;
-        let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
-
-        let db = env.get_table(TableName::IntegrationLimbo)?;
-        let integration_limbo = KvBufFresh::new(env.clone(), db);
-
-        let validation_limbo = ValidationLimboStore::new(env.clone())?;
-
-        let elements = ElementBuf::vault(env.clone(), true)?;
-        let meta = MetadataBuf::vault(env.clone())?;
-
-        let element_pending = ElementBuf::pending(env.clone())?;
-        let meta_pending = MetadataBuf::pending(env.clone())?;
-
-        let element_rejected = ElementBuf::rejected(env.clone())?;
-        let meta_rejected = MetadataBuf::rejected(env)?;
-
-        Ok(Self {
-            integration_limbo,
-            integrated_dht_ops,
-            elements,
-            meta,
-            element_pending,
-            meta_pending,
-            element_rejected,
-            meta_rejected,
-            validation_limbo,
-            to_disintegrate_pending: Vec::new(),
-        })
-    }
-
-    pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
-        Ok(self.integrated_dht_ops.contains(&hash)? || self.integration_limbo.contains(&hash)?)
-    }
-}
-
-pub fn dump_state(env: EnvRead) -> WorkspaceResult<IntegrationStateDump> {
-    let workspace = IncomingDhtOpsWorkspace::new(env.clone())?;
-    let (validation_limbo, integration_limbo, integrated) = fresh_reader!(env, |mut r| {
-        let v = workspace.validation_limbo.iter(&mut r)?.count()?;
-        let il = workspace.integration_limbo.iter(&mut r)?.count()?;
-        let i = workspace.integrated_dht_ops.iter(&mut r)?.count()?;
-        DatabaseResult::Ok((v, il, i))
-    })?;
-
-    Ok(IntegrationStateDump {
-        validation_limbo,
-        integration_limbo,
-        integrated,
-    })
 }

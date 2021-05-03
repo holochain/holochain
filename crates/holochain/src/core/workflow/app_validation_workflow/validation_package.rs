@@ -9,7 +9,7 @@ use crate::core::ribosome::guest_callback::validation_package::ValidationPackage
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::RibosomeT;
 use crate::core::SourceChainResult;
-use holochain_state::source_chain2::SourceChain;
+use holochain_state::source_chain::SourceChain;
 use tracing::*;
 
 pub fn get_as_author_sub_chain(

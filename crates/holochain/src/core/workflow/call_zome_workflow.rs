@@ -9,26 +9,16 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
-pub use call_zome_workspace_lock::CallZomeWorkspaceLock;
 use either::Either;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
-use holochain_sqlite::prelude::*;
-use holochain_state::element_buf::ElementBuf;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
-use holochain_state::metadata::MetadataBuf;
-use holochain_state::metadata::MetadataBufT;
-use holochain_state::source_chain::SourceChain;
 use holochain_state::source_chain::SourceChainError;
-use holochain_state::workspace::Workspace;
-use holochain_state::workspace::WorkspaceResult;
 use holochain_zome_types::element::Element;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
 use tracing::instrument;
-
-pub mod call_zome_workspace_lock;
 
 #[cfg(test)]
 mod validation_test;
@@ -236,56 +226,6 @@ async fn call_zome_workflow_inner<
     }
 
     Ok(result)
-}
-
-#[deprecated = "Remove when updating sys validation tests for sql"]
-pub struct CallZomeWorkspace {
-    pub source_chain: SourceChain,
-    pub meta_authored: MetadataBuf<AuthoredPrefix>,
-    pub element_integrated: ElementBuf<IntegratedPrefix>,
-    pub meta_integrated: MetadataBuf<IntegratedPrefix>,
-    pub element_rejected: ElementBuf<RejectedPrefix>,
-    pub meta_rejected: MetadataBuf<RejectedPrefix>,
-    pub element_cache: ElementBuf,
-    pub meta_cache: MetadataBuf,
-}
-
-impl<'a> CallZomeWorkspace {
-    pub fn new(env: EnvRead) -> WorkspaceResult<Self> {
-        let source_chain = SourceChain::new(env.clone())?;
-        let meta_authored = MetadataBuf::authored(env.clone())?;
-        let element_integrated = ElementBuf::vault(env.clone(), true)?;
-        let meta_integrated = MetadataBuf::vault(env.clone())?;
-        let element_rejected = ElementBuf::rejected(env.clone())?;
-        let meta_rejected = MetadataBuf::rejected(env.clone())?;
-        let element_cache = ElementBuf::cache(env.clone())?;
-        let meta_cache = MetadataBuf::cache(env)?;
-
-        Ok(CallZomeWorkspace {
-            source_chain,
-            meta_authored,
-            element_integrated,
-            meta_integrated,
-            element_rejected,
-            meta_rejected,
-            element_cache,
-            meta_cache,
-        })
-    }
-
-    pub fn env(&self) -> &EnvRead {
-        self.meta_authored.env()
-    }
-}
-
-impl Workspace for CallZomeWorkspace {
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.source_chain.flush_to_txn_ref(writer)?;
-        self.meta_authored.flush_to_txn_ref(writer)?;
-        self.element_cache.flush_to_txn_ref(writer)?;
-        self.meta_cache.flush_to_txn_ref(writer)?;
-        Ok(())
-    }
 }
 
 #[cfg(test)]

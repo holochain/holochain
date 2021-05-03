@@ -1,15 +1,14 @@
-use std::sync::Arc;
-
 use holo_hash::AgentPubKey;
 use holochain_types::env::EnvRead;
 use holochain_types::env::EnvWrite;
 
+use crate::prelude::SourceChain;
 use crate::prelude::SourceChainResult;
 use crate::scratch::SyncScratch;
 
 #[derive(Clone)]
 pub struct HostFnWorkspace {
-    source_chain: crate::source_chain2::SourceChain,
+    source_chain: SourceChain,
     vault: EnvWrite,
     cache: EnvWrite,
 }
@@ -24,7 +23,7 @@ pub type Cache = EnvWrite;
 
 impl HostFnWorkspace {
     pub fn new(vault: EnvWrite, cache: EnvWrite, author: AgentPubKey) -> SourceChainResult<Self> {
-        let source_chain = crate::source_chain2::SourceChain::new(vault.clone().into(), author)?;
+        let source_chain = SourceChain::new(vault.clone().into(), author)?;
         Ok(Self {
             source_chain,
             vault,
@@ -36,7 +35,7 @@ impl HostFnWorkspace {
         self.source_chain.flush()
     }
 
-    pub fn source_chain(&self) -> &crate::source_chain2::SourceChain {
+    pub fn source_chain(&self) -> &SourceChain {
         &self.source_chain
     }
 

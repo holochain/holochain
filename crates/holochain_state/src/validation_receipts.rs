@@ -1,15 +1,22 @@
 //! Module for items related to aggregating validation_receipts
 
-use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_keystore::KeystoreSender;
 use holochain_keystore::{keystore_actor::KeystoreApiResult, AgentPubKeyExt};
 use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::prelude::*;
+use holochain_sqlite::rusqlite::named_params;
+use holochain_sqlite::rusqlite::OptionalExtension;
+use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::Timestamp;
 use holochain_zome_types::signature::Signature;
 use holochain_zome_types::ValidationStatus;
+use mutations::StateMutationResult;
+
+use crate::mutations;
+use crate::prelude::from_blob;
+use crate::prelude::StateQueryResult;
 
 /// Validation receipt content - to be signed.
 #[derive(
@@ -73,67 +80,43 @@ pub struct SignedValidationReceipt {
     pub validator_signature: Signature,
 }
 
-/// The database/buffer for aggregating validation_receipts sent by remote
-/// nodes in charge of storage thereof.
-pub struct ValidationReceiptsBuf(KvvBufUsed<DhtOpHash, SignedValidationReceipt>);
-
-impl ValidationReceiptsBuf {
-    /// Constructor given read-only transaction and db ref.
-    pub fn new(dbs: &impl GetTable) -> DatabaseResult<ValidationReceiptsBuf> {
-        Ok(Self(KvvBufUsed::new(
-            dbs.get_table(TableName::ValidationReceipts)?,
-        )))
-    }
-
-    /// List all the validation receipts for a given hash.
-    pub fn list_receipts<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
-        dht_op_hash: &'r DhtOpHash,
-    ) -> DatabaseResult<
-        impl fallible_iterator::FallibleIterator<
-                Item = SignedValidationReceipt,
-                Error = DatabaseError,
-            > + '_,
-    > {
-        Ok(fallible_iterator::convert(self.0.get(r, dht_op_hash)?))
-    }
-
-    /// Get the current valid receipt count for a given hash.
-    pub fn count_valid<'r, R: Readable>(
-        &'r self,
-        r: &'r mut R,
-        dht_op_hash: &DhtOpHash,
-    ) -> DatabaseResult<usize> {
-        let mut count = 0;
-
-        let mut iter = self.list_receipts(r, dht_op_hash)?;
-        while let Some(v) = iter.next()? {
-            if v.receipt.validation_status == ValidationStatus::Valid {
-                count += 1;
-            }
-        }
-        Ok(count)
-    }
-
-    /// Add this receipt if it isn't already in the database.
-    pub fn add_if_unique(&mut self, receipt: SignedValidationReceipt) -> DatabaseResult<()> {
-        // The underlying KvvBufUsed manages the uniqueness
-        self.0.insert(receipt.receipt.dht_op_hash.clone(), receipt);
-        Ok(())
-    }
+pub fn list_receipts(
+    txn: &Transaction,
+    op_hash: &DhtOpHash,
+) -> StateQueryResult<Vec<SignedValidationReceipt>> {
+    let mut stmt = txn.prepare(
+        "
+        SELECT blob FROM ValidationReceipt WHERE op_hash = :op_hash
+        ",
+    )?;
+    let iter = stmt.query_and_then(
+        named_params! {
+            ":op_hash": op_hash
+        },
+        |row| from_blob::<SignedValidationReceipt>(row.get("blob")?),
+    )?;
+    iter.collect()
 }
 
-impl BufferedStore for ValidationReceiptsBuf {
-    type Error = DatabaseError;
+pub fn count_valid(txn: &Transaction, op_hash: &DhtOpHash) -> DatabaseResult<usize> {
+    let count: usize = txn
+        .query_row(
+            "SELECT COUNT(hash) FROM ValidationReceipt WHERE op_hash = :op_hash",
+            named_params! {
+                ":op_hash": op_hash
+            },
+            |row| row.get(0),
+        )
+        .optional()?
+        .unwrap_or(0);
+    Ok(count)
+}
 
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
-        // we are in no_dup_data mode
-        // so even if someone else added a dup in the mean time
-        // it will not get written to the DB
-        self.0.flush_to_txn_ref(writer)?;
-        Ok(())
-    }
+pub fn add_if_unique(
+    txn: &mut Transaction,
+    receipt: SignedValidationReceipt,
+) -> StateMutationResult<()> {
+    mutations::insert_validation_receipt(txn, receipt)
 }
 
 #[cfg(test)]

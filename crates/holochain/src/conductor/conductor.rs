@@ -12,10 +12,8 @@ use super::api::RealAdminInterfaceApi;
 use super::api::RealAppInterfaceApi;
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
-use super::dna_store::DnaDefBuf;
 use super::dna_store::RealDnaStore;
 use super::entry_def_store::get_entry_defs;
-use super::entry_def_store::EntryDefBuf;
 use super::error::ConductorError;
 use super::error::CreateAppError;
 use super::handle::ConductorHandleImpl;
@@ -47,9 +45,7 @@ use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::InitialQueueTriggers;
-use crate::core::workflow::integrate_dht_ops_workflow;
 pub use builder::*;
-use fallible_iterator::FallibleIterator;
 use futures::future;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
@@ -59,15 +55,14 @@ use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::KeystoreSender;
 use holochain_keystore::KeystoreSenderExt;
-use holochain_sqlite::buffer::BufferedStore;
 use holochain_sqlite::buffer::KvStore;
 use holochain_sqlite::buffer::KvStoreT;
 use holochain_sqlite::db::DbKind;
 use holochain_sqlite::exports::SingleTable;
 use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
-use holochain_state::source_chain::SourceChainBuf;
-use holochain_state::wasm::WasmBuf;
+use holochain_state::prelude::StateMutationResult;
+use holochain_state::source_chain;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashMap;
@@ -736,43 +731,33 @@ where
         impl IntoIterator<Item = (DnaHash, DnaFile)>,
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
-        let environ = &self.wasm_env;
-        let wasm = environ.get_table(TableName::Wasm)?;
-        let dna_def_db = environ.get_table(TableName::DnaDef)?;
-        let entry_def_db = environ.get_table(TableName::EntryDef)?;
+        let env = &self.wasm_env;
 
-        let wasm_buf = Arc::new(WasmBuf::new(environ.clone().into(), wasm)?);
-        let dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
-        let entry_def_buf = EntryDefBuf::new(environ.clone().into(), entry_def_db)?;
         // Load out all dna defs
-        let wasm_tasks = dna_def_buf
-            .get_all()?
-            .into_iter()
-            .map(|dna_def| {
-                // Load all wasms for each dna_def from the wasm db into memory
-                let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
-                    let wasm_buf = wasm_buf.clone();
-                    async move {
-                        wasm_buf
-                            .get(&zome.wasm_hash(&zome_name)?)
-                            .await?
+        let (wasm_tasks, defs) = env.conn()?.with_reader(|txn| {
+            let wasm_tasks = holochain_state::dna_def::get_all(&txn)?
+                .into_iter()
+                .map(|dna_def| {
+                    // Load all wasms for each dna_def from the wasm db into memory
+                    let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
+                        let wasm_hash = zome.wasm_hash(&zome_name)?;
+                        holochain_state::wasm::get(txn.as_ref(), &wasm_hash)?
                             .map(|hashed| hashed.into_content())
                             .ok_or(ConductorError::WasmMissing)
+                    });
+                    let wasms = wasms.collect::<ConductorResult<Vec<_>>>();
+                    async move {
+                        let dna_file = DnaFile::new(dna_def.into_content(), wasms?).await?;
+                        ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
                     }
-                });
-                async move {
-                    let wasms = futures::future::try_join_all(wasms).await?;
-                    let dna_file = DnaFile::new(dna_def.into_content(), wasms).await?;
-                    ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
-                }
-            })
-            // This needs to happen due to the environment not being Send
-            .collect::<Vec<_>>();
+                })
+                // This needs to happen due to the environment not being Send
+                .collect::<Vec<_>>();
+            let defs = holochain_state::entry_def::get_all(&txn)?;
+            ConductorResult::Ok((wasm_tasks, defs))
+        })?;
         // try to join all the tasks and return the list of dna files
         let dnas = futures::future::try_join_all(wasm_tasks).await?;
-        let defs = fresh_reader!(environ, |mut r| entry_def_buf
-            .get_all(&mut r)?
-            .collect::<Vec<_>>())?;
         Ok((dnas, defs))
     }
 
@@ -809,46 +794,32 @@ where
         &self,
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-        let environ = self.wasm_env.clone();
-        let wasm = environ.get_table(TableName::Wasm)?;
-        let dna_def_db = environ.get_table(TableName::DnaDef)?;
-        let entry_def_db = environ.get_table(TableName::EntryDef)?;
+        let env = self.wasm_env.clone();
 
         let zome_defs = get_entry_defs(dna.clone())?;
 
-        let mut entry_def_buf = EntryDefBuf::new(environ.clone().into(), entry_def_db)?;
-
-        for (key, entry_def) in zome_defs.clone() {
-            entry_def_buf.put(key, entry_def)?;
-        }
-
-        let mut wasm_buf = WasmBuf::new(environ.clone().into(), wasm)?;
-        let mut dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
         // TODO: PERF: This loop might be slow
-        for (wasm_hash, dna_wasm) in dna.code().clone().into_iter() {
-            if wasm_buf.get(&wasm_hash).await?.is_none() {
-                wasm_buf.put(DnaWasmHashed::from_content(dna_wasm).await);
+        let wasms = futures::future::join_all(
+            dna.code()
+                .clone()
+                .into_iter()
+                .map(|(_, dna_wasm)| DnaWasmHashed::from_content(dna_wasm)),
+        )
+        .await;
+        env.conn()?.with_commit(|txn| {
+            for dna_wasm in wasms {
+                if !holochain_state::wasm::contains(txn, dna_wasm.as_hash())? {
+                    holochain_state::wasm::put(txn, dna_wasm)?;
+                }
             }
-        }
-        if dna_def_buf.get(dna.dna_hash()).await?.is_none() {
-            dna_def_buf.put(dna.dna_def().clone()).await?;
-        }
-        {
-            // write the wasm db
-            environ
-                .conn()?
-                .with_commit(|writer| wasm_buf.flush_to_txn(writer))?;
-
-            // write the dna_def db
-            environ
-                .conn()?
-                .with_commit(|writer| dna_def_buf.flush_to_txn(writer))?;
-
-            // write the entry_def db
-            environ
-                .conn()?
-                .with_commit(|writer| entry_def_buf.flush_to_txn(writer))?;
-        }
+            for (key, entry_def) in zome_defs.clone() {
+                holochain_state::entry_def::put(txn, key, entry_def)?;
+            }
+            if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {
+                holochain_state::dna_def::put(txn, dna.dna_def().clone())?;
+            }
+            StateMutationResult::Ok(())
+        })?;
         Ok(zome_defs)
     }
 
@@ -864,16 +835,14 @@ where
     pub(super) async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.env();
-        let source_chain = SourceChainBuf::new(arc.clone().into())?;
 
         let peer_dump = p2p_store::dump_state(self.p2p_env.clone().into(), Some(cell_id.clone()))?;
-        let source_chain_dump = source_chain.dump_state().await?;
-        let integration_dump = integrate_dht_ops_workflow::dump_state(arc.clone().into())?;
+        let source_chain_dump =
+            source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey()).await?;
 
         let out = JsonDump {
             peer_dump,
             source_chain_dump,
-            integration_dump,
         };
         // Add summary
         let summary = out.to_string();

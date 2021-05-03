@@ -5,8 +5,6 @@ use super::sys_validation_workflow::counterfeit_check;
 use crate::core::queue_consumer::TriggerSender;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
-use holochain_sqlite::buffer::BufferedStore;
-use holochain_sqlite::buffer::KvBufFresh;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
@@ -108,71 +106,4 @@ fn set_send_receipt(vault: &EnvWrite, hash: DhtOpHash) -> StateMutationResult<()
         StateMutationResult::Ok(())
     })?;
     Ok(())
-}
-
-#[allow(missing_docs)]
-#[deprecated = "This workspace is no longer required"]
-pub struct IncomingDhtOpsWorkspace {
-    pub integration_limbo: IntegrationLimboStore,
-    pub integrated_dht_ops: IntegratedDhtOpsStore,
-    pub validation_limbo: ValidationLimboStore,
-    pub element_pending: ElementBuf<PendingPrefix>,
-    pub meta_pending: MetadataBuf<PendingPrefix>,
-    pub meta_integrated: MetadataBuf<IntegratedPrefix>,
-}
-
-impl Workspace for IncomingDhtOpsWorkspace {
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.validation_limbo.0.flush_to_txn_ref(writer)?;
-        self.element_pending.flush_to_txn_ref(writer)?;
-        self.meta_pending.flush_to_txn_ref(writer)?;
-        self.meta_integrated.flush_to_txn_ref(writer)?;
-        Ok(())
-    }
-}
-
-impl IncomingDhtOpsWorkspace {
-    pub fn new(env: EnvRead) -> WorkspaceResult<Self> {
-        let db = env.get_table(TableName::IntegratedDhtOps)?;
-        let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
-
-        let db = env.get_table(TableName::IntegrationLimbo)?;
-        let integration_limbo = KvBufFresh::new(env.clone(), db);
-
-        let validation_limbo = ValidationLimboStore::new(env.clone())?;
-
-        let element_pending = ElementBuf::pending(env.clone())?;
-        let meta_pending = MetadataBuf::pending(env.clone())?;
-
-        let meta_integrated = MetadataBuf::vault(env)?;
-
-        Ok(Self {
-            integration_limbo,
-            integrated_dht_ops,
-            validation_limbo,
-            element_pending,
-            meta_pending,
-            meta_integrated,
-        })
-    }
-
-    pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
-        Ok(self.integrated_dht_ops.contains(&hash)?
-            || self.integration_limbo.contains(&hash)?
-            || self.validation_limbo.contains(&hash)?)
-    }
-
-    pub fn set_send_receipt(&mut self, hash: DhtOpHash) -> DatabaseResult<()> {
-        if let Some(mut v) = self.integrated_dht_ops.get(&hash)? {
-            v.send_receipt = true;
-            self.integrated_dht_ops.put(hash, v)?;
-        } else if let Some(mut v) = self.integration_limbo.get(&hash)? {
-            v.send_receipt = true;
-            self.integration_limbo.put(hash, v)?;
-        } else if let Some(mut v) = self.validation_limbo.get(&hash)? {
-            v.send_receipt = true;
-            self.validation_limbo.put(hash, v)?;
-        }
-        Ok(())
-    }
 }

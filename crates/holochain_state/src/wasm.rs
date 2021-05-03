@@ -1,31 +1,46 @@
 use holo_hash::WasmHash;
-use holochain_sqlite::prelude::*;
+use holochain_sqlite::rusqlite::named_params;
+use holochain_sqlite::rusqlite::OptionalExtension;
+use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
 
-/// This is where wasm lives
-pub struct WasmBuf(CasBufFreshAsync<DnaWasm>);
+use crate::mutations;
+use crate::prelude::from_blob;
+use crate::prelude::StateMutationResult;
+use crate::prelude::StateQueryResult;
 
-impl WasmBuf {
-    pub fn new(env: EnvRead, wasm_store: SingleTable) -> DatabaseResult<Self> {
-        Ok(Self(CasBufFreshAsync::new(DbRead::from(env), wasm_store)))
-    }
-
-    pub async fn get(&self, wasm_hash: &WasmHash) -> DatabaseResult<Option<DnaWasmHashed>> {
-        self.0.get(&wasm_hash).await
-    }
-
-    pub fn put(&mut self, v: DnaWasmHashed) {
-        self.0.put(v);
+pub fn get(txn: &Transaction<'_>, hash: &WasmHash) -> StateQueryResult<Option<DnaWasmHashed>> {
+    let item = txn
+        .query_row(
+            "SELECT hash, blob FROM Wasm WHERE hash = :hash",
+            named_params! {
+                ":hash": hash
+            },
+            |row| {
+                let hash: WasmHash = row.get("hash")?;
+                let wasm = row.get("blob")?;
+                Ok((hash, wasm))
+            },
+        )
+        .optional()?;
+    match item {
+        Some((hash, wasm)) => Ok(Some(DnaWasmHashed::with_pre_hashed(from_blob(wasm)?, hash))),
+        None => Ok(None),
     }
 }
 
-impl BufferedStore for WasmBuf {
-    type Error = DatabaseError;
+pub fn contains(txn: &Transaction<'_>, hash: &WasmHash) -> StateQueryResult<bool> {
+    Ok(txn.query_row(
+        "EXISTS(SELECT 1 FROM Wasm WHERE hash = :hash)",
+        named_params! {
+            ":hash": hash
+        },
+        |row| row.get(0),
+    )?)
+}
 
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.0.flush_to_txn_ref(writer)?;
-        Ok(())
-    }
+pub fn put(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationResult<()> {
+    mutations::insert_wasm(txn, wasm)
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 -- Initial Holochain Cell schema
 
-CREATE TABLE Entry (
+CREATE TABLE IF NOT EXISTS Entry (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     -- might not need this index, let's avoid for now
     -- type             VARCHAR(64)    NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE Entry (
 
 -- TODO: some of the NULL fields can be collapsed,
 --       like between Update and Delete
-CREATE TABLE Header (
+CREATE TABLE IF NOT EXISTS Header (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             VARCHAR(64)    NOT NULL,
     seq              INTEGER        NOT NULL,
@@ -80,7 +80,7 @@ CREATE INDEX Header_author ON Header ( author );
 
 -- NB: basis_hash, header_hash, and entry_hash, in general, will have
 --     duplication of data. Could rethink these a bit.
-CREATE TABLE DhtOp (
+CREATE TABLE IF NOT EXISTS DhtOp (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             VARCHAR(64)    NOT NULL,
     basis_hash       BLOB           NOT NULL,
@@ -129,3 +129,28 @@ CREATE TABLE DhtOp (
 );
 CREATE INDEX DhtOp_type_idx ON DhtOp ( type );
 -- CREATE INDEX DhtOp_basis_hash_idx ON DhtOp ( basis_hash );
+
+CREATE TABLE IF NOT EXISTS ValidationReceipt (
+    hash            BLOB           PRIMARY KEY ON CONFLICT IGNORE,
+    op_hash         BLOB           NOT NULL,
+    blob            BLOB           NOT NULL,
+    FOREIGN KEY(op_hash) REFERENCES DhtOp(hash)
+);
+
+-- TODO Move this to a different non-cell schema
+CREATE TABLE IF NOT EXISTS Wasm (
+    hash            BLOB           PRIMARY KEY ON CONFLICT IGNORE,
+    blob            BLOB           NOT NULL,
+);
+
+-- TODO Move this to a different non-cell schema
+CREATE TABLE IF NOT EXISTS DnaDef (
+    hash            BLOB           PRIMARY KEY ON CONFLICT IGNORE,
+    blob            BLOB           NOT NULL,
+);
+
+-- TODO Move this to a different non-cell schema
+CREATE TABLE IF NOT EXISTS EntryDef (
+    key             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
+    blob            BLOB           NOT NULL,
+);

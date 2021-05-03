@@ -9,8 +9,6 @@ use crate::conductor::p2p_store;
 use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
-use crate::core::workflow::integrate_dht_ops_workflow;
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use hdk::prelude::ZomeName;
@@ -422,7 +420,8 @@ async fn consistency_envs_others(
 
 fn get_authored_ops(env: &EnvWrite) -> Vec<DhtOpLight> {
     let query = ChainQueryFilter::new().include_entries(true);
-    let chain = SourceChain::new(env.clone().into()).unwrap();
+    // let chain = SourceChain::new(env.clone().into()).unwrap();
+    let chain: SourceChain = todo!();
     let elements = chain.query(&query).unwrap();
     let elements = elements.iter().collect::<Vec<_>>();
     let private = elements
@@ -479,16 +478,17 @@ pub async fn wait_for_integration(
 }
 
 fn int_ops(env: &EnvWrite) -> Vec<DhtOpLight> {
-    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
-    fresh_reader_test!(env, |mut r| {
-        workspace
-            .integrated_dht_ops
-            .iter(&mut r)
-            .unwrap()
-            .map(|(_, v)| Ok(v.op))
-            .collect()
-            .unwrap()
-    })
+    // let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
+    // fresh_reader_test!(env, |mut r| {
+    //     workspace
+    //         .integrated_dht_ops
+    //         .iter(&mut r)
+    //         .unwrap()
+    //         .map(|(_, v)| Ok(v.op))
+    //         .collect()
+    //         .unwrap()
+    // })
+    todo!()
 }
 
 /// Same as wait for integration but can print other states at the same time
@@ -569,17 +569,19 @@ pub async fn wait_for_integration_with_others(
 /// Show authored data for each cell environment
 pub fn show_authored(envs: &[&EnvWrite]) {
     for (i, &env) in envs.iter().enumerate() {
-        let chain = SourceChain::new(env.clone().into()).unwrap();
-        let mut items = chain.iter_back().collect::<Vec<_>>().unwrap();
+        // let chain = SourceChain::new(env.clone().into()).unwrap();
+        let chain: SourceChain = todo!();
+        // let mut items = chain.iter_back().collect::<Vec<_>>().unwrap();
+        let mut items: Vec<SignedHeaderHashed> = todo!();
         items.reverse();
         for item in items {
-            let header = item.header();
-            let seq_num = header.header_seq();
-            let header_type = header.header_type();
-            let entry = header
-                .entry_hash()
-                .and_then(|e| chain.get_entry(e).unwrap());
-            tracing::debug!(chain = %i, %seq_num, ?header_type, ?entry);
+            // let header = item.header();
+            // let seq_num = header.header_seq();
+            // let header_type = header.header_type();
+            // let entry = header
+            //     .entry_hash()
+            // .and_then(|e| chain.get_entry(e).unwrap());
+            // tracing::debug!(chain = %i, %seq_num, ?header_type, ?entry);
         }
     }
 }
@@ -629,72 +631,71 @@ async fn get_counts(envs: &[&EnvWrite]) -> IntegrationStateDumps {
 }
 
 async fn count_integration(env: &EnvWrite) -> IntegrationStateDump {
-    integrate_dht_ops_workflow::dump_state(env.clone().into()).unwrap()
+    todo!()
 }
 
 async fn display_integration(env: &EnvWrite) -> usize {
-    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
+    // let val_limbo: Vec<_> = fresh_reader_test!(env, |mut r| {
+    //     workspace
+    //         .validation_limbo
+    //         .iter(&mut r)
+    //         .unwrap()
+    //         .map(|(_, v)| Ok(v))
+    //         .collect()
+    //         .unwrap()
+    // });
+    // tracing::debug!(?val_limbo);
 
-    let val_limbo: Vec<_> = fresh_reader_test!(env, |mut r| {
-        workspace
-            .validation_limbo
-            .iter(&mut r)
-            .unwrap()
-            .map(|(_, v)| Ok(v))
-            .collect()
-            .unwrap()
-    });
-    tracing::debug!(?val_limbo);
+    // let int_limbo: Vec<_> = fresh_reader_test!(env, |mut r| {
+    //     workspace
+    //         .integration_limbo
+    //         .iter(&mut r)
+    //         .unwrap()
+    //         .map(|(_, v)| Ok(v))
+    //         .collect()
+    //         .unwrap()
+    // });
+    // tracing::debug!(?int_limbo);
 
-    let int_limbo: Vec<_> = fresh_reader_test!(env, |mut r| {
-        workspace
-            .integration_limbo
-            .iter(&mut r)
-            .unwrap()
-            .map(|(_, v)| Ok(v))
-            .collect()
-            .unwrap()
-    });
-    tracing::debug!(?int_limbo);
+    // let int: Vec<_> = fresh_reader_test!(env, |mut r| {
+    //     workspace
+    //         .integrated_dht_ops
+    //         .iter(&mut r)
+    //         .unwrap()
+    //         .map(|(_, v)| Ok(v))
+    //         .collect()
+    //         .unwrap()
+    // });
+    // let count = int.len();
 
-    let int: Vec<_> = fresh_reader_test!(env, |mut r| {
-        workspace
-            .integrated_dht_ops
-            .iter(&mut r)
-            .unwrap()
-            .map(|(_, v)| Ok(v))
-            .collect()
-            .unwrap()
-    });
-    let count = int.len();
-
-    {
-        let s = tracing::trace_span!("wait_for_integration_deep");
-        let _g = s.enter();
-        let mut cascade = Cascade::empty().with_vault(env.clone().into());
-        let mut headers_to_display = Vec::with_capacity(int.len());
-        for iv in int {
-            let el = cascade
-                .retrieve(iv.op.header_hash().clone().into(), Default::default())
-                .await
-                .unwrap()
-                .unwrap();
-            tracing::trace!(op = ?iv.op, ?el);
-            let header = el.header();
-            let entry = format!("{:?}", el.entry());
-            headers_to_display.push((
-                header.header_seq(),
-                header.header_type(),
-                iv.op.to_string(),
-                entry,
-            ))
-        }
-        headers_to_display.sort_by_key(|i| i.0);
-        for (i, h) in headers_to_display.into_iter().enumerate() {
-            tracing::debug!(?i, seq_num = %h.0, header_type = ?h.1, op_type = %h.2, entry = ?h.3);
-        }
-    }
-    count
+    // {
+    //     let s = tracing::trace_span!("wait_for_integration_deep");
+    //     let _g = s.enter();
+    //     let mut cascade = Cascade::empty().with_vault(env.clone().into());
+    //     let mut headers_to_display = Vec::with_capacity(int.len());
+    //     for iv in int {
+    //         let el = cascade
+    //             .retrieve(iv.op.header_hash().clone().into(), Default::default())
+    //             .await
+    //             .unwrap()
+    //             .unwrap();
+    //         tracing::trace!(op = ?iv.op, ?el);
+    //         let header = el.header();
+    //         let entry = format!("{:?}", el.entry());
+    //         headers_to_display.push((
+    //             header.header_seq(),
+    //             header.header_type(),
+    //             iv.op.to_string(),
+    //             entry,
+    //         ))
+    //     }
+    //     headers_to_display.sort_by_key(|i| i.0);
+    //     for (i, h) in headers_to_display.into_iter().enumerate() {
+    //         tracing::debug!(?i, seq_num = %h.0, header_type = ?h.1, op_type = %h.2, entry = ?h.3);
+    //     }
+    // }
+    // count
+    todo!()
 }
 
 /// Helper for displaying agent infos stored on a conductor

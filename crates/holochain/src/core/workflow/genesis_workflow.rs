@@ -12,7 +12,7 @@ use super::error::WorkflowResult;
 use crate::conductor::api::CellConductorApiT;
 use derive_more::Constructor;
 use holochain_sqlite::prelude::*;
-use holochain_state::source_chain2;
+use holochain_state::source_chain;
 use holochain_state::workspace::WorkspaceResult;
 use holochain_types::prelude::*;
 use rusqlite::named_params;
@@ -108,9 +108,9 @@ async fn genesis_workflow_inner<Api: CellConductorApiT>(
     let agent_entry = agent_entry.into_option();
 
     workspace.vault.conn()?.with_commit(|txn| {
-        source_chain2::put_raw(txn, dna_header, dna_ops, None)?;
-        source_chain2::put_raw(txn, agent_validation_header, avh_ops, None)?;
-        source_chain2::put_raw(txn, agent_header, agent_ops, agent_entry)?;
+        source_chain::put_raw(txn, dna_header, dna_ops, None)?;
+        source_chain::put_raw(txn, agent_validation_header, avh_ops, None)?;
+        source_chain::put_raw(txn, agent_header, agent_ops, agent_entry)?;
         WorkflowResult::Ok(())
     })?;
 
@@ -124,7 +124,7 @@ pub struct GenesisWorkspace {
 
 impl GenesisWorkspace {
     /// Constructor
-    pub async fn new(env: EnvWrite) -> WorkspaceResult<Self> {
+    pub fn new(env: EnvWrite) -> WorkspaceResult<Self> {
         Ok(Self { vault: env.clone() })
     }
 

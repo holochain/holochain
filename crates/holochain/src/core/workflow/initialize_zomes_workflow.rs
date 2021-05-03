@@ -1,5 +1,4 @@
 use super::error::WorkflowResult;
-use super::CallZomeWorkspace;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
@@ -17,8 +16,6 @@ pub struct InitializeZomesWorkflowArgs<Ribosome: RibosomeT> {
     pub dna_def: DnaDef,
     pub ribosome: Ribosome,
 }
-
-pub type InitializeZomesWorkspace = CallZomeWorkspace;
 
 #[instrument(skip(network, keystore, workspace))]
 pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(

@@ -6,7 +6,6 @@ use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
-use crate::core::workflow::call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;

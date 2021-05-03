@@ -35,16 +35,6 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u32 = 5;
 /// flooding the network with spurious publishes.
 pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(5);
 
-/// Database buffers required for publishing [DhtOp]s
-#[cfg(test)]
-#[deprecated = "Remove when updating publish tests for sql"]
-pub struct PublishDhtOpsWorkspace {
-    /// Database of authored DhtOps, with data about prior publishing
-    authored_dht_ops: AuthoredDhtOpsStore,
-    /// Element store for looking up data to construct ops
-    elements: ElementBuf<AuthoredPrefix>,
-}
-
 #[instrument(skip(env, writer, network))]
 pub async fn publish_dht_ops_workflow(
     env: EnvRead,
@@ -108,32 +98,6 @@ pub async fn publish_dht_ops_workflow_inner(
     }
 
     Ok((to_publish, hashes))
-}
-
-#[cfg(test)]
-impl Workspace for PublishDhtOpsWorkspace {
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.authored_dht_ops.flush_to_txn_ref(writer)?;
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-impl PublishDhtOpsWorkspace {
-    pub fn new(env: EnvRead) -> WorkspaceResult<Self> {
-        let db = env.get_table(TableName::AuthoredDhtOps)?;
-        let authored_dht_ops = KvBufFresh::new(env.clone(), db);
-        // Note that this must always be false as we don't want private entries being published
-        let elements = ElementBuf::authored(env, false)?;
-        Ok(Self {
-            authored_dht_ops,
-            elements,
-        })
-    }
-
-    fn authored(&mut self) -> &mut AuthoredDhtOpsStore {
-        &mut self.authored_dht_ops
-    }
 }
 
 #[cfg(test)]

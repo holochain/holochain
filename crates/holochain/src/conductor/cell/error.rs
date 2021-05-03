@@ -60,6 +60,8 @@ pub enum CellError {
     OpMissingForReceipt(DhtOpHash),
     #[error(transparent)]
     StateQueryError(#[from] holochain_state::query::StateQueryError),
+    #[error(transparent)]
+    StateMutationError(#[from] holochain_state::mutations::StateMutationError),
 }
 
 pub type CellResult<T> = Result<T, CellError>;

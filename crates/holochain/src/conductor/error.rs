@@ -108,6 +108,12 @@ pub enum ConductorError {
 
     #[error(transparent)]
     MrBundleError(#[from] mr_bundle::error::MrBundleError),
+
+    #[error(transparent)]
+    StateQueryError(#[from] holochain_state::query::StateQueryError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] holochain_state::mutations::StateMutationError),
 }
 
 #[derive(Error, Debug)]

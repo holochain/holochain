@@ -1,6 +1,9 @@
+use crate::entry_def::EntryDefStoreKey;
+use crate::prelude::SignedValidationReceipt;
 use crate::query::to_blob;
 use crate::scratch::Scratch;
 use crate::validation_db::ValidationLimboStatus;
+use holo_hash::encode::blake2b_256;
 use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Transaction;
@@ -8,6 +11,8 @@ use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::prelude::DhtOpError;
+use holochain_types::prelude::DnaDefHashed;
+use holochain_types::prelude::DnaWasmHashed;
 use holochain_types::EntryHashed;
 use holochain_zome_types::*;
 
@@ -43,6 +48,25 @@ macro_rules! dht_op_update {
             $(
             (format!(":{}", $field).as_str(), &$val as &dyn holochain_sqlite::rusqlite::ToSql),
         )+])
+    }};
+}
+
+#[macro_export]
+macro_rules! dht_op_add_one {
+    ($txn:expr, $hash:expr, $field:literal) => {{
+        let fieldvars = format!("{} = {} + 1", $field, $field);
+        let sql = format!(
+            "
+            UPDATE DhtOp 
+            SET {}
+            WHERE DhtOp.hash = :hash
+            ",
+            fieldvars
+        );
+        $txn.execute(
+            &sql,
+            &[(":hash", &$hash as &dyn holochain_sqlite::rusqlite::ToSql)],
+        )
     }};
 }
 
@@ -123,6 +147,56 @@ pub fn insert_op_lite(
         "require_receipt": 0,
         "blob": to_blob(op_lite)?,
         "op_order": order,
+    })?;
+    Ok(())
+}
+
+/// Insert a [`SignedValidationReceipt`] into the database.
+pub fn insert_validation_receipt(
+    txn: &mut Transaction,
+    receipt: SignedValidationReceipt,
+) -> StateMutationResult<()> {
+    let op_hash = receipt.receipt.dht_op_hash.clone();
+    let bytes: UnsafeBytes = SerializedBytes::try_from(receipt)?.into();
+    let bytes: Vec<u8> = bytes.into();
+    let hash = blake2b_256(&bytes);
+    sql_insert!(txn, ValidationReceipt, {
+        "hash": hash,
+        "op_hash": op_hash,
+        "blob": bytes,
+    })?;
+    Ok(())
+}
+
+/// Insert a [`DnaWasm`] into the database.
+pub fn insert_wasm(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationResult<()> {
+    let hash = wasm.as_hash().clone();
+    sql_insert!(txn, Wasm, {
+        "hash": hash,
+        "blob": to_blob(wasm)?,
+    })?;
+    Ok(())
+}
+
+/// Insert a [`DnaDef`] into the database.
+pub fn insert_dna_def(txn: &mut Transaction, dna_def: DnaDefHashed) -> StateMutationResult<()> {
+    let hash = dna_def.as_hash().clone();
+    sql_insert!(txn, Wasm, {
+        "hash": hash,
+        "blob": to_blob(dna_def)?,
+    })?;
+    Ok(())
+}
+
+/// Insert a [`EntryDef`] into the database.
+pub fn insert_entry_def(
+    txn: &mut Transaction,
+    key: EntryDefStoreKey,
+    entry_def: EntryDef,
+) -> StateMutationResult<()> {
+    sql_insert!(txn, Wasm, {
+        "key": key,
+        "blob": to_blob(entry_def)?,
     })?;
     Ok(())
 }
@@ -209,7 +283,7 @@ pub fn set_last_publish_time(
     Ok(())
 }
 
-/// Set when a [`DhtOp`] was last publish time
+/// Set the receipt count for a [`DhtOp`].
 pub fn set_receipt_count(
     txn: &mut Transaction,
     hash: DhtOpHash,
@@ -218,6 +292,12 @@ pub fn set_receipt_count(
     dht_op_update!(txn, hash, {
         "receipt_count": count,
     })?;
+    Ok(())
+}
+
+/// Add one to the receipt count for a [`DhtOp`].
+pub fn add_one_receipt_count(txn: &mut Transaction, hash: &DhtOpHash) -> StateMutationResult<()> {
+    dht_op_add_one!(txn, hash, "receipt_count")?;
     Ok(())
 }
 
