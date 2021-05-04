@@ -1,10 +1,10 @@
 #![cfg(feature = "test_utils")]
 
 use hdk::prelude::Links;
-use holochain::test_utils::consistency_10s;
 use holochain::sweettest::SweetAgents;
 use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetDnaFile;
+use holochain::test_utils::consistency_10s;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
