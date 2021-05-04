@@ -27,7 +27,7 @@ pub async fn new_kitsune_direct_v1(
     proxy: TxUrl,
 ) -> KitsuneResult<(
     KitsuneDirect,
-    Box<dyn futures::Stream<Item = KitsuneDirectEvt>>,
+    Box<dyn futures::Stream<Item = KitsuneDirectEvt> + 'static + Send + Unpin>,
 )> {
     let mut config = KitsuneP2pConfig::default();
 

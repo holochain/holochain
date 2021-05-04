@@ -20,8 +20,19 @@ pub struct KdAgentInfoInner {
     pub raw: AgentInfoSigned,
 }
 
+impl std::fmt::Debug for KdAgentInfoInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KdAgentInfoInner")
+            .field("root", &self.root)
+            .field("agent", &self.agent)
+            .field("urls", &self.urls)
+            .field("signed_at_ms", &self.signed_at_ms)
+            .finish()
+    }
+}
+
 /// a more ergonomic kdirect wrapper around the kitsune agent info type
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct KdAgentInfo(pub Arc<KdAgentInfoInner>);
 
 impl std::ops::Deref for KdAgentInfo {

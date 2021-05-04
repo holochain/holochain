@@ -9,6 +9,7 @@ use types::kdhash::KdHash;
 use types::persist::KdPersist;
 
 /// Events emitted from a kitsune direct instance.
+#[derive(Debug)]
 pub enum KitsuneDirectEvt {
     /// A new agent was generated
     AgentGenerated {
