@@ -56,7 +56,7 @@ use crate::core::workflow::ZomeCallResult;
 use crate::core::{queue_consumer::InitialQueueTriggers, ribosome::real_ribosome::RealRibosome};
 use derive_more::From;
 use futures::future::FutureExt;
-use futures::{future::BoxFuture, StreamExt};
+use futures::StreamExt;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_lmdb::env::EnvironmentRead;
 use holochain_p2p::event::HolochainP2pEvent::*;
@@ -416,20 +416,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
             _ => {
-                self.with_cell(cell_id, |cell| {
-                    async move { Ok(cell.handle_holochain_p2p_event(event).await?) }.boxed()
-                })
-                .await?
+                let cell = self.cell_by_id(cell_id).await?;
+                cell.handle_holochain_p2p_event(event).await?;
             }
         }
         Ok(())
     }
 
     async fn call_zome(&self, call: ZomeCall) -> ConductorApiResult<ZomeCallResult> {
-        self.with_cell(&call.cell_id.clone(), |cell| {
-            async move { Ok(cell.call_zome(call, None).await?) }.boxed()
-        })
-        .await
+        let cell = self.cell_by_id(&call.cell_id).await?;
+        Ok(cell.call_zome(call, None).await?)
     }
 
     async fn call_zome_with_workspace(
@@ -438,10 +434,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         workspace_lock: CallZomeWorkspaceLock,
     ) -> ConductorApiResult<ZomeCallResult> {
         debug!(cell_id = ?call.cell_id);
-        self.with_cell(&call.cell_id.clone(), |cell| {
-            async move { Ok(cell.call_zome(call, Some(workspace_lock)).await?) }.boxed()
-        })
-        .await
+        let cell = self.cell_by_id(&call.cell_id).await?;
+        Ok(cell.call_zome(call, Some(workspace_lock)).await?)
     }
 
     async fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle> {
@@ -699,18 +693,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn get_cell_env_readonly(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentRead> {
-        self.with_cell(cell_id, |cell| {
-            async move { Ok(cell.env().clone().into()) }.boxed()
-        })
-        .await
+        let cell = self.cell_by_id(cell_id).await?;
+        Ok(cell.env().clone().into())
     }
 
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
-        self.with_cell(cell_id, |cell| {
-            async move { Ok(cell.env().clone()) }.boxed()
-        })
-        .await
+        let cell = self.cell_by_id(cell_id).await?;
+        Ok(cell.env().clone())
     }
 
     #[cfg(any(test, feature = "test_utils"))]
@@ -721,10 +711,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_triggers(&self, cell_id: &CellId) -> ConductorApiResult<QueueTriggers> {
-        self.with_cell(cell_id, |cell| {
-            async move { Ok(cell.triggers().clone()) }.boxed()
-        })
-        .await
+        let cell = self.cell_by_id(cell_id).await?;
+        Ok(cell.triggers().clone())
     }
 
     #[cfg(any(test, feature = "test_utils"))]
@@ -744,13 +732,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 }
 
 impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
-    async fn with_cell<'a, Func, O>(&'a self, cell_id: &'a CellId, f: Func) -> ConductorApiResult<O>
-    where
-        // Fut: Future<Output = ConductorApiResult<O>> + 'static,
-        Func: FnOnce(&Cell) -> BoxFuture<ConductorApiResult<O>>,
-    {
+    async fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<Arc<Cell>> {
         let lock = self.conductor.read().await;
-        f(lock.cell_by_id(cell_id)?).await
+        Ok(lock.cell_by_id(cell_id)?)
     }
 
     /// Add cells to the map then join the network then initialize workflows.
