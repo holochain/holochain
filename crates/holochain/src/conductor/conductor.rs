@@ -954,16 +954,6 @@ where
             .insert(id, AppInterfaceRuntime::Test { signal_tx });
         Ok(())
     }
-
-    /// Swap out the KeystoreSender. Only used to test faulty keystores
-    /// in tests.
-    #[cfg(any(test, feature = "test_utils"))]
-    pub(super) fn set_keystore_sender(&mut self, keystore: KeystoreSender) {
-        for (_, item) in self.cells.iter_mut() {
-            item.cell.set_keystore_sender(keystore.clone());
-        }
-        self.keystore = keystore;
-    }
 }
 
 //-----------------------------------------------------------------------------

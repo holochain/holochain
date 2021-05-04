@@ -268,11 +268,6 @@ pub trait ConductorHandleT: Send + Sync {
     #[cfg(any(test, feature = "test_utils"))]
     async fn add_test_app_interface(&self, id: super::state::AppInterfaceId)
         -> ConductorResult<()>;
-
-    /// Swap out the KeystoreSender. Only used to test faulty keystores
-    /// in tests.
-    #[cfg(any(test, feature = "test_utils"))]
-    async fn set_keystore_sender(&self, keystore: KeystoreSender);
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -733,12 +728,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     ) -> ConductorResult<()> {
         let mut lock = self.conductor.write().await;
         lock.add_test_app_interface(id).await
-    }
-
-    #[cfg(any(test, feature = "test_utils"))]
-    async fn set_keystore_sender(&self, keystore: KeystoreSender) {
-        let mut lock = self.conductor.write().await;
-        lock.set_keystore_sender(keystore)
     }
 }
 
