@@ -7,7 +7,6 @@
 use super::api::ZomeCall;
 use super::interface::SignalBroadcaster;
 use super::manager::ManagedTaskAdd;
-use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::cell::error::CellResult;
@@ -31,6 +30,7 @@ use crate::core::workflow::GenesisWorkflowArgs;
 use crate::core::workflow::GenesisWorkspace;
 use crate::core::workflow::InitializeZomesWorkflowArgs;
 use crate::core::workflow::ZomeCallResult;
+use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
 use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
 use error::CellError;
 use fallible_iterator::FallibleIterator;
@@ -157,12 +157,16 @@ impl Cell {
     /// Performs the Genesis workflow the Cell, ensuring that its initial
     /// elements are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
-    pub async fn genesis(
+    pub async fn genesis<Ribosome>(
         id: CellId,
         conductor_handle: ConductorHandle,
         cell_env: EnvironmentWrite,
+        ribosome: Ribosome,
         membrane_proof: Option<SerializedBytes>,
-    ) -> CellResult<()> {
+    ) -> CellResult<()>
+    where
+        Ribosome: RibosomeT + Send + 'static,
+    {
         // get the dna
         let dna_file = conductor_handle
             .get_dna(id.dna_hash())
@@ -176,7 +180,13 @@ impl Cell {
             .await
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
-        let args = GenesisWorkflowArgs::new(dna_file, id.agent_pubkey().clone(), membrane_proof);
+
+        let args = GenesisWorkflowArgs::new(
+            dna_file,
+            id.agent_pubkey().clone(),
+            membrane_proof,
+            ribosome,
+        );
 
         genesis_workflow(workspace, cell_env.clone().into(), conductor_api, args)
             .await

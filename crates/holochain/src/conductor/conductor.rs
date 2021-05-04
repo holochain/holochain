@@ -39,13 +39,15 @@ use super::{api::CellConductorApi, state::AppInterfaceConfig};
 use super::{api::CellConductorApiT, interface::AppInterfaceRuntime};
 use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
 use super::{api::RealAppInterfaceApi, p2p_store};
-use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::cell::Cell;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::workflow::integrate_dht_ops_workflow;
+use crate::{
+    conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
+};
 pub use builder::*;
 use fallible_iterator::FallibleIterator;
 use futures::future;
@@ -421,6 +423,14 @@ where
         )
     }
 
+    /// Instantiate a Ribosome for use with a DNA
+    pub(crate) fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome> {
+        match self.dna_store().get(dna_hash) {
+            Some(dna) => Ok(RealRibosome::new(dna)),
+            None => Err(DnaError::DnaMissing(dna_hash.to_owned()).into()),
+        }
+    }
+
     /// Perform Genesis on the source chains for each of the specified CellIds.
     ///
     /// If genesis fails for any cell, this entire function fails, and all other
@@ -433,22 +443,29 @@ where
         let root_env_dir = std::path::PathBuf::from(self.root_env_dir.clone());
         let keystore = self.keystore.clone();
 
-        let cells_tasks = cell_ids_with_proofs.into_iter().map(|(cell_id, proof)| {
-            let root_env_dir = root_env_dir.clone();
-            let keystore = self.keystore.clone();
-            let conductor_handle = conductor_handle.clone();
-            let cell_id_inner = cell_id.clone();
-            tokio::spawn(async move {
-                let env = EnvironmentWrite::new(
-                    &root_env_dir,
-                    EnvironmentKind::Cell(cell_id_inner.clone()),
-                    keystore.clone(),
-                )?;
-                Cell::genesis(cell_id_inner, conductor_handle, env, proof).await
-            })
-            .map_err(CellError::from)
-            .and_then(|result| async move { result.map(|_| cell_id) })
-        });
+        let cells_tasks = cell_ids_with_proofs
+            .into_iter()
+            .map(|(cell_id, proof)| async {
+                let root_env_dir = root_env_dir.clone();
+                let keystore = self.keystore.clone();
+                let conductor_handle = conductor_handle.clone();
+                let cell_id_inner = cell_id.clone();
+                let ribosome = conductor_handle
+                    .get_ribosome(cell_id.dna_hash())
+                    .await
+                    .map_err(Box::new)?;
+                tokio::spawn(async move {
+                    let env = EnvironmentWrite::new(
+                        &root_env_dir,
+                        EnvironmentKind::Cell(cell_id_inner.clone()),
+                        keystore.clone(),
+                    )?;
+                    Cell::genesis(cell_id_inner, conductor_handle, env, ribosome, proof).await
+                })
+                .map_err(CellError::from)
+                .and_then(|result| async move { result.map(|_| cell_id) })
+                .await
+            });
         let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
             .await
             .into_iter()

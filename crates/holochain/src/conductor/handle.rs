@@ -51,9 +51,9 @@ use super::p2p_store::put_agent_info_signed;
 use super::p2p_store::query_agent_info_signed;
 use super::Cell;
 use super::Conductor;
-use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::core::workflow::ZomeCallResult;
+use crate::core::{queue_consumer::InitialQueueTriggers, ribosome::real_ribosome::RealRibosome};
 use derive_more::From;
 use futures::future::FutureExt;
 use futures::StreamExt;
@@ -121,6 +121,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Get a [Dna] from the [DnaStore]
     async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
+
+    /// Get an instance of a [RealRibosome] for the DnaHash
+    async fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome>;
 
     /// Get a [EntryDef] from the [EntryDefBuffer]
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
@@ -356,6 +359,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile> {
         self.conductor.read().await.dna_store().get(hash)
+    }
+
+    async fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome> {
+        self.conductor.read().await.get_ribosome(dna_hash)
     }
 
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {

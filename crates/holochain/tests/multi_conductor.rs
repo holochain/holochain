@@ -60,7 +60,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
         .await
         .unwrap();
 
-    let apps = conductors.setup_app("app", &[dna_file]).await;
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (_carol,)) = apps.into_tuples();
@@ -109,7 +109,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
         .await
         .unwrap();
 
-    let apps = conductors.setup_app("app", &[dna_file]).await;
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();

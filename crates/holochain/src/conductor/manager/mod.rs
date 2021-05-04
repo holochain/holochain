@@ -242,9 +242,9 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
                 ManagedTaskError::Conductor(conductor_err) => match conductor_err {
                     // If the error was due to validation failure during genesis,
                     // just uninstall the app.
-                    ConductorError::WorkflowError(
-                        WorkflowError::AuthoredGenesisValidationRejection(_),
-                    ) => UninstallApp(cell_id.to_owned(), Box::new(err), name),
+                    ConductorError::WorkflowError(WorkflowError::GenesisFailure(_)) => {
+                        UninstallApp(cell_id.to_owned(), Box::new(err), name)
+                    }
 
                     // For all other errors, shut down the conductor
                     _ => ShutdownConductor(Box::new(err), name),

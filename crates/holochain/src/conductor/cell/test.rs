@@ -1,8 +1,12 @@
-use crate::conductor::manager::spawn_task_manager;
+use crate::core::ribosome::MockRibosomeT;
 use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
 use crate::fixt::DnaFileFixturator;
 use crate::fixt::SignatureFixturator;
 use crate::test_utils::test_network;
+use crate::{
+    conductor::manager::spawn_task_manager,
+    core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
+};
 use ::fixt::prelude::*;
 use holo_hash::HasHash;
 use holochain_lmdb::test_utils::test_cell_env;
@@ -30,10 +34,20 @@ async fn test_cell_handle_publish() {
         .returning(|_| Some(fixt!(DnaFile)));
 
     let mock_handle: crate::conductor::handle::ConductorHandle = Arc::new(mock_handle);
+    let mut mock_ribosome = MockRibosomeT::new();
+    mock_ribosome
+        .expect_run_genesis_self_check()
+        .returning(|_, _| Ok(GenesisSelfCheckResult::Valid));
 
-    super::Cell::genesis(cell_id.clone(), mock_handle.clone(), env.clone(), None)
-        .await
-        .unwrap();
+    super::Cell::genesis(
+        cell_id.clone(),
+        mock_handle.clone(),
+        env.clone(),
+        mock_ribosome,
+        None,
+    )
+    .await
+    .unwrap();
 
     let (add_task_sender, shutdown) = spawn_task_manager(mock_handle.clone());
     let (stop_tx, _) = sync::broadcast::channel(1);

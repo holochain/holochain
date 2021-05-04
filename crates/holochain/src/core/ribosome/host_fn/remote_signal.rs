@@ -125,7 +125,8 @@ mod tests {
 
         let apps = conductors
             .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone().into()])
-            .await;
+            .await
+            .unwrap();
 
         conductors.exchange_peer_info().await;
 
