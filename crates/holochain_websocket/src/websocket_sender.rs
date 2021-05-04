@@ -175,9 +175,7 @@ impl WebsocketSender {
             .await
             .ok_or(WebsocketError::Shutdown)?
             .map_err(|_| WebsocketError::FailedToRecvResp)?
-            .ok_or(WebsocketError::FailedToRecvResp)?
-            .try_into()?;
-        dbg!(&sb);
+            .ok_or(WebsocketError::FailedToRecvResp)?;
         let resp: O = hsb::decode(&Vec::from(hsb::UnsafeBytes::from(sb)))?;
         stale_request_guard.response_received();
         Ok(resp)
