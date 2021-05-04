@@ -23,7 +23,7 @@ struct PersistMemInner {
     tls: Option<TlsConfig>,
     priv_keys: HashMap<KdHash, sodoken::Buffer>,
     agent_info: HashMap<KdHash, HashMap<KdHash, KdAgentInfo>>,
-    entries: HashMap<KdHash, HashMap<KdHash, KdEntry>>,
+    entries: HashMap<KdHash, HashMap<KdHash, HashMap<KdHash, KdEntry>>>,
 }
 
 struct PersistMem(Share<PersistMemInner>, Uniq);
@@ -185,13 +185,19 @@ impl AsKdPersist for PersistMem {
         async move { r }.boxed()
     }
 
-    fn store_entry(&self, root: KdHash, entry: KdEntry) -> BoxFuture<'static, KitsuneResult<()>> {
+    fn store_entry(
+        &self,
+        root: KdHash,
+        agent: KdHash,
+        entry: KdEntry,
+    ) -> BoxFuture<'static, KitsuneResult<()>> {
         let r = self.0.share_mut(move |i, _| {
             let hash = entry.hash().clone();
 
             let root_map = i.entries.entry(root).or_insert_with(HashMap::new);
+            let agent_map = root_map.entry(agent).or_insert_with(HashMap::new);
 
-            match root_map.entry(hash) {
+            match agent_map.entry(hash) {
                 Entry::Occupied(mut e) => {
                     e.insert(entry);
                 }
@@ -205,14 +211,24 @@ impl AsKdPersist for PersistMem {
         async move { r }.boxed()
     }
 
-    fn get_entry(&self, root: KdHash, hash: KdHash) -> BoxFuture<'static, KitsuneResult<KdEntry>> {
+    fn get_entry(
+        &self,
+        root: KdHash,
+        agent: KdHash,
+        hash: KdHash,
+    ) -> BoxFuture<'static, KitsuneResult<KdEntry>> {
         let r = self.0.share_mut(|i, _| {
             let root_map = match i.entries.get(&root) {
                 None => return Err("root not found".into()),
                 Some(r) => r,
             };
 
-            match root_map.get(&hash) {
+            let agent_map = match root_map.get(&agent) {
+                None => return Err("agent not found".into()),
+                Some(r) => r,
+            };
+
+            match agent_map.get(&hash) {
                 None => Err("entry not found".into()),
                 Some(e) => Ok(e.clone()),
             }
@@ -223,6 +239,7 @@ impl AsKdPersist for PersistMem {
     fn query_entries(
         &self,
         root: KdHash,
+        agent: KdHash,
         _created_at_start_s: f32,
         _created_at_end_s: f32,
         _dht_arc: DhtArc,
@@ -235,7 +252,12 @@ impl AsKdPersist for PersistMem {
                 Some(r) => r,
             };
 
-            Ok(root_map.values().cloned().collect())
+            let agent_map = match root_map.get(&agent) {
+                None => return Err("agent not found".into()),
+                Some(r) => r,
+            };
+
+            Ok(agent_map.values().cloned().collect())
         });
         async move { r }.boxed()
     }

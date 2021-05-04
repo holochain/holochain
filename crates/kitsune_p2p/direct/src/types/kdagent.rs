@@ -32,14 +32,10 @@ impl std::ops::Deref for KdAgentInfo {
     }
 }
 
-fn to_kd_hash(r: &[u8]) -> KdHash {
-    assert_eq!(36, r.len());
-    let mut bytes = [0; 39];
-    bytes[0] = 0x90;
-    bytes[1] = 0x30;
-    bytes[2] = 0x24;
-    bytes[3..].copy_from_slice(r);
-    KdHash::from_bytes(bytes)
+impl From<KdAgentInfo> for AgentInfoSigned {
+    fn from(f: KdAgentInfo) -> AgentInfoSigned {
+        f.0.raw.clone()
+    }
 }
 
 impl KdAgentInfo {
@@ -47,8 +43,8 @@ impl KdAgentInfo {
     pub fn new(f: AgentInfoSigned) -> KitsuneResult<Self> {
         let i = AgentInfo::try_from(&f).map_err(KitsuneError::other)?;
         assert_eq!(f.as_agent_ref(), i.as_agent_ref());
-        let root = to_kd_hash(i.as_space_ref());
-        let agent = to_kd_hash(i.as_agent_ref());
+        let root = i.as_space_ref().into();
+        let agent = i.as_agent_ref().into();
         let signed_at_ms = i.signed_at_ms();
         let urls = i.as_urls_ref().iter().map(|u| u.clone().into()).collect();
         Ok(Self(Arc::new(KdAgentInfoInner {

@@ -48,15 +48,26 @@ pub trait AsKdPersist: 'static + Send + Sync {
         -> BoxFuture<'static, KitsuneResult<Vec<KdAgentInfo>>>;
 
     /// Store entry
-    fn store_entry(&self, root: KdHash, entry: KdEntry) -> BoxFuture<'static, KitsuneResult<()>>;
+    fn store_entry(
+        &self,
+        root: KdHash,
+        agent: KdHash,
+        entry: KdEntry,
+    ) -> BoxFuture<'static, KitsuneResult<()>>;
 
     /// Get entry
-    fn get_entry(&self, root: KdHash, hash: KdHash) -> BoxFuture<'static, KitsuneResult<KdEntry>>;
+    fn get_entry(
+        &self,
+        root: KdHash,
+        agent: KdHash,
+        hash: KdHash,
+    ) -> BoxFuture<'static, KitsuneResult<KdEntry>>;
 
     /// Get entry
     fn query_entries(
         &self,
         root: KdHash,
+        agent: KdHash,
         created_at_start_s: f32,
         created_at_end_s: f32,
         dht_arc: DhtArc,
@@ -144,24 +155,27 @@ impl KdPersist {
     pub fn store_entry(
         &self,
         root: KdHash,
+        agent: KdHash,
         entry: KdEntry,
     ) -> impl Future<Output = KitsuneResult<()>> + 'static + Send {
-        AsKdPersist::store_entry(&*self.0, root, entry)
+        AsKdPersist::store_entry(&*self.0, root, agent, entry)
     }
 
     /// Get entry
     pub fn get_entry(
         &self,
         root: KdHash,
+        agent: KdHash,
         hash: KdHash,
     ) -> impl Future<Output = KitsuneResult<KdEntry>> + 'static + Send {
-        AsKdPersist::get_entry(&*self.0, root, hash)
+        AsKdPersist::get_entry(&*self.0, root, agent, hash)
     }
 
     /// Get entry
     pub fn query_entries(
         &self,
         root: KdHash,
+        agent: KdHash,
         created_at_start_s: f32,
         created_at_end_s: f32,
         dht_arc: DhtArc,
@@ -169,6 +183,7 @@ impl KdPersist {
         AsKdPersist::query_entries(
             &*self.0,
             root,
+            agent,
             created_at_start_s,
             created_at_end_s,
             dht_arc,

@@ -80,7 +80,12 @@ pub trait AsKitsuneDirect: 'static + Send + Sync {
     ) -> BoxFuture<'static, KitsuneResult<()>>;
 
     /// Publish a new entry to given root app.
-    fn publish_entry(&self, root: KdHash, entry: KdEntry) -> BoxFuture<'static, KitsuneResult<()>>;
+    fn publish_entry(
+        &self,
+        root: KdHash,
+        agent: KdHash,
+        entry: KdEntry,
+    ) -> BoxFuture<'static, KitsuneResult<()>>;
 }
 
 /// Struct representing a kitsune direct api implementation
@@ -150,8 +155,9 @@ impl KitsuneDirect {
     pub fn publish_entry(
         &self,
         root: KdHash,
+        agent: KdHash,
         entry: KdEntry,
     ) -> impl Future<Output = KitsuneResult<()>> + 'static + Send {
-        AsKitsuneDirect::publish_entry(&*self.0, root, entry)
+        AsKitsuneDirect::publish_entry(&*self.0, root, agent, entry)
     }
 }

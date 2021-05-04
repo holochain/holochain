@@ -21,6 +21,8 @@ use kitsune_p2p::*;
 //kD4k 7952 <Buffer 90 3e 24>
 //kD8k 8080 <Buffer 90 3f 24>
 
+const PREFIX: &[u8; 3] = &[0x90, 0x30, 0x24];
+
 /// Kitsune Direct Hash Type
 #[derive(Clone)]
 pub struct KdHash(pub Arc<(String, [u8; 39])>);
@@ -100,23 +102,46 @@ impl From<[u8; 39]> for KdHash {
     }
 }
 
-impl From<KdHash> for Arc<KitsuneSpace> {
-    fn from(f: KdHash) -> Self {
-        Arc::new(KitsuneSpace(f.0 .1[3..].to_vec()))
+impl From<[u8; 36]> for KdHash {
+    fn from(b: [u8; 36]) -> Self {
+        let mut n = [0; 39];
+        n[0..3].copy_from_slice(PREFIX);
+        n[3..].copy_from_slice(&b);
+        n.into()
     }
 }
 
-impl From<KdHash> for Arc<KitsuneAgent> {
-    fn from(f: KdHash) -> Self {
-        Arc::new(KitsuneAgent(f.0 .1[3..].to_vec()))
-    }
+macro_rules! implfrom {
+    ($k:ident) => {
+        impl From<KdHash> for Arc<$k> {
+            fn from(f: KdHash) -> Self {
+                Arc::new($k(f.0 .1[3..].to_vec()))
+            }
+        }
+
+        impl From<&$k> for KdHash {
+            fn from(f: &$k) -> Self {
+                (*arrayref::array_ref![&f.0, 0, 36]).into()
+            }
+        }
+
+        impl From<&Arc<$k>> for KdHash {
+            fn from(f: &Arc<$k>) -> Self {
+                (&**f).into()
+            }
+        }
+
+        impl From<Arc<$k>> for KdHash {
+            fn from(f: Arc<$k>) -> Self {
+                (&*f).into()
+            }
+        }
+    };
 }
 
-impl From<KdHash> for Arc<KitsuneOpHash> {
-    fn from(f: KdHash) -> Self {
-        Arc::new(KitsuneOpHash(f.0 .1[3..].to_vec()))
-    }
-}
+implfrom!(KitsuneSpace);
+implfrom!(KitsuneAgent);
+implfrom!(KitsuneOpHash);
 
 impl KdHash {
     /// Construct a KdHash from raw bytes
@@ -191,9 +216,7 @@ impl KdHash {
         let loc = loc_hash(data).await?;
 
         let mut out = [0; 39];
-        out[0] = 0x90;
-        out[1] = 0x30;
-        out[2] = 0x24;
+        out[0..3].copy_from_slice(PREFIX);
         out[3..35].copy_from_slice(data);
         out[35..].copy_from_slice(&loc);
 
