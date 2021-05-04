@@ -23,11 +23,12 @@ members = [
   "crates/holochain_websocket",
   "crates/holochain_zome_types",
 
+  "crates/kitsune_p2p/direct",
   "crates/kitsune_p2p/kitsune_p2p",
+  "crates/kitsune_p2p/mdns",
+  "crates/kitsune_p2p/proxy",
   "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",
-  "crates/kitsune_p2p/proxy",
-  "crates/kitsune_p2p/mdns",
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
