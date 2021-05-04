@@ -1,9 +1,9 @@
 use hdk::prelude::*;
 use holochain::conductor::config::ConductorConfig;
+use holochain::sweettest::SweetNetwork;
+use holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
 use holochain::test_utils::host_fn_caller::Post;
 use holochain::test_utils::show_authored;
-use holochain::test_utils::sweetest::SweetNetwork;
-use holochain::test_utils::sweetest::{SweetConductorBatch, SweetDnaFile};
 use holochain::test_utils::wait_for_integration_1m;
 use holochain::test_utils::wait_for_integration_with_others_10s;
 use holochain::test_utils::WaitOps;

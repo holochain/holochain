@@ -3,7 +3,7 @@
 use hdk::prelude::*;
 use holochain::{
     conductor::api::error::ConductorApiResult,
-    test_utils::sweetest::{SweetAgents, SweetConductor, SweetDnaFile},
+    sweettest::{SweetAgents, SweetConductor, SweetDnaFile},
 };
 use holochain::{
     conductor::{api::error::ConductorApiError, CellError},
