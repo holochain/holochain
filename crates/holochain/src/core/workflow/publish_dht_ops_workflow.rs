@@ -11,7 +11,6 @@
 //!
 
 use super::error::WorkflowResult;
-use crate::core::queue_consumer::OneshotWriter;
 use crate::core::queue_consumer::WorkComplete;
 use holo_hash::*;
 use holochain_p2p::HolochainP2pCell;
@@ -35,13 +34,13 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u32 = 5;
 /// flooding the network with spurious publishes.
 pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(5);
 
-#[instrument(skip(env, writer, network))]
+#[instrument(skip(env, network))]
 pub async fn publish_dht_ops_workflow(
-    env: EnvRead,
-    writer: OneshotWriter,
+    env: EnvWrite,
     mut network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
-    let (to_publish, hashes) = publish_dht_ops_workflow_inner(env, network.from_agent()).await?;
+    let (to_publish, hashes) =
+        publish_dht_ops_workflow_inner(env.clone().into(), network.from_agent()).await?;
 
     // commit the workspace
     //
@@ -65,11 +64,11 @@ pub async fn publish_dht_ops_workflow(
         }
     }
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
-    writer.with_writer(|writer| {
+    env.conn()?.with_commit(|writer| {
         for hash in hashes {
             mutations::set_last_publish_time(writer, hash, now)?;
         }
-        Ok(())
+        WorkflowResult::Ok(())
     })?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 

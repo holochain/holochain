@@ -116,25 +116,4 @@ impl PConn {
     pub(crate) fn new(inner: PConnInner, _kind: DbKind) -> Self {
         Self { inner, _kind }
     }
-
-    #[cfg(feature = "test_utils")]
-    pub fn open_single(&mut self, name: &str) -> Result<SingleTable, DatabaseError> {
-        crate::naive::initialize_table_single(&mut self.inner, name.to_string())?;
-        Ok(Table {
-            name: TableName::TestSingle(name.to_string()),
-        })
-    }
-
-    #[cfg(feature = "test_utils")]
-    pub fn open_integer(&mut self, name: &str) -> Result<IntegerTable, DatabaseError> {
-        self.open_single(name)
-    }
-
-    #[cfg(feature = "test_utils")]
-    pub fn open_multi(&mut self, name: &str) -> Result<MultiTable, DatabaseError> {
-        crate::naive::initialize_table_multi(&mut self.inner, name.to_string())?;
-        Ok(Table {
-            name: TableName::TestMulti(name.to_string()),
-        })
-    }
 }

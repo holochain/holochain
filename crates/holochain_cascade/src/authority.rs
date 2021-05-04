@@ -35,7 +35,7 @@ pub fn handle_get_entry(
     let query = GetEntryOpsQuery::new(hash);
     let results = state_env
         .conn()?
-        .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;
+        .with_reader(|txn| query.run(Txn::from(&txn)))?;
     Ok(results)
 }
 
@@ -46,9 +46,7 @@ pub fn handle_get_element(
     options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<WireElementOps> {
     let query = GetElementOpsQuery::new(hash, options);
-    let results = env
-        .conn()?
-        .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;
+    let results = env.conn()?.with_reader(|txn| query.run(Txn::from(&txn)))?;
     Ok(results)
 }
 
@@ -60,9 +58,7 @@ pub fn handle_get_agent_activity(
     options: holochain_p2p::event::GetActivityOptions,
 ) -> CascadeResult<AgentActivityResponse<HeaderHash>> {
     let query = GetAgentActivityQuery::new(agent, query, options);
-    let results = env
-        .conn()?
-        .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;
+    let results = env.conn()?.with_reader(|txn| query.run(Txn::from(&txn)))?;
     Ok(results)
 }
 
@@ -74,9 +70,7 @@ pub fn handle_get_agent_activity_deterministic(
     options: holochain_p2p::event::GetActivityOptions,
 ) -> CascadeResult<DeterministicGetAgentActivityResponse> {
     let query = DeterministicGetAgentActivityQuery::new(agent, filter, options);
-    let results = env
-        .conn()?
-        .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;
+    let results = env.conn()?.with_reader(|txn| query.run(Txn::from(&txn)))?;
     Ok(results)
 }
 
@@ -87,8 +81,6 @@ pub fn handle_get_links(
     _options: holochain_p2p::event::GetLinksOptions,
 ) -> CascadeResult<WireLinkOps> {
     let query = GetLinksOpsQuery::new(link_key);
-    let results = env
-        .conn()?
-        .with_reader(|txn| query.run(Txn::from(txn.as_ref())))?;
+    let results = env.conn()?.with_reader(|txn| query.run(Txn::from(&txn)))?;
     Ok(results)
 }

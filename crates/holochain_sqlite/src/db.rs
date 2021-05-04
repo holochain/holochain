@@ -51,9 +51,6 @@ impl DbRead {
     }
 }
 
-impl GetTable for DbRead {}
-impl GetTable for DbWrite {}
-
 /// The canonical representation of a (singleton) database.
 /// The wrapper contains methods for managing transactions
 /// and database connections,
@@ -83,7 +80,7 @@ impl DbWrite {
         let path = path_prefix.join(kind.filename());
         let pool = new_connection_pool(&path, kind.clone());
         let mut conn = pool.get()?;
-        crate::naive::initialize_database(&mut conn, &kind)?;
+        crate::table::initialize_database(&mut conn, &kind)?;
 
         Ok(DbWrite(DbRead {
             kind,
@@ -143,13 +140,13 @@ pub trait ReadManager<'e> {
     fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
-        F: 'e + FnOnce(Reader) -> Result<R, E>;
+        F: 'e + FnOnce(Transaction) -> Result<R, E>;
 
     #[cfg(feature = "test_utils")]
     /// Same as with_reader, but with no Results: everything gets unwrapped
     fn with_reader_test<R, F>(&'e mut self, f: F) -> R
     where
-        F: 'e + FnOnce(Reader) -> R;
+        F: 'e + FnOnce(Transaction) -> R;
 }
 
 /// Implementors are able to create a new read-write DB transaction
@@ -161,7 +158,7 @@ pub trait WriteManager<'e> {
     fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
-        F: 'e + FnOnce(&mut Writer) -> Result<R, E>;
+        F: 'e + FnOnce(&mut Transaction) -> Result<R, E>;
 
     // /// Get a raw read-write transaction for this environment.
     // /// It is preferable to use WriterManager::with_commit for database writes,
@@ -173,17 +170,16 @@ impl<'e> ReadManager<'e> for PConn {
     fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
-        F: 'e + FnOnce(Reader) -> Result<R, E>,
+        F: 'e + FnOnce(Transaction) -> Result<R, E>,
     {
         let txn = self.transaction().map_err(DatabaseError::from)?;
-        let reader = Reader::from(txn);
-        f(reader)
+        f(txn)
     }
 
     #[cfg(feature = "test_utils")]
     fn with_reader_test<R, F>(&'e mut self, f: F) -> R
     where
-        F: 'e + FnOnce(Reader) -> R,
+        F: 'e + FnOnce(Transaction) -> R,
     {
         self.with_reader(|r| DatabaseResult::Ok(f(r))).unwrap()
     }
@@ -193,12 +189,11 @@ impl<'e> WriteManager<'e> for PConn {
     fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
-        F: 'e + FnOnce(&mut Writer) -> Result<R, E>,
+        F: 'e + FnOnce(&mut Transaction) -> Result<R, E>,
     {
-        let txn = self.transaction().map_err(DatabaseError::from)?;
-        let mut writer = txn;
-        let result = f(&mut writer)?;
-        writer.commit().map_err(DatabaseError::from)?;
+        let mut txn = self.transaction().map_err(DatabaseError::from)?;
+        let result = f(&mut txn)?;
+        txn.commit().map_err(DatabaseError::from)?;
         Ok(result)
     }
 }

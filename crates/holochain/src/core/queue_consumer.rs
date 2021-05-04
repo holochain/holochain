@@ -26,12 +26,8 @@
 //! Implicitly, every workflow also writes to its own source queue, i.e. to
 //! remove the item it has just processed.
 
-use derive_more::Constructor;
 use derive_more::Display;
-use derive_more::From;
 use futures::future::Either;
-use holochain_sqlite::db::WriteManager;
-use holochain_sqlite::prelude::Writer;
 use holochain_types::prelude::*;
 use tokio::sync;
 use tokio::sync::mpsc;
@@ -49,7 +45,6 @@ mod validation_receipt_consumer;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::manager::ManagedTaskAdd;
 use holochain_p2p::HolochainP2pCell;
-use holochain_state::workspace::WorkspaceError;
 use publish_dht_ops_consumer::*;
 
 /// Spawns several long-running tasks which are responsible for processing work
@@ -244,28 +239,6 @@ impl TriggerReceiver {
         } else {
             Err(QueueTriggerClosedError)
         }
-    }
-}
-
-/// A lazy Writer factory which can only be used once.
-///
-/// This is a way of encapsulating an EnvWrite so that it can only be
-/// used to create a single Writer before being consumed.
-#[derive(Constructor, From)]
-pub struct OneshotWriter(EnvWrite);
-
-impl OneshotWriter {
-    /// Create the writer and pass it into a closure.
-    pub fn with_writer<F>(self, f: F) -> Result<(), WorkspaceError>
-    where
-        F: FnOnce(&mut Writer) -> Result<(), WorkspaceError> + Send,
-    {
-        let mut conn = self.0.conn()?;
-        conn.with_commit::<WorkspaceError, (), _>(|w| {
-            f(w)?;
-            Ok(())
-        })?;
-        Ok(())
     }
 }
 

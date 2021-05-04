@@ -28,12 +28,8 @@ pub fn spawn_publish_dht_ops_consumer(
 
             holochain_sqlite::db::optimistic_retry_async("publish_dht_ops_consumer", || async {
                 // Run the workflow
-                if let WorkComplete::Incomplete = publish_dht_ops_workflow(
-                    env.clone().into(),
-                    env.clone().into(),
-                    cell_network.clone(),
-                )
-                .await?
+                if let WorkComplete::Incomplete =
+                    publish_dht_ops_workflow(env.clone(), cell_network.clone()).await?
                 {
                     trigger_self.clone().trigger()
                 };

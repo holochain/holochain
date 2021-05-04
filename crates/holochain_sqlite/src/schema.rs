@@ -12,6 +12,33 @@ pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| {
     }
 });
 
+pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| {
+    let migration_0 = Migration::initial(include_str!("schema/conductor/initial.sql"));
+
+    Schema {
+        current_index: 0,
+        migrations: vec![migration_0],
+    }
+});
+
+pub static SCHEMA_WASM: Lazy<Schema> = Lazy::new(|| {
+    let migration_0 = Migration::initial(include_str!("schema/wasm/initial.sql"));
+
+    Schema {
+        current_index: 0,
+        migrations: vec![migration_0],
+    }
+});
+
+pub static SCHEMA_P2P: Lazy<Schema> = Lazy::new(|| {
+    let migration_0 = Migration::initial(include_str!("schema/p2p/initial.sql"));
+
+    Schema {
+        current_index: 0,
+        migrations: vec![migration_0],
+    }
+});
+
 pub struct Schema {
     current_index: usize,
     migrations: Vec<Migration>,

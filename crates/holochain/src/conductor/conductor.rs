@@ -740,7 +740,7 @@ where
                     // Load all wasms for each dna_def from the wasm db into memory
                     let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
                         let wasm_hash = zome.wasm_hash(&zome_name)?;
-                        holochain_state::wasm::get(txn.as_ref(), &wasm_hash)?
+                        holochain_state::wasm::get(&txn, &wasm_hash)?
                             .map(|hashed| hashed.into_content())
                             .ok_or(ConductorError::WasmMissing)
                     });

@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS Entry (
     blob             BLOB           NOT NULL,
 
     -- CapClaim / CapGrant
-    tag              VARCHAR(64)           NULL,
+    tag              TEXT           NULL,
 
     -- CapClaim
     grantor          BLOB           NULL,
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS Entry (
 
     -- CapGrant
     functions        BLOB           NULL,
-    access_type      VARCHAR(64)    NULL,
+    access_type      TEXT           NULL,
     access_secret    BLOB           NULL,
     access_assignees BLOB           NULL
 );
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS Entry (
 --       like between Update and Delete
 CREATE TABLE IF NOT EXISTS Header (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
-    type             VARCHAR(64)    NOT NULL,
+    type             TEXT           NOT NULL,
     seq              INTEGER        NOT NULL,
     author           BLOB           NOT NULL,
 
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS Header (
 
     -- Create / Update
     entry_hash       BLOB           NULL,
-    entry_type       VARCHAR(64)    NULL,  -- The opaque EntryType
+    entry_type       TEXT           NULL,  -- The opaque EntryType
     private_entry    INTEGER        NULL,  -- BOOLEAN
 
     -- Update
@@ -82,7 +82,7 @@ CREATE INDEX Header_author ON Header ( author );
 --     duplication of data. Could rethink these a bit.
 CREATE TABLE IF NOT EXISTS DhtOp (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
-    type             VARCHAR(64)    NOT NULL,
+    type             TEXT           NOT NULL,
     basis_hash       BLOB           NOT NULL,
     header_hash      BLOB           NOT NULL,
     is_authored      INTEGER        NOT NULL,      -- BOOLEAN
@@ -135,28 +135,4 @@ CREATE TABLE IF NOT EXISTS ValidationReceipt (
     op_hash         BLOB           NOT NULL,
     blob            BLOB           NOT NULL,
     FOREIGN KEY(op_hash) REFERENCES DhtOp(hash)
-);
-
--- TODO Move this to a different non-cell schema
-CREATE TABLE IF NOT EXISTS Wasm (
-    hash            BLOB           PRIMARY KEY ON CONFLICT IGNORE,
-    blob            BLOB           NOT NULL,
-);
-
--- TODO Move this to a different non-cell schema
-CREATE TABLE IF NOT EXISTS DnaDef (
-    hash            BLOB           PRIMARY KEY ON CONFLICT IGNORE,
-    blob            BLOB           NOT NULL,
-);
-
--- TODO Move this to a different non-cell schema
-CREATE TABLE IF NOT EXISTS EntryDef (
-    key             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
-    blob            BLOB           NOT NULL,
-);
-
--- TODO Move this to a different non-cell schema
-CREATE TABLE IF NOT EXISTS ConductorState (
-    id              INTEGER        PRIMARY KEY ON CONFLICT REPLACE,
-    blob            BLOB           NOT NULL,
 );

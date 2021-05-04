@@ -109,30 +109,6 @@ impl AsRef<[u8]> for AgentKvKey {
 
 holochain_zome_types::impl_to_sql_via_as_ref!(AgentKvKey);
 
-impl BufKey for AgentKvKey {
-    fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
-        assert_eq!(
-            bytes.len(),
-            AGENT_KEY_LEN,
-            "AgentKvKey needs to be {} bytes long, found {} bytes",
-            AGENT_KEY_LEN,
-            bytes.len()
-        );
-        let mut inner = [0; AGENT_KEY_LEN];
-        inner.copy_from_slice(bytes);
-        Self(inner)
-    }
-}
-
-/// Defines the structure of the KvBuf for AgentInfoSigned.
-pub struct AgentKv(KvStore<AgentKvKey, AgentInfoSigned>);
-
-impl AsRef<KvStore<AgentKvKey, AgentInfoSigned>> for AgentKv {
-    fn as_ref(&self) -> &KvStore<AgentKvKey, AgentInfoSigned> {
-        &self.0
-    }
-}
-
 /// Inject multiple agent info entries into the peer store
 pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
     env: EnvWrite,
