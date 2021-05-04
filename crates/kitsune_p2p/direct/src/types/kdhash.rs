@@ -1,6 +1,7 @@
 //! kdirect kdhash type
 
 use crate::*;
+use kitsune_p2p::*;
 
 // multihash-like prefixes
 //kDAk 6160 <Buffer 90 30 24> <-- using this for KdHash
@@ -96,6 +97,24 @@ impl std::fmt::Display for KdHash {
 impl From<[u8; 39]> for KdHash {
     fn from(b: [u8; 39]) -> Self {
         Self::from_bytes(b)
+    }
+}
+
+impl From<KdHash> for Arc<KitsuneSpace> {
+    fn from(f: KdHash) -> Self {
+        Arc::new(KitsuneSpace(f.0 .1[3..].to_vec()))
+    }
+}
+
+impl From<KdHash> for Arc<KitsuneAgent> {
+    fn from(f: KdHash) -> Self {
+        Arc::new(KitsuneAgent(f.0 .1[3..].to_vec()))
+    }
+}
+
+impl From<KdHash> for Arc<KitsuneOpHash> {
+    fn from(f: KdHash) -> Self {
+        Arc::new(KitsuneOpHash(f.0 .1[3..].to_vec()))
     }
 }
 

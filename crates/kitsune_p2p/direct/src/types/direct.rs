@@ -6,6 +6,7 @@ use kitsune_p2p_types::tx2::tx2_utils::*;
 use std::future::Future;
 use types::kdentry::KdEntry;
 use types::kdhash::KdHash;
+use types::persist::KdPersist;
 
 /// Events emitted from a kitsune direct instance.
 pub enum KitsuneDirectEvt {
@@ -54,11 +55,17 @@ pub trait AsKitsuneDirect: 'static + Send + Sync {
     /// Get a uniq val that assists with Eq/Hash of trait objects.
     fn uniq(&self) -> Uniq;
 
-    /// List transport bindings
-    fn list_transport_bindings(&self) -> BoxFuture<'static, Vec<TxUrl>>;
+    /// Check if this kdirect instance has been closed
+    fn is_closed(&self) -> bool;
 
-    /// Create a new signature agent for use with kdirect
-    fn generate_agent(&self) -> BoxFuture<'static, KitsuneResult<KdHash>>;
+    /// Explicitly close this kdirect instance
+    fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()>;
+
+    /// Get a handle to the persist store used by this kdirect instance.
+    fn get_persist(&self) -> KdPersist;
+
+    /// List transport bindings
+    fn list_transport_bindings(&self) -> BoxFuture<'static, KitsuneResult<Vec<TxUrl>>>;
 
     /// Begin gossiping with given agent on given root app.
     fn join(&self, root: KdHash, agent: KdHash) -> BoxFuture<'static, KitsuneResult<()>>;
@@ -95,14 +102,28 @@ impl std::hash::Hash for KitsuneDirect {
 }
 
 impl KitsuneDirect {
-    /// List transport bindings
-    pub fn list_transport_bindings(&self) -> impl Future<Output = Vec<TxUrl>> + 'static + Send {
-        AsKitsuneDirect::list_transport_bindings(&*self.0)
+    /// Check if this kdirect instance has been closed
+    pub fn is_closed(&self) -> bool {
+        AsKitsuneDirect::is_closed(&*self.0)
     }
 
-    /// Create a new signature agent for use with kdirect
-    pub fn generate_agent(&self) -> impl Future<Output = KitsuneResult<KdHash>> + 'static + Send {
-        AsKitsuneDirect::generate_agent(&*self.0)
+    /// Explicitly close this kdirect instance
+    pub fn close(&self, code: u32, reason: &str) -> impl Future<Output = ()> + 'static + Send {
+        AsKitsuneDirect::close(&*self.0, code, reason)
+    }
+
+    /// Get a handle to the persist store used by this kdirect instance.
+    /// (persist is closed separately, as we may have cleanup
+    /// operations to do on the store.)
+    pub fn get_persist(&self) -> KdPersist {
+        AsKitsuneDirect::get_persist(&*self.0)
+    }
+
+    /// List transport bindings
+    pub fn list_transport_bindings(
+        &self,
+    ) -> impl Future<Output = KitsuneResult<Vec<TxUrl>>> + 'static + Send {
+        AsKitsuneDirect::list_transport_bindings(&*self.0)
     }
 
     /// Begin gossiping with given agent on given root app.

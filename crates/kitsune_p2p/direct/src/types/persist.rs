@@ -2,14 +2,26 @@
 
 use crate::*;
 use futures::future::BoxFuture;
+use kitsune_p2p_types::dht_arc::DhtArc;
+use kitsune_p2p_types::tls::TlsConfig;
 use std::future::Future;
 use types::kdagent::*;
+use types::kdentry::KdEntry;
 use types::kdhash::KdHash;
 
 /// Trait representing a persistence store.
 pub trait AsKdPersist: 'static + Send + Sync {
     /// Get a uniq val that assists with Eq/Hash of trait objects.
     fn uniq(&self) -> Uniq;
+
+    /// Check if this persist instance has been closed
+    fn is_closed(&self) -> bool;
+
+    /// Explicitly close this persist instance
+    fn close(&self) -> BoxFuture<'static, ()>;
+
+    /// Get or create and get the singleton tls cert creds for this store.
+    fn singleton_tls_config(&self) -> BoxFuture<'static, KitsuneResult<TlsConfig>>;
 
     /// Generate a signature keypair, returning the pub key as a KdHash.
     fn generate_signing_keypair(&self) -> BoxFuture<'static, KitsuneResult<KdHash>>;
@@ -34,6 +46,21 @@ pub trait AsKdPersist: 'static + Send + Sync {
     /// Query agent info
     fn query_agent_info(&self, root: KdHash)
         -> BoxFuture<'static, KitsuneResult<Vec<KdAgentInfo>>>;
+
+    /// Store entry
+    fn store_entry(&self, root: KdHash, entry: KdEntry) -> BoxFuture<'static, KitsuneResult<()>>;
+
+    /// Get entry
+    fn get_entry(&self, root: KdHash, hash: KdHash) -> BoxFuture<'static, KitsuneResult<KdEntry>>;
+
+    /// Get entry
+    fn query_entries(
+        &self,
+        root: KdHash,
+        created_at_start_s: f32,
+        created_at_end_s: f32,
+        dht_arc: DhtArc,
+    ) -> BoxFuture<'static, KitsuneResult<Vec<KdEntry>>>;
 }
 
 /// Handle to a persistence store.
@@ -55,6 +82,23 @@ impl std::hash::Hash for KdPersist {
 }
 
 impl KdPersist {
+    /// Check if this persist instance has been closed
+    pub fn is_closed(&self) -> bool {
+        AsKdPersist::is_closed(&*self.0)
+    }
+
+    /// Explicitly close this persist instance
+    pub fn close(&self) -> impl Future<Output = ()> + 'static + Send {
+        AsKdPersist::close(&*self.0)
+    }
+
+    /// Get or create and get the singleton tls cert creds for this store.
+    pub fn singleton_tls_config(
+        &self,
+    ) -> impl Future<Output = KitsuneResult<TlsConfig>> + 'static + Send {
+        AsKdPersist::singleton_tls_config(&*self.0)
+    }
+
     /// Generate a signature keypair, returning the pub key as a KdHash.
     pub fn generate_signing_keypair(
         &self,
@@ -94,5 +138,40 @@ impl KdPersist {
         root: KdHash,
     ) -> impl Future<Output = KitsuneResult<Vec<KdAgentInfo>>> + 'static + Send {
         AsKdPersist::query_agent_info(&*self.0, root)
+    }
+
+    /// Store entry
+    pub fn store_entry(
+        &self,
+        root: KdHash,
+        entry: KdEntry,
+    ) -> impl Future<Output = KitsuneResult<()>> + 'static + Send {
+        AsKdPersist::store_entry(&*self.0, root, entry)
+    }
+
+    /// Get entry
+    pub fn get_entry(
+        &self,
+        root: KdHash,
+        hash: KdHash,
+    ) -> impl Future<Output = KitsuneResult<KdEntry>> + 'static + Send {
+        AsKdPersist::get_entry(&*self.0, root, hash)
+    }
+
+    /// Get entry
+    pub fn query_entries(
+        &self,
+        root: KdHash,
+        created_at_start_s: f32,
+        created_at_end_s: f32,
+        dht_arc: DhtArc,
+    ) -> impl Future<Output = KitsuneResult<Vec<KdEntry>>> + 'static + Send {
+        AsKdPersist::query_entries(
+            &*self.0,
+            root,
+            created_at_start_s,
+            created_at_end_s,
+            dht_arc,
+        )
     }
 }

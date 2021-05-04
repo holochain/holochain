@@ -53,7 +53,7 @@ pub struct KdEntryInner {
     /// the encoded bytes of this entry.
     /// this (and the signature) should be sent over the network,
     /// and is what should be used to verify signature.
-    pub encoded: Box<[u8]>,
+    pub encoded: String,
 
     /// the decoded content of this entry, use this for logic.
     pub decoded: KdEntryData,
@@ -91,7 +91,7 @@ impl KdEntryInner {
 }
 
 /// A KdEntry is a mono-type representing all data in kitsune direct.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KdEntry(pub Arc<KdEntryInner>);
 
 impl PartialEq for KdEntry {
@@ -129,12 +129,11 @@ impl KdEntry {
 
     /// Sign entry data into a full KdEntry instance
     pub async fn sign(persist: &KdPersist, decoded: KdEntryData) -> KitsuneResult<Self> {
-        let encoded: Box<[u8]> = serde_json::to_string(&decoded)
-            .map_err(KitsuneError::other)?
-            .as_bytes()
-            .into();
-        let hash = KdHash::from_data(&encoded).await?;
-        let signature = persist.sign(decoded.author.clone(), &encoded).await?;
+        let encoded = serde_json::to_string(&decoded).map_err(KitsuneError::other)?;
+        let hash = KdHash::from_data(encoded.as_bytes()).await?;
+        let signature = persist
+            .sign(decoded.author.clone(), encoded.as_bytes())
+            .await?;
         Ok(Self(Arc::new(KdEntryInner {
             encoded,
             decoded,
@@ -145,21 +144,25 @@ impl KdEntry {
 
     /// Encode this entry for storage or transmition
     pub fn encode(&self) -> PoolBuf {
+        let sig_b64 = base64::encode_config(&self.0.signature[..], base64::URL_SAFE_NO_PAD);
+        let full = serde_json::to_string(&(sig_b64, &self.0.encoded)).unwrap();
+        let full = full.as_bytes();
         let mut out = PoolBuf::new();
-        out.reserve(64 + self.0.encoded.len());
-        out.extend_from_slice(&*self.0.signature);
-        out.extend_from_slice(&self.0.encoded);
+        out.extend_from_slice(full);
         out
     }
 
     /// Decode and check signature on an encoded signature + entry
     pub async fn decode_checked(entry: &[u8]) -> KitsuneResult<Self> {
+        let (sig, encoded): (String, String) =
+            serde_json::from_slice(entry).map_err(KitsuneError::other)?;
         let mut signature = [0; 64];
-        signature.copy_from_slice(&entry[..64]);
+        let sig =
+            base64::decode_config(sig, base64::URL_SAFE_NO_PAD).map_err(KitsuneError::other)?;
+        signature.copy_from_slice(&sig);
         let signature = Arc::new(signature);
-        let encoded: Box<[u8]> = entry[64..].into();
-        let decoded: KdEntryData = serde_json::from_slice(&encoded).map_err(KitsuneError::other)?;
-        let data = Buffer::from_ref(&encoded);
+        let decoded: KdEntryData = serde_json::from_str(&encoded).map_err(KitsuneError::other)?;
+        let data = Buffer::from_ref(encoded.as_bytes());
         if !decoded
             .author
             .verify_signature(data, signature.clone())
@@ -167,7 +170,7 @@ impl KdEntry {
         {
             return Err("invalid signature".into());
         }
-        let hash = KdHash::from_data(&encoded).await?;
+        let hash = KdHash::from_data(encoded.as_bytes()).await?;
         Ok(Self(Arc::new(KdEntryInner {
             encoded,
             decoded,

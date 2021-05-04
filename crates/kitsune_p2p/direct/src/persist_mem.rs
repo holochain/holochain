@@ -2,10 +2,13 @@
 
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
+use kitsune_p2p_types::dht_arc::DhtArc;
+use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use types::kdagent::*;
+use types::kdentry::KdEntry;
 use types::kdhash::KdHash;
 use types::persist::*;
 
@@ -17,8 +20,10 @@ pub fn new_persist_mem() -> KdPersist {
 // -- private -- //
 
 struct PersistMemInner {
+    tls: Option<TlsConfig>,
     priv_keys: HashMap<KdHash, sodoken::Buffer>,
     agent_info: HashMap<KdHash, HashMap<KdHash, KdAgentInfo>>,
+    entries: HashMap<KdHash, HashMap<KdHash, KdEntry>>,
 }
 
 struct PersistMem(Share<PersistMemInner>, Uniq);
@@ -27,8 +32,10 @@ impl PersistMem {
     pub fn new() -> Arc<Self> {
         Arc::new(PersistMem(
             Share::new(PersistMemInner {
+                tls: None,
                 priv_keys: HashMap::new(),
                 agent_info: HashMap::new(),
+                entries: HashMap::new(),
             }),
             Uniq::default(),
         ))
@@ -38,6 +45,36 @@ impl PersistMem {
 impl AsKdPersist for PersistMem {
     fn uniq(&self) -> Uniq {
         self.1
+    }
+
+    fn is_closed(&self) -> bool {
+        self.0.is_closed()
+    }
+
+    fn close(&self) -> BoxFuture<'static, ()> {
+        self.0.close();
+        async move {}.boxed()
+    }
+
+    fn singleton_tls_config(&self) -> BoxFuture<'static, KitsuneResult<TlsConfig>> {
+        let inner = self.0.clone();
+        async move {
+            match inner.share_mut(|i, _| Ok(i.tls.clone()))? {
+                None => {
+                    let tls = TlsConfig::new_ephemeral().await?;
+                    inner.share_mut(move |i, _| {
+                        if i.tls.is_some() {
+                            Ok(i.tls.as_ref().unwrap().clone())
+                        } else {
+                            i.tls = Some(tls.clone());
+                            Ok(tls)
+                        }
+                    })
+                }
+                Some(tls) => Ok(tls),
+            }
+        }
+        .boxed()
     }
 
     fn generate_signing_keypair(&self) -> BoxFuture<'static, KitsuneResult<KdHash>> {
@@ -139,6 +176,61 @@ impl AsKdPersist for PersistMem {
     ) -> BoxFuture<'static, KitsuneResult<Vec<KdAgentInfo>>> {
         let r = self.0.share_mut(|i, _| {
             let root_map = match i.agent_info.get(&root) {
+                None => return Err("root not found".into()),
+                Some(r) => r,
+            };
+
+            Ok(root_map.values().cloned().collect())
+        });
+        async move { r }.boxed()
+    }
+
+    fn store_entry(&self, root: KdHash, entry: KdEntry) -> BoxFuture<'static, KitsuneResult<()>> {
+        let r = self.0.share_mut(move |i, _| {
+            let hash = entry.hash().clone();
+
+            let root_map = i.entries.entry(root).or_insert_with(HashMap::new);
+
+            match root_map.entry(hash) {
+                Entry::Occupied(mut e) => {
+                    e.insert(entry);
+                }
+                Entry::Vacant(e) => {
+                    e.insert(entry);
+                }
+            }
+
+            Ok(())
+        });
+        async move { r }.boxed()
+    }
+
+    fn get_entry(&self, root: KdHash, hash: KdHash) -> BoxFuture<'static, KitsuneResult<KdEntry>> {
+        let r = self.0.share_mut(|i, _| {
+            let root_map = match i.entries.get(&root) {
+                None => return Err("root not found".into()),
+                Some(r) => r,
+            };
+
+            match root_map.get(&hash) {
+                None => Err("entry not found".into()),
+                Some(e) => Ok(e.clone()),
+            }
+        });
+        async move { r }.boxed()
+    }
+
+    fn query_entries(
+        &self,
+        root: KdHash,
+        _created_at_start_s: f32,
+        _created_at_end_s: f32,
+        _dht_arc: DhtArc,
+    ) -> BoxFuture<'static, KitsuneResult<Vec<KdEntry>>> {
+        // TODO - actually filter
+
+        let r = self.0.share_mut(|i, _| {
+            let root_map = match i.entries.get(&root) {
                 None => return Err("root not found".into()),
                 Some(r) => r,
             };
