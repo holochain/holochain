@@ -106,7 +106,7 @@ async fn setup() -> (ListenerHandle, Url2, JoinHandle<()>) {
             let jh = tokio::task::spawn(async move {
                 let msg = TestMessage("test".to_string());
                 // Make a request and get the echoed response
-                while let Ok(rsp) = send.request::<_, TestMessage, _, _>(msg.clone()).await {
+                while let Ok(rsp) = send.request::<_, TestMessage>(msg.clone()).await {
                     assert_eq!("client: test", &rsp.0,);
                 }
 
