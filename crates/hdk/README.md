@@ -182,9 +182,9 @@ expects, then holochain can run it to manage a p2p DHT network.
 
 **There are three things that make a wasm holochain-compatible:**
 
-**- It must use only the host functionality that holochain provides**
-**- It must expose callback functions that holochain expects**
-**- Memory handling and (de)serialization must be compatible with holochain**
+- **It must use only the host functionality that holochain provides**
+- **It must expose callback functions that holochain expects**
+- **Memory handling and (de)serialization must be compatible with holochain**
 
 ### Holochain functionality
 
@@ -284,4 +284,4 @@ documentation.
 - Serde messagepack: https://github.com/3Hren/msgpack-rust
 - Holochain serialized bytes: https://github.com/holochain/holochain-serialization/tree/develop/crates/holochain_serialized_bytes
 
-Check out the [advanced Holochain + WASM Overview for deeper details]()
+Check out the [advanced Holochain + WASM Overview for deeper details](./ON-WASM-md).
