@@ -193,7 +193,7 @@ Holochain exposes a list of holochain-specific things that a wasm can do.
 For detailed documentation of the full list, see the `core/ribosome` module
 inside core, but some illustrative examples include:
 
-- `emit_signal`: publish data to subscribed clients
+- `emit_signal`: publish data to subscribed interface clients
 - `encrypt` & `decrypt`: use the agent's keypair to encrypt and decrypt data
 - `sign`: use the agent's keypair to sign some data
 - `create_entry`: save some data to the local source chain and broadcast it to
@@ -201,7 +201,8 @@ inside core, but some illustrative examples include:
 - `get_entry`: retrieve some data from local or the network given its hash
 - `create_link`: create graph style relationships (links) between entries
 - `get_links`: retrive links between entries using the DHT as a graph database
-- `send`: send data directly to a known peer on the network
+- `remote_signal`: send data directly to known peers on the network
+- `remote_call`: perform a remote procedure call on a peers node, if you're authorized
 
 This toolkit of functionality is available to the wasm as a list of "extern"
 functions that are all injected into the wasm by holochain - i.e. these
@@ -235,7 +236,7 @@ There are broadly two types of exposed functions:
 
 Both work in the same way technically but they have different responsibilities.
 Callbacks extend holochain itself whereas other extern functions extend the
-interactive client that is sending requests via. holochain.
+interactive client that is sending requests via holochain.
 
 All the extern functions are run in a newly built, sandboxed wasm instance, so
 there are no long-running processes and it is not possible for callbacks to
