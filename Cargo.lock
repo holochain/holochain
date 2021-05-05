@@ -230,7 +230,7 @@ dependencies = [
  "event-listener",
  "futures-lite",
  "once_cell",
- "signal-hook",
+ "signal-hook 0.3.7",
  "winapi",
 ]
 
@@ -796,6 +796,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossterm"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c36c10130df424b2f3552fcc2ddcd9b28a27b1e54b358b45874f88d1ca6888c"
+dependencies = [
+ "bitflags",
+ "crossterm_winapi",
+ "lazy_static",
+ "libc",
+ "mio",
+ "parking_lot 0.11.1",
+ "signal-hook 0.1.17",
+ "winapi",
+]
+
+[[package]]
+name = "crossterm_winapi"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0da8964ace4d3e4a044fd027919b2237000b24315a37c916f61809f1ff2140b9"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
 name = "crunchy"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1212,7 +1237,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
  "parking_lot 0.10.2",
- "paste 1.0.3",
+ "paste 1.0.5",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "serde",
@@ -1225,7 +1250,7 @@ name = "fixt_test"
 version = "0.0.1"
 dependencies = [
  "fixt",
- "paste 1.0.3",
+ "paste 1.0.5",
 ]
 
 [[package]]
@@ -1544,7 +1569,7 @@ dependencies = [
  "holochain_wasmer_guest",
  "holochain_zome_types",
  "mockall 0.9.1",
- "paste 1.0.3",
+ "paste 1.0.5",
  "serde",
  "serde_bytes",
  "thiserror",
@@ -1558,7 +1583,7 @@ name = "hdk_derive"
 version = "0.0.2-alpha.1"
 dependencies = [
  "holochain_zome_types",
- "paste 1.0.3",
+ "paste 1.0.5",
  "proc-macro2",
  "quote",
  "syn",
@@ -1982,6 +2007,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_derive",
+ "serde_json",
  "serde_yaml",
  "shrinkwraprs",
  "strum",
@@ -2083,7 +2109,7 @@ dependencies = [
  "fixt",
  "holo_hash",
  "holochain_serialized_bytes",
- "paste 1.0.3",
+ "paste 1.0.5",
  "rand 0.7.3",
  "serde",
  "serde_bytes",
@@ -2390,6 +2416,7 @@ dependencies = [
  "base64",
  "blake2b_simd",
  "criterion",
+ "crossterm",
  "derive_more",
  "futures",
  "kitsune_p2p_transport_quic",
@@ -2431,6 +2458,7 @@ dependencies = [
 name = "kitsune_p2p_types"
 version = "0.0.1"
 dependencies = [
+ "base64",
  "criterion",
  "derive_more",
  "futures",
@@ -2441,7 +2469,7 @@ dependencies = [
  "observability",
  "once_cell",
  "parking_lot 0.11.1",
- "paste 1.0.3",
+ "paste 1.0.5",
  "rmp-serde",
  "rustls",
  "serde",
@@ -3181,9 +3209,9 @@ dependencies = [
 
 [[package]]
 name = "paste"
-version = "1.0.3"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7151b083b0664ed58ed669fcdd92f01c3d2fdbf10af4931a301474950b52bfa9"
+checksum = "acbf547ad0c65e31259204bd90935776d1c693cec2f4ff7abb7a1bbbd40dfe58"
 
 [[package]]
 name = "paste-impl"
@@ -4264,6 +4292,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "signal-hook"
+version = "0.1.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e31d442c16f047a671b5a71e2161d6e68814012b7f5379d269ebd915fac2729"
+dependencies = [
+ "libc",
+ "mio",
+ "signal-hook-registry",
 ]
 
 [[package]]

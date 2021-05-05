@@ -16,4 +16,8 @@ pub enum InlineZomeError {
 
     #[error(transparent)]
     SerializationError(#[from] SerializedBytesError),
+
+    #[cfg(any(test, feature = "test_utils"))]
+    #[error("test error: {0}")]
+    TestError(String),
 }

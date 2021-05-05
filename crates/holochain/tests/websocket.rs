@@ -4,9 +4,9 @@ use assert_cmd::prelude::*;
 use futures::future;
 use futures::Future;
 use hdk::prelude::RemoteSignal;
-use holochain::test_utils::sweetest::SweetAgents;
-use holochain::test_utils::sweetest::SweetConductorBatch;
-use holochain::test_utils::sweetest::SweetDnaFile;
+use holochain::sweettest::SweetAgents;
+use holochain::sweettest::SweetConductorBatch;
+use holochain::sweettest::SweetDnaFile;
 use holochain::{
     conductor::api::ZomeCall,
     conductor::{
@@ -440,7 +440,8 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let apps = conductors
         .setup_app_for_zipped_agents("app", &all_agents, &[dna_file])
-        .await;
+        .await
+        .unwrap();
 
     conductors.exchange_peer_info().await;
 
