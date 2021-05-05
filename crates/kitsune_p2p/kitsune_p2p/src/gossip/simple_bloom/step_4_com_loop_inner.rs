@@ -31,9 +31,32 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
 
     // parse the message
     let (send_accept, remote_filter) = match gossip {
-        GossipWire::Initiate(Initiate { filter }) => (true, filter),
-        GossipWire::Accept(Accept { filter }) => (false, filter),
+        GossipWire::Initiate(Initiate { filter }) => {
+            let bloom_byte_count = filter.len();
+            tracing::debug!(
+                %bloom_byte_count,
+                "incoming 'Initiate'",
+            );
+
+            (true, filter)
+        }
+        GossipWire::Accept(Accept { filter }) => {
+            let bloom_byte_count = filter.len();
+            tracing::debug!(
+                %bloom_byte_count,
+                "incoming 'Accept'",
+            );
+
+            (false, filter)
+        }
         GossipWire::Chunk(Chunk { finished, chunks }) => {
+            let chunk_count = chunks.len();
+            tracing::debug!(
+                %finished,
+                %chunk_count,
+                "incoming 'Chunk'",
+            );
+
             // parse/integrate the chunks
             let futs = inner.share_mut(move |i, _| {
                 if let Some(tgt_cert) = i.initiate_tgt.clone() {
@@ -194,7 +217,7 @@ async fn data_map_get(
     let op_key = match &**key {
         MetaOpKey::Op(key) => key.clone(),
         // we should already have all this data...
-        MetaOpKey::Agent(_) => unreachable!(),
+        MetaOpKey::Agent(_, _) => unreachable!(),
     };
 
     // next, check locally

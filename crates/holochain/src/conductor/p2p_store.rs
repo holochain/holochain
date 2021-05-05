@@ -171,6 +171,30 @@ impl AgentKv {
     }
 }
 
+fn put_agent_info_if_newer(
+    p2p_store: &AgentKv,
+    writer: &mut holochain_state::prelude::Writer<'_>,
+    agent_info_signed: &AgentInfoSigned,
+) -> DatabaseResult<()> {
+    let new_info = kitsune_p2p::agent_store::AgentInfo::try_from(agent_info_signed)
+        .map_err(|e| anyhow::anyhow!(e))?;
+    let res = p2p_store.as_store_ref().get(writer, &(&new_info).into())?;
+
+    if let Some(res) = res {
+        let old_info =
+            kitsune_p2p::agent_store::AgentInfo::try_from(&res).map_err(|e| anyhow::anyhow!(e))?;
+        let old_time = old_info.signed_at_ms();
+        let new_time = new_info.signed_at_ms();
+        if old_time >= new_time {
+            return Ok(());
+        }
+    }
+
+    p2p_store
+        .as_store_ref()
+        .put(writer, &(agent_info_signed).try_into()?, agent_info_signed)
+}
+
 /// Inject multiple agent info entries into the peer store
 pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
     env: EnvironmentWrite,
@@ -180,11 +204,7 @@ pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
     let env_ref = env.guard();
     Ok(env_ref.with_commit(|writer| {
         for agent_info_signed in iter {
-            p2p_store.as_store_ref().put(
-                writer,
-                &(&agent_info_signed).try_into()?,
-                &agent_info_signed,
-            )?
+            put_agent_info_if_newer(&p2p_store, writer, &agent_info_signed)?;
         }
         DatabaseResult::Ok(())
     })?)
@@ -342,13 +362,7 @@ pub fn put_agent_info_signed(
 ) -> ConductorResult<()> {
     let p2p_kv = AgentKv::new(environ.clone().into())?;
     let env = environ.guard();
-    Ok(env.with_commit(|writer| {
-        p2p_kv.as_store_ref().put(
-            writer,
-            &(&agent_info_signed).try_into()?,
-            &agent_info_signed,
-        )
-    })?)
+    Ok(env.with_commit(|writer| put_agent_info_if_newer(&p2p_kv, writer, &agent_info_signed))?)
 }
 
 fn now() -> u64 {

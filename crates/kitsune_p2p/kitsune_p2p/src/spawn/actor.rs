@@ -102,19 +102,12 @@ impl KitsuneP2pActor {
 
         let metrics = Tx2ApiMetrics::default().set_write_len(|d, l| {
             let t = match d {
-                "Wire::Failure" => KitsuneMetrics::Fail,
+                "Wire::Failure" => KitsuneMetrics::Failure,
                 "Wire::Call" => KitsuneMetrics::Call,
                 "Wire::CallResp" => KitsuneMetrics::CallResp,
                 "Wire::Notify" => KitsuneMetrics::Notify,
                 "Wire::NotifyResp" => KitsuneMetrics::NotifyResp,
-                "Wire::FetchOpHashes" => KitsuneMetrics::FetchOpHashes,
-                "Wire::FetchOpHashesResponse" => KitsuneMetrics::FetchOpHashesResp,
-                "Wire::FetchOpData" => KitsuneMetrics::FetchOpData,
-                "Wire::FetchOpDataResponse" => KitsuneMetrics::FetchOpDataResp,
-                "Wire::AgentInfoQuery" => KitsuneMetrics::AgentInfoQuery,
-                "Wire::AgentInfoQueryResp" => KitsuneMetrics::AgentInfoQueryResp,
                 "Wire::Gossip" => KitsuneMetrics::Gossip,
-                "Wire::GossipResp" => KitsuneMetrics::GossipResp,
                 _ => return,
             };
             KitsuneMetrics::count(t, l);

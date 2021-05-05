@@ -155,15 +155,21 @@ impl KdTestHarness {
         conf.allow_proxy_fwd = true;
         let f = tx2_proxy(f, conf)?;
 
-        let proxy = f
+        let mut proxy = f
             .bind(
                 "kitsune-quic://0.0.0.0:0".into(),
                 tuning_params.implicit_timeout(),
             )
             .await?;
+
         let proxy_hnd = proxy.handle().clone();
         let proxy_url = proxy_hnd.local_addr()?;
         tracing::info!(%proxy_url);
+
+        metric_task(async move {
+            while proxy.next().await.is_some() {}
+            KitsuneResult::Ok(())
+        });
 
         let mut nodes = Vec::new();
 
@@ -360,7 +366,9 @@ mod tests {
 
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
+        assert_eq!(2, test.nodes.len());
         for node in test.nodes.iter() {
+            assert_eq!(2, node.local_agents.len());
             for agent in node.local_agents.iter() {
                 let entries = node
                     .kdirect
@@ -377,6 +385,7 @@ mod tests {
                 let entry_count = entries.len();
                 let entry_hashes = entries.iter().map(|e| e.hash()).collect::<Vec<_>>();
                 tracing::info!(%entry_count, ?entry_hashes);
+                assert_eq!(5, entry_count);
             }
         }
 

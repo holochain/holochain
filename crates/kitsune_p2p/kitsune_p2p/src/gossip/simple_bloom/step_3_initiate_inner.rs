@@ -109,8 +109,9 @@ pub(crate) fn danger_mutex_locked_sync_step_3_initiate_inner(
     }
 
     if let Some((cert, url)) = initiate {
-        tracing::info!(?cert, "initiating gossip");
         let gossip = encode_bloom_filter(&inner.local_bloom);
+        let bloom_byte_count = gossip.len();
+        tracing::info!(%url, ?cert, %bloom_byte_count, "initiating gossip");
         let gossip = GossipWire::initiate(gossip);
         inner.outgoing.push((cert, HowToConnect::Url(url), gossip));
     }

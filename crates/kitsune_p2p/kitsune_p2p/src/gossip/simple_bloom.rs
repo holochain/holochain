@@ -21,7 +21,7 @@ pub enum MetaOpKey {
     Op(Arc<KitsuneOpHash>),
 
     /// agent key type
-    Agent(Arc<KitsuneAgent>),
+    Agent(Arc<KitsuneAgent>, u64),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -48,7 +48,11 @@ impl MetaOpData {
     fn key(&self) -> Arc<MetaOpKey> {
         let key = match self {
             MetaOpData::Op(key, _) => MetaOpKey::Op(key.clone()),
-            MetaOpData::Agent(s) => MetaOpKey::Agent(Arc::new(s.as_agent_ref().clone())),
+            MetaOpData::Agent(s) => {
+                use std::convert::TryInto;
+                let info: crate::agent_store::AgentInfo = s.try_into().unwrap();
+                MetaOpKey::Agent(Arc::new(s.as_agent_ref().clone()), info.signed_at_ms())
+            }
         };
         Arc::new(key)
     }

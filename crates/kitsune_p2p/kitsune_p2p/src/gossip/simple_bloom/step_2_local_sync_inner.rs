@@ -83,10 +83,8 @@ impl Inner {
                 .await
             {
                 for agent_info in agent_infos {
-                    let key = Arc::new(MetaOpKey::Agent(Arc::new(
-                        agent_info.as_agent_ref().clone(),
-                    )));
                     let data = Arc::new(MetaOpData::Agent(agent_info));
+                    let key = data.key();
                     data_map.insert(key.clone(), data);
                     for (_agent, has) in has_hash.iter_mut() {
                         has.insert(key.clone());
@@ -107,6 +105,7 @@ impl Inner {
             ..
         } = self;
 
+        let mut local_synced_ops = 0;
         for (old_agent, old_set) in has_hash.iter() {
             for (new_agent, new_set) in new_has_map.iter_mut() {
                 if old_agent == new_agent {
@@ -114,6 +113,7 @@ impl Inner {
                 }
                 for old_key in old_set.iter() {
                     if !new_set.contains(old_key) {
+                        local_synced_ops += 1;
                         let op_data =
                             data_map_get(evt_sender, space, old_agent, data_map, &old_key).await?;
 
@@ -141,6 +141,13 @@ impl Inner {
             }
         }
 
+        if local_synced_ops > 0 {
+            tracing::debug!(
+                %local_synced_ops,
+                "local sync",
+            );
+        }
+
         *has_hash = new_has_map;
 
         Ok(())
@@ -160,6 +167,10 @@ impl Inner {
         // so we can just take the first one
         let (key_set, bloom) = if let Some((_, map)) = has_hash.into_iter().next() {
             let len = map.len();
+            tracing::debug!(
+                local_op_count=%len,
+                "generating local bloom",
+            );
             let mut bloom = bloomfilter::Bloom::new_for_fp_rate(len, TGT_FP);
             for h in map.iter() {
                 bloom.set(h);
@@ -208,6 +219,6 @@ async fn data_map_get(
         }
         // the query agents api returns all the data,
         // so we should already be fully pre-populated.
-        MetaOpKey::Agent(_) => unreachable!(),
+        MetaOpKey::Agent(_, _) => unreachable!(),
     }
 }
