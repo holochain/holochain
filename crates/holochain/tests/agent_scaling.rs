@@ -45,7 +45,8 @@ async fn many_agents_can_reach_consistency_agent_links() {
     let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor
         .setup_app_for_agents("app", &agents, &[dna_file])
-        .await;
+        .await
+        .unwrap();
     let cells = apps.cells_flattened();
     let alice = cells[0].zome("links");
 
@@ -96,7 +97,8 @@ async fn many_agents_can_reach_consistency_normal_links() {
     let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor
         .setup_app_for_agents("app", &agents, &[dna_file])
-        .await;
+        .await
+        .unwrap();
     let cells = apps.cells_flattened();
     let alice = cells[0].zome(TestWasm::Link);
 
@@ -131,6 +133,7 @@ async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
     let alice = conductor
         .setup_app("app", &[dna_file])
         .await
+        .unwrap()
         .into_cells()
         .into_iter()
         .next()

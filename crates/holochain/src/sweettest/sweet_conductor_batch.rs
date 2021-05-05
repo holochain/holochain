@@ -1,5 +1,5 @@
 use super::{standard_config, SweetAgents, SweetAppBatch, SweetConductor};
-use crate::conductor::config::ConductorConfig;
+use crate::conductor::{config::ConductorConfig, error::ConductorResult};
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
@@ -50,7 +50,7 @@ impl SweetConductorBatch {
         &mut self,
         installed_app_id: &str,
         dna_files: &[DnaFile],
-    ) -> SweetAppBatch {
+    ) -> ConductorResult<SweetAppBatch> {
         let apps = self
             .0
             .iter_mut()
@@ -62,7 +62,11 @@ impl SweetConductorBatch {
             })
             .collect::<Vec<_>>();
 
-        future::join_all(apps).await.into()
+        Ok(future::join_all(apps)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?
+            .into())
     }
 
     /// Opinionated app setup. Creates one app on each Conductor in this batch,
@@ -79,7 +83,7 @@ impl SweetConductorBatch {
         installed_app_id: &str,
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
-    ) -> SweetAppBatch {
+    ) -> ConductorResult<SweetAppBatch> {
         if agents.len() != self.0.len() {
             panic!(
                 "setup_app_for_zipped_agents must take as many Agents as there are Conductors in this batch."
@@ -95,7 +99,11 @@ impl SweetConductorBatch {
             })
             .collect::<Vec<_>>();
 
-        future::join_all(apps).await.into()
+        Ok(future::join_all(apps)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?
+            .into())
     }
 
     /// Let each conductor know about each others' agents so they can do networking
