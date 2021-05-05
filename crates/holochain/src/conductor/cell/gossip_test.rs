@@ -1,12 +1,9 @@
-use crate::conductor::p2p_store::AgentKv;
-use crate::conductor::p2p_store::AgentKvKey;
 use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::new_zome_call;
 use crate::test_utils::wait_for_integration;
-use fallible_iterator::FallibleIterator;
 use hdk::prelude::*;
-use holochain_sqlite::buffer::KvStoreT;
-use holochain_sqlite::fresh_reader_test;
+use holochain_state::agent_info::AgentKvKey;
+use holochain_state::prelude::fresh_reader_test;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneBinType;
@@ -119,13 +116,11 @@ async fn agent_info_test() {
     let alice_kit = kitsune_p2p::KitsuneAgent::new(alice_agent_id.get_raw_36().to_vec());
 
     let p2p_env = handle.get_p2p_env().await;
-    let p2p_kv = AgentKv::new(p2p_env.clone().into()).unwrap();
-
     let alice_key: AgentKvKey = (&dna_kit, &alice_kit).into();
 
-    let (agent_info, len) = fresh_reader_test!(p2p_env, |mut r| {
-        let agent_info = p2p_kv.as_store_ref().get(&mut r, &alice_key).unwrap();
-        let len = p2p_kv.as_store_ref().iter(&mut r).unwrap().count().unwrap();
+    let (agent_info, len) = fresh_reader_test(p2p_env.clone(), |txn| {
+        let agent_info = holochain_state::agent_info::get(&txn, alice_key.clone()).unwrap();
+        let len = holochain_state::agent_info::get_all(&txn).unwrap().len();
         (agent_info, len)
     });
     tracing::debug!(?agent_info);
@@ -147,11 +142,10 @@ async fn agent_info_test() {
     // Give publish time to finish
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
-    let p2p_kv = AgentKv::new(p2p_env.clone().into()).unwrap();
-    let (alice_agent_info, bob_agent_info, len) = fresh_reader_test!(p2p_env, |mut r| {
-        let alice_agent_info = p2p_kv.as_store_ref().get(&mut r, &alice_key).unwrap();
-        let bob_agent_info = p2p_kv.as_store_ref().get(&mut r, &bob_key).unwrap();
-        let len = p2p_kv.as_store_ref().iter(&mut r).unwrap().count().unwrap();
+    let (alice_agent_info, bob_agent_info, len) = fresh_reader_test(p2p_env.clone(), |txn| {
+        let alice_agent_info = holochain_state::agent_info::get(&txn, alice_key.clone()).unwrap();
+        let bob_agent_info = holochain_state::agent_info::get(&txn, bob_key.clone()).unwrap();
+        let len = holochain_state::agent_info::get_all(&txn).unwrap().len();
         (alice_agent_info, bob_agent_info, len)
     });
     tracing::debug!(?alice_agent_info);

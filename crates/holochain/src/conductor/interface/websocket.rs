@@ -265,19 +265,16 @@ pub mod test {
     use crate::conductor::api::AdminResponse;
     use crate::conductor::api::RealAdminInterfaceApi;
     use crate::conductor::conductor::ConductorBuilder;
-    use crate::conductor::p2p_store::AgentKv;
-    use crate::conductor::p2p_store::AgentKvKey;
     use crate::conductor::state::ConductorState;
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
     use crate::test_utils::conductor_setup::ConductorTestData;
     use ::fixt::prelude::*;
-    use fallible_iterator::FallibleIterator;
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_sqlite::buffer::KvStoreT;
-    use holochain_sqlite::fresh_reader_test;
+    use holochain_state::agent_info::AgentKvKey;
+    use holochain_state::prelude::fresh_reader_test;
     use holochain_state::prelude::test_environments;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
@@ -704,17 +701,13 @@ pub mod test {
             .into_iter()
             .map(|d| d.dna_hash().clone())
             .collect::<Vec<_>>();
-        let p2p_store = AgentKv::new(env.clone().into()).unwrap();
 
         // - Give time for the agents to join the network.
         crate::assert_eq_retry_10s!(
             {
-                fresh_reader_test!(env, |mut r| p2p_store
-                    .as_store_ref()
-                    .iter(&mut r)
-                    .unwrap()
-                    .count()
-                    .unwrap())
+                fresh_reader_test(env.clone(), |txn| {
+                    holochain_state::agent_info::get_all(&txn).unwrap().len()
+                })
             },
             4
         );

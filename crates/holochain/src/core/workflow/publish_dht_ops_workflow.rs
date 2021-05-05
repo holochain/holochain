@@ -377,8 +377,7 @@ mod tests {
                 let author = fake_agent_pubkey_1();
 
                 // Put data in elements
-                let mut source_chain =
-                    SourceChain::new(env.clone().into(), author.clone()).unwrap();
+                let source_chain = SourceChain::new(env.clone().into(), author.clone()).unwrap();
                 let original_header_address = source_chain
                     .put(
                         builder::Create {

@@ -133,13 +133,6 @@ impl TestData {
             new_entry_hash,
         }
     }
-
-    /// Sets the Entries to App types
-    async fn with_app_entry_type() -> Self {
-        let original_entry = EntryFixturator::new(AppEntry).next().unwrap();
-        let new_entry = EntryFixturator::new(AppEntry).next().unwrap();
-        Self::new_inner(original_entry, new_entry)
-    }
 }
 
 #[derive(Clone)]

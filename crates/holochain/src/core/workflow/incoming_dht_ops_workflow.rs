@@ -82,7 +82,7 @@ fn add_to_pending(
     Ok(())
 }
 
-fn op_exists(vault: &EnvWrite, hash: &DhtOpHash) -> DatabaseResult<bool> {
+pub fn op_exists(vault: &EnvWrite, hash: &DhtOpHash) -> DatabaseResult<bool> {
     let exists = vault.conn()?.with_reader(|txn| {
         let mut stmt = txn.prepare(
             "

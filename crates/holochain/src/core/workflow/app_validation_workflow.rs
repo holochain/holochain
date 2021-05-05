@@ -45,9 +45,11 @@ use holochain_zome_types::ValidationStatus;
 use tracing::*;
 pub use types::Outcome;
 
-#[cfg(test)]
+// #[cfg(test)]
+#[cfg(todo_redo_old_tests)]
 mod network_call_tests;
-#[cfg(test)]
+// #[cfg(test)]
+#[cfg(todo_redo_old_tests)]
 mod tests;
 
 mod error;

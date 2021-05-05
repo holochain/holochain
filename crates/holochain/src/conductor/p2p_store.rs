@@ -14,100 +14,11 @@ use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_types::prelude::*;
 use holochain_zome_types::CellId;
-use kitsune_p2p::{agent_store::AgentInfo, KitsuneBinType};
+use kitsune_p2p::KitsuneBinType;
 use std::convert::TryFrom;
-use std::convert::TryInto;
 use std::sync::Arc;
 
 use super::error::ConductorResult;
-
-const AGENT_KEY_LEN: usize = 64;
-const AGENT_KEY_COMPONENT_LEN: usize = 32;
-
-#[derive(Clone)]
-/// Required new type for KvBuf key.
-pub struct AgentKvKey([u8; AGENT_KEY_LEN]);
-
-impl PartialEq for AgentKvKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.0[..] == other.0[..]
-    }
-}
-
-impl std::fmt::Debug for AgentKvKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", &self.0[..])
-    }
-}
-
-impl Eq for AgentKvKey {}
-
-impl PartialOrd for AgentKvKey {
-    fn partial_cmp(&self, other: &AgentKvKey) -> Option<std::cmp::Ordering> {
-        PartialOrd::partial_cmp(&&self.0[..], &&other.0[..])
-    }
-}
-
-impl Ord for AgentKvKey {
-    fn cmp(&self, other: &AgentKvKey) -> std::cmp::Ordering {
-        Ord::cmp(&&self.0[..], &&other.0[..])
-    }
-}
-
-impl std::convert::TryFrom<&AgentInfoSigned> for AgentKvKey {
-    type Error = holochain_sqlite::error::DatabaseError;
-    fn try_from(agent_info_signed: &AgentInfoSigned) -> Result<Self, Self::Error> {
-        let agent_info: AgentInfo = agent_info_signed
-            .try_into()
-            .map_err(|_| holochain_sqlite::error::DatabaseError::KeyConstruction)?;
-        Ok((&agent_info).into())
-    }
-}
-
-impl From<&AgentInfo> for AgentKvKey {
-    fn from(o: &AgentInfo) -> Self {
-        (o.as_space_ref(), o.as_agent_ref()).into()
-    }
-}
-
-impl From<(DnaHash, AgentPubKey)> for AgentKvKey {
-    fn from((space, agent): (DnaHash, AgentPubKey)) -> Self {
-        let space = holochain_p2p::space_holo_to_kit(space);
-        let agent = holochain_p2p::agent_holo_to_kit(agent);
-        (&space, &agent).into()
-    }
-}
-
-impl From<(&kitsune_p2p::KitsuneSpace, &kitsune_p2p::KitsuneAgent)> for AgentKvKey {
-    fn from(o: (&kitsune_p2p::KitsuneSpace, &kitsune_p2p::KitsuneAgent)) -> Self {
-        let mut bytes = [0; AGENT_KEY_LEN];
-        bytes[..AGENT_KEY_COMPONENT_LEN].copy_from_slice(&o.0.get_bytes());
-        bytes[AGENT_KEY_COMPONENT_LEN..].copy_from_slice(&o.1.get_bytes());
-        Self(bytes)
-    }
-}
-
-impl From<&[u8]> for AgentKvKey {
-    fn from(f: &[u8]) -> Self {
-        let mut o = [0_u8; AGENT_KEY_LEN];
-        o.copy_from_slice(&f[..AGENT_KEY_LEN]);
-        Self(o)
-    }
-}
-
-impl From<Vec<u8>> for AgentKvKey {
-    fn from(v: Vec<u8>) -> Self {
-        v.as_slice().into()
-    }
-}
-
-impl AsRef<[u8]> for AgentKvKey {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-holochain_zome_types::impl_to_sql_via_as_ref!(AgentKvKey);
 
 /// Inject multiple agent info entries into the peer store
 pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
@@ -355,10 +266,9 @@ pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2p
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use holochain_sqlite::buffer::KvStoreT;
     use holochain_sqlite::db::ReadManager;
     use holochain_sqlite::db::WriteManager;
-    use holochain_sqlite::fresh_reader_test;
+    use holochain_state::agent_info::AgentKvKey;
     use holochain_state::test_utils::test_p2p_env;
     use kitsune_p2p::fixt::AgentInfoFixturator;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
@@ -383,31 +293,21 @@ mod tests {
         observability::test_run().ok();
 
         let test_env = test_p2p_env();
-        let environ = test_env.env();
-
-        let store_buf = super::AgentKv::new(environ.clone().into()).unwrap();
+        let env = test_env.env();
 
         let agent_info_signed = fixt!(AgentInfoSigned);
 
-        environ
-            .conn()
+        env.conn()
             .unwrap()
-            .with_commit(|writer| {
-                store_buf.as_store_ref().put(
-                    writer,
-                    &(&agent_info_signed).try_into().unwrap(),
-                    &agent_info_signed,
-                )
-            })
+            .with_commit(|txn| holochain_state::agent_info::put(txn, agent_info_signed.clone()))
             .unwrap();
 
-        environ.conn().unwrap().with_reader_test(|mut reader| {
-            let ret = &store_buf
-                .as_store_ref()
-                .get(&mut reader, &(&agent_info_signed).try_into().unwrap())
-                .unwrap();
+        env.conn().unwrap().with_reader_test(|txn| {
+            let ret =
+                holochain_state::agent_info::get(&txn, (&agent_info_signed).try_into().unwrap())
+                    .unwrap();
 
-            assert_eq!(ret, &Some(agent_info_signed),);
+            assert_eq!(ret, Some(agent_info_signed),);
         })
     }
 
@@ -416,15 +316,12 @@ mod tests {
         observability::test_run().ok();
         let t_env = test_p2p_env();
         let env = t_env.env();
-        let p2p_store = AgentKv::new(env.clone().into()).unwrap();
 
         // - Check no data in the store to start
-        let count = fresh_reader_test!(env, |mut r| p2p_store
-            .as_store_ref()
-            .iter(&mut r)
+        let count = env
+            .conn()
             .unwrap()
-            .count()
-            .unwrap());
+            .with_reader_test(|txn| holochain_state::agent_info::get_all(&txn).unwrap().len());
 
         assert_eq!(count, 0);
 

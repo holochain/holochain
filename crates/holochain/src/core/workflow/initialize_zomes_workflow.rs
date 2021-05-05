@@ -79,7 +79,7 @@ pub mod tests {
         let test_cache = test_cache_env();
         let env = test_env.env();
         let author = fake_agent_pubkey_1();
-        let mut workspace =
+        let workspace =
             HostFnWorkspace::new(env.clone(), test_cache.env(), author.clone()).unwrap();
         let mut ribosome = MockRibosomeT::new();
 

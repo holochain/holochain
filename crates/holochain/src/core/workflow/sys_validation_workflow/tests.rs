@@ -165,6 +165,7 @@ async fn run_test(
                     ":update_element": DhtOpType::RegisterUpdatedElement,
                     ":bad_update_entry_hash": bad_update_entry_hash,
                     ":bad_update_header": bad_update_header,
+                    ":link_add_hash": link_add_hash,
                 },
                 |row| row.get(0))
                 .unwrap();
