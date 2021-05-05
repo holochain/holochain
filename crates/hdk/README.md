@@ -285,4 +285,4 @@ documentation.
 - Serde messagepack: https://github.com/3Hren/msgpack-rust
 - Holochain serialized bytes: https://github.com/holochain/holochain-serialization/tree/develop/crates/holochain_serialized_bytes
 
-Check out the [advanced Holochain + WASM Overview for deeper details](./ON-WASM-md).
+Check out the [advanced Holochain + WASM Overview for deeper details](./ON-WASM.md).
