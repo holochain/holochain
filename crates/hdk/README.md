@@ -194,14 +194,13 @@ For detailed documentation of the full list, see the `core/ribosome` module
 inside core, but some illustrative examples include:
 
 - `emit_signal`: publish data to subscribed interface clients
-- `encrypt` & `decrypt`: use the agent's keypair to encrypt and decrypt data
 - `sign`: use the agent's keypair to sign some data
 - `create_entry`: save some data to the local source chain and broadcast it to
   the DHT to be redundantly validated and stored
 - `get_entry`: retrieve some data from local or the network given its hash
 - `create_link`: create graph style relationships (links) between entries
 - `get_links`: retrive links between entries using the DHT as a graph database
-- `remote_signal`: send data directly to known peers on the network
+- `remote_signal`: send data directly to known peers on the network without waiting for a response
 - `remote_call`: perform a remote procedure call on a peers node, if you're authorized
 
 This toolkit of functionality is available to the wasm as a list of "extern"
