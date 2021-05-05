@@ -1,20 +1,9 @@
 # Holochain Development Kit (HDK)
 
-This HDK is currently in flux, expect rapid changes.
-
-There are a few big differences between this kit and previous kits.
-
 This kit:
 
 1. The DSL is ergonomic and composable, so optional if you want more control
-2. It is compatible with the cell-driven version of holochain
-3. Differentiates between the holochain API/interface and "sugar" syntax
-
-Old kits:
-
-1. The DSL is monolithic and so a bit fragile off the beaten track
-2. Only compatible with the redux version of holochain
-3. Requires all holochain interactions to be routed through the HDK
+2. Differentiates between the holochain API/interface and "sugar" syntax
 
 
 ## HDK API
@@ -27,7 +16,7 @@ allows for more useful compiler and IDE feedback loops.
 
 ## Examples
 
-### map_extern!
+### hdk_extern
 
 ```rust
 use crate::prelude::*;
@@ -38,40 +27,22 @@ pub struct MyInput;
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct MyOutput(MyInput);
 
-fn _foo(input: MyInput) -> Result<MyOutput, WasmError> {
+#[hdk_extern]
+fn foo(input: MyInput) -> ExternResult<MyOutput> {
   Ok(MyOutput(input))
 }
 
-map_extern!(foo, _foo);
 ```
 
-### entry_def! & entry_defs
+### hdk_entry
 
 ```rust
-#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+
+#[hdk_entry(id = "profile")]test
+#[derive(Clone)]
 pub struct Foo;
 
-#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
-pub struct Bar;
-
-const FOO_ID: &str = "foo";
-const BAR_ID: &str = "bar";
-
-// Long version
-entry_def!(Foo EntryDef {
-    id: FOO_ID.into(),
-    crdt_type: CrdtType,
-    required_validations: RequiredValidations::default(),
-    visibility: EntryVisibility::Public,
-});
-
-// Short version
-entry_def!(Bar EntryDef {
-    id: BAR_ID.into(),
-    ..Default::default()
-});
-
-entry_defs!(vec![Foo::entry_def(), Bar::entry_def()]);
+entry_defs![Foo::entry_def()];
 ```
 
 ### create_entry, get, hash_entry, create_link, get_links, debug!
