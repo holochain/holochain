@@ -220,3 +220,14 @@ macro_rules! secure_primitive {
         }
     };
 }
+
+/// 10MB of entropy free for the taking.
+/// Useful for initializing arbitrary::Unstructured data
+#[cfg(any(test, feature = "test_utils"))]
+pub static NOISE: once_cell::sync::Lazy<Vec<u8>> = once_cell::sync::Lazy::new(|| {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    std::iter::repeat_with(|| rng.gen())
+        .take(10_000_000)
+        .collect()
+});

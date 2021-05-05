@@ -18,6 +18,9 @@ use serde::Serialize;
 #[allow(missing_docs)]
 pub mod error;
 
+#[cfg(feature = "test_utils")]
+pub mod facts;
+
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
 /// as well as changes to the status of already held data.
 #[derive(
@@ -250,6 +253,17 @@ impl DhtOp {
             DhtOp::RegisterDeletedEntryHeader(_, h) => h.clone().into(),
             DhtOp::RegisterAddLink(_, h) => h.clone().into(),
             DhtOp::RegisterRemoveLink(_, h) => h.clone().into(),
+        }
+    }
+
+    /// Access inner Entry, if present
+    pub fn entry(&self) -> Option<&Entry> {
+        match self {
+            DhtOp::StoreElement(_, _, e) => e.as_ref().map(|e| &**e),
+            DhtOp::StoreEntry(_, _, e) => Some(&*e),
+            DhtOp::RegisterUpdatedContent(_, _, e) => e.as_ref().map(|e| &**e),
+            DhtOp::RegisterUpdatedElement(_, _, e) => e.as_ref().map(|e| &**e),
+            _ => None,
         }
     }
 }

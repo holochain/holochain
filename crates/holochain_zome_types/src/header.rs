@@ -14,6 +14,8 @@ use holochain_serialized_bytes::prelude::*;
 
 pub mod builder;
 pub mod conversions;
+#[cfg(any(test, feature = "test_utils"))]
+pub mod facts;
 
 /// Any header with a header_seq less than this value is part of an element
 /// created during genesis. Anything with this seq or higher was created
@@ -78,6 +80,7 @@ macro_rules! write_into_header {
         /// A unit enum which just maps onto the different Header variants,
         /// without containing any extra data
         #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
+        #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
         pub enum HeaderType {
             $($n,)*
         }

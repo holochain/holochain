@@ -18,6 +18,9 @@ use error::*;
 
 pub mod error;
 
+#[cfg(feature = "contrafact")]
+pub mod facts;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 /// A header of one of the two types that create a new entry.
