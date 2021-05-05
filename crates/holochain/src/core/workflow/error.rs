@@ -18,6 +18,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum WorkflowError {
+    #[error("The genesis self-check failed. App cannot be installed. Reason: {0}")]
+    GenesisFailure(String),
+
     #[error(transparent)]
     AppValidationError(#[from] AppValidationError),
 

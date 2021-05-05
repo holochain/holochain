@@ -133,7 +133,9 @@ async fn mk_core(tt: TT) -> (TxUrl, Ep, EpHnd) {
     };
 
     let f = tx2_pool_promote(f, Default::default());
-    let f = tx2_proxy(f, Default::default());
+    let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
+    conf.allow_proxy_fwd = true;
+    let f = tx2_proxy(f, conf).unwrap();
 
     let ep = f.bind("kitsune-quic://0.0.0.0:0".into(), t).await.unwrap();
     let ep_hnd = ep.handle().clone();
