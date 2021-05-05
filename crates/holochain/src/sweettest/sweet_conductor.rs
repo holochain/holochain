@@ -1,8 +1,6 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
 // TODO [ B-03669 ] move to own crate
 
-use std::sync::Arc;
-
 use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorHandle};
 use crate::conductor::{
     config::ConductorConfig, error::ConductorResult, handle::ConductorHandle, Conductor,
@@ -16,6 +14,7 @@ use holochain_lmdb::test_utils::{test_environments, TestEnvironments};
 use holochain_types::prelude::*;
 use holochain_websocket::*;
 use kitsune_p2p::KitsuneP2pConfig;
+use std::sync::Arc;
 
 /// A stream of signals.
 pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>;

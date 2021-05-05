@@ -36,7 +36,6 @@ impl SweetConductorHandle {
         self.call_from_fallible(zome.cell_id().agent_pubkey(), None, zome, fn_name, payload)
             .await
     }
-
     /// Make a zome call to a Cell, as if some other Cell were the caller. More general case.
     /// Can optionally provide a capability.
     pub async fn call_from<I, O, F>(
@@ -86,6 +85,11 @@ impl SweetConductorHandle {
                 .expect("Couldn't deserialize zome call output")
         })
     }
+
+    // /// Get a stream of all Signals emitted since the time of this function call.
+    // pub async fn signal_stream(&self) -> impl tokio_stream::Stream<Item = Signal> {
+    //     self.0.signal_broadcaster().await.subscribe_merged()
+    // }
 
     /// Manually await shutting down the conductor.
     /// Conductors are already cleaned up on drop but this
