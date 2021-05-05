@@ -201,7 +201,7 @@ inside core, but some illustrative examples include:
 - `create_link`: create graph style relationships (links) between entries
 - `get_links`: retrive links between entries using the DHT as a graph database
 - `remote_signal`: send data directly to known peers on the network without waiting for a response
-- `remote_call`: perform a remote procedure call on a peers node, if you're authorized
+- `call_remote`: perform a remote procedure call on a peers node, if you're authorized
 
 This toolkit of functionality is available to the wasm as a list of "extern"
 functions that are all injected into the wasm by holochain - i.e. these
