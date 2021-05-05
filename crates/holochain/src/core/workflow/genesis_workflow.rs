@@ -61,58 +61,13 @@ async fn genesis_workflow_inner<Api: CellConductorApiT>(
         return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
     }
 
-    let keystore = api.keystore();
-
-    let dna_header = Header::Dna(header::Dna {
-        author: agent_pubkey.clone(),
-        timestamp: timestamp::now(),
-        hash: dna_file.dna_hash().clone(),
-    });
-    let dna_header = HeaderHashed::from_content_sync(dna_header);
-    let dna_header = SignedHeaderHashed::new(&keystore, dna_header).await?;
-    let dna_header_address = dna_header.as_hash().clone();
-    let element = Element::new(dna_header, None);
-    let dna_ops = produce_op_lights_from_elements(vec![&element])?;
-    let (dna_header, _) = element.into_inner();
-
-    // create the agent validation entry and add it directly to the store
-    let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
-        author: agent_pubkey.clone(),
-        timestamp: timestamp::now(),
-        header_seq: 1,
-        prev_header: dna_header_address,
+    source_chain::genesis(
+        workspace.vault.clone(),
+        dna_file.dna_hash().clone(),
+        agent_pubkey,
         membrane_proof,
-    });
-    let agent_validation_header = HeaderHashed::from_content_sync(agent_validation_header);
-    let agent_validation_header =
-        SignedHeaderHashed::new(&keystore, agent_validation_header).await?;
-    let avh_addr = agent_validation_header.as_hash().clone();
-    let element = Element::new(agent_validation_header, None);
-    let avh_ops = produce_op_lights_from_elements(vec![&element])?;
-    let (agent_validation_header, _) = element.into_inner();
-
-    // create a agent chain element and add it directly to the store
-    let agent_header = Header::Create(header::Create {
-        author: agent_pubkey.clone(),
-        timestamp: timestamp::now(),
-        header_seq: 2,
-        prev_header: avh_addr,
-        entry_type: header::EntryType::AgentPubKey,
-        entry_hash: agent_pubkey.clone().into(),
-    });
-    let agent_header = HeaderHashed::from_content_sync(agent_header);
-    let agent_header = SignedHeaderHashed::new(&keystore, agent_header).await?;
-    let element = Element::new(agent_header, Some(Entry::Agent(agent_pubkey)));
-    let agent_ops = produce_op_lights_from_elements(vec![&element])?;
-    let (agent_header, agent_entry) = element.into_inner();
-    let agent_entry = agent_entry.into_option();
-
-    workspace.vault.conn()?.with_commit(|txn| {
-        source_chain::put_raw(txn, dna_header, dna_ops, None)?;
-        source_chain::put_raw(txn, agent_validation_header, avh_ops, None)?;
-        source_chain::put_raw(txn, agent_header, agent_ops, agent_entry)?;
-        WorkflowResult::Ok(())
-    })?;
+    )
+    .await?;
 
     Ok(())
 }
@@ -158,7 +113,6 @@ pub mod tests {
 
     use crate::conductor::api::MockCellConductorApi;
     use crate::core::SourceChainResult;
-    use fallible_iterator::FallibleIterator;
     use holochain_state::{prelude::test_cell_env, source_chain::SourceChain};
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
@@ -166,48 +120,43 @@ pub mod tests {
     use matches::assert_matches;
     use observability;
 
-    pub async fn fake_genesis(source_chain: &mut SourceChain) -> SourceChainResult<()> {
+    pub async fn fake_genesis(vault: EnvWrite) -> SourceChainResult<()> {
         let dna = fake_dna_file("cool dna");
         let dna_hash = dna.dna_hash().clone();
         let agent_pubkey = fake_agent_pubkey_1();
 
-        source_chain.genesis(dna_hash, agent_pubkey, None).await
+        source_chain::genesis(vault, dna_hash, agent_pubkey, None).await
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn genesis_initializes_source_chain() {
         observability::test_run().unwrap();
         let test_env = test_cell_env();
-        let arc = test_env.env();
+        let vault = test_env.env();
         let dna = fake_dna_file("a");
-        let agent_pubkey = fake_agent_pubkey_1();
+        let author = fake_agent_pubkey_1();
 
         {
-            let workspace = GenesisWorkspace::new(arc.clone().into()).await.unwrap();
+            let workspace = GenesisWorkspace::new(vault.clone().into()).unwrap();
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
             let args = GenesisWorkflowArgs {
                 dna_file: dna.clone(),
-                agent_pubkey: agent_pubkey.clone(),
+                agent_pubkey: author.clone(),
                 membrane_proof: None,
             };
             let _: () = genesis_workflow(workspace, api, args).await.unwrap();
         }
 
         {
-            let source_chain = SourceChain::new(arc.clone().into()).unwrap();
-            assert_eq!(source_chain.agent_pubkey().unwrap(), agent_pubkey);
-            source_chain.chain_head().expect("chain head should be set");
-
-            let mut iter = source_chain.iter_back();
-            let mut headers = Vec::new();
-
-            while let Some(h) = iter.next().unwrap() {
-                let (h, _) = h.into_header_and_signature();
-                let (h, _) = h.into_inner();
-                headers.push(h);
-            }
+            let source_chain = SourceChain::new(vault.clone().into(), author.clone()).unwrap();
+            let headers = source_chain
+                .query(&Default::default())
+                .unwrap()
+                .into_iter()
+                .map(|e| e.header().clone())
+                .collect::<Vec<_>>();
 
             assert_matches!(
                 headers.as_slice(),

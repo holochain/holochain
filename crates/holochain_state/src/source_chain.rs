@@ -1,7 +1,7 @@
 use holo_hash::AgentPubKey;
+use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
-use holochain_keystore::KeystoreSender;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dht_op::produce_op_lights_from_iter;
@@ -10,8 +10,10 @@ use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
 use holochain_types::element::SignedHeaderHashedExt;
 use holochain_types::env::EnvRead;
+use holochain_types::env::EnvWrite;
 use holochain_types::timestamp;
 use holochain_types::EntryHashed;
+use holochain_zome_types::header;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
 use holochain_zome_types::Element;
@@ -41,7 +43,7 @@ pub struct SourceChain {
     scratch: SyncScratch,
     vault: EnvRead,
     author: Arc<AgentPubKey>,
-    persisted_len: u32,
+    persisted_seq: u32,
     persisted_head: HeaderHash,
     public_only: bool,
 }
@@ -66,14 +68,14 @@ impl SourceChain {
     pub fn new(vault: EnvRead, author: AgentPubKey) -> SourceChainResult<Self> {
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
-        let (persisted_head, persisted_len) = vault
+        let (persisted_head, persisted_seq) = vault
             .conn()?
             .with_reader(|txn| chain_head_db(&txn, author.clone()))?;
         Ok(Self {
             scratch,
             vault,
             author,
-            persisted_len,
+            persisted_seq,
             persisted_head,
             public_only: false,
         })
@@ -102,19 +104,23 @@ impl SourceChain {
         Ok(self.scratch.apply(|scratch| scratch.elements().collect())?)
     }
 
+    pub fn chain_head(&self) -> SourceChainResult<(HeaderHash, u32)> {
+        // Check scratch for newer head.
+        Ok(self.scratch.apply(|scratch| {
+            let chain_head = chain_head_scratch(&(*scratch), self.author.as_ref());
+            let (prev_header, header_seq) =
+                chain_head.unwrap_or_else(|| (self.persisted_head.clone(), self.persisted_seq));
+            (prev_header, header_seq)
+        })?)
+    }
+
     pub async fn put<H: HeaderInner, B: HeaderBuilder<H>>(
         &self,
         header_builder: B,
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<HeaderHash> {
-        // Check scratch for newer head.
-        let (prev_header, header_seq) = self.scratch.apply(|scratch| {
-            let chain_head = chain_head_scratch(&(*scratch), self.author.as_ref());
-            let (prev_header, chain_len) =
-                chain_head.unwrap_or_else(|| (self.persisted_head.clone(), self.persisted_len));
-            let header_seq = chain_len + 1;
-            (prev_header, header_seq)
-        })?;
+        let (prev_header, chain_head_seq) = self.chain_head()?;
+        let header_seq = chain_head_seq + 1;
 
         // Build the header.
         let common = HeaderBuilderCommon {
@@ -145,8 +151,9 @@ impl SourceChain {
         Ok(self.scratch.apply(|scratch| {
             let scratch_max = chain_head_scratch(&(*scratch), self.author.as_ref()).map(|(_, s)| s);
             scratch_max
-                .map(|s| std::cmp::max(s, self.persisted_len))
-                .unwrap_or(self.persisted_len)
+                .map(|s| std::cmp::max(s, self.persisted_seq))
+                .unwrap_or(self.persisted_seq)
+                + 1
         })?)
     }
     pub fn valid_cap_grant(
@@ -338,6 +345,65 @@ impl SourceChain {
     }
 }
 
+pub async fn genesis(
+    vault: EnvWrite,
+    dna_hash: DnaHash,
+    agent_pubkey: AgentPubKey,
+    membrane_proof: Option<SerializedBytes>,
+) -> SourceChainResult<()> {
+    let keystore = vault.keystore().clone();
+    let dna_header = Header::Dna(header::Dna {
+        author: agent_pubkey.clone(),
+        timestamp: timestamp::now(),
+        hash: dna_hash,
+    });
+    let dna_header = HeaderHashed::from_content_sync(dna_header);
+    let dna_header = SignedHeaderHashed::new(&keystore, dna_header).await?;
+    let dna_header_address = dna_header.as_hash().clone();
+    let element = Element::new(dna_header, None);
+    let dna_ops = produce_op_lights_from_elements(vec![&element])?;
+    let (dna_header, _) = element.into_inner();
+
+    // create the agent validation entry and add it directly to the store
+    let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
+        author: agent_pubkey.clone(),
+        timestamp: timestamp::now(),
+        header_seq: 1,
+        prev_header: dna_header_address,
+        membrane_proof,
+    });
+    let agent_validation_header = HeaderHashed::from_content_sync(agent_validation_header);
+    let agent_validation_header =
+        SignedHeaderHashed::new(&keystore, agent_validation_header).await?;
+    let avh_addr = agent_validation_header.as_hash().clone();
+    let element = Element::new(agent_validation_header, None);
+    let avh_ops = produce_op_lights_from_elements(vec![&element])?;
+    let (agent_validation_header, _) = element.into_inner();
+
+    // create a agent chain element and add it directly to the store
+    let agent_header = Header::Create(header::Create {
+        author: agent_pubkey.clone(),
+        timestamp: timestamp::now(),
+        header_seq: 2,
+        prev_header: avh_addr,
+        entry_type: header::EntryType::AgentPubKey,
+        entry_hash: agent_pubkey.clone().into(),
+    });
+    let agent_header = HeaderHashed::from_content_sync(agent_header);
+    let agent_header = SignedHeaderHashed::new(&keystore, agent_header).await?;
+    let element = Element::new(agent_header, Some(Entry::Agent(agent_pubkey)));
+    let agent_ops = produce_op_lights_from_elements(vec![&element])?;
+    let (agent_header, agent_entry) = element.into_inner();
+    let agent_entry = agent_entry.into_option();
+
+    vault.conn()?.with_commit(|txn| {
+        source_chain::put_raw(txn, dna_header, dna_ops, None)?;
+        source_chain::put_raw(txn, agent_validation_header, avh_ops, None)?;
+        source_chain::put_raw(txn, agent_header, agent_ops, agent_entry)?;
+        SourceChainResult::Ok(())
+    })
+}
+
 pub fn put_raw(
     txn: &mut Transaction,
     shh: SignedHeaderHashed,
@@ -394,31 +460,41 @@ fn chain_head_scratch(scratch: &Scratch, author: &AgentPubKey) -> Option<(Header
         .max_by_key(|h| h.1)
 }
 
+#[cfg(test)]
 async fn put_db<H: HeaderInner, B: HeaderBuilder<H>>(
-    txn: &mut Transaction<'_>,
-    keystore: &KeystoreSender,
+    vault: holochain_types::env::EnvWrite,
     author: Arc<AgentPubKey>,
     header_builder: B,
     maybe_entry: Option<Entry>,
 ) -> SourceChainResult<HeaderHash> {
-    let (prev_header, last_header_seq) = chain_head_db(txn, author.clone())?;
+    let (prev_header, last_header_seq) =
+        fresh_reader!(vault, |txn| { chain_head_db(&txn, author.clone()) })?;
     let header_seq = last_header_seq + 1;
 
     let common = HeaderBuilderCommon {
         author: (*author).clone(),
         timestamp: timestamp::now(),
         header_seq,
-        prev_header,
+        prev_header: prev_header.clone(),
     };
     let header = header_builder.build(common).into();
     let header = HeaderHashed::from_content_sync(header);
-    let header = SignedHeaderHashed::new(&keystore, header).await?;
+    let header = SignedHeaderHashed::new(&vault.keystore(), header).await?;
     let element = Element::new(header, maybe_entry);
     let ops = produce_op_lights_from_elements(vec![&element])?;
     let (header, entry) = element.into_inner();
     let entry = entry.into_option();
     let hash = header.as_hash().clone();
-    put_raw(txn, header, ops, entry)?;
+    vault.conn()?.with_commit(|txn| {
+        let (new_head, _) = chain_head_db(txn, author.clone())?;
+        if new_head != prev_header {
+            return Err(SourceChainError::HeadMoved(
+                Some(prev_header),
+                Some(new_head),
+            ));
+        }
+        SourceChainResult::Ok(put_raw(txn, header, ops, entry)?)
+    })?;
     Ok(hash)
 }
 
@@ -475,15 +551,9 @@ pub mod tests {
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
-    use holochain_types::test_utils::fake_dna_hash;
-    use holochain_zome_types::capability::CapAccess;
-    use holochain_zome_types::capability::ZomeCallCapGrant;
-
-    use std::collections::HashSet;
+    use matches::assert_matches;
 
     use crate::source_chain::SourceChainResult;
-    use fallible_iterator::FallibleIterator;
-    use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::header;
@@ -745,67 +815,63 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
         let test_env = test_cell_env();
-        let arc = test_env.env();
+        let vault = test_env.env();
 
-        let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
+        let author = test_env.cell_id().unwrap().agent_pubkey().clone();
+        let author = Arc::new(author);
 
-        {
-            let mut store = SourceChainBuf::new(arc.clone().into()).unwrap();
-            assert!(store.chain_head().is_none());
-            store
-                .put_raw(dna_header.as_content().clone(), dna_entry.clone())
-                .await?;
-            store
-                .put_raw(agent_header.as_content().clone(), agent_entry.clone())
-                .await?;
-            arc.conn()
-                .unwrap()
-                .with_commit(|writer| store.flush_to_txn(writer))?;
+        fresh_reader_test!(vault, |txn| {
+            assert_matches!(
+                chain_head_db(&txn, author.clone()),
+                Err(SourceChainError::ChainEmpty)
+            );
+        });
+        genesis(
+            vault.clone().into(),
+            fixt!(DnaHash),
+            (*author).clone(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let source_chain = SourceChain::new(vault.clone().into(), (*author).clone()).unwrap();
+        let entry = Entry::App(fixt!(AppEntryBytes));
+        let create = builder::Create {
+            entry_type: EntryType::App(fixt!(AppEntryType)),
+            entry_hash: EntryHash::with_data_sync(&entry),
         };
+        let h1 = source_chain.put(create, Some(entry)).await.unwrap();
+        let entry = Entry::App(fixt!(AppEntryBytes));
+        let create = builder::Create {
+            entry_type: EntryType::App(fixt!(AppEntryType)),
+            entry_hash: EntryHash::with_data_sync(&entry),
+        };
+        let h2 = source_chain.put(create, Some(entry)).await.unwrap();
+        source_chain.flush().unwrap();
 
-        {
-            let store = SourceChainBuf::new(arc.clone().into()).unwrap();
-            assert!(store.chain_head().is_some());
-
+        fresh_reader_test!(vault, |txn| {
+            assert_eq!(chain_head_db(&txn, author.clone()).unwrap().0, h2);
             // get the full element
-            let dna_element_fetched = store
-                .get_element(dna_header.as_hash())
+            let store = Txn::from(&txn);
+            let h1_element_fetched = store
+                .get_element(&h1.clone().into())
                 .expect("error retrieving")
                 .expect("entry not found");
-            let agent_element_fetched = store
-                .get_element(agent_header.as_hash())
+            let h2_element_fetched = store
+                .get_element(&h2.clone().into())
                 .expect("error retrieving")
                 .expect("entry not found");
-            assert_eq!(dna_header.as_content(), dna_element_fetched.header());
-            assert_eq!(dna_entry.as_ref(), dna_element_fetched.entry().as_option());
-            assert_eq!(agent_header.as_content(), agent_element_fetched.header());
-            assert_eq!(
-                agent_entry.as_ref(),
-                agent_element_fetched.entry().as_option()
-            );
+            assert_eq!(h1, *h1_element_fetched.header_address());
+            assert_eq!(h2, *h2_element_fetched.header_address());
+        });
 
-            // check that you can iterate on the chain
-            let mut iter = store.iter_back();
-            let mut res = Vec::new();
-
-            while let Some(h) = iter.next()? {
-                res.push(
-                    store
-                        .get_element(h.header_address())
-                        .unwrap()
-                        .unwrap()
-                        .header()
-                        .clone(),
-                );
-            }
-            assert_eq!(
-                vec![
-                    agent_header.as_content().clone(),
-                    dna_header.as_content().clone(),
-                ],
-                res
-            );
-        }
+        // check that you can iterate on the chain
+        let source_chain = SourceChain::new(vault.clone().into(), (*author).clone()).unwrap();
+        let res = source_chain.query(&QueryFilter::new()).unwrap();
+        assert_eq!(res.len(), 5);
+        assert_eq!(*res[3].header_address(), h1);
+        assert_eq!(*res[4].header_address(), h2);
 
         Ok(())
     }
@@ -813,61 +879,27 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
         let test_env = test_cell_env();
-        let arc = test_env.env();
+        let vault = test_env.env();
+        let author = test_env.cell_id().unwrap().agent_pubkey().clone();
+        genesis(vault.clone().into(), fixt!(DnaHash), author.clone(), None)
+            .await
+            .unwrap();
 
-        let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
+        let json = dump_state(vault.clone().into(), &author).await?;
+        let json = serde_json::to_string_pretty(&json)?;
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-        {
-            let mut store = SourceChainBuf::new(arc.clone().into()).unwrap();
-            store
-                .put_raw(dna_header.as_content().clone(), dna_entry)
-                .await?;
-            store
-                .put_raw(agent_header.as_content().clone(), agent_entry)
-                .await?;
+        assert_eq!(parsed["elements"][0]["header"]["type"], "Create");
+        assert_eq!(parsed["elements"][0]["header"]["entry_type"], "AgentPubKey");
+        assert_eq!(parsed["elements"][0]["entry"]["entry_type"], "Agent");
+        assert_ne!(
+            parsed["elements"][0]["entry"]["entry"],
+            serde_json::Value::Null
+        );
 
-            arc.conn()
-                .unwrap()
-                .with_commit(|writer| store.flush_to_txn(writer))?;
-        }
-
-        {
-            let store = SourceChainBuf::new(arc.clone().into()).unwrap();
-            let json = store.dump_state().await?;
-            let json = serde_json::to_string_pretty(&json)?;
-            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
-
-            assert_eq!(parsed["elements"][0]["header"]["type"], "Create");
-            assert_eq!(parsed["elements"][0]["header"]["entry_type"], "AgentPubKey");
-            assert_eq!(parsed["elements"][0]["entry"]["entry_type"], "Agent");
-            assert_ne!(
-                parsed["elements"][0]["entry"]["entry"],
-                serde_json::Value::Null
-            );
-
-            assert_eq!(parsed["elements"][1]["header"]["type"], "Dna");
-            assert_eq!(parsed["elements"][1]["entry"], serde_json::Value::Null);
-        }
+        assert_eq!(parsed["elements"][1]["header"]["type"], "Dna");
+        assert_eq!(parsed["elements"][1]["entry"], serde_json::Value::Null);
 
         Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_header_cas_roundtrip() {
-        let test_env = test_cell_env();
-        let arc = test_env.env();
-        let mut store = SourceChainBuf::new(arc.clone().into()).unwrap();
-
-        let (_, hashed, _, _, _) = fixtures();
-        let header = hashed.into_content();
-        let hash = HeaderHash::with_data_sync(&header);
-        let hashed = HeaderHashed::from_content_sync(header.clone());
-        assert_eq!(hash, *hashed.as_hash());
-
-        store.put_raw(header, None).await.unwrap();
-        let signed_header = store.get_header(&hash).unwrap().unwrap();
-
-        assert_eq!(signed_header.as_hash(), hashed.as_hash());
-        assert_eq!(signed_header.as_hash(), signed_header.header_address());
     }
 }

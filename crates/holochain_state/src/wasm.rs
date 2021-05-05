@@ -47,6 +47,7 @@ pub fn put(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationResult<()
 mod tests {
     use super::*;
     use holo_hash::HasHash;
+    use holochain_sqlite::prelude::DatabaseResult;
     use holochain_types::dna::wasm::DnaWasm;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -56,21 +57,23 @@ mod tests {
 
         // all the stuff needed to have a WasmBuf
         let env = crate::test_utils::test_wasm_env();
-        let mut wasm_buf =
-            WasmBuf::new(env.env().into(), env.get_table(TableName::Wasm).unwrap()).unwrap();
 
         // a wasm
         let wasm =
             DnaWasmHashed::from_content(DnaWasm::from(holochain_wasm_test_utils::TestWasm::Foo))
                 .await;
 
-        // a wasm in the WasmBuf
-        wasm_buf.put(wasm.clone());
-        // a wasm from the WasmBuf
-        let ret = wasm_buf.get(&wasm.as_hash()).await.unwrap().unwrap();
+        // Put wasm
+        env.conn()?
+            .with_commit(|txn| put(txn, wasm.clone()))
+            .unwrap();
+        fresh_reader_test!(env, |txn| {
+            // a wasm from the WasmBuf
+            let ret = get(&txn, &wasm.as_hash()).unwrap().unwrap();
 
-        // assert the round trip
-        assert_eq!(ret, wasm);
+            // assert the round trip
+            assert_eq!(ret, wasm);
+        });
 
         Ok(())
     }

@@ -102,11 +102,7 @@ pub async fn publish_dht_ops_workflow_inner(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::queue_consumer::TriggerSender;
     use crate::core::workflow::fake_genesis;
-    use crate::core::workflow::produce_dht_ops_workflow::produce_dht_ops_workflow;
-    use crate::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
-    use crate::core::SourceChainError;
     use crate::fixt::CreateLinkFixturator;
     use crate::fixt::EntryFixturator;
     use crate::test_utils::test_network_with_events;
@@ -115,9 +111,8 @@ mod tests {
     use futures::future::FutureExt;
     use holochain_p2p::actor::HolochainP2pSender;
     use holochain_p2p::HolochainP2pRef;
-    use holochain_sqlite::buffer::BufferedStore;
-    use matches::assert_matches;
     use observability;
+    use rusqlite::Transaction;
     use std::collections::HashMap;
     use std::convert::TryInto;
     use std::sync::atomic::AtomicU32;
@@ -146,48 +141,22 @@ mod tests {
         let mut sig_fixt = SignatureFixturator::new(Unpredictable);
         let mut link_add_fixt = CreateLinkFixturator::new(Unpredictable);
 
-        let mut data = Vec::new();
-        for _ in 0..num_hash {
-            // Create data for op
-            let sig = sig_fixt.next().unwrap();
-            let link_add = link_add_fixt.next().unwrap();
-            // Create DhtOp
-            let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
-            // Get the hash from the op
-            let op_hashed = DhtOpHashed::from_content_sync(op.clone());
-            // Convert op to DhtOpLight
-            let header_hash = HeaderHashed::from_content_sync(link_add.clone().into());
-            let op_light = DhtOpLight::RegisterAddLink(
-                header_hash.as_hash().clone(),
-                link_add.base_address.into(),
-            );
-            data.push((sig, op_hashed, op_light, header_hash));
-        }
-
-        // Create and fill authored ops db in the workspace
-        {
-            let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
-            for (sig, op_hashed, op_light, header_hash) in data {
-                let op_hash = op_hashed.as_hash().clone();
-                let authored_value = AuthoredDhtOpsValue::from_light(op_light);
-                workspace
-                    .authored_dht_ops
-                    .put(op_hash.clone(), authored_value)
-                    .unwrap();
-                // Put data into element store
-                let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig);
-                workspace.elements.put(signed_header, None).unwrap();
-            }
-            // Manually commit because this workspace doesn't commit to all dbs
-            env.conn()
-                .unwrap()
-                .with_commit::<DatabaseError, _, _>(|writer| {
-                    workspace.authored_dht_ops.flush_to_txn(writer)?;
-                    workspace.elements.flush_to_txn(writer)?;
-                    Ok(())
-                })
-                .unwrap();
-        }
+        env.conn()
+            .unwrap()
+            .with_commit(|txn| {
+                for _ in 0..num_hash {
+                    // Create data for op
+                    let sig = sig_fixt.next().unwrap();
+                    let link_add = link_add_fixt.next().unwrap();
+                    // Create DhtOp
+                    let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
+                    // Get the hash from the op
+                    let op_hashed = DhtOpHashed::from_content_sync(op.clone());
+                    mutations::insert_op(txn, op_hashed, true)?;
+                }
+                StateMutationResult::Ok(())
+            })
+            .unwrap();
 
         // Create cell data
         let dna = fixt!(DnaHash);
@@ -253,7 +222,7 @@ mod tests {
 
     /// Call the workflow
     async fn call_workflow(env: EnvWrite, cell_network: HolochainP2pCell) {
-        publish_dht_ops_workflow(env.clone().into(), env.clone().into(), cell_network)
+        publish_dht_ops_workflow(env.clone().into(), cell_network)
             .await
             .unwrap();
     }
@@ -292,12 +261,15 @@ mod tests {
 
             let check = async move {
                 recv_task.await.unwrap();
-                let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
-                fresh_reader_test!(env, |mut reader| {
-                    for i in workspace.authored().iter(&mut reader).unwrap().iterator() {
-                        // Check that each item now has a publish time
-                        assert!(i.expect("can iterate").1.last_publish_time.is_some())
-                    }
+                fresh_reader_test!(env, |txn: Transaction| {
+                    let unpublished_ops: bool = txn
+                        .query_row(
+                            "EXISTS(SELECT 1 FROM DhtOp WHERE last_publish_time IS NULL)",
+                            [],
+                            |row| row.get(0),
+                        )
+                        .unwrap();
+                    assert!(!unpublished_ops);
                 })
             };
 
@@ -332,34 +304,16 @@ mod tests {
                 setup(env.clone(), num_agents, num_hash, true).await;
 
             // Update the authored to have > R counts
-            {
-                let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
-
-                // Update authored to R
-                let values = fresh_reader_test!(env, |mut reader| workspace
-                    .authored_dht_ops
-                    .iter(&mut reader)
-                    .unwrap()
-                    .map(|(k, mut v)| {
-                        v.receipt_count = DEFAULT_RECEIPT_BUNDLE_SIZE;
-                        Ok((DhtOpHash::from_raw_39_panicky(k.to_vec()), v))
-                    })
-                    .collect::<Vec<_>>()
-                    .unwrap());
-
-                for (hash, v) in values.into_iter() {
-                    workspace.authored_dht_ops.put(hash, v).unwrap();
-                }
-
-                // Manually commit because this workspace doesn't commit to all dbs
-                env.conn()
-                    .unwrap()
-                    .with_commit::<DatabaseError, _, _>(|writer| {
-                        workspace.authored_dht_ops.flush_to_txn(writer)?;
-                        Ok(())
-                    })
+            env.conn()
+                .unwrap()
+                .with_commit_test(|txn| {
+                    txn.execute(
+                        "UPDATE DhtOp SET receipt_count = ?",
+                        [DEFAULT_RECEIPT_BUNDLE_SIZE],
+                    )
                     .unwrap();
-            }
+                })
+                .unwrap();
 
             // Call the workflow
             call_workflow(env.clone().into(), cell_network).await;
@@ -419,84 +373,47 @@ mod tests {
                 let eu_entry_type = entry_type_fixt.next().unwrap();
 
                 // Genesis and produce ops to clear these from the chains
-                {
-                    let mut source_chain = SourceChain::new(env.clone().into()).unwrap();
-                    fake_genesis(&mut source_chain).await.unwrap();
-                    env.conn()
-                        .unwrap()
-                        .with_commit::<SourceChainError, _, _>(|writer| {
-                            source_chain.flush_to_txn(writer)?;
-                            Ok(())
-                        })
-                        .unwrap();
-                }
-                {
-                    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
-                    let (qt, _rx) = TriggerSender::new();
-                    let complete = produce_dht_ops_workflow(workspace, env.clone().into(), qt)
-                        .await
-                        .unwrap();
-                    self::assert_matches!(complete, WorkComplete::Complete);
-                }
-                {
-                    let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
-                    env.conn()
-                        .unwrap()
-                        .with_commit::<SourceChainError, _, _>(|writer| {
-                            workspace.authored_dht_ops.clear_all(writer)?;
-                            Ok(())
-                        })
-                        .unwrap();
-                }
+                fake_genesis(env.clone()).await.unwrap();
+                let author = fake_agent_pubkey_1();
 
                 // Put data in elements
-                let (entry_create_header, entry_update_header) = {
-                    let mut source_chain = SourceChain::new(env.clone().into()).unwrap();
-                    let original_header_address = source_chain
-                        .put(
-                            builder::Create {
-                                entry_type: ec_entry_type,
-                                entry_hash: original_entry_hash.clone(),
-                            },
-                            Some(original_entry),
-                        )
-                        .await
-                        .unwrap();
+                let mut source_chain =
+                    SourceChain::new(env.clone().into(), author.clone()).unwrap();
+                let original_header_address = source_chain
+                    .put(
+                        builder::Create {
+                            entry_type: ec_entry_type,
+                            entry_hash: original_entry_hash.clone(),
+                        },
+                        Some(original_entry),
+                    )
+                    .await
+                    .unwrap();
 
-                    let entry_create_header = source_chain
-                        .get_header(&original_header_address)
-                        .unwrap()
-                        .unwrap()
-                        .clone();
+                let entry_update_hash = source_chain
+                    .put(
+                        builder::Update {
+                            entry_type: eu_entry_type,
+                            entry_hash: new_entry_hash,
+                            original_header_address: original_header_address.clone(),
+                            original_entry_address: original_entry_hash,
+                        },
+                        Some(new_entry),
+                    )
+                    .await
+                    .unwrap();
 
-                    let entry_update_hash = source_chain
-                        .put(
-                            builder::Update {
-                                entry_type: eu_entry_type,
-                                entry_hash: new_entry_hash,
-                                original_header_address: original_header_address.clone(),
-                                original_entry_address: original_entry_hash,
-                            },
-                            Some(new_entry),
-                        )
-                        .await
-                        .unwrap();
-
-                    let entry_update_header = source_chain
-                        .get_header(&entry_update_hash)
-                        .unwrap()
-                        .unwrap()
-                        .clone();
-
-                    env.conn()
-                        .unwrap()
-                        .with_commit::<SourceChainError, _, _>(|writer| {
-                            source_chain.flush_to_txn(writer)?;
-                            Ok(())
-                        })
-                        .unwrap();
-                    (entry_create_header, entry_update_header)
-                };
+                source_chain.flush().unwrap();
+                let (entry_create_header, entry_update_header) = env
+                    .conn()
+                    .unwrap()
+                    .with_commit_test(|writer| {
+                        let store = Txn::from(writer);
+                        let ech = store.get_header(&original_header_address).unwrap().unwrap();
+                        let euh = store.get_header(&entry_update_hash).unwrap().unwrap();
+                        (ech, euh)
+                    })
+                    .unwrap();
 
                 // Gather the expected op hashes, ops and basis
                 // We are only expecting Store Element and Register Replaced By ops and nothing else
@@ -569,16 +486,6 @@ mod tests {
 
                     map
                 };
-
-                // Create and fill authored ops db in the workspace
-                {
-                    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
-                    let (qt, _rx) = TriggerSender::new();
-                    let complete = produce_dht_ops_workflow(workspace, env.clone().into(), qt)
-                        .await
-                        .unwrap();
-                    self::assert_matches!(complete, WorkComplete::Complete);
-                }
 
                 // Create cell data
                 let dna = fixt!(DnaHash);

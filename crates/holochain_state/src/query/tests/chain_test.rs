@@ -1,6 +1,3 @@
-use super::ChainItemKey;
-use super::MetadataBuf;
-use super::MetadataBufT;
 use crate::test_utils::{test_cell_env, TestEnv};
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;

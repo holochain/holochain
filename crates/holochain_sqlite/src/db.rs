@@ -164,6 +164,14 @@ pub trait WriteManager<'e> {
     // /// It is preferable to use WriterManager::with_commit for database writes,
     // /// which can properly recover from and manage write failures
     // fn writer_unmanaged(&'e mut self) -> DatabaseResult<Writer<'e>>;
+
+    #[cfg(feature = "test_utils")]
+    fn with_commit_test<R, F>(&'e mut self, f: F) -> Result<R, DatabaseError>
+    where
+        F: 'e + FnOnce(&mut Transaction) -> R,
+    {
+        self.with_commit(|w| DatabaseResult::Ok(f(w)))
+    }
 }
 
 impl<'e> ReadManager<'e> for PConn {

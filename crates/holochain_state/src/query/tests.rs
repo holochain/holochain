@@ -16,13 +16,16 @@ use super::test_data::*;
 use super::*;
 use crate::mutations::*;
 
+#[cfg(todo_redo_old_tests)]
 mod chain_sequence;
+#[cfg(todo_redo_old_tests)]
 mod chain_test;
 mod details;
-mod dht_op;
 mod links;
+#[cfg(todo_redo_old_tests)]
 mod links_test;
 mod store;
+#[cfg(todo_redo_old_tests)]
 mod sys_meta;
 
 #[tokio::test(flavor = "multi_thread")]

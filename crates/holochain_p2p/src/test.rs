@@ -148,7 +148,6 @@ mod tests {
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
 
-    use holochain_zome_types::HeaderHashed;
     use holochain_zome_types::ValidationStatus;
     use kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig;
     use kitsune_p2p::KitsuneP2pConfig;
@@ -348,34 +347,18 @@ mod tests {
         .await
         .unwrap();
 
-        let test_1 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
-            ElementStatus::new(
-                Element::new(
-                    SignedHeaderHashed::with_presigned(
-                        HeaderHashed::from_content_sync(fixt!(Header)),
-                        fixt!(Signature),
-                    ),
-                    None,
-                ),
-                ValidationStatus::Valid,
-            ),
-            vec![],
-            vec![],
-        ))));
-        let test_2 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
-            ElementStatus::new(
-                Element::new(
-                    SignedHeaderHashed::with_presigned(
-                        HeaderHashed::from_content_sync(fixt!(Header)),
-                        fixt!(Signature),
-                    ),
-                    None,
-                ),
-                ValidationStatus::Valid,
-            ),
-            vec![],
-            vec![],
-        ))));
+        let test_1 = WireOps::Element(WireElementOps {
+            header: Some(Judged::valid(SignedHeader(fixt!(Header), fixt!(Signature)))),
+            deletes: vec![],
+            updates: vec![],
+            entry: None,
+        });
+        let test_2 = WireOps::Element(WireElementOps {
+            header: Some(Judged::valid(SignedHeader(fixt!(Header), fixt!(Signature)))),
+            deletes: vec![],
+            updates: vec![],
+            entry: None,
+        });
 
         let mut respond_queue = vec![test_1.clone(), test_2.clone()];
         let r_task = tokio::task::spawn(async move {
@@ -436,9 +419,17 @@ mod tests {
         .await
         .unwrap();
 
-        let test_1 = GetLinksResponse {
-            link_adds: vec![(fixt!(CreateLink), fixt!(Signature))],
-            link_removes: vec![(fixt!(DeleteLink), fixt!(Signature))],
+        let test_1 = WireLinkOps {
+            creates: vec![WireCreateLink::condense(
+                fixt!(CreateLink),
+                fixt!(Signature),
+                ValidationStatus::Valid,
+            )],
+            deletes: vec![WireDeleteLink::condense(
+                fixt!(DeleteLink),
+                fixt!(Signature),
+                ValidationStatus::Valid,
+            )],
         };
 
         let test_1_clone = test_1.clone();
@@ -469,7 +460,11 @@ mod tests {
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash::hash_type::Entry,
         );
-        let link_key = WireLinkMetaKey::Base(hash);
+        let link_key = WireLinkKey {
+            base: hash,
+            zome_id: 0.into(),
+            tag: None,
+        };
 
         let res = p2p
             .get_links(dna, a1, link_key, actor::GetLinksOptions::default())

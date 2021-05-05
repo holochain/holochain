@@ -146,7 +146,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_validation_receipts_db_populate_and_list() -> DatabaseResult<()> {
+    async fn test_validation_receipts_db_populate_and_list() -> StateMutationResult<()> {
         observability::test_run().ok();
 
         let test_env = crate::test_utils::test_cell_env();
@@ -158,36 +158,22 @@ mod tests {
         let vr2 = fake_vr(&test_op_hash, &keystore).await;
 
         {
-            let mut vr_buf1 = ValidationReceiptsBuf::new(&env)?;
-            let mut vr_buf2 = ValidationReceiptsBuf::new(&env)?;
-
-            vr_buf1.add_if_unique(vr1.clone())?;
-            vr_buf1.add_if_unique(vr1.clone())?;
-
-            vr_buf1.add_if_unique(vr2.clone())?;
+            env.conn().unwrap().with_commit(|txn| {
+                add_if_unique(txn, vr1.clone())?;
+                add_if_unique(txn, vr1.clone())?;
+                add_if_unique(txn, vr2.clone())
+            })?;
 
             env.conn()
                 .unwrap()
-                .with_commit(|writer| vr_buf1.flush_to_txn(writer))?;
-
-            vr_buf2.add_if_unique(vr1.clone())?;
-
-            env.conn()
-                .unwrap()
-                .with_commit(|writer| vr_buf2.flush_to_txn(writer))?;
+                .with_commit(|txn| add_if_unique(txn, vr1.clone()))?;
         }
 
         let mut g = env.conn().unwrap();
-        g.with_reader_test(|mut reader| {
-            let vr_buf = ValidationReceiptsBuf::new(&env).unwrap();
+        g.with_reader_test(|reader| {
+            assert_eq!(2, count_valid(&reader, &test_op_hash).unwrap());
 
-            assert_eq!(2, vr_buf.count_valid(&mut reader, &test_op_hash).unwrap());
-
-            let mut list = vr_buf
-                .list_receipts(&mut reader, &test_op_hash)
-                .unwrap()
-                .collect::<Vec<_>>()
-                .unwrap();
+            let mut list = list_receipts(&reader, &test_op_hash).unwrap();
             list.sort_by(|a, b| {
                 a.receipt
                     .validator

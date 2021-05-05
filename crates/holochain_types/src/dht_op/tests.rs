@@ -245,46 +245,30 @@ async fn test_all_ops() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_dht_basis() {
-    let test_env = test_cell_env();
-    let env = test_env.env();
+    // Create a header that points to an entry
+    let original_header = fixt!(Create);
+    let expected_entry_hash: AnyDhtHash = original_header.entry_hash.clone().into();
 
-    {
-        // Create a header that points to an entry
-        let new_entry = fixt!(Entry);
-        let original_header = fixt!(Create);
-        let expected_entry_hash: AnyDhtHash = original_header.entry_hash.clone().into();
+    let original_header_hash =
+        HeaderHashed::from_content_sync(Header::Create(original_header.clone()));
+    let original_header_hash = original_header_hash.into_inner().1;
 
-        let original_header_hash =
-            HeaderHashed::from_content_sync(Header::Create(original_header.clone()));
-        let signed_header =
-            SignedHeaderHashed::with_presigned(original_header_hash.clone(), fixt!(Signature));
-        let original_header_hash = original_header_hash.into_inner().1;
+    // Create the update header with the same hash
+    let update_new_entry = fixt!(Entry);
+    let mut entry_update = fixt!(Update, update_new_entry.clone());
+    entry_update.original_entry_address = original_header.entry_hash.clone();
+    entry_update.original_header_address = original_header_hash;
 
-        let entry_hashed = EntryHashed::with_pre_hashed(new_entry.clone(), fixt!(EntryHash));
+    // Create the op
+    let op = DhtOp::RegisterUpdatedContent(
+        fixt!(Signature),
+        entry_update,
+        Some(update_new_entry.into()),
+    );
 
-        // Setup a cascade
-        let mut cas = ElementBuf::vault(env.clone().into(), true).unwrap();
+    // Get the basis
+    let result = op.dht_basis();
 
-        // Put the header into the db
-        cas.put(signed_header, Some(entry_hashed)).unwrap();
-
-        // Create the update header with the same hash
-        let update_new_entry = fixt!(Entry);
-        let mut entry_update = fixt!(Update, update_new_entry.clone());
-        entry_update.original_entry_address = original_header.entry_hash.clone();
-        entry_update.original_header_address = original_header_hash;
-
-        // Create the op
-        let op = DhtOp::RegisterUpdatedContent(
-            fixt!(Signature),
-            entry_update,
-            Some(update_new_entry.into()),
-        );
-
-        // Get the basis
-        let result = op.dht_basis();
-
-        // Check the hash matches
-        assert_eq!(expected_entry_hash, result);
-    }
+    // Check the hash matches
+    assert_eq!(expected_entry_hash, result);
 }

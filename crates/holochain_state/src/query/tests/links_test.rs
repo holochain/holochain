@@ -2,6 +2,7 @@ use super::*;
 use crate::here;
 use crate::prelude::*;
 use ::fixt::prelude::*;
+use holochain_types::link::WireLinkKey;
 use observability;
 
 #[derive(Clone)]
@@ -80,9 +81,13 @@ impl TestData {
         td
     }
 
-    async fn empty<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
-        let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
-        let val = fresh_reader_test!(self.env, |mut r| meta_buf
+    async fn empty<'a>(&'a self, test: &'static str) {
+        let key = WireLinkKey {
+            base: self.base_hash.clone(),
+            zome_id: self.zome_id,
+            tag: Some(self.tag.clone()),
+        };
+        let val = fresh_reader_test!(self.env, |mut r| r
             .get_live_links(&mut r, &key)
             .unwrap()
             .collect::<Vec<_>>()

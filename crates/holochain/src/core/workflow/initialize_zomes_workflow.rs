@@ -67,15 +67,20 @@ pub mod tests {
     use ::fixt::prelude::*;
     use fixt::Unpredictable;
     use holochain_p2p::HolochainP2pCellFixturator;
+    use holochain_state::prelude::test_cache_env;
     use holochain_state::prelude::test_cell_env;
+    use holochain_zome_types::fake_agent_pubkey_1;
     use holochain_zome_types::Header;
     use matches::assert_matches;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn adds_init_marker() {
         let test_env = test_cell_env();
+        let test_cache = test_cache_env();
         let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+        let author = fake_agent_pubkey_1();
+        let mut workspace =
+            HostFnWorkspace::new(env.clone(), test_cache.env(), author.clone()).unwrap();
         let mut ribosome = MockRibosomeT::new();
 
         // Setup the ribosome mock
@@ -84,28 +89,21 @@ pub mod tests {
             .returning(move |_workspace, _invocation| Ok(InitResult::Pass));
 
         // Genesis
-        fake_genesis(&mut workspace.source_chain).await.unwrap();
+        fake_genesis(env.clone()).await.unwrap();
 
         let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
 
         let args = InitializeZomesWorkflowArgs { ribosome, dna_def };
         let keystore = fixt!(KeystoreSender);
         let network = fixt!(HolochainP2pCell);
-        let workspace_lock = CallZomeWorkspaceLock::new(workspace);
-        initialize_zomes_workflow_inner(workspace_lock.clone(), network, keystore, args)
+        initialize_zomes_workflow_inner(workspace.clone(), network, keystore, args)
             .await
             .unwrap();
 
         // Check init is added to the workspace
+        let scratch = workspace.source_chain().snapshot().unwrap();
         assert_matches!(
-            workspace_lock
-                .read()
-                .await
-                .source_chain
-                .get_at_index(3)
-                .unwrap()
-                .unwrap()
-                .header(),
+            scratch.headers().nth(3).unwrap().header(),
             Header::InitZomesComplete(_)
         );
     }

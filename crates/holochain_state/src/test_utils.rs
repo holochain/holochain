@@ -1,12 +1,16 @@
 //! Helpers for unit tests
 
 use holochain_sqlite::prelude::*;
+use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
 use holochain_zome_types::test_utils::fake_cell_id;
 use shrinkwraprs::Shrinkwrap;
 use std::path::Path;
 use std::sync::Arc;
 use tempdir::TempDir;
+
+use crate::prelude::Store;
+use crate::prelude::Txn;
 
 /// Create a [TestEnv] of [DbKind::Cell], backed by a temp directory.
 pub fn test_cell_env() -> TestEnv {
@@ -185,4 +189,24 @@ macro_rules! here {
     ($test: expr) => {
         concat!($test, " !!!_LOOK HERE:---> ", file!(), ":", line!())
     };
+}
+
+/// Helper to get a [`Store`] from an [`EnvRead`].
+pub fn fresh_store_test<F, R>(env: &EnvRead, f: F) -> R
+where
+    F: FnOnce(&dyn Store) -> R,
+{
+    fresh_reader_test!(env, |txn| {
+        let store = Txn::from(&txn);
+        f(&store)
+    })
+}
+
+/// Function to help avoid needing to specify types.
+pub fn fresh_reader_test<E, F, R>(env: E, f: F) -> R
+where
+    E: Into<EnvRead>,
+    F: FnOnce(Transaction) -> R,
+{
+    fresh_reader_test!(&env.into(), f)
 }

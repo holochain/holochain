@@ -1,3 +1,14 @@
+use chrono::Duration;
+use chrono::Utc;
+use fixt::prelude::*;
+use holochain_sqlite::db::WriteManager;
+use holochain_types::dht_op::DhtOpLight;
+use holochain_types::Timestamp;
+use holochain_zome_types::fixt::*;
+use holochain_zome_types::ValidationStatus;
+
+use crate::prelude::test_cell_env;
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_dht_op_query() {
     let test_env = test_cell_env();
@@ -13,30 +24,28 @@ async fn test_dht_op_query() {
     times.push(now);
     times.push(now + Duration::hours(100));
     let times_exp = times.clone();
-    let values = times
-        .into_iter()
-        .map(|when_integrated| IntegratedDhtOpsValue {
-            validation_status: ValidationStatus::Valid,
-            op: DhtOpLight::RegisterAgentActivity(fixt!(HeaderHash), basis.next().unwrap()),
-            when_integrated: when_integrated.into(),
-            send_receipt: false,
-        });
+    let values = times.into_iter().map(|when_integrated| {
+        (
+            ValidationStatus::Valid,
+            DhtOpLight::RegisterAgentActivity(fixt!(HeaderHash), basis.next().unwrap()),
+            Timestamp::from(when_integrated),
+        )
+    });
 
     // Put them in the db
     {
         let mut dht_hash = DhtOpHashFixturator::new(Predictable);
-        let mut buf = IntegratedDhtOpsBuf::new(env.clone().into()).unwrap();
-        for mut value in values {
+        for (validation_status, op, when_integrated) in values {
+            env.conn()
+                .unwrap()
+                .with_commit(|txn| mutations::insert_op())
+                .unwrap();
             buf.put(dht_hash.next().unwrap(), value.clone()).unwrap();
             expected.push(value.clone());
             value.op = DhtOpLight::RegisterAgentActivity(fixt!(HeaderHash), same_basis.clone());
             buf.put(dht_hash.next().unwrap(), value.clone()).unwrap();
             expected.push(value.clone());
         }
-        env.conn()
-            .unwrap()
-            .with_commit(|writer| buf.flush_to_txn(writer))
-            .unwrap();
     }
 
     // Check queries

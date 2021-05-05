@@ -1,6 +1,5 @@
 use crate::test_utils::consistency_10s;
 use crate::test_utils::sweetest::*;
-use fallible_iterator::FallibleIterator;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
@@ -8,6 +7,7 @@ use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::dna::zome::inline_zome::InlineZome;
 use holochain_types::{dht_op::produce_ops_from_element, env::EnvRead};
+use rusqlite::Transaction;
 
 fn simple_crud_zome() -> InlineZome {
     let entry_def = EntryDef::default_with_id("entrydef");
@@ -47,9 +47,10 @@ async fn test_validation_receipt() {
     consistency_10s(&[&alice, &bobbo, &carol]).await;
 
     // Get op hashes
-    let env: EnvRead = alice.env().clone().into();
-    let sc = SourceChain::new(env.clone()).unwrap();
-    let element = sc.get_element(&hash).unwrap().unwrap();
+    let vault: EnvRead = alice.env().clone().into();
+    let element = fresh_store_test(&vault, |store| {
+        store.get_element(&hash.clone().into()).unwrap().unwrap()
+    });
     let ops = produce_ops_from_element(&element)
         .unwrap()
         .into_iter()
@@ -57,17 +58,11 @@ async fn test_validation_receipt() {
         .collect::<Vec<_>>();
 
     // Wait for receipts to be sent
-    let db = ValidationReceiptsBuf::new(&env).unwrap();
-
     crate::assert_eq_retry_10s!(
         {
             let mut counts = Vec::new();
             for hash in &ops {
-                let count = fresh_reader_test!(env, |mut r| db
-                    .list_receipts(&mut r, hash)
-                    .unwrap()
-                    .count()
-                    .unwrap());
+                let count = fresh_reader_test!(vault, |r| list_receipts(&r, hash).unwrap().len());
                 counts.push(count);
             }
             counts
@@ -77,11 +72,8 @@ async fn test_validation_receipt() {
 
     // Check alice has receipts from both bobbo and carol
     for hash in ops {
-        let receipts: Vec<_> = fresh_reader_test!(env, |mut r| db
-            .list_receipts(&mut r, &hash)
-            .unwrap()
-            .collect()
-            .unwrap());
+        let receipts: Vec<_> =
+            fresh_reader_test!(vault, |mut r| list_receipts(&mut r, &hash).unwrap());
         assert_eq!(receipts.len(), 2);
         for receipt in receipts {
             let SignedValidationReceipt {
@@ -95,17 +87,17 @@ async fn test_validation_receipt() {
     }
 
     // Check alice has 2 receipts in their authored dht ops table.
-    let db = env.get_table(TableName::AuthoredDhtOps).unwrap();
-    let authored_dht_ops: AuthoredDhtOpsStore = KvBufFresh::new(env.clone(), db);
-
     crate::assert_eq_retry_1m!(
         {
-            fresh_reader_test!(env, |mut r| authored_dht_ops
-                .iter(&mut r)
-                .unwrap()
-                .map(|(_, v)| Ok(v.receipt_count))
-                .collect::<Vec<_>>()
-                .unwrap())
+            fresh_reader_test!(vault, |txn: Transaction| {
+                let mut stmt = txn
+                    .prepare("SELECT receipt_count FROM DhtOp WHERE is_authored = 1")
+                    .unwrap();
+                stmt.query_map([], |row| row.get::<_, u32>("receipt_count"))
+                    .unwrap()
+                    .map(Result::unwrap)
+                    .collect::<Vec<u32>>()
+            })
         },
         vec![2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
     );

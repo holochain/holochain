@@ -38,7 +38,7 @@ async fn get_activity() {
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.env().clone().into()]);
 
     // Cascade
-    let mut cascade = Cascade::<PassThroughNetwork>::empty().with_network(network, cache.env());
+    let mut cascade = Cascade::empty().with_network(network, cache.env());
 
     let r = cascade
         .get_agent_activity(td.agent.clone(), td.query_filter.clone(), options)

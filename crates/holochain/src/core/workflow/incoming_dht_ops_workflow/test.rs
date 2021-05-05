@@ -25,7 +25,22 @@ async fn incoming_ops_to_limbo() {
         .unwrap();
     rx.listen().await.unwrap();
 
-    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
-    let r = workspace.validation_limbo.get(&hash).unwrap().unwrap();
-    assert_eq!(r.op, op_light);
+    fresh_reader_test(env, |txn| {
+        let found: bool = txn
+            .query_row(
+                "
+            EXISTS(
+                SELECT 1 FROM DhtOP 
+                WHERE when_integrated IS NULL 
+                AND hash = :hash
+            )
+            ",
+                named_params! {
+                    ":hash": hash,
+                },
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(found);
+    });
 }

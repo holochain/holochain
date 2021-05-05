@@ -1,6 +1,7 @@
 use ghost_actor::dependencies::observability;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::Cascade;
+use holochain_p2p::MockHolochainP2pCellT;
 use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_cell_env;
 use holochain_state::scratch::Scratch;
@@ -23,7 +24,7 @@ async fn links_not_authority() {
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.env().clone().into()]);
 
     // Cascade
-    let mut cascade = Cascade::<PassThroughNetwork>::empty().with_network(network, cache.env());
+    let mut cascade = Cascade::empty().with_network(network, cache.env());
 
     let r = cascade
         .dht_get_links(td.link_key_tag.clone(), Default::default())
@@ -77,12 +78,12 @@ async fn links_authority() {
 
     // Network
     // - Not expecting any calls to the network.
-    let mut mock = MockHolochainP2pCellT2::new();
+    let mut mock = MockHolochainP2pCellT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(true));
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let mut cascade = Cascade::<MockNetwork>::empty()
+    let mut cascade = Cascade::empty()
         .with_network(mock, cache.env())
         .with_vault(vault.env().into());
 
@@ -118,7 +119,7 @@ async fn links_authoring() {
 
     // Network
     // - Not expecting any calls to the network.
-    let mut mock = MockHolochainP2pCellT2::new();
+    let mut mock = MockHolochainP2pCellT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(false));
     mock.expect_get_links().returning(|_, _| {
         Ok(vec![WireLinkOps {
@@ -129,9 +130,9 @@ async fn links_authoring() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let mut cascade = Cascade::<MockNetwork>::empty()
+    let mut cascade = Cascade::empty()
         .with_network(mock.clone(), cache.env())
-        .with_scratch(scratch.clone());
+        .with_scratch(scratch.clone().into_sync());
 
     let r = cascade
         .dht_get_links(td.link_key_tag.clone(), Default::default())
@@ -142,9 +143,9 @@ async fn links_authoring() {
 
     insert_op_scratch(&mut scratch, td.delete_link_op.clone()).unwrap();
 
-    let mut cascade = Cascade::<MockNetwork>::empty()
+    let mut cascade = Cascade::empty()
         .with_network(mock, cache.env())
-        .with_scratch(scratch.clone());
+        .with_scratch(scratch.into_sync());
 
     let r = cascade
         .dht_get_links(td.link_key.clone(), Default::default())

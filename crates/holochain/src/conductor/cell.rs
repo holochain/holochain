@@ -53,6 +53,8 @@ pub mod error;
 
 #[cfg(test)]
 mod gossip_test;
+#[cfg(test)]
+mod op_query_test;
 
 #[cfg(test)]
 mod test;

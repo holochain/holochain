@@ -34,28 +34,27 @@ pub fn get_details<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::core::workflow::CallZomeWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_get_details_test<'a>() {
         observability::test_run().ok();
-
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::core::workflow::fake_genesis(env.clone())
             .await
             .unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
 
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        host_access.workspace = workspace.clone();
 
         // simple replica of the internal type for the TestWasm::Crud entry
         #[derive(Clone, Copy, Serialize, Deserialize, SerializedBytes, Debug, PartialEq)]

@@ -28,6 +28,7 @@ pub mod test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
 
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;
@@ -35,18 +36,16 @@ pub mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn invoke_import_agent_info_test() {
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::core::workflow::fake_genesis(env.clone())
             .await
             .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
+        host_access.workspace = workspace;
 
         let agent_info: AgentInfo =
             crate::call_test_ribosome!(host_access, TestWasm::AgentInfo, "agent_info", ());

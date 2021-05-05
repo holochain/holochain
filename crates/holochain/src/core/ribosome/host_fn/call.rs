@@ -64,7 +64,6 @@ pub mod wasm_test {
     use crate::test_utils::conductor_setup::ConductorTestData;
     use crate::test_utils::install_app;
     use crate::test_utils::new_zome_call;
-    use holochain_state::element_buf::ElementBuf;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_test() {

@@ -55,6 +55,7 @@ pub mod slow_tests {
     use crate::test_utils::WaitOps;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_test_wasm_common::*;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
@@ -62,19 +63,15 @@ pub mod slow_tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children() {
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::core::workflow::fake_genesis(env.clone())
             .await
             .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
+        host_access.workspace = workspace;
 
         // ensure foo.bar twice to ensure idempotency
         let _: () = crate::call_test_ribosome!(
@@ -137,19 +134,15 @@ pub mod slow_tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn hash_path_anchor_get_anchor() {
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::core::workflow::fake_genesis(env.clone())
             .await
             .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
+        host_access.workspace = workspace;
 
         // anchor foo bar
         let anchor_address_one: EntryHash = crate::call_test_ribosome!(

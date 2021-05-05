@@ -6,6 +6,7 @@ use error::SysValidationError;
 
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::prelude::test_cache_env;
 use holochain_state::prelude::test_cell_env;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
@@ -55,13 +56,14 @@ async fn check_previous_header() {
 #[tokio::test(flavor = "multi_thread")]
 async fn check_valid_if_dna_test() {
     let tmp = test_cell_env();
+    let tmp_cache = test_cache_env();
     let env: EnvRead = tmp.env().into();
     // Test data
     let _activity_return = vec![fixt!(HeaderHash)];
 
     // Empty store not dna
     let header = fixt!(CreateLink);
-    let workspace = SysValidationWorkspace::new(env);
+    let workspace = SysValidationWorkspace::new(env, tmp_cache.env());
 
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &workspace).await,

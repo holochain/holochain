@@ -274,28 +274,6 @@ where
         Ok(network.get_agent_activity(agent, query, options).await?)
     }
 
-    /// Check if this hash has been validated.
-    /// Elements can end up in the cache or integrated table because
-    /// they were gossiped to you or you authored them.
-    /// If you care about the hash you are using being valid in the same
-    /// way as if you got it from the StoreElement authority you can
-    /// this function to verify that constraint.
-    ///
-    /// An example of how this could go wrong is you do a get for a HeaderHash
-    /// where you are the authority for the RegisterAgentActivity for this header.
-    /// That hash is in your integrated db so you find it but the element has failed
-    /// app validation. The header appears valid even though it isn't because as a
-    /// RegisterAgentActivity authority you haven't run app validation.
-    pub fn valid_header(&self, _hash: &HeaderHash) -> CascadeResult<bool> {
-        todo!("I'm guessing we can remove this function")
-    }
-
-    /// Same as valid_header but checks for StoreEntry validation
-    /// See valid_header for details
-    pub fn valid_entry(&self, _hash: &EntryHash) -> CascadeResult<bool> {
-        todo!("I'm guessing we can remove this function")
-    }
-
     /// Check if we have a valid reason to return an element from the cascade
     /// See valid_header for details
     pub fn valid_element(

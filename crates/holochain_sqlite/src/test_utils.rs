@@ -95,3 +95,16 @@ impl TestDbs {
         self.tempdir.clone()
     }
 }
+
+#[macro_export]
+/// Macro to generate a fresh reader from an DbRead with less boilerplate
+/// Use this in tests, where everything gets unwrapped anyway
+macro_rules! fresh_reader_test {
+    ($env: expr, $f: expr) => {{
+        let mut conn = $env.conn().unwrap();
+        $crate::db::ReadManager::with_reader(&mut conn, |r| {
+            $crate::error::DatabaseResult::Ok($f(r))
+        })
+        .unwrap()
+    }};
+}
