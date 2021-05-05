@@ -185,13 +185,18 @@ pub(super) fn initialize_databases(rkv: &Rkv, kind: &EnvironmentKind) -> Databas
     let path = rkv.path().to_owned();
     match dbmap.entry(path.clone()) {
         hash_map::Entry::Occupied(_) => {
-            return Err(DatabaseError::EnvironmentDoubleInitialized(path));
+            tracing::warn!(
+                "Ignored attempt to double-initialize an LMDB environment: {:?}",
+                path
+            );
         }
-        hash_map::Entry::Vacant(e) => e.insert({
-            let mut um = UniversalMap::new();
-            register_databases(&rkv, kind, &mut um)?;
-            um
-        }),
+        hash_map::Entry::Vacant(e) => {
+            e.insert({
+                let mut um = UniversalMap::new();
+                register_databases(&rkv, kind, &mut um)?;
+                um
+            });
+        }
     };
     Ok(())
 }

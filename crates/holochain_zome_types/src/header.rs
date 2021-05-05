@@ -15,6 +15,11 @@ use holochain_serialized_bytes::prelude::*;
 pub mod builder;
 pub mod conversions;
 
+/// Any header with a header_seq less than this value is part of an element
+/// created during genesis. Anything with this seq or higher was created
+/// after genesis.
+pub const POST_GENESIS_SEQ_THRESHOLD: u32 = 3;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct HeaderHashes(pub Vec<HeaderHash>);
 
@@ -205,6 +210,10 @@ impl Header {
             Self::Create(Create { prev_header, .. }) => prev_header,
             Self::Update(Update { prev_header, .. }) => prev_header,
         })
+    }
+
+    pub fn is_genesis(&self) -> bool {
+        self.header_seq() < POST_GENESIS_SEQ_THRESHOLD
     }
 }
 

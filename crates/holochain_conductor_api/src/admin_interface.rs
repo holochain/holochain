@@ -3,6 +3,8 @@ use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
+use crate::InstalledAppInfo;
+
 /// Represents the available conductor functions to call over an Admin interface
 /// and will result in a corresponding [`AdminResponse`] message being sent back over the
 /// interface connection.
@@ -243,27 +245,27 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::InstallApp`].
     ///
-    /// The resulting [`InstalledApp`] contains the App id,
+    /// The resulting [`InstalledAppInfo`] contains the App id,
     /// the [`CellNick`]s and, most usefully, the new [`CellId`]s
-    /// of the newly installed `Dna`s. See the [`InstalledApp`] docs for details.
+    /// of the newly installed `Dna`s. See the [`InstalledAppInfo`] docs for details.
     ///
     /// [`AdminRequest::InstallApp`]: enum.AdminRequest.html#variant.InstallApp
-    /// [`InstalledApp`]: ../../../holochain_types/app/struct.InstalledApp.html
+    /// [`InstalledAppInfo`]: ../../../holochain_types/app/struct.InstalledAppInfo.html
     /// [`CellNick`]: ../../../holochain_types/app/type.CellNick.html
     /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
-    AppInstalled(InstalledApp),
+    AppInstalled(InstalledAppInfo),
 
     /// The successful response to an [`AdminRequest::InstallAppBundle`].
     ///
-    /// The resulting [`InstalledApp`] contains the App id,
+    /// The resulting [`InstalledAppInfo`] contains the App id,
     /// the [`CellNick`]s and, most usefully, the new [`CellId`]s
-    /// of the newly installed `Dna`s. See the [`InstalledApp`] docs for details.
+    /// of the newly installed `Dna`s. See the [`InstalledAppInfo`] docs for details.
     ///
     /// [`AdminRequest::InstallApp`]: enum.AdminRequest.html#variant.InstallApp
-    /// [`InstalledApp`]: ../../../holochain_types/app/struct.InstalledApp.html
+    /// [`InstalledAppInfo`]: ../../../holochain_types/app/struct.InstalledAppInfo.html
     /// [`CellNick`]: ../../../holochain_types/app/type.CellNick.html
     /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
-    AppBundleInstalled(InstalledApp),
+    AppBundleInstalled(InstalledAppInfo),
 
     /// The successful response to an [`AdminRequest::CreateCloneCell`].
     ///

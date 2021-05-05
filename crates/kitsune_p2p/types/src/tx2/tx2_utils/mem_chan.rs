@@ -230,7 +230,7 @@ mod tests {
     async fn _inner_test_async_bound_mem_channel(bind_size: usize, buf_size: usize) {
         let (mut send, mut recv) = bound_async_mem_channel(bind_size, None);
 
-        let rt = tokio::task::spawn(async move {
+        let rt = metric_task(async move {
             let mut read_buf = vec![0_u8; buf_size];
             use futures::io::AsyncReadExt;
             recv.read_exact(&mut read_buf).await.unwrap();
@@ -240,6 +240,7 @@ mod tests {
                 buf_size,
                 parse_latency_info(&read_buf).unwrap().as_micros()
             );
+            KitsuneResult::Ok(())
         });
 
         use futures::io::AsyncWriteExt;
@@ -247,7 +248,7 @@ mod tests {
         fill_with_latency_info(&mut write_buf);
         send.write_all(&write_buf).await.unwrap();
 
-        rt.await.unwrap();
+        rt.await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
