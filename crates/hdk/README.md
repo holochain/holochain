@@ -38,11 +38,11 @@ fn foo(input: MyInput) -> ExternResult<MyOutput> {
 
 ```rust
 
-#[hdk_entry(id = "foo")]test
+#[hdk_entry(id = "foo")]
 #[derive(Clone)]
 pub struct Foo;
 
-#[hdk_entry(id = "bar")]test
+#[hdk_entry(id = "bar")]
 #[derive(Clone)]
 pub struct Bar;
 
@@ -76,16 +76,16 @@ debug!(links);
 let agent_pubkey = agent_info()?.agent_pubkey;
 // Get the name of this zome
 let zome_name = zome_info()?.zome_name;
-// Call your friends foo function
+// Call your friends "foo" function
 let result: SerializedBytes = call_remote(
     my_friends_agent_pubkey,
     zome_name,
     "foo".to_string(),
     CapSecret::default(),
-    MyInput.try_into()?
+    MyInput
 )?;
 // Get their output
-let output: MyOutput = result.try_into()?;
+let output: MyOutput = result.decode()?;
 // Print their output
 debug!(output);
 ```
