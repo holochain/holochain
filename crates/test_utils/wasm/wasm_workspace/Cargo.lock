@@ -821,6 +821,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_genesis_self_check_invalid"
+version = "0.0.1"
+dependencies = [
+ "hdk",
+ "serde",
+]
+
+[[package]]
+name = "test_wasm_genesis_self_check_valid"
+version = "0.0.1"
+dependencies = [
+ "hdk",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_hash_entry"
 version = "0.0.1"
 dependencies = [
