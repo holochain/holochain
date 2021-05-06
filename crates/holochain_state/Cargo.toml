@@ -33,6 +33,7 @@ tracing = "=0.1.21"
 tracing-futures = "0.2.4"
 
 tempdir = { version = "0.3", optional = true }
+base64 = {version = "0.13", optional = true}
 
 [dev-dependencies]
 anyhow = "1.0.26"
@@ -53,4 +54,5 @@ test_utils = [
     "holochain_zome_types/test_utils",
     "holochain_wasm_test_utils",
     "tempdir",
+    "base64",
 ]

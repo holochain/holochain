@@ -122,10 +122,14 @@ pub fn add_if_unique(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fixt::prelude::*;
+    use holo_hash::HasHash;
     use holochain_keystore::KeystoreSenderExt;
     use holochain_sqlite::db::ReadManager;
-    use holochain_types::test_utils::fake_dht_op_hash;
+    use holochain_types::dht_op::DhtOp;
+    use holochain_types::dht_op::DhtOpHashed;
     use holochain_types::timestamp;
+    use holochain_zome_types::fixt::*;
 
     async fn fake_vr(
         dht_op_hash: &DhtOpHash,
@@ -153,7 +157,16 @@ mod tests {
         let env = test_env.env();
         let keystore = crate::test_utils::test_keystore();
 
-        let test_op_hash = fake_dht_op_hash(1);
+        let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
+            fixt!(Signature),
+            fixt!(Header),
+        ));
+        let test_op_hash = op.as_hash().clone();
+        env.conn()
+            .unwrap()
+            .with_commit(|txn| mutations::insert_op(txn, op, true))
+            .unwrap();
+
         let vr1 = fake_vr(&test_op_hash, &keystore).await;
         let vr2 = fake_vr(&test_op_hash, &keystore).await;
 

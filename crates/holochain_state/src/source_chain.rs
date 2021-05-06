@@ -176,7 +176,7 @@ impl SourceChain {
         };
         let mut elements = self.vault.conn()?.with_reader(|txn| {
             let mut sql = "
-                SELECT 
+                SELECT DISTINCT 
                 Header.hash AS header_hash, Header.blob AS header_blob
             "
             .to_string();
@@ -814,6 +814,7 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
+        observability::test_run().ok();
         let test_env = test_cell_env();
         let vault = test_env.env();
 

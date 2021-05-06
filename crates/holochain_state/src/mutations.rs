@@ -171,7 +171,7 @@ pub fn insert_validation_receipt(
 
 /// Insert a [`DnaWasm`] into the database.
 pub fn insert_wasm(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationResult<()> {
-    let hash = wasm.as_hash().clone();
+    let (wasm, hash) = wasm.into_inner();
     sql_insert!(txn, Wasm, {
         "hash": hash,
         "blob": to_blob(wasm)?,
@@ -181,7 +181,7 @@ pub fn insert_wasm(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationR
 
 /// Insert a [`DnaDef`] into the database.
 pub fn insert_dna_def(txn: &mut Transaction, dna_def: DnaDefHashed) -> StateMutationResult<()> {
-    let hash = dna_def.as_hash().clone();
+    let (dna_def, hash) = dna_def.into_inner();
     sql_insert!(txn, Wasm, {
         "hash": hash,
         "blob": to_blob(dna_def)?,

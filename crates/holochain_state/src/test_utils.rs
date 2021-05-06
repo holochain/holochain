@@ -1,6 +1,7 @@
 //! Helpers for unit tests
 
 use holochain_sqlite::prelude::*;
+use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
 use holochain_zome_types::test_utils::fake_cell_id;
@@ -11,6 +12,8 @@ use tempdir::TempDir;
 
 use crate::prelude::Store;
 use crate::prelude::Txn;
+
+pub mod mutations_helpers;
 
 /// Create a [TestEnv] of [DbKind::Cell], backed by a temp directory.
 pub fn test_cell_env() -> TestEnv {
@@ -209,4 +212,41 @@ where
     F: FnOnce(Transaction) -> R,
 {
     fresh_reader_test!(&env.into(), f)
+}
+
+#[tracing::instrument(skip(txn))]
+pub fn dump_db(txn: &Transaction) {
+    let dump = |mut stmt: Statement| {
+        let mut rows = stmt.query([]).unwrap();
+        while let Some(row) = rows.next().unwrap() {
+            for column in row.column_names() {
+                let row = row.get_ref_unwrap(column);
+                match row {
+                    holochain_sqlite::rusqlite::types::ValueRef::Null
+                    | holochain_sqlite::rusqlite::types::ValueRef::Integer(_)
+                    | holochain_sqlite::rusqlite::types::ValueRef::Real(_) => {
+                        tracing::debug!(?column, ?row);
+                    }
+                    holochain_sqlite::rusqlite::types::ValueRef::Text(text) => {
+                        tracing::debug!(?column, row = ?String::from_utf8_lossy(text));
+                    }
+                    holochain_sqlite::rusqlite::types::ValueRef::Blob(blob) => {
+                        let blob = base64::encode_config(blob, base64::URL_SAFE_NO_PAD);
+                        tracing::debug!("column: {:?} row:{}", column, blob);
+                    }
+                }
+            }
+        }
+    };
+    tracing::debug!("Headers:");
+    let stmt = txn.prepare("SELECT * FROM Header").unwrap();
+    dump(stmt);
+
+    tracing::debug!("Entries:");
+    let stmt = txn.prepare("SELECT * FROM Entry").unwrap();
+    dump(stmt);
+
+    tracing::debug!("DhtOps:");
+    let stmt = txn.prepare("SELECT * FROM DhtOp").unwrap();
+    dump(stmt);
 }
