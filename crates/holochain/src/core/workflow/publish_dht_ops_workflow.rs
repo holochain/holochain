@@ -264,7 +264,7 @@ mod tests {
                 fresh_reader_test!(env, |txn: Transaction| {
                     let unpublished_ops: bool = txn
                         .query_row(
-                            "EXISTS(SELECT 1 FROM DhtOp WHERE last_publish_time IS NULL)",
+                            "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE last_publish_time IS NULL)",
                             [],
                             |row| row.get(0),
                         )

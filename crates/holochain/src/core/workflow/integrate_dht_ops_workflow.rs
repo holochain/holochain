@@ -83,7 +83,7 @@ pub async fn integrate_dht_ops_workflow(
             CASE DhtOp.type
                 WHEN :store_entry               THEN 1
                 WHEN :store_element             THEN 1
-                WHEN :register_activity         THEN EXISTS({activity})
+                WHEN :register_activity         THEN (EXISTS({activity}) OR Header.prev_hash IS NULL)
                 WHEN :updated_content           THEN EXISTS({update_content})
                 WHEN :updated_element           THEN EXISTS({update_element})
                 WHEN :deleted_by                THEN EXISTS({deleted_by})
@@ -138,7 +138,7 @@ pub async fn integrate_dht_ops_workflow(
 
             },
         )?;
-        tracing::debug!("{}", stmt.expanded_sql().unwrap());
+        // tracing::debug!("{}", stmt.expanded_sql().unwrap());
         WorkflowResult::Ok(changed)
     })?;
     tracing::debug!(?changed);

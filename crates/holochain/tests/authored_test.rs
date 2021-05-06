@@ -52,7 +52,7 @@ async fn authored_test() {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_authored_entry: bool = txn
             .query_row(
-                "EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash AND is_authored = 1 AND when_integrated IS NULL)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash AND is_authored = 1 AND when_integrated IS NULL)",
                 named_params! {
                     ":hash": basis,
                 },
@@ -79,7 +79,7 @@ async fn authored_test() {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_authored_entry: bool = txn
             .query_row(
-                "EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash AND is_authored = 1 AND when_integrated IS NULL)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash AND is_authored = 1 AND when_integrated IS NULL)",
                 named_params! {
                     ":hash": basis,
                 },
@@ -90,7 +90,7 @@ async fn authored_test() {
         assert!(!has_authored_entry);
         let has_integrated_entry: bool = txn
             .query_row(
-                "EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash AND when_integrated IS NOT NULL)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash AND when_integrated IS NOT NULL)",
                 named_params! {
                     ":hash": basis,
                 },
@@ -117,7 +117,7 @@ async fn authored_test() {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_authored_entry: bool = txn
             .query_row(
-                "EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash AND is_authored = 1)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash AND is_authored = 1)",
                 named_params! {
                     ":hash": basis,
                 },

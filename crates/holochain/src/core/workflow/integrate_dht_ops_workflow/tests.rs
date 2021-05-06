@@ -168,7 +168,7 @@ impl Db {
                         let found: bool = txn
                             .query_row(
                                 "
-                                EXISTS(
+                                SELECT EXISTS(
                                     SELECT 1 FROM DhtOP 
                                     WHERE when_integrated IS NOT NULL 
                                     AND hash = :hash
@@ -190,7 +190,7 @@ impl Db {
                         let found: bool = txn
                             .query_row(
                                 "
-                                EXISTS(
+                                SELECT EXISTS(
                                     SELECT 1 FROM DhtOP 
                                     WHERE when_integrated IS NULL 
                                     AND hash = :hash
@@ -210,7 +210,7 @@ impl Db {
                         let found: bool = txn
                             .query_row(
                                 "
-                                EXISTS(
+                                SELECT EXISTS(
                                     SELECT 1 FROM DhtOP 
                                     WHERE when_integrated IS NULL 
                                     AND validation_stage = 3
@@ -232,7 +232,7 @@ impl Db {
                         let found: bool = txn
                             .query_row(
                                 "
-                                EXISTS(
+                                SELECT EXISTS(
                                     SELECT 1 FROM DhtOP 
                                     WHERE when_integrated IS NOT NULL 
                                     AND header_hash = :hash
@@ -257,7 +257,7 @@ impl Db {
                         let found: bool = txn
                             .query_row(
                                 "
-                                EXISTS(
+                                SELECT EXISTS(
                                     SELECT 1 FROM DhtOP 
                                     WHERE when_integrated IS NOT NULL 
                                     AND validation_status = :status
@@ -285,7 +285,7 @@ impl Db {
                         let found: bool = txn
                             .query_row(
                                 "
-                                EXISTS(
+                                SELECT EXISTS(
                                     SELECT 1 FROM DhtOP 
                                     WHERE when_integrated IS NULL 
                                     AND header_hash = :hash
@@ -304,7 +304,7 @@ impl Db {
                         let found: bool = txn
                             .query_row(
                                 "
-                                EXISTS(
+                                SELECT EXISTS(
                                     SELECT 1 FROM DhtOP 
                                     WHERE when_integrated IS NULL 
                                     AND basis_hash = :basis
@@ -324,7 +324,7 @@ impl Db {
                         let found: bool = txn
                             .query_row(
                                 "
-                                EXISTS(
+                                SELECT EXISTS(
                                     SELECT 1 FROM DhtOP 
                                     WHERE when_integrated IS NOT NULL 
                                     AND basis_hash = :basis
@@ -350,7 +350,7 @@ impl Db {
                         let found: bool = txn
                             .query_row(
                                 "
-                                EXISTS(
+                                SELECT EXISTS(
                                     SELECT 1 FROM DhtOP 
                                     WHERE when_integrated IS NOT NULL 
                                     AND basis_hash = :basis
@@ -375,7 +375,7 @@ impl Db {
                         let found: bool = txn
                             .query_row(
                                 "
-                                EXISTS(
+                                SELECT EXISTS(
                                     SELECT 1 FROM DhtOP 
                                     WHERE when_integrated IS NOT NULL 
                                     AND basis_hash = :basis
@@ -402,7 +402,7 @@ impl Db {
                         let found: bool = txn
                             .query_row(
                                 "
-                                EXISTS(
+                                SELECT EXISTS(
                                     SELECT 1 FROM DhtOP 
                                     WHERE when_integrated IS NOT NULL 
                                     AND validation_status = :status
@@ -425,7 +425,7 @@ impl Db {
                     Db::IntegratedEmpty => {
                         let not_empty: bool = txn
                             .query_row(
-                                "EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NOT NULL)",
+                                "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NOT NULL)",
                                 [],
                                 |row| row.get(0),
                             )
@@ -435,7 +435,7 @@ impl Db {
                     Db::IntQueueEmpty => {
                         let not_empty: bool = txn
                             .query_row(
-                                "EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NULL)",
+                                "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NULL)",
                                 [],
                                 |row| row.get(0),
                             )
@@ -445,7 +445,7 @@ impl Db {
                     Db::MetaEmpty => {
                         let not_empty: bool = txn
                             .query_row(
-                                "EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NOT NULL)",
+                                "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NOT NULL)",
                                 [],
                                 |row| row.get(0),
                             )

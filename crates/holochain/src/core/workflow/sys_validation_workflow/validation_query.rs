@@ -36,7 +36,7 @@ fn get_ops_to_validate(env: &EnvRead, system: bool) -> WorkflowResult<Vec<DhtOpH
         JOIN
         DhtOp ON DhtOp.header_hash = Header.hash
         LEFT JOIN
-        Entry ON (Header.entry_hash IS NULL OR Header.entry_hash = Entry.hash)
+        Entry ON Header.entry_hash = Entry.hash
         "
     );
     if system {
@@ -61,10 +61,7 @@ fn get_ops_to_validate(env: &EnvRead, system: bool) -> WorkflowResult<Vec<DhtOpH
         ",
     );
     let results = env.conn()?.with_reader(|txn| {
-        let mut stmt = txn.prepare(
-            "
-            ",
-        )?;
+        let mut stmt = txn.prepare(&sql)?;
         let r = stmt.query_and_then([], |row| {
             let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
             let op_type: DhtOpType = row.get("dht_type")?;
@@ -79,8 +76,10 @@ fn get_ops_to_validate(env: &EnvRead, system: bool) -> WorkflowResult<Vec<DhtOpH
                 hash,
             ))
         })?;
-        WorkflowResult::Ok(r.collect())
+        let r = r.collect();
+        WorkflowResult::Ok(r)
     })?;
+    tracing::debug!(?results);
     results
 }
 

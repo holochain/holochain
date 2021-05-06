@@ -48,7 +48,7 @@ pub fn get_all(txn: &Transaction<'_>) -> StateQueryResult<Vec<DnaDefHashed>> {
 
 pub fn contains(txn: &Transaction<'_>, hash: &DnaHash) -> StateQueryResult<bool> {
     Ok(txn.query_row(
-        "EXISTS(SELECT 1 FROM DnaDef WHERE hash = :hash)",
+        "SELECT EXISTS(SELECT 1 FROM DnaDef WHERE hash = :hash)",
         named_params! {
             ":hash": hash
         },

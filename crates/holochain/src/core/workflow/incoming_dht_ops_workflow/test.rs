@@ -28,7 +28,7 @@ async fn incoming_ops_to_limbo() {
         let found: bool = txn
             .query_row(
                 "
-            EXISTS(
+            SELECT EXISTS(
                 SELECT 1 FROM DhtOP 
                 WHERE when_integrated IS NULL 
                 AND hash = :hash

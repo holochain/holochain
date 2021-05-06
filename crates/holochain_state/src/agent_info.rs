@@ -166,7 +166,7 @@ pub fn get_all_values(txn: &Transaction<'_>) -> StateQueryResult<Vec<AgentInfoSi
 
 pub fn contains(txn: &Transaction<'_>, key: AgentKvKey) -> StateQueryResult<bool> {
     Ok(txn.query_row(
-        "EXISTS(SELECT 1 FROM AgentInfo WHERE key = :key)",
+        "SELECT EXISTS(SELECT 1 FROM AgentInfo WHERE key = :key)",
         named_params! {
             ":key": key
         },

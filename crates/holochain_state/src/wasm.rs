@@ -31,7 +31,7 @@ pub fn get(txn: &Transaction<'_>, hash: &WasmHash) -> StateQueryResult<Option<Dn
 
 pub fn contains(txn: &Transaction<'_>, hash: &WasmHash) -> StateQueryResult<bool> {
     Ok(txn.query_row(
-        "EXISTS(SELECT 1 FROM Wasm WHERE hash = :hash)",
+        "SELECT EXISTS(SELECT 1 FROM Wasm WHERE hash = :hash)",
         named_params! {
             ":hash": hash
         },
@@ -68,6 +68,7 @@ mod tests {
             .with_commit(|txn| put(txn, wasm.clone()))
             .unwrap();
         fresh_reader_test!(env, |txn| {
+            assert!(contains(&txn, &wasm.as_hash()).unwrap());
             // a wasm from the WasmBuf
             let ret = get(&txn, &wasm.as_hash()).unwrap().unwrap();
 

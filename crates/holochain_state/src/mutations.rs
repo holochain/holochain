@@ -182,7 +182,7 @@ pub fn insert_wasm(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationR
 /// Insert a [`DnaDef`] into the database.
 pub fn insert_dna_def(txn: &mut Transaction, dna_def: DnaDefHashed) -> StateMutationResult<()> {
     let (dna_def, hash) = dna_def.into_inner();
-    sql_insert!(txn, Wasm, {
+    sql_insert!(txn, DnaDef, {
         "hash": hash,
         "blob": to_blob(dna_def)?,
     })?;
@@ -195,7 +195,7 @@ pub fn insert_entry_def(
     key: EntryDefStoreKey,
     entry_def: EntryDef,
 ) -> StateMutationResult<()> {
-    sql_insert!(txn, Wasm, {
+    sql_insert!(txn, EntryDef, {
         "key": key,
         "blob": to_blob(entry_def)?,
     })?;

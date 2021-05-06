@@ -702,7 +702,9 @@ impl SysValidationWorkspace {
             FROM Header
             WHERE
             Header.author = :author
+            AND
             Header.seq = :seq
+            AND
             Header.hash != :hash
             ",
             )?;

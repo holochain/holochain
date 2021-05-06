@@ -199,7 +199,9 @@ impl<'e> WriteManager<'e> for PConn {
         E: From<DatabaseError>,
         F: 'e + FnOnce(&mut Transaction) -> Result<R, E>,
     {
-        let mut txn = self.transaction().map_err(DatabaseError::from)?;
+        let mut txn = self
+            .transaction_with_behavior(TransactionBehavior::Exclusive)
+            .map_err(DatabaseError::from)?;
         let result = f(&mut txn)?;
         txn.commit().map_err(DatabaseError::from)?;
         Ok(result)

@@ -27,6 +27,7 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_state::prelude::test_environments;
 use holochain_state::prelude::SourceChain;
+use holochain_state::test_utils::fresh_reader_test;
 use holochain_state::test_utils::TestEnvs;
 use holochain_types::prelude::*;
 
@@ -634,6 +635,14 @@ async fn count_integration(env: &EnvWrite) -> IntegrationStateDump {
 }
 
 async fn display_integration(env: &EnvWrite) -> usize {
+    fresh_reader_test(env.clone(), |txn| {
+        txn.query_row(
+            "SELECT COUNT(hash) FROM DhtOp WHERE DhtOp.when_integrated IS NOT NULL",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap()
+    })
     // let val_limbo: Vec<_> = fresh_reader_test!(env, |mut r| {
     //     workspace
     //         .validation_limbo
@@ -694,7 +703,6 @@ async fn display_integration(env: &EnvWrite) -> usize {
     //     }
     // }
     // count
-    todo!()
 }
 
 /// Helper for displaying agent infos stored on a conductor

@@ -9,6 +9,8 @@ use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::fresh_reader_test;
+use holochain_state::prelude::from_blob;
+use holochain_state::prelude::StateQueryResult;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::cell::CellId;
@@ -91,17 +93,27 @@ async fn run_test(
     let limbo_is_empty = |txn: &Transaction| {
         let not_empty: bool = txn
             .query_row(
-                "EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NULL)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NULL)",
                 [],
                 |row| row.get(0),
             )
             .unwrap();
         !not_empty
     };
+    let show_limbo = |txn: &Transaction| {
+        txn.prepare("SELECT blob FROM DhtOp WHERE when_integrated IS NULL")
+            .unwrap()
+            .query_and_then([], |row| from_blob(row.get("blob")?))
+            .unwrap()
+            .collect::<StateQueryResult<Vec<DhtOpLight>>>()
+            .unwrap()
+    };
 
     // Validation should be empty
     fresh_reader_test(alice_env, |txn| {
-        assert!(limbo_is_empty(&txn));
+        holochain_state::prelude::dump_db(&txn);
+        let limbo = show_limbo(&txn);
+        assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
         let num_valid_ops: usize = txn
                 .query_row("SELECT COUNT(hash) FROM DhtOP WHERE when_integrated IS NOT NULL AND validation_status = :status", 

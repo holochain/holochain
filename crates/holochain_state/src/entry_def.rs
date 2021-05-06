@@ -74,7 +74,7 @@ pub fn get_all(txn: &Transaction<'_>) -> StateQueryResult<Vec<(EntryDefBufferKey
 pub fn contains(txn: &Transaction<'_>, key: EntryDefBufferKey) -> StateQueryResult<bool> {
     let key: EntryDefStoreKey = key.into();
     Ok(txn.query_row(
-        "EXISTS(SELECT 1 FROM EntryDef WHERE key = :key)",
+        "SELECT EXISTS(SELECT 1 FROM EntryDef WHERE key = :key)",
         named_params! {
             ":key": key
         },

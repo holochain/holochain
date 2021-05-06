@@ -44,17 +44,17 @@ pub fn get_ops_to_publish(
             JOIN
             DhtOp ON DhtOp.header_hash = Header.hash
             LEFT JOIN
-            Entry ON (Header.entry_hash IS NULL OR Header.entry_hash = Entry.hash)
+            Entry ON Header.entry_hash = Entry.hash
             WHERE
             DhtOp.is_authored = 1
             AND
             Header.author = :author
             AND
-            (DhtOp.type != :store_entry OR Header.private_entry = 0)
+            (DhtOp.type != :store_entry OR Header.private_entry = 0 OR Header.private_entry IS NULL)
             AND
-            DhtOp.last_publish_time <= :earliest_allowed_time
+            (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :earliest_allowed_time)
             AND
-            DhtOp.receipt_count < :required_receipt_count
+            (DhtOp.receipt_count IS NULL OR DhtOp.receipt_count < :required_receipt_count)
             ",
         )?;
         let r = stmt.query_and_then(
@@ -81,6 +81,7 @@ pub fn get_ops_to_publish(
         )?;
         WorkflowResult::Ok(r.collect())
     })?;
+    tracing::debug!(?results);
     results
 }
 

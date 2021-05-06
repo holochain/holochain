@@ -805,20 +805,24 @@ where
                 .map(|(_, dna_wasm)| DnaWasmHashed::from_content(dna_wasm)),
         )
         .await;
+
         env.conn()?.with_commit(|txn| {
             for dna_wasm in wasms {
                 if !holochain_state::wasm::contains(txn, dna_wasm.as_hash())? {
                     holochain_state::wasm::put(txn, dna_wasm)?;
                 }
             }
+
             for (key, entry_def) in zome_defs.clone() {
                 holochain_state::entry_def::put(txn, key, entry_def)?;
             }
+
             if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {
                 holochain_state::dna_def::put(txn, dna.dna_def().clone())?;
             }
             StateMutationResult::Ok(())
         })?;
+
         Ok(zome_defs)
     }
 
@@ -925,14 +929,15 @@ where
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
         self.env.conn()?.with_reader(|txn| {
-            let state = txn.query_row_and_then(
-                "SELECT blob FROM ConductorState WHERE id = 1",
-                [],
-                |row| {
-                    let item: ConductorState = from_blob(row.get("blob")?)?;
-                    ConductorResult::Ok(item)
-                },
-            )?;
+            let state = txn
+                .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                    row.get("blob")
+                })
+                .optional()?;
+            let state = match state {
+                Some(state) => from_blob(state)?,
+                None => ConductorState::default(),
+            };
             Ok(state)
         })
     }
@@ -1197,9 +1202,11 @@ mod builder {
         #[cfg(any(test, feature = "test_utils"))]
         pub async fn test(self, envs: &TestEnvs) -> ConductorResult<ConductorHandle> {
             let keystore = envs.conductor().keystore().clone();
+
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
                     .await?;
+
             let conductor = Conductor::new(
                 envs.conductor(),
                 envs.wasm(),
