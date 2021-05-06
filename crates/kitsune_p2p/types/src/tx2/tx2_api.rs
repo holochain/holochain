@@ -764,14 +764,17 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                     EpEvent::IncomingError(EpIncomingError {
                         con, msg_id, err, ..
                     }) => match msg_id.get_type() {
-                        MsgIdType::Notify => unimplemented!(),
-                        MsgIdType::Req => unimplemented!(),
                         MsgIdType::Res => {
                             let _ = rmap.share_mut(move |i, _| {
                                 i.respond_err(con.uniq(), msg_id.as_id(), err);
                                 Ok(())
                             });
                             Tx2EpEvent::Tick
+                        }
+                        _ => {
+                            // TODO - should this be a connection-specific
+                            // error type, so we can give the con handle?
+                            Tx2EpEvent::Error(err)
                         }
                     },
                     EpEvent::ConnectionClosed(EpConnectionClosed {

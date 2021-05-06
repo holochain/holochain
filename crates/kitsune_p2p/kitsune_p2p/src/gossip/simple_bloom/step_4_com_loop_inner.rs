@@ -2,9 +2,11 @@ use super::*;
 use kitsune_p2p_types::codec::*;
 
 pub(crate) async fn step_4_com_loop_inner_outgoing(
+    inner: &Share<SimpleBloomModInner>,
     tuning_params: KitsuneP2pTuningParams,
     space: Arc<KitsuneSpace>,
     ep_hnd: Tx2EpHnd<wire::Wire>,
+    peer_cert: Tx2Cert,
     how: HowToConnect,
     gossip: GossipWire,
 ) -> KitsuneResult<()> {
@@ -14,7 +16,14 @@ pub(crate) async fn step_4_com_loop_inner_outgoing(
     let t = tuning_params.implicit_timeout();
 
     let con = match how {
-        HowToConnect::Con(con) => con,
+        HowToConnect::Con(con) => {
+            if con.is_closed() {
+                let url = pick_url_for_cert(inner, &peer_cert)?;
+                ep_hnd.get_connection(url, t).await?
+            } else {
+                con
+            }
+        }
         HowToConnect::Url(url) => ep_hnd.get_connection(url, t).await?,
     };
     con.notify(&gossip, t).await?;
@@ -119,8 +128,9 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
         if send_accept {
             let local_filter = encode_bloom_filter(&i.local_bloom);
             let gossip = GossipWire::accept(local_filter);
+            let peer_cert = con_clone.peer_cert();
             i.outgoing
-                .push((con_clone.peer_cert(), HowToConnect::Con(con_clone), gossip));
+                .push((peer_cert, HowToConnect::Con(con_clone), gossip));
         }
 
         let mut out_keys = Vec::new();
@@ -148,6 +158,12 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
                     i.initiate_tgt = None;
                 }
             }
+
+            // publish an empty chunk incase it was the remote who initiated
+            let gossip = GossipWire::chunk(true, Vec::new());
+            let peer_cert = con.peer_cert();
+            i.outgoing.push((peer_cert, HowToConnect::Con(con), gossip));
+
             Ok(())
         })?;
 
@@ -201,14 +217,64 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
     inner.share_mut(move |i, _| {
         for (finished, chunks) in gossip {
             let gossip = GossipWire::chunk(finished, chunks);
+            let peer_cert = con.peer_cert();
             i.outgoing
-                .push((con.peer_cert(), HowToConnect::Con(con.clone()), gossip));
+                .push((peer_cert, HowToConnect::Con(con.clone()), gossip));
         }
 
         Ok(())
     })?;
 
     Ok(())
+}
+
+// if the connection is closed while awaiting an outgoing send,
+// we'll need to establish a new one...
+fn pick_url_for_cert(inner: &Share<SimpleBloomModInner>, cert: &Tx2Cert) -> KitsuneResult<TxUrl> {
+    // this is a bit computationally intensive...
+    // but, in case there is a split in data recency, safer as a starting point
+
+    // first, gather the most recent agent_infos we have for this cert,
+    // then, see if the urls match - outputting a warning if they don't
+    // and pick one..
+
+    inner.share_mut(|i, _| {
+        let mut most_recent = 0;
+        let mut out_url = None;
+        for data in i.local_data_map.values() {
+            if let MetaOpData::Agent(agent_info_signed) = &**data {
+                use std::convert::TryFrom;
+                if let Ok(agent_info) = crate::agent_store::AgentInfo::try_from(agent_info_signed) {
+                    if let Some(url) = agent_info.as_urls_ref().get(0) {
+                        if let Ok(purl) = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()) {
+                            if &Tx2Cert::from(purl.digest()) != cert {
+                                continue;
+                            }
+
+                            if agent_info.signed_at_ms() < most_recent {
+                                continue;
+                            }
+                            most_recent = agent_info.signed_at_ms();
+
+                            let url = TxUrl::from(url.as_str());
+
+                            if let Some(out_url) = out_url {
+                                if out_url != url {
+                                    tracing::warn!(?cert, %out_url, %url, "url mismatch for tgt cert");
+                                }
+                            }
+
+                            out_url = Some(url);
+                        }
+                    }
+                }
+            }
+        }
+        match out_url.take() {
+            Some(out_url) => Ok(out_url),
+            None => Err("failed to find url for cert".into()),
+        }
+    })
 }
 
 async fn data_map_get(

@@ -321,7 +321,11 @@ impl SimpleBloomMod {
                 if let Some(metric) = i.remote_metrics.get(&initiate_tgt) {
                     if metric.was_err
                         || metric.last_touch.elapsed().as_millis() as u32
-                            > i.tuning_params.tx2_implicit_timeout_ms
+                            > i.tuning_params.gossip_peer_on_success_next_gossip_delay_ms
+                            // give us a little leeway... we don't
+                            // need to be too agressive with timing out
+                            // this loop
+                            * 2
                     {
                         tracing::warn!("gossip timeout on initiate tgt {:?}", i.initiate_tgt);
                         i.initiate_tgt = None;
@@ -432,9 +436,11 @@ impl SimpleBloomMod {
             if let Some(outgoing) = maybe_outgoing.take() {
                 let (cert, how, gossip) = outgoing;
                 if let Err(e) = step_4_com_loop_inner_outgoing(
+                    &self.0,
                     tuning_params.clone(),
                     space.clone(),
                     ep_hnd,
+                    cert.clone(),
                     how,
                     gossip,
                 )
