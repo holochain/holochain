@@ -5,27 +5,6 @@ use super::*;
 pub(crate) fn danger_mutex_locked_sync_step_3_initiate_inner(
     inner: &mut SimpleBloomModInner,
 ) -> KitsuneResult<()> {
-    // first check to see if we should time out any current initiate_tgt
-    if let Some(initiate_tgt) = inner.initiate_tgt.clone() {
-        if let Some(metric) = inner.remote_metrics.get(&initiate_tgt) {
-            if metric.was_err
-                || metric.last_touch.elapsed().as_millis() as u32
-                    > inner.tuning_params.tx2_implicit_timeout_ms
-            {
-                tracing::warn!("gossip timeout on initiate tgt {:?}", inner.initiate_tgt);
-                inner.initiate_tgt = None;
-            } else {
-                // we're still processing the current initiate...
-                // continue.
-                return Ok(());
-            }
-        } else {
-            // erm... we have an initate tgt, but we've never seen them??
-            // this must be a logic error.
-            unreachable!()
-        }
-    }
-
     // we have decided to do an initiate check, mark the time
     inner.last_initiate_check = std::time::Instant::now();
 
@@ -62,6 +41,12 @@ pub(crate) fn danger_mutex_locked_sync_step_3_initiate_inner(
     let mut rng = thread_rng();
     certs.shuffle(&mut rng);
 
+    // last_touch fudge
+    // we don't really want two nodes to both decide to initiate gossip
+    // at the same time... so let's randomize our talk window by a
+    // couple seconds
+    let last_touch_fudge_ms: u32 = rng.gen_range(0, 5000);
+
     // pick the first one that matches our criteria
     // or just proceed without a gossip initiate.
     let mut initiate = None;
@@ -72,18 +57,19 @@ pub(crate) fn danger_mutex_locked_sync_step_3_initiate_inner(
                 let e = e.get_mut();
 
                 let saw_recently = if e.was_err {
-                    e.last_touch.elapsed().as_millis() as u32
+                    e.last_touch.elapsed().as_millis() as u32 + last_touch_fudge_ms
                         <= inner
                             .tuning_params
                             .gossip_peer_on_error_next_gossip_delay_ms
                 } else {
-                    e.last_touch.elapsed().as_millis() as u32
+                    e.last_touch.elapsed().as_millis() as u32 + last_touch_fudge_ms
                         <= inner
                             .tuning_params
                             .gossip_peer_on_success_next_gossip_delay_ms
                 };
 
                 if saw_recently {
+                    tracing::trace!(?cert, "saw too recently");
                     // we've seen this node too recently, skip them
                     continue;
                 }

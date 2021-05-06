@@ -167,7 +167,7 @@ impl Inner {
         // so we can just take the first one
         let (key_set, bloom) = if let Some((_, map)) = has_hash.into_iter().next() {
             let len = map.len();
-            tracing::debug!(
+            tracing::trace!(
                 local_op_count=%len,
                 "generating local bloom",
             );

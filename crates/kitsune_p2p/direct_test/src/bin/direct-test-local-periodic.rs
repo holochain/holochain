@@ -8,8 +8,8 @@ async fn main() {
     init_tracing();
 
     let mut config = KdTestConfig::default();
-    config.node_count = 10;
-    config.agents_per_node = 10;
+    config.node_count = 2;
+    config.agents_per_node = 1;
     config.periodic_agent_hook_interval_ms = Some(1000);
     config.periodic_agent_hook = Box::new(|input| {
         async move {

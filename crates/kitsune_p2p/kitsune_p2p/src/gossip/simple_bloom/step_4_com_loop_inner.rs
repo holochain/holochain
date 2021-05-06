@@ -51,7 +51,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
         }
         GossipWire::Chunk(Chunk { finished, chunks }) => {
             let chunk_count = chunks.len();
-            tracing::debug!(
+            tracing::info!(
                 %finished,
                 %chunk_count,
                 "incoming 'Chunk'",
@@ -132,8 +132,27 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
             }
         }
 
+        let local_op_count = i.local_key_set.len();
+        let remote_needs_op_count = out_keys.len();
+        tracing::debug!(%local_op_count, %remote_needs_op_count, "identified ops remote needs");
+
         Ok(out_keys)
     })?;
+
+    if out_keys.is_empty() {
+        // the remote doesn't need anything from us
+        // ... if we initiated this gossip, mark it as done.
+        inner.share_mut(move |i, _| {
+            if let Some(tgt_cert) = i.initiate_tgt.clone() {
+                if con.peer_cert() == tgt_cert {
+                    i.initiate_tgt = None;
+                }
+            }
+            Ok(())
+        })?;
+
+        return Ok(());
+    }
 
     // get all the local data we have that they need
     let mut out_data = Vec::new();

@@ -295,6 +295,15 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
 
             this.metrics.write_len(dbg_name, len);
 
+            let peer_cert = this.peer_cert();
+            tracing::debug!(
+                %dbg_name,
+                req_byte_count=%len,
+                local_cert=?this.local_cert,
+                ?peer_cert,
+                "(api) notify",
+            );
+
             Ok(())
         }
     }

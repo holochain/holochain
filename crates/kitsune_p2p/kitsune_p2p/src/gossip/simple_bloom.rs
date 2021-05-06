@@ -310,9 +310,34 @@ impl SimpleBloomMod {
 
     fn step_1_check(&self) -> CheckResult {
         match self.0.share_mut(|i, _| {
+            // first, if we don't have any local agents, there's
+            // no point in doing any gossip logic
             if i.local_agents.is_empty() {
                 return Ok(CheckResult::NotReady);
             }
+
+            // next, check to see if we should time out any current initiate_tgt
+            if let Some(initiate_tgt) = i.initiate_tgt.clone() {
+                if let Some(metric) = i.remote_metrics.get(&initiate_tgt) {
+                    if metric.was_err
+                        || metric.last_touch.elapsed().as_millis() as u32
+                            > i.tuning_params.tx2_implicit_timeout_ms
+                    {
+                        tracing::warn!("gossip timeout on initiate tgt {:?}", i.initiate_tgt);
+                        i.initiate_tgt = None;
+                    } else {
+                        // we're still processing the current initiate...
+                        // don't bother syncing locally
+                        return Ok(CheckResult::SkipSyncAndInitiate);
+                    }
+                } else {
+                    // erm... we have an initate tgt,
+                    // but we've never seen them??
+                    // this must be a logic error.
+                    unreachable!()
+                }
+            }
+
             if i.initiate_tgt.is_none()
                 && i.last_initiate_check.elapsed().as_millis() as u32
                     > i.tuning_params.gossip_loop_iteration_delay_ms
