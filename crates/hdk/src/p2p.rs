@@ -115,7 +115,7 @@ where
 /// exposed by this zome with a signature like:
 /// ```ignore
 /// #[hdk_extern]
-/// fn recv_remote_signal(signal: SerializedBytes) -> ExternResult<()> {
+/// fn recv_remote_signal(signal: ExternIO) -> ExternResult<()> {
 ///     emit_signal(&signal)?;
 ///     Ok(())
 /// }
