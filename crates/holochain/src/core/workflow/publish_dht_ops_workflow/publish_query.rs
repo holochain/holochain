@@ -4,12 +4,14 @@ use std::time::UNIX_EPOCH;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_sqlite::db::ReadManager;
+use holochain_state::prelude::dump_tmp;
 use holochain_state::query::prelude::*;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpType;
 use holochain_types::env::EnvRead;
 use holochain_zome_types::Entry;
+use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::SignedHeader;
 use rusqlite::named_params;
 
@@ -50,7 +52,7 @@ pub fn get_ops_to_publish(
             AND
             Header.author = :author
             AND
-            (DhtOp.type != :store_entry OR Header.private_entry = 0 OR Header.private_entry IS NULL)
+            (DhtOp.type != :store_entry OR Header.private_entry = 0)
             AND
             (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :earliest_allowed_time)
             AND
@@ -68,10 +70,15 @@ pub fn get_ops_to_publish(
                 let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
                 let op_type: DhtOpType = row.get("dht_type")?;
                 let hash: DhtOpHash = row.get("dht_hash")?;
-                let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                let entry = match entry {
-                    Some(entry) => Some(from_blob::<Entry>(entry)?),
-                    None => None,
+                let entry = match header.0.entry_type().map(|et| et.visibility()) {
+                    Some(EntryVisibility::Public) => {
+                        let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                        match entry {
+                            Some(entry) => Some(from_blob::<Entry>(entry)?),
+                            None => None,
+                        }
+                    }
+                    _ => None,
                 };
                 WorkflowResult::Ok(DhtOpHashed::with_pre_hashed(
                     DhtOp::from_type(op_type, header, entry)?,
@@ -81,6 +88,7 @@ pub fn get_ops_to_publish(
         )?;
         WorkflowResult::Ok(r.collect())
     })?;
+    tracing::info!(?results);
     results
 }
 

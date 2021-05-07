@@ -54,15 +54,17 @@ pub async fn publish_dht_ops_workflow(
     //        is abolished [ B-04053 ]
     // @freesig I think the correct thing to do here is not wait for a response from the
     // publish.
-    tracing::warn!("Committing local state before publishing to network! TODO: circle back ");
+    // tracing::warn!("Committing local state before publishing to network! TODO: circle back ");
     // writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     // Commit to the network
+    tracing::info!("sending {} ops", to_publish.len());
     for (basis, ops) in to_publish {
         if let Err(e) = network.publish(true, basis, ops, None).await {
             tracing::info!(failed_to_send_publish = ?e);
         }
     }
+    tracing::info!("sent {} ops", hashes.len());
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
     env.conn()?.with_commit(|writer| {
         for hash in hashes {
@@ -70,6 +72,7 @@ pub async fn publish_dht_ops_workflow(
         }
         WorkflowResult::Ok(())
     })?;
+    tracing::info!("commited sent ops");
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     Ok(WorkComplete::Complete)
@@ -140,6 +143,7 @@ mod tests {
         // Create data fixts for op
         let mut sig_fixt = SignatureFixturator::new(Unpredictable);
         let mut link_add_fixt = CreateLinkFixturator::new(Unpredictable);
+        let author = fake_agent_pubkey_1();
 
         env.conn()
             .unwrap()
@@ -147,7 +151,8 @@ mod tests {
                 for _ in 0..num_hash {
                     // Create data for op
                     let sig = sig_fixt.next().unwrap();
-                    let link_add = link_add_fixt.next().unwrap();
+                    let mut link_add = link_add_fixt.next().unwrap();
+                    link_add.author = author.clone();
                     // Create DhtOp
                     let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
                     // Get the hash from the op
@@ -170,13 +175,9 @@ mod tests {
             _ => false,
         };
         let (tx, mut recv) = tokio::sync::mpsc::channel(10);
-        let test_network = test_network_with_events(
-            Some(dna.clone()),
-            Some(agents[0].clone()),
-            filter_events,
-            tx,
-        )
-        .await;
+        let test_network =
+            test_network_with_events(Some(dna.clone()), Some(author.clone()), filter_events, tx)
+                .await;
         let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
         let cell_network = test_network.cell_network();
         let network = test_network.network();
@@ -374,6 +375,13 @@ mod tests {
 
                 // Genesis and produce ops to clear these from the chains
                 fake_genesis(env.clone()).await.unwrap();
+                env.conn()
+                    .unwrap()
+                    .execute(
+                        "UPDATE DhtOp SET receipt_count = ?",
+                        [DEFAULT_RECEIPT_BUNDLE_SIZE],
+                    )
+                    .unwrap();
                 let author = fake_agent_pubkey_1();
 
                 // Put data in elements
@@ -501,7 +509,7 @@ mod tests {
                 let (tx, mut recv) = tokio::sync::mpsc::channel(10);
                 let test_network = test_network_with_events(
                     Some(dna.clone()),
-                    Some(agents[0].clone()),
+                    Some(fake_agent_pubkey_1()),
                     filter_events,
                     tx,
                 )
