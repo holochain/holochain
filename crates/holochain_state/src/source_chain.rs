@@ -162,6 +162,10 @@ impl SourceChain {
         check_agent: &AgentPubKey,
         check_secret: Option<&CapSecret>,
     ) -> SourceChainResult<Option<CapGrant>> {
+        let author_grant = CapGrant::from(self.agent_pubkey().clone());
+        if author_grant.is_valid(check_function, check_agent, check_secret) {
+            return Ok(Some(author_grant));
+        }
         todo!("Implement cap query")
     }
 

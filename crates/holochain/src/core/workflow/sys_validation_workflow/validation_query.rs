@@ -113,7 +113,6 @@ mod tests {
         observability::test_run().ok();
         let env = test_cell_env();
         let expected = test_data(&env.env().into());
-        env.dump_tmp().unwrap();
         let r = get_ops_to_validate(&env.env().into(), true).unwrap();
         let mut r_sorted = r.clone();
         // Sorted by OpOrder

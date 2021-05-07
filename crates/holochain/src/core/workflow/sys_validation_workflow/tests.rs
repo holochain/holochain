@@ -71,8 +71,8 @@ async fn run_test(
     // Check if the correct number of ops are integrated
     // every 100 ms for a maximum of 10 seconds but early exit
     // if they are there.
-    let num_attempts = 200;
-    let delay_per_attempt = Duration::from_millis(500);
+    let num_attempts = 100;
+    let delay_per_attempt = Duration::from_millis(100);
 
     bob_links_in_a_legit_way(&bob_cell_id, &handle, &dna_file).await;
 
@@ -111,7 +111,6 @@ async fn run_test(
 
     // Validation should be empty
     fresh_reader_test(alice_env, |txn| {
-        holochain_state::prelude::dump_db(&txn);
         let limbo = show_limbo(&txn);
         assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
@@ -141,13 +140,8 @@ async fn run_test(
     .await;
 
     let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
-    fresh_reader_test(alice_env, |txn| {
-        holochain_state::prelude::dump_db(&txn);
-        // Validation should be empty
-        let limbo = show_limbo(&txn);
-        assert!(limbo_is_empty(&txn), "{:?}", limbo);
-
-        let num_valid_ops: usize = txn
+    let num_valid_ops = |txn: &Transaction| {
+        let valid_ops: usize = txn
                 .query_row(
                     "
                     SELECT COUNT(hash) FROM DhtOP 
@@ -184,7 +178,16 @@ async fn run_test(
                 },
                 |row| row.get(0))
                 .unwrap();
-        assert_eq!(num_valid_ops, expected_count);
+        valid_ops
+    };
+
+    fresh_reader_test(alice_env, |txn| {
+        // Validation should be empty
+        let limbo = show_limbo(&txn);
+        assert!(limbo_is_empty(&txn), "{:?}", limbo);
+
+        let valid_ops = num_valid_ops(&txn);
+        assert_eq!(valid_ops, expected_count);
     });
 
     dodgy_bob(&bob_cell_id, &handle, &dna_file).await;
@@ -202,29 +205,31 @@ async fn run_test(
     .await;
 
     // Validation should still contain bobs link pending because the target was missing
-    fresh_reader_test(alice_env, |txn| {
-        let num_limbo_ops: usize = txn
-            .query_row(
-                "
-                    SELECT COUNT(hash) FROM DhtOP 
-                    WHERE 
-                    when_integrated IS NULL
-                    AND (validation_stage IS NULL OR validation_stage = 0)
-                    ",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(num_limbo_ops, 2);
-        let num_valid_ops: usize = txn
-                .query_row("SELECT COUNT(hash) FROM DhtOP WHERE when_integrated IS NOT NULL AND validation_status = :status", 
-                named_params!{
-                    ":status": ValidationStatus::Valid,
-                },
-                |row| row.get(0))
-                .unwrap();
-        assert_eq!(num_valid_ops, expected_count);
+    // holochain_state::prelude::dump_tmp(&alice_env);
+    fresh_reader_test(alice_env.clone(), |txn| {
+        let valid_ops = num_valid_ops(&txn);
+        assert_eq!(valid_ops, expected_count);
     });
+    crate::assert_eq_retry_10s!(
+        {
+            fresh_reader_test(alice_env.clone(), |txn| {
+                let num_limbo_ops: usize = txn
+                    .query_row(
+                        "
+                        SELECT COUNT(hash) FROM DhtOP 
+                        WHERE 
+                        when_integrated IS NULL
+                        AND (validation_stage IS NULL OR validation_stage = 2)
+                        ",
+                        [],
+                        |row| row.get(0),
+                    )
+                    .unwrap();
+                num_limbo_ops
+            })
+        },
+        2
+    );
 }
 
 async fn bob_links_in_a_legit_way(

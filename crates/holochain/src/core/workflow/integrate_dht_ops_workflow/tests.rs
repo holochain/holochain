@@ -5,6 +5,7 @@ use super::*;
 
 use crate::core::queue_consumer::TriggerSender;
 use crate::here;
+use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 use holochain_sqlite::db::WriteManager;
 use holochain_state::query::link::GetLinksQuery;

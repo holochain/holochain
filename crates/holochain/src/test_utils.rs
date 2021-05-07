@@ -27,6 +27,8 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_state::prelude::test_environments;
 use holochain_state::prelude::SourceChain;
+use holochain_state::prelude::SourceChainResult;
+use holochain_state::source_chain;
 use holochain_state::test_utils::fresh_reader_test;
 use holochain_state::test_utils::TestEnvs;
 use holochain_types::prelude::*;
@@ -757,4 +759,13 @@ where
 /// A fixture example dna for unit testing.
 pub fn fake_valid_dna_file(uid: &str) -> DnaFile {
     fake_dna_zomes(uid, vec![(TestWasm::Foo.into(), TestWasm::Foo.into())])
+}
+
+/// Run genesis on the source chain for testing.
+pub async fn fake_genesis(vault: EnvWrite) -> SourceChainResult<()> {
+    let dna = fake_dna_file("cool dna");
+    let dna_hash = dna.dna_hash().clone();
+    let agent_pubkey = fake_agent_pubkey_1();
+
+    source_chain::genesis(vault, dna_hash, agent_pubkey, None).await
 }

@@ -148,11 +148,7 @@ pub async fn integrate_dht_ops_workflow(
         // tracing::debug!("{}", stmt.expanded_sql().unwrap());
         WorkflowResult::Ok(changed)
     })?;
-    if let DbKind::Cell(id) = vault.kind() {
-        if *id.agent_pubkey() == fake_agent_pubkey_1() {
-            tracing::debug!(?changed);
-        }
-    }
+    tracing::debug!(?changed);
     if changed > 0 {
         trigger_sys.trigger();
         trigger_receipt.trigger();

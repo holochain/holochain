@@ -33,7 +33,7 @@ pub mod wasm_test {
         let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
         let author = fake_agent_pubkey_1();
-        crate::core::workflow::fake_genesis(env.clone())
+        crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
         let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();

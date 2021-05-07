@@ -120,13 +120,7 @@ pub mod tests {
     use matches::assert_matches;
     use observability;
 
-    pub async fn fake_genesis(vault: EnvWrite) -> SourceChainResult<()> {
-        let dna = fake_dna_file("cool dna");
-        let dna_hash = dna.dna_hash().clone();
-        let agent_pubkey = fake_agent_pubkey_1();
-
-        source_chain::genesis(vault, dna_hash, agent_pubkey, None).await
-    }
+    use crate::test_utils::fake_genesis;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn genesis_initializes_source_chain() {

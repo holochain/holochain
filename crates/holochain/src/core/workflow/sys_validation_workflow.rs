@@ -64,11 +64,6 @@ pub async fn sys_validation_workflow(
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
-    if let DbKind::Cell(id) = workspace.vault.kind() {
-        if *id.agent_pubkey() == fake_agent_pubkey_1() {
-            tracing::debug!("TRIGGERING APP VAL");
-        }
-    }
     // trigger other workflows
     trigger_app_validation.trigger();
 

@@ -25,7 +25,6 @@ pub async fn incoming_dht_ops_workflow(
     // add incoming ops to the validation limbo
     for (hash, op) in ops {
         if !op_exists(&vault, &hash)? {
-            tracing::debug!(?hash, ?op);
             if should_keep(&op).await? {
                 let op = DhtOpHashed::from_content_sync(op);
                 add_to_pending(&vault, op, from_agent.clone(), request_validation_receipt)?;
@@ -42,11 +41,6 @@ pub async fn incoming_dht_ops_workflow(
             }
             // Check if it's authored and needs to be integrated
             set_authored_to_pending_integration(vault, hash)?;
-        }
-    }
-    if let DbKind::Cell(id) = vault.kind() {
-        if *id.agent_pubkey() == fake_agent_pubkey_1() {
-            tracing::debug!("TRIGGERING SYS VAL");
         }
     }
 

@@ -112,7 +112,10 @@ impl TestEnv {
             let path = entry.path();
             if path.is_file() {
                 let mut out = out.to_owned();
-                out.push(path.file_name().unwrap());
+                out.push(format!(
+                    "backup.{}",
+                    path.extension().unwrap().to_string_lossy()
+                ));
                 std::fs::copy(path, out)?;
             }
         }
@@ -120,10 +123,8 @@ impl TestEnv {
     }
 
     /// Dump db into `/tmp/test_dbs`.
-    pub fn dump_tmp(&self) -> std::io::Result<()> {
-        let mut tmp = std::env::temp_dir();
-        tmp.push("test_dbs");
-        self.dump(&tmp)
+    pub fn dump_tmp(&self) {
+        dump_tmp(&self.env);
     }
 
     pub fn cell_id(&self) -> Option<CellId> {
@@ -132,6 +133,33 @@ impl TestEnv {
             _ => None,
         }
     }
+}
+// /// Dump db into `/tmp/test_dbs`.
+// pub fn dump_tmp(env: &EnvWrite) {
+//     let mut tmp = std::env::temp_dir();
+//     tmp.push("test_dbs");
+//     std::fs::create_dir(&tmp).ok();
+//     tmp.push("backup.sqlite");
+//     std::fs::write(&tmp, b"").unwrap();
+//     env.conn()
+//         .unwrap()
+//         .transaction_with_behavior(holochain_sqlite::rusqlite::TransactionBehavior::Exclusive)
+//         .unwrap()
+//         .backup(DatabaseName::Main, tmp, None)
+//         .unwrap();
+// }
+/// Dump db into `/tmp/test_dbs`.
+pub fn dump_tmp(env: &EnvWrite) {
+    let mut tmp = std::env::temp_dir();
+    tmp.push("test_dbs");
+    std::fs::create_dir(&tmp).ok();
+    tmp.push("backup.sqlite");
+    std::fs::write(&tmp, b"").unwrap();
+    env.conn()
+        .unwrap()
+        .execute("VACUUM main into ?", [tmp.to_string_lossy()])
+        // .backup(DatabaseName::Main, tmp, None)
+        .unwrap();
 }
 
 #[derive(Clone)]

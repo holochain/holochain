@@ -27,6 +27,7 @@ use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomesToInvoke;
+use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
 use holo_hash::HeaderHash;
@@ -270,7 +271,8 @@ fixturator!(
         //      wrapped in an UnsafeZomeCallWorkspace
         let vault = holochain_state::test_utils::test_cell_env();
         let cache = holochain_state::test_utils::test_cell_env();
-        HostFnWorkspace::new(vault.env().into(), cache.env().into(), fixt!(AgentPubKey)).unwrap()
+        tokio_helper::block_forever_on(fake_genesis(vault.env())).unwrap();
+        HostFnWorkspace::new(vault.env().into(), cache.env().into(), fake_agent_pubkey_1()).unwrap()
     };
     curve Unpredictable {
         HostFnWorkspaceFixturator::new(Empty)

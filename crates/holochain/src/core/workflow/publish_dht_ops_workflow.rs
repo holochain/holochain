@@ -102,9 +102,9 @@ pub async fn publish_dht_ops_workflow_inner(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::workflow::fake_genesis;
     use crate::fixt::CreateLinkFixturator;
     use crate::fixt::EntryFixturator;
+    use crate::test_utils::fake_genesis;
     use crate::test_utils::test_network_with_events;
     use crate::test_utils::TestNetwork;
     use ::fixt::prelude::*;

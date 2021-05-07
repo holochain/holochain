@@ -666,12 +666,30 @@ where
         options: GetActivityOptions,
     ) -> CascadeResult<AgentActivityResponse<Element>> {
         let status_only = !options.include_rejected_activity && !options.include_valid_activity;
-        let results = self
-            .fetch_agent_activity(agent.clone(), query.clone(), options.clone())
-            .await?;
-
-        let merged_response: AgentActivityResponse<HeaderHash> =
-            agent_activity::merge_activities(agent.clone(), &options, results)?;
+        // TODO: Evaluate if it's ok to **not** go to another authority for agent activity?
+        let authority = self.am_i_an_authority(agent.clone().into()).await?;
+        let merged_response = if !authority {
+            let results = self
+                .fetch_agent_activity(agent.clone(), query.clone(), options.clone())
+                .await?;
+            let merged_response: AgentActivityResponse<HeaderHash> =
+                agent_activity::merge_activities(agent.clone(), &options, results)?;
+            merged_response
+        } else {
+            match self.vault.clone() {
+                Some(vault) => authority::handle_get_agent_activity(
+                    vault,
+                    agent.clone(),
+                    query.clone(),
+                    (&options).into(),
+                )?,
+                None => agent_activity::merge_activities(
+                    agent.clone(),
+                    &options,
+                    Vec::with_capacity(0),
+                )?,
+            }
+        };
 
         // If the response is empty we can finish.
         if let ChainStatus::Empty = &merged_response.status {
