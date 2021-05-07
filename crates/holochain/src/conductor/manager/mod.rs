@@ -113,9 +113,6 @@ impl std::fmt::Debug for ManagedTaskAdd {
 pub enum TaskOutcome {
     /// Spawn a new managed task.
     NewTask(ManagedTaskAdd),
-    // /// Ignore the exit and do nothing.
-    // (let's not allow this for now, while we are dealing with tricky errors)
-    // Ignore,
     /// Log an info trace and take no other action.
     LogInfo(String),
     /// Log an error and take no other action.
@@ -176,7 +173,6 @@ async fn run(
                 tracing::info!("Task completed. Total tasks: {}", task_manager.stream.len());
                 match result {
                 Some(TaskOutcome::NewTask(new_task)) => task_manager.stream.push(new_task),
-                // Some(TaskOutcome::Ignore) => (),
                 Some(TaskOutcome::LogInfo(context)) => {
                     info!("Managed task completed: {}", context)
                 }
@@ -373,7 +369,7 @@ mod test {
                     let handle = ManagedTaskAdd::ignore(handle, "respawned task");
                     TaskOutcome::NewTask(handle)
                 }
-                Err(_) => unreachable!("This is not the error you're looking for"),
+                Err(_) => unreachable!("No other error is created by this test."),
             }),
         );
         // Check that the main task doesn't close straight away
