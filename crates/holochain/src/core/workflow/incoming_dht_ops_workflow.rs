@@ -38,14 +38,65 @@ pub async fn incoming_dht_ops_workflow(
         } else {
             // Check if we should set receipt to send.
             if needs_receipt(&op, &from_agent) && request_validation_receipt {
-                set_send_receipt(&vault, hash)?;
+                set_send_receipt(vault, hash.clone())?;
             }
+            // Check if it's authored and needs to be integrated
+            set_authored_to_pending_integration(vault, hash)?;
+        }
+    }
+    if let DbKind::Cell(id) = vault.kind() {
+        if *id.agent_pubkey() == fake_agent_pubkey_1() {
+            tracing::debug!("TRIGGERING SYS VAL");
         }
     }
 
     // trigger validation of queued ops
     sys_validation_trigger.trigger();
 
+    Ok(())
+}
+
+fn set_authored_to_pending_integration(
+    vault: &EnvWrite,
+    hash: DhtOpHash,
+) -> StateMutationResult<()> {
+    let mut conn = vault.conn()?;
+    // Avoid taking a write transaction by checking first.
+    let is_authored = conn.with_reader(|txn| {
+        StateMutationResult::Ok(txn.query_row(
+            "
+            SELECT EXISTS(
+                SELECT 1 FROM DhtOp 
+                WHERE hash = :hash
+                AND is_authored = 1
+                AND when_integrated IS NULL
+                AND validation_stage IS NULL
+            )",
+            named_params! {
+                ":hash": hash,
+            },
+            |row| row.get(0),
+        )?)
+    })?;
+    if is_authored {
+        conn.with_commit(|txn| {
+            txn.execute(
+                "
+                UPDATE DhtOp
+                SET
+                validation_stage = 3
+                WHERE hash = :hash
+                AND is_authored = 1
+                AND when_integrated IS NULL
+                AND validation_stage IS NULL
+                ",
+                named_params! {
+                    ":hash": hash,
+                },
+            )?;
+            StateMutationResult::Ok(())
+        })?;
+    }
     Ok(())
 }
 

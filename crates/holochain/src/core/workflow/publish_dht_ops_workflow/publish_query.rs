@@ -81,7 +81,6 @@ pub fn get_ops_to_publish(
         )?;
         WorkflowResult::Ok(r.collect())
     })?;
-    tracing::debug!(?results);
     results
 }
 

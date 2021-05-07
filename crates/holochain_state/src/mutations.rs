@@ -222,7 +222,7 @@ pub fn insert_agent_info(
     bytes: SerializedBytes,
 ) -> StateMutationResult<()> {
     let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
-    sql_insert!(txn, ConductorState, {
+    sql_insert!(txn, AgentInfo, {
         "key": key.as_ref(),
         "blob": bytes,
     })?;
@@ -271,7 +271,7 @@ pub fn set_validation_stage(
         "
         UPDATE DhtOp
         SET
-        num_validation_attempts = num_validation_attempts + 1,
+        num_validation_attempts = IFNULL(num_validation_attempts, 0) + 1,
         last_validation_attempt = :last_validation_attempt,
         validation_stage = :validation_stage
         WHERE
@@ -375,6 +375,7 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
                 "author": author,
                 "prev_hash": prev_hash,
                 "entry_hash": create.entry_hash,
+                "entry_type": create.entry_type,
                 "private_entry": private,
                 "blob": to_blob(SignedHeader::from((Header::Create(create.clone()), signature)))?,
             })?;
@@ -398,6 +399,8 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
                 "seq": header_seq,
                 "author": author,
                 "prev_hash": prev_hash,
+                "entry_hash": update.entry_hash,
+                "entry_type": update.entry_type,
                 "original_entry_hash": update.original_entry_address,
                 "original_header_hash": update.original_header_address,
                 "private_entry": private,

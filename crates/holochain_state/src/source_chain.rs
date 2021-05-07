@@ -337,7 +337,8 @@ impl SourceChain {
                 insert_header(txn, header)?;
             }
             for (op, op_hash, op_order) in ops {
-                insert_op_lite(txn, op, op_hash, true, op_order)?;
+                insert_op_lite(txn, op, op_hash.clone(), true, op_order)?;
+                set_validation_status(txn, op_hash, holochain_zome_types::ValidationStatus::Valid)?;
             }
             SourceChainResult::Ok(())
         })?;

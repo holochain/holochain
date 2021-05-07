@@ -43,14 +43,14 @@ fn get_ops_to_validate(env: &EnvRead, system: bool) -> WorkflowResult<Vec<DhtOpH
         sql.push_str(
             "
             WHERE
-            (DhtOp.validation_status IS NULL OR DhtOp.validation_stage = 1 OR DhtOp.validation_stage = 2)
-            "
+            (DhtOp.validation_status IS NULL OR DhtOp.validation_stage = 0)
+            ",
         );
     } else {
         sql.push_str(
             "
             WHERE
-            (DhtOp.validation_status IS NULL OR DhtOp.validation_stage = 0)
+            (DhtOp.validation_stage = 1 OR DhtOp.validation_stage = 2)
             ",
         );
     }
@@ -79,7 +79,6 @@ fn get_ops_to_validate(env: &EnvRead, system: bool) -> WorkflowResult<Vec<DhtOpH
         let r = r.collect();
         WorkflowResult::Ok(r)
     })?;
-    tracing::debug!(?results);
     results
 }
 

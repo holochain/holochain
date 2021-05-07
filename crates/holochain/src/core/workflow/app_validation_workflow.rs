@@ -63,9 +63,25 @@ pub async fn app_validation_workflow(
     conductor_api: impl CellConductorApiT,
     network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
-    let complete = app_validation_workflow_inner(&mut workspace, conductor_api, &network).await?;
+    if let DbKind::Cell(id) = workspace.vault.kind() {
+        if *id.agent_pubkey() == fake_agent_pubkey_1() {
+            tracing::debug!("STARTING APP VAL");
+        }
+    }
+    let start = std::time::Instant::now();
+    let complete =
+        dbg!(app_validation_workflow_inner(&mut workspace, conductor_api, &network).await)?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
+    if let DbKind::Cell(id) = workspace.vault.kind() {
+        if *id.agent_pubkey() == fake_agent_pubkey_1() {
+            tracing::debug!(
+                "App val took {}ms to run TOTAL",
+                start.elapsed().as_millis()
+            );
+            tracing::debug!("TRIGGERING INTEGRATION");
+        }
+    }
     // trigger other workflows
     trigger_integration.trigger();
 
@@ -85,11 +101,17 @@ async fn app_validation_workflow_inner(
         let (op, op_hash) = so.into_inner();
 
         // Validate this op
+        let start = std::time::Instant::now();
         let outcome = validate_op(op.clone(), &conductor_api, workspace, &network)
             .await
             // Get the outcome or return the error
             .or_else(|outcome_or_err| outcome_or_err.try_into())?;
 
+        tracing::debug!(
+            "App val took {}ms to run {:?}",
+            start.elapsed().as_millis(),
+            outcome
+        );
         match outcome {
             Outcome::Accepted => {
                 workspace.put_integration_limbo(op_hash, ValidationStatus::Valid)?;

@@ -64,6 +64,11 @@ pub async fn sys_validation_workflow(
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
+    if let DbKind::Cell(id) = workspace.vault.kind() {
+        if *id.agent_pubkey() == fake_agent_pubkey_1() {
+            tracing::debug!("TRIGGERING APP VAL");
+        }
+    }
     // trigger other workflows
     trigger_app_validation.trigger();
 
@@ -669,19 +674,22 @@ impl SysValidationWorkspace {
         let chain_not_empty = self.vault.conn()?.with_reader(|txn| {
             let mut stmt = txn.prepare(
                 "
-            SELECT 
-            *
-            FROM Header
-            JOIN
-            DhtOp ON Header.hash = DhtOp.header_hash
-            WHERE
-            Header.author = :author
-            AND
-            DhtOp.when_integrated IS NOT NULL
-            ",
+                SELECT 
+                1 
+                FROM Header
+                JOIN
+                DhtOp ON Header.hash = DhtOp.header_hash
+                WHERE
+                Header.author = :author
+                AND
+                DhtOp.when_integrated IS NOT NULL
+                AND
+                DhtOp.type = :activity
+                ",
             )?;
             DatabaseResult::Ok(stmt.exists(named_params! {
                 ":author": author,
+                ":activity": DhtOpType::RegisterAgentActivity,
             })?)
         })?;
         let chain_not_empty = match &self.scratch {

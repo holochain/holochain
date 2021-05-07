@@ -138,10 +138,21 @@ pub async fn integrate_dht_ops_workflow(
 
             },
         )?;
+        if changed == 0 {
+            if let DbKind::Cell(id) = vault.kind() {
+                if *id.agent_pubkey() == fake_agent_pubkey_1() {
+                    dump_db(txn);
+                }
+            }
+        }
         // tracing::debug!("{}", stmt.expanded_sql().unwrap());
         WorkflowResult::Ok(changed)
     })?;
-    tracing::debug!(?changed);
+    if let DbKind::Cell(id) = vault.kind() {
+        if *id.agent_pubkey() == fake_agent_pubkey_1() {
+            tracing::debug!(?changed);
+        }
+    }
     if changed > 0 {
         trigger_sys.trigger();
         trigger_receipt.trigger();

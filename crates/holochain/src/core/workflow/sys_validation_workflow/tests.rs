@@ -71,8 +71,8 @@ async fn run_test(
     // Check if the correct number of ops are integrated
     // every 100 ms for a maximum of 10 seconds but early exit
     // if they are there.
-    let num_attempts = 100;
-    let delay_per_attempt = Duration::from_millis(100);
+    let num_attempts = 200;
+    let delay_per_attempt = Duration::from_millis(500);
 
     bob_links_in_a_legit_way(&bob_cell_id, &handle, &dna_file).await;
 
@@ -142,8 +142,10 @@ async fn run_test(
 
     let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
     fresh_reader_test(alice_env, |txn| {
+        holochain_state::prelude::dump_db(&txn);
         // Validation should be empty
-        assert!(limbo_is_empty(&txn));
+        let limbo = show_limbo(&txn);
+        assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
         let num_valid_ops: usize = txn
                 .query_row(
@@ -155,7 +157,7 @@ async fn run_test(
                     (validation_status = :valid
                         OR (validation_status = :rejected
                             AND (
-                                (type = :store_entry AND basis = :bad_update_entry_hash AND header_hash = :bad_update_header)
+                                (type = :store_entry AND basis_hash = :bad_update_entry_hash AND header_hash = :bad_update_header)
                                 OR
                                 (type = :store_element AND header_hash = :bad_update_header)
                                 OR
@@ -166,6 +168,7 @@ async fn run_test(
                                 (type = :update_element AND header_hash = :bad_update_header)
                             )
                         )
+                    )
                     ", 
                 named_params!{
                     ":valid": ValidationStatus::Valid,
@@ -206,12 +209,9 @@ async fn run_test(
                     SELECT COUNT(hash) FROM DhtOP 
                     WHERE 
                     when_integrated IS NULL
-                    AND (validation_stage IS NULL OR validation_stage = 2)
+                    AND (validation_stage IS NULL OR validation_stage = 0)
                     ",
-                named_params! {
-                    ":valid": ValidationStatus::Valid,
-                    ":rejected": ValidationStatus::Rejected,
-                },
+                [],
                 |row| row.get(0),
             )
             .unwrap();
