@@ -14,6 +14,7 @@ use holochain_types::env::EnvWrite;
 use holochain_types::timestamp;
 use holochain_types::EntryHashed;
 use holochain_zome_types::header;
+use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
 use holochain_zome_types::Element;
@@ -166,7 +167,102 @@ impl SourceChain {
         if author_grant.is_valid(check_function, check_agent, check_secret) {
             return Ok(Some(author_grant));
         }
-        todo!("Implement cap query")
+        let valid_cap_grant = self.vault.conn()?.with_reader(|txn| {
+            let not_referenced_header = "
+            SELECT COUNT(H_REF.hash)
+            FROM Header AS H_REF
+            JOIN DhtOp AS D_REF ON D_REF.header_hash = H_REF.hash
+            WHERE
+            D_REF.is_authored = 1
+            AND
+            (
+                H_REF.original_header_hash = Header.hash
+                OR
+                H_REF.deletes_header_hash = Header.hash
+            )
+            ";
+            let sql = format!(
+                "
+                SELECT DISTINCT Entry.blob
+                FROM Entry
+                JOIN Header ON Header.entry_hash = Entry.hash
+                JOIN DhtOp ON Header.hash = DhtOp.header_hash
+                WHERE
+                DhtOp.is_authored = 1
+                AND
+                Entry.access_type IS NOT NULL
+                AND
+                ({}) = 0
+                ",
+                not_referenced_header
+            );
+            txn.prepare(&sql)?
+                .query_and_then([], |row| from_blob(row.get("blob")?))?
+                .filter_map(|result: StateQueryResult<Entry>| match result {
+                    Ok(entry) => entry
+                        .as_cap_grant()
+                        .filter(|grant| match grant {
+                            // This is short circuited at the start.
+                            CapGrant::ChainAuthor(_) => false,
+                            _ => true,
+                        })
+                        .filter(|grant| grant.is_valid(check_function, check_agent, check_secret))
+                        .map(|cap| Some(Ok(cap)))
+                        .unwrap_or(None),
+                    Err(e) => Some(Err(e)),
+                })
+                // if there are still multiple grants, fold them down based on specificity
+                // authorship > assigned > transferable > unrestricted
+                .fold(
+                    Ok(None),
+                    |acc: StateQueryResult<Option<CapGrant>>, grant| {
+                        let grant = grant?;
+                        let acc = acc?;
+                        let acc = match &grant {
+                            CapGrant::RemoteAgent(zome_call_cap_grant) => {
+                                match &zome_call_cap_grant.access {
+                                    CapAccess::Assigned { .. } => match &acc {
+                                        Some(CapGrant::RemoteAgent(acc_zome_call_cap_grant)) => {
+                                            match acc_zome_call_cap_grant.access {
+                                                // an assigned acc takes precedence
+                                                CapAccess::Assigned { .. } => acc,
+                                                // current grant takes precedence over all other accs
+                                                _ => Some(grant),
+                                            }
+                                        }
+                                        None => Some(grant),
+                                        // authorship should be short circuit and filtered
+                                        _ => unreachable!(),
+                                    },
+                                    CapAccess::Transferable { .. } => match &acc {
+                                        Some(CapGrant::RemoteAgent(acc_zome_call_cap_grant)) => {
+                                            match acc_zome_call_cap_grant.access {
+                                                // an assigned acc takes precedence
+                                                CapAccess::Assigned { .. } => acc,
+                                                // transferable acc takes precedence
+                                                CapAccess::Transferable { .. } => acc,
+                                                // current grant takes preference over other accs
+                                                _ => Some(grant),
+                                            }
+                                        }
+                                        None => Some(grant),
+                                        // authorship should be short circuited and filtered by now
+                                        _ => unreachable!(),
+                                    },
+                                    CapAccess::Unrestricted => match acc {
+                                        Some(_) => acc,
+                                        None => Some(grant),
+                                    },
+                                }
+                            }
+                            // ChainAuthor should have short circuited and be filtered out already
+                            _ => unreachable!(),
+                        };
+                        Ok(acc)
+                    },
+                )
+        })?;
+        Ok(valid_cap_grant)
     }
 
     /// Query Headers in the source chain.
@@ -237,8 +333,11 @@ impl SourceChain {
                         let header = HeaderHashed::with_pre_hashed(header, hash);
                         let shh = SignedHeaderHashed::with_presigned(header, signature);
                         let entry = if query.include_entries {
-                            let entry = from_blob::<Entry>(row.get("entry_blob")?)?;
-                            Some(entry)
+                            let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                            match entry {
+                                Some(entry) => Some(from_blob::<Entry>(entry)?),
+                                None => None,
+                            }
                         } else {
                             None
                         };

@@ -464,9 +464,52 @@ pub fn insert_header(txn: &mut Transaction, header: SignedHeaderHashed) -> State
 /// Insert an [`Entry`] into the database.
 pub fn insert_entry(txn: &mut Transaction, entry: EntryHashed) -> StateMutationResult<()> {
     let (entry, hash) = entry.into_inner();
+    let mut cap_secret = None;
+    let mut cap_access = None;
+    let mut cap_grantor = None;
+    let cap_tag = match &entry {
+        Entry::CapGrant(ZomeCallCapGrant {
+            tag,
+            access,
+            functions: _,
+        }) => {
+            cap_access = match access {
+                CapAccess::Unrestricted => Some("unrestricted"),
+                CapAccess::Transferable { secret } => {
+                    cap_secret = Some(to_blob(secret)?);
+                    Some("transferable")
+                }
+                CapAccess::Assigned {
+                    secret,
+                    assignees: _,
+                } => {
+                    cap_secret = Some(to_blob(secret)?);
+                    // TODO: put assignees in when we merge in BHashSet from develop.
+                    Some("assigned")
+                }
+            };
+            // TODO: put functions in when we merge in BHashSet from develop.
+            Some(tag.clone())
+        }
+        Entry::CapClaim(CapClaim {
+            tag,
+            grantor,
+            secret,
+        }) => {
+            cap_secret = Some(to_blob(secret)?);
+            cap_grantor = Some(grantor.clone());
+            Some(tag.clone())
+        }
+        _ => None,
+    };
     sql_insert!(txn, Entry, {
         "hash": hash,
         "blob": to_blob(entry)?,
+        "tag": cap_tag,
+        "access_type": cap_access,
+        "grantor": cap_grantor,
+        "cap_secret": cap_secret,
+        // TODO: add cap functions and assignees
     })?;
     Ok(())
 }
