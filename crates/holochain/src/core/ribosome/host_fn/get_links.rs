@@ -62,13 +62,12 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children() {
+        observability::test_run().ok();
         let test_env = holochain_state::test_utils::test_cell_env();
         let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
         let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone())
-            .await
-            .unwrap();
+        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
         let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace;
@@ -137,9 +136,7 @@ pub mod slow_tests {
         let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
         let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone())
-            .await
-            .unwrap();
+        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
         let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace;

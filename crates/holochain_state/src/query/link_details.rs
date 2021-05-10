@@ -66,7 +66,10 @@ impl Query for GetLinkDetailsQuery {
             }) => {
                 *base_address == *base_filter
                     && *zome_id == zome_id_filter
-                    && tag_filter.as_ref().map(|t| *tag == **t).unwrap_or(true)
+                    && tag_filter
+                        .as_ref()
+                        .map(|t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))
+                        .unwrap_or(true)
             }
             Header::DeleteLink(DeleteLink { base_address, .. }) => *base_address == *base_filter,
             _ => false,

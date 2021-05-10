@@ -386,6 +386,7 @@ mod tests {
 
                 // Put data in elements
                 let source_chain = SourceChain::new(env.clone().into(), author.clone()).unwrap();
+                // Produces 3 ops but minus 1 for store entry so 2 ops.
                 let original_header_address = source_chain
                     .put(
                         builder::Create {
@@ -397,6 +398,7 @@ mod tests {
                     .await
                     .unwrap();
 
+                // Produces 5 ops but minus 1 for store entry so 4 ops.
                 let entry_update_hash = source_chain
                     .put(
                         builder::Update {
@@ -516,14 +518,13 @@ mod tests {
                 .await;
                 let cell_network = test_network.cell_network();
                 let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
-                // We are expecting five ops per agent
-                let total_expected = num_agents * 6;
+                // We are expecting six ops per agent plus one for self
+                let total_expected = (num_agents + 1) * 6;
                 let mut recv_count: u32 = 0;
 
                 // Receive events and increment count
                 let recv_task = tokio::task::spawn({
                     async move {
-                        // use tokio_stream::StreamExt;
                         let mut tx_complete = Some(tx_complete);
                         while let Some(evt) = recv.recv().await {
                             use holochain_p2p::event::HolochainP2pEvent::*;
@@ -584,6 +585,9 @@ mod tests {
                     }
                 };
 
+                // We publish to ourself in a full sync network so we need
+                // to expect one more op.
+                let num_agents = num_agents + 1;
                 // Check there is no ops left that didn't come through
                 assert_eq!(
                     num_agents * 1,

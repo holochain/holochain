@@ -15,20 +15,30 @@ pub struct GetLinksQuery {
 pub struct LinksQuery {
     pub base: Arc<EntryHash>,
     pub zome_id: ZomeId,
-    pub tag: Option<Arc<LinkTag>>,
+    pub tag: Option<Arc<String>>,
     query: Arc<String>,
 }
 
 impl LinksQuery {
     pub fn new(base: EntryHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
-        let create_string = Self::create_query_string(tag.is_some());
-        let delete_string = Self::delete_query_string(tag.is_some());
+        let tag = tag.map(|tag| Arc::new(Self::tag_to_hex(&tag)));
+        let create_string = Self::create_query_string(tag.clone());
+        let delete_string = Self::delete_query_string(tag.clone());
         Self {
             base: Arc::new(base),
             zome_id,
-            tag: tag.map(Arc::new),
+            tag,
             query: Arc::new(Self::create_query(create_string, delete_string)),
         }
+    }
+
+    pub fn tag_to_hex(tag: &LinkTag) -> String {
+        use std::fmt::Write;
+        let mut s = String::with_capacity(tag.0.len());
+        for b in &tag.0 {
+            write!(&mut s, "{:X}", b).ok();
+        }
+        s
     }
 
     pub fn base(base: EntryHash, zome_id: ZomeId) -> Self {
@@ -60,7 +70,7 @@ impl LinksQuery {
             AND (DhtOp.when_integrated IS NOT NULL OR DhtOp.is_authored = 1)
         "
     }
-    fn create_query_string(tag: bool) -> String {
+    fn create_query_string(tag: Option<Arc<String>>) -> String {
         let s = format!(
             "
             SELECT Header.blob AS header_blob FROM DhtOp
@@ -70,19 +80,19 @@ impl LinksQuery {
         );
         Self::add_tag(s, tag)
     }
-    fn add_tag(q: String, tag: bool) -> String {
-        if tag {
+    fn add_tag(q: String, tag: Option<Arc<String>>) -> String {
+        if let Some(tag) = tag {
             format!(
                 "{}
             AND
-            Header.tag = :tag",
-                q
+            HEX(Header.tag) like '{}%'",
+                q, tag
             )
         } else {
             q
         }
     }
-    fn delete_query_string(tag: bool) -> String {
+    fn delete_query_string(tag: Option<Arc<String>>) -> String {
         let sub_create_query = format!(
             "
             SELECT Header.hash FROM DhtOp
@@ -109,7 +119,7 @@ impl LinksQuery {
     }
 
     pub fn params(&self) -> Vec<Params> {
-        let mut params = named_params! {
+        let params = named_params! {
             ":create": DhtOpType::RegisterAddLink,
             ":delete": DhtOpType::RegisterRemoveLink,
             ":base_hash": self.base,
@@ -117,11 +127,6 @@ impl LinksQuery {
             ":status": ValidationStatus::Valid,
         }
         .to_vec();
-        if self.tag.is_some() {
-            params.extend(named_params! {
-                ":tag": self.tag,
-            });
-        }
         params
     }
 }
@@ -182,7 +187,10 @@ impl Query for GetLinksQuery {
             }) => {
                 *base_address == *base_filter
                     && *zome_id == zome_id_filter
-                    && tag_filter.as_ref().map(|t| *tag == **t).unwrap_or(true)
+                    && tag_filter
+                        .as_ref()
+                        .map(|t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))
+                        .unwrap_or(true)
             }
             Header::DeleteLink(DeleteLink { base_address, .. }) => *base_address == *base_filter,
             _ => false,

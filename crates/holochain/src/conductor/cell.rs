@@ -640,9 +640,11 @@ impl Cell {
     > {
         // FIXME: Test this query.
         let results = self.env().conn()?.with_reader(|txn| {
+            let mut positions = "?,".repeat(op_hashes.len());
+            positions.pop();
             let sql = format!(
                 "
-                SELECT DhtOp.hash, DhtOp.basis_hash, DhtOp.type
+                SELECT DhtOp.hash, DhtOp.basis_hash, DhtOp.type AS dht_type,
                 Header.blob AS header_blob, Entry.blob AS entry_blob
                 FROM DHtOp
                 JOIN Header ON DhtOp.header_hash = Header.hash
@@ -652,7 +654,7 @@ impl Cell {
                 AND
                 DhtOp.hash in ({})
                 ",
-                "?,".repeat(op_hashes.len())
+                positions
             );
             let mut stmt = txn.prepare(&sql)?;
             let r = stmt

@@ -112,15 +112,12 @@ pub mod tests {
     use super::*;
 
     use crate::conductor::api::MockCellConductorApi;
-    use crate::core::SourceChainResult;
     use holochain_state::{prelude::test_cell_env, source_chain::SourceChain};
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::Header;
     use matches::assert_matches;
     use observability;
-
-    use crate::test_utils::fake_genesis;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn genesis_initializes_source_chain() {
@@ -154,7 +151,7 @@ pub mod tests {
 
             assert_matches!(
                 headers.as_slice(),
-                [Header::Create(_), Header::AgentValidationPkg(_), Header::Dna(_)]
+                [Header::Dna(_), Header::AgentValidationPkg(_), Header::Create(_)]
             );
         }
     }
