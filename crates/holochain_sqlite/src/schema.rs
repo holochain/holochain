@@ -3,6 +3,10 @@ use rusqlite::Connection;
 
 use crate::db::DbKind;
 
+pub(crate) const P2P_INSERT: &str = include_str!("schema/p2p/insert.sql");
+pub(crate) const P2P_SELECT_ALL: &str = include_str!("schema/p2p/select_all.sql");
+pub(crate) const P2P_PRUNE: &str = include_str!("schema/p2p/prune.sql");
+
 pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| {
     let migration_0 = Migration::initial(include_str!("schema/cell/initial.sql"));
 

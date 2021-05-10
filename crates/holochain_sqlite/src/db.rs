@@ -13,6 +13,9 @@ use shrinkwraprs::Shrinkwrap;
 use std::path::Path;
 use std::path::PathBuf;
 
+mod p2p;
+pub use p2p::*;
+
 /// A read-only version of [DbWrite].
 /// This environment can only generate read-only transactions, never read-write.
 #[derive(Clone)]
