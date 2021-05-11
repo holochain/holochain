@@ -2,21 +2,22 @@
 
 use super::*;
 
+use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
 use crate::core::workflow::publish_dht_ops_workflow::PublishDhtOpsWorkspace;
-use crate::{conductor::manager::ManagedTaskResult, core::workflow::error::WorkflowResult};
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for Publish workflow
-#[instrument(skip(env, stop, cell_network))]
+#[instrument(skip(env, conductor_handle, stop, cell_network))]
 pub fn spawn_publish_dht_ops_consumer(
     env: EnvWrite,
+    conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
     cell_network: HolochainP2pCell,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
-    let trigger_self = tx.clone();
+    let mut trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
         loop {
             // Wait for next job
@@ -27,19 +28,24 @@ pub fn spawn_publish_dht_ops_consumer(
                 break;
             }
 
-            holochain_sqlite::db::optimistic_retry_async("publish_dht_ops_consumer", || async {
-                // Run the workflow
-                let workspace = PublishDhtOpsWorkspace::new(env.clone().into())?;
-                if let WorkComplete::Incomplete =
-                    publish_dht_ops_workflow(workspace, env.clone().into(), cell_network.clone())
-                        .await?
-                {
-                    trigger_self.clone().trigger()
-                };
-                WorkflowResult::Ok(())
-            })
-            .await
-            .expect("Too many consecutive errors. Shutting down loop. TODO: make Holochain crash");
+            // Run the workflow
+            let workspace = PublishDhtOpsWorkspace::new(env.clone().into())
+                .expect("Could not create Workspace");
+            match publish_dht_ops_workflow(workspace, env.clone().into(), cell_network.clone())
+                .await
+            {
+                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
+                Err(err) => {
+                    handle_workflow_error(
+                        conductor_handle.clone(),
+                        cell_network.cell_id(),
+                        err,
+                        "publish_dht_ops failure",
+                    )
+                    .await?
+                }
+                _ => (),
+            };
         }
         Ok(())
     });

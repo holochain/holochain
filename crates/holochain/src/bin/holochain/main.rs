@@ -61,6 +61,8 @@ async fn async_main() {
     observability::init_fmt(opt.structured).expect("Failed to start contextual logging");
     debug!("observability initialized");
 
+    kitsune_p2p_types::metrics::init_sys_info_poll();
+
     let conductor =
         conductor_handle_from_config_path(opt.config_path.clone(), opt.interactive).await;
 

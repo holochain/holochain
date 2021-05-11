@@ -18,11 +18,6 @@ struct FakeProperties {
     test: String,
 }
 
-/// simple DnaWasm fixture
-pub fn fake_dna_wasm() -> DnaWasm {
-    DnaWasm::from(vec![0_u8])
-}
-
 /// A fixture example dna for unit testing.
 pub fn fake_dna_file(uid: &str) -> DnaFile {
     fake_dna_zomes(uid, vec![("test".into(), vec![].into())])

@@ -49,7 +49,7 @@ impl SConn {
         let guard = self
             .inner
             .try_lock_for(std::time::Duration::from_secs(30))
-            .unwrap_or_else(|| panic!(format!("Couldn't unlock connection. Kind: {}", &kind)));
+            .unwrap_or_else(|| panic!("Couldn't unlock connection. Kind: {}", &kind));
         tracing::trace!("lock success {}", &kind);
         SwanSong::new(guard, move |_| {
             tracing::trace!("lock drop {}", &kind);

@@ -1,5 +1,5 @@
-use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::entry_def_store::error::EntryDefStoreError;
+use crate::conductor::{api::error::ConductorApiError, error::ConductorError};
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::workflow::error::WorkflowError;
@@ -48,6 +48,8 @@ pub enum CellError {
     InitFailed(InitResult),
     #[error(transparent)]
     HolochainP2pError(#[from] HolochainP2pError),
+    #[error(transparent)]
+    ConductorError(#[from] Box<ConductorError>),
     #[error(transparent)]
     ConductorApiError(#[from] Box<ConductorApiError>),
     #[error(transparent)]

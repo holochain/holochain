@@ -12,6 +12,8 @@ members = [
     "entry_defs",
     "hash_entry",
     "foo",
+    "genesis_self_check_invalid",
+    "genesis_self_check_valid",
     "hash_path",
     "hdk_extern",
     "init_fail",

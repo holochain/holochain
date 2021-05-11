@@ -7,7 +7,6 @@
 use super::api::ZomeCall;
 use super::interface::SignalBroadcaster;
 use super::manager::ManagedTaskAdd;
-use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::cell::error::CellResult;
@@ -31,6 +30,7 @@ use crate::core::workflow::GenesisWorkflowArgs;
 use crate::core::workflow::GenesisWorkspace;
 use crate::core::workflow::InitializeZomesWorkflowArgs;
 use crate::core::workflow::ZomeCallResult;
+use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
 use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
 use error::CellError;
 use fallible_iterator::FallibleIterator;
@@ -129,6 +129,7 @@ impl Cell {
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 &env,
                 holochain_p2p_cell.clone(),
+                conductor_handle.clone(),
                 conductor_api.clone(),
                 managed_task_add_sender,
                 managed_task_stop_broadcaster,
@@ -153,12 +154,16 @@ impl Cell {
     /// Performs the Genesis workflow the Cell, ensuring that its initial
     /// elements are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
-    pub async fn genesis(
+    pub async fn genesis<Ribosome>(
         id: CellId,
         conductor_handle: ConductorHandle,
         cell_env: EnvWrite,
+        ribosome: Ribosome,
         membrane_proof: Option<SerializedBytes>,
-    ) -> CellResult<()> {
+    ) -> CellResult<()>
+    where
+        Ribosome: RibosomeT + Send + 'static,
+    {
         // get the dna
         let dna_file = conductor_handle
             .get_dna(id.dna_hash())
@@ -172,7 +177,13 @@ impl Cell {
             .await
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
-        let args = GenesisWorkflowArgs::new(dna_file, id.agent_pubkey().clone(), membrane_proof);
+
+        let args = GenesisWorkflowArgs::new(
+            dna_file,
+            id.agent_pubkey().clone(),
+            membrane_proof,
+            ribosome,
+        );
 
         genesis_workflow(workspace, cell_env.clone().into(), conductor_api, args)
             .await
@@ -642,16 +653,6 @@ impl Cell {
         Ok([0; 64].into())
     }
 
-    /// When the Conductor determines that it's time to execute some [AutonomicProcess],
-    /// whether scheduled or through an [AutonomicCue], this function gets called
-    #[tracing::instrument(skip(self, process))]
-    pub async fn handle_autonomic_process(&self, process: AutonomicProcess) -> CellResult<()> {
-        match process {
-            AutonomicProcess::SlowHeal => unimplemented!(),
-            AutonomicProcess::HealthCheck => unimplemented!(),
-        }
-    }
-
     #[instrument(skip(self, from_agent, fn_name, cap, payload))]
     /// a remote agent is attempting a "call_remote" on this cell.
     async fn handle_call_remote(
@@ -768,12 +769,32 @@ impl Cell {
         Ok(())
     }
 
-    /// Delete all data associated with this Cell by deleting the associated
-    /// database. Completely reverses Cell creation.
+    /// Clean up long-running managed tasks.
+    //
+    // FIXME: this should ensure that the long-running managed tasks,
+    //        i.e. the queue consumers, are stopped. Currently, they
+    //        will continue running because we have no way to target a specific
+    //        Cell's tasks for shutdown.
+    //
+    //        Consider using a separate TaskManager for each Cell, so that all
+    //        of a Cell's tasks can be shut down at once. Perhaps the Conductor
+    //        TaskManager can have these Cell TaskManagers as children.
+    //        [ B-04176 ]
+    pub async fn cleanup(&self) -> CellResult<()> {
+        tracing::info!("Cell removed, but cleanup is not yet implemented.");
+        Ok(())
+    }
+
+    /// Delete all data associated with this Cell by DELETING the associated
+    /// LMDB environment. Completely reverses Cell creation.
+    /// NB: This is NOT meant to be a Drop impl! This destroys all data
+    ///     associated with a Cell, i.e. this Cell can never be instantiated again!
+    //
+
     #[tracing::instrument(skip(self))]
     pub async fn destroy(self) -> CellResult<()> {
+        self.cleanup().await?;
         let path = self.env.path().clone();
-        // Remove db from global map
         // Delete directory
         self.env
             .remove()

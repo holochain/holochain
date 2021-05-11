@@ -8,6 +8,10 @@ pub enum KitsuneP2pError {
     #[error(transparent)]
     GhostError(#[from] ghost_actor::GhostError),
 
+    /// Base Kitsune Error
+    #[error(transparent)]
+    KitsuneError(#[from] kitsune_p2p_types::KitsuneError),
+
     /// RoutingSpaceError
     #[error("Routing Space Error: {0:?}")]
     RoutingSpaceError(Arc<KitsuneSpace>),

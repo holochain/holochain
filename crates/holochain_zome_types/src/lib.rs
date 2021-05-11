@@ -24,6 +24,7 @@ pub mod element;
 pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;
+pub mod genesis;
 #[allow(missing_docs)]
 pub mod header;
 #[allow(missing_docs)]

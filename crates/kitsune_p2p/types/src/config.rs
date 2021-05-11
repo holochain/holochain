@@ -83,17 +83,17 @@ pub mod tuning_params_struct {
         /// Default agent count for remote notify. [Default: 5]
         default_notify_remote_agent_count: u32 = 5,
 
-        /// Default timeout for remote notify. [Default: 1000ms]
-        default_notify_timeout_ms: u32 = 1000,
+        /// Default timeout for remote notify. [Default: 30s]
+        default_notify_timeout_ms: u32 = 1000 * 30,
 
-        /// Default timeout for rpc single. [Default: 2000]
-        default_rpc_single_timeout_ms: u32 = 2000,
+        /// Default timeout for rpc single. [Default: 30s]
+        default_rpc_single_timeout_ms: u32 = 1000 * 30,
 
         /// Default agent count for rpc multi. [Default: 2]
         default_rpc_multi_remote_agent_count: u32 = 2,
 
-        /// Default timeout for rpc multi. [Default: 2000]
-        default_rpc_multi_timeout_ms: u32 = 2000,
+        /// Default timeout for rpc multi. [Default: 30s]
+        default_rpc_multi_timeout_ms: u32 = 1000 * 30,
 
         /// Default agent expires after milliseconds. [Default: 20 minutes]
         agent_info_expires_after_ms: u32 = 1000 * 60 * 20,
@@ -110,6 +110,11 @@ pub mod tuning_params_struct {
         /// [Default: 5 minutes]
         proxy_to_expire_ms: u32 = 1000 * 60 * 5,
 
+        /// Mainly used as the for_each_concurrent limit,
+        /// this restricts the number of active polled futures
+        /// on a single thread.
+        concurrent_limit_per_thread: usize = 32,
+
         /// tx2 quic max_idle_timeout
         /// [Default: 30 seconds]
         tx2_quic_max_idle_timeout_ms: u32 = 1000 * 30,
@@ -122,15 +127,24 @@ pub mod tuning_params_struct {
         /// [Default: 3]
         tx2_channel_count_per_connection: usize = 3,
 
-        /// tx2 read-side timeout
+        /// tx2 timeout used for passive background operations
+        /// like reads / responds.
         /// [Default: 30 seconds]
-        tx2_read_timeout_ms: u32 = 1000 * 30,
+        tx2_implicit_timeout_ms: u32 = 1000 * 30,
 
         /// tx2 initial connect retry delay
         /// (note, this delay is currenty exponentially backed off--
         /// multiplied by 2x on every loop)
         /// [Default: 200 ms]
         tx2_initial_connect_retry_delay_ms: usize = 200,
+    }
+
+    impl KitsuneP2pTuningParams {
+        /// Generate a KitsuneTimeout instance
+        /// based on the tuning parameter tx2_implicit_timeout_ms
+        pub fn implicit_timeout(&self) -> crate::KitsuneTimeout {
+            crate::KitsuneTimeout::from_millis(self.tx2_implicit_timeout_ms as u64)
+        }
     }
 }
 
