@@ -65,6 +65,7 @@ fn set_authored_to_pending_integration(
                 AND is_authored = 1
                 AND when_integrated IS NULL
                 AND validation_stage IS NULL
+                AND validation_status IS NOT NULL
             )",
             named_params! {
                 ":hash": hash,
@@ -83,6 +84,7 @@ fn set_authored_to_pending_integration(
                 AND is_authored = 1
                 AND when_integrated IS NULL
                 AND validation_stage IS NULL
+                AND validation_status IS NOT NULL
                 ",
                 named_params! {
                     ":hash": hash,

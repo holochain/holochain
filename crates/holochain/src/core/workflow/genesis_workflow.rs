@@ -80,7 +80,7 @@ pub struct GenesisWorkspace {
 impl GenesisWorkspace {
     /// Constructor
     pub fn new(env: EnvWrite) -> WorkspaceResult<Self> {
-        Ok(Self { vault: env.clone() })
+        Ok(Self { vault: env })
     }
 
     pub fn has_genesis(&self, author: &AgentPubKey) -> DatabaseResult<bool> {

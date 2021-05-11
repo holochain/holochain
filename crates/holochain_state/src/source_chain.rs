@@ -53,7 +53,7 @@ pub struct SourceChain {
 // show if the database is corrupted and doesn't have an element
 #[derive(Serialize, Deserialize)]
 pub struct SourceChainJsonDump {
-    pub elements: Vec<Option<SourceChainJsonElement>>,
+    pub elements: Vec<SourceChainJsonElement>,
     pub published_ops_count: usize,
 }
 
@@ -148,6 +148,10 @@ impl SourceChain {
         Ok(self.len()? > 3)
     }
 
+    pub fn is_empty(&self) -> SourceChainResult<bool> {
+        Ok(self.len()? == 0)
+    }
+
     pub fn len(&self) -> SourceChainResult<u32> {
         Ok(self.scratch.apply(|scratch| {
             let scratch_max = chain_head_scratch(&(*scratch), self.author.as_ref()).map(|(_, s)| s);
@@ -201,11 +205,7 @@ impl SourceChain {
                 .filter_map(|result: StateQueryResult<Entry>| match result {
                     Ok(entry) => entry
                         .as_cap_grant()
-                        .filter(|grant| match grant {
-                            // This is short circuited at the start.
-                            CapGrant::ChainAuthor(_) => false,
-                            _ => true,
-                        })
+                        .filter(|grant| !matches!(grant, CapGrant::ChainAuthor(_)))
                         .filter(|grant| grant.is_valid(check_function, check_agent, check_secret))
                         .map(|cap| Some(Ok(cap)))
                         .unwrap_or(None),
@@ -565,7 +565,7 @@ fn chain_head_scratch(scratch: &Scratch, author: &AgentPubKey) -> Option<(Header
 }
 
 #[cfg(test)]
-async fn put_db<H: HeaderInner, B: HeaderBuilder<H>>(
+async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     vault: holochain_types::env::EnvWrite,
     author: Arc<AgentPubKey>,
     header_builder: B,
@@ -607,46 +607,63 @@ pub async fn dump_state(
     vault: EnvRead,
     author: &AgentPubKey,
 ) -> Result<SourceChainJsonDump, SourceChainError> {
-    // let mut iter = self.iter_back();
-    // let mut elements = Vec::new();
-    // let mut published_ops_count = 0;
-
-    // while let Some(h) = iter.next()? {
-    //     let maybe_element = self.get_element(h.header_address())?;
-    //     match maybe_element {
-    //         None => elements.push(None),
-    //         Some(element) => {
-    //             let ops = produce_op_lights_from_elements(vec![&element]).unwrap();
-    //             published_ops_count += if element
-    //                 .header()
-    //                 .entry_type()
-    //                 .map(|e| *e.visibility() == EntryVisibility::Public)
-    //                 .unwrap_or(true)
-    //             {
-    //                 ops.len()
-    //             } else {
-    //                 ops.into_iter()
-    //                     .filter(|op| !matches!(&op, DhtOpLight::StoreEntry(_, _, _)))
-    //                     .count()
-    //             };
-    //             let (signed, entry) = element.into_inner();
-    //             let (header, signature) = signed.into_header_and_signature();
-    //             let (header, header_address) = header.into_inner();
-    //             elements.push(Some(SourceChainJsonElement {
-    //                 signature,
-    //                 header_address,
-    //                 header,
-    //                 entry: entry.into_option(),
-    //             }));
-    //         }
-    //     }
-    // }
-
-    // Ok(SourceChainJsonDump {
-    //     elements,
-    //     published_ops_count,
-    // })
-    todo!()
+    Ok(vault.conn()?.with_reader(|txn| {
+        let elements = txn
+            .prepare(
+                "
+                SELECT DISTINCT 
+                Header.blob AS header_blob, Entry.blob AS entry_blob,
+                Header.hash AS header_hash
+                FROM Header
+                JOIN DhtOp ON DhtOp.header_hash = Header.hash
+                LEFT JOIN Entry ON Header.entry_hash = Entry.hash
+                WHERE
+                DhtOp.is_authored = 1
+                AND
+                Header.author = :author
+                ORDER BY Header.seq ASC
+                ",
+            )?
+            .query_and_then(
+                named_params! {
+                    ":author": author,
+                },
+                |row| {
+                    let SignedHeader(header, signature) = from_blob(row.get("header_blob")?)?;
+                    let header_address = row.get("header_hash")?;
+                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                    let entry: Option<Entry> = match entry {
+                        Some(entry) => Some(from_blob(entry)?),
+                        None => None,
+                    };
+                    StateQueryResult::Ok(SourceChainJsonElement {
+                        signature,
+                        header_address,
+                        header,
+                        entry,
+                    })
+                },
+            )?
+            .collect::<StateQueryResult<Vec<_>>>()?;
+        let published_ops_count = txn.query_row(
+            "
+                SELECT COUNT(DhtOp.hash) FROM DhtOp
+                JOIN Header ON DhtOp.header_hash = Header.hash
+                WHERE
+                DhtOp.is_authored = 1
+                AND
+                Header.author = :author
+                ",
+            named_params! {
+            ":author": author,
+            },
+            |row| row.get(0),
+        )?;
+        StateQueryResult::Ok(SourceChainJsonDump {
+            elements,
+            published_ops_count,
+        })
+    })?)
 }
 
 #[cfg(test)]
@@ -870,7 +887,7 @@ pub mod tests {
         //     Ok(())
     }
 
-    fn fixtures() -> (
+    fn _fixtures() -> (
         AgentPubKey,
         HeaderHashed,
         Option<Entry>,

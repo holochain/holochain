@@ -44,8 +44,8 @@ pub fn get_single_agent_info(
     space: DnaHash,
     agent: AgentPubKey,
 ) -> StateQueryResult<Option<AgentInfoSigned>> {
-    fresh_reader!(env, |mut r| {
-        holochain_state::agent_info::get_agent_info(&mut r, space, agent)
+    fresh_reader!(env, |r| {
+        holochain_state::agent_info::get_agent_info(&r, space, agent)
     })
 }
 
@@ -100,21 +100,16 @@ pub fn query_agent_info_signed(
         let mut expired = Vec::new();
 
         {
-            let mut iter = holochain_state::agent_info::get_all(writer)?.into_iter();
+            let iter = holochain_state::agent_info::get_all(writer)?.into_iter();
 
             let now = now();
 
-            loop {
-                match iter.next() {
-                    Some((k, v)) => {
-                        let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
-                        if is_expired(now, &info) {
-                            expired.push(k);
-                        } else if info.as_space_ref() == kitsune_space.as_ref() {
-                            out.push(v);
-                        }
-                    }
-                    None => break,
+            for (k, v) in iter {
+                let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
+                if is_expired(now, &info) {
+                    expired.push(k);
+                } else if info.as_space_ref() == kitsune_space.as_ref() {
+                    out.push(v);
                 }
             }
         }

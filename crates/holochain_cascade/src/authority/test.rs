@@ -21,7 +21,7 @@ async fn get_entry() {
     observability::test_run().ok();
     let env = test_cell_env();
 
-    let td = EntryTestData::new();
+    let td = EntryTestData::create();
 
     fill_db(&env.env(), td.store_entry_op.clone());
     let options = options();
@@ -63,7 +63,7 @@ async fn get_element() {
     observability::test_run().ok();
     let env = test_cell_env();
 
-    let td = ElementTestData::new();
+    let td = ElementTestData::create();
 
     fill_db(&env.env(), td.store_element_op.clone());
 
@@ -125,7 +125,7 @@ async fn retrieve_element() {
     observability::test_run().ok();
     let env = test_cell_env();
 
-    let td = ElementTestData::new();
+    let td = ElementTestData::create();
 
     fill_db_pending(&env.env(), td.store_element_op.clone());
 
@@ -148,7 +148,7 @@ async fn get_links() {
     observability::test_run().ok();
     let env = test_cell_env();
 
-    let td = EntryTestData::new();
+    let td = EntryTestData::create();
 
     fill_db(&env.env(), td.store_entry_op.clone());
     fill_db(&env.env(), td.create_link_op.clone());

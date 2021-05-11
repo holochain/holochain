@@ -16,7 +16,7 @@ async fn links_not_authority() {
     let authority = test_cell_env();
 
     // Data
-    let td = EntryTestData::new();
+    let td = EntryTestData::create();
     fill_db(&authority.env(), td.store_entry_op.clone());
     fill_db(&authority.env(), td.create_link_op.clone());
 
@@ -72,7 +72,7 @@ async fn links_authority() {
     let vault = test_cell_env();
 
     // Data
-    let td = EntryTestData::new();
+    let td = EntryTestData::create();
     fill_db(&vault.env(), td.store_entry_op.clone());
     fill_db(&vault.env(), td.create_link_op.clone());
 
@@ -113,7 +113,7 @@ async fn links_authoring() {
     let mut scratch = Scratch::new();
 
     // Data
-    let td = EntryTestData::new();
+    let td = EntryTestData::create();
     insert_op_scratch(&mut scratch, td.store_entry_op.clone()).unwrap();
     insert_op_scratch(&mut scratch, td.create_link_op.clone()).unwrap();
 

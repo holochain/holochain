@@ -141,7 +141,7 @@ pub fn get_all(txn: &Transaction<'_>) -> StateQueryResult<Vec<(AgentKvKey, Agent
             let key: Vec<u8> = row.get("key")?;
             let key: AgentKvKey = key.into();
             let item = row.get("blob")?;
-            StateQueryResult::Ok((key.into(), from_blob::<Value>(item)?.0))
+            StateQueryResult::Ok((key, from_blob::<Value>(item)?.0))
         })?
         .collect::<StateQueryResult<Vec<_>>>();
 

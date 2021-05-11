@@ -39,7 +39,7 @@ pub struct ElementTestData {
 }
 
 impl ElementTestData {
-    pub fn new() -> Self {
+    pub fn create() -> Self {
         let mut create = fixt!(Create);
         let mut update = fixt!(Update);
         let mut delete = fixt!(Delete);
@@ -52,9 +52,9 @@ impl ElementTestData {
         let update_entry_hash = EntryHash::with_data_sync(&update_entry);
 
         create.entry_hash = entry_hash.clone();
-        update.entry_hash = update_entry_hash.clone();
+        update.entry_hash = update_entry_hash;
 
-        let create_header = Header::Create(create.clone());
+        let create_header = Header::Create(create);
         let create_hash = HeaderHash::with_data_sync(&create_header);
 
         delete.deletes_address = create_hash.clone();
@@ -75,31 +75,21 @@ impl ElementTestData {
             Some(Box::new(entry.clone())),
         ));
 
-        let wire_create = Judged::valid(SignedHeader(create_header.clone(), signature.clone()));
+        let wire_create = Judged::valid(SignedHeader(create_header, signature));
 
         let signature = fixt!(Signature);
-        let deleted_by_op = DhtOpHashed::from_content_sync(DhtOp::RegisterDeletedBy(
-            signature.clone(),
-            delete.clone(),
-        ));
+        let deleted_by_op =
+            DhtOpHashed::from_content_sync(DhtOp::RegisterDeletedBy(signature.clone(), delete));
 
-        let wire_delete = Judged::valid(
-            SignedHeader(delete_header.clone(), signature.clone())
-                .try_into()
-                .unwrap(),
-        );
+        let wire_delete = Judged::valid(SignedHeader(delete_header, signature).try_into().unwrap());
 
         let signature = fixt!(Signature);
         let update_element_op = DhtOpHashed::from_content_sync(DhtOp::RegisterUpdatedElement(
             signature.clone(),
-            update.clone(),
-            Some(Box::new(update_entry.clone())),
+            update,
+            Some(Box::new(update_entry)),
         ));
-        let wire_update = Judged::valid(
-            SignedHeader(update_header.clone(), signature.clone())
-                .try_into()
-                .unwrap(),
-        );
+        let wire_update = Judged::valid(SignedHeader(update_header, signature).try_into().unwrap());
 
         let mut any_entry = None;
         let mut any_entry_hash = None;
@@ -134,7 +124,7 @@ impl ElementTestData {
             any_entry.clone().map(|i| *i),
         );
 
-        let any_header = Judged::valid(SignedHeader(any_header.clone(), signature.clone()));
+        let any_header = Judged::valid(SignedHeader(any_header, signature));
 
         Self {
             store_element_op,

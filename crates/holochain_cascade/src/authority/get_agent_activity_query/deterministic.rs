@@ -56,8 +56,7 @@ impl Query for DeterministicGetAgentActivityQuery {
     type Output = DeterministicGetAgentActivityResponse;
 
     fn query(&self) -> String {
-        format!(
-            "
+        "
             SELECT H.blob, H.hash, D.validation_status FROM Header AS H
             JOIN DhtOp as D
             ON D.header_hash = H.hash
@@ -69,7 +68,7 @@ impl Query for DeterministicGetAgentActivityQuery {
             AND H.seq <= (SELECT seq FROM Header WHERE hash = :hash_high)
             ORDER BY H.seq DESC
         "
-        )
+        .to_string()
     }
 
     fn params(&self) -> Vec<holochain_state::query::Params> {

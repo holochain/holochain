@@ -74,8 +74,8 @@ CREATE TABLE IF NOT EXISTS Header (
     -- FOREIGN KEY(deletes_header_hash) REFERENCES Header(hash),
     -- FOREIGN KEY(create_link_hash) REFERENCES Header(hash)
 );
-CREATE INDEX Header_type_idx ON Header ( type );
-CREATE INDEX Header_author ON Header ( author );
+CREATE INDEX IF NOT EXISTS Header_type_idx ON Header ( type );
+CREATE INDEX IF NOT EXISTS Header_author ON Header ( author );
 
 
 -- NB: basis_hash, header_hash, and entry_hash, in general, will have
@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS DhtOp (
 
     FOREIGN KEY(header_hash) REFERENCES Header(hash)
 );
-CREATE INDEX DhtOp_type_idx ON DhtOp ( type );
+CREATE INDEX IF NOT EXISTS DhtOp_type_idx ON DhtOp ( type );
 -- CREATE INDEX DhtOp_basis_hash_idx ON DhtOp ( basis_hash );
 
 CREATE TABLE IF NOT EXISTS ValidationReceipt (

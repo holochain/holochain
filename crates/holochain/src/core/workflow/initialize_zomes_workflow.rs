@@ -79,6 +79,10 @@ pub mod tests {
         let test_cache = test_cache_env();
         let env = test_env.env();
         let author = fake_agent_pubkey_1();
+
+        // Genesis
+        fake_genesis(env.clone()).await.unwrap();
+
         let workspace =
             HostFnWorkspace::new(env.clone(), test_cache.env(), author.clone()).unwrap();
         let mut ribosome = MockRibosomeT::new();
@@ -87,9 +91,6 @@ pub mod tests {
         ribosome
             .expect_run_init()
             .returning(move |_workspace, _invocation| Ok(InitResult::Pass));
-
-        // Genesis
-        fake_genesis(env.clone()).await.unwrap();
 
         let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
 
@@ -103,7 +104,7 @@ pub mod tests {
         // Check init is added to the workspace
         let scratch = workspace.source_chain().snapshot().unwrap();
         assert_matches!(
-            scratch.headers().nth(3).unwrap().header(),
+            scratch.headers().next().unwrap().header(),
             Header::InitZomesComplete(_)
         );
     }

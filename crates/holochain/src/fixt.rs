@@ -272,7 +272,7 @@ fixturator!(
         let vault = holochain_state::test_utils::test_cell_env();
         let cache = holochain_state::test_utils::test_cell_env();
         tokio_helper::block_forever_on(fake_genesis(vault.env())).unwrap();
-        HostFnWorkspace::new(vault.env().into(), cache.env().into(), fake_agent_pubkey_1()).unwrap()
+        HostFnWorkspace::new(vault.env(), cache.env(), fake_agent_pubkey_1()).unwrap()
     };
     curve Unpredictable {
         HostFnWorkspaceFixturator::new(Empty)

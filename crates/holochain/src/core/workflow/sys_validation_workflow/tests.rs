@@ -210,7 +210,7 @@ async fn run_test(
         let valid_ops = num_valid_ops(&txn);
         assert_eq!(valid_ops, expected_count);
     });
-    crate::assert_eq_retry_10s!(
+    crate::assert_eq_retry_1m!(
         {
             fresh_reader_test(alice_env.clone(), |txn| {
                 let num_limbo_ops: usize = txn

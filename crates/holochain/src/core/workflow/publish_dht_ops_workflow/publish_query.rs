@@ -4,7 +4,6 @@ use std::time::UNIX_EPOCH;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_sqlite::db::ReadManager;
-use holochain_state::prelude::dump_tmp;
 use holochain_state::query::prelude::*;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;

@@ -666,7 +666,8 @@ impl SysValidationWorkspace {
         Ok(())
     }
     pub fn is_chain_empty(&self, author: &AgentPubKey) -> SourceChainResult<bool> {
-        let chain_not_empty = self.vault.conn()?.with_reader(|txn| {
+        let mut conn = self.vault.conn()?;
+        let chain_not_empty = conn.with_reader(|txn| {
             let mut stmt = txn.prepare(
                 "
                 SELECT 
@@ -734,7 +735,7 @@ impl SysValidationWorkspace {
         let cascade = Cascade::empty()
             .with_vault(self.vault.clone())
             // TODO: Does the cache count as local?
-            .with_cache(self.cache.clone().into());
+            .with_cache(self.cache.clone());
         match &self.scratch {
             Some(scratch) => cascade.with_scratch(scratch.clone()),
             None => cascade,
@@ -746,7 +747,7 @@ impl SysValidationWorkspace {
     ) -> Cascade<Network> {
         let cascade = Cascade::empty()
             .with_vault(self.vault.clone())
-            .with_network(network, self.cache.clone().into());
+            .with_network(network, self.cache.clone());
         match &self.scratch {
             Some(scratch) => cascade.with_scratch(scratch.clone()),
             None => cascade,

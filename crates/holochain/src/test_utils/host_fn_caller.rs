@@ -165,8 +165,7 @@ impl HostFnCaller {
         let (cell_id, zome_name) = zome_path.into();
 
         let workspace_lock =
-            HostFnWorkspace::new(env.clone(), cache.clone(), cell_id.agent_pubkey().clone())
-                .unwrap();
+            HostFnWorkspace::new(env.clone(), cache, cell_id.agent_pubkey().clone()).unwrap();
         let host_access = ZomeCallHostAccess::new(
             workspace_lock.clone(),
             keystore,
@@ -257,7 +256,7 @@ impl HostFnCaller {
         link_tag: LinkTag,
     ) -> HeaderHash {
         let (_, ribosome, call_context, workspace_lock) = self.unpack();
-        let input = CreateLinkInput::new(base.clone(), target.clone(), link_tag);
+        let input = CreateLinkInput::new(base, target, link_tag);
         let output = { host_fn::create_link::create_link(ribosome, call_context, input).unwrap() };
 
         // Write
@@ -284,7 +283,7 @@ impl HostFnCaller {
         _options: GetLinksOptions,
     ) -> Vec<Link> {
         let (_, ribosome, call_context, workspace_lock) = self.unpack();
-        let input = GetLinksInput::new(base.clone(), link_tag);
+        let input = GetLinksInput::new(base, link_tag);
         let output = { host_fn::get_links::get_links(ribosome, call_context, input).unwrap() };
 
         // Write
@@ -300,7 +299,7 @@ impl HostFnCaller {
         _options: GetLinksOptions,
     ) -> Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)> {
         let (_, ribosome, call_context, workspace_lock) = self.unpack();
-        let input = GetLinksInput::new(base.clone(), Some(tag));
+        let input = GetLinksInput::new(base, Some(tag));
         let output =
             { host_fn::get_link_details::get_link_details(ribosome, call_context, input).unwrap() };
 

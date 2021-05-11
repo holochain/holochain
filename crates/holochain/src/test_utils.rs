@@ -10,7 +10,6 @@ use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::ZomeCallInvocation;
 use ::fixt::prelude::*;
-use fallible_iterator::FallibleIterator;
 use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
@@ -25,9 +24,10 @@ use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
+use holochain_state::prelude::from_blob;
 use holochain_state::prelude::test_environments;
-use holochain_state::prelude::SourceChain;
 use holochain_state::prelude::SourceChainResult;
+use holochain_state::prelude::StateQueryResult;
 use holochain_state::source_chain;
 use holochain_state::test_utils::fresh_reader_test;
 use holochain_state::test_utils::TestEnvs;
@@ -35,7 +35,6 @@ use holochain_types::prelude::*;
 
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
-use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use tempdir::TempDir;
@@ -421,33 +420,14 @@ async fn consistency_envs_others(
 }
 
 fn get_authored_ops(env: &EnvWrite) -> Vec<DhtOpLight> {
-    let query = ChainQueryFilter::new().include_entries(true);
-    // let chain = SourceChain::new(env.clone().into()).unwrap();
-    let chain: SourceChain = todo!();
-    let elements = chain.query(&query).unwrap();
-    let elements = elements.iter().collect::<Vec<_>>();
-    let private = elements
-        .iter()
-        .filter(|el| {
-            el.header()
-                .entry_type()
-                .map(|e| *e.visibility() == EntryVisibility::Private)
-                .unwrap_or(false)
-        })
-        .map(|el| el.header_address().clone())
-        .collect::<HashSet<_>>();
-    produce_op_lights_from_elements(elements)
-        .unwrap()
-        .into_iter()
-        .filter(|op| {
-            if let DhtOpLight::StoreEntry(_, _, _) = &op {
-                if private.contains(op.header_hash()) {
-                    return false;
-                }
-            }
-            true
-        })
-        .collect()
+    fresh_reader_test(env.clone(), |txn| {
+        txn.prepare("SELECT blob FROM DhtOp WHERE is_authored = 1")
+            .unwrap()
+            .query_and_then([], |row| from_blob(row.get("blob")?))
+            .unwrap()
+            .collect::<StateQueryResult<_>>()
+            .unwrap()
+    })
 }
 
 /// Same as wait_for_integration but with a default wait time of 10 seconds
@@ -480,17 +460,14 @@ pub async fn wait_for_integration(
 }
 
 fn int_ops(env: &EnvWrite) -> Vec<DhtOpLight> {
-    // let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
-    // fresh_reader_test!(env, |mut r| {
-    //     workspace
-    //         .integrated_dht_ops
-    //         .iter(&mut r)
-    //         .unwrap()
-    //         .map(|(_, v)| Ok(v.op))
-    //         .collect()
-    //         .unwrap()
-    // })
-    todo!()
+    fresh_reader_test(env.clone(), |txn| {
+        txn.prepare("SELECT blob FROM DhtOp WHERE when_integrated IS NOT NULL")
+            .unwrap()
+            .query_and_then([], |row| from_blob(row.get("blob")?))
+            .unwrap()
+            .collect::<StateQueryResult<_>>()
+            .unwrap()
+    })
 }
 
 /// Same as wait for integration but can print other states at the same time
@@ -571,20 +548,21 @@ pub async fn wait_for_integration_with_others(
 /// Show authored data for each cell environment
 pub fn show_authored(envs: &[&EnvWrite]) {
     for (i, &env) in envs.iter().enumerate() {
-        // let chain = SourceChain::new(env.clone().into()).unwrap();
-        let chain: SourceChain = todo!();
-        // let mut items = chain.iter_back().collect::<Vec<_>>().unwrap();
-        let mut items: Vec<SignedHeaderHashed> = todo!();
-        items.reverse();
-        for item in items {
-            // let header = item.header();
-            // let seq_num = header.header_seq();
-            // let header_type = header.header_type();
-            // let entry = header
-            //     .entry_hash()
-            // .and_then(|e| chain.get_entry(e).unwrap());
-            // tracing::debug!(chain = %i, %seq_num, ?header_type, ?entry);
-        }
+        fresh_reader_test(env.clone(), |txn| {
+            txn.prepare("SELECT DISTINCT Header.seq, Header.type, Header.entry_hash FROM Header JOIN DhtOp ON Header.hash = DhtOp.hash WHERE is_authored = 1")
+            .unwrap()
+            .query_map([], |row| {
+                let header_type: String = row.get("type")?;
+                let seq: u32 = row.get("seq")?;
+                let entry: Option<EntryHash> = row.get("entry_hash")?;
+                Ok((header_type, seq, entry))
+            })
+            .unwrap()
+            .for_each(|r|{
+                let (header_type, seq, entry) = r.unwrap();
+                tracing::debug!(chain = %i, %seq, ?header_type, ?entry);
+            });
+        });
     }
 }
 
@@ -633,7 +611,24 @@ async fn get_counts(envs: &[&EnvWrite]) -> IntegrationStateDumps {
 }
 
 async fn count_integration(env: &EnvWrite) -> IntegrationStateDump {
-    todo!()
+    fresh_reader_test(env.clone(), |txn| {
+        let integrated = txn
+            .query_row(
+                "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let integration_limbo = txn.query_row("SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3", [], |row|row.get(0))
+            .unwrap();
+        let validation_limbo = txn.query_row("SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND (validation_stage IS NULL OR validation_stage < 3)", [], |row|row.get(0))
+            .unwrap();
+        IntegrationStateDump {
+            validation_limbo,
+            integration_limbo,
+            integrated,
+        }
+    })
 }
 
 async fn display_integration(env: &EnvWrite) -> usize {
@@ -645,66 +640,6 @@ async fn display_integration(env: &EnvWrite) -> usize {
         )
         .unwrap()
     })
-    // let val_limbo: Vec<_> = fresh_reader_test!(env, |mut r| {
-    //     workspace
-    //         .validation_limbo
-    //         .iter(&mut r)
-    //         .unwrap()
-    //         .map(|(_, v)| Ok(v))
-    //         .collect()
-    //         .unwrap()
-    // });
-    // tracing::debug!(?val_limbo);
-
-    // let int_limbo: Vec<_> = fresh_reader_test!(env, |mut r| {
-    //     workspace
-    //         .integration_limbo
-    //         .iter(&mut r)
-    //         .unwrap()
-    //         .map(|(_, v)| Ok(v))
-    //         .collect()
-    //         .unwrap()
-    // });
-    // tracing::debug!(?int_limbo);
-
-    // let int: Vec<_> = fresh_reader_test!(env, |mut r| {
-    //     workspace
-    //         .integrated_dht_ops
-    //         .iter(&mut r)
-    //         .unwrap()
-    //         .map(|(_, v)| Ok(v))
-    //         .collect()
-    //         .unwrap()
-    // });
-    // let count = int.len();
-
-    // {
-    //     let s = tracing::trace_span!("wait_for_integration_deep");
-    //     let _g = s.enter();
-    //     let mut cascade = Cascade::empty().with_vault(env.clone().into());
-    //     let mut headers_to_display = Vec::with_capacity(int.len());
-    //     for iv in int {
-    //         let el = cascade
-    //             .retrieve(iv.op.header_hash().clone().into(), Default::default())
-    //             .await
-    //             .unwrap()
-    //             .unwrap();
-    //         tracing::trace!(op = ?iv.op, ?el);
-    //         let header = el.header();
-    //         let entry = format!("{:?}", el.entry());
-    //         headers_to_display.push((
-    //             header.header_seq(),
-    //             header.header_type(),
-    //             iv.op.to_string(),
-    //             entry,
-    //         ))
-    //     }
-    //     headers_to_display.sort_by_key(|i| i.0);
-    //     for (i, h) in headers_to_display.into_iter().enumerate() {
-    //         tracing::debug!(?i, seq_num = %h.0, header_type = ?h.1, op_type = %h.2, entry = ?h.3);
-    //     }
-    // }
-    // count
 }
 
 /// Helper for displaying agent infos stored on a conductor

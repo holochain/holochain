@@ -183,11 +183,8 @@ where
     }
 
     fn insert_rendered_ops(txn: &mut Transaction, ops: RenderedOps) -> CascadeResult<()> {
-        let RenderedOps {
-            ops,
-            entry: entries,
-        } = ops;
-        for entry in entries {
+        let RenderedOps { ops, entry } = ops;
+        if let Some(entry) = entry {
             insert_entry(txn, entry)?;
         }
         for op in ops {
@@ -354,8 +351,7 @@ where
             return Ok(result.map(EntryHashed::from_content_sync));
         }
         options.request_type = holochain_p2p::event::GetRequest::Pending;
-        self.fetch_element(hash.clone().into(), options.into())
-            .await?;
+        self.fetch_element(hash.clone().into(), options).await?;
 
         // Check if we have the data now after the network call.
         let result = self.find_map(|store| Ok(store.get_entry(&hash)?))?;
@@ -374,8 +370,7 @@ where
             return Ok(result);
         }
         options.request_type = holochain_p2p::event::GetRequest::Pending;
-        self.fetch_element(hash.clone().into(), options.into())
-            .await?;
+        self.fetch_element(hash.clone().into(), options).await?;
 
         // Check if we have the data now after the network call.
         let result = self.find_map(|store| Ok(store.get_header(&hash)?))?;
@@ -394,8 +389,7 @@ where
             return Ok(result);
         }
         options.request_type = holochain_p2p::event::GetRequest::Pending;
-        self.fetch_element(hash.clone().into(), options.into())
-            .await?;
+        self.fetch_element(hash.clone(), options).await?;
 
         // Check if we have the data now after the network call.
         let result = self.find_map(|store| Ok(store.get_element(&hash)?))?;
@@ -624,7 +618,7 @@ where
     ) -> CascadeResult<Vec<Link>> {
         let authority = self.am_i_an_authority(key.base.clone().into()).await?;
         if !authority {
-            self.fetch_links(key.clone(), options.into()).await?;
+            self.fetch_links(key.clone(), options).await?;
         }
         let query = GetLinksQuery::new(key.base, key.zome_id, key.tag);
         let results = self.cascading(query)?;
@@ -641,7 +635,7 @@ where
     ) -> CascadeResult<Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)>> {
         let authority = self.am_i_an_authority(key.base.clone().into()).await?;
         if !authority {
-            self.fetch_links(key.clone(), options.into()).await?;
+            self.fetch_links(key.clone(), options).await?;
         }
         let query = GetLinkDetailsQuery::new(key.base, key.zome_id, key.tag);
         let results = self.cascading(query)?;

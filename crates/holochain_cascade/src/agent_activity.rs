@@ -87,10 +87,13 @@ fn merge_hashes(
     }
 }
 
+type ValidHashes = Vec<(u32, HeaderHash)>;
+type RejectedHashes = Vec<(u32, HeaderHash)>;
+
 fn compute_chain_status(
     valid: HashSet<(u32, HeaderHash)>,
     rejected: HashSet<(u32, HeaderHash)>,
-) -> (ChainStatus, Vec<(u32, HeaderHash)>, Vec<(u32, HeaderHash)>) {
+) -> (ChainStatus, ValidHashes, RejectedHashes) {
     let mut valid: Vec<_> = valid.into_iter().collect();
     let mut rejected: Vec<_> = rejected.into_iter().collect();
     // Sort ascending.
@@ -124,7 +127,7 @@ fn compute_chain_status(
         }
     }
 
-    let status = status.clone().unwrap_or_else(|| {
+    let status = status.unwrap_or_else(|| {
         if valid_out.is_empty() && rejected.is_empty() {
             ChainStatus::Empty
         } else {

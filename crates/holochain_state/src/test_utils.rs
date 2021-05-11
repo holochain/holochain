@@ -242,6 +242,15 @@ where
     fresh_reader_test!(&env.into(), f)
 }
 
+/// Function to help avoid needing to specify types.
+pub fn print_stmts_test<E, F, R>(env: E, f: F) -> R
+where
+    E: Into<EnvRead>,
+    F: FnOnce(Transaction) -> R,
+{
+    holochain_sqlite::print_stmts_test!(&env.into(), f)
+}
+
 #[tracing::instrument(skip(txn))]
 pub fn dump_db(txn: &Transaction) {
     let dump = |mut stmt: Statement| {

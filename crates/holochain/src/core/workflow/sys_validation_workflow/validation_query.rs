@@ -25,8 +25,7 @@ pub fn get_ops_to_sys_validate(env: &EnvRead) -> WorkflowResult<Vec<DhtOpHashed>
 }
 
 fn get_ops_to_validate(env: &EnvRead, system: bool) -> WorkflowResult<Vec<DhtOpHashed>> {
-    let mut sql = format!(
-        "
+    let mut sql = "
         SELECT 
         Header.blob as header_blob,
         Entry.blob as entry_blob,
@@ -38,7 +37,7 @@ fn get_ops_to_validate(env: &EnvRead, system: bool) -> WorkflowResult<Vec<DhtOpH
         LEFT JOIN
         Entry ON Header.entry_hash = Entry.hash
         "
-    );
+    .to_string();
     if system {
         sql.push_str(
             "
@@ -60,7 +59,7 @@ fn get_ops_to_validate(env: &EnvRead, system: bool) -> WorkflowResult<Vec<DhtOpH
         DhtOp.op_order ASC
         ",
     );
-    let results = env.conn()?.with_reader(|txn| {
+    env.conn()?.with_reader(|txn| {
         let mut stmt = txn.prepare(&sql)?;
         let r = stmt.query_and_then([], |row| {
             let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
@@ -78,8 +77,7 @@ fn get_ops_to_validate(env: &EnvRead, system: bool) -> WorkflowResult<Vec<DhtOpH
         })?;
         let r = r.collect();
         WorkflowResult::Ok(r)
-    })?;
-    results
+    })?
 }
 
 #[cfg(test)]

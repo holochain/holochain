@@ -171,7 +171,7 @@ impl Cell {
         let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
 
         // run genesis
-        let workspace = GenesisWorkspace::new(cell_env.clone().into())
+        let workspace = GenesisWorkspace::new(cell_env.clone())
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
         let args = GenesisWorkflowArgs::new(dna_file, id.agent_pubkey().clone(), membrane_proof);
@@ -493,11 +493,11 @@ impl Cell {
             AnyDht::Entry => self
                 .handle_get_entry(dht_hash.into(), options)
                 .await
-                .map(|r| WireOps::Entry(r)),
+                .map(WireOps::Entry),
             AnyDht::Header => self
                 .handle_get_element(dht_hash.into(), options)
                 .await
-                .map(|r| WireOps::Element(r)),
+                .map(WireOps::Element),
         };
         if let Err(e) = &mut r {
             error!(msg = "Error handling a get", ?e, agent = ?self.id.agent_pubkey());
