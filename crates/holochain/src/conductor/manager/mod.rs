@@ -113,9 +113,9 @@ impl std::fmt::Debug for ManagedTaskAdd {
 pub enum TaskOutcome {
     /// Spawn a new managed task.
     NewTask(ManagedTaskAdd),
-    /// Ignore the exit and do nothing.
-    Ignore,
-    /// Ignore the exit and do nothing.
+    /// Log an info trace and take no other action.
+    LogInfo(String),
+    /// Log an error and take no other action.
     MinorError(ManagedTaskError, String),
     /// Close the conductor down because this is an unrecoverable error.
     ShutdownConductor(Box<ManagedTaskError>, String),
@@ -167,10 +167,15 @@ async fn run(
         tokio::select! {
             Some(new_task) = new_task_channel.recv() => {
                 task_manager.stream.push(new_task);
+                tracing::info!("Task added. Total tasks: {}", task_manager.stream.len());
             }
-            result = task_manager.stream.next() => match result {
+            result = task_manager.stream.next() => {
+                tracing::info!("Task completed. Total tasks: {}", task_manager.stream.len());
+                match result {
                 Some(TaskOutcome::NewTask(new_task)) => task_manager.stream.push(new_task),
-                Some(TaskOutcome::Ignore) => (),
+                Some(TaskOutcome::LogInfo(context)) => {
+                    info!("Managed task completed: {}", context)
+                }
                 Some(TaskOutcome::MinorError(error, context)) => {
                     error!("Minor error during managed task: {:?}\nContext: {}", error, context)
                 }
@@ -219,7 +224,7 @@ async fn run(
                     tracing::error!("Apps quarantined via deactivation.");
                 },
                 None => return Ok(()),
-            }
+            }}
         };
     }
 }
@@ -229,20 +234,21 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
     use TaskOutcome::*;
     match kind {
         TaskKind::Ignore => match result {
-            Ok(_) => Ignore,
+            Ok(_) => LogInfo(name),
             Err(err) => MinorError(err, name),
         },
         TaskKind::Unrecoverable => match result {
-            Ok(_) => Ignore,
+            Ok(_) => LogInfo(name),
             Err(err) => ShutdownConductor(Box::new(err), name),
         },
         TaskKind::CellCritical(cell_id) => match result {
-            Ok(_) => Ignore,
+            Ok(_) => LogInfo(name),
             Err(err) => match &err {
                 ManagedTaskError::Conductor(conductor_err) => match conductor_err {
                     // If the error was due to validation failure during genesis,
                     // just uninstall the app.
-                    ConductorError::WorkflowError(WorkflowError::GenesisFailure(_)) => {
+                    ConductorError::WorkflowError(WorkflowError::GenesisFailure(_))
+                    | ConductorError::GenesisFailed { .. } => {
                         UninstallApp(cell_id.to_owned(), Box::new(err), name)
                     }
 
@@ -363,7 +369,7 @@ mod test {
                     let handle = ManagedTaskAdd::ignore(handle, "respawned task");
                     TaskOutcome::NewTask(handle)
                 }
-                _ => TaskOutcome::Ignore,
+                Err(_) => unreachable!("No other error is created by this test."),
             }),
         );
         // Check that the main task doesn't close straight away

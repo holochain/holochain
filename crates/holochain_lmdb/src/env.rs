@@ -159,6 +159,7 @@ impl GetDb for EnvironmentRead {
 /// The wrapper contains methods for managing transactions
 /// and database connections,
 #[derive(Clone, Shrinkwrap, Into, derive_more::From)]
+#[cfg_attr(feature = "test_utils", shrinkwrap(mutable, unsafe_ignore_visibility))]
 pub struct EnvironmentWrite(EnvironmentRead);
 
 impl EnvironmentWrite {

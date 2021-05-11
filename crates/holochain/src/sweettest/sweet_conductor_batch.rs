@@ -3,7 +3,6 @@ use crate::conductor::{config::ConductorConfig, error::ConductorResult};
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
-
 /// A collection of SweetConductors, with methods for operating on the entire collection
 #[derive(derive_more::From, derive_more::Into, derive_more::IntoIterator)]
 pub struct SweetConductorBatch(Vec<SweetConductor>);
