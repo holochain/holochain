@@ -77,9 +77,20 @@ fn rkv_builder(
 ) -> impl (Fn(&Path) -> Result<Rkv, rkv::StoreError>) {
     move |path: &Path| {
         let mut env_builder = Rkv::environment_builder();
+        let initial_map_size = initial_map_size.unwrap_or_else(|| {
+            std::env::var("HC_LMDB_SIZE")
+                .ok()
+                .and_then(|size| size.parse::<usize>().ok())
+                .unwrap_or(DEFAULT_INITIAL_MAP_SIZE)
+        });
+        let page_size = page_size::get();
+        let mut initial_map_size = initial_map_size / page_size * page_size;
+        if initial_map_size == 0 {
+            initial_map_size = page_size;
+        }
         env_builder
             // max size of memory map, can be changed later
-            .set_map_size(initial_map_size.unwrap_or(DEFAULT_INITIAL_MAP_SIZE))
+            .set_map_size(initial_map_size)
             // max number of DBs in this environment
             .set_max_dbs(MAX_DBS)
             .set_flags(flags.unwrap_or_else(default_flags) | required_flags());
