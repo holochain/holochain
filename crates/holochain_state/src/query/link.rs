@@ -24,6 +24,7 @@ impl LinksQuery {
         let tag = tag.map(|tag| Arc::new(Self::tag_to_hex(&tag)));
         let create_string = Self::create_query_string(tag.clone());
         let delete_string = Self::delete_query_string(tag.clone());
+        println!("{:?}", tag);
         Self {
             base: Arc::new(base),
             zome_id,
@@ -36,7 +37,7 @@ impl LinksQuery {
         use std::fmt::Write;
         let mut s = String::with_capacity(tag.0.len());
         for b in &tag.0 {
-            write!(&mut s, "{:X}", b).ok();
+            write!(&mut s, "{:02X}", b).ok();
         }
         s
     }

@@ -75,7 +75,7 @@ impl Query for GetAgentActivityQuery {
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         Arc::new(move |row| {
-            let validation_status: ValidationStatus = row.get("validation_status")?;
+            let validation_status: Option<ValidationStatus> = row.get("validation_status")?;
             let hash: HeaderHash = row.get("hash")?;
             let item = from_blob::<SignedHeader>(row.get("header_blob")?).and_then(|header| {
                 let integrated: Option<i32> = row.get("when_integrated")?;
@@ -85,7 +85,7 @@ impl Query for GetAgentActivityQuery {
                 } else {
                     Item::Pending(header)
                 };
-                Ok(Judged::new(item, validation_status))
+                Ok(Judged::raw(item, validation_status))
             });
             Ok(item?)
         })

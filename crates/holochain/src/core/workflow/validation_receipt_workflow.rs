@@ -40,6 +40,8 @@ pub async fn validation_receipt_workflow(
             DhtOp.require_receipt = 1
             AND
             DhtOp.when_integrated_ns IS NOT NULL
+            AND
+            DhtOp.validation_status IS NOT NULL
             ",
         )?;
         let ops = stmt

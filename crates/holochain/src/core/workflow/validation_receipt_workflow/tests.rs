@@ -93,9 +93,10 @@ async fn test_validation_receipt() {
                 let mut stmt = txn
                     .prepare("SELECT receipt_count FROM DhtOp WHERE is_authored = 1")
                     .unwrap();
-                stmt.query_map([], |row| row.get::<_, u32>("receipt_count"))
+                stmt.query_map([], |row| row.get::<_, Option<u32>>("receipt_count"))
                     .unwrap()
                     .map(Result::unwrap)
+                    .filter_map(|i| i)
                     .collect::<Vec<u32>>()
             })
         },

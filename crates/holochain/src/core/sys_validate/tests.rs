@@ -1,6 +1,7 @@
 use super::*;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::MockCellConductorApi;
+use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 
@@ -63,17 +64,25 @@ async fn check_valid_if_dna_test() {
 
     // Empty store not dna
     let header = fixt!(CreateLink);
-    let workspace = SysValidationWorkspace::new(env, tmp_cache.env());
+    let workspace = SysValidationWorkspace::new(env.clone(), tmp_cache.env());
 
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &workspace).await,
         Ok(())
     );
-    let header = fixt!(Dna);
+    let mut header = fixt!(Dna);
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &workspace).await,
         Ok(())
     );
+
+    fake_genesis(env.clone().into()).await.unwrap();
+    env.conn()
+        .unwrap()
+        .execute("UPDATE DhtOp SET when_integrated = 0", [])
+        .unwrap();
+
+    header.author = fake_agent_pubkey_1();
 
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &workspace).await,

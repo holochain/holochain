@@ -666,7 +666,8 @@ impl SysValidationWorkspace {
         Ok(())
     }
     pub fn is_chain_empty(&self, author: &AgentPubKey) -> SourceChainResult<bool> {
-        let chain_not_empty = self.vault.conn()?.with_reader(|txn| {
+        let mut conn = self.vault.conn()?;
+        let chain_not_empty = conn.with_reader(|txn| {
             let mut stmt = txn.prepare(
                 "
                 SELECT 

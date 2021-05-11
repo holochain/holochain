@@ -40,11 +40,10 @@ async fn integrate_query() {
     let expected = test_data(&env.env().into());
     let (qt, _rx) = TriggerSender::new();
     let (qt2, _rx) = TriggerSender::new();
-    // env.dump_tmp().unwrap();
+    // dump_tmp(&env.env());
     integrate_dht_ops_workflow(env.env().into(), qt, qt2)
         .await
         .unwrap();
-    // env.dump_tmp().unwrap();
     let hashes = env
         .conn()
         .unwrap()
@@ -106,6 +105,7 @@ fn create_and_insert_op(env: &EnvRead, facts: Facts, data: &mut SharedData) -> D
         .with_commit(|txn| {
             let hash = state.as_hash().clone();
             insert_op(txn, state.clone(), false).unwrap();
+            set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
             if facts.integrated {
                 set_when_integrated(txn, hash.clone(), holochain_types::timestamp::now()).unwrap();
             }

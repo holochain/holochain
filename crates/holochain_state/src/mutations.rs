@@ -34,7 +34,6 @@ macro_rules! sql_insert {
     }};
 }
 
-#[macro_export]
 macro_rules! dht_op_update {
     ($txn:expr, $hash:expr, { $($field:literal : $val:expr , )+ $(,)? }) => {{
         let fieldvars = &[ $( { format!("{} = :{}", $field, $field) } ,)+ ].join(",");
@@ -52,10 +51,9 @@ macro_rules! dht_op_update {
     }};
 }
 
-#[macro_export]
 macro_rules! dht_op_add_one {
     ($txn:expr, $hash:expr, $field:literal) => {{
-        let fieldvars = format!("{} = {} + 1", $field, $field);
+        let fieldvars = format!("{} = IFNULL({}, 0) + 1", $field, $field);
         let sql = format!(
             "
             UPDATE DhtOp 
