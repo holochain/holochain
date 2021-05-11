@@ -24,7 +24,6 @@ impl LinksQuery {
         let tag = tag.map(|tag| Arc::new(Self::tag_to_hex(&tag)));
         let create_string = Self::create_query_string(tag.clone());
         let delete_string = Self::delete_query_string(tag.clone());
-        println!("{:?}", tag);
         Self {
             base: Arc::new(base),
             zome_id,

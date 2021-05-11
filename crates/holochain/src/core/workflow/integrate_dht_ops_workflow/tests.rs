@@ -155,9 +155,8 @@ impl Db {
     /// Checks that the database is in a state
     #[instrument(skip(expects, env))]
     async fn check(expects: Vec<Self>, env: EnvWrite, here: String) {
-        dump_tmp(&env);
-        // fresh_reader_test(env, |txn| {
-        print_stmts_test(env, |txn| {
+        fresh_reader_test(env, |txn| {
+            // print_stmts_test(env, |txn| {
             for expect in expects {
                 match expect {
                     Db::Integrated(op) => {
