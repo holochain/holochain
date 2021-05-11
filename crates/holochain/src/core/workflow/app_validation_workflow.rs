@@ -48,8 +48,7 @@ pub use types::Outcome;
 // #[cfg(test)]
 #[cfg(todo_redo_old_tests)]
 mod network_call_tests;
-// #[cfg(test)]
-#[cfg(todo_redo_old_tests)]
+#[cfg(test)]
 mod tests;
 
 mod error;
@@ -862,16 +861,13 @@ impl AppValidationWorkspace {
     ) -> Cascade<Network> {
         Cascade::empty()
             .with_vault(self.vault.clone())
-            .with_network(network, self.cache.clone().into())
+            .with_network(network, self.cache.clone())
     }
 }
 
 impl From<&HostFnWorkspace> for AppValidationWorkspace {
     fn from(h: &HostFnWorkspace) -> Self {
         let (vault, cache) = h.databases();
-        Self {
-            vault,
-            cache: cache.into(),
-        }
+        Self { vault, cache }
     }
 }

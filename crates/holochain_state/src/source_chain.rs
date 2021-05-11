@@ -148,6 +148,10 @@ impl SourceChain {
         Ok(self.len()? > 3)
     }
 
+    pub fn is_empty(&self) -> SourceChainResult<bool> {
+        Ok(self.len()? == 0)
+    }
+
     pub fn len(&self) -> SourceChainResult<u32> {
         Ok(self.scratch.apply(|scratch| {
             let scratch_max = chain_head_scratch(&(*scratch), self.author.as_ref()).map(|(_, s)| s);
@@ -201,11 +205,7 @@ impl SourceChain {
                 .filter_map(|result: StateQueryResult<Entry>| match result {
                     Ok(entry) => entry
                         .as_cap_grant()
-                        .filter(|grant| match grant {
-                            // This is short circuited at the start.
-                            CapGrant::ChainAuthor(_) => false,
-                            _ => true,
-                        })
+                        .filter(|grant| !matches!(grant, CapGrant::ChainAuthor(_)))
                         .filter(|grant| grant.is_valid(check_function, check_agent, check_secret))
                         .map(|cap| Some(Ok(cap)))
                         .unwrap_or(None),

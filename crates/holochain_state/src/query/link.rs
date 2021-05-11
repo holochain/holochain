@@ -15,20 +15,20 @@ pub struct GetLinksQuery {
 pub struct LinksQuery {
     pub base: Arc<EntryHash>,
     pub zome_id: ZomeId,
-    pub tag: Option<Arc<String>>,
-    query: Arc<String>,
+    pub tag: Option<String>,
+    query: String,
 }
 
 impl LinksQuery {
     pub fn new(base: EntryHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
-        let tag = tag.map(|tag| Arc::new(Self::tag_to_hex(&tag)));
+        let tag = tag.map(|tag| Self::tag_to_hex(&tag));
         let create_string = Self::create_query_string(tag.clone());
         let delete_string = Self::delete_query_string(tag.clone());
         Self {
             base: Arc::new(base),
             zome_id,
             tag,
-            query: Arc::new(Self::create_query(create_string, delete_string)),
+            query: Self::create_query(create_string, delete_string),
         }
     }
 
@@ -54,7 +54,7 @@ impl LinksQuery {
     }
 
     pub fn query(&self) -> String {
-        (*self.query).clone()
+        self.query.clone()
     }
 
     fn common_query_string() -> &'static str {
@@ -70,7 +70,7 @@ impl LinksQuery {
             AND (DhtOp.when_integrated IS NOT NULL OR DhtOp.is_authored = 1)
         "
     }
-    fn create_query_string(tag: Option<Arc<String>>) -> String {
+    fn create_query_string(tag: Option<String>) -> String {
         let s = format!(
             "
             SELECT Header.blob AS header_blob FROM DhtOp
@@ -80,7 +80,7 @@ impl LinksQuery {
         );
         Self::add_tag(s, tag)
     }
-    fn add_tag(q: String, tag: Option<Arc<String>>) -> String {
+    fn add_tag(q: String, tag: Option<String>) -> String {
         if let Some(tag) = tag {
             format!(
                 "{}
@@ -92,7 +92,7 @@ impl LinksQuery {
             q
         }
     }
-    fn delete_query_string(tag: Option<Arc<String>>) -> String {
+    fn delete_query_string(tag: Option<String>) -> String {
         let sub_create_query = format!(
             "
             SELECT Header.hash FROM DhtOp
@@ -119,15 +119,16 @@ impl LinksQuery {
     }
 
     pub fn params(&self) -> Vec<Params> {
-        let params = named_params! {
-            ":create": DhtOpType::RegisterAddLink,
-            ":delete": DhtOpType::RegisterRemoveLink,
-            ":base_hash": self.base,
-            ":zome_id": self.zome_id,
-            ":status": ValidationStatus::Valid,
+        {
+            named_params! {
+                ":create": DhtOpType::RegisterAddLink,
+                ":delete": DhtOpType::RegisterRemoveLink,
+                ":base_hash": self.base,
+                ":zome_id": self.zome_id,
+                ":status": ValidationStatus::Valid,
+            }
         }
-        .to_vec();
-        params
+        .to_vec()
     }
 }
 

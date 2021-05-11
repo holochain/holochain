@@ -49,7 +49,7 @@ pub struct EntryTestData {
 }
 
 impl EntryTestData {
-    pub fn new() -> Self {
+    pub fn create() -> Self {
         let mut create = fixt!(Create);
         let mut update = fixt!(Update);
         let mut delete = fixt!(Delete);
@@ -65,7 +65,7 @@ impl EntryTestData {
         let update_entry_hash = EntryHash::with_data_sync(&update_entry);
 
         create.entry_hash = entry_hash.clone();
-        update.entry_hash = update_entry_hash.clone();
+        update.entry_hash = update_entry_hash;
 
         let create_header = Header::Create(create.clone());
         let create_hash = HeaderHash::with_data_sync(&create_header);
@@ -95,34 +95,22 @@ impl EntryTestData {
             Box::new(entry.clone()),
         ));
 
-        let wire_create = Judged::valid(
-            SignedHeader(create_header.clone(), signature.clone())
-                .try_into()
-                .unwrap(),
-        );
+        let wire_create = Judged::valid(SignedHeader(create_header, signature).try_into().unwrap());
 
         let signature = fixt!(Signature);
         let delete_entry_header_op = DhtOpHashed::from_content_sync(
-            DhtOp::RegisterDeletedEntryHeader(signature.clone(), delete.clone()),
+            DhtOp::RegisterDeletedEntryHeader(signature.clone(), delete),
         );
 
-        let wire_delete = Judged::valid(
-            SignedHeader(delete_header.clone(), signature.clone())
-                .try_into()
-                .unwrap(),
-        );
+        let wire_delete = Judged::valid(SignedHeader(delete_header, signature).try_into().unwrap());
 
         let signature = fixt!(Signature);
         let update_content_op = DhtOpHashed::from_content_sync(DhtOp::RegisterUpdatedContent(
             signature.clone(),
-            update.clone(),
+            update,
             Some(Box::new(update_entry)),
         ));
-        let wire_update = Judged::valid(
-            SignedHeader(update_header.clone(), signature.clone())
-                .try_into()
-                .unwrap(),
-        );
+        let wire_update = Judged::valid(SignedHeader(update_header, signature).try_into().unwrap());
 
         let signature = fixt!(Signature);
         let create_link_op = DhtOpHashed::from_content_sync(DhtOp::RegisterAddLink(
@@ -135,7 +123,7 @@ impl EntryTestData {
             ValidationStatus::Valid,
         );
         let wire_create_link_base = WireCreateLink::condense_base_only(
-            create_link_header.clone().try_into().unwrap(),
+            create_link_header.try_into().unwrap(),
             signature.clone(),
             ValidationStatus::Valid,
         );
@@ -151,12 +139,12 @@ impl EntryTestData {
             delete_link.clone(),
         ));
         let wire_delete_link = WireDeleteLink::condense(
-            delete_link_header.clone().try_into().unwrap(),
+            delete_link_header.try_into().unwrap(),
             signature.clone(),
             ValidationStatus::Valid,
         );
         let delete_link_header = SignedHeaderHashed::with_presigned(
-            HeaderHashed::from_content_sync(Header::DeleteLink(delete_link.clone())),
+            HeaderHashed::from_content_sync(Header::DeleteLink(delete_link)),
             signature,
         );
 
@@ -173,14 +161,14 @@ impl EntryTestData {
 
         let link = Link {
             target: create_link.target_address.clone(),
-            timestamp: create_link.timestamp.clone(),
-            tag: create_link.tag.clone(),
-            create_link_hash: create_link_hash.clone(),
+            timestamp: create_link.timestamp,
+            tag: create_link.tag,
+            create_link_hash,
         };
 
         let entry = EntryData {
             entry,
-            entry_type: create.entry_type.clone(),
+            entry_type: create.entry_type,
         };
 
         Self {

@@ -86,7 +86,7 @@ impl WireElementOps {
             }
         }
         Ok(RenderedOps {
-            entry: entry.map(|e| EntryHashed::from_content_sync(e)),
+            entry: entry.map(EntryHashed::from_content_sync),
             ops,
         })
     }

@@ -232,8 +232,8 @@ async fn entry_not_authority_or_authoring() {
     let authority = test_cell_env();
 
     // Data
-    let td_entry = EntryTestData::new();
-    let td_element = ElementTestData::new();
+    let td_entry = EntryTestData::create();
+    let td_element = ElementTestData::create();
     fill_db(&authority.env(), td_entry.store_entry_op.clone());
     fill_db(&authority.env(), td_element.any_store_element_op.clone());
 
@@ -255,8 +255,8 @@ async fn entry_authoring() {
     let mut scratch = Scratch::new();
 
     // Data
-    let td_entry = EntryTestData::new();
-    let td_element = ElementTestData::new();
+    let td_entry = EntryTestData::create();
+    let td_element = ElementTestData::create();
     insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone()).unwrap();
     insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone()).unwrap();
 
@@ -283,8 +283,8 @@ async fn entry_authority() {
     let vault = test_cell_env();
 
     // Data
-    let td_entry = EntryTestData::new();
-    let td_element = ElementTestData::new();
+    let td_entry = EntryTestData::create();
+    let td_element = ElementTestData::create();
     fill_db(&vault.env(), td_entry.store_entry_op.clone());
     fill_db(&vault.env(), td_element.any_store_element_op.clone());
 
@@ -311,8 +311,8 @@ async fn content_not_authority_or_authoring() {
     let vault = test_cell_env();
 
     // Data
-    let td_entry = EntryTestData::new();
-    let td_element = ElementTestData::new();
+    let td_entry = EntryTestData::create();
+    let td_element = ElementTestData::create();
     fill_db(&vault.env(), td_entry.store_entry_op.clone());
     fill_db(&vault.env(), td_element.any_store_element_op.clone());
 
@@ -339,8 +339,8 @@ async fn content_authoring() {
     let mut scratch = Scratch::new();
 
     // Data
-    let td_entry = EntryTestData::new();
-    let td_element = ElementTestData::new();
+    let td_entry = EntryTestData::create();
+    let td_element = ElementTestData::create();
     insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone()).unwrap();
     insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone()).unwrap();
 
@@ -367,8 +367,8 @@ async fn content_authority() {
     let vault = test_cell_env();
 
     // Data
-    let td_entry = EntryTestData::new();
-    let td_element = ElementTestData::new();
+    let td_entry = EntryTestData::create();
+    let td_element = ElementTestData::create();
 
     // Network
     // - Not expecting any calls to the network.
@@ -393,8 +393,8 @@ async fn rejected_ops() {
     let authority = test_cell_env();
 
     // Data
-    let td_entry = EntryTestData::new();
-    let td_element = ElementTestData::new();
+    let td_entry = EntryTestData::create();
+    let td_element = ElementTestData::create();
     fill_db_rejected(&authority.env(), td_entry.store_entry_op.clone());
     fill_db_rejected(&authority.env(), td_element.any_store_element_op.clone());
 
@@ -415,8 +415,8 @@ async fn check_can_handle_rejected_ops_in_cache() {
     let authority = test_cell_env();
 
     // Data
-    let td_entry = EntryTestData::new();
-    let td_element = ElementTestData::new();
+    let td_entry = EntryTestData::create();
+    let td_element = ElementTestData::create();
     fill_db_rejected(&cache.env(), td_entry.store_entry_op.clone());
     fill_db_rejected(&cache.env(), td_element.any_store_element_op.clone());
 
@@ -457,8 +457,8 @@ async fn test_pending_data_isnt_returned() {
     let vault = test_cell_env();
 
     // Data
-    let td_entry = EntryTestData::new();
-    let td_element = ElementTestData::new();
+    let td_entry = EntryTestData::create();
+    let td_element = ElementTestData::create();
     fill_db_pending(&authority.env(), td_entry.store_entry_op.clone());
     fill_db_pending(&authority.env(), td_element.any_store_element_op.clone());
     fill_db_pending(&vault.env(), td_entry.store_entry_op.clone());

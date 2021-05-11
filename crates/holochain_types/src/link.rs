@@ -151,7 +151,7 @@ impl WireCreateLink {
             prev_header: self.prev_header,
             base_address: key.base.clone(),
             target_address: self.target_address,
-            zome_id: key.zome_id.clone(),
+            zome_id: key.zome_id,
             tag,
         });
         let signature = self.signature;

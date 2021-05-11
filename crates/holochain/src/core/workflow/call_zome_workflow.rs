@@ -67,7 +67,7 @@ async fn call_zome_workflow_inner<
     Ribosome: RibosomeT + Send + 'static,
     C: CellConductorApiT,
 >(
-    mut workspace: HostFnWorkspace,
+    workspace: HostFnWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     args: CallZomeWorkflowArgs<Ribosome, C>,
@@ -110,7 +110,7 @@ async fn call_zome_workflow_inner<
             Vec::with_capacity(workspace.source_chain().len()? as usize);
         // Loop forwards through all the new elements
         for element in workspace.source_chain().elements()? {
-            sys_validate_element(&element, &mut workspace, network.clone(), &conductor_api)
+            sys_validate_element(&element, &workspace, network.clone(), &conductor_api)
                 .await
                 // If the was en error exit
                 // If the validation failed, exit with an InvalidCommit

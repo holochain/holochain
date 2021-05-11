@@ -235,7 +235,7 @@ pub fn fill_db_pending(env: &EnvWrite, op: DhtOpHashed) {
         .with_commit(|txn| {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false).unwrap();
-            set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
+            set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
             DatabaseResult::Ok(())
         })
         .unwrap();
