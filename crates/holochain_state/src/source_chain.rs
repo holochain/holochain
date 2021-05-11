@@ -565,7 +565,7 @@ fn chain_head_scratch(scratch: &Scratch, author: &AgentPubKey) -> Option<(Header
 }
 
 #[cfg(test)]
-async fn put_db<H: HeaderInner, B: HeaderBuilder<H>>(
+async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     vault: holochain_types::env::EnvWrite,
     author: Arc<AgentPubKey>,
     header_builder: B,
@@ -887,7 +887,7 @@ pub mod tests {
         //     Ok(())
     }
 
-    fn fixtures() -> (
+    fn _fixtures() -> (
         AgentPubKey,
         HeaderHashed,
         Option<Entry>,
