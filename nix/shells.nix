@@ -39,7 +39,8 @@ rec {
   # * everything needed to compile this repos' crates
   # * CI scripts
   coreDev = hcMkShell {
-    nativeBuildInputs = builtins.attrValues (pkgs.core);
+    nativeBuildInputs = builtins.attrValues (pkgs.core)
+      ++ [ holonix.pkgs.sqlcipher ];
   };
 
   ci = hcMkShell {

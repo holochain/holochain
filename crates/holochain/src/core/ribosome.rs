@@ -48,8 +48,13 @@ use holochain_types::prelude::*;
 use mockall::automock;
 use std::iter::Iterator;
 
-use self::error::RibosomeError;
-use self::guest_callback::entry_defs::EntryDefsInvocation;
+use self::guest_callback::{
+    entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
+};
+use self::{
+    error::RibosomeError,
+    guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation},
+};
 
 #[derive(Clone)]
 pub struct CallContext {
@@ -74,6 +79,7 @@ impl CallContext {
 #[derive(Clone)]
 pub enum HostAccess {
     ZomeCall(ZomeCallHostAccess),
+    GenesisSelfCheck(GenesisSelfCheckHostAccess),
     Validate(ValidateHostAccess),
     ValidateCreateLink(ValidateLinkHostAccess),
     Init(InitHostAccess),
@@ -86,18 +92,15 @@ pub enum HostAccess {
 impl From<&HostAccess> for HostFnAccess {
     fn from(host_access: &HostAccess) -> Self {
         match host_access {
-            HostAccess::ZomeCall(zome_call_host_access) => zome_call_host_access.into(),
-            HostAccess::Validate(validate_host_access) => validate_host_access.into(),
-            HostAccess::ValidateCreateLink(validate_link_add_host_access) => {
-                validate_link_add_host_access.into()
-            }
-            HostAccess::Init(init_host_access) => init_host_access.into(),
-            HostAccess::EntryDefs(entry_defs_host_access) => entry_defs_host_access.into(),
-            HostAccess::MigrateAgent(migrate_agent_host_access) => migrate_agent_host_access.into(),
-            HostAccess::ValidationPackage(validation_package_host_access) => {
-                validation_package_host_access.into()
-            }
-            HostAccess::PostCommit(post_commit_host_access) => post_commit_host_access.into(),
+            HostAccess::ZomeCall(access) => access.into(),
+            HostAccess::GenesisSelfCheck(access) => access.into(),
+            HostAccess::Validate(access) => access.into(),
+            HostAccess::ValidateCreateLink(access) => access.into(),
+            HostAccess::Init(access) => access.into(),
+            HostAccess::EntryDefs(access) => access.into(),
+            HostAccess::MigrateAgent(access) => access.into(),
+            HostAccess::ValidationPackage(access) => access.into(),
+            HostAccess::PostCommit(access) => access.into(),
         }
     }
 }
@@ -447,6 +450,12 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         // pseudocode
         // self.instance().exports().filter(|e| !e.is_callback())
     }
+
+    fn run_genesis_self_check(
+        &self,
+        access: GenesisSelfCheckHostAccess,
+        invocation: GenesisSelfCheckInvocation,
+    ) -> RibosomeResult<GenesisSelfCheckResult>;
 
     fn run_init(
         &self,

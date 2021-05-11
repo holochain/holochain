@@ -9,7 +9,10 @@
 
 use super::error::WorkflowError;
 use super::error::WorkflowResult;
-use crate::conductor::api::CellConductorApiT;
+use crate::core::ribosome::guest_callback::genesis_self_check::{
+    GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation, GenesisSelfCheckResult,
+};
+use crate::{conductor::api::CellConductorApiT, core::ribosome::RibosomeT};
 use derive_more::Constructor;
 use holochain_sqlite::prelude::*;
 use holochain_state::source_chain;
@@ -20,35 +23,61 @@ use tracing::*;
 
 /// The struct which implements the genesis Workflow
 #[derive(Constructor, Debug)]
-pub struct GenesisWorkflowArgs {
+pub struct GenesisWorkflowArgs<Ribosome>
+where
+    Ribosome: RibosomeT + Send + 'static,
+{
     dna_file: DnaFile,
     agent_pubkey: AgentPubKey,
     membrane_proof: Option<SerializedBytes>,
+    ribosome: Ribosome,
 }
 
 #[instrument(skip(workspace, api))]
-pub async fn genesis_workflow<'env, Api: CellConductorApiT>(
+pub async fn genesis_workflow<'env, Api: CellConductorApiT, Ribosome>(
     mut workspace: GenesisWorkspace,
     api: Api,
-    args: GenesisWorkflowArgs,
-) -> WorkflowResult<()> {
+    args: GenesisWorkflowArgs<Ribosome>,
+) -> WorkflowResult<()>
+where
+    Ribosome: RibosomeT + Send + 'static,
+{
     genesis_workflow_inner(&mut workspace, args, api).await?;
     Ok(())
 }
 
-async fn genesis_workflow_inner<Api: CellConductorApiT>(
+async fn genesis_workflow_inner<Api: CellConductorApiT, Ribosome>(
     workspace: &mut GenesisWorkspace,
-    args: GenesisWorkflowArgs,
+    args: GenesisWorkflowArgs<Ribosome>,
     api: Api,
-) -> WorkflowResult<()> {
+) -> WorkflowResult<()>
+where
+    Ribosome: RibosomeT + Send + 'static,
+{
     let GenesisWorkflowArgs {
         dna_file,
         agent_pubkey,
         membrane_proof,
+        ribosome,
     } = args;
 
     if workspace.has_genesis(&agent_pubkey)? {
         return Ok(());
+    }
+
+    let result = ribosome.run_genesis_self_check(
+        GenesisSelfCheckHostAccess,
+        GenesisSelfCheckInvocation {
+            payload: GenesisSelfCheckData {
+                membrane_proof: membrane_proof.clone(),
+                agent_key: agent_pubkey.clone(),
+            },
+        },
+    )?;
+
+    // If the self-check fails, fail genesis, and don't create the source chain.
+    if let GenesisSelfCheckResult::Invalid(reason) = result {
+        return Err(WorkflowError::GenesisFailure(reason));
     }
 
     // TODO: this is a placeholder for a real DPKI request to show intent
@@ -112,6 +141,7 @@ pub mod tests {
     use super::*;
 
     use crate::conductor::api::MockCellConductorApi;
+    use crate::core::ribosome::MockRibosomeT;
     use holochain_state::{prelude::test_cell_env, source_chain::SourceChain};
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
@@ -132,10 +162,15 @@ pub mod tests {
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
+            let mut ribosome = MockRibosomeT::new();
+            ribosome
+                .expect_run_genesis_self_check()
+                .returning(|_, _| Ok(GenesisSelfCheckResult::Valid));
             let args = GenesisWorkflowArgs {
                 dna_file: dna.clone(),
                 agent_pubkey: author.clone(),
                 membrane_proof: None,
+                ribosome,
             };
             let _: () = genesis_workflow(workspace, api, args).await.unwrap();
         }

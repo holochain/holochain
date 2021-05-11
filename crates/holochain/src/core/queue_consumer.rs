@@ -29,6 +29,7 @@
 use derive_more::Display;
 use futures::future::Either;
 use holochain_types::prelude::*;
+use holochain_zome_types::CellId;
 use tokio::sync;
 use tokio::sync::mpsc;
 
@@ -42,10 +43,13 @@ use app_validation_consumer::*;
 mod publish_dht_ops_consumer;
 use validation_receipt_consumer::*;
 mod validation_receipt_consumer;
-use crate::conductor::api::CellConductorApiT;
-use crate::conductor::manager::ManagedTaskAdd;
+use crate::conductor::{api::CellConductorApiT, error::ConductorError, manager::ManagedTaskResult};
+use crate::conductor::{manager::ManagedTaskAdd, ConductorHandle};
 use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::*;
 use publish_dht_ops_consumer::*;
+
+use super::workflow::error::WorkflowError;
 
 /// Spawns several long-running tasks which are responsible for processing work
 /// which shows up on various databases.
@@ -53,26 +57,44 @@ use publish_dht_ops_consumer::*;
 /// Waits for the initial loop to complete before returning, to prevent causing
 /// a race condition by trying to run a workflow too soon after cell creation.
 pub async fn spawn_queue_consumer_tasks(
-    env: &EnvWrite,
-    cache: &EnvWrite,
+    env: EnvWrite,
+    cache: EnvWrite,
     cell_network: HolochainP2pCell,
+    conductor_handle: ConductorHandle,
     conductor_api: impl CellConductorApiT + 'static,
     task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
     stop: sync::broadcast::Sender<()>,
 ) -> (QueueTriggers, InitialQueueTriggers) {
+    let cell_id = cell_network.cell_id();
     // Publish
-    let (tx_publish, handle) =
-        spawn_publish_dht_ops_consumer(env.clone(), stop.subscribe(), cell_network.clone());
+    let (tx_publish, handle) = spawn_publish_dht_ops_consumer(
+        env.clone(),
+        conductor_handle.clone(),
+        stop.subscribe(),
+        cell_network.clone(),
+    );
     task_sender
-        .send(ManagedTaskAdd::unrecoverable(handle))
+        .send(ManagedTaskAdd::cell_critical(
+            handle,
+            cell_id.clone(),
+            "publish_dht_ops_consumer",
+        ))
         .await
         .expect("Failed to manage workflow handle");
 
     // Validation Receipt
-    let (tx_receipt, handle) =
-        spawn_validation_receipt_consumer(env.clone(), stop.subscribe(), cell_network.clone());
+    let (tx_receipt, handle) = spawn_validation_receipt_consumer(
+        env.clone(),
+        conductor_handle.clone(),
+        stop.subscribe(),
+        cell_network.clone(),
+    );
     task_sender
-        .send(ManagedTaskAdd::unrecoverable(handle))
+        .send(ManagedTaskAdd::cell_critical(
+            handle,
+            cell_id.clone(),
+            "validation_receipt_consumer",
+        ))
         .await
         .expect("Failed to manage workflow handle");
 
@@ -81,12 +103,18 @@ pub async fn spawn_queue_consumer_tasks(
     // Integration
     let (tx_integration, handle) = spawn_integrate_dht_ops_consumer(
         env.clone(),
+        conductor_handle.clone(),
+        cell_network.cell_id(),
         stop.subscribe(),
         get_tx_sys,
         tx_receipt.clone(),
     );
     task_sender
-        .send(ManagedTaskAdd::unrecoverable(handle))
+        .send(ManagedTaskAdd::cell_critical(
+            handle,
+            cell_id.clone(),
+            "integrate_dht_ops_consumer",
+        ))
         .await
         .expect("Failed to manage workflow handle");
 
@@ -94,13 +122,18 @@ pub async fn spawn_queue_consumer_tasks(
     let (tx_app, handle) = spawn_app_validation_consumer(
         env.clone(),
         cache.clone(),
+        conductor_handle.clone(),
         stop.subscribe(),
         tx_integration.clone(),
         conductor_api.clone(),
         cell_network.clone(),
     );
     task_sender
-        .send(ManagedTaskAdd::unrecoverable(handle))
+        .send(ManagedTaskAdd::cell_critical(
+            handle,
+            cell_id.clone(),
+            "app_validation_consumer",
+        ))
         .await
         .expect("Failed to manage workflow handle");
 
@@ -108,13 +141,18 @@ pub async fn spawn_queue_consumer_tasks(
     let (tx_sys, handle) = spawn_sys_validation_consumer(
         env.clone(),
         cache.clone(),
+        conductor_handle.clone(),
         stop.subscribe(),
         tx_app.clone(),
-        cell_network,
+        cell_network.clone(),
         conductor_api,
     );
     task_sender
-        .send(ManagedTaskAdd::unrecoverable(handle))
+        .send(ManagedTaskAdd::cell_critical(
+            handle,
+            cell_id.clone(),
+            "sys_validation_consumer",
+        ))
         .await
         .expect("Failed to manage workflow handle");
     if create_tx_sys.send(tx_sys.clone()).is_err() {
@@ -282,4 +320,14 @@ async fn next_job_or_exit(
     } else {
         Job::Run
     }
+}
+
+/// Does nothing.
+async fn handle_workflow_error(
+    _conductor: ConductorHandle,
+    _cell_id: CellId,
+    err: WorkflowError,
+    _reason: &str,
+) -> ManagedTaskResult {
+    Err(ConductorError::from(err).into())
 }

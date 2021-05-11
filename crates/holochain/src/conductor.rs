@@ -10,6 +10,7 @@
 //! outside world
 
 #![deny(missing_docs)]
+
 // TODO: clean up allows once parent is fully documented
 
 pub mod api;

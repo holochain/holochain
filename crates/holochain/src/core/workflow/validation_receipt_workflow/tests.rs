@@ -1,5 +1,5 @@
+use crate::sweettest::*;
 use crate::test_utils::consistency_10s;
-use crate::test_utils::sweetest::*;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
@@ -36,7 +36,7 @@ async fn test_validation_receipt() {
         .await
         .unwrap();
 
-    let apps = conductors.setup_app("app", &[dna_file]).await;
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();

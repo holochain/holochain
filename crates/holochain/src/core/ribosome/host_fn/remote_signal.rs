@@ -55,8 +55,8 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use super::*;
-    use crate::test_utils::sweetest::SweetDnaFile;
-    use crate::test_utils::sweetest::{SweetAgents, SweetConductorBatch};
+    use crate::sweettest::SweetDnaFile;
+    use crate::sweettest::{SweetAgents, SweetConductorBatch};
     use futures::future;
     use hdk::prelude::*;
     use holochain_types::dna::zome::inline_zome::InlineZome;
@@ -83,7 +83,7 @@ mod tests {
                 api.emit_signal(AppSignal::new(signal)).map_err(Into::into)
             })
             .callback("init", move |api, ()| {
-                let mut functions: GrantedFunctions = HashSet::new();
+                let mut functions: GrantedFunctions = BTreeSet::new();
                 functions.insert((
                     api.zome_info(()).unwrap().zome_name,
                     "recv_remote_signal".into(),
@@ -125,7 +125,8 @@ mod tests {
 
         let apps = conductors
             .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone().into()])
-            .await;
+            .await
+            .unwrap();
 
         conductors.exchange_peer_info().await;
 

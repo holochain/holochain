@@ -3,7 +3,7 @@
 use hdk::prelude::*;
 use holochain::{
     conductor::api::error::ConductorApiResult,
-    test_utils::sweetest::{SweetAgents, SweetConductor, SweetDnaFile},
+    sweettest::{SweetAgents, SweetConductor, SweetDnaFile},
 };
 use holochain::{
     conductor::{api::error::ConductorApiError, CellError},
@@ -92,7 +92,8 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     // Install DNA and install and activate apps in conductor
     let apps = conductor
         .setup_app_for_agents("app", &[alice.clone(), bobbo.clone()], &[dna_file])
-        .await;
+        .await
+        .unwrap();
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
@@ -136,7 +137,8 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     let apps = conductor
         .setup_app_for_agents("app", &agents, &[dna_foo, dna_bar])
-        .await;
+        .await
+        .unwrap();
 
     let ((alice_foo, alice_bar), (bobbo_foo, bobbo_bar), (_carol_foo, carol_bar)) =
         apps.into_tuples();
@@ -240,6 +242,7 @@ async fn get_deleted() -> anyhow::Result<()> {
     let alice = conductor
         .setup_app("app", &[dna_file])
         .await
+        .unwrap()
         .into_cells()
         .into_iter()
         .next()
@@ -291,7 +294,7 @@ async fn signal_subscription() {
         .await
         .unwrap();
     let mut conductor = SweetConductor::from_config(Default::default()).await;
-    let app = conductor.setup_app("app", &[dna_file]).await;
+    let app = conductor.setup_app("app", &[dna_file]).await.unwrap();
     let zome = &app.cells()[0].zome("zome1");
 
     let signals = conductor.signals().take(N);
@@ -339,7 +342,8 @@ async fn simple_validation() -> anyhow::Result<()> {
     let (alice, bobbo) = SweetAgents::two(conductor.keystore()).await;
     let apps = conductor
         .setup_app_for_agents("app", &[alice.clone(), bobbo.clone()], &[dna_file])
-        .await;
+        .await
+        .unwrap();
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
     let alice = alice.zome("zome");

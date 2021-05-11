@@ -75,6 +75,14 @@ macro_rules! assert_eq_retry_1m {
     };
 }
 
+#[macro_export]
+macro_rules! assert_eq_retry_5m {
+    ($test:expr, $check:expr $(, $reason:literal)? $(,)?) => {
+        let mut wait_for = $crate::test_utils::WaitForAny::five_m();
+        $crate::assert_eq_retry!(wait_for, $test, $check  $(, $reason:literal)?)
+    };
+}
+
 #[derive(Debug, Clone)]
 /// Generic waiting for some test property to
 /// be true. This allows early exit from waiting when
@@ -106,6 +114,12 @@ impl WaitForAny {
     pub fn one_m() -> Self {
         const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(500);
         Self::new(120, DELAY_PER_ATTEMPT)
+    }
+
+    /// Wait for 5 minutes checking every 1000ms.
+    pub fn five_m() -> Self {
+        const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(1000);
+        Self::new(60 * 5, DELAY_PER_ATTEMPT)
     }
 
     /// Wait for some time before trying again.

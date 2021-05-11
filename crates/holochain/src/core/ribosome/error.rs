@@ -36,7 +36,7 @@ pub enum RibosomeError {
     ZomeFnNotExists(ZomeName, FunctionName),
 
     /// a problem with entry defs
-    #[error("An error with entry defs: {0}")]
+    #[error("An error with entry defs in zome '{0}': {1}")]
     EntryDefs(ZomeName, String),
 
     /// a mandatory dependency for an element doesn't exist
