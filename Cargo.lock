@@ -1924,6 +1924,7 @@ dependencies = [
  "holo_hash",
  "holochain_serialized_bytes",
  "holochain_zome_types",
+ "kitsune_p2p",
  "lazy_static",
  "must_future",
  "nanoid",

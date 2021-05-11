@@ -72,6 +72,22 @@ impl AgentInfoSigned {
     }
 }
 
+impl std::convert::TryFrom<&AgentInfoSigned> for Vec<u8> {
+    type Error = KitsuneP2pError;
+    fn try_from(signed: &AgentInfoSigned) -> Result<Self, Self::Error> {
+        let mut buf = Vec::new();
+        kitsune_p2p_types::codec::rmp_encode(&mut buf, signed)?;
+        Ok(buf)
+    }
+}
+
+impl std::convert::TryFrom<&[u8]> for AgentInfoSigned {
+    type Error = KitsuneP2pError;
+    fn try_from(mut bytes: &[u8]) -> Result<Self, Self::Error> {
+        Ok(kitsune_p2p_types::codec::rmp_decode(&mut bytes)?)
+    }
+}
+
 /// Value that an agent signs to represent themselves on the network.
 #[derive(
     serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, derive_more::AsRef, Hash, Eq,
@@ -94,13 +110,6 @@ pub struct AgentInfo {
     meta_info: Vec<u8>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Hash, Eq)]
-/// Extra info that is not used by the bootstrap server.
-pub struct AgentMetaInfo {
-    /// The half length of the [`DhtArc`]
-    pub dht_storage_arc_half_length: u32,
-}
-
 impl std::convert::TryFrom<&AgentInfoSigned> for AgentInfo {
     type Error = KitsuneP2pError;
     fn try_from(agent_info_signed: &AgentInfoSigned) -> Result<Self, Self::Error> {
@@ -108,6 +117,29 @@ impl std::convert::TryFrom<&AgentInfoSigned> for AgentInfo {
             &mut &*agent_info_signed.agent_info,
         )?)
     }
+}
+
+impl std::convert::TryFrom<&AgentInfo> for Vec<u8> {
+    type Error = KitsuneP2pError;
+    fn try_from(info: &AgentInfo) -> Result<Self, Self::Error> {
+        let mut buf = Vec::new();
+        kitsune_p2p_types::codec::rmp_encode(&mut buf, info)?;
+        Ok(buf)
+    }
+}
+
+impl std::convert::TryFrom<&[u8]> for AgentInfo {
+    type Error = KitsuneP2pError;
+    fn try_from(mut bytes: &[u8]) -> Result<Self, Self::Error> {
+        Ok(kitsune_p2p_types::codec::rmp_decode(&mut bytes)?)
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Hash, Eq)]
+/// Extra info that is not used by the bootstrap server.
+pub struct AgentMetaInfo {
+    /// The half length of the [`DhtArc`]
+    pub dht_storage_arc_half_length: u32,
 }
 
 impl std::convert::TryFrom<AgentMetaInfo> for Vec<u8> {
