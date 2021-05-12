@@ -17,8 +17,8 @@ pub fn capability_grants(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::test_utils::sweetest::SweetDnaFile;
-    use crate::{conductor::ConductorBuilder, test_utils::sweetest::SweetConductor};
+    use crate::{conductor::ConductorBuilder, sweettest::SweetConductor};
+    use crate::{sweettest::SweetDnaFile};
     use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -116,7 +116,8 @@ pub mod wasm_test {
                 &[alice_agent_id.clone(), bob_agent_id.clone()],
                 &[dna_file.into()],
             )
-            .await;
+            .await
+            .unwrap();
 
         let ((alice,), (bobbo,)) = apps.into_tuples();
         // There's only one zome to call, so let's peel that off now.

@@ -76,11 +76,14 @@ impl DbWrite {
     }
 
     pub(crate) fn new(path_prefix: &Path, kind: DbKind) -> DatabaseResult<Self> {
-        if !path_prefix.is_dir() {
-            std::fs::create_dir(path_prefix)
-                .map_err(|_e| DatabaseError::DatabaseMissing(path_prefix.to_owned()))?;
-        }
         let path = path_prefix.join(kind.filename());
+        let parent = path
+            .parent()
+            .ok_or_else(|| DatabaseError::DatabaseMissing(path_prefix.to_owned()))?;
+        if !parent.is_dir() {
+            std::fs::create_dir_all(parent)
+                .map_err(|_e| DatabaseError::DatabaseMissing(parent.to_owned()))?;
+        }
         let pool = new_connection_pool(&path, kind.clone());
         let mut conn = pool.get()?;
         crate::table::initialize_database(&mut conn, &kind)?;
@@ -102,7 +105,9 @@ impl DbWrite {
     /// Remove the db and directory
     #[deprecated = "is this used?"]
     pub async fn remove(self) -> DatabaseResult<()> {
-        std::fs::remove_dir_all(&self.0.path)?;
+        if let Some(parent) = self.0.path.parent() {
+            std::fs::remove_dir_all(parent)?;
+        }
         Ok(())
     }
 }
@@ -125,12 +130,12 @@ pub enum DbKind {
 impl DbKind {
     /// Constuct a partial Path based on the kind
     fn filename(&self) -> PathBuf {
-        let mut path = match self {
-            DbKind::Cell(cell_id) => PathBuf::from(cell_id.to_string()),
-            DbKind::Cache(dna) => PathBuf::from(format!("cache-{}", dna)),
-            DbKind::Conductor => PathBuf::from("conductor"),
-            DbKind::Wasm => PathBuf::from("wasm"),
-            DbKind::P2p => PathBuf::from("p2p"),
+        let mut path: PathBuf = match self {
+            DbKind::Cell(cell_id) => ["cell", &cell_id.to_string()].iter().collect(),
+            DbKind::Cache(dna) => ["cache", &format!("cache-{}", dna)].iter().collect(),
+            DbKind::Conductor => ["conductor", "conductor"].iter().collect(),
+            DbKind::Wasm => ["wasm", "wasm"].iter().collect(),
+            DbKind::P2p => ["p2p", "p2p"].iter().collect(),
         };
         path.set_extension("sqlite3");
         path

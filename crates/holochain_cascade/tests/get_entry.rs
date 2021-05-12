@@ -429,6 +429,7 @@ async fn check_can_handle_rejected_ops_in_cache() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "todo"]
 async fn check_all_queries_still_work() {
     // TODO: Come up with a list of different states the authority could
     // have data in (updates, rejected, abandoned, nothing etc.)
@@ -438,11 +439,13 @@ async fn check_all_queries_still_work() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "todo"]
 async fn check_all_queries_still_work_with_cache() {
     todo!()
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "todo"]
 async fn check_all_queries_still_work_with_scratch() {
     todo!()
 }

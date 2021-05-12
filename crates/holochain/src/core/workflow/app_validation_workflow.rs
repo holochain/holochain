@@ -106,6 +106,11 @@ async fn app_validation_workflow_inner(
                 workspace.put_validation_limbo(op_hash, status)?;
             }
             Outcome::Rejected(_) => {
+                if *op.header().author() == network.from_agent() {
+                    tracing::warn!("Authored invalid op! If you didn't hack your node, this is a bug in Holochain.\nOp: {:?}", op.to_light());
+                } else {
+                    tracing::warn!("Received invalid op! Warrants aren't implemented yet, so we can't do anything about this right now, but be warned that somebody on the network has maliciously hacked their node.\nOp: {:?}", op.to_light());
+                }
                 workspace.put_integration_limbo(op_hash, ValidationStatus::Rejected)?;
             }
         }

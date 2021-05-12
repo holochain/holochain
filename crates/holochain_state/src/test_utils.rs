@@ -50,6 +50,12 @@ fn test_env(kind: DbKind) -> TestEnv {
     }
 }
 
+/// Create a fresh set of test environments with a new TempDir and custom KeystoreSender
+pub fn test_envs_with_keystore(keystore: KeystoreSender) -> TestEnvs {
+    let tempdir = TempDir::new("holochain-test-environments").unwrap();
+    TestEnvs::with_keystore(tempdir, keystore)
+}
+
 /// Create a fresh set of test environments with a new TempDir
 pub fn test_environments() -> TestEnvs {
     let tempdir = TempDir::new("holochain-test-environments").unwrap();
@@ -177,10 +183,9 @@ pub struct TestEnvs {
 
 #[allow(missing_docs)]
 impl TestEnvs {
-    /// Create all three non-cell environments at once
-    pub fn new(tempdir: TempDir) -> Self {
+    /// Create all three non-cell environments at once with a custom keystore
+    pub fn with_keystore(tempdir: TempDir, keystore: KeystoreSender) -> Self {
         use DbKind::*;
-        let keystore = test_keystore();
         let conductor = EnvWrite::test(&tempdir, Conductor, keystore.clone()).unwrap();
         let wasm = EnvWrite::test(&tempdir, Wasm, keystore.clone()).unwrap();
         let p2p = EnvWrite::test(&tempdir, P2p, keystore).unwrap();
@@ -190,6 +195,11 @@ impl TestEnvs {
             p2p,
             tempdir: Arc::new(tempdir),
         }
+    }
+
+    /// Create all three non-cell environments at once with a test keystore
+    pub fn new(tempdir: TempDir) -> Self {
+        Self::with_keystore(tempdir, test_keystore())
     }
 
     pub fn conductor(&self) -> EnvWrite {

@@ -675,263 +675,200 @@ pub mod tests {
     use matches::assert_matches;
 
     use crate::source_chain::SourceChainResult;
-    use holochain_types::test_utils::fake_agent_pubkey_1;
-    use holochain_types::test_utils::fake_dna_file;
-    use holochain_zome_types::header;
     use holochain_zome_types::Entry;
-    use holochain_zome_types::Header;
-    use holochain_zome_types::HeaderHashed;
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
-        todo!("re-write as sql test");
-        //     let test_env = test_cell_env();
-        //     let env = test_env.env();
-        //     let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
-        //     let access = CapAccess::from(secret.unwrap());
+        let test_env = test_cell_env();
+        let env = test_env.env();
+        let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
+        let access = CapAccess::from(secret.unwrap());
 
-        //     // @todo curry
-        //     let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
-        //     let function: GrantedFunction = ("foo".into(), "bar".into());
-        //     let mut functions: GrantedFunctions = HashSet::new();
-        //     functions.insert(function.clone());
-        //     let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), functions.clone());
-        //     let mut agents = AgentPubKeyFixturator::new(Predictable);
-        //     let alice = agents.next().unwrap();
-        //     let bob = agents.next().unwrap();
-        //     {
-        //         let mut store = SourceChainBuf::new(env.clone().into())?;
-        //         store.genesis(fake_dna_hash(1), alice.clone(), None).await?;
-        //         env.conn()
-        //             .unwrap()
-        //             .with_commit(|writer| store.flush_to_txn(writer))?;
-        //     }
+        // @todo curry
+        let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
+        let function: GrantedFunction = ("foo".into(), "bar".into());
+        let mut functions: GrantedFunctions = BTreeSet::new();
+        functions.insert(function.clone());
+        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), functions.clone());
+        let mut agents = AgentPubKeyFixturator::new(Predictable);
+        let alice = agents.next().unwrap();
+        let bob = agents.next().unwrap();
+        source_chain::genesis(env.clone(), fake_dna_hash(1), alice.clone(), None)
+            .await
+            .unwrap();
 
-        //     {
-        //         let chain = SourceChain::new(env.clone().into())?;
-        //         assert_eq!(
-        //             chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
-        //             Some(CapGrant::ChainAuthor(alice.clone())),
-        //         );
+        {
+            let chain = SourceChain::new(env.clone().into(), alice.clone())?;
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
+                Some(CapGrant::ChainAuthor(alice.clone())),
+            );
 
-        //         // bob should not match anything as the secret hasn't been committed yet
-        //         assert_eq!(
-        //             chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
-        //             None
-        //         );
-        //     }
+            // bob should not match anything as the secret hasn't been committed yet
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
+                None
+            );
+        }
 
-        //     let (original_header_address, original_entry_address) = {
-        //         let mut chain = SourceChain::new(env.clone().into())?;
-        //         let (entry, entry_hash) =
-        //             EntryHashed::from_content_sync(Entry::CapGrant(grant.clone())).into_inner();
-        //         let header_builder = builder::Create {
-        //             entry_type: EntryType::CapGrant,
-        //             entry_hash: entry_hash.clone(),
-        //         };
-        //         let header = chain.put(header_builder, Some(entry)).await?;
+        let (original_header_address, original_entry_address) = {
+            let chain = SourceChain::new(env.clone().into(), alice.clone())?;
+            let (entry, entry_hash) =
+                EntryHashed::from_content_sync(Entry::CapGrant(grant.clone())).into_inner();
+            let header_builder = builder::Create {
+                entry_type: EntryType::CapGrant,
+                entry_hash: entry_hash.clone(),
+            };
+            let header = chain.put(header_builder, Some(entry)).await?;
 
-        //         env.conn()
-        //             .unwrap()
-        //             .with_commit(|writer| chain.flush_to_txn(writer))?;
+            chain.flush().unwrap();
 
-        //         (header, entry_hash)
-        //     };
+            (header, entry_hash)
+        };
 
-        //     {
-        //         let chain = SourceChain::new(env.clone().into())?;
-        //         // alice should find her own authorship with higher priority than the committed grant
-        //         // even if she passes in the secret
-        //         assert_eq!(
-        //             chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
-        //             Some(CapGrant::ChainAuthor(alice.clone())),
-        //         );
+        {
+            let chain = SourceChain::new(env.clone().into(), alice.clone())?;
+            // alice should find her own authorship with higher priority than the committed grant
+            // even if she passes in the secret
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
+                Some(CapGrant::ChainAuthor(alice.clone())),
+            );
 
-        //         // bob should be granted with the committed grant as it matches the secret he passes to
-        //         // alice at runtime
-        //         assert_eq!(
-        //             chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
-        //             Some(grant.clone().into())
-        //         );
-        //     }
+            // bob should be granted with the committed grant as it matches the secret he passes to
+            // alice at runtime
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
+                Some(grant.clone().into())
+            );
+        }
 
-        //     // let's roll the secret and assign the grant to bob specifically
-        //     let mut assignees = HashSet::new();
-        //     assignees.insert(bob.clone());
-        //     let updated_secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
-        //     let updated_access = CapAccess::from((updated_secret.clone().unwrap(), assignees));
-        //     let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
+        // let's roll the secret and assign the grant to bob specifically
+        let mut assignees = BTreeSet::new();
+        assignees.insert(bob.clone());
+        let updated_secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
+        let updated_access = CapAccess::from((updated_secret.clone().unwrap(), assignees));
+        let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 
-        //     let (updated_header_hash, updated_entry_hash) = {
-        //         let mut chain = SourceChain::new(env.clone().into())?;
-        //         let (entry, entry_hash) =
-        //             EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
-        //         let header_builder = builder::Update {
-        //             entry_type: EntryType::CapGrant,
-        //             entry_hash: entry_hash.clone(),
-        //             original_header_address,
-        //             original_entry_address,
-        //         };
-        //         let header = chain.put(header_builder, Some(entry)).await?;
+        let (updated_header_hash, updated_entry_hash) = {
+            let chain = SourceChain::new(env.clone().into(), alice.clone())?;
+            let (entry, entry_hash) =
+                EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
+            let header_builder = builder::Update {
+                entry_type: EntryType::CapGrant,
+                entry_hash: entry_hash.clone(),
+                original_header_address,
+                original_entry_address,
+            };
+            let header = chain.put(header_builder, Some(entry)).await?;
 
-        //         env.conn()
-        //             .unwrap()
-        //             .with_commit(|writer| chain.flush_to_txn(writer))?;
+            chain.flush().unwrap();
 
-        //         (header, entry_hash)
-        //     };
+            (header, entry_hash)
+        };
 
-        //     {
-        //         let chain = SourceChain::new(env.clone().into())?;
-        //         // alice should find her own authorship with higher priority than the committed grant
-        //         // even if she passes in the secret
-        //         assert_eq!(
-        //             chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
-        //             Some(CapGrant::ChainAuthor(alice.clone())),
-        //         );
-        //         assert_eq!(
-        //             chain.valid_cap_grant(&function, &alice, updated_secret.as_ref())?,
-        //             Some(CapGrant::ChainAuthor(alice.clone())),
-        //         );
+        {
+            let chain = SourceChain::new(env.clone().into(), alice.clone())?;
+            // alice should find her own authorship with higher priority than the committed grant
+            // even if she passes in the secret
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
+                Some(CapGrant::ChainAuthor(alice.clone())),
+            );
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, updated_secret.as_ref())?,
+                Some(CapGrant::ChainAuthor(alice.clone())),
+            );
 
-        //         // bob MUST provide the updated secret as the old one is invalidated by the new one
-        //         assert_eq!(
-        //             chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
-        //             None
-        //         );
-        //         assert_eq!(
-        //             chain.valid_cap_grant(&function, &bob, updated_secret.as_ref())?,
-        //             Some(updated_grant.into())
-        //         );
-        //     }
+            // bob MUST provide the updated secret as the old one is invalidated by the new one
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
+                None
+            );
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, updated_secret.as_ref())?,
+                Some(updated_grant.into())
+            );
+        }
 
-        //     {
-        //         let mut chain = SourceChain::new(env.clone().into())?;
-        //         let header_builder = builder::Delete {
-        //             deletes_address: updated_header_hash,
-        //             deletes_entry_address: updated_entry_hash,
-        //         };
-        //         chain.put(header_builder, None).await?;
+        {
+            let chain = SourceChain::new(env.clone().into(), alice.clone())?;
+            let header_builder = builder::Delete {
+                deletes_address: updated_header_hash,
+                deletes_entry_address: updated_entry_hash,
+            };
+            chain.put(header_builder, None).await?;
 
-        //         env.conn()
-        //             .unwrap()
-        //             .with_commit(|writer| chain.flush_to_txn(writer))?;
-        //     }
+            chain.flush().unwrap();
+        }
 
-        //     {
-        //         let chain = SourceChain::new(env.clone().into())?;
-        //         // alice should find her own authorship
-        //         assert_eq!(
-        //             chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
-        //             Some(CapGrant::ChainAuthor(alice.clone())),
-        //         );
-        //         assert_eq!(
-        //             chain.valid_cap_grant(&function, &alice, updated_secret.as_ref())?,
-        //             Some(CapGrant::ChainAuthor(alice)),
-        //         );
+        {
+            let chain = SourceChain::new(env.clone().into(), alice.clone())?;
+            // alice should find her own authorship
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
+                Some(CapGrant::ChainAuthor(alice.clone())),
+            );
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, updated_secret.as_ref())?,
+                Some(CapGrant::ChainAuthor(alice)),
+            );
 
-        //         // bob has no access
-        //         assert_eq!(
-        //             chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
-        //             None
-        //         );
-        //         assert_eq!(
-        //             chain.valid_cap_grant(&function, &bob, updated_secret.as_ref())?,
-        //             None
-        //         );
-        //     }
+            // bob has no access
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
+                None
+            );
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, updated_secret.as_ref())?,
+                None
+            );
+        }
 
-        //     Ok(())
-        // }
-
-        // @todo bring all this back when we want to administer cap claims better
-        // #[tokio::test(flavor = "multi_thread")]
-        // async fn test_get_cap_claim() -> SourceChainResult<()> {
-        //     let test_env = test_cell_env();
-        //     let env = test_env.env();
-        //     let env = env.conn().unwrap().await;
-        //     let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
-        //     let agent_pubkey = fake_agent_pubkey_1().into();
-        //     let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
-        //     {
-        //         let mut store = SourceChainBuf::new(env.clone().into(), &env).await?;
-        //         store
-        //             .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
-        //             .await?;
-        //         arc.conn().unwrap().with_commit(|writer| store.flush_to_txn(writer))?;
-        //     }
-        //
-        //     {
-        //         let mut chain = SourceChain::new(env.clone().into(), &env).await?;
-        //         chain.put_cap_claim(claim.clone()).await?;
-        //
-        // // ideally the following would work, but it won't because currently
-        // // we can't get claims from the scratch space
-        // // this will be fixed once we add the capability index
-        //
-        // // assert_eq!(
-        // //     chain.get_persisted_cap_claim_by_secret(&secret)?,
-        // //     Some(claim.clone())
-        // // );
-        //
-        //         arc.conn().unwrap().with_commit(|writer| chain.flush_to_txn(writer))?;
-        //     }
-        //
-        //     {
-        //         let chain = SourceChain::new(env.clone().into(), &env).await?;
-        //         assert_eq!(
-        //             chain.get_persisted_cap_claim_by_secret(&secret).await?,
-        //             Some(claim)
-        //         );
-        //     }
-        //
-        //     Ok(())
+        Ok(())
     }
 
-    fn _fixtures() -> (
-        AgentPubKey,
-        HeaderHashed,
-        Option<Entry>,
-        HeaderHashed,
-        Option<Entry>,
-    ) {
-        let dna = fake_dna_file("a");
-        let agent_pubkey = fake_agent_pubkey_1();
-
-        let agent_entry = Entry::Agent(agent_pubkey.clone().into());
-
-        let (dna_header, agent_header) = tokio_helper::block_on(
-            async {
-                let dna_header = Header::Dna(header::Dna {
-                    author: agent_pubkey.clone(),
-                    timestamp: Timestamp(0, 0).into(),
-                    hash: dna.dna_hash().clone(),
-                });
-                let dna_header = HeaderHashed::from_content_sync(dna_header);
-
-                let agent_header = Header::Create(header::Create {
-                    author: agent_pubkey.clone(),
-                    timestamp: Timestamp(1, 0).into(),
-                    header_seq: 1,
-                    prev_header: dna_header.as_hash().to_owned().into(),
-                    entry_type: header::EntryType::AgentPubKey,
-                    entry_hash: agent_pubkey.clone().into(),
-                });
-                let agent_header = HeaderHashed::from_content_sync(agent_header);
-
-                (dna_header, agent_header)
-            },
-            std::time::Duration::from_secs(1),
-        )
-        .expect("timeout elapsed");
-
-        (
-            agent_pubkey,
-            dna_header,
-            None,
-            agent_header,
-            Some(agent_entry),
-        )
-    }
+    // @todo bring all this back when we want to administer cap claims better
+    // #[tokio::test(flavor = "multi_thread")]
+    // async fn test_get_cap_claim() -> SourceChainResult<()> {
+    //     let test_env = test_cell_env();
+    //     let env = test_env.env();
+    //     let env = env.conn().unwrap().await;
+    //     let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
+    //     let agent_pubkey = fake_agent_pubkey_1().into();
+    //     let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
+    //     {
+    //         let mut store = SourceChainBuf::new(env.clone().into(), &env).await?;
+    //         store
+    //             .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
+    //             .await?;
+    //         arc.conn().unwrap().with_commit(|writer| store.flush_to_txn(writer))?;
+    //     }
+    //
+    //     {
+    //         let mut chain = SourceChain::new(env.clone().into(), &env).await?;
+    //         chain.put_cap_claim(claim.clone()).await?;
+    //
+    // // ideally the following would work, but it won't because currently
+    // // we can't get claims from the scratch space
+    // // this will be fixed once we add the capability index
+    //
+    // // assert_eq!(
+    // //     chain.get_persisted_cap_claim_by_secret(&secret)?,
+    // //     Some(claim.clone())
+    // // );
+    //
+    //         arc.conn().unwrap().with_commit(|writer| chain.flush_to_txn(writer))?;
+    //     }
+    //
+    //     {
+    //         let chain = SourceChain::new(env.clone().into(), &env).await?;
+    //         assert_eq!(
+    //             chain.get_persisted_cap_claim_by_secret(&secret).await?,
+    //             Some(claim)
+    //         );
+    //     }
+    //
+    //     Ok(())
 
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
@@ -1011,16 +948,16 @@ pub mod tests {
         let json = serde_json::to_string_pretty(&json)?;
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(parsed["elements"][0]["header"]["type"], "Create");
-        assert_eq!(parsed["elements"][0]["header"]["entry_type"], "AgentPubKey");
-        assert_eq!(parsed["elements"][0]["entry"]["entry_type"], "Agent");
+        assert_eq!(parsed["elements"][0]["header"]["type"], "Dna");
+        assert_eq!(parsed["elements"][0]["entry"], serde_json::Value::Null);
+
+        assert_eq!(parsed["elements"][2]["header"]["type"], "Create");
+        assert_eq!(parsed["elements"][2]["header"]["entry_type"], "AgentPubKey");
+        assert_eq!(parsed["elements"][2]["entry"]["entry_type"], "Agent");
         assert_ne!(
-            parsed["elements"][0]["entry"]["entry"],
+            parsed["elements"][2]["entry"]["entry"],
             serde_json::Value::Null
         );
-
-        assert_eq!(parsed["elements"][1]["header"]["type"], "Dna");
-        assert_eq!(parsed["elements"][1]["entry"], serde_json::Value::Null);
 
         Ok(())
     }

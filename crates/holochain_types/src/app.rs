@@ -18,8 +18,8 @@ pub use app_manifest::*;
 use derive_more::Into;
 pub use dna_gamut::*;
 use holo_hash::{AgentPubKey, DnaHash};
-use holochain_serialized_bytes::SerializedBytes;
-use holochain_zome_types::cell::CellId;
+use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::prelude::*;
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
@@ -170,15 +170,13 @@ impl InstallAppDnaPayload {
     }
 }
 
-/// App-specific payload for proving membership in the membrane of the app
-pub type MembraneProof = SerializedBytes;
-
 /// Data about an installed Cell. It's deprecated because it is not used in
 /// the new installation scheme using AppBundles.
 #[deprecated = "can be removed after the old way of installing apps (`InstallApp`) is phased out"]
 #[derive(Clone, Debug, Into, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct InstalledCell {
     cell_id: CellId,
+    // TODO: rename to slot_id
     cell_nick: CellNick,
 }
 
@@ -214,9 +212,191 @@ impl InstalledCell {
     }
 }
 
+/// An app which has been installed.
 /// An installed app is merely its collection of "slots", associated with an ID.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
+pub enum InstalledApp {
+    /// An active app
+    Active(ActiveApp),
+    /// An inactive app
+    Inactive(InactiveApp),
+}
+
+impl InstalledApp {
+    /// Constructor for freshly installed app
+    pub fn new_inactive(app: InstalledAppCommon) -> Self {
+        Self::Inactive(InactiveApp {
+            app,
+            reason: DeactivationReason::NeverActivated,
+        })
+    }
+
+    /// Constructor for freshly installed app
+    pub fn new_active(app: InstalledAppCommon) -> Self {
+        Self::Active(ActiveApp(app))
+    }
+
+    /// Return the common app info, as well as a status which encodes the remaining
+    /// information
+    pub fn into_app_and_status(self) -> (InstalledAppCommon, InstalledAppStatus) {
+        match self {
+            Self::Active(app) => (app.into_common(), InstalledAppStatus::Active),
+            Self::Inactive(InactiveApp { app, reason, .. }) => {
+                (app, InstalledAppStatus::Inactive { reason })
+            }
+        }
+    }
+
+    /// Return the status
+    pub fn status(&self) -> InstalledAppStatus {
+        match self {
+            Self::Active(_) => InstalledAppStatus::Active,
+            Self::Inactive(InactiveApp { reason, .. }) => InstalledAppStatus::Inactive {
+                reason: reason.clone(),
+            },
+        }
+    }
+}
+
+impl AsRef<InstalledAppCommon> for InstalledApp {
+    fn as_ref(&self) -> &InstalledAppCommon {
+        match self {
+            Self::Active(app) => &app.0,
+            Self::Inactive(app) => &app.app,
+        }
+    }
+}
+
+impl std::ops::Deref for InstalledApp {
+    type Target = InstalledAppCommon;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
+    }
+}
+
+/// An active app
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    derive_more::From,
+    shrinkwraprs::Shrinkwrap,
+)]
+pub struct ActiveApp(InstalledAppCommon);
+
+impl ActiveApp {
+    /// Convert to a InactiveApp with the given reason
+    pub fn into_inactive(self, reason: DeactivationReason) -> InactiveApp {
+        InactiveApp::new(self.0, reason)
+    }
+
+    /// Add a cloned cell
+    pub fn add_clone(&mut self, slot_id: &SlotId, cell_id: CellId) -> AppResult<()> {
+        let slot = self.0.slot_mut(slot_id)?;
+        assert_eq!(
+            cell_id.agent_pubkey(),
+            slot.agent_key(),
+            "A clone cell must use the same agent key as the slot it is added to"
+        );
+        if slot.clones.len() as u32 >= slot.clone_limit {
+            return Err(AppError::CloneLimitExceeded(slot.clone_limit, slot.clone()));
+        }
+        let _ = slot.clones.insert(cell_id);
+        Ok(())
+    }
+
+    /// Remove a cloned cell
+    pub fn remove_clone(&mut self, slot_id: &SlotId, cell_id: &CellId) -> AppResult<bool> {
+        let slot = self.0.slot_mut(slot_id)?;
+        Ok(slot.clones.remove(cell_id))
+    }
+
+    /// Move inner type out
+    pub fn into_common(self) -> InstalledAppCommon {
+        self.0
+    }
+}
+
+impl automap::AutoMapped for ActiveApp {
+    type Key = InstalledAppId;
+
+    fn key(&self) -> &Self::Key {
+        &self.0.installed_app_id
+    }
+}
+
+/// An app which has either never been activated, or has been deactivated.
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, shrinkwraprs::Shrinkwrap,
+)]
+pub struct InactiveApp {
+    #[shrinkwrap(main_field)]
+    app: InstalledAppCommon,
+    reason: DeactivationReason,
+}
+
+impl InactiveApp {
+    /// Constructor
+    pub fn new(app: InstalledAppCommon, reason: DeactivationReason) -> Self {
+        Self { app, reason }
+    }
+
+    /// Constructor
+    pub fn new_fresh(app: InstalledAppCommon) -> Self {
+        Self {
+            app,
+            reason: DeactivationReason::NeverActivated,
+        }
+    }
+
+    /// Convert to a ActiveApp
+    pub fn into_active(self) -> ActiveApp {
+        ActiveApp(self.app)
+    }
+
+    /// Move inner type out
+    pub fn into_common(self) -> InstalledAppCommon {
+        self.app
+    }
+}
+
+impl automap::AutoMapped for InactiveApp {
+    type Key = InstalledAppId;
+
+    fn key(&self) -> &Self::Key {
+        &self.app.installed_app_id
+    }
+}
+
+impl From<InactiveApp> for InstalledAppCommon {
+    fn from(d: InactiveApp) -> Self {
+        d.app
+    }
+}
+
+/// The possible reasons for an app being deactivated
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct InstalledApp {
+#[serde(rename_all = "snake_case")]
+pub enum DeactivationReason {
+    /// The app has never been fully activated, and is just awaiting genesis
+    NeverActivated,
+    /// The app was deactivated by the user normally
+    Normal,
+    /// The app was automatically deactivated due to an unrecoverable error by
+    /// one of its Cells
+    Quarantined {
+        /// The error which necessitated the quarantine
+        error: String,
+    },
+}
+
+/// The common data between apps of any status
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct InstalledAppCommon {
     /// The unique identifier for an installed app in this conductor
     installed_app_id: InstalledAppId,
     /// The agent key used to install this app. Currently this is meaningless,
@@ -227,29 +407,72 @@ pub struct InstalledApp {
     slots: HashMap<CellNick, AppSlot>,
 }
 
-impl automap::AutoMapped for InstalledApp {
-    type Key = InstalledAppId;
-
-    fn key(&self) -> &Self::Key {
-        &self.installed_app_id
-    }
-}
-
-/// A map from InstalledAppId -> InstalledApp
-pub type InstalledAppMap = automap::AutoHashMap<InstalledApp>;
-
-impl InstalledApp {
+impl InstalledAppCommon {
     /// Constructor
     pub fn new<S: ToString, I: IntoIterator<Item = (SlotId, AppSlot)>>(
         installed_app_id: S,
         _agent_key: AgentPubKey,
         slots: I,
     ) -> Self {
-        Self {
+        InstalledAppCommon {
             installed_app_id: installed_app_id.to_string(),
             _agent_key,
             slots: slots.into_iter().collect(),
         }
+    }
+
+    /// Accessor
+    pub fn installed_app_id(&self) -> &InstalledAppId {
+        &self.installed_app_id
+    }
+
+    /// Accessor
+    pub fn provisioned_cells(&self) -> impl Iterator<Item = (&SlotId, &CellId)> {
+        self.slots
+            .iter()
+            .filter_map(|(nick, slot)| slot.provisioned_cell().map(|c| (nick, c)))
+    }
+
+    /// Accessor
+    pub fn into_provisioned_cells(self) -> impl Iterator<Item = (SlotId, CellId)> {
+        self.slots
+            .into_iter()
+            .filter_map(|(nick, slot)| slot.into_provisioned_cell().map(|c| (nick, c)))
+    }
+
+    /// Accessor
+    pub fn cloned_cells(&self) -> impl Iterator<Item = &CellId> {
+        self.slots.iter().map(|(_, slot)| &slot.clones).flatten()
+    }
+
+    /// Iterator of all cells, both provisioned and cloned
+    pub fn all_cells(&self) -> impl Iterator<Item = &CellId> {
+        self.provisioned_cells()
+            .map(|(_, c)| c)
+            .chain(self.cloned_cells())
+    }
+
+    /// Accessor for particular slot
+    pub fn slot(&self, slot_id: &SlotId) -> AppResult<&AppSlot> {
+        self.slots
+            .get(slot_id)
+            .ok_or_else(|| AppError::SlotIdMissing(slot_id.clone()))
+    }
+
+    fn slot_mut(&mut self, slot_id: &SlotId) -> AppResult<&mut AppSlot> {
+        self.slots
+            .get_mut(slot_id)
+            .ok_or_else(|| AppError::SlotIdMissing(slot_id.clone()))
+    }
+
+    /// Accessor
+    pub fn slots(&self) -> &HashMap<SlotId, AppSlot> {
+        &self.slots
+    }
+
+    /// Accessor
+    pub fn _agent_key(&self) -> &AgentPubKey {
+        &self._agent_key
     }
 
     /// Constructor for apps not using a manifest.
@@ -311,82 +534,25 @@ impl InstalledApp {
             slots,
         })
     }
-
-    /// Accessor
-    pub fn installed_app_id(&self) -> &InstalledAppId {
-        &self.installed_app_id
-    }
-
-    /// Accessor
-    pub fn provisioned_cells(&self) -> impl Iterator<Item = (&SlotId, &CellId)> {
-        self.slots
-            .iter()
-            .filter_map(|(nick, slot)| slot.provisioned_cell().map(|c| (nick, c)))
-    }
-
-    /// Accessor
-    pub fn into_provisioned_cells(self) -> impl Iterator<Item = (SlotId, CellId)> {
-        self.slots
-            .into_iter()
-            .filter_map(|(nick, slot)| slot.into_provisioned_cell().map(|c| (nick, c)))
-    }
-
-    /// Accessor
-    pub fn cloned_cells(&self) -> impl Iterator<Item = &CellId> {
-        self.slots.iter().map(|(_, slot)| &slot.clones).flatten()
-    }
-
-    /// Iterator of all cells, both provisioned and cloned
-    pub fn all_cells(&self) -> impl Iterator<Item = &CellId> {
-        self.provisioned_cells()
-            .map(|(_, c)| c)
-            .chain(self.cloned_cells())
-    }
-
-    /// Accessor for particular slot
-    pub fn slot(&self, slot_id: &SlotId) -> AppResult<&AppSlot> {
-        self.slots
-            .get(slot_id)
-            .ok_or_else(|| AppError::SlotIdMissing(slot_id.clone()))
-    }
-
-    fn slot_mut(&mut self, slot_id: &SlotId) -> AppResult<&mut AppSlot> {
-        self.slots
-            .get_mut(slot_id)
-            .ok_or_else(|| AppError::SlotIdMissing(slot_id.clone()))
-    }
-
-    /// Accessor
-    pub fn slots(&self) -> &HashMap<SlotId, AppSlot> {
-        &self.slots
-    }
-
-    /// Accessor
-    pub fn _agent_key(&self) -> &AgentPubKey {
-        &self._agent_key
-    }
-
-    /// Add a cloned cell
-    pub fn add_clone(&mut self, slot_id: &SlotId, cell_id: CellId) -> AppResult<()> {
-        let slot = self.slot_mut(slot_id)?;
-        assert_eq!(
-            cell_id.agent_pubkey(),
-            slot.agent_key(),
-            "A clone cell must use the same agent key as the slot it is added to"
-        );
-        if slot.clones.len() as u32 >= slot.clone_limit {
-            return Err(AppError::CloneLimitExceeded(slot.clone_limit, slot.clone()));
-        }
-        let _ = slot.clones.insert(cell_id);
-        Ok(())
-    }
-
-    /// Remove a cloned cell
-    pub fn remove_clone(&mut self, slot_id: &SlotId, cell_id: &CellId) -> AppResult<bool> {
-        let slot = self.slot_mut(slot_id)?;
-        Ok(slot.clones.remove(cell_id))
-    }
 }
+
+/// The information in an InstalledApp which is not captured by InstalledAppCommon
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(rename_all = "snake_case")]
+pub enum InstalledAppStatus {
+    /// Indicates the app is active
+    Active,
+    /// Indicates the app is inactive, and why
+    Inactive {
+        /// The reason for deactivation
+        reason: DeactivationReason,
+    },
+}
+
+/// A map from InstalledAppId -> ActiveApp
+pub type InstalledAppMap = automap::AutoHashMap<ActiveApp>;
+/// A map from InstalledAppId -> InactiveApp
+pub type DeactivatedAppMap = automap::AutoHashMap<InactiveApp>;
 
 /// Cell "slots" correspond to cell entries in the AppManifest.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -454,7 +620,7 @@ impl AppSlot {
 
 #[cfg(test)]
 mod tests {
-    use super::{AppSlot, InstalledApp};
+    use super::{ActiveApp, AppSlot};
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use std::collections::HashSet;
@@ -467,7 +633,8 @@ mod tests {
         let slot1 = AppSlot::new(base_cell_id, false, 3);
         let agent = fixt!(AgentPubKey);
         let slot_id: SlotId = "slot_id".into();
-        let mut app = InstalledApp::new("app", agent.clone(), vec![(slot_id.clone(), slot1)]);
+        let mut app: ActiveApp =
+            InstalledAppCommon::new("app", agent.clone(), vec![(slot_id.clone(), slot1)]).into();
 
         // Can add clones up to the limit
         let clones: Vec<_> = vec![new_clone(), new_clone(), new_clone()];
@@ -503,6 +670,21 @@ mod tests {
         assert_eq!(
             app.cloned_cells().collect::<HashSet<_>>(),
             app.all_cells().collect::<HashSet<_>>()
+        );
+    }
+
+    #[test]
+    fn status_serialization() {
+        let status = InstalledAppStatus::Inactive {
+            reason: DeactivationReason::Quarantined {
+                error: "because".into(),
+            },
+        };
+
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(
+            json,
+            "{\"inactive\":{\"reason\":{\"quarantined\":{\"error\":\"because\"}}}}"
         );
     }
 }

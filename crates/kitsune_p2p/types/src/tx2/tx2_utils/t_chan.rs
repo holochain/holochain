@@ -95,21 +95,21 @@ mod tests {
 
         let f = futures::future::try_join_all(vec![s.send(2), s.send(1), s.send(3)]);
 
-        let t = tokio::task::spawn(async move {
+        let t = metric_task(async move {
             let f = futures::future::try_join_all(vec![s.send(5), s.send(4), s.send(6)]);
             s.close_channel();
             f.await
         });
 
-        let r = tokio::task::spawn(async move {
+        let r = metric_task(async move {
             use futures::stream::StreamExt;
-            r.collect::<Vec<_>>().await
+            KitsuneResult::Ok(r.collect::<Vec<_>>().await)
         });
 
         f.await.unwrap();
         t.await.unwrap().unwrap();
 
-        let mut r = r.await.unwrap();
+        let mut r = r.await.unwrap().unwrap();
         r.sort();
         assert_eq!(&[1, 2, 3, 4, 5, 6], r.as_slice());
     }
