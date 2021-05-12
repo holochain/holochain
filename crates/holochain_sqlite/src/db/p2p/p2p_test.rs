@@ -66,40 +66,7 @@ fn rand_insert(tx: &Transaction, space: &KitsuneSpace, agent: &KitsuneAgent) {
     )
     .unwrap();
 
-    tx.p2p_insert(&signed).unwrap();
-
-    /*
-    let mut s_1 = None;
-    let mut e_1 = None;
-    let mut s_2 = None;
-    let mut e_2 = None;
-
-    if rng.gen() {
-        if rng.gen() {
-            s_1 = Some(rng.gen_range(u32::MAX / 4, u32::MAX / 2));
-            e_1 = Some(rng.gen_range(u32::MAX / 2 + 1, (u32::MAX / 4) * 3));
-        } else {
-            s_1 = Some(0);
-            e_1 = Some(rng.gen_range(u32::MAX / 4, u32::MAX / 2));
-            s_2 = Some(rng.gen_range(u32::MAX / 2 + 1, (u32::MAX / 4) * 3));
-            e_2 = Some(u32::MAX);
-        }
-    }
-
-    tx.p2p_insert(P2pRecordRef {
-        space,
-        agent,
-        signed_at_ms,
-        expires_at_ms,
-        encoded: &[],
-        storage_center_loc: 0,  // - these are not used yet
-        storage_half_length: 0, // - these are not used yet
-        storage_start_1: s_1,
-        storage_end_1: e_1,
-        storage_start_2: s_2,
-        storage_end_2: e_2,
-    }).unwrap();
-    */
+    tx.p2p_put(&signed).unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -115,19 +82,22 @@ async fn test_p2p_store_sanity() {
         .unwrap()
         .as_millis() as u64;
 
+    let mut example_agent = rand_agent();
+
     con.with_commit(|writer| {
         for _ in 0..20 {
-            let agent = rand_agent();
+            example_agent = rand_agent();
 
             for _ in 0..3 {
-                rand_insert(writer, &space, &agent);
+                rand_insert(writer, &space, &example_agent);
             }
         }
 
-        let all = writer.p2p_select_all(&space).unwrap();
+        let all = writer.p2p_list(&space).unwrap();
         assert_eq!(20, all.len());
         println!("after insert select all count: {}", all.len());
-        //println!("{:#?}", all.into_iter().map(|r| r.signed_at_ms).collect::<Vec<_>>());
+        let signed = writer.p2p_get(&space, &example_agent).unwrap();
+        assert!(signed.is_some());
 
         DatabaseResult::Ok(())
     })
@@ -135,12 +105,13 @@ async fn test_p2p_store_sanity() {
 
     con.with_commit(|writer| {
         // prune duplicates, but not any expirations
-        writer.prune(now - 2000).unwrap();
+        writer.p2p_prune(now - 2000).unwrap();
 
-        let all = writer.p2p_select_all(&space).unwrap();
+        let all = writer.p2p_list(&space).unwrap();
         assert_eq!(20, all.len());
         println!("after prune select all count: {}", all.len());
-        //println!("{:#?}", all.into_iter().map(|r| r.signed_at_ms).collect::<Vec<_>>());
+        let signed = writer.p2p_get(&space, &example_agent).unwrap();
+        assert!(signed.is_some());
 
         DatabaseResult::Ok(())
     })
@@ -148,11 +119,13 @@ async fn test_p2p_store_sanity() {
 
     con.with_commit(|writer| {
         // prune everything by expires time
-        writer.prune(now + 2000).unwrap();
+        writer.p2p_prune(now + 2000).unwrap();
 
-        let all = writer.p2p_select_all(&space).unwrap();
+        let all = writer.p2p_list(&space).unwrap();
         assert_eq!(0, all.len());
         println!("after prune_all select all count: {}", all.len());
+        let signed = writer.p2p_get(&space, &example_agent).unwrap();
+        assert!(signed.is_none());
 
         DatabaseResult::Ok(())
     })
