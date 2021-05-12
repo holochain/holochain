@@ -6,6 +6,10 @@ use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use thiserror::Error;
 
+use crate::prelude::StateMutationError;
+use crate::query::StateQueryError;
+use crate::scratch::SyncScratchError;
+
 #[derive(Error, Debug)]
 pub enum SourceChainError {
     #[error("The source chain is empty, but is expected to have been initialized")]
@@ -65,6 +69,15 @@ pub enum SourceChainError {
 
     #[error(transparent)]
     ElementGroupError(#[from] ElementGroupError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] StateMutationError),
+
+    #[error(transparent)]
+    StateQueryError(#[from] StateQueryError),
+
+    #[error(transparent)]
+    SyncScratchError(#[from] SyncScratchError),
 }
 
 // serde_json::Error does not implement PartialEq - why is that a requirement??

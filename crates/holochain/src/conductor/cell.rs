@@ -19,27 +19,24 @@ use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::call_zome_workflow;
-use crate::core::workflow::error::WorkflowError;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
 use crate::core::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use crate::core::workflow::initialize_zomes_workflow;
-use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op;
 use crate::core::workflow::CallZomeWorkflowArgs;
-use crate::core::workflow::CallZomeWorkspace;
 use crate::core::workflow::GenesisWorkflowArgs;
 use crate::core::workflow::GenesisWorkspace;
 use crate::core::workflow::InitializeZomesWorkflowArgs;
 use crate::core::workflow::ZomeCallResult;
 use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
-use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
 use error::CellError;
-use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
+use holochain_cascade::Cascade;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_sqlite::{fresh_reader, prelude::*};
+use holochain_sqlite::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use observability::OpenSpanExt;
@@ -48,7 +45,6 @@ use std::hash::Hasher;
 use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
-use validation_package::ValidationPackageDb;
 
 mod validation_package;
 
@@ -57,6 +53,9 @@ pub mod error;
 
 #[cfg(test)]
 mod gossip_test;
+// #[cfg(test)]
+#[cfg(todo_redo_old_tests)]
+mod op_query_test;
 
 #[cfg(test)]
 mod test;
@@ -96,6 +95,7 @@ where
     id: CellId,
     conductor_api: Api,
     env: EnvWrite,
+    cache: EnvWrite,
     holochain_p2p_cell: P2pCell,
     queue_triggers: QueueTriggers,
 }
@@ -113,6 +113,7 @@ impl Cell {
         id: CellId,
         conductor_handle: ConductorHandle,
         env: EnvWrite,
+        cache: EnvWrite,
         holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
@@ -121,13 +122,14 @@ impl Cell {
 
         // check if genesis has been run
         let has_genesis = {
-            // check if genesis ran on source chain buf
-            SourceChainBuf::new(env.clone().into())?.has_genesis()
+            // check if genesis ran.
+            GenesisWorkspace::new(env.clone())?.has_genesis(id.agent_pubkey())?
         };
 
         if has_genesis {
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
-                &env,
+                env.clone(),
+                cache.clone(),
                 holochain_p2p_cell.clone(),
                 conductor_handle.clone(),
                 conductor_api.clone(),
@@ -141,6 +143,7 @@ impl Cell {
                     id,
                     conductor_api,
                     env,
+                    cache,
                     holochain_p2p_cell,
                     queue_triggers,
                 },
@@ -173,8 +176,7 @@ impl Cell {
         let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
 
         // run genesis
-        let workspace = GenesisWorkspace::new(cell_env.clone().into())
-            .await
+        let workspace = GenesisWorkspace::new(cell_env.clone())
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
 
@@ -185,7 +187,7 @@ impl Cell {
             ribosome,
         );
 
-        genesis_workflow(workspace, cell_env.clone().into(), conductor_api, args)
+        genesis_workflow(workspace, conductor_api, args)
             .await
             .map_err(Box::new)
             .map_err(ConductorApiError::from)
@@ -453,8 +455,7 @@ impl Cell {
         let env: EnvRead = self.env.clone().into();
 
         // Get the header
-        let databases = ValidationPackageDb::create(env.clone())?;
-        let mut cascade = databases.cascade();
+        let mut cascade = Cascade::empty().with_vault(env.clone());
         let header = match cascade
             .retrieve_header(header_hash, Default::default())
             .await?
@@ -470,6 +471,7 @@ impl Cell {
             validation_package::get_as_author(
                 header,
                 env,
+                self.cache.clone(),
                 &ribosome,
                 &self.conductor_api,
                 &self.holochain_p2p_cell,
@@ -492,15 +494,21 @@ impl Cell {
         &self,
         dht_hash: holo_hash::AnyDhtHash,
         options: holochain_p2p::event::GetOptions,
-    ) -> CellResult<GetElementResponse> {
+    ) -> CellResult<WireOps> {
         debug!("handling get");
         // TODO: Later we will need more get types but for now
         // we can just have these defaults depending on whether or not
         // the hash is an entry or header.
         // In the future we should use GetOptions to choose which get to run.
         let mut r = match *dht_hash.hash_type() {
-            AnyDht::Entry => self.handle_get_entry(dht_hash.into(), options).await,
-            AnyDht::Header => self.handle_get_element(dht_hash.into()).await,
+            AnyDht::Entry => self
+                .handle_get_entry(dht_hash.into(), options)
+                .await
+                .map(WireOps::Entry),
+            AnyDht::Header => self
+                .handle_get_element(dht_hash.into(), options)
+                .await
+                .map(WireOps::Element),
         };
         if let Err(e) = &mut r {
             error!(msg = "Error handling a get", ?e, agent = ?self.id.agent_pubkey());
@@ -513,15 +521,19 @@ impl Cell {
         &self,
         hash: EntryHash,
         options: holochain_p2p::event::GetOptions,
-    ) -> CellResult<GetElementResponse> {
+    ) -> CellResult<WireEntryOps> {
         let env = self.env.clone();
         authority::handle_get_entry(env.into(), hash, options).map_err(Into::into)
     }
 
     #[tracing::instrument(skip(self))]
-    async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
+    async fn handle_get_element(
+        &self,
+        hash: HeaderHash,
+        options: holochain_p2p::event::GetOptions,
+    ) -> CellResult<WireElementOps> {
         let env = self.env.clone();
-        authority::handle_get_element(env.into(), hash).map_err(Into::into)
+        authority::handle_get_element(env.into(), hash, options).map_err(Into::into)
     }
 
     #[instrument(skip(self, _dht_hash, _options))]
@@ -541,9 +553,9 @@ impl Cell {
     // if we are careful.
     fn handle_get_links(
         &self,
-        link_key: WireLinkMetaKey,
+        link_key: WireLinkKey,
         options: holochain_p2p::event::GetLinksOptions,
-    ) -> CellResult<GetLinksResponse> {
+    ) -> CellResult<WireLinkOps> {
         debug!(id = ?self.id());
         let env = self.env.clone();
         authority::handle_get_links(env.into(), link_key, options).map_err(Into::into)
@@ -555,7 +567,7 @@ impl Cell {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: holochain_p2p::event::GetActivityOptions,
-    ) -> CellResult<AgentActivityResponse> {
+    ) -> CellResult<AgentActivityResponse<HeaderHash>> {
         let env = self.env.clone();
         authority::handle_get_agent_activity(env.into(), agent, query, options).map_err(Into::into)
     }
@@ -565,32 +577,11 @@ impl Cell {
     async fn handle_validation_receipt(&self, receipt: SerializedBytes) -> CellResult<()> {
         let receipt: SignedValidationReceipt = receipt.try_into()?;
 
-        // Add to authored
-        let db = self.env.get_table(TableName::AuthoredDhtOps)?;
-        let mut authored_dht_ops: AuthoredDhtOpsStore = KvBufFresh::new(self.env.clone(), db);
-        match authored_dht_ops.get(&receipt.receipt.dht_op_hash)? {
-            Some(mut auth) => {
-                auth.receipt_count += 1;
-                authored_dht_ops.put(receipt.receipt.dht_op_hash.clone(), auth)?;
-            }
-            None => {
-                warn!(
-                    "Got receipt {:?} but it's missing from authored db so throwing receipt away",
-                    receipt
-                );
-                return Err(CellError::OpMissingForReceipt(receipt.receipt.dht_op_hash));
-            }
-        }
-
-        // Add to receipts db
-        let mut receipts_db = ValidationReceiptsBuf::new(&self.env)?;
-        receipts_db.add_if_unique(receipt)?;
-
-        // Write to db
-        self.env.conn().unwrap().with_commit(|w| {
-            authored_dht_ops.flush_to_txn_ref(w)?;
-            receipts_db.flush_to_txn_ref(w)?;
-            DatabaseResult::Ok(())
+        self.env.conn()?.with_commit(|txn| {
+            // Update receipt count.
+            add_one_receipt_count(txn, &receipt.receipt.dht_op_hash)?;
+            // Add to receipts db
+            validation_receipts::add_if_unique(txn, receipt)
         })?;
 
         Ok(())
@@ -604,11 +595,45 @@ impl Cell {
         since: Timestamp,
         until: Timestamp,
     ) -> CellResult<Vec<DhtOpHash>> {
-        let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into())?;
-        let result: Vec<DhtOpHash> = fresh_reader!(self.env(), |mut reader| integrated_dht_ops
-            .query(&mut reader, Some(since), Some(until), Some(dht_arc))?
-            .map(|(k, _)| Ok(k))
-            .collect())?;
+        // FIXME: Test this query.
+        // TODO: Figure out how to make DhtArc.contains()
+        // into a WHERE constraint.
+        let result = self.env().conn()?.with_reader(|txn| {
+            let mut stmt = txn.prepare(
+                "
+                SELECT DhtOp.hash, DhtOp.basis_hash
+                FROM DHtOp
+                WHERE
+                DhtOp.when_integrated >= :from
+                AND 
+                DhtOp.when_integrated < :to
+                ",
+            )?;
+            let r = stmt
+                .query_map(
+                    named_params! {
+                        ":from": since,
+                        ":to": until,
+                    },
+                    |row| {
+                        let hash: DhtOpHash = row.get("hash")?;
+                        let basis_hash: AnyDhtHash = row.get("basis_hash")?;
+                        Ok((hash, basis_hash))
+                    },
+                )?
+                .filter_map(|r| match r {
+                    Ok((hash, basis)) => {
+                        if dht_arc.contains(basis.get_loc()) {
+                            Some(Ok(hash))
+                        } else {
+                            None
+                        }
+                    }
+                    Err(e) => Some(Err(e)),
+                })
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            DatabaseResult::Ok(r)
+        })?;
         Ok(result)
     }
 
@@ -624,27 +649,43 @@ impl Cell {
             holochain_types::dht_op::DhtOp,
         )>,
     > {
-        let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into())?;
-        let mut out = vec![];
-        for op_hash in op_hashes {
-            let val = integrated_dht_ops.get(&op_hash)?;
-            if let Some(val) = val {
-                let full_op = match &val.validation_status {
-                    ValidationStatus::Valid => {
-                        let cas = ElementBuf::vault(self.env.clone().into(), false)?;
-                        light_to_op(val.op, &cas)?
-                    }
-                    ValidationStatus::Rejected => {
-                        let cas = ElementBuf::rejected(self.env.clone().into())?;
-                        light_to_op(val.op, &cas)?
-                    }
-                    ValidationStatus::Abandoned => todo!("Add when abandoned store is added"),
-                };
-                let basis = full_op.dht_basis();
-                out.push((basis, op_hash, full_op));
-            }
-        }
-        Ok(out)
+        // FIXME: Test this query.
+        let results = self.env().conn()?.with_reader(|txn| {
+            let mut positions = "?,".repeat(op_hashes.len());
+            positions.pop();
+            let sql = format!(
+                "
+                SELECT DhtOp.hash, DhtOp.basis_hash, DhtOp.type AS dht_type,
+                Header.blob AS header_blob, Entry.blob AS entry_blob
+                FROM DHtOp
+                JOIN Header ON DhtOp.header_hash = Header.hash
+                LEFT JOIN Entry ON Header.entry_hash = Entry.hash
+                WHERE
+                DhtOp.when_integrated IS NOT NULL
+                AND
+                DhtOp.hash in ({})
+                ",
+                positions
+            );
+            let mut stmt = txn.prepare(&sql)?;
+            let r = stmt
+                .query_and_then(rusqlite::params_from_iter(op_hashes.into_iter()), |row| {
+                    let basis_hash: AnyDhtHash = row.get("basis_hash")?;
+                    let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+                    let op_type: DhtOpType = row.get("dht_type")?;
+                    let hash: DhtOpHash = row.get("hash")?;
+                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                    let entry = match entry {
+                        Some(entry) => Some(from_blob::<Entry>(entry)?),
+                        None => None,
+                    };
+                    let op = DhtOp::from_type(op_type, header, entry)?;
+                    StateQueryResult::Ok((basis_hash, hash, op))
+                })?
+                .collect::<StateQueryResult<Vec<_>>>()?;
+            StateQueryResult::Ok(r)
+        })?;
+        Ok(results)
     }
 
     /// the network module would like this cell/agent to sign some data
@@ -682,7 +723,7 @@ impl Cell {
     pub async fn call_zome(
         &self,
         call: ZomeCall,
-        workspace_lock: Option<CallZomeWorkspaceLock>,
+        workspace_lock: Option<HostFnWorkspace>,
     ) -> CellResult<ZomeCallResult> {
         // Check if init has run if not run it
         self.check_or_run_zome_init().await?;
@@ -694,7 +735,11 @@ impl Cell {
         let is_root_zome_call = workspace_lock.is_none();
         let workspace_lock = match workspace_lock {
             Some(l) => l,
-            None => CallZomeWorkspaceLock::new(CallZomeWorkspace::new(arc.clone().into())?),
+            None => HostFnWorkspace::new(
+                self.env().clone(),
+                self.cache().clone(),
+                self.id.agent_pubkey().clone(),
+            )?,
         };
 
         let conductor_api = self.conductor_api.clone();
@@ -713,9 +758,8 @@ impl Cell {
             workspace_lock,
             self.holochain_p2p_cell.clone(),
             keystore,
-            arc.clone().into(),
             args,
-            self.queue_triggers.produce_dht_ops.clone(),
+            self.queue_triggers.publish_dht_ops.clone(),
         )
         .await
         .map_err(Box::new)?)
@@ -730,12 +774,14 @@ impl Cell {
         let id = self.id.clone();
         let conductor_api = self.conductor_api.clone();
         // Create the workspace
-        let workspace = CallZomeWorkspace::new(self.env().clone().into())
-            .map_err(WorkflowError::from)
-            .map_err(Box::new)?;
+        let workspace = HostFnWorkspace::new(
+            self.env().clone(),
+            self.cache().clone(),
+            id.agent_pubkey().clone(),
+        )?;
 
         // Check if initialization has run
-        if workspace.source_chain.has_initialized() {
+        if workspace.source_chain().has_initialized()? {
             return Ok(());
         }
         trace!("running init");
@@ -752,15 +798,10 @@ impl Cell {
 
         // Run the workflow
         let args = InitializeZomesWorkflowArgs { dna_def, ribosome };
-        let init_result = initialize_zomes_workflow(
-            workspace,
-            self.holochain_p2p_cell.clone(),
-            keystore,
-            env.clone().into(),
-            args,
-        )
-        .await
-        .map_err(Box::new)?;
+        let init_result =
+            initialize_zomes_workflow(workspace, self.holochain_p2p_cell.clone(), keystore, args)
+                .await
+                .map_err(Box::new)?;
         trace!(?init_result);
         match init_result {
             InitResult::Pass => {}
@@ -816,6 +857,10 @@ impl Cell {
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) fn env(&self) -> &EnvWrite {
         &self.env
+    }
+
+    pub(crate) fn cache(&self) -> &EnvWrite {
+        &self.cache
     }
 
     #[cfg(any(test, feature = "test_utils"))]

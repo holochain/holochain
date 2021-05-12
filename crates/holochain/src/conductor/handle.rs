@@ -51,7 +51,6 @@ use super::p2p_store::put_agent_info_signed;
 use super::p2p_store::query_agent_info_signed;
 use super::Cell;
 use super::Conductor;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::core::workflow::ZomeCallResult;
 use crate::core::{queue_consumer::InitialQueueTriggers, ribosome::real_ribosome::RealRibosome};
 use derive_more::From;
@@ -60,6 +59,7 @@ use futures::StreamExt;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
@@ -143,7 +143,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn call_zome_with_workspace(
         &self,
         invocation: ZomeCall,
-        workspace_lock: CallZomeWorkspaceLock,
+        workspace_lock: HostFnWorkspace,
     ) -> ConductorApiResult<ZomeCallResult>;
 
     /// Get a Websocket port which will
@@ -248,6 +248,10 @@ pub trait ConductorHandleT: Send + Sync {
     /// Retrieve the environment for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite>;
+
+    /// Retrieve the database for this cell. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn get_cache_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite>;
 
     /// Retrieve the database for networking. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -428,7 +432,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn call_zome_with_workspace(
         &self,
         call: ZomeCall,
-        workspace_lock: CallZomeWorkspaceLock,
+        workspace_lock: HostFnWorkspace,
     ) -> ConductorApiResult<ZomeCallResult> {
         debug!(cell_id = ?call.cell_id);
         let cell = self.cell_by_id(&call.cell_id).await?;
@@ -698,6 +702,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite> {
         let cell = self.cell_by_id(cell_id).await?;
         Ok(cell.env().clone())
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn get_cache_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite> {
+        let cell = self.cell_by_id(cell_id).await?;
+        Ok(cell.cache().clone())
     }
 
     #[cfg(any(test, feature = "test_utils"))]

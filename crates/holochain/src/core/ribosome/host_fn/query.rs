@@ -13,9 +13,7 @@ pub fn query(
         let elements: Vec<Element> = call_context
             .host_access
             .workspace()
-            .write()
-            .await
-            .source_chain
+            .source_chain()
             .query(&input)
             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
         Ok(elements)
@@ -28,6 +26,7 @@ pub mod slow_tests {
     use crate::{core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator};
     use ::fixt::prelude::*;
     use hdk::prelude::*;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_state::prelude::TestEnv;
     use query::ChainQueryFilter;
 
@@ -36,19 +35,15 @@ pub mod slow_tests {
     // TODO: use this setup function to DRY up a lot of duplicated code
     async fn setup() -> (TestEnv, ZomeCallHostAccess) {
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
+        host_access.workspace = workspace;
         (test_env, host_access)
     }
 

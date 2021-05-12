@@ -4,6 +4,8 @@
 //!
 //! [DhtOp]: enum.DhtOp.html
 
+use std::str::FromStr;
+
 use crate::element::ElementGroup;
 use crate::header::NewEntryHeader;
 use crate::prelude::*;
@@ -11,12 +13,17 @@ use error::DhtOpError;
 use error::DhtOpResult;
 use holo_hash::hash_type;
 use holo_hash::HashableContentBytes;
+use holochain_sqlite::rusqlite::types::FromSql;
+use holochain_sqlite::rusqlite::ToSql;
 use holochain_zome_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
 #[allow(missing_docs)]
 pub mod error;
+
+#[cfg(test)]
+pub mod tests;
 
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
 /// as well as changes to the status of already held data.
@@ -106,7 +113,7 @@ type DhtBasis = AnyDhtHash;
 /// A type for storing in databases that don't need the actual
 /// data. Everything is a hash of the type except the signatures.
 #[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, derive_more::Display)]
+#[derive(Clone, Debug, Serialize, Deserialize, derive_more::Display)]
 pub enum DhtOpLight {
     #[display(fmt = "StoreElement")]
     StoreElement(HeaderHash, Option<EntryHash>, DhtBasis),
@@ -126,6 +133,80 @@ pub enum DhtOpLight {
     RegisterAddLink(HeaderHash, DhtBasis),
     #[display(fmt = "RegisterRemoveLink")]
     RegisterRemoveLink(HeaderHash, DhtBasis),
+}
+
+impl PartialEq for DhtOpLight {
+    fn eq(&self, other: &Self) -> bool {
+        // The ops are the same if they are the same type on the same header hash.
+        // We can't derive eq because `Option<EntryHash>` doesn't make the op different.
+        // We can ignore the basis because the basis is derived from the header and op type.
+        self.get_type() == other.get_type() && self.header_hash() == other.header_hash()
+    }
+}
+
+impl Eq for DhtOpLight {}
+
+impl std::hash::Hash for DhtOpLight {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.get_type().hash(state);
+        self.header_hash().hash(state);
+    }
+}
+
+/// This enum is used to
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Hash,
+    derive_more::Display,
+    strum_macros::EnumString,
+)]
+pub enum DhtOpType {
+    #[display(fmt = "StoreElement")]
+    StoreElement,
+    #[display(fmt = "StoreEntry")]
+    StoreEntry,
+    #[display(fmt = "RegisterAgentActivity")]
+    RegisterAgentActivity,
+    #[display(fmt = "RegisterUpdatedContent")]
+    RegisterUpdatedContent,
+    #[display(fmt = "RegisterUpdatedElement")]
+    RegisterUpdatedElement,
+    #[display(fmt = "RegisterDeletedBy")]
+    RegisterDeletedBy,
+    #[display(fmt = "RegisterDeletedEntryHeader")]
+    RegisterDeletedEntryHeader,
+    #[display(fmt = "RegisterAddLink")]
+    RegisterAddLink,
+    #[display(fmt = "RegisterRemoveLink")]
+    RegisterRemoveLink,
+}
+
+impl ToSql for DhtOpType {
+    fn to_sql(
+        &self,
+    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput> {
+        Ok(holochain_sqlite::rusqlite::types::ToSqlOutput::Owned(
+            format!("{}", self).into(),
+        ))
+    }
+}
+
+impl FromSql for DhtOpType {
+    fn column_result(
+        value: holochain_sqlite::rusqlite::types::ValueRef<'_>,
+    ) -> holochain_sqlite::rusqlite::types::FromSqlResult<Self> {
+        String::column_result(value).and_then(|string| {
+            DhtOpType::from_str(&string)
+                .map_err(|_| holochain_sqlite::rusqlite::types::FromSqlError::InvalidType)
+        })
+    }
 }
 
 impl DhtOp {
@@ -251,6 +332,73 @@ impl DhtOp {
             DhtOp::RegisterRemoveLink(_, h) => h.clone().into(),
         }
     }
+
+    /// Get the entry from this op, if one exists
+    pub fn entry(&self) -> Option<&Entry> {
+        match self {
+            DhtOp::StoreElement(_, _, e) => e.as_ref().map(|b| &**b),
+            DhtOp::StoreEntry(_, _, e) => Some(&*e),
+            DhtOp::RegisterUpdatedContent(_, _, e) => e.as_ref().map(|b| &**b),
+            DhtOp::RegisterUpdatedElement(_, _, e) => e.as_ref().map(|b| &**b),
+            DhtOp::RegisterAgentActivity(_, _) => None,
+            DhtOp::RegisterDeletedBy(_, _) => None,
+            DhtOp::RegisterDeletedEntryHeader(_, _) => None,
+            DhtOp::RegisterAddLink(_, _) => None,
+            DhtOp::RegisterRemoveLink(_, _) => None,
+        }
+    }
+
+    /// Get the type as a unit enum, for Display purposes
+    pub fn get_type(&self) -> DhtOpType {
+        match self {
+            DhtOp::StoreElement(_, _, _) => DhtOpType::StoreElement,
+            DhtOp::StoreEntry(_, _, _) => DhtOpType::StoreEntry,
+            DhtOp::RegisterUpdatedContent(_, _, _) => DhtOpType::RegisterUpdatedContent,
+            DhtOp::RegisterUpdatedElement(_, _, _) => DhtOpType::RegisterUpdatedElement,
+            DhtOp::RegisterAgentActivity(_, _) => DhtOpType::RegisterAgentActivity,
+            DhtOp::RegisterDeletedBy(_, _) => DhtOpType::RegisterDeletedBy,
+            DhtOp::RegisterDeletedEntryHeader(_, _) => DhtOpType::RegisterDeletedEntryHeader,
+            DhtOp::RegisterAddLink(_, _) => DhtOpType::RegisterAddLink,
+            DhtOp::RegisterRemoveLink(_, _) => DhtOpType::RegisterRemoveLink,
+        }
+    }
+
+    /// From a type, header and an entry (if there is one)
+    pub fn from_type(
+        op_type: DhtOpType,
+        header: SignedHeader,
+        entry: Option<Entry>,
+    ) -> DhtOpResult<Self> {
+        let SignedHeader(header, signature) = header;
+        let r = match op_type {
+            DhtOpType::StoreElement => DhtOp::StoreElement(signature, header, entry.map(Box::new)),
+            DhtOpType::StoreEntry => {
+                let entry = entry.ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?;
+                let header = match header {
+                    Header::Create(c) => NewEntryHeader::Create(c),
+                    Header::Update(c) => NewEntryHeader::Update(c),
+                    _ => return Err(DhtOpError::OpHeaderMismatch(op_type, header.header_type())),
+                };
+                DhtOp::StoreEntry(signature, header, Box::new(entry))
+            }
+            DhtOpType::RegisterAgentActivity => DhtOp::RegisterAgentActivity(signature, header),
+            DhtOpType::RegisterUpdatedContent => {
+                DhtOp::RegisterUpdatedContent(signature, header.try_into()?, entry.map(Box::new))
+            }
+            DhtOpType::RegisterUpdatedElement => {
+                DhtOp::RegisterUpdatedElement(signature, header.try_into()?, entry.map(Box::new))
+            }
+            DhtOpType::RegisterDeletedBy => DhtOp::RegisterDeletedBy(signature, header.try_into()?),
+            DhtOpType::RegisterDeletedEntryHeader => {
+                DhtOp::RegisterDeletedBy(signature, header.try_into()?)
+            }
+            DhtOpType::RegisterAddLink => DhtOp::RegisterAddLink(signature, header.try_into()?),
+            DhtOpType::RegisterRemoveLink => {
+                DhtOp::RegisterRemoveLink(signature, header.try_into()?)
+            }
+        };
+        Ok(r)
+    }
 }
 
 impl DhtOpLight {
@@ -281,6 +429,92 @@ impl DhtOpLight {
             | DhtOpLight::RegisterAddLink(h, _)
             | DhtOpLight::RegisterRemoveLink(h, _) => h,
         }
+    }
+
+    /// Get the type as a unit enum, for Display purposes
+    pub fn get_type(&self) -> DhtOpType {
+        match self {
+            DhtOpLight::StoreElement(_, _, _) => DhtOpType::StoreElement,
+            DhtOpLight::StoreEntry(_, _, _) => DhtOpType::StoreEntry,
+            DhtOpLight::RegisterUpdatedContent(_, _, _) => DhtOpType::RegisterUpdatedContent,
+            DhtOpLight::RegisterUpdatedElement(_, _, _) => DhtOpType::RegisterUpdatedElement,
+            DhtOpLight::RegisterAgentActivity(_, _) => DhtOpType::RegisterAgentActivity,
+            DhtOpLight::RegisterDeletedBy(_, _) => DhtOpType::RegisterDeletedBy,
+            DhtOpLight::RegisterDeletedEntryHeader(_, _) => DhtOpType::RegisterDeletedEntryHeader,
+            DhtOpLight::RegisterAddLink(_, _) => DhtOpType::RegisterAddLink,
+            DhtOpLight::RegisterRemoveLink(_, _) => DhtOpType::RegisterRemoveLink,
+        }
+    }
+
+    /// From a type with the hashes.
+    pub fn from_type(
+        op_type: DhtOpType,
+        header_hash: HeaderHash,
+        header: &Header,
+    ) -> DhtOpResult<Self> {
+        let op = match op_type {
+            DhtOpType::StoreElement => {
+                let entry_hash = header.entry_hash().cloned();
+                Self::StoreElement(header_hash.clone(), entry_hash, header_hash.into())
+            }
+            DhtOpType::StoreEntry => {
+                let entry_hash = header
+                    .entry_hash()
+                    .cloned()
+                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?;
+                Self::StoreEntry(header_hash, entry_hash.clone(), entry_hash.into())
+            }
+            DhtOpType::RegisterAgentActivity => {
+                Self::RegisterAgentActivity(header_hash, header.author().clone().into())
+            }
+            DhtOpType::RegisterUpdatedContent => {
+                let entry_hash = header
+                    .entry_hash()
+                    .cloned()
+                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?;
+                let basis = match header {
+                    Header::Update(update) => update.original_entry_address.clone(),
+                    _ => return Err(DhtOpError::OpHeaderMismatch(op_type, header.header_type())),
+                };
+                Self::RegisterUpdatedContent(header_hash, entry_hash, basis.into())
+            }
+            DhtOpType::RegisterUpdatedElement => {
+                let entry_hash = header
+                    .entry_hash()
+                    .cloned()
+                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?;
+                let basis = match header {
+                    Header::Update(update) => update.original_entry_address.clone(),
+                    _ => return Err(DhtOpError::OpHeaderMismatch(op_type, header.header_type())),
+                };
+                Self::RegisterUpdatedElement(header_hash, entry_hash, basis.into())
+            }
+            DhtOpType::RegisterDeletedBy => {
+                Self::RegisterDeletedBy(header_hash.clone(), header_hash.into())
+            }
+            DhtOpType::RegisterDeletedEntryHeader => {
+                let basis = header
+                    .entry_hash()
+                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?
+                    .clone();
+                Self::RegisterDeletedBy(header_hash, basis.into())
+            }
+            DhtOpType::RegisterAddLink => {
+                let basis = match header {
+                    Header::CreateLink(create_link) => create_link.base_address.clone(),
+                    _ => return Err(DhtOpError::OpHeaderMismatch(op_type, header.header_type())),
+                };
+                Self::RegisterAddLink(header_hash, basis.into())
+            }
+            DhtOpType::RegisterRemoveLink => {
+                let basis = match header {
+                    Header::DeleteLink(delete_link) => delete_link.base_address.clone(),
+                    _ => return Err(DhtOpError::OpHeaderMismatch(op_type, header.header_type())),
+                };
+                Self::RegisterRemoveLink(header_hash, basis.into())
+            }
+        };
+        Ok(op)
     }
 }
 
@@ -319,6 +553,56 @@ impl<'a> UniqueForm<'a> {
             }
             UniqueForm::RegisterAddLink(header) => header.base_address.clone().into(),
             UniqueForm::RegisterRemoveLink(header) => header.base_address.clone().into(),
+        }
+    }
+
+    /// Get the dht op hash without cloning the header.
+    pub fn op_hash(op_type: DhtOpType, header: Header) -> DhtOpResult<(Header, DhtOpHash)> {
+        match op_type {
+            DhtOpType::StoreElement => {
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::StoreElement(&header));
+                Ok((header, hash))
+            }
+            DhtOpType::StoreEntry => {
+                let header = header.try_into()?;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::StoreEntry(&header));
+                Ok((header.into(), hash))
+            }
+            DhtOpType::RegisterAgentActivity => {
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterAgentActivity(&header));
+                Ok((header, hash))
+            }
+            DhtOpType::RegisterUpdatedContent => {
+                let header = header.try_into()?;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterUpdatedContent(&header));
+                Ok((header.into(), hash))
+            }
+            DhtOpType::RegisterUpdatedElement => {
+                let header = header.try_into()?;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterUpdatedElement(&header));
+                Ok((header.into(), hash))
+            }
+            DhtOpType::RegisterDeletedBy => {
+                let header = header.try_into()?;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterDeletedBy(&header));
+                Ok((header.into(), hash))
+            }
+            DhtOpType::RegisterDeletedEntryHeader => {
+                let header = header.try_into()?;
+                let hash =
+                    DhtOpHash::with_data_sync(&UniqueForm::RegisterDeletedEntryHeader(&header));
+                Ok((header.into(), hash))
+            }
+            DhtOpType::RegisterAddLink => {
+                let header = header.try_into()?;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterAddLink(&header));
+                Ok((header.into(), hash))
+            }
+            DhtOpType::RegisterRemoveLink => {
+                let header = header.try_into()?;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterRemoveLink(&header));
+                Ok((header.into(), hash))
+            }
         }
     }
 }
@@ -418,7 +702,9 @@ fn produce_op_lights_from_parts<'a>(
     let iter = headers_and_hashes.map(|(head, hash)| (head, hash, maybe_entry_hash.cloned()));
     produce_op_lights_from_iter(iter, length)
 }
-fn produce_op_lights_from_iter<'a>(
+
+/// Produce op lights from iter of (header hash, header, maybe entry).
+pub fn produce_op_lights_from_iter<'a>(
     iter: impl Iterator<Item = (&'a HeaderHash, &'a Header, Option<EntryHash>)>,
     length: usize,
 ) -> DhtOpResult<Vec<DhtOpLight>> {
@@ -542,5 +828,126 @@ impl HashableContent for UniqueForm<'_> {
             self.try_into()
                 .expect("Could not serialize HashableContent"),
         )
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+/// Condensed version of ops for sending across the wire.
+pub enum WireOps {
+    /// Response for get entry.
+    Entry(WireEntryOps),
+    /// Response for get element.
+    Element(WireElementOps),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+/// The data rendered from a wire op to place in the database.
+pub struct RenderedOp {
+    /// The header to insert into the database.
+    pub header: SignedHeaderHashed,
+    /// The header to insert into the database.
+    pub op_light: DhtOpLight,
+    /// The hash of the [`DhtOp`]
+    pub op_hash: DhtOpHash,
+    /// The validation status of the header.
+    pub validation_status: Option<ValidationStatus>,
+}
+
+impl RenderedOp {
+    /// Try to create a new rendered op from wire data.
+    /// This function computes all the hashes and
+    /// reconstructs the full headers.
+    pub fn new(
+        header: Header,
+        signature: Signature,
+        validation_status: Option<ValidationStatus>,
+        op_type: DhtOpType,
+    ) -> DhtOpResult<Self> {
+        let (header, op_hash) = UniqueForm::op_hash(op_type, header)?;
+        let header_hashed = HeaderHashed::from_content_sync(header);
+        // TODO: Verify signature?
+        let header = SignedHeaderHashed::with_presigned(header_hashed, signature);
+        let op_light = DhtOpLight::from_type(op_type, header.as_hash().clone(), header.header())?;
+        Ok(Self {
+            header,
+            op_light,
+            validation_status,
+            op_hash,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+/// The full data for insertion into the database.
+/// The reason we don't use [`DhtOp`] is because we don't
+/// want to clone the entry for every header.
+pub struct RenderedOps {
+    /// Entry for the ops if there is one.
+    pub entry: Option<EntryHashed>,
+    /// Op data to insert.
+    pub ops: Vec<RenderedOp>,
+}
+
+/// Type for deriving ordering of DhtOps
+/// Don't change the order of this enum unless
+/// you mean to change the order we process ops
+#[allow(missing_docs)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum OpNumericalOrder {
+    RegisterAgentActivity = 0,
+    StoreEntry,
+    StoreElement,
+    RegisterUpdatedContent,
+    RegisterUpdatedElement,
+    RegisterDeletedBy,
+    RegisterDeletedEntryHeader,
+    RegisterAddLink,
+    RegisterRemoveLink,
+}
+
+/// This is used as an index for ordering ops in our database.
+/// It gives the most likely ordering where dependencies will come
+/// first.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct OpOrder {
+    order: OpNumericalOrder,
+    timestamp: holochain_zome_types::timestamp::Timestamp,
+}
+
+impl std::fmt::Display for OpOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{:019}{:010}",
+            self.order as u8, self.timestamp.0, self.timestamp.1
+        )
+    }
+}
+
+impl OpOrder {
+    /// Create a new ordering from a op type and timestamp.
+    pub fn new(op_type: DhtOpType, timestamp: holochain_zome_types::timestamp::Timestamp) -> Self {
+        let order = match op_type {
+            DhtOpType::StoreElement => OpNumericalOrder::StoreElement,
+            DhtOpType::StoreEntry => OpNumericalOrder::StoreEntry,
+            DhtOpType::RegisterAgentActivity => OpNumericalOrder::RegisterAgentActivity,
+            DhtOpType::RegisterUpdatedContent => OpNumericalOrder::RegisterUpdatedContent,
+            DhtOpType::RegisterUpdatedElement => OpNumericalOrder::RegisterUpdatedElement,
+            DhtOpType::RegisterDeletedBy => OpNumericalOrder::RegisterDeletedBy,
+            DhtOpType::RegisterDeletedEntryHeader => OpNumericalOrder::RegisterDeletedEntryHeader,
+            DhtOpType::RegisterAddLink => OpNumericalOrder::RegisterAddLink,
+            DhtOpType::RegisterRemoveLink => OpNumericalOrder::RegisterRemoveLink,
+        };
+        Self { order, timestamp }
+    }
+}
+
+impl holochain_sqlite::rusqlite::ToSql for OpOrder {
+    fn to_sql(
+        &self,
+    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput> {
+        Ok(holochain_sqlite::rusqlite::types::ToSqlOutput::Owned(
+            self.to_string().into(),
+        ))
     }
 }

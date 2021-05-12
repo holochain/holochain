@@ -3,7 +3,6 @@
 use super::*;
 use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
-use crate::core::workflow::validation_receipt_workflow::ValidationReceiptWorkspace;
 use tokio::task::JoinHandle;
 use tracing::*;
 
@@ -28,11 +27,7 @@ pub fn spawn_validation_receipt_consumer(
             }
 
             // Run the workflow
-            let workspace = ValidationReceiptWorkspace::new(env.clone().into())
-                .expect("Could not create ValidationReceiptWorkspace");
-            match validation_receipt_workflow(workspace, env.clone().into(), &mut cell_network)
-                .await
-            {
+            match validation_receipt_workflow(env.clone(), &mut cell_network).await {
                 Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
                 Err(err) => {
                     handle_workflow_error(

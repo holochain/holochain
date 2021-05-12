@@ -3,7 +3,6 @@
 use super::*;
 use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_dht_ops_workflow;
-use crate::core::workflow::integrate_dht_ops_workflow::IntegrateDhtOpsWorkspace;
 use tokio::task::JoinHandle;
 use tracing::*;
 
@@ -31,11 +30,8 @@ pub fn spawn_integrate_dht_ops_consumer(
             }
 
             // Run the workflow
-            let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into())
-                .expect("Could not create Workspace");
             match integrate_dht_ops_workflow(
-                workspace,
-                env.clone().into(),
+                env.clone(),
                 trigger_sys.clone(),
                 trigger_receipt.clone(),
             )

@@ -33,6 +33,9 @@ pub enum ConductorError {
     #[error("Cell is not initialized.")]
     CellNotInitialized,
 
+    #[error("The lock for the caches has been poisoned.")]
+    CachesLockPoisoned,
+
     #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
     CellMissing(CellId),
 
@@ -105,6 +108,15 @@ pub enum ConductorError {
 
     #[error(transparent)]
     MrBundleError(#[from] mr_bundle::error::MrBundleError),
+
+    #[error(transparent)]
+    StateQueryError(#[from] holochain_state::query::StateQueryError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] holochain_state::mutations::StateMutationError),
+
+    #[error(transparent)]
+    RusqliteError(#[from] rusqlite::Error),
 }
 
 #[derive(Error, Debug)]

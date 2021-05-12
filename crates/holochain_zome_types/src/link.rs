@@ -153,3 +153,10 @@ impl LinkDetails {
         self.into()
     }
 }
+
+#[cfg(feature = "full")]
+impl rusqlite::ToSql for LinkTag {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        Ok(rusqlite::types::ToSqlOutput::Borrowed((&self.0[..]).into()))
+    }
+}

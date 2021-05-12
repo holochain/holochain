@@ -37,5 +37,4 @@ pub use cell::error::CellError;
 pub use cell::Cell;
 pub use conductor::Conductor;
 pub use conductor::ConductorBuilder;
-pub use conductor::ConductorStateDb;
 pub use handle::ConductorHandle;

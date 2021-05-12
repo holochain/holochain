@@ -28,6 +28,7 @@ use tempdir::TempDir;
 pub struct CellHostFnCaller {
     pub cell_id: CellId,
     pub env: EnvWrite,
+    pub cache: EnvWrite,
     pub ribosome: RealRibosome,
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
@@ -39,6 +40,7 @@ pub struct CellHostFnCaller {
 impl CellHostFnCaller {
     pub async fn new(cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) -> Self {
         let env = handle.get_cell_env(cell_id).await.unwrap();
+        let cache = handle.get_cache_env(cell_id).await.unwrap();
         let keystore = env.keystore().clone();
         let network = handle
             .holochain_p2p()
@@ -51,6 +53,7 @@ impl CellHostFnCaller {
         CellHostFnCaller {
             cell_id: cell_id.clone(),
             env,
+            cache,
             ribosome,
             network,
             keystore,
@@ -67,6 +70,7 @@ impl CellHostFnCaller {
         let call_zome_handle = self.cell_conductor_api.clone().into_call_zome_handle();
         HostFnCaller {
             env: self.env.clone(),
+            cache: self.cache.clone(),
             ribosome: self.ribosome.clone(),
             zome_path,
             network: self.network.clone(),

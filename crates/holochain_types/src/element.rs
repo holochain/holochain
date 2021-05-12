@@ -16,8 +16,85 @@ use std::collections::BTreeSet;
 #[allow(missing_docs)]
 pub mod error;
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, Default)]
+/// A condensed version of get element request.
+/// This saves bandwidth by removing duplicated and implied data.
+pub struct WireElementOps {
+    /// The header this request was for.
+    pub header: Option<Judged<SignedHeader>>,
+    /// Any deletes on the header.
+    pub deletes: Vec<Judged<WireDelete>>,
+    /// Any updates on the header.
+    pub updates: Vec<Judged<WireUpdateRelationship>>,
+    /// The entry if there is one.
+    pub entry: Option<Entry>,
+}
+
+impl WireElementOps {
+    /// Create an empty set of wire element ops.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// Render these ops to their full types.
+    pub fn render(self) -> DhtOpResult<RenderedOps> {
+        let Self {
+            header,
+            deletes,
+            updates,
+            entry,
+        } = self;
+        let mut ops = Vec::with_capacity(1 + deletes.len() + updates.len());
+        if let Some(header) = header {
+            let status = header.validation_status();
+            let SignedHeader(header, signature) = header.data;
+            // TODO: If they only need the metadata because they already have
+            // the content we could just send the entry hash instead of the
+            // SignedHeader.
+            let entry_hash = header.entry_hash().cloned();
+            ops.push(RenderedOp::new(
+                header,
+                signature,
+                status,
+                DhtOpType::StoreElement,
+            )?);
+            if let Some(entry_hash) = entry_hash {
+                for op in deletes {
+                    let status = op.validation_status();
+                    let op = op.data;
+                    let signature = op.signature;
+                    let header = Header::Delete(op.delete);
+
+                    ops.push(RenderedOp::new(
+                        header,
+                        signature,
+                        status,
+                        DhtOpType::RegisterDeletedBy,
+                    )?);
+                }
+                for op in updates {
+                    let status = op.validation_status();
+                    let SignedHeader(header, signature) =
+                        op.data.into_signed_header(entry_hash.clone());
+
+                    ops.push(RenderedOp::new(
+                        header,
+                        signature,
+                        status,
+                        DhtOpType::RegisterUpdatedElement,
+                    )?);
+                }
+            }
+        }
+        Ok(RenderedOps {
+            entry: entry.map(EntryHashed::from_content_sync),
+            ops,
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 /// Element without the hashes for sending across the network
+/// TODO: Remove this as it's no longer needed.
 pub struct WireElement {
     /// The signed header for this element
     signed_header: SignedHeader,

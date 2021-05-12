@@ -1,9 +1,8 @@
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use holochain_cascade::error::CascadeResult;
+use holochain_cascade::Cascade;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
@@ -25,14 +24,9 @@ pub fn delete_link<'a>(
 
     // handle timeouts at the network layer
     let maybe_add_link: Option<SignedHeaderHashed> = tokio_helper::block_forever_on(async move {
+        let workspace = call_context_2.host_access.workspace();
         CascadeResult::Ok(
-            call_context_2
-                .clone()
-                .host_access
-                .workspace()
-                .write()
-                .await
-                .cascade(network)
+            Cascade::from_workspace_network(workspace, network)
                 .dht_get(address.into(), GetOptions::content())
                 .await?
                 .map(|el| el.into_inner().0),
@@ -58,15 +52,12 @@ pub fn delete_link<'a>(
     }
     .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
 
-    let workspace_lock = call_context.host_access.workspace();
+    let source_chain = call_context.host_access.workspace().source_chain();
 
     // handle timeouts at the source chain layer
 
     // add a DeleteLink to the source chain
     tokio_helper::block_forever_on(async move {
-        let mut guard = workspace_lock.write().await;
-        let workspace: &mut CallZomeWorkspace = &mut guard;
-        let source_chain = &mut workspace.source_chain;
         let header_builder = builder::DeleteLink {
             link_add_address: input,
             base_address,
@@ -75,16 +66,6 @@ pub fn delete_link<'a>(
             .put(header_builder, None)
             .await
             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
-        let element = source_chain
-            .get_element(&header_hash)
-            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?
-            .expect("Element we just put in SourceChain must be gettable");
-        integrate_to_authored(
-            &element,
-            workspace.source_chain.elements(),
-            &mut workspace.meta_authored,
-        )
-        .map_err(|dht_op_convert_error| WasmError::Host(dht_op_convert_error.to_string()))?;
         Ok(header_hash)
     })
 }
@@ -95,25 +76,23 @@ pub mod slow_tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::fake_agent_pubkey_1;
     use holochain_zome_types::link::Links;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_delete_link_add_remove() {
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
+        host_access.workspace = workspace;
 
         // links should start empty
         let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());

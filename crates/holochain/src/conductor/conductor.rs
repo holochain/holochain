@@ -10,10 +10,8 @@
 //! users in a testing environment.
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
-use super::dna_store::DnaDefBuf;
 use super::dna_store::RealDnaStore;
 use super::entry_def_store::get_entry_defs;
-use super::entry_def_store::EntryDefBuf;
 use super::error::ConductorError;
 use super::error::CreateAppError;
 use super::handle::ConductorHandleImpl;
@@ -44,12 +42,10 @@ use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::InitialQueueTriggers;
-use crate::core::workflow::integrate_dht_ops_workflow;
 use crate::{
     conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
 };
 pub use builder::*;
-use fallible_iterator::FallibleIterator;
 use futures::future;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
@@ -59,17 +55,15 @@ use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::KeystoreSender;
 use holochain_keystore::KeystoreSenderExt;
-use holochain_sqlite::buffer::BufferedStore;
-use holochain_sqlite::buffer::KvStore;
-use holochain_sqlite::buffer::KvStoreT;
 use holochain_sqlite::db::DbKind;
-use holochain_sqlite::exports::SingleTable;
-use holochain_sqlite::fresh_reader;
 use holochain_sqlite::prelude::*;
-use holochain_state::source_chain::SourceChainBuf;
-use holochain_state::wasm::WasmBuf;
+use holochain_state::mutations;
+use holochain_state::prelude::from_blob;
+use holochain_state::prelude::StateMutationResult;
+use holochain_state::source_chain;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use rusqlite::OptionalExtension;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -111,6 +105,10 @@ where
     /// The database for persisting state related to this Conductor
     env: EnvWrite,
 
+    /// The caches databases. These are shared across cells.
+    /// There is one per unique Dna.
+    caches: std::sync::Mutex<HashMap<DnaHash, EnvWrite>>,
+
     /// A database for storing wasm
     wasm_env: EnvWrite,
 
@@ -118,7 +116,7 @@ where
     p2p_env: EnvWrite,
 
     /// The database for persisting [ConductorState]
-    state_db: ConductorStateDb,
+    // state_db: ConductorStateDb,
 
     /// Set to true when `conductor.shutdown()` has been called, so that other
     /// tasks can check on the shutdown status
@@ -493,6 +491,26 @@ where
         }
     }
 
+    fn get_or_create_cache(&self, dna_hash: &DnaHash) -> ConductorResult<EnvWrite> {
+        let mut caches = self
+            .caches
+            .lock()
+            .map_err(|_| ConductorError::CachesLockPoisoned)?;
+        match caches.get(dna_hash) {
+            Some(env) => Ok(env.clone()),
+            None => {
+                let dir = self.root_env_dir.clone();
+                let env = EnvWrite::open(
+                    dir.as_ref(),
+                    DbKind::Cache(dna_hash.clone()),
+                    self.keystore.clone(),
+                )?;
+                caches.insert(dna_hash.clone(), env.clone());
+                Ok(env)
+            }
+        }
+    }
+
     /// Create Cells for each CellId marked active in the ConductorState db
     pub(super) async fn create_active_app_cells(
         &self,
@@ -547,10 +565,14 @@ where
                                 DbKind::Cell(cell_id.clone()),
                                 keystore.clone(),
                             )?;
+                            let cache = self
+                                .get_or_create_cache(cell_id.dna_hash())
+                                .map_err(|e| CellError::FailedToCreateCache(e.into()))?;
                             Cell::create(
                                 cell_id.clone(),
                                 conductor_handle.clone(),
                                 env,
+                                cache,
                                 holochain_p2p_cell,
                                 task_manager.task_add_sender().clone(),
                                 task_manager.task_stop_broadcaster().clone(),
@@ -758,43 +780,33 @@ where
         impl IntoIterator<Item = (DnaHash, DnaFile)>,
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
-        let environ = &self.wasm_env;
-        let wasm = environ.get_table(TableName::Wasm)?;
-        let dna_def_db = environ.get_table(TableName::DnaDef)?;
-        let entry_def_db = environ.get_table(TableName::EntryDef)?;
+        let env = &self.wasm_env;
 
-        let wasm_buf = Arc::new(WasmBuf::new(environ.clone().into(), wasm)?);
-        let dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
-        let entry_def_buf = EntryDefBuf::new(environ.clone().into(), entry_def_db)?;
         // Load out all dna defs
-        let wasm_tasks = dna_def_buf
-            .get_all()?
-            .into_iter()
-            .map(|dna_def| {
-                // Load all wasms for each dna_def from the wasm db into memory
-                let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
-                    let wasm_buf = wasm_buf.clone();
-                    async move {
-                        wasm_buf
-                            .get(&zome.wasm_hash(&zome_name)?)
-                            .await?
+        let (wasm_tasks, defs) = env.conn()?.with_reader(|txn| {
+            let wasm_tasks = holochain_state::dna_def::get_all(&txn)?
+                .into_iter()
+                .map(|dna_def| {
+                    // Load all wasms for each dna_def from the wasm db into memory
+                    let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
+                        let wasm_hash = zome.wasm_hash(&zome_name)?;
+                        holochain_state::wasm::get(&txn, &wasm_hash)?
                             .map(|hashed| hashed.into_content())
                             .ok_or(ConductorError::WasmMissing)
+                    });
+                    let wasms = wasms.collect::<ConductorResult<Vec<_>>>();
+                    async move {
+                        let dna_file = DnaFile::new(dna_def.into_content(), wasms?).await?;
+                        ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
                     }
-                });
-                async move {
-                    let wasms = futures::future::try_join_all(wasms).await?;
-                    let dna_file = DnaFile::new(dna_def.into_content(), wasms).await?;
-                    ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
-                }
-            })
-            // This needs to happen due to the environment not being Send
-            .collect::<Vec<_>>();
+                })
+                // This needs to happen due to the environment not being Send
+                .collect::<Vec<_>>();
+            let defs = holochain_state::entry_def::get_all(&txn)?;
+            ConductorResult::Ok((wasm_tasks, defs))
+        })?;
         // try to join all the tasks and return the list of dna files
         let dnas = futures::future::try_join_all(wasm_tasks).await?;
-        let defs = fresh_reader!(environ, |mut r| entry_def_buf
-            .get_all(&mut r)?
-            .collect::<Vec<_>>())?;
         Ok((dnas, defs))
     }
 
@@ -835,46 +847,36 @@ where
         &self,
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-        let environ = self.wasm_env.clone();
-        let wasm = environ.get_table(TableName::Wasm)?;
-        let dna_def_db = environ.get_table(TableName::DnaDef)?;
-        let entry_def_db = environ.get_table(TableName::EntryDef)?;
+        let env = self.wasm_env.clone();
 
         let zome_defs = get_entry_defs(dna.clone())?;
 
-        let mut entry_def_buf = EntryDefBuf::new(environ.clone().into(), entry_def_db)?;
-
-        for (key, entry_def) in zome_defs.clone() {
-            entry_def_buf.put(key, entry_def)?;
-        }
-
-        let mut wasm_buf = WasmBuf::new(environ.clone().into(), wasm)?;
-        let mut dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
         // TODO: PERF: This loop might be slow
-        for (wasm_hash, dna_wasm) in dna.code().clone().into_iter() {
-            if wasm_buf.get(&wasm_hash).await?.is_none() {
-                wasm_buf.put(DnaWasmHashed::from_content(dna_wasm).await);
+        let wasms = futures::future::join_all(
+            dna.code()
+                .clone()
+                .into_iter()
+                .map(|(_, dna_wasm)| DnaWasmHashed::from_content(dna_wasm)),
+        )
+        .await;
+
+        env.conn()?.with_commit(|txn| {
+            for dna_wasm in wasms {
+                if !holochain_state::wasm::contains(txn, dna_wasm.as_hash())? {
+                    holochain_state::wasm::put(txn, dna_wasm)?;
+                }
             }
-        }
-        if dna_def_buf.get(dna.dna_hash()).await?.is_none() {
-            dna_def_buf.put(dna.dna_def().clone()).await?;
-        }
-        {
-            // write the wasm db
-            environ
-                .conn()?
-                .with_commit(|writer| wasm_buf.flush_to_txn(writer))?;
 
-            // write the dna_def db
-            environ
-                .conn()?
-                .with_commit(|writer| dna_def_buf.flush_to_txn(writer))?;
+            for (key, entry_def) in zome_defs.clone() {
+                holochain_state::entry_def::put(txn, key, entry_def)?;
+            }
 
-            // write the entry_def db
-            environ
-                .conn()?
-                .with_commit(|writer| entry_def_buf.flush_to_txn(writer))?;
-        }
+            if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {
+                holochain_state::dna_def::put(txn, dna.dna_def().clone())?;
+            }
+            StateMutationResult::Ok(())
+        })?;
+
         Ok(zome_defs)
     }
 
@@ -903,16 +905,14 @@ where
     pub(super) async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.env();
-        let source_chain = SourceChainBuf::new(arc.clone().into())?;
 
         let peer_dump = p2p_store::dump_state(self.p2p_env.clone().into(), Some(cell_id.clone()))?;
-        let source_chain_dump = source_chain.dump_state().await?;
-        let integration_dump = integrate_dht_ops_workflow::dump_state(arc.clone().into())?;
+        let source_chain_dump =
+            source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey()).await?;
 
         let out = JsonDump {
             peer_dump,
             source_chain_dump,
-            integration_dump,
         };
         // Add summary
         let summary = out.to_string();
@@ -972,12 +972,11 @@ where
         root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
     ) -> ConductorResult<Self> {
-        let db: SingleTable = env.get_table(TableName::ConductorState)?;
         Ok(Self {
             env,
             wasm_env,
             p2p_env,
-            state_db: KvStore::new(db),
+            caches: std::sync::Mutex::new(HashMap::new()),
             cells: HashMap::new(),
             shutting_down: false,
             app_interfaces: HashMap::new(),
@@ -1008,10 +1007,18 @@ where
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        fresh_reader!(self.env, |mut reader| Ok(self
-            .state_db
-            .get(&mut reader, &UnitDbKey)?
-            .unwrap_or_default()))
+        self.env.conn()?.with_reader(|txn| {
+            let state = txn
+                .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                    row.get("blob")
+                })
+                .optional()?;
+            let state = match state {
+                Some(state) => from_blob(state)?,
+                None => ConductorState::default(),
+            };
+            Ok(state)
+        })
     }
 
     /// Update the internal state with a pure function mapping old state to new
@@ -1033,9 +1040,17 @@ where
         self.check_running()?;
         let mut guard = self.env.conn()?;
         let output = guard.with_commit(|txn| {
-            let state: ConductorState = self.state_db.get(txn, &UnitDbKey)?.unwrap_or_default();
+            let state = txn
+                .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                    row.get("blob")
+                })
+                .optional()?;
+            let state = match state {
+                Some(state) => from_blob(state)?,
+                None => ConductorState::default(),
+            };
             let (new_state, output) = f(state)?;
-            self.state_db.put(txn, &UnitDbKey, &new_state)?;
+            mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
             Result::<_, ConductorError>::Ok((new_state, output))
         })?;
         Ok(output)
@@ -1056,9 +1071,6 @@ where
             .map_err(|e| ConductorError::SubmitTaskError(format!("{}", e)))
     }
 }
-
-/// The database used to store ConductorState. It has only one key-value pair.
-pub type ConductorStateDb = KvStore<UnitDbKey, ConductorState>;
 
 mod builder {
     use super::*;
@@ -1267,9 +1279,11 @@ mod builder {
         #[cfg(any(test, feature = "test_utils"))]
         pub async fn test(self, envs: &TestEnvs) -> ConductorResult<ConductorHandle> {
             let keystore = envs.conductor().keystore().clone();
+
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
                     .await?;
+
             let conductor = Conductor::new(
                 envs.conductor(),
                 envs.wasm(),

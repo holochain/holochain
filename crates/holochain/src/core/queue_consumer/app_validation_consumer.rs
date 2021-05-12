@@ -11,6 +11,7 @@ use tracing::*;
 /// Spawn the QueueConsumer for AppValidation workflow
 #[instrument(skip(
     env,
+    cache,
     conductor_handle,
     stop,
     trigger_integration,
@@ -19,6 +20,7 @@ use tracing::*;
 ))]
 pub fn spawn_app_validation_consumer(
     env: EnvWrite,
+    cache: EnvWrite,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_integration: TriggerSender,
@@ -38,11 +40,9 @@ pub fn spawn_app_validation_consumer(
             }
 
             // Run the workflow
-            let workspace = AppValidationWorkspace::new(env.clone().into())
-                .expect("Could not create Workspace");
+            let workspace = AppValidationWorkspace::new(env.clone().into(), cache.clone());
             let result = app_validation_workflow(
                 workspace,
-                env.clone().into(),
                 trigger_integration.clone(),
                 conductor_api.clone(),
                 network.clone(),

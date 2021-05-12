@@ -1,12 +1,13 @@
 use super::*;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::MockCellConductorApi;
-use crate::meta_mock;
+use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::prelude::test_cache_env;
 use holochain_state::prelude::test_cell_env;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
@@ -56,31 +57,35 @@ async fn check_previous_header() {
 #[tokio::test(flavor = "multi_thread")]
 async fn check_valid_if_dna_test() {
     let tmp = test_cell_env();
+    let tmp_cache = test_cache_env();
     let env: EnvRead = tmp.env().into();
     // Test data
-    let activity_return = vec![fixt!(HeaderHash)];
+    let _activity_return = vec![fixt!(HeaderHash)];
 
     // Empty store not dna
     let header = fixt!(CreateLink);
-    let mut metadata = meta_mock!();
-    metadata.expect_env().return_const(env.clone());
+    let workspace = SysValidationWorkspace::new(env.clone(), tmp_cache.env());
 
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &metadata).await,
+        check_valid_if_dna(&header.clone().into(), &workspace).await,
         Ok(())
     );
-    let header = fixt!(Dna);
-    let mut metadata = meta_mock!(expect_get_activity);
-    metadata.expect_env().return_const(env.clone());
+    let mut header = fixt!(Dna);
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &metadata).await,
+        check_valid_if_dna(&header.clone().into(), &workspace).await,
         Ok(())
     );
 
-    let mut metadata = meta_mock!(expect_get_activity, activity_return);
-    metadata.expect_env().return_const(env);
+    fake_genesis(env.clone().into()).await.unwrap();
+    env.conn()
+        .unwrap()
+        .execute("UPDATE DhtOp SET when_integrated = 0", [])
+        .unwrap();
+
+    header.author = fake_agent_pubkey_1();
+
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &metadata).await,
+        check_valid_if_dna(&header.clone().into(), &workspace).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRoot)
         ))

@@ -10,6 +10,7 @@ use tracing::*;
 /// Spawn the QueueConsumer for SysValidation workflow
 #[instrument(skip(
     env,
+    cache,
     conductor_handle,
     stop,
     trigger_app_validation,
@@ -18,6 +19,7 @@ use tracing::*;
 ))]
 pub fn spawn_sys_validation_consumer(
     env: EnvWrite,
+    cache: EnvWrite,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_app_validation: TriggerSender,
@@ -37,11 +39,9 @@ pub fn spawn_sys_validation_consumer(
             }
 
             // Run the workflow
-            let workspace = SysValidationWorkspace::new(env.clone().into())
-                .expect("Could not create Workspace");
+            let workspace = SysValidationWorkspace::new(env.clone().into(), cache.clone());
             match sys_validation_workflow(
                 workspace,
-                env.clone().into(),
                 trigger_app_validation.clone(),
                 trigger_self.clone(),
                 network.clone(),

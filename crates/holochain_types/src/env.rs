@@ -102,6 +102,3 @@ impl From<EnvRead> for EnvWrite {
         }
     }
 }
-
-impl GetTable for EnvRead {}
-impl GetTable for EnvWrite {}

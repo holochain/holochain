@@ -2,7 +2,6 @@
 #![allow(missing_docs)]
 
 use super::app_validation_workflow::AppValidationError;
-use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::CellError;
 use crate::core::queue_consumer::QueueTriggerClosedError;
@@ -53,9 +52,6 @@ pub enum WorkflowError {
     SerializedBytesError(#[from] SerializedBytesError),
 
     #[error(transparent)]
-    DhtOpConvertError(#[from] DhtOpConvertError),
-
-    #[error(transparent)]
     CellError(#[from] CellError),
 
     #[error(transparent)]
@@ -78,6 +74,18 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     KeystoreError(#[from] KeystoreError),
+
+    #[error(transparent)]
+    SqlError(#[from] holochain_sqlite::rusqlite::Error),
+
+    #[error(transparent)]
+    StateQueryError(#[from] holochain_state::query::StateQueryError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] holochain_state::mutations::StateMutationError),
+
+    #[error(transparent)]
+    SystemTimeError(#[from] std::time::SystemTimeError),
 }
 
 /// Internal type to handle running workflows

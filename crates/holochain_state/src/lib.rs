@@ -35,17 +35,19 @@
 #![allow(deprecated)]
 
 #[allow(missing_docs)]
-pub mod chain_sequence;
-pub mod dht_op_integration;
-#[allow(missing_docs)]
-pub mod element_buf;
-pub mod metadata;
+pub mod agent_info;
+pub mod dna_def;
+pub mod entry_def;
+pub mod host_fn_workspace;
+pub mod mutations;
 #[allow(missing_docs)]
 pub mod prelude;
+pub mod query;
+pub mod scratch;
 #[allow(missing_docs)]
 pub mod source_chain;
 pub mod validation_db;
-pub mod validation_receipts_db;
+pub mod validation_receipts;
 #[allow(missing_docs)]
 pub mod wasm;
 pub mod workspace;

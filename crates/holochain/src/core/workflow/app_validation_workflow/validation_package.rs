@@ -1,4 +1,5 @@
 use holochain_p2p::HolochainP2pCell;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use holochain_zome_types::HeaderHashed;
 
@@ -7,7 +8,6 @@ use crate::core::ribosome::guest_callback::validation_package::ValidationPackage
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::RibosomeT;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::core::SourceChainResult;
 use holochain_state::source_chain::SourceChain;
 use tracing::*;
@@ -43,7 +43,7 @@ pub fn get_as_author_custom(
     header_hashed: &HeaderHashed,
     ribosome: &impl RibosomeT,
     network: &HolochainP2pCell,
-    workspace_lock: CallZomeWorkspaceLock,
+    workspace_lock: HostFnWorkspace,
 ) -> RibosomeResult<Option<ValidationPackageResult>> {
     let header = header_hashed.as_content();
     let access = ValidationPackageHostAccess::new(workspace_lock, network.clone());

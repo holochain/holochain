@@ -1,9 +1,8 @@
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use holochain_cascade::error::CascadeError;
+use holochain_cascade::Cascade;
 use holochain_wasmer_host::prelude::WasmError;
 
 use holo_hash::EntryHash;
@@ -23,9 +22,7 @@ pub fn delete<'a>(
 
     // handle timeouts at the source chain layer
     tokio_helper::block_forever_on(async move {
-        let mut guard = host_access.workspace().write().await;
-        let workspace: &mut CallZomeWorkspace = &mut guard;
-        let source_chain = &mut workspace.source_chain;
+        let source_chain = host_access.workspace().source_chain();
         let header_builder = builder::Delete {
             deletes_address: input,
             deletes_entry_address,
@@ -34,17 +31,6 @@ pub fn delete<'a>(
             .put(header_builder, None)
             .await
             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
-        let element = source_chain
-            .get_element(&header_hash)
-            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?
-            .expect("Element we just put in SourceChain must be gettable");
-        tracing::debug!(in_delete_entry = ?header_hash);
-        integrate_to_authored(
-            &element,
-            workspace.source_chain.elements(),
-            &mut workspace.meta_authored,
-        )
-        .map_err(|dht_op_convert_error| WasmError::Host(dht_op_convert_error.to_string()))?;
         Ok(header_hash)
     })
 }
@@ -55,11 +41,10 @@ pub(crate) fn get_original_address<'a>(
     address: HeaderHash,
 ) -> Result<EntryHash, WasmError> {
     let network = call_context.host_access.network().clone();
-    let workspace_lock = call_context.host_access.workspace();
+    let workspace = call_context.host_access.workspace();
 
     tokio_helper::block_forever_on(async move {
-        let mut workspace = workspace_lock.write().await;
-        let mut cascade = workspace.cascade(network);
+        let mut cascade = Cascade::from_workspace_network(workspace, network);
         // TODO: Think about what options to use here
         let maybe_original_element: Option<SignedHeaderHashed> = cascade
             .get_details(address.clone().into(), GetOptions::content())
@@ -93,28 +78,27 @@ pub(crate) fn get_original_address<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::core::workflow::CallZomeWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_delete_entry_test<'a>() {
         observability::test_run().ok();
-
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
 
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        host_access.workspace = workspace.clone();
 
         let thing_a: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "create", ());

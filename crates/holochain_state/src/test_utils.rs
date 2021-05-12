@@ -1,16 +1,30 @@
 //! Helpers for unit tests
 
 use holochain_sqlite::prelude::*;
+use holochain_sqlite::rusqlite::Statement;
+use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
 use holochain_zome_types::test_utils::fake_cell_id;
 use shrinkwraprs::Shrinkwrap;
+use std::path::Path;
 use std::sync::Arc;
 use tempdir::TempDir;
+
+use crate::prelude::Store;
+use crate::prelude::Txn;
+
+pub mod mutations_helpers;
 
 /// Create a [TestEnv] of [DbKind::Cell], backed by a temp directory.
 pub fn test_cell_env() -> TestEnv {
     let cell_id = fake_cell_id(1);
     test_env(DbKind::Cell(cell_id))
+}
+
+/// Create a [TestEnv] of [DbKind::Cache], backed by a temp directory.
+pub fn test_cache_env() -> TestEnv {
+    let dna = fake_cell_id(1).dna_hash().clone();
+    test_env(DbKind::Cache(dna))
 }
 
 /// Create a [TestEnv] of [DbKind::Conductor], backed by a temp directory.
@@ -89,6 +103,63 @@ impl TestEnv {
     pub fn tmpdir(&self) -> Arc<TempDir> {
         self.tmpdir.clone()
     }
+
+    /// Dump db to a location.
+    pub fn dump(&self, out: &Path) -> std::io::Result<()> {
+        std::fs::create_dir(&out).ok();
+        for entry in std::fs::read_dir(self.tmpdir.path())? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                let mut out = out.to_owned();
+                out.push(format!(
+                    "backup.{}",
+                    path.extension().unwrap().to_string_lossy()
+                ));
+                std::fs::copy(path, out)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Dump db into `/tmp/test_dbs`.
+    pub fn dump_tmp(&self) {
+        dump_tmp(&self.env);
+    }
+
+    pub fn cell_id(&self) -> Option<CellId> {
+        match self.env.kind() {
+            DbKind::Cell(cell_id) => Some(cell_id.clone()),
+            _ => None,
+        }
+    }
+}
+// /// Dump db into `/tmp/test_dbs`.
+// pub fn dump_tmp(env: &EnvWrite) {
+//     let mut tmp = std::env::temp_dir();
+//     tmp.push("test_dbs");
+//     std::fs::create_dir(&tmp).ok();
+//     tmp.push("backup.sqlite");
+//     std::fs::write(&tmp, b"").unwrap();
+//     env.conn()
+//         .unwrap()
+//         .transaction_with_behavior(holochain_sqlite::rusqlite::TransactionBehavior::Exclusive)
+//         .unwrap()
+//         .backup(DatabaseName::Main, tmp, None)
+//         .unwrap();
+// }
+/// Dump db into `/tmp/test_dbs`.
+pub fn dump_tmp(env: &EnvWrite) {
+    let mut tmp = std::env::temp_dir();
+    tmp.push("test_dbs");
+    std::fs::create_dir(&tmp).ok();
+    tmp.push("backup.sqlite");
+    std::fs::write(&tmp, b"").unwrap();
+    env.conn()
+        .unwrap()
+        .execute("VACUUM main into ?", [tmp.to_string_lossy()])
+        // .backup(DatabaseName::Main, tmp, None)
+        .unwrap();
 }
 
 #[derive(Clone)]
@@ -149,4 +220,70 @@ macro_rules! here {
     ($test: expr) => {
         concat!($test, " !!!_LOOK HERE:---> ", file!(), ":", line!())
     };
+}
+
+/// Helper to get a [`Store`] from an [`EnvRead`].
+pub fn fresh_store_test<F, R>(env: &EnvRead, f: F) -> R
+where
+    F: FnOnce(&dyn Store) -> R,
+{
+    fresh_reader_test!(env, |txn| {
+        let store = Txn::from(&txn);
+        f(&store)
+    })
+}
+
+/// Function to help avoid needing to specify types.
+pub fn fresh_reader_test<E, F, R>(env: E, f: F) -> R
+where
+    E: Into<EnvRead>,
+    F: FnOnce(Transaction) -> R,
+{
+    fresh_reader_test!(&env.into(), f)
+}
+
+/// Function to help avoid needing to specify types.
+pub fn print_stmts_test<E, F, R>(env: E, f: F) -> R
+where
+    E: Into<EnvRead>,
+    F: FnOnce(Transaction) -> R,
+{
+    holochain_sqlite::print_stmts_test!(&env.into(), f)
+}
+
+#[tracing::instrument(skip(txn))]
+pub fn dump_db(txn: &Transaction) {
+    let dump = |mut stmt: Statement| {
+        let mut rows = stmt.query([]).unwrap();
+        while let Some(row) = rows.next().unwrap() {
+            for column in row.column_names() {
+                let row = row.get_ref_unwrap(column);
+                match row {
+                    holochain_sqlite::rusqlite::types::ValueRef::Null
+                    | holochain_sqlite::rusqlite::types::ValueRef::Integer(_)
+                    | holochain_sqlite::rusqlite::types::ValueRef::Real(_) => {
+                        tracing::debug!(?column, ?row);
+                    }
+                    holochain_sqlite::rusqlite::types::ValueRef::Text(text) => {
+                        tracing::debug!(?column, row = ?String::from_utf8_lossy(text));
+                    }
+                    holochain_sqlite::rusqlite::types::ValueRef::Blob(blob) => {
+                        let blob = base64::encode_config(blob, base64::URL_SAFE_NO_PAD);
+                        tracing::debug!("column: {:?} row:{}", column, blob);
+                    }
+                }
+            }
+        }
+    };
+    tracing::debug!("Headers:");
+    let stmt = txn.prepare("SELECT * FROM Header").unwrap();
+    dump(stmt);
+
+    tracing::debug!("Entries:");
+    let stmt = txn.prepare("SELECT * FROM Entry").unwrap();
+    dump(stmt);
+
+    tracing::debug!("DhtOps:");
+    let stmt = txn.prepare("SELECT * FROM DhtOp").unwrap();
+    dump(stmt);
 }

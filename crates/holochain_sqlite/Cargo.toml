@@ -11,6 +11,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.26"
 byteorder = "1.3.4"
+cfg-if = "0.1"
 chashmap = "2.2"
 chrono = "0.4.6"
 derive_more = "0.99.3"
@@ -19,7 +20,7 @@ fallible-iterator = "0.2.0"
 failure = "0.1.6"
 fixt = { version = "^0.0.2-alpha.1", path = "../fixt" }
 futures = "0.3.1"
-holo_hash = { path = "../holo_hash" }
+holo_hash = { path = "../holo_hash", features = ["rusqlite"] }
 holochain_serialized_bytes = "=0.0.50"
 holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
 lazy_static = "1.4.0"
@@ -30,7 +31,7 @@ page_size = "0.4.2"
 parking_lot = "0.10"
 rand = "0.7"
 r2d2 = "0.8"
-r2d2_sqlite = "0.17"
+r2d2_sqlite = "0.18"
 rmp-serde = "0.15"
 serde = "1.0"
 serde_derive = "1.0"
@@ -42,8 +43,10 @@ tokio_helper = { version = "0.0.1", path = "../tokio_helper" }
 tracing = "0.1.18"
 tracing-futures = "0.2"
 
-rusqlite = { version = "0.24", features = [
+rusqlite = { version = "0.25", features = [
   "blob",        # better integration with blob types (Read, Write, etc)
+  "backup",
+  "trace",
   #"chrono",      # integration with chrono crate
   #"functions",   # rust scalar / agg / window functions
   #"hooks",       # sqlite notification callbacks

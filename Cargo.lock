@@ -51,6 +51,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ahash"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f200cbb1e856866d9eade941cf3aa0c5d7dd36f74311c4273b494f4ef036957"
+dependencies = [
+ "getrandom 0.2.2",
+ "once_cell",
+ "version_check",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "0.7.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1028,6 +1039,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "diff"
+version = "0.1.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e25ea47919b1560c4e3b7fe0aaab9becf5b84a10325ddf7db0f0ba5e1026499"
+
+[[package]]
 name = "difference"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1587,12 +1604,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "hashlink"
-version = "0.6.0"
+name = "hashbrown"
+version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d99cf782f0dc4372d26846bec3de7804ceb5df083c2d4462c0b8d2330e894fa8"
+checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 dependencies = [
- "hashbrown",
+ "ahash 0.7.2",
+]
+
+[[package]]
+name = "hashlink"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7249a3129cbc1ffccd74857f81464a323a152173cdb134e0fd81bc803b29facf"
+dependencies = [
+ "hashbrown 0.11.2",
 ]
 
 [[package]]
@@ -1680,7 +1706,6 @@ dependencies = [
  "cfg-if 0.1.10",
  "chrono",
  "criterion",
- "derivative",
  "derive_more",
  "directories 2.0.2",
  "either",
@@ -1719,9 +1744,10 @@ dependencies = [
  "once_cell",
  "parking_lot 0.10.2",
  "predicates",
- "pretty_assertions",
+ "pretty_assertions 0.6.1",
  "rand 0.7.3",
  "ring",
+ "rusqlite",
  "sd-notify",
  "serde",
  "serde_json",
@@ -1752,6 +1778,7 @@ dependencies = [
 name = "holochain_cascade"
 version = "0.0.1"
 dependencies = [
+ "async-trait",
  "derive_more",
  "either",
  "fallible-iterator",
@@ -1768,6 +1795,10 @@ dependencies = [
  "holochain_types",
  "holochain_zome_types",
  "kitsune_p2p",
+ "matches",
+ "mockall 0.9.1",
+ "observability",
+ "pretty_assertions 0.7.2",
  "serde",
  "serde_derive",
  "thiserror",
@@ -1934,6 +1965,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "byteorder",
+ "cfg-if 0.1.10",
  "chashmap",
  "chrono",
  "derive_more",
@@ -1973,9 +2005,11 @@ name = "holochain_state"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "base64",
  "byteorder",
  "chrono",
  "derive_more",
+ "either",
  "fallible-iterator",
  "fixt",
  "hdk",
@@ -1990,7 +2024,7 @@ dependencies = [
  "matches",
  "mockall 0.8.3",
  "observability",
- "pretty_assertions",
+ "pretty_assertions 0.6.1",
  "serde",
  "serde_json",
  "shrinkwraprs",
@@ -2047,6 +2081,7 @@ dependencies = [
  "observability",
  "rand 0.7.3",
  "regex",
+ "rusqlite",
  "serde",
  "serde_bytes",
  "serde_derive",
@@ -2054,6 +2089,7 @@ dependencies = [
  "serde_yaml",
  "shrinkwraprs",
  "strum",
+ "strum_macros",
  "tempdir",
  "thiserror",
  "tokio",
@@ -2150,12 +2186,15 @@ version = "0.0.2-alpha.1"
 dependencies = [
  "byteorder",
  "chrono",
+ "derive_more",
  "fixt",
  "holo_hash",
  "holochain_serialized_bytes",
  "itertools 0.10.0",
+ "num_enum",
  "paste 1.0.5",
  "rand 0.7.3",
+ "rusqlite",
  "serde",
  "serde_bytes",
  "strum",
@@ -2317,7 +2356,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "824845a0bf897a9042383849b02c1bc219c2383772efcd5c6f9766fa4b81aef3"
 dependencies = [
  "autocfg 1.0.1",
- "hashbrown",
+ "hashbrown 0.9.1",
  "serde",
 ]
 
@@ -2612,9 +2651,9 @@ dependencies = [
 
 [[package]]
 name = "libsqlite3-sys"
-version = "0.20.1"
+version = "0.22.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64d31059f22935e6c31830db5249ba2b7ecd54fd73a9909286f0a67aa55c2fbd"
+checksum = "290b64917f8b0cb885d9de0f9959fe1f775d7fa12f1da2db9001c1c8ab60f89d"
 dependencies = [
  "cc",
  "pkg-config",
@@ -2672,7 +2711,7 @@ version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f374d42cdfc1d7dbf3d3dec28afab2eb97ffbf43a3234d795b5986dbf4b90ba"
 dependencies = [
- "hashbrown",
+ "hashbrown 0.9.1",
 ]
 
 [[package]]
@@ -3033,6 +3072,28 @@ checksum = "05499f3756671c15885fee9034446956fff3f243d6077b91e5767df161f766b3"
 dependencies = [
  "hermit-abi",
  "libc",
+]
+
+[[package]]
+name = "num_enum"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "226b45a5c2ac4dd696ed30fa6b94b057ad909c7b7fc2e0d0808192bced894066"
+dependencies = [
+ "derivative",
+ "num_enum_derive",
+]
+
+[[package]]
+name = "num_enum_derive"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c0fd9eba1d5db0994a239e09c1be402d35622277e35468ba891aa5e3188ce7e"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -3502,6 +3563,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "pretty_assertions"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1cab0e7c02cf376875e9335e0ba1da535775beb5450d21e1dffca068818ed98b"
+dependencies = [
+ "ansi_term 0.12.1",
+ "ctor",
+ "diff",
+ "output_vt100",
+]
+
+[[package]]
+name = "proc-macro-crate"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d6ea3c4595b96363c13943497db34af4460fb474a95c43f4446ad341b8c9785"
+dependencies = [
+ "toml",
+]
+
+[[package]]
 name = "proc-macro-error"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3622,9 +3704,9 @@ dependencies = [
 
 [[package]]
 name = "r2d2_sqlite"
-version = "0.17.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "227ab35ff4cbb01fa76da8f062590fe677b93c8d9e8415eb5fa981f2c1dba9d8"
+checksum = "9d24607049214c5e42d3df53ac1d8a23c34cc6a5eefe3122acb2c72174719959"
 dependencies = [
  "r2d2",
  "rusqlite",
@@ -4050,9 +4132,9 @@ dependencies = [
 
 [[package]]
 name = "rusqlite"
-version = "0.24.2"
+version = "0.25.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5f38ee71cbab2c827ec0ac24e76f82eca723cee92c509a65f67dee393c25112"
+checksum = "57adcf67c8faaf96f3248c2a7b419a0dbc52ebe36ba83dd57fe83827c1ea4eb3"
 dependencies = [
  "bitflags",
  "fallible-iterator",

@@ -6,6 +6,7 @@ use crate::{
 };
 use derive_more::Into;
 use futures::Future;
+use holo_hash::DnaHash;
 use holochain_zome_types::cell::CellId;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
@@ -50,9 +51,6 @@ impl DbRead {
     }
 }
 
-impl GetTable for DbRead {}
-impl GetTable for DbWrite {}
-
 /// The canonical representation of a (singleton) database.
 /// The wrapper contains methods for managing transactions
 /// and database connections,
@@ -75,14 +73,17 @@ impl DbWrite {
     }
 
     pub(crate) fn new(path_prefix: &Path, kind: DbKind) -> DatabaseResult<Self> {
-        if !path_prefix.is_dir() {
-            std::fs::create_dir(path_prefix)
-                .map_err(|_e| DatabaseError::DatabaseMissing(path_prefix.to_owned()))?;
-        }
         let path = path_prefix.join(kind.filename());
+        let parent = path
+            .parent()
+            .ok_or_else(|| DatabaseError::DatabaseMissing(path_prefix.to_owned()))?;
+        if !parent.is_dir() {
+            std::fs::create_dir_all(parent)
+                .map_err(|_e| DatabaseError::DatabaseMissing(parent.to_owned()))?;
+        }
         let pool = new_connection_pool(&path, kind.clone());
         let mut conn = pool.get()?;
-        initialize_database(&mut conn, &kind)?;
+        crate::table::initialize_database(&mut conn, &kind)?;
 
         Ok(DbWrite(DbRead {
             kind,
@@ -101,7 +102,9 @@ impl DbWrite {
     /// Remove the db and directory
     #[deprecated = "is this used?"]
     pub async fn remove(self) -> DatabaseResult<()> {
-        std::fs::remove_dir_all(&self.0.path)?;
+        if let Some(parent) = self.0.path.parent() {
+            std::fs::remove_dir_all(parent)?;
+        }
         Ok(())
     }
 }
@@ -111,6 +114,8 @@ impl DbWrite {
 pub enum DbKind {
     /// Specifies the environment used by each Cell
     Cell(CellId),
+    /// Specifies the environment used by each Cache (one per dna).
+    Cache(DnaHash),
     /// Specifies the environment used by a Conductor
     Conductor,
     /// Specifies the environment used to save wasm
@@ -122,11 +127,12 @@ pub enum DbKind {
 impl DbKind {
     /// Constuct a partial Path based on the kind
     fn filename(&self) -> PathBuf {
-        let mut path = match self {
-            DbKind::Cell(cell_id) => PathBuf::from(cell_id.to_string()),
-            DbKind::Conductor => PathBuf::from("conductor"),
-            DbKind::Wasm => PathBuf::from("wasm"),
-            DbKind::P2p => PathBuf::from("p2p"),
+        let mut path: PathBuf = match self {
+            DbKind::Cell(cell_id) => ["cell", &cell_id.to_string()].iter().collect(),
+            DbKind::Cache(dna) => ["cache", &format!("cache-{}", dna)].iter().collect(),
+            DbKind::Conductor => ["conductor", "conductor"].iter().collect(),
+            DbKind::Wasm => ["wasm", "wasm"].iter().collect(),
+            DbKind::P2p => ["p2p", "p2p"].iter().collect(),
         };
         path.set_extension("sqlite3");
         path
@@ -139,13 +145,13 @@ pub trait ReadManager<'e> {
     fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
-        F: 'e + FnOnce(Reader) -> Result<R, E>;
+        F: 'e + FnOnce(Transaction) -> Result<R, E>;
 
     #[cfg(feature = "test_utils")]
     /// Same as with_reader, but with no Results: everything gets unwrapped
     fn with_reader_test<R, F>(&'e mut self, f: F) -> R
     where
-        F: 'e + FnOnce(Reader) -> R;
+        F: 'e + FnOnce(Transaction) -> R;
 }
 
 /// Implementors are able to create a new read-write DB transaction
@@ -157,29 +163,36 @@ pub trait WriteManager<'e> {
     fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
-        F: 'e + FnOnce(&mut Writer) -> Result<R, E>;
+        F: 'e + FnOnce(&mut Transaction) -> Result<R, E>;
 
     // /// Get a raw read-write transaction for this environment.
     // /// It is preferable to use WriterManager::with_commit for database writes,
     // /// which can properly recover from and manage write failures
     // fn writer_unmanaged(&'e mut self) -> DatabaseResult<Writer<'e>>;
+
+    #[cfg(feature = "test_utils")]
+    fn with_commit_test<R, F>(&'e mut self, f: F) -> Result<R, DatabaseError>
+    where
+        F: 'e + FnOnce(&mut Transaction) -> R,
+    {
+        self.with_commit(|w| DatabaseResult::Ok(f(w)))
+    }
 }
 
 impl<'e> ReadManager<'e> for PConn {
     fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
-        F: 'e + FnOnce(Reader) -> Result<R, E>,
+        F: 'e + FnOnce(Transaction) -> Result<R, E>,
     {
         let txn = self.transaction().map_err(DatabaseError::from)?;
-        let reader = Reader::from(txn);
-        f(reader)
+        f(txn)
     }
 
     #[cfg(feature = "test_utils")]
     fn with_reader_test<R, F>(&'e mut self, f: F) -> R
     where
-        F: 'e + FnOnce(Reader) -> R,
+        F: 'e + FnOnce(Transaction) -> R,
     {
         self.with_reader(|r| DatabaseResult::Ok(f(r))).unwrap()
     }
@@ -189,14 +202,13 @@ impl<'e> WriteManager<'e> for PConn {
     fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
-        F: 'e + FnOnce(&mut Writer) -> Result<R, E>,
+        F: 'e + FnOnce(&mut Transaction) -> Result<R, E>,
     {
-        let txn = self
+        let mut txn = self
             .transaction_with_behavior(TransactionBehavior::Exclusive)
             .map_err(DatabaseError::from)?;
-        let mut writer = txn;
-        let result = f(&mut writer)?;
-        writer.commit().map_err(DatabaseError::from)?;
+        let result = f(&mut txn)?;
+        txn.commit().map_err(DatabaseError::from)?;
         Ok(result)
     }
 }

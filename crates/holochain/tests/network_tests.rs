@@ -1,4 +1,5 @@
 #![cfg(feature = "test_utils")]
+#![cfg(todo_redo_old_tests)]
 #![allow(unused_imports)]
 #![allow(dead_code)]
 #![allow(deprecated)]

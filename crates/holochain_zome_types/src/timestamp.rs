@@ -344,6 +344,13 @@ impl Sub<Timestamp> for Timestamp {
     }
 }
 
+#[cfg(feature = "full")]
+impl rusqlite::ToSql for Timestamp {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        Ok(rusqlite::types::ToSqlOutput::Owned(self.0.into()))
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
 

@@ -16,7 +16,6 @@ async fn incoming_ops_to_limbo() {
     let signature = author.sign(&keystore, &header).await.unwrap();
 
     let op = DhtOp::RegisterAgentActivity(signature, header);
-    let op_light = op.to_light();
     let hash = DhtOpHash::with_data_sync(&op);
     let ops = vec![(hash.clone(), op.clone())];
 
@@ -25,7 +24,22 @@ async fn incoming_ops_to_limbo() {
         .unwrap();
     rx.listen().await.unwrap();
 
-    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
-    let r = workspace.validation_limbo.get(&hash).unwrap().unwrap();
-    assert_eq!(r.op, op_light);
+    fresh_reader_test(env, |txn| {
+        let found: bool = txn
+            .query_row(
+                "
+            SELECT EXISTS(
+                SELECT 1 FROM DhtOP 
+                WHERE when_integrated IS NULL 
+                AND hash = :hash
+            )
+            ",
+                named_params! {
+                    ":hash": hash,
+                },
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(found);
+    });
 }
