@@ -34,8 +34,19 @@ pub use error::{TimestampError, TimestampResult};
 /// Create a new Timestamp instance from the supplied secs/nsecs.  Note that we can easily create a
 /// Timestamp that cannot be converted to a valid DateTime<Utc> (ie. by supplying 86,400-second days
 /// beyond range of +/- i32 offset from 0AD or 1970AD, nsecs beyond 1e9, etc.; see its code.)
+///
 #[derive(
-    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize, SerializedBytes,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Deserialize,
+    Serialize,
+    SerializedBytes,
 )]
 pub struct Timestamp(
     pub i64, // seconds from UNIX Epoch, positive or negative
@@ -69,35 +80,22 @@ impl fmt::Debug for Timestamp {
 }
 
 /// Infallible conversions into a Timestamp.  The only infallible ways to create a Timestamp are
-/// `from` a Unix timestamp, or `normalize` with a timestamp and nanoseconds, or converting from
-/// a DateTime<Utc>.
+/// `from` a Unix i64-ish timestamp, or `normalize` with a timestamp and nanoseconds, or converting
+/// from a DateTime<Timezone>.
 impl From<i64> for Timestamp {
     fn from(secs: i64) -> Self {
         Self(secs, 0)
     }
 }
 
-impl From<i32> for Timestamp {
-    fn from(secs: i32) -> Self {
-        Self(secs.into(), 0)
-    }
-}
-
-impl From<u32> for Timestamp {
-    fn from(secs: u32) -> Self {
-        Self(secs.into(), 0)
-    }
-}
-
-impl From<chrono::DateTime<chrono::Utc>> for Timestamp {
-    fn from(t: chrono::DateTime<chrono::Utc>) -> Self {
+impl<Tz: chrono::TimeZone> From<chrono::DateTime<Tz>> for Timestamp {
+    fn from(t: chrono::DateTime<Tz>) -> Self {
         std::convert::From::from(&t)
     }
 }
 
-impl From<&chrono::DateTime<chrono::Utc>> for Timestamp {
-    fn from(t: &chrono::DateTime<chrono::Utc>) -> Self {
-        let t = t.naive_utc();
+impl<Tz: chrono::TimeZone> From<&chrono::DateTime<Tz>> for Timestamp {
+    fn from(t: &chrono::DateTime<Tz>) -> Self {
         Timestamp(t.timestamp(), t.timestamp_subsec_nanos())
     }
 }
@@ -128,9 +126,7 @@ impl FromStr for Timestamp {
     type Err = TimestampError;
 
     fn from_str(t: &str) -> Result<Self, Self::Err> {
-        let t = chrono::DateTime::parse_from_rfc3339(t)?;
-        let t = chrono::DateTime::from_utc(t.naive_utc(), chrono::Utc);
-        Ok(t.into())
+        Ok(chrono::DateTime::parse_from_rfc3339(t)?.into())
     }
 }
 
@@ -208,6 +204,15 @@ macro_rules! try_opt {
 }
 
 impl Timestamp {
+    /// The UNIX Epoch is the Timestamp::default(); also make it explicitly available
+    /// ```
+    /// use holochain_zome_types::prelude::*;
+    /// assert_eq!( Timestamp::epoch(), Timestamp( 0, 0 ))
+    /// ```
+    pub fn epoch() -> Timestamp {
+        Timestamp::default()
+    }
+
     /// Construct a normalized Timestamp from the given secs/nanos.  Allows a full, signed range of
     /// seconds and/or nanoseconds; produces a Timestamp with a properly signed i64 seconds, and an
     /// always positive-offset u32 nanoseconds.  Differs from typical `new` implementation in that
@@ -359,7 +364,7 @@ pub mod tests {
         let d1: TimestampResult<chrono::DateTime<chrono::Utc>> = t1.try_into();
         assert_eq!(d1, Err(TimestampError::Overflow));
 
-        let t2 = Timestamp(0, 0) + core::time::Duration::new(0, 1);
+        let t2 = Timestamp::epoch() + core::time::Duration::new(0, 1);
         assert_eq!(t2, Ok(Timestamp(0, 1)));
     }
 }

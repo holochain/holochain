@@ -154,14 +154,18 @@ pub async fn check_spam(_header: &Header) -> SysValidationResult<()> {
 
 /// Check previous header timestamp is before this header
 pub fn check_prev_timestamp(header: &Header, prev_header: &Header) -> SysValidationResult<()> {
-    if header.timestamp() > prev_header.timestamp() {
+    // We allow equal or greater timestamps, just not decreasing.  The system clock may slow during
+    // time adjustment, or CPU speeds may increase, and multiple Headers may be validly created
+    // with the same timestamp.  Or, multiple commits may occur during or due to the same system
+    // "event" with a specific Timestamp.
+    if header.timestamp() >= prev_header.timestamp() {
         Ok(())
     } else {
         Err(PrevHeaderError::Timestamp).map_err(|e| ValidationOutcome::from(e).into())
     }
 }
 
-/// Check the previous header is one less then the current
+/// Check the previous header sequence is one less then the current
 pub fn check_prev_seq(header: &Header, prev_header: &Header) -> SysValidationResult<()> {
     let header_seq = header.header_seq();
     let prev_seq = prev_header.header_seq();

@@ -9,6 +9,27 @@ use crate::prelude::*;
 ///
 /// Usually you don't need to use this function directly; it is the most general way to create an
 /// entry and standardises the internals of higher level create functions.
+///
+/// The HeaderDeterminism trait can be useful if your committed Entry's content is dependent on the
+/// actual header commit timestamp, eg. for time-dependent calculations such as PID loops.  You may
+/// specify which HeaderHash this entry follows, or its sequence number in the source chain, to
+/// implement Read-Modify-Write "atomic" commits; eg. that will fail if another Zome thread commits
+/// something else while this thread is computing the commit.
+/// 
+/// ```ignore
+/// use hdk::prelude::*;
+/// use hdk::prelude::builder::HeaderDeterminism;
+/// 
+/// #[hdk_entry(id = "secs")]
+/// pub struct Secs(Timestamp);
+/// fn secs_now() -> ExternResult<HeaderHash> {
+///     let now: Timestamp = (Timestamp::epoch() + sys_time()?)
+///         .map_err(|e| WasmError::Guest(format!("Timestamp error: {}", e)))?;
+///     let secs = Secs(now);
+///     let entry_def_with_id: EntryDefWithId = secs.try_into()?;
+///     create(entry_def_with_id.at(now)); // The source-chain Header Timestamp == Secs.0
+/// }
+/// ```
 pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
     HDK.with(|h| h.borrow().create(entry_with_def_id))
 }

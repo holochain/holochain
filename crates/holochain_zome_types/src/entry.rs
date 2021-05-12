@@ -5,9 +5,12 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
+use crate::builder::HeaderDeterminism;
 use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
+use crate::header::HeaderDetails;
+use crate::timestamp::Timestamp;
 use holo_hash::hash_type;
 use holo_hash::AgentPubKey;
 use holo_hash::HashableContent;
@@ -170,11 +173,16 @@ impl HashableContent for Entry {
     }
 }
 
-/// Data to create an entry.
+/// Data to create an entry, optionally with a certain HeaderDetails, eg. timestamp, necessary in
+/// order to support algorithms that compute Entry contents deterministically based on the
+/// difference in time (dt) between commits, eg. PID loops.  Also allows implementing "atomic"
+/// Read-Modify-Write algorithms, ensuring that no other Zome API updates the source-chain between
+/// querying it and committing an Entry.
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct EntryWithDefId {
     entry_def_id: crate::entry_def::EntryDefId,
     entry: crate::entry::Entry,
+    details: Option<HeaderDetails>,
 }
 
 impl EntryWithDefId {
@@ -183,6 +191,37 @@ impl EntryWithDefId {
         Self {
             entry_def_id,
             entry,
+            details: None,
+        }
+    }
+}
+
+impl HeaderDeterminism for EntryWithDefId {
+    fn at(self, timestamp: Timestamp) -> Self {
+        Self {
+            details: Some(HeaderDetails {
+                timestamp: Some(timestamp),
+                ..self.details.unwrap_or(HeaderDetails::default())
+            }),
+            ..self
+        }
+    }
+    fn follows(self, prev_header: holo_hash::HeaderHash) -> Self {
+        Self {
+            details: Some(HeaderDetails {
+                prev_header: Some(prev_header),
+                ..self.details.unwrap_or(HeaderDetails::default())
+            }),
+            ..self
+        }
+    }
+    fn sequence(self, header_seq: u32) -> Self {
+        Self {
+            details: Some(HeaderDetails {
+                header_seq: Some(header_seq),
+                ..self.details.unwrap_or(HeaderDetails::default())
+            }),
+            ..self
         }
     }
 }
@@ -196,6 +235,12 @@ impl AsRef<crate::Entry> for EntryWithDefId {
 impl AsRef<crate::EntryDefId> for EntryWithDefId {
     fn as_ref(&self) -> &crate::EntryDefId {
         &self.entry_def_id
+    }
+}
+
+impl AsRef<Option<HeaderDetails>> for EntryWithDefId {
+    fn as_ref(&self) -> &Option<HeaderDetails> {
+        &self.details
     }
 }
 
@@ -225,6 +270,8 @@ pub struct UpdateInput {
     pub original_header_address: holo_hash::HeaderHash,
     /// Value of the update.
     pub entry_with_def_id: EntryWithDefId,
+    /// Optional Header determinism details
+    pub details: Option<HeaderDetails>,
 }
 
 impl UpdateInput {
@@ -236,6 +283,37 @@ impl UpdateInput {
         Self {
             original_header_address,
             entry_with_def_id,
+            details: None,
+        }
+    }
+}
+
+impl HeaderDeterminism for UpdateInput {
+    fn at(self, timestamp: Timestamp) -> Self {
+        Self {
+            details: Some(HeaderDetails {
+                timestamp: Some(timestamp),
+                ..self.details.unwrap_or(HeaderDetails::default())
+            }),
+            ..self
+        }
+    }
+    fn follows(self, prev_header: holo_hash::HeaderHash) -> Self {
+        Self {
+            details: Some(HeaderDetails {
+                prev_header: Some(prev_header),
+                ..self.details.unwrap_or(HeaderDetails::default())
+            }),
+            ..self
+        }
+    }
+    fn sequence(self, header_seq: u32) -> Self {
+        Self {
+            details: Some(HeaderDetails {
+                header_seq: Some(header_seq),
+                ..self.details.unwrap_or(HeaderDetails::default())
+            }),
+            ..self
         }
     }
 }
