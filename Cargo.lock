@@ -1881,6 +1881,7 @@ dependencies = [
  "must_future",
  "nanoid",
  "observability",
+ "page_size",
  "parking_lot 0.10.2",
  "rand 0.7.3",
  "rkv",
