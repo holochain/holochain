@@ -2,6 +2,7 @@
 
 use crate::agent_store::AgentInfo;
 use crate::agent_store::AgentInfoSigned;
+use crate::agent_store::AgentMetaInfo;
 use crate::agent_store::Urls;
 use crate::dependencies::url2;
 use crate::KitsuneAgent;
@@ -52,8 +53,41 @@ fixturator!(
 );
 
 fixturator!(
+    AgentMetaInfo;
+    curve Empty AgentMetaInfo { dht_storage_arc_half_length: u32::MAX / 4 };
+    curve Unpredictable AgentMetaInfo { dht_storage_arc_half_length: u32::MAX / 4 };
+    curve Predictable AgentMetaInfo { dht_storage_arc_half_length: u32::MAX / 4 };
+);
+
+fixturator!(
     AgentInfo;
-    constructor fn new(KitsuneSpace, KitsuneAgent, Urls, U64, U64);
+    curve Empty {
+        AgentInfo::new(
+            fixt!(KitsuneSpace, Empty),
+            fixt!(KitsuneAgent, Empty),
+            fixt!(Urls, Empty),
+            0,
+            0,
+        ).with_meta_info(fixt!(AgentMetaInfo, Empty)).unwrap()
+    };
+    curve Unpredictable {
+        AgentInfo::new(
+            fixt!(KitsuneSpace, Unpredictable),
+            fixt!(KitsuneAgent, Unpredictable),
+            fixt!(Urls, Unpredictable),
+            0,
+            0,
+        ).with_meta_info(fixt!(AgentMetaInfo, Unpredictable)).unwrap()
+    };
+    curve Predictable {
+        AgentInfo::new(
+            fixt!(KitsuneSpace, Predictable),
+            fixt!(KitsuneAgent, Predictable),
+            fixt!(Urls, Predictable),
+            0,
+            0,
+        ).with_meta_info(fixt!(AgentMetaInfo, Predictable)).unwrap()
+    };
 );
 
 fixturator!(

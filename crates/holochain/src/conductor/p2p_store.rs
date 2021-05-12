@@ -217,7 +217,7 @@ mod tests {
         let test_env = test_p2p_env();
         let env = test_env.env();
 
-        let agent_info_signed = fixt!(AgentInfoSigned);
+        let agent_info_signed = fixt!(AgentInfoSigned, Predictable);
 
         env.conn().unwrap().p2p_put(&agent_info_signed).unwrap();
 

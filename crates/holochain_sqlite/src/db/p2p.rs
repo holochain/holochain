@@ -114,8 +114,9 @@ impl AsP2pTxExt for Transaction<'_> {
 
         Ok(stmt
             .query_row(named_params! { ":agent": &agent.0 }, |r| {
-                let encoded: Vec<u8> = r.get(0)?;
-                let signed = AgentInfoSigned::try_from(encoded.as_ref())
+                let r = r.get_ref(0)?;
+                let r = r.as_blob()?;
+                let signed = AgentInfoSigned::try_from(r)
                     .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
                 Ok(signed)
             })
@@ -130,8 +131,9 @@ impl AsP2pTxExt for Transaction<'_> {
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
         let mut out = Vec::new();
         for r in stmt.query_map([], |r| {
-            let encoded: Vec<u8> = r.get(0)?;
-            let signed = AgentInfoSigned::try_from(encoded.as_ref())
+            let r = r.get_ref(0)?;
+            let r = r.as_blob()?;
+            let signed = AgentInfoSigned::try_from(r)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
             Ok(signed)
