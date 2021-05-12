@@ -9,7 +9,7 @@ use std::collections::HashMap;
 /// Wrap a transport listener sender/receiver in kitsune proxy logic.
 pub async fn spawn_kitsune_proxy_listener(
     proxy_config: Arc<ProxyConfig>,
-    tuning_params: Arc<KitsuneP2pTuningParams>,
+    tuning_params: KitsuneP2pTuningParams,
     sub_sender: ghost_actor::GhostSender<TransportListener>,
     mut sub_receiver: TransportEventReceiver,
 ) -> TransportResult<(
@@ -138,7 +138,7 @@ struct ProxyTo {
 struct InnerListen {
     i_s: ghost_actor::GhostSender<Internal>,
     #[allow(dead_code)]
-    tuning_params: Arc<KitsuneP2pTuningParams>,
+    tuning_params: KitsuneP2pTuningParams,
     this_url: ProxyUrl,
     accept_proxy_cb: AcceptProxyCallback,
     sub_sender: ghost_actor::GhostSender<TransportListener>,
@@ -152,7 +152,7 @@ struct InnerListen {
 impl InnerListen {
     pub async fn new(
         i_s: ghost_actor::GhostSender<Internal>,
-        tuning_params: Arc<KitsuneP2pTuningParams>,
+        tuning_params: KitsuneP2pTuningParams,
         this_url: ProxyUrl,
         tls: TlsConfig,
         accept_proxy_cb: AcceptProxyCallback,
@@ -532,7 +532,6 @@ impl TransportListenerHandler for InnerListen {
                 "sub_transport": sub,
                 "url": url,
                 "proxy_count": proxy_count,
-                "tokio_task_count": kitsune_p2p_types::metrics::metric_task_count(),
                 "sys_info": kitsune_p2p_types::metrics::get_sys_info(),
             }})
         }

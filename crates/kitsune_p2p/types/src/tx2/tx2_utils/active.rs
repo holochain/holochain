@@ -10,6 +10,13 @@ impl ActiveInner {
         Self(NotifyAll::new())
     }
 
+    pub fn register_kill_cb<F>(&self, cb: F)
+    where
+        F: FnOnce() + 'static + Send,
+    {
+        self.0.wait_cb(cb);
+    }
+
     pub fn kill(&self) {
         self.0.notify();
     }
@@ -64,6 +71,20 @@ impl Active {
         Self(out.into_boxed_slice())
     }
 
+    /// Register a callback to be invoked on kill.
+    /// Beware the cb may be invoked multiple times if this Active is mixed.
+    pub fn register_kill_cb<F>(&self, cb: F)
+    where
+        F: Fn() + 'static + Send + Sync,
+    {
+        type CB = Arc<dyn Fn() + 'static + Send + Sync>;
+        let cb: CB = Arc::new(cb);
+        for i in self.0.iter() {
+            let cb = cb.clone();
+            i.register_kill_cb(move || cb());
+        }
+    }
+
     /// Kill this active tracker (all trackers if mixed).
     pub fn kill(&self) {
         for i in self.0.iter() {
@@ -104,6 +125,25 @@ impl Active {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_active_cb() {
+        let count = Arc::new(atomic::AtomicUsize::new(0));
+
+        let a1 = Active::new();
+        let a2 = Active::new();
+        let mix = a1.mix(&a2);
+
+        let c2 = count.clone();
+        mix.register_kill_cb(move || {
+            c2.fetch_add(1, atomic::Ordering::Relaxed);
+        });
+
+        a1.kill();
+        a2.kill();
+        assert_eq!(2, count.load(atomic::Ordering::Relaxed));
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_active() {
@@ -120,22 +160,24 @@ mod tests {
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             Ok(())
         });
-        let t1 = tokio::task::spawn(async move {
+        let t1 = metric_task(async move {
             assert!(f1.await.is_ok());
+            KitsuneResult::Ok(())
         });
 
         let f2 = mix.fut(async move {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             Ok(())
         });
-        let t2 = tokio::task::spawn(async move {
+        let t2 = metric_task(async move {
             assert!(f2.await.is_err());
+            KitsuneResult::Ok(())
         });
 
         tokio::time::sleep(std::time::Duration::from_millis(120)).await;
         a3.kill();
 
-        t1.await.unwrap();
-        t2.await.unwrap();
+        t1.await.unwrap().unwrap();
+        t2.await.unwrap().unwrap();
     }
 }

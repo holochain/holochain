@@ -11,23 +11,24 @@ use crate::prelude::{SlotId, YamlProperties};
 use holo_hash::{DnaHash, DnaHashB64};
 use std::collections::HashMap;
 
-/// Placeholder for a real UUID type
-pub type Uuid = String;
+/// Placeholder for a real UID type
+pub type Uid = String;
 
 /// Version 1 of the App manifest schema
 #[derive(
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct AppManifestV1 {
     /// Name of the App. This may be used as the installed_app_id.
-    pub(super) name: String,
+    pub name: String,
 
     /// Description of the app, just for context.
-    pub(super) description: Option<String>,
+    pub description: Option<String>,
 
     /// The Cell manifests that make up this app.
-    pub(super) slots: Vec<AppSlotManifest>,
+    pub slots: Vec<AppSlotManifest>,
 }
 
 /// Description of an app "slot" defined by this app.
@@ -35,16 +36,17 @@ pub struct AppManifestV1 {
 /// potential runtime clones.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct AppSlotManifest {
     /// The SlotId which will be given to the installed Cell for this Dna.
-    pub(super) id: SlotId,
+    pub id: SlotId,
 
     /// Determines if, how, and when a Cell will be provisioned.
-    pub(super) provisioning: Option<CellProvisioning>,
+    pub provisioning: Option<CellProvisioning>,
 
     /// Declares where to find the DNA, and options to modify it before
     /// inclusion in a Cell
-    pub(super) dna: AppSlotDnaManifest,
+    pub dna: AppSlotDnaManifest,
 }
 
 impl AppSlotManifest {
@@ -61,6 +63,7 @@ impl AppSlotManifest {
 /// The DNA portion of an app slot
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct AppSlotDnaManifest {
     /// Where to find this Dna. To specify a DNA included in a hApp Bundle,
     /// use a local relative path that corresponds with the bundle structure.
@@ -68,24 +71,24 @@ pub struct AppSlotDnaManifest {
     /// Note that since this is flattened,
     /// there is no actual "location" key in the manifest.
     #[serde(flatten)]
-    pub(super) location: Option<mr_bundle::Location>,
+    pub location: Option<mr_bundle::Location>,
 
     /// Optional default properties. May be overridden during installation.
-    pub(super) properties: Option<YamlProperties>,
+    pub properties: Option<YamlProperties>,
 
-    /// Optional fixed UUID. May be overridden during installation.
-    pub(super) uuid: Option<Uuid>,
+    /// Optional fixed UID. May be overridden during installation.
+    pub uid: Option<Uid>,
 
     /// The versioning constraints for the DNA. Ensures that only a DNA that
     /// matches the version spec will be used.
-    pub(super) version: Option<DnaVersionFlexible>,
+    pub version: Option<DnaVersionFlexible>,
 
     /// Allow up to this many "clones" to be created at runtime.
     /// Each runtime clone is created by the `CreateClone` strategy,
     /// regardless of the provisioning strategy set in the manifest.
     /// Default: 0
     #[serde(default)]
-    pub(super) clone_limit: u32,
+    pub clone_limit: u32,
 }
 
 impl AppSlotDnaManifest {
@@ -96,7 +99,7 @@ impl AppSlotDnaManifest {
                 "./path/to/my/dnabundle.dna".into(),
             )),
             properties: None,
-            uuid: None,
+            uid: None,
             version: None,
             clone_limit: 0,
         }
@@ -108,6 +111,7 @@ impl AppSlotDnaManifest {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
 #[serde(rename_all = "snake_case")]
 #[serde(untagged)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum DnaVersionFlexible {
     /// A version spec with a single hash
     Singleton(DnaHashB64),
@@ -133,6 +137,7 @@ pub type DnaLocation = mr_bundle::Location;
 /// valid DnaHashes. The order of the list is from latest version to earliest.
 /// In subsequent manifest versions, this will become more expressive.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct DnaVersionSpec(Vec<DnaHashB64>);
 
 // NB: the following is likely to remain in the API for DnaVersionSpec
@@ -157,12 +162,13 @@ impl DnaVersionSpec {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "strategy")]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[allow(missing_docs)]
 pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
     Create { deferred: bool },
     /// Always create a new Cell when installing the App,
-    /// and use a unique UUID to ensure a distinct DHT network
+    /// and use a unique UID to ensure a distinct DHT network
     CreateClone { deferred: bool },
     /// Require that a Cell is already installed which matches the DNA version
     /// spec, and which has an Agent that's associated with this App's agent
@@ -182,6 +188,21 @@ impl Default for CellProvisioning {
 }
 
 impl AppManifestV1 {
+    /// Update the UID for all DNAs used in Create-provisioned Cells.
+    /// Cells with other provisioning strategies are not affected.
+    ///
+    // TODO: it probably makes sense to do this for CreateIfNotExists cells
+    // too, in the Create case, but we would have to do that during installation
+    // rather than simply updating the manifest. Let's hold off on that until
+    // we know we need it, since this way is substantially simpler.
+    pub fn set_uid(&mut self, uid: Uid) {
+        for mut slot in self.slots.iter_mut() {
+            if matches!(slot.provisioning, Some(CellProvisioning::Create { .. })) {
+                slot.dna.uid = Some(uid.clone());
+            }
+        }
+    }
+
     /// Convert this human-focused manifest into a validated, concise representation
     pub fn validate(self) -> AppManifestResult<AppManifestValidated> {
         let AppManifestV1 {
@@ -201,7 +222,7 @@ impl AppManifestV1 {
                         location,
                         properties,
                         version,
-                        uuid,
+                        uid,
                         clone_limit,
                     } = dna;
                     // Go from "flexible" enum into proper DnaVersionSpec.
@@ -212,7 +233,7 @@ impl AppManifestV1 {
                             clone_limit,
                             location: Self::require(location, "slots.dna.(path|url)")?,
                             properties,
-                            uuid,
+                            uid,
                             version,
                         },
                         CellProvisioning::CreateClone { deferred } => {
@@ -238,7 +259,7 @@ impl AppManifestV1 {
                                 location: Self::require(location, "slots.dna.(path|url)")?,
                                 version: Self::require(version, "slots.dna.version")?,
                                 properties,
-                                uuid,
+                                uid,
                             }
                         }
                         CellProvisioning::Disabled => AppSlotManifestValidated::Disabled {
@@ -268,19 +289,27 @@ pub mod tests {
     use ::fixt::prelude::*;
     use std::path::PathBuf;
 
+    #[cfg(feature = "arbitrary")]
+    use arbitrary::Arbitrary;
+
     #[derive(serde::Serialize, serde::Deserialize)]
     struct Props {
         salad: String,
+    }
+
+    pub fn app_manifest_properties_fixture() -> YamlProperties {
+        YamlProperties::new(
+            serde_yaml::to_value(Props {
+                salad: "bar".to_string(),
+            })
+            .unwrap(),
+        )
     }
 
     pub async fn app_manifest_fixture<I: IntoIterator<Item = DnaDef>>(
         location: Option<mr_bundle::Location>,
         dnas: I,
     ) -> (AppManifest, Vec<DnaHashB64>) {
-        let props = Props {
-            salad: "bar".to_string(),
-        };
-
         let hashes = join_all(
             dnas.into_iter()
                 .map(|dna| async move { DnaHash::with_data_sync(&dna).into() }),
@@ -293,8 +322,8 @@ pub mod tests {
             id: "nick".into(),
             dna: AppSlotDnaManifest {
                 location,
-                properties: Some(YamlProperties::new(serde_yaml::to_value(props).unwrap())),
-                uuid: Some("uuid".into()),
+                properties: Some(app_manifest_properties_fixture()),
+                uid: Some("uid".into()),
                 version: Some(version),
                 clone_limit: 50,
             },
@@ -335,7 +364,7 @@ slots:
         - {}
         - {}
       clone_limit: 50
-      uuid: uuid
+      uid: uid
       properties:
         salad: "bar"
 
@@ -357,5 +386,33 @@ slots:
         assert_eq!(actual.get(fields[1]), expected.get(fields[1]));
         assert_eq!(actual.get(fields[2]), expected.get(fields[2]));
         assert_eq!(actual.get(fields[3]), expected.get(fields[3]));
+    }
+
+    #[tokio::test]
+    async fn manifest_v1_set_uid() {
+        let mut u = arbitrary::Unstructured::new(&[0]);
+        let mut manifest = AppManifestV1::arbitrary(&mut u).unwrap();
+        manifest.slots = vec![
+            AppSlotManifest::arbitrary(&mut u).unwrap(),
+            AppSlotManifest::arbitrary(&mut u).unwrap(),
+            AppSlotManifest::arbitrary(&mut u).unwrap(),
+            AppSlotManifest::arbitrary(&mut u).unwrap(),
+        ];
+        manifest.slots[0].provisioning = Some(CellProvisioning::Create { deferred: false });
+        manifest.slots[1].provisioning = Some(CellProvisioning::Create { deferred: false });
+        manifest.slots[2].provisioning = Some(CellProvisioning::UseExisting { deferred: false });
+        manifest.slots[3].provisioning =
+            Some(CellProvisioning::CreateIfNotExists { deferred: false });
+
+        let uid = Uid::from("blabla");
+        manifest.set_uid(uid.clone());
+
+        // - The Create slots have the UID rewritten.
+        assert_eq!(manifest.slots[0].dna.uid.as_ref(), Some(&uid));
+        assert_eq!(manifest.slots[1].dna.uid.as_ref(), Some(&uid));
+
+        // - The others do not.
+        assert_ne!(manifest.slots[2].dna.uid.as_ref(), Some(&uid));
+        assert_ne!(manifest.slots[3].dna.uid.as_ref(), Some(&uid));
     }
 }

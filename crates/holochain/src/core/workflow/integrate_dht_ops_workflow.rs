@@ -282,8 +282,8 @@ async fn op_dependencies_held(
                             let op_hash = DhtOpHash::with_data_sync(
                                 &UniqueForm::RegisterAgentActivity(prev_header.header()),
                             );
-                            if workspace.integration_limbo.contains(&op_hash)? {
-                                return Ok(true);
+                            if !workspace.integrated_dht_ops.contains(&op_hash)? {
+                                return Ok(false);
                             }
                         }
                         None => return Ok(false),

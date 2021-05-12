@@ -132,7 +132,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "need_for_speed_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: vec![TestWasm::Anchor.into()].into(),
         },
@@ -304,7 +304,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
     }
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
     test_env
 }
 

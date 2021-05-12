@@ -46,7 +46,7 @@ pub fn spawn_gossip_module(config: Arc<KitsuneP2pConfig>) -> GossipEventReceiver
     evt_recv
 }
 
-#[tracing::instrument(skip(evt_send))]
+#[tracing::instrument(skip(config, evt_send))]
 /// the gossip module is not an actor because we want to pause while
 /// awaiting requests - not process requests in parallel.
 async fn gossip_loop(

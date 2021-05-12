@@ -1,8 +1,12 @@
-use crate::conductor::manager::spawn_task_manager;
+use crate::core::ribosome::MockRibosomeT;
 use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
 use crate::fixt::DnaFileFixturator;
 use crate::fixt::SignatureFixturator;
 use crate::test_utils::test_network;
+use crate::{
+    conductor::manager::spawn_task_manager,
+    core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
+};
 use ::fixt::prelude::*;
 use holo_hash::HasHash;
 use holochain_lmdb::test_utils::test_cell_env;
@@ -24,23 +28,33 @@ async fn test_cell_handle_publish() {
     let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
     let holochain_p2p_cell = test_network.cell_network();
 
-    let mut mock_handler = crate::conductor::handle::MockConductorHandleT::new();
-    mock_handler
+    let mut mock_handle = crate::conductor::handle::MockConductorHandleT::new();
+    mock_handle
         .expect_get_dna()
         .returning(|_| Some(fixt!(DnaFile)));
 
-    let mock_handler: crate::conductor::handle::ConductorHandle = Arc::new(mock_handler);
+    let mock_handle: crate::conductor::handle::ConductorHandle = Arc::new(mock_handle);
+    let mut mock_ribosome = MockRibosomeT::new();
+    mock_ribosome
+        .expect_run_genesis_self_check()
+        .returning(|_, _| Ok(GenesisSelfCheckResult::Valid));
 
-    super::Cell::genesis(cell_id.clone(), mock_handler.clone(), env.clone(), None)
-        .await
-        .unwrap();
+    super::Cell::genesis(
+        cell_id.clone(),
+        mock_handle.clone(),
+        env.clone(),
+        mock_ribosome,
+        None,
+    )
+    .await
+    .unwrap();
 
-    let (add_task_sender, shutdown) = spawn_task_manager();
+    let (add_task_sender, shutdown) = spawn_task_manager(mock_handle.clone());
     let (stop_tx, _) = sync::broadcast::channel(1);
 
     let (cell, _) = super::Cell::create(
         cell_id,
-        mock_handler,
+        mock_handle,
         env.clone(),
         holochain_p2p_cell,
         add_task_sender,
@@ -74,5 +88,5 @@ async fn test_cell_handle_publish() {
     workspace.op_exists(&op_hash).unwrap();
 
     stop_tx.send(()).unwrap();
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }

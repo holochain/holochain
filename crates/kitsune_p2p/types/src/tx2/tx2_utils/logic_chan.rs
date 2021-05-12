@@ -1,4 +1,4 @@
-use crate::tx2::tx2_utils::Share;
+use crate::tx2::tx2_utils::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::futures_unordered::FuturesUnordered;
@@ -9,8 +9,8 @@ enum LType<E: 'static + Send> {
     Event(E),
     Logic(OwnedSemaphorePermit, BoxFuture<'static, ()>),
 }
-type LTypeSend<E> = tokio::sync::mpsc::Sender<LType<E>>;
-type LTypeRecv<E> = tokio::sync::mpsc::Receiver<LType<E>>;
+type LTypeSend<E> = TSender<LType<E>>;
+type LTypeRecv<E> = TReceiver<LType<E>>;
 
 struct LogicChanInner<E: 'static + Send> {
     send: LTypeSend<E>,
@@ -95,8 +95,9 @@ impl<E: 'static + Send> LogicChanHandle<E> {
 
     /// Close this logic_chan.
     pub fn close(&self) {
-        let _ = self.0.share_mut(|_, c| {
+        let _ = self.0.share_mut(|i, c| {
             *c = true;
+            i.send.close_channel();
             Ok(())
         });
     }
@@ -139,7 +140,7 @@ pub struct LogicChan<E: 'static + Send> {
 impl<E: 'static + Send> LogicChan<E> {
     /// Create a new LogicChan instance.
     pub fn new(capture_bound: usize) -> Self {
-        let (send, recv) = tokio::sync::mpsc::channel(capture_bound);
+        let (send, recv) = t_chan(capture_bound);
         let logic_limit = Arc::new(Semaphore::new(capture_bound));
         let inner = LogicChanInner { send, logic_limit };
         let hnd = LogicChanHandle(Share::new(inner));
@@ -249,13 +250,14 @@ mod tests {
         let count = Arc::new(atomic::AtomicUsize::new(0));
 
         let count2 = count.clone();
-        let rt = tokio::task::spawn(async move {
+        let rt = metric_task(async move {
             while let Some(_res) = futures::stream::StreamExt::next(&mut logic_chan).await {
                 count2.fetch_add(1, atomic::Ordering::SeqCst);
             }
+            KitsuneResult::Ok(())
         });
 
-        let wt = tokio::task::spawn(async move {
+        let wt = metric_task(async move {
             a.emit("a1").await.unwrap();
             let b = a.clone();
             a.capture_logic(async move {
@@ -267,13 +269,14 @@ mod tests {
             .unwrap();
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
             a.emit("a2").await.unwrap();
+            KitsuneResult::Ok(())
         });
 
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         h.close();
 
-        wt.await.unwrap();
-        rt.await.unwrap();
+        wt.await.unwrap().unwrap();
+        rt.await.unwrap().unwrap();
 
         assert_eq!(4, count.load(atomic::Ordering::SeqCst));
     }

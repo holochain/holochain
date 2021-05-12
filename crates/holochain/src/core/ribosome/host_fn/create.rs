@@ -285,7 +285,7 @@ pub mod wasm_test {
         let dna_file = DnaFile::new(
             DnaDef {
                 name: "create_multi_test".to_string(),
-                uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 zomes: vec![TestWasm::MultipleCalls.into()].into(),
             },
@@ -384,7 +384,7 @@ pub mod wasm_test {
 
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
-        shutdown.await.unwrap();
+        shutdown.await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]

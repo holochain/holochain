@@ -9,17 +9,8 @@ let
   config = import ./config.nix;
 
   # START HOLONIX IMPORT BOILERPLATE
-  holonixPath = if ! config.holonix.use-github
-   then config.holonix.local.path
-   else fetchTarball {
-    url = "https://github.com/${config.holonix.github.owner}/${config.holonix.github.repo}/tarball/${config.holonix.github.ref}";
-    sha256 = config.holonix.github.sha256;
-   }
-   ;
-  holonix = import (holonixPath) {
-    inherit config;
-    includeHolochainBinaries = config.includeHolochainBinaries or false;
-  };
+  holonixPath = config.holonix.pathFn {};
+  holonix = config.holonix.importFn {};
   # END HOLONIX IMPORT BOILERPLATE
 
   overlays = [

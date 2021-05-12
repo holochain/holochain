@@ -25,5 +25,8 @@ pub use resource_bucket::*;
 mod share;
 pub use share::*;
 
+mod t_chan;
+pub use t_chan::*;
+
 mod tx_url;
 pub use tx_url::*;

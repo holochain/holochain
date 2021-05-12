@@ -5,6 +5,7 @@ use futures::io::{Error, ErrorKind};
 /// Construct a bound async read/write memory channel
 pub fn bound_async_mem_channel(
     max_bytes: usize,
+    maybe_active: Option<&Active>,
 ) -> (
     Box<dyn futures::io::AsyncWrite + 'static + Send + Unpin>,
     Box<dyn futures::io::AsyncRead + 'static + Send + Unpin>,
@@ -18,6 +19,22 @@ pub fn bound_async_mem_channel(
         want_read_waker: None,
         want_write_waker: None,
     }));
+
+    if let Some(active) = maybe_active {
+        let k_inner = inner.clone();
+        active.register_kill_cb(move || {
+            let _ = k_inner.share_mut(|i, c| {
+                *c = true;
+                if let Some(waker) = i.want_read_waker.take() {
+                    waker.wake();
+                }
+                if let Some(waker) = i.want_write_waker.take() {
+                    waker.wake();
+                }
+                Ok(())
+            });
+        });
+    }
 
     (Box::new(MemWrite(inner.clone())), Box::new(MemRead(inner)))
 }
@@ -211,9 +228,9 @@ mod tests {
     use super::*;
 
     async fn _inner_test_async_bound_mem_channel(bind_size: usize, buf_size: usize) {
-        let (mut send, mut recv) = bound_async_mem_channel(bind_size);
+        let (mut send, mut recv) = bound_async_mem_channel(bind_size, None);
 
-        let rt = tokio::task::spawn(async move {
+        let rt = metric_task(async move {
             let mut read_buf = vec![0_u8; buf_size];
             use futures::io::AsyncReadExt;
             recv.read_exact(&mut read_buf).await.unwrap();
@@ -223,6 +240,7 @@ mod tests {
                 buf_size,
                 parse_latency_info(&read_buf).unwrap().as_micros()
             );
+            KitsuneResult::Ok(())
         });
 
         use futures::io::AsyncWriteExt;
@@ -230,7 +248,7 @@ mod tests {
         fill_with_latency_info(&mut write_buf);
         send.write_all(&write_buf).await.unwrap();
 
-        rt.await.unwrap();
+        rt.await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
