@@ -1011,6 +1011,7 @@ where
     async fn new(
         env: EnvWrite,
         wasm_env: EnvWrite,
+        p2p_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
@@ -1019,7 +1020,7 @@ where
         Ok(Self {
             env,
             wasm_env,
-            p2p_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
+            p2p_env,
             caches: std::sync::Mutex::new(HashMap::new()),
             cells: HashMap::new(),
             shutting_down: false,
@@ -1207,6 +1208,8 @@ mod builder {
             let wasm_environment =
                 EnvWrite::open(env_path.as_ref(), DbKind::Wasm, keystore.clone())?;
 
+            let p2p_env = Arc::new(parking_lot::Mutex::new(HashMap::new()));
+
             #[cfg(any(test, feature = "test_utils"))]
             let state = self.state;
 
@@ -1232,6 +1235,7 @@ mod builder {
             let conductor = Conductor::new(
                 environment,
                 wasm_environment,
+                p2p_env,
                 dna_store,
                 keystore,
                 env_path,
@@ -1328,6 +1332,7 @@ mod builder {
             let conductor = Conductor::new(
                 envs.conductor(),
                 envs.wasm(),
+                envs.p2p(),
                 self.dna_store,
                 keystore,
                 envs.tempdir().path().to_path_buf().into(),

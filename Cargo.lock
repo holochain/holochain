@@ -2026,6 +2026,7 @@ dependencies = [
  "matches",
  "mockall 0.8.3",
  "observability",
+ "parking_lot 0.10.2",
  "pretty_assertions 0.6.1",
  "serde",
  "serde_json",

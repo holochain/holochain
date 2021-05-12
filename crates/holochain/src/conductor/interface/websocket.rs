@@ -274,7 +274,6 @@ pub mod test {
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
     use holochain_sqlite::prelude::*;
-    use holochain_state::prelude::fresh_reader_test;
     use holochain_state::prelude::test_environments;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
@@ -688,7 +687,7 @@ pub mod test {
     async fn add_agent_info_via_admin() {
         observability::test_run().ok();
         let test_envs = test_environments();
-        let env = test_envs.p2p();
+        let p2p = test_envs.p2p();
         let agents = vec![fake_agent_pubkey_1(), fake_agent_pubkey_2()];
         let dnas = vec![
             make_dna("1", vec![TestWasm::Anchor]).await,
@@ -706,7 +705,13 @@ pub mod test {
 
         // - Give time for the agents to join the network.
         crate::assert_eq_retry_10s!(
-            { fresh_reader_test(env.clone(), |txn| { txn.p2p_list().unwrap().len() }) },
+            {
+                let mut count = 0;
+                for env in p2p.lock().values() {
+                    count += env.conn().unwrap().p2p_list().unwrap().len();
+                }
+                count
+            },
             4
         );
 

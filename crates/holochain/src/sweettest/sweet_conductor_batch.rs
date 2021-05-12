@@ -107,8 +107,13 @@ impl SweetConductorBatch {
 
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info(&self) {
-        let envs = self.0.iter().map(|c| c.envs().p2p()).collect();
-        crate::conductor::p2p_store::exchange_peer_info(envs);
+        let mut all = Vec::new();
+        for c in self.0.iter() {
+            for env in c.envs().p2p().lock().values() {
+                all.push(env.clone());
+            }
+        }
+        crate::conductor::p2p_store::exchange_peer_info(all);
     }
 }
 
