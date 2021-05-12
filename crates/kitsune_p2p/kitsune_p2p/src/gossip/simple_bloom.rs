@@ -409,7 +409,7 @@ impl SimpleBloomMod {
                             .checked_add(std::time::Duration::from_millis(
                                 i.tuning_params.tx2_implicit_timeout_ms as u64,
                             ))
-                            .unwrap();
+                            .expect("Congratulations on running holochain near the heat death of the universe :)");
 
                         Some((cert, how, gossip))
                     } else {
