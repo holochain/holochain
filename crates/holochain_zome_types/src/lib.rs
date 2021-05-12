@@ -24,12 +24,14 @@ pub mod element;
 pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;
+pub mod genesis;
 #[allow(missing_docs)]
 pub mod header;
 #[allow(missing_docs)]
 pub mod info;
 #[allow(missing_docs)]
 pub mod init;
+pub mod judged;
 #[allow(missing_docs)]
 pub mod link;
 pub mod metadata;
@@ -215,6 +217,34 @@ macro_rules! secure_primitive {
         impl AsRef<[u8]> for $t {
             fn as_ref(&self) -> &[u8] {
                 &self.0
+            }
+        }
+    };
+}
+
+/// Helper macro for implementing ToSql, when using rusqlite as a dependency
+#[macro_export]
+macro_rules! impl_to_sql_via_as_ref {
+    ($s: ty) => {
+        impl ::rusqlite::ToSql for $s {
+            fn to_sql(&self) -> ::rusqlite::Result<::rusqlite::types::ToSqlOutput<'_>> {
+                Ok(::rusqlite::types::ToSqlOutput::Borrowed(
+                    self.as_ref().into(),
+                ))
+            }
+        }
+    };
+}
+
+/// Helper macro for implementing ToSql, when using rusqlite as a dependency
+#[macro_export]
+macro_rules! impl_to_sql_via_display {
+    ($s: ty) => {
+        impl ::rusqlite::ToSql for $s {
+            fn to_sql(&self) -> ::rusqlite::Result<::rusqlite::types::ToSqlOutput<'_>> {
+                Ok(::rusqlite::types::ToSqlOutput::Owned(
+                    self.to_string().into(),
+                ))
             }
         }
     };

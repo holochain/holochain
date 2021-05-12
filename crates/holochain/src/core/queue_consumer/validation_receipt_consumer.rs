@@ -3,14 +3,14 @@
 use super::*;
 use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
-use crate::core::workflow::validation_receipt_workflow::ValidationReceiptWorkspace;
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for validation receipt workflow
-#[instrument(skip(env, stop, cell_network))]
+#[instrument(skip(env, conductor_handle, stop, cell_network))]
 pub fn spawn_validation_receipt_consumer(
-    env: DbWrite,
+    env: EnvWrite,
+    conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
     mut cell_network: HolochainP2pCell,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
@@ -27,14 +27,18 @@ pub fn spawn_validation_receipt_consumer(
             }
 
             // Run the workflow
-            let workspace = ValidationReceiptWorkspace::new(env.clone().into())
-                .expect("Could not create ValidationReceiptWorkspace");
-            if let WorkComplete::Incomplete =
-                validation_receipt_workflow(workspace, env.clone().into(), &mut cell_network)
-                    .await
-                    .expect("Error running validation receipt workflow")
-            {
-                trigger_self.trigger()
+            match validation_receipt_workflow(env.clone(), &mut cell_network).await {
+                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
+                Err(err) => {
+                    handle_workflow_error(
+                        conductor_handle.clone(),
+                        cell_network.cell_id(),
+                        err,
+                        "validation_receipt_workflow failure",
+                    )
+                    .await?
+                }
+                _ => (),
             };
         }
         Ok(())

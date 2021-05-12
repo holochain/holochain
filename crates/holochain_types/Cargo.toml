@@ -28,6 +28,7 @@ futures = "0.3"
 holo_hash = { version = "^0.0.2-alpha.1", path = "../holo_hash", features = ["string-encoding"] }
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.50"
+holochain_sqlite = { path = "../holochain_sqlite" }
 holochain_zome_types = { path = "../holochain_zome_types" }
 itertools = { version = "0.10" }
 lazy_static = "1.4.0"
@@ -38,12 +39,14 @@ nanoid = "0.3"
 observability = "0.1.3"
 rand = "0.7"
 regex = "1.4"
+rusqlite = { version = "0.25"}
 serde = { version = "1.0", features = [ "derive", "rc" ] }
 serde_bytes = "0.11"
 serde_derive = "1.0"
 serde_yaml = "0.8"
 shrinkwraprs = "0.3.0"
 strum = "0.18.0"
+strum_macros = "0.18.0"
 tempdir = "0.3.7"
 thiserror = "1.0.22"
 tokio = { version = "1.3", features = [ "rt" ] }
@@ -51,12 +54,15 @@ tokio_helper = { version = "0.0.1", path = "../tokio_helper" }
 tracing = "=0.1.21"
 derive_builder = "0.9.0"
 
+arbitrary = { version = "1.0", features = ["derive"], optional = true}
+
 [dev-dependencies]
 maplit = "1"
 matches = "0.1"
+serde_json = "1"
 tokio = { version = "1.3", features = [ "full" ] }
 
 [features]
 default = ["fixturators", "test_utils"]
 fixturators = ["holochain_zome_types/fixturators"]
-test_utils = ["holochain_zome_types/test_utils"]
+test_utils = ["holochain_zome_types/test_utils", "arbitrary", "holo_hash/arbitrary", "mr_bundle/arbitrary"]

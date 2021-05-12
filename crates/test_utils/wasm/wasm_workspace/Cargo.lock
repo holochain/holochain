@@ -299,6 +299,7 @@ version = "0.0.2-alpha.1"
 dependencies = [
  "byteorder",
  "chrono",
+ "derive_more",
  "fixt",
  "holo_hash",
  "holochain_serialized_bytes",
@@ -467,9 +468,9 @@ dependencies = [
 
 [[package]]
 name = "paste"
-version = "1.0.3"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7151b083b0664ed58ed669fcdd92f01c3d2fdbf10af4931a301474950b52bfa9"
+checksum = "acbf547ad0c65e31259204bd90935776d1c693cec2f4ff7abb7a1bbbd40dfe58"
 
 [[package]]
 name = "pin-project-lite"
@@ -834,6 +835,22 @@ version = "0.0.1"
 dependencies = [
  "hdk",
  "holochain_test_wasm_common",
+ "serde",
+]
+
+[[package]]
+name = "test_wasm_genesis_self_check_invalid"
+version = "0.0.1"
+dependencies = [
+ "hdk",
+ "serde",
+]
+
+[[package]]
+name = "test_wasm_genesis_self_check_valid"
+version = "0.0.1"
+dependencies = [
+ "hdk",
  "serde",
 ]
 

@@ -7,6 +7,13 @@ use std::sync::Arc;
 )]
 pub struct TxUrl(Arc<url2::Url2>);
 
+impl TxUrl {
+    /// reference this txurl as a Url2.
+    pub fn as_url2(&self) -> &url2::Url2 {
+        &self.0
+    }
+}
+
 impl std::ops::Deref for TxUrl {
     type Target = url::Url;
 
@@ -27,9 +34,21 @@ impl From<TxUrl> for Arc<url2::Url2> {
     }
 }
 
+impl From<TxUrl> for url2::Url2 {
+    fn from(u: TxUrl) -> Self {
+        (*u.0).clone()
+    }
+}
+
 impl From<Arc<url2::Url2>> for TxUrl {
     fn from(r: Arc<url2::Url2>) -> Self {
         Self(r)
+    }
+}
+
+impl From<url2::Url2> for TxUrl {
+    fn from(r: url2::Url2) -> Self {
+        Self(Arc::new(r))
     }
 }
 

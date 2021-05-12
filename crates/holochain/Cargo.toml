@@ -15,7 +15,6 @@ base64 = "0.13"
 byteorder = "1.3.4"
 cfg-if = "0.1"
 chrono = "0.4.6"
-derivative = "2.1.1"
 derive_more = "0.99.3"
 directories = "2.0.2"
 either = "1.5.0"
@@ -37,6 +36,8 @@ holochain_wasmer_host = "=0.0.67"
 holochain_websocket = { version = "0.0.1", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
 human-panic = "1.0.3"
+kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p_types = { version = "0.0.1", path = "../kitsune_p2p/types" }
 lazy_static = "1.4.0"
 mockall = "0.8"
 mr_bundle = { version = "0.0.1", path = "../mr_bundle" }
@@ -44,10 +45,12 @@ must_future = "0.1.1"
 nanoid = "0.3"
 num_cpus = "1.8"
 observability = "0.1.3"
+once_cell = "1.4.1"
 parking_lot = "0.10"
 predicates = "1.0.4"
 rand = "0.7"
 ring = "0.16"
+rusqlite = { version = "0.25" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 serde_yaml = "0.8"
@@ -67,9 +70,7 @@ url = "1.7.2"
 url2 = "0.0.6"
 url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
-kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 xsalsa20poly1305 = "0.6.0"
-once_cell = "1.4.1"
 
 # Dependencies for test_utils: keep in sync with below
 hdk = { path = "../hdk", optional = true }
@@ -77,7 +78,9 @@ matches = {version = "0.1.8", optional = true }
 holochain_test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_common", optional = true  }
 unwrap_to = { version = "0.1.0", optional = true }
 itertools = { version = "0.10", optional = true }
-kitsune_p2p_types = { version = "0.0.1", path = "../kitsune_p2p/types", optional = true }
+
+[target.'cfg(unix)'.dependencies]
+sd-notify = "0.3.0"
 
 
 [dev-dependencies]
@@ -113,8 +116,6 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-# TODO: consider changing "no-deps" to "db-encryption" if we decide to add
-# sqlcipher to the nix env
 default = ["slow_tests", "test_utils", "only_check_wasms", "no-deps"]
 
 # Exposes additional functionality only needed for integration tests.
@@ -125,7 +126,6 @@ test_utils = [
   "holochain_state/test_utils",
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",
-  "kitsune_p2p_types",
   "kitsune_p2p_types/test_utils",
   "itertools",
   "matches",

@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
+use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetLinksOptions;
-use holochain_state::metadata::LinkMetaKey;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
@@ -27,20 +27,18 @@ pub fn get_link_details<'a>(
 
     tokio_helper::block_forever_on(async move {
         // Create the key
-        let key = match tag_prefix.as_ref() {
-            Some(tag_prefix) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag_prefix),
-            None => LinkMetaKey::BaseZome(&base_address, zome_id),
+        let key = WireLinkKey {
+            base: base_address,
+            zome_id,
+            tag: tag_prefix,
         };
 
+        let workspace = call_context.host_access.workspace();
+        let mut cascade = Cascade::from_workspace_network(workspace, network);
         // Get the links from the dht
         let link_details = LinkDetails::from(
-            call_context
-                .host_access
-                .workspace()
-                .write()
-                .await
-                .cascade(network)
-                .get_link_details(&key, GetLinksOptions::default())
+            cascade
+                .get_link_details(key, GetLinksOptions::default())
                 .await
                 .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?,
         );
@@ -54,26 +52,24 @@ pub fn get_link_details<'a>(
 pub mod slow_tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::Header;
+    use holochain_zome_types::fake_agent_pubkey_1;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {
-        let test_env = holochain_sqlite::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
+        host_access.workspace = workspace;
 
         // ensure foo.bar twice to ensure idempotency
         let _: () = crate::call_test_ribosome!(

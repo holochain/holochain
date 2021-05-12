@@ -18,47 +18,57 @@ pub const APP_BUNDLE_EXT: &str = "happ";
 /// Work with Holochain DNA bundles
 #[derive(Debug, StructOpt)]
 pub enum HcDnaBundle {
-    /// Create a new, empty Holochain DNA bundle working directory
+    /// Create a new, empty Holochain DNA bundle working directory and create a new
+    /// sample `dna.yaml` manifest inside.
+    /// .
     Init {
         /// The path to create the working directory
         path: PathBuf,
     },
 
-    /// Pack the contents of a directory into a `.dna` bundle file.
+    /// Pack into the `[name].dna` bundle according to the `dna.yaml` manifest,
+    /// found inside the working directory. The `[name]` is taken from the `name`
+    /// property of the manifest file.
     ///
     /// e.g.:
     ///
-    /// $ hc-dna pack ./some/directory/foo/`
+    /// $ hc dna pack ./some/directory/foo
     ///
-    /// will create file `./some/directory/foo/foo.dna`
+    /// creates a file `./some/directory/foo/[name].dna`, based on
+    /// `./some/directory/foo/dna.yaml`
     Pack {
-        /// The path to the unpacked directory containing a `dna.yaml` manifest
+        /// The path to the working directory containing a `dna.yaml` manifest
         path: std::path::PathBuf,
 
-        /// Specify the output path for the packed bundle file.
+        /// Specify the output path for the packed bundle file
         ///
-        /// If not specified, the file will be placed alongside the input directory,
-        /// and given the name "[DIRECTORY].dna"
+        /// If not specified, the `[name].dna` bundle will be placed inside the
+        /// provided working directory.
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
     },
 
-    /// Unpack the parts of `.dna` file out into a directory.
+    /// Unpack parts of the `.dna` bundle file into a specific directory.
     ///
-    /// (`hc-dna -u my-dna.dna` creates dir `my-dna`)
+    /// e.g.:
+    ///
+    /// $ hc dna unpack ./some/dir/my-dna.dna
+    ///
+    /// creates a new directory `./some/dir/my-dna`, containining a new `dna.yaml`
+    /// manifest
     // #[structopt(short = "u", long)]
     Unpack {
         /// The path to the bundle to unpack
         path: std::path::PathBuf,
 
-        /// Specify the directory for the unpacked directory.
+        /// Specify the directory for the unpacked content
         ///
         /// If not specified, the directory will be placed alongside the
         /// bundle file, with the same name as the bundle file name.
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
 
-        /// Overwrite an existing directory, if one exists.
+        /// Overwrite an existing directory, if one exists
         #[structopt(short = "f", long)]
         force: bool,
     },
@@ -67,47 +77,56 @@ pub enum HcDnaBundle {
 /// Work with Holochain hApp bundles
 #[derive(Debug, StructOpt)]
 pub enum HcAppBundle {
-    /// Create a new, empty Holochain app (hApp) working directory
+    /// Create a new, empty Holochain app (hApp) working directory and create a new
+    /// sample `happ.yaml` manifest inside.
     Init {
-        /// The path to create the directory
+        /// The path to create the working directory
         path: PathBuf,
     },
 
-    /// Pack the contents of a directory into a `.happ` bundle file.
+    /// Pack into the `[name].happ` bundle according to the `happ.yaml` manifest,
+    /// found inside the working directory. The `[name]` is taken from the `name`
+    /// property of the manifest file.
     ///
     /// e.g.:
     ///
-    /// $ hc-app pack ./some/directory/foo/`
+    /// $ hc app pack ./some/directory/foo
     ///
-    /// will create file `./some/directory/foo.happ`
+    /// creates a file `./some/directory/foo/[name].happ`, based on
+    /// `./some/directory/foo/happ.yaml`
     Pack {
-        /// The path to the unpacked directory containing a `happ.yaml` manifest
+        /// The path to the working directory containing a `happ.yaml` manifest
         path: std::path::PathBuf,
 
-        /// Specify the output path for the packed bundle file.
+        /// Specify the output path for the packed bundle file
         ///
-        /// If not specified, the file will be placed alongside the input directory,
-        /// and given the name "[DIRECTORY].happ"
+        /// If not specified, the `[name].happ` bundle will be placed inside the
+        /// provided working directory.
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
     },
 
-    /// Unpack the parts of `.happ` file out into a directory.
+    /// Unpack parts of the `.happ` bundle file into a specific directory.
     ///
-    /// (`hc-app -u my-app.happ` creates dir `my-app`)
+    /// e.g.:
+    ///
+    /// $ hc app unpack ./some/dir/my-app.happ
+    ///
+    /// creates a new directory `./some/dir/my-app`, containining a new `happ.yaml`
+    /// manifest
     // #[structopt(short = "u", long)]
     Unpack {
         /// The path to the bundle to unpack
         path: std::path::PathBuf,
 
-        /// Specify the directory for the unpacked directory.
+        /// Specify the directory for the unpacked content
         ///
         /// If not specified, the directory will be placed alongside the
         /// bundle file, with the same name as the bundle file name.
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
 
-        /// Overwrite an existing directory, if one exists.
+        /// Overwrite an existing directory, if one exists
         #[structopt(short = "f", long)]
         force: bool,
     },

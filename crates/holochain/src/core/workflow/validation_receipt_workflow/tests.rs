@@ -1,13 +1,13 @@
+use crate::sweettest::*;
 use crate::test_utils::consistency_10s;
-use crate::test_utils::sweetest::*;
-use fallible_iterator::FallibleIterator;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
-use holochain_types::dht_op::produce_ops_from_element;
 use holochain_types::dna::zome::inline_zome::InlineZome;
+use holochain_types::{dht_op::produce_ops_from_element, env::EnvRead};
+use rusqlite::Transaction;
 
 fn simple_crud_zome() -> InlineZome {
     let entry_def = EntryDef::default_with_id("entrydef");
@@ -36,7 +36,7 @@ async fn test_validation_receipt() {
         .await
         .unwrap();
 
-    let apps = conductors.setup_app("app", &[dna_file]).await;
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
@@ -47,9 +47,10 @@ async fn test_validation_receipt() {
     consistency_10s(&[&alice, &bobbo, &carol]).await;
 
     // Get op hashes
-    let env: DbRead = alice.env().clone().into();
-    let sc = SourceChain::new(env.clone()).unwrap();
-    let element = sc.get_element(&hash).unwrap().unwrap();
+    let vault: EnvRead = alice.env().clone().into();
+    let element = fresh_store_test(&vault, |store| {
+        store.get_element(&hash.clone().into()).unwrap().unwrap()
+    });
     let ops = produce_ops_from_element(&element)
         .unwrap()
         .into_iter()
@@ -57,32 +58,22 @@ async fn test_validation_receipt() {
         .collect::<Vec<_>>();
 
     // Wait for receipts to be sent
-    let db = ValidationReceiptsBuf::new(&env).unwrap();
-
-    crate::wait_for_any_10s!(
+    crate::assert_eq_retry_10s!(
         {
             let mut counts = Vec::new();
             for hash in &ops {
-                let count = fresh_reader_test!(env, |mut r| db
-                    .list_receipts(&mut r, hash)
-                    .unwrap()
-                    .count()
-                    .unwrap());
+                let count = fresh_reader_test!(vault, |r| list_receipts(&r, hash).unwrap().len());
                 counts.push(count);
             }
             counts
         },
-        |counts| counts == &vec![2, 2, 2],
-        |_| ()
+        vec![2, 2, 2],
     );
 
     // Check alice has receipts from both bobbo and carol
     for hash in ops {
-        let receipts: Vec<_> = fresh_reader_test!(env, |mut r| db
-            .list_receipts(&mut r, &hash)
-            .unwrap()
-            .collect()
-            .unwrap());
+        let receipts: Vec<_> =
+            fresh_reader_test!(vault, |mut r| list_receipts(&mut r, &hash).unwrap());
         assert_eq!(receipts.len(), 2);
         for receipt in receipts {
             let SignedValidationReceipt {
@@ -96,20 +87,19 @@ async fn test_validation_receipt() {
     }
 
     // Check alice has 2 receipts in their authored dht ops table.
-    let db = env.get_table(TableName::AuthoredDhtOps).unwrap();
-    let authored_dht_ops: AuthoredDhtOpsStore = KvBufFresh::new(env.clone(), db);
-
-    let expected_counts = vec![2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
-    crate::wait_for_any_10s!(
+    crate::assert_eq_retry_1m!(
         {
-            fresh_reader_test!(env, |mut r| authored_dht_ops
-                .iter(&mut r)
-                .unwrap()
-                .map(|(_, v)| Ok(v.receipt_count))
-                .collect::<Vec<_>>()
-                .unwrap())
+            fresh_reader_test!(vault, |txn: Transaction| {
+                let mut stmt = txn
+                    .prepare("SELECT receipt_count FROM DhtOp WHERE is_authored = 1")
+                    .unwrap();
+                stmt.query_map([], |row| row.get::<_, Option<u32>>("receipt_count"))
+                    .unwrap()
+                    .map(Result::unwrap)
+                    .filter_map(|i| i)
+                    .collect::<Vec<u32>>()
+            })
         },
-        |counts| counts == &expected_counts,
-        |counts| assert_eq!(counts, expected_counts)
+        vec![2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
     );
 }

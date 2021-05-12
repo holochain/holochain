@@ -10,6 +10,7 @@
 //! outside world
 
 #![deny(missing_docs)]
+
 // TODO: clean up allows once parent is fully documented
 
 pub mod api;
@@ -36,5 +37,4 @@ pub use cell::error::CellError;
 pub use cell::Cell;
 pub use conductor::Conductor;
 pub use conductor::ConductorBuilder;
-pub use conductor::ConductorStateDb;
 pub use handle::ConductorHandle;

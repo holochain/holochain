@@ -63,7 +63,7 @@ impl HolochainP2pHandler for StubNetwork {
         from_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
-    ) -> HolochainP2pHandlerResult<Vec<GetElementResponse>> {
+    ) -> HolochainP2pHandlerResult<Vec<WireOps>> {
         Err("stub".into())
     }
     fn handle_get_meta(
@@ -79,9 +79,9 @@ impl HolochainP2pHandler for StubNetwork {
         &mut self,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
-        link_key: WireLinkMetaKey,
+        link_key: WireLinkKey,
         options: actor::GetLinksOptions,
-    ) -> HolochainP2pHandlerResult<Vec<GetLinksResponse>> {
+    ) -> HolochainP2pHandlerResult<Vec<WireLinkOps>> {
         Err("stub".into())
     }
     fn handle_get_agent_activity(
@@ -91,7 +91,7 @@ impl HolochainP2pHandler for StubNetwork {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse>> {
+    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse<HeaderHash>>> {
         Err("stub".into())
     }
     fn handle_send_validation_receipt(
@@ -148,7 +148,6 @@ mod tests {
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
 
-    use holochain_zome_types::HeaderHashed;
     use holochain_zome_types::ValidationStatus;
     use kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig;
     use kitsune_p2p::KitsuneP2pConfig;
@@ -339,6 +338,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_workflow() {
+        observability::test_run().ok();
+
         let (dna, a1, a2, _a3) = test_setup();
 
         let (p2p, mut evt) = spawn_holochain_p2p(
@@ -348,34 +349,18 @@ mod tests {
         .await
         .unwrap();
 
-        let test_1 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
-            ElementStatus::new(
-                Element::new(
-                    SignedHeaderHashed::with_presigned(
-                        HeaderHashed::from_content_sync(fixt!(Header)),
-                        fixt!(Signature),
-                    ),
-                    None,
-                ),
-                ValidationStatus::Valid,
-            ),
-            vec![],
-            vec![],
-        ))));
-        let test_2 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
-            ElementStatus::new(
-                Element::new(
-                    SignedHeaderHashed::with_presigned(
-                        HeaderHashed::from_content_sync(fixt!(Header)),
-                        fixt!(Signature),
-                    ),
-                    None,
-                ),
-                ValidationStatus::Valid,
-            ),
-            vec![],
-            vec![],
-        ))));
+        let test_1 = WireOps::Element(WireElementOps {
+            header: Some(Judged::valid(SignedHeader(fixt!(Header), fixt!(Signature)))),
+            deletes: vec![],
+            updates: vec![],
+            entry: None,
+        });
+        let test_2 = WireOps::Element(WireElementOps {
+            header: Some(Judged::valid(SignedHeader(fixt!(Header), fixt!(Signature)))),
+            deletes: vec![],
+            updates: vec![],
+            entry: None,
+        });
 
         let mut respond_queue = vec![test_1.clone(), test_2.clone()];
         let r_task = tokio::task::spawn(async move {
@@ -389,6 +374,7 @@ mod tests {
                         } else {
                             panic!("too many requests!")
                         };
+                        tracing::info!("test - get respond");
                         respond.r(Ok(async move { Ok(resp) }.boxed().into()));
                     }
                     SignNetworkData { respond, .. } => {
@@ -397,12 +383,20 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
-                    _ => {}
+                    QueryAgentInfoSigned { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    }
+                    FetchOpHashesForConstraints { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    }
+                    evt => println!("unhandled: {:?}", evt),
                 }
             }
         });
 
+        tracing::info!("test - join1");
         p2p.join(dna.clone(), a1.clone()).await.unwrap();
+        tracing::info!("test - join2");
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
 
         let hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
@@ -410,19 +404,24 @@ mod tests {
             holo_hash::hash_type::AnyDht::Header,
         );
 
+        tracing::info!("test - get");
         let res = p2p
             .get(dna, a1, hash, actor::GetOptions::default())
             .await
             .unwrap();
 
+        tracing::info!("test - check res");
         assert_eq!(2, res.len());
 
         for r in res {
             assert!(r == test_1 || r == test_2);
         }
 
+        tracing::info!("test - end of test shutdown p2p");
         p2p.ghost_actor_shutdown().await.unwrap();
+        tracing::info!("test - end of test await task end");
         r_task.await.unwrap();
+        tracing::info!("test - end of test - final done.");
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -436,9 +435,17 @@ mod tests {
         .await
         .unwrap();
 
-        let test_1 = GetLinksResponse {
-            link_adds: vec![(fixt!(CreateLink), fixt!(Signature))],
-            link_removes: vec![(fixt!(DeleteLink), fixt!(Signature))],
+        let test_1 = WireLinkOps {
+            creates: vec![WireCreateLink::condense(
+                fixt!(CreateLink),
+                fixt!(Signature),
+                ValidationStatus::Valid,
+            )],
+            deletes: vec![WireDeleteLink::condense(
+                fixt!(DeleteLink),
+                fixt!(Signature),
+                ValidationStatus::Valid,
+            )],
         };
 
         let test_1_clone = test_1.clone();
@@ -469,7 +476,11 @@ mod tests {
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash::hash_type::Entry,
         );
-        let link_key = WireLinkMetaKey::Base(hash);
+        let link_key = WireLinkKey {
+            base: hash,
+            zome_id: 0.into(),
+            tag: None,
+        };
 
         let res = p2p
             .get_links(dna, a1, link_key, actor::GetLinksOptions::default())

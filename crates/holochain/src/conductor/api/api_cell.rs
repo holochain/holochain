@@ -6,12 +6,12 @@ use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
-use crate::core::workflow::call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_conductor_api::ZomeCall;
 use holochain_keystore::KeystoreSender;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use tracing::*;
 
@@ -65,12 +65,6 @@ impl CellConductorApiT for CellConductorApi {
     async fn dpki_request(&self, _method: String, _args: String) -> ConductorApiResult<String> {
         warn!("Using placeholder dpki");
         Ok("TODO".to_string())
-    }
-
-    async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()> {
-        self.conductor_handle
-            .autonomic_cue(cue, &self.cell_id)
-            .await
     }
 
     fn keystore(&self) -> &KeystoreSender {
@@ -129,10 +123,6 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     /// TODO: decide on actual signature
     async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
 
-    /// Cue the autonomic system to run an [AutonomicProcess] earlier than its scheduled time.
-    /// This is basically a heuristic designed to help things run more smoothly.
-    async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
-
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &KeystoreSender;
 
@@ -167,7 +157,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
     async fn call_zome(
         &self,
         call: ZomeCall,
-        workspace_lock: &CallZomeWorkspaceLock,
+        workspace_lock: &HostFnWorkspace,
     ) -> ConductorApiResult<ZomeCallResult>;
 
     /// Get a zome from this cell's Dna
@@ -183,7 +173,7 @@ impl CellConductorReadHandleT for CellConductorApi {
     async fn call_zome(
         &self,
         call: ZomeCall,
-        workspace_lock: &CallZomeWorkspaceLock,
+        workspace_lock: &HostFnWorkspace,
     ) -> ConductorApiResult<ZomeCallResult> {
         if self.cell_id == call.cell_id {
             self.conductor_handle

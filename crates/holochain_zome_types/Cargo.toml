@@ -15,7 +15,7 @@ edition = "2018"
 chrono = "0.4.6"
 holo_hash = { version = "0.0.2-alpha.1", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.50"
-paste = "=1.0.3"
+paste = "=1.0.5"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 subtle = "2"
@@ -31,11 +31,22 @@ rand = {version = "0.7", optional = true}
 byteorder = { version = "1.4", optional = true }
 itertools = { version = "0.10", optional = true }
 
+# sqlite dependencies
+rusqlite = { version = "0.25", optional = true }
+num_enum = { version = "0.5", optional = true }
+
+# helper dependencies
+derive_more = { version = "0.99", optional = true }
+
 [features]
 default = ["fixturators", "test_utils", "tinyid"]
 
+full = ["default", "rusqlite", "num_enum", "helpers"]
+
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
 
-test_utils = ["holo_hash/hashing"]
+test_utils = ["holo_hash/hashing", "helpers"]
 
 tinyid = ["byteorder", "itertools"]
+
+helpers = ["derive_more"]

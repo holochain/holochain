@@ -3,19 +3,12 @@
 // missing_docs allowed here since the errors already have self-descriptive strings
 #![allow(missing_docs)]
 
-use crate::table::TableName;
 use holochain_serialized_bytes::SerializedBytesError;
 use std::path::PathBuf;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum DatabaseError {
-    #[error("A store which was expected not to be empty turned out to be empty: {0}")]
-    EmptyStore(TableName),
-
-    #[error("A database was not created/initialized: {0}, path: {1}")]
-    StoreNotInitialized(TableName, PathBuf),
-
     #[error("A database's database map was initialized more than once: {0}")]
     EnvironmentDoubleInitialized(PathBuf),
 
@@ -50,9 +43,6 @@ pub enum DatabaseError {
 
     #[error(transparent)]
     DbConnectionPoolError(#[from] r2d2::Error),
-
-    #[error(transparent)]
-    KeystoreError(#[from] holochain_keystore::KeystoreError),
 
     #[error("Empty keys cannot be used with SQLite")]
     EmptyKey,

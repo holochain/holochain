@@ -1,11 +1,3 @@
-use fallible_iterator::FallibleIterator;
-use holochain_sqlite::buffer::CasBufFreshSync;
-use holochain_sqlite::db::DbRead;
-use holochain_sqlite::error::DatabaseError;
-use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::exports::SingleTable;
-use holochain_sqlite::fresh_reader;
-use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::entry_def::EntryDef;
 use std::collections::HashMap;
@@ -16,10 +8,6 @@ use tracing::*;
 pub struct RealDnaStore {
     dnas: HashMap<DnaHash, DnaFile>,
     entry_defs: HashMap<EntryDefBufferKey, EntryDef>,
-}
-
-pub struct DnaDefBuf {
-    dna_defs: CasBufFreshSync<DnaDef>,
 }
 
 impl DnaStore for RealDnaStore {
@@ -58,38 +46,5 @@ impl RealDnaStore {
             dnas: HashMap::new(),
             entry_defs: HashMap::new(),
         }
-    }
-}
-
-impl DnaDefBuf {
-    pub fn new(env: DbRead, dna_def_store: SingleTable) -> DatabaseResult<Self> {
-        Ok(Self {
-            dna_defs: CasBufFreshSync::new(env, dna_def_store),
-        })
-    }
-
-    pub async fn get(&self, dna_hash: &DnaHash) -> DatabaseResult<Option<DnaDefHashed>> {
-        self.dna_defs.get(dna_hash)
-    }
-
-    pub async fn put(&mut self, dna_def: DnaDef) -> DatabaseResult<()> {
-        self.dna_defs.put(DnaDefHashed::from_content_sync(dna_def));
-        Ok(())
-    }
-
-    pub fn get_all(&self) -> DatabaseResult<Vec<DnaDefHashed>> {
-        fresh_reader!(self.dna_defs.env(), |mut r| self
-            .dna_defs
-            .iter_fail(&mut r)?
-            .collect())
-    }
-}
-
-impl BufferedStore for DnaDefBuf {
-    type Error = DatabaseError;
-
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.dna_defs.flush_to_txn_ref(writer)?;
-        Ok(())
     }
 }

@@ -8,17 +8,20 @@ use holochain_serialized_bytes::prelude::*;
 /// much of this happens in the subconscious
 /// an entry missing validation dependencies may cycle through Pending many times before finally
 /// reaching a final validation state or being abandoned
+
 #[derive(
     Clone, Copy, Hash, serde::Serialize, serde::Deserialize, PartialOrd, Ord, Debug, Eq, PartialEq,
 )]
+#[cfg_attr(feature = "full", derive(num_enum::TryFromPrimitive))]
+#[cfg_attr(feature = "full", repr(i32))]
 pub enum ValidationStatus {
     /// all implemented validation callbacks found all dependencies and passed validation
-    Valid,
+    Valid = 0,
     /// some implemented validation callback definitively failed validation
-    Rejected,
+    Rejected = 1,
     /// the subconscious has decided to never again attempt a conscious validation
     /// commonly due to missing validation dependencies remaining missing for "too long"
-    Abandoned,
+    Abandoned = 2,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
@@ -99,5 +102,21 @@ impl Default for RequiredValidationType {
 impl ValidationPackage {
     pub fn new(elements: Vec<Element>) -> Self {
         Self(elements)
+    }
+}
+
+#[cfg(feature = "full")]
+impl rusqlite::ToSql for ValidationStatus {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        Ok(rusqlite::types::ToSqlOutput::Owned((*self as i32).into()))
+    }
+}
+
+#[cfg(feature = "full")]
+impl rusqlite::types::FromSql for ValidationStatus {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        i32::column_result(value).and_then(|int| {
+            Self::try_from(int).map_err(|_| rusqlite::types::FromSqlError::InvalidType)
+        })
     }
 }

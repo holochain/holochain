@@ -4,34 +4,15 @@
 use super::*;
 
 use crate::core::queue_consumer::TriggerSender;
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-use crate::core::ribosome::host_fn;
-use crate::core::ribosome::MockRibosomeT;
-use crate::core::workflow::CallZomeWorkspaceLock;
-use crate::fixt::CallContextFixturator;
-use crate::fixt::ZomeCallHostAccessFixturator;
-use crate::fixt::*;
 use crate::here;
-use crate::test_utils::test_network;
 use ::fixt::prelude::*;
 use holochain_sqlite::db::WriteManager;
-use holochain_sqlite::error::DatabaseError;
-use holochain_sqlite::test_utils::test_cell_env;
-use holochain_sqlite::{db::DbWrite, fresh_reader_test};
-use holochain_state::metadata::ChainItemKey;
-use holochain_state::metadata::LinkMetaKey;
+use holochain_state::query::link::GetLinksQuery;
 use holochain_state::workspace::WorkspaceError;
-
 use holochain_zome_types::Entry;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::ValidationStatus;
 use observability;
-use produce_dht_ops_workflow::produce_dht_ops_workflow;
-use produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
-use std::convert::TryInto;
-use std::sync::Arc;
 
 #[derive(Clone)]
 struct TestData {
@@ -151,13 +132,6 @@ impl TestData {
             new_entry_hash,
         }
     }
-
-    /// Sets the Entries to App types
-    async fn with_app_entry_type() -> Self {
-        let original_entry = EntryFixturator::new(AppEntry).next().unwrap();
-        let new_entry = EntryFixturator::new(AppEntry).next().unwrap();
-        Self::new_inner(original_entry, new_entry)
-    }
 }
 
 #[derive(Clone)]
@@ -168,8 +142,6 @@ enum Db {
     IntQueueEmpty,
     CasHeader(Header, Option<Signature>),
     CasEntry(Entry, Option<Header>, Option<Signature>),
-    PendingHeader(Header, Option<Signature>),
-    PendingEntry(Entry, Option<Header>, Option<Signature>),
     MetaEmpty,
     MetaHeader(Entry, Header),
     MetaActivity(Header),
@@ -182,273 +154,269 @@ enum Db {
 impl Db {
     /// Checks that the database is in a state
     #[instrument(skip(expects, env))]
-    async fn check(expects: Vec<Self>, env: DbWrite, here: String) {
-        fresh_reader_test!(env, |mut reader| {
-            let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
+    async fn check(expects: Vec<Self>, env: EnvWrite, here: String) {
+        fresh_reader_test(env, |txn| {
+            // print_stmts_test(env, |txn| {
             for expect in expects {
                 match expect {
                     Db::Integrated(op) => {
-                        let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
-                        let value = IntegratedDhtOpsValue {
-                            validation_status: ValidationStatus::Valid,
-                            op: op.to_light(),
-                            when_integrated: timestamp::now().into(),
-                            send_receipt: false,
-                        };
-                        let mut r = workspace
-                            .integrated_dht_ops
-                            .get(&op_hash)
-                            .unwrap()
-                            .expect(&format!("Should contain {:?}", op));
-                        r.when_integrated = value.when_integrated;
-                        assert_eq!(r, value, "{}", here);
+                        let op_hash = DhtOpHash::with_data_sync(&op);
+
+                        let found: bool = txn
+                            .query_row(
+                                "
+                                SELECT EXISTS(
+                                    SELECT 1 FROM DhtOP 
+                                    WHERE when_integrated IS NOT NULL 
+                                    AND hash = :hash
+                                    AND validation_status = :status
+                                )
+                                ",
+                                named_params! {
+                                    ":hash": op_hash,
+                                    ":status": ValidationStatus::Valid,
+                                },
+                                |row| row.get(0),
+                            )
+                            .unwrap();
+                        assert!(found, "{}\n{:?}", here, op);
                     }
                     Db::IntQueue(op) => {
-                        let value = IntegrationLimboValue {
-                            validation_status: ValidationStatus::Valid,
-                            op: op.to_light(),
-                            send_receipt: false,
-                        };
-                        let res = workspace
-                            .integration_limbo
-                            .iter(&mut reader)
-                            .unwrap()
-                            .filter_map(|(_, v)| if v == value { Ok(Some(v)) } else { Ok(None) })
-                            .collect::<Vec<_>>()
+                        let op_hash = DhtOpHash::with_data_sync(&op);
+
+                        let found: bool = txn
+                            .query_row(
+                                "
+                                SELECT EXISTS(
+                                    SELECT 1 FROM DhtOP 
+                                    WHERE when_integrated IS NULL 
+                                    AND validation_stage = 3
+                                    AND hash = :hash
+                                    AND validation_status = :status
+                                )
+                                ",
+                                named_params! {
+                                    ":hash": op_hash,
+                                    ":status": ValidationStatus::Valid,
+                                },
+                                |row| row.get(0),
+                            )
                             .unwrap();
-                        let exp = [value];
-                        assert_eq!(&res[..], &exp[..], "{}", here,);
+                        assert!(found, "{}\n{:?}", here, op);
                     }
                     Db::CasHeader(header, _) => {
-                        let hash = HeaderHashed::from_content_sync(header.clone());
-                        assert_eq!(
-                            workspace
-                                .elements
-                                .get_header(hash.as_hash())
-                                .unwrap()
-                                .expect(&format!(
-                                    "Header {:?} not in element vault for {}",
-                                    header, here
-                                ))
-                                .header(),
-                            &header,
-                            "{}",
-                            here,
-                        );
+                        let hash = HeaderHash::with_data_sync(&header);
+                        let found: bool = txn
+                            .query_row(
+                                "
+                                SELECT EXISTS(
+                                    SELECT 1 FROM DhtOP 
+                                    WHERE when_integrated IS NOT NULL 
+                                    AND header_hash = :hash
+                                    AND validation_status = :status
+                                    AND (type = :store_entry OR type = :store_element)
+                                )
+                                ",
+                                named_params! {
+                                    ":hash": hash,
+                                    ":status": ValidationStatus::Valid,
+                                    ":store_entry": DhtOpType::StoreEntry,
+                                    ":store_element": DhtOpType::StoreElement,
+                                },
+                                |row| row.get(0),
+                            )
+                            .unwrap();
+                        assert!(found, "{}\n{:?}", here, header);
                     }
                     Db::CasEntry(entry, _, _) => {
-                        let hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-                        assert_eq!(
-                            workspace
-                                .elements
-                                .get_entry(&hash)
-                                .unwrap()
-                                .expect(&format!(
-                                    "Entry {:?} with hash {:?} not in element vault for {}",
-                                    entry, hash, here
-                                ))
-                                .into_content(),
-                            entry,
-                            "{}",
-                            here,
-                        );
-                    }
-                    Db::PendingHeader(header, _) => {
-                        let hash = HeaderHashed::from_content_sync(header.clone());
-                        assert_eq!(
-                            workspace
-                                .element_pending
-                                .get_header(hash.as_hash())
-                                .unwrap()
-                                .expect(&format!(
-                                    "Header {:?} not in element judged for {}",
-                                    header, here
-                                ))
-                                .header(),
-                            &header,
-                            "{}",
-                            here,
-                        );
-                    }
-                    Db::PendingEntry(entry, _, _) => {
-                        let hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-                        assert_eq!(
-                            workspace
-                                .element_pending
-                                .get_entry(&hash)
-                                .unwrap()
-                                .expect(&format!(
-                                    "Entry {:?} not in element judged for {}",
-                                    entry, here
-                                ))
-                                .into_content(),
-                            entry,
-                            "{}",
-                            here,
-                        );
+                        let hash = EntryHash::with_data_sync(&entry);
+                        let basis: AnyDhtHash = hash.clone().into();
+                        let found: bool = txn
+                            .query_row(
+                                "
+                                SELECT EXISTS(
+                                    SELECT 1 FROM DhtOp
+                                    JOIN Header ON DhtOp.header_hash = Header.hash
+                                    WHERE DhtOp.when_integrated IS NOT NULL 
+                                    AND DhtOp.validation_status = :status
+                                    AND (
+                                        (Header.entry_hash = :hash AND DhtOp.type = :store_element)
+                                        OR
+                                        (DhtOp.basis_hash = :basis AND DhtOp.type = :store_entry)
+                                    )
+                                )
+                                ",
+                                named_params! {
+                                    ":hash": hash,
+                                    ":basis": basis,
+                                    ":status": ValidationStatus::Valid,
+                                    ":store_entry": DhtOpType::StoreEntry,
+                                    ":store_element": DhtOpType::StoreElement,
+                                },
+                                |row| row.get(0),
+                            )
+                            .unwrap();
+                        assert!(found, "{}\n{:?}", here, entry);
                     }
                     Db::MetaHeader(entry, header) => {
-                        let header_hash = HeaderHashed::from_content_sync(header.clone());
-                        let header_hash = TimedHeaderHash::from(header_hash);
-                        let entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-                        let res = workspace
-                            .meta
-                            .get_headers(&mut reader, entry_hash)
-                            .unwrap()
-                            .collect::<Vec<_>>()
+                        let hash = HeaderHash::with_data_sync(&header);
+                        let basis: AnyDhtHash = EntryHash::with_data_sync(&entry).into();
+                        let found: bool = txn
+                            .query_row(
+                                "
+                                SELECT EXISTS(
+                                    SELECT 1 FROM DhtOP 
+                                    WHERE when_integrated IS NOT NULL 
+                                    AND basis_hash = :basis
+                                    AND header_hash = :hash
+                                    AND validation_status = :status
+                                    AND type = :store_entry
+                                )
+                                ",
+                                named_params! {
+                                    ":basis": basis,
+                                    ":hash": hash,
+                                    ":status": ValidationStatus::Valid,
+                                    ":store_entry": DhtOpType::StoreEntry,
+                                },
+                                |row| row.get(0),
+                            )
                             .unwrap();
-                        let exp = [header_hash];
-                        assert_eq!(&res[..], &exp[..], "{}", here,);
+                        assert!(found, "{}\n{:?}", here, entry);
                     }
                     Db::MetaActivity(header) => {
-                        let header_hash = HeaderHashed::from_content_sync(header.clone());
-                        let header_hash = TimedHeaderHash::from(header_hash);
-                        let res = workspace
-                            .meta
-                            .get_activity(
-                                &mut reader,
-                                ChainItemKey::new(&header, ValidationStatus::Valid),
+                        let hash = HeaderHash::with_data_sync(&header);
+                        let basis: AnyDhtHash = header.author().clone().into();
+                        let found: bool = txn
+                            .query_row(
+                                "
+                                SELECT EXISTS(
+                                    SELECT 1 FROM DhtOP 
+                                    WHERE when_integrated IS NOT NULL 
+                                    AND basis_hash = :basis
+                                    AND header_hash = :hash
+                                    AND validation_status = :status
+                                    AND type = :activity
+                                )
+                                ",
+                                named_params! {
+                                    ":basis": basis,
+                                    ":hash": hash,
+                                    ":status": ValidationStatus::Valid,
+                                    ":activity": DhtOpType::RegisterAgentActivity,
+                                },
+                                |row| row.get(0),
                             )
-                            .unwrap()
-                            .collect::<Vec<_>>()
                             .unwrap();
-                        let exp = [header_hash];
-                        assert_eq!(&res[..], &exp[..], "{}", here,);
+                        assert!(found, "{}\n{:?}", here, header);
                     }
                     Db::MetaUpdate(base, header) => {
-                        let header_hash = HeaderHashed::from_content_sync(header.clone());
-                        let header_hash = TimedHeaderHash::from(header_hash);
-                        let res = workspace
-                            .meta
-                            .get_updates(&mut reader, base)
-                            .unwrap()
-                            .collect::<Vec<_>>()
+                        let hash = HeaderHash::with_data_sync(&header);
+                        let found: bool = txn
+                            .query_row(
+                                "
+                                SELECT EXISTS(
+                                    SELECT 1 FROM DhtOP 
+                                    WHERE when_integrated IS NOT NULL 
+                                    AND basis_hash = :basis
+                                    AND header_hash = :hash
+                                    AND validation_status = :status
+                                    AND (type = :update_content OR type = :update_element)
+                                )
+                                ",
+                                named_params! {
+                                    ":basis": base,
+                                    ":hash": hash,
+                                    ":status": ValidationStatus::Valid,
+                                    ":update_content": DhtOpType::RegisterUpdatedContent,
+                                    ":update_element": DhtOpType::RegisterUpdatedElement,
+                                },
+                                |row| row.get(0),
+                            )
                             .unwrap();
-                        let exp = [header_hash];
-                        assert_eq!(&res[..], &exp[..], "{}", here,);
+                        assert!(found, "{}\n{:?}", here, header);
                     }
                     Db::MetaDelete(deleted_header_hash, header) => {
-                        let header_hash = HeaderHashed::from_content_sync(header.clone());
-                        let header_hash = TimedHeaderHash::from(header_hash);
-                        let res = workspace
-                            .meta
-                            .get_deletes_on_entry(
-                                &mut reader,
-                                Delete::try_from(header).unwrap().deletes_entry_address,
+                        let hash = HeaderHash::with_data_sync(&header);
+                        let found: bool = txn
+                            .query_row(
+                                "
+                                SELECT EXISTS(
+                                    SELECT 1 FROM DhtOP
+                                    JOIN Header on DhtOp.header_hash = Header.hash
+                                    WHERE when_integrated IS NOT NULL 
+                                    AND validation_status = :status
+                                    AND (
+                                        (DhtOp.type = :deleted_entry_header AND Header.deletes_header_hash = :deleted_header_hash)
+                                        OR 
+                                        (DhtOp.type = :deleted_by AND header_hash = :hash)
+                                    )
+                                )
+                                ",
+                                named_params! {
+                                    ":deleted_header_hash": deleted_header_hash,
+                                    ":hash": hash,
+                                    ":status": ValidationStatus::Valid,
+                                    ":deleted_by": DhtOpType::RegisterDeletedBy,
+                                    ":deleted_entry_header": DhtOpType::RegisterDeletedEntryHeader,
+                                },
+                                |row| row.get(0),
                             )
-                            .unwrap()
-                            .collect::<Vec<_>>()
                             .unwrap();
-                        let res2 = workspace
-                            .meta
-                            .get_deletes_on_header(&mut reader, deleted_header_hash)
-                            .unwrap()
-                            .collect::<Vec<_>>()
-                            .unwrap();
-                        let exp = [header_hash];
-                        assert_eq!(&res[..], &exp[..], "{}", here,);
-                        assert_eq!(&res2[..], &exp[..], "{}", here,);
+                        assert!(found, "{}\n{:?}", here, header);
                     }
                     Db::IntegratedEmpty => {
-                        assert_eq!(
-                            workspace
-                                .integrated_dht_ops
-                                .iter(&mut reader)
-                                .unwrap()
-                                .count()
-                                .unwrap(),
-                            0,
-                            "{}",
-                            here
-                        );
+                        let not_empty: bool = txn
+                            .query_row(
+                                "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NOT NULL)",
+                                [],
+                                |row| row.get(0),
+                            )
+                            .unwrap();
+                        assert!(!not_empty, "{}", here);
                     }
                     Db::IntQueueEmpty => {
-                        assert_eq!(
-                            workspace
-                                .integration_limbo
-                                .iter(&mut reader)
-                                .unwrap()
-                                .count()
-                                .unwrap(),
-                            0,
-                            "{}",
-                            here
-                        );
+                        let not_empty: bool = txn
+                            .query_row(
+                                "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NULL)",
+                                [],
+                                |row| row.get(0),
+                            )
+                            .unwrap();
+                        assert!(!not_empty, "{}", here);
                     }
                     Db::MetaEmpty => {
-                        // TODO: Not currently possible because kvv bufs have no iterator over all keys
+                        let not_empty: bool = txn
+                            .query_row(
+                                "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NOT NULL)",
+                                [],
+                                |row| row.get(0),
+                            )
+                            .unwrap();
+                        assert!(!not_empty, "{}", here);
                     }
                     Db::MetaLink(link_add, target_hash) => {
                         let link_add_hash =
-                            HeaderHashed::from_content_sync(link_add.clone().into()).into_hash();
-
-                        // LinkMetaKey
-                        let mut link_meta_keys = Vec::new();
-                        link_meta_keys.push(LinkMetaKey::Full(
-                            &link_add.base_address,
+                            HeaderHash::with_data_sync(&Header::from(link_add.clone()));
+                        let query = GetLinksQuery::new(
+                            link_add.base_address.clone(),
                             link_add.zome_id,
-                            &link_add.tag,
-                            &link_add_hash,
-                        ));
-                        link_meta_keys.push(LinkMetaKey::BaseZomeTag(
-                            &link_add.base_address,
-                            link_add.zome_id,
-                            &link_add.tag,
-                        ));
-                        link_meta_keys.push(LinkMetaKey::BaseZome(
-                            &link_add.base_address,
-                            link_add.zome_id,
-                        ));
-                        link_meta_keys.push(LinkMetaKey::Base(&link_add.base_address));
-
-                        for link_meta_key in link_meta_keys {
-                            let res = workspace
-                                .meta
-                                .get_live_links(&mut reader, &link_meta_key)
-                                .unwrap()
-                                .collect::<Vec<_>>()
-                                .unwrap();
-
-                            assert_eq!(res.len(), 1, "{}", here);
-                            assert_eq!(res[0].link_add_hash, link_add_hash, "{}", here);
-                            assert_eq!(res[0].target, target_hash, "{}", here);
-                            assert_eq!(res[0].zome_id, link_add.zome_id, "{}", here);
-                            assert_eq!(res[0].tag, link_add.tag, "{}", here);
-                        }
+                            Some(link_add.tag.clone()),
+                        );
+                        let res = query.run(Txn::from(&txn)).unwrap();
+                        assert_eq!(res.len(), 1, "{}", here);
+                        assert_eq!(res[0].create_link_hash, link_add_hash, "{}", here);
+                        assert_eq!(res[0].target, target_hash, "{}", here);
+                        assert_eq!(res[0].tag, link_add.tag, "{}", here);
                     }
                     Db::MetaLinkEmpty(link_add) => {
-                        let link_add_hash =
-                            HeaderHashed::from_content_sync(link_add.clone().into()).into_hash();
-
-                        // LinkMetaKey
-                        let mut link_meta_keys = Vec::new();
-                        link_meta_keys.push(LinkMetaKey::Full(
-                            &link_add.base_address,
+                        let query = GetLinksQuery::new(
+                            link_add.base_address.clone(),
                             link_add.zome_id,
-                            &link_add.tag,
-                            &link_add_hash,
-                        ));
-                        link_meta_keys.push(LinkMetaKey::BaseZomeTag(
-                            &link_add.base_address,
-                            link_add.zome_id,
-                            &link_add.tag,
-                        ));
-                        link_meta_keys.push(LinkMetaKey::BaseZome(
-                            &link_add.base_address,
-                            link_add.zome_id,
-                        ));
-                        link_meta_keys.push(LinkMetaKey::Base(&link_add.base_address));
-
-                        for link_meta_key in link_meta_keys {
-                            let res = workspace
-                                .meta
-                                .get_live_links(&mut reader, &link_meta_key)
-                                .unwrap()
-                                .collect::<Vec<_>>()
-                                .unwrap();
-
-                            assert_eq!(res.len(), 0, "{}", here);
-                        }
+                            Some(link_add.tag.clone()),
+                        );
+                        let res = query.run(Txn::from(&txn)).unwrap();
+                        assert_eq!(res.len(), 0, "{}", here);
                     }
                 }
             }
@@ -457,155 +425,64 @@ impl Db {
 
     // Sets the database to a certain state
     #[instrument(skip(pre_state, env))]
-    async fn set<'env>(pre_state: Vec<Self>, env: DbWrite) {
-        let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
-        for state in pre_state {
-            match state {
-                Db::Integrated(_) => {}
-                Db::IntQueue(op) => {
-                    let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
-                    let val = IntegrationLimboValue {
-                        validation_status: ValidationStatus::Valid,
-                        op: op.to_light(),
-                        send_receipt: false,
-                    };
-                    workspace
-                        .integration_limbo
-                        .put(op_hash.try_into().unwrap(), val)
-                        .unwrap();
-                }
-                Db::CasHeader(header, signature) => {
-                    let header_hash = HeaderHashed::from_content_sync(header.clone());
-                    debug!(header_hash = %header_hash.as_hash());
-                    let signed_header =
-                        SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
-                    workspace.elements.put(signed_header, None).unwrap();
-                }
-                Db::CasEntry(entry, header, signature) => {
-                    let header_hash = HeaderHashed::from_content_sync(header.unwrap().clone());
-                    let entry_hash = EntryHashed::from_content_sync(entry.clone());
-                    let signed_header =
-                        SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
-                    workspace
-                        .elements
-                        .put(signed_header, Some(entry_hash))
-                        .unwrap();
-                }
-                Db::PendingHeader(header, signature) => {
-                    let header_hash = HeaderHashed::from_content_sync(header.clone());
-                    let signed_header =
-                        SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
-                    workspace.element_pending.put(signed_header, None).unwrap();
-                }
-                Db::PendingEntry(entry, header, signature) => {
-                    let header_hash = HeaderHashed::from_content_sync(header.unwrap().clone());
-                    let entry_hash = EntryHashed::from_content_sync(entry.clone());
-                    let signed_header =
-                        SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
-                    workspace
-                        .element_pending
-                        .put(signed_header, Some(entry_hash))
-                        .unwrap();
-                }
-                Db::MetaHeader(_, _) => {}
-                Db::MetaActivity(_) => {}
-                Db::MetaUpdate(_, _) => {}
-                Db::IntegratedEmpty => {}
-                Db::MetaEmpty => {}
-                Db::MetaDelete(_, _) => {}
-                Db::MetaLink(link_add, _) => {
-                    workspace.meta.add_link(link_add).unwrap();
-                }
-                Db::MetaLinkEmpty(_) => {}
-                Db::IntQueueEmpty => {}
-            }
-        }
-        // Commit workspace
+    async fn set<'env>(pre_state: Vec<Self>, env: EnvWrite) {
         env.conn()
             .unwrap()
-            .with_commit::<WorkspaceError, _, _>(|writer| {
-                workspace.flush_to_txn(writer)?;
+            .with_commit::<WorkspaceError, _, _>(|txn| {
+                for state in pre_state {
+                    match state {
+                        Db::Integrated(op) => {
+                            let op = DhtOpHashed::from_content_sync(op.clone());
+                            let hash = op.as_hash().clone();
+                            mutations::insert_op(txn, op, false).unwrap();
+                            mutations::set_when_integrated(txn, hash.clone(), timestamp::now())
+                                .unwrap();
+                            mutations::set_validation_status(txn, hash, ValidationStatus::Valid)
+                                .unwrap();
+                        }
+                        Db::IntQueue(op) => {
+                            let op = DhtOpHashed::from_content_sync(op.clone());
+                            let hash = op.as_hash().clone();
+                            mutations::insert_op(txn, op, false).unwrap();
+                            mutations::set_validation_stage(
+                                txn,
+                                hash.clone(),
+                                ValidationLimboStatus::AwaitingIntegration,
+                            )
+                            .unwrap();
+                            mutations::set_validation_status(txn, hash, ValidationStatus::Valid)
+                                .unwrap();
+                        }
+                        _ => {
+                            unimplemented!("Use Db::Integrated");
+                        }
+                    }
+                }
                 Ok(())
             })
             .unwrap();
     }
 }
 
-async fn call_workflow<'env>(env: DbWrite) {
-    let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
+async fn call_workflow<'env>(env: EnvWrite) {
     let (qt, _rx) = TriggerSender::new();
     let (qt2, _rx) = TriggerSender::new();
-    integrate_dht_ops_workflow(workspace, env.clone().into(), qt, qt2)
+    integrate_dht_ops_workflow(env.clone(), qt, qt2)
         .await
         .unwrap();
 }
 
 // Need to clear the data from the previous test
-fn clear_dbs(env: DbWrite) {
-    let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
+fn clear_dbs(env: EnvWrite) {
     env.conn()
         .unwrap()
-        .with_commit::<DatabaseError, _, _>(|writer| {
-            workspace.integration_limbo.clear_all(writer)?;
-            workspace.integrated_dht_ops.clear_all(writer)?;
-            workspace.elements.clear_all(writer)?;
-            workspace.element_pending.clear_all(writer)?;
-            workspace.meta.clear_all(writer)?;
-            Ok(())
+        .with_commit(|txn| {
+            txn.execute("DELETE FROM DhtOP", []).unwrap();
+            txn.execute("DELETE FROM Header", []).unwrap();
+            txn.execute("DELETE FROM Entry", []).unwrap();
+            StateMutationResult::Ok(())
         })
         .unwrap();
-}
-
-fn add_op_to_judged(mut ps: Vec<Db>, op: &DhtOp) -> Vec<Db> {
-    match op {
-        DhtOp::StoreElement(s, h, e) => {
-            ps.push(Db::PendingHeader(h.clone(), Some(s.clone())));
-            if let Some(e) = e {
-                ps.push(Db::PendingEntry(
-                    *e.clone(),
-                    Some(h.clone()),
-                    Some(s.clone()),
-                ));
-            }
-        }
-        DhtOp::StoreEntry(s, h, e) => {
-            let h: Header = h.clone().try_into().unwrap();
-            ps.push(Db::PendingHeader(h.clone(), Some(s.clone())));
-            ps.push(Db::PendingEntry(
-                *e.clone(),
-                Some(h.clone()),
-                Some(s.clone()),
-            ));
-        }
-        DhtOp::RegisterAgentActivity(s, h) => {
-            ps.push(Db::PendingHeader(h.clone(), Some(s.clone())));
-        }
-        DhtOp::RegisterUpdatedContent(s, h, _) => {
-            let h: Header = h.clone().try_into().unwrap();
-            ps.push(Db::PendingHeader(h.clone(), Some(s.clone())));
-        }
-        DhtOp::RegisterUpdatedElement(s, h, _) => {
-            let h: Header = h.clone().try_into().unwrap();
-            ps.push(Db::PendingHeader(h.clone(), Some(s.clone())));
-        }
-        DhtOp::RegisterDeletedBy(s, h) => {
-            let h: Header = h.clone().try_into().unwrap();
-            ps.push(Db::PendingHeader(h.clone(), Some(s.clone())));
-        }
-        DhtOp::RegisterDeletedEntryHeader(s, h) => {
-            let h: Header = h.clone().try_into().unwrap();
-            ps.push(Db::PendingHeader(h.clone(), Some(s.clone())));
-        }
-        DhtOp::RegisterAddLink(s, h) => {
-            let h: Header = h.clone().try_into().unwrap();
-            ps.push(Db::PendingHeader(h.clone(), Some(s.clone())));
-        }
-        DhtOp::RegisterRemoveLink(s, h) => {
-            let h: Header = h.clone().try_into().unwrap();
-            ps.push(Db::PendingHeader(h.clone(), Some(s.clone())));
-        }
-    }
-    ps
 }
 
 // TESTS BEGIN HERE
@@ -625,7 +502,6 @@ fn store_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     );
     let pre_state = vec![Db::IntQueue(op.clone())];
     // Add op data to pending
-    let pre_state = add_op_to_judged(pre_state, &op);
     let mut expect = vec![
         Db::Integrated(op.clone()),
         Db::CasHeader(a.any_header.clone().into(), None),
@@ -644,7 +520,6 @@ fn store_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     );
     debug!(?a.original_header);
     let pre_state = vec![Db::IntQueue(op.clone())];
-    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::CasHeader(a.original_header.clone().into(), None),
@@ -657,7 +532,6 @@ fn store_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterAgentActivity(a.signature.clone(), a.dna_header.clone());
     let pre_state = vec![Db::IntQueue(op.clone())];
-    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaActivity(a.dna_header.clone()),
@@ -666,20 +540,17 @@ fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 fn register_updated_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let original_op = DhtOp::StoreElement(
+        a.signature.clone(),
+        a.original_header.clone().into(),
+        Some(a.original_entry.clone().into()),
+    );
     let op = DhtOp::RegisterUpdatedElement(
         a.signature.clone(),
         a.entry_update_header.clone(),
         Some(a.new_entry.clone().into()),
     );
-    let pre_state = vec![
-        Db::IntQueue(op.clone()),
-        Db::CasEntry(
-            a.original_entry.clone(),
-            Some(a.original_header.clone().into()),
-            Some(a.signature.clone()),
-        ),
-    ];
-    let pre_state = add_op_to_judged(pre_state, &op);
+    let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaUpdate(
@@ -691,20 +562,17 @@ fn register_updated_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let original_op = DhtOp::StoreEntry(
+        a.signature.clone(),
+        a.original_header.clone(),
+        a.original_entry.clone().into(),
+    );
     let op = DhtOp::RegisterUpdatedContent(
         a.signature.clone(),
         a.entry_update_entry.clone(),
         Some(a.new_entry.clone().into()),
     );
-    let pre_state = vec![
-        Db::IntQueue(op.clone()),
-        Db::CasEntry(
-            a.original_entry.clone(),
-            Some(a.original_header.clone().into()),
-            Some(a.signature.clone()),
-        ),
-    ];
-    let pre_state = add_op_to_judged(pre_state, &op);
+    let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaUpdate(
@@ -716,16 +584,13 @@ fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static st
 }
 
 fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let original_op = DhtOp::StoreEntry(
+        a.signature.clone(),
+        a.original_header.clone(),
+        a.original_entry.clone().into(),
+    );
     let op = DhtOp::RegisterDeletedEntryHeader(a.signature.clone(), a.entry_delete.clone());
-    let pre_state = vec![
-        Db::IntQueue(op.clone()),
-        Db::CasEntry(
-            a.original_entry.clone(),
-            Some(a.original_header.clone().into()),
-            Some(a.signature.clone()),
-        ),
-    ];
-    let pre_state = add_op_to_judged(pre_state, &op);
+    let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
         Db::IntQueueEmpty,
         Db::Integrated(op.clone()),
@@ -738,16 +603,13 @@ fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 fn register_deleted_header_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let original_op = DhtOp::StoreElement(
+        a.signature.clone(),
+        a.original_header.clone().into(),
+        Some(a.original_entry.clone().into()),
+    );
     let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
-    let pre_state = vec![
-        Db::IntQueue(op.clone()),
-        Db::CasEntry(
-            a.original_entry.clone(),
-            Some(a.original_header.clone().into()),
-            Some(a.signature.clone()),
-        ),
-    ];
-    let pre_state = add_op_to_judged(pre_state, &op);
+    let pre_state = vec![Db::IntQueue(op.clone()), Db::Integrated(original_op)];
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaDelete(
@@ -759,16 +621,13 @@ fn register_deleted_header_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 fn register_add_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let original_op = DhtOp::StoreEntry(
+        a.signature.clone(),
+        a.original_header.clone(),
+        a.original_entry.clone().into(),
+    );
     let op = DhtOp::RegisterAddLink(a.signature.clone(), a.link_add.clone());
-    let pre_state = vec![
-        Db::IntQueue(op.clone()),
-        Db::CasEntry(
-            a.original_entry.clone().into(),
-            Some(a.original_header.clone().into()),
-            Some(a.signature.clone()),
-        ),
-    ];
-    let pre_state = add_op_to_judged(pre_state, &op);
+    let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaLink(a.link_add.clone(), a.new_entry_hash.clone().into()),
@@ -777,18 +636,18 @@ fn register_add_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let original_op = DhtOp::StoreEntry(
+        a.signature.clone(),
+        a.original_header.clone(),
+        a.original_entry.clone().into(),
+    );
+    let original_link_op = DhtOp::RegisterAddLink(a.signature.clone(), a.link_add.clone());
     let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
     let pre_state = vec![
+        Db::Integrated(original_op),
+        Db::Integrated(original_link_op),
         Db::IntQueue(op.clone()),
-        Db::CasHeader(a.link_add.clone().into(), Some(a.signature.clone())),
-        Db::CasEntry(
-            a.original_entry.clone().into(),
-            Some(a.original_header.clone().into()),
-            Some(a.signature.clone()),
-        ),
-        Db::MetaLink(a.link_add.clone(), a.new_entry_hash.clone().into()),
     ];
-    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaLinkEmpty(a.link_add.clone()),
@@ -800,7 +659,6 @@ fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
     let pre_state = vec![Db::IntQueue(op.clone())];
-    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
     (
         pre_state,
@@ -840,30 +698,10 @@ async fn test_ops_state() {
     }
 }
 
-/// Call the produce dht ops workflow
-async fn produce_dht_ops<'env>(env: DbWrite) {
-    let (qt, _rx) = TriggerSender::new();
-    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
-    produce_dht_ops_workflow(workspace, env.clone().into(), qt)
-        .await
-        .unwrap();
-}
-
-/// Run genesis on the source chain
-async fn genesis<'env>(env: DbWrite) {
-    let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-    fake_genesis(&mut workspace.source_chain).await.unwrap();
-    {
-        env.conn()
-            .unwrap()
-            .with_commit(|writer| workspace.flush_to_txn(writer))
-            .unwrap();
-    }
-}
-
+#[cfg(todo_redo_old_tests)]
 async fn commit_entry<'env>(
     pre_state: Vec<Db>,
-    env: DbWrite,
+    env: EnvWrite,
     zome_name: ZomeName,
 ) -> (EntryHash, HeaderHash) {
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
@@ -943,7 +781,8 @@ async fn commit_entry<'env>(
     (entry_hash, output)
 }
 
-async fn get_entry(env: DbWrite, entry_hash: EntryHash) -> Option<Entry> {
+#[cfg(todo_redo_old_tests)]
+async fn get_entry(env: EnvWrite, entry_hash: EntryHash) -> Option<Entry> {
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
@@ -966,8 +805,9 @@ async fn get_entry(env: DbWrite, entry_hash: EntryHash) -> Option<Entry> {
     output.and_then(|el| el.into())
 }
 
+#[cfg(todo_redo_old_tests)]
 async fn create_link(
-    env: DbWrite,
+    env: EnvWrite,
     base_address: EntryHash,
     target_address: EntryHash,
     zome_name: ZomeName,
@@ -1021,8 +861,9 @@ async fn create_link(
     output
 }
 
+#[cfg(todo_redo_old_tests)]
 async fn get_links(
-    env: DbWrite,
+    env: EnvWrite,
     base_address: EntryHash,
     zome_name: ZomeName,
     link_tag: LinkTag,
@@ -1067,10 +908,11 @@ async fn get_links(
 // register_add_link test except all the
 // pre-state is added through real host fn calls
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(todo_redo_old_tests)]
 async fn test_metadata_from_wasm_api() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let test_env = holochain_sqlite::test_utils::test_cell_env();
+    let test_env = holochain_state::test_utils::test_cell_env();
     let env = test_env.env();
     clear_dbs(env.clone());
 
@@ -1133,10 +975,11 @@ async fn test_metadata_from_wasm_api() {
 
 // This doesn't work without inline integration
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(todo_redo_old_tests)]
 async fn test_wasm_api_without_integration_links() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let test_env = holochain_sqlite::test_utils::test_cell_env();
+    let test_env = holochain_state::test_utils::test_cell_env();
     let env = test_env.env();
     clear_dbs(env.clone());
 
@@ -1183,12 +1026,13 @@ async fn test_wasm_api_without_integration_links() {
     assert_eq!(links[0], target_entry_hash);
 }
 
+#[cfg(todo_redo_old_tests)]
 #[ignore = "Evaluate if this test adds any value or remove"]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_wasm_api_without_integration_delete() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let test_env = holochain_sqlite::test_utils::test_cell_env();
+    let test_env = holochain_state::test_utils::test_cell_env();
     let env = test_env.env();
     clear_dbs(env.clone());
 
@@ -1290,7 +1134,8 @@ async fn test_integrate_single_register_delete_link() {
     todo!("write this test")
 }
 
-#[cfg(feature = "slow_tests")]
+// #[cfg(feature = "slow_tests")]
+#[cfg(todo_redo_old_tests)]
 mod slow_tests {
     use crate::test_utils::host_fn_caller::*;
     use crate::test_utils::setup_app;
@@ -1322,7 +1167,7 @@ mod slow_tests {
         let dna_file = DnaFile::new(
             DnaDef {
                 name: "integration_workflow_test".to_string(),
-                uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 zomes: vec![TestWasm::Create.into()].into(),
             },
@@ -1405,7 +1250,7 @@ mod slow_tests {
                 .env
                 .get_table(TableName::IntegratedDhtOps)
                 .unwrap();
-            let ops_db = IntegratedDhtOpsStore::new(call_data.env.clone().into(), db);
+            let ops_db = IntegratedDhtOpsStore::new(call_data.env.clone(), db);
 
             fresh_reader_test!(call_data.env, |mut reader| {
                 let ops = ops_db
@@ -1453,6 +1298,6 @@ mod slow_tests {
         // Shut everything down
         let shutdown = conductor.take_shutdown_handle().await.unwrap();
         conductor.shutdown().await;
-        shutdown.await.unwrap();
+        shutdown.await.unwrap().unwrap();
     }
 }

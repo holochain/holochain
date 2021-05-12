@@ -1,43 +1,53 @@
 use holo_hash::WasmHash;
-use holochain_sqlite::buffer::CasBufFreshAsync;
-use holochain_sqlite::error::DatabaseError;
-use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::exports::SingleTable;
-use holochain_sqlite::prelude::BufferedStore;
-use holochain_sqlite::prelude::DbRead;
-use holochain_sqlite::transaction::Writer;
+use holochain_sqlite::rusqlite::named_params;
+use holochain_sqlite::rusqlite::OptionalExtension;
+use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
 
-/// This is where wasm lives
-pub struct WasmBuf(CasBufFreshAsync<DnaWasm>);
+use crate::mutations;
+use crate::prelude::from_blob;
+use crate::prelude::StateMutationResult;
+use crate::prelude::StateQueryResult;
 
-impl WasmBuf {
-    pub fn new(env: DbRead, wasm_store: SingleTable) -> DatabaseResult<Self> {
-        Ok(Self(CasBufFreshAsync::new(env, wasm_store)))
-    }
-
-    pub async fn get(&self, wasm_hash: &WasmHash) -> DatabaseResult<Option<DnaWasmHashed>> {
-        self.0.get(&wasm_hash).await
-    }
-
-    pub fn put(&mut self, v: DnaWasmHashed) {
-        self.0.put(v);
+pub fn get(txn: &Transaction<'_>, hash: &WasmHash) -> StateQueryResult<Option<DnaWasmHashed>> {
+    let item = txn
+        .query_row(
+            "SELECT hash, blob FROM Wasm WHERE hash = :hash",
+            named_params! {
+                ":hash": hash
+            },
+            |row| {
+                let hash: WasmHash = row.get("hash")?;
+                let wasm = row.get("blob")?;
+                Ok((hash, wasm))
+            },
+        )
+        .optional()?;
+    match item {
+        Some((hash, wasm)) => Ok(Some(DnaWasmHashed::with_pre_hashed(from_blob(wasm)?, hash))),
+        None => Ok(None),
     }
 }
 
-impl BufferedStore for WasmBuf {
-    type Error = DatabaseError;
+pub fn contains(txn: &Transaction<'_>, hash: &WasmHash) -> StateQueryResult<bool> {
+    Ok(txn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM Wasm WHERE hash = :hash)",
+        named_params! {
+            ":hash": hash
+        },
+        |row| row.get(0),
+    )?)
+}
 
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.0.flush_to_txn_ref(writer)?;
-        Ok(())
-    }
+pub fn put(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationResult<()> {
+    mutations::insert_wasm(txn, wasm)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use holo_hash::HasHash;
+    use holochain_sqlite::prelude::DatabaseResult;
     use holochain_types::dna::wasm::DnaWasm;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -46,22 +56,25 @@ mod tests {
         observability::test_run().ok();
 
         // all the stuff needed to have a WasmBuf
-        let env = holochain_sqlite::test_utils::test_wasm_env();
-        let mut wasm_buf =
-            WasmBuf::new(env.env().into(), env.get_table(TableName::Wasm).unwrap()).unwrap();
+        let env = crate::test_utils::test_wasm_env();
 
         // a wasm
         let wasm =
             DnaWasmHashed::from_content(DnaWasm::from(holochain_wasm_test_utils::TestWasm::Foo))
                 .await;
 
-        // a wasm in the WasmBuf
-        wasm_buf.put(wasm.clone());
-        // a wasm from the WasmBuf
-        let ret = wasm_buf.get(&wasm.as_hash()).await.unwrap().unwrap();
+        // Put wasm
+        env.conn()?
+            .with_commit(|txn| put(txn, wasm.clone()))
+            .unwrap();
+        fresh_reader_test!(env, |txn| {
+            assert!(contains(&txn, &wasm.as_hash()).unwrap());
+            // a wasm from the WasmBuf
+            let ret = get(&txn, &wasm.as_hash()).unwrap().unwrap();
 
-        // assert the round trip
-        assert_eq!(ret, wasm);
+            // assert the round trip
+            assert_eq!(ret, wasm);
+        });
 
         Ok(())
     }

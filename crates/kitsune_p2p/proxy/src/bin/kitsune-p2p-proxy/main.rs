@@ -7,13 +7,12 @@ use kitsune_p2p_types::dependencies::ghost_actor;
 use kitsune_p2p_types::dependencies::serde_json;
 use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::transport::*;
-use std::sync::Arc;
 use structopt::StructOpt;
 
 mod opt;
 use opt::*;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     let _ = ghost_actor::dependencies::tracing::subscriber::set_global_default(
         tracing_subscriber::FmtSubscriber::builder()
@@ -97,7 +96,7 @@ async fn inner() -> TransportResult<()> {
 
     let (listener, mut events) = spawn_kitsune_proxy_listener(
         proxy_config,
-        Arc::new(KitsuneP2pTuningParams::default()),
+        KitsuneP2pTuningParams::default(),
         listener,
         events,
     )

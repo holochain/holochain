@@ -31,8 +31,7 @@ use holochain::conductor::config::InterfaceDriver;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 
-use holochain_sqlite::test_utils::test_environments;
-use holochain_sqlite::test_utils::TestDbs;
+use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
 use holochain_test_wasm_common::AnchorInput;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -122,7 +121,7 @@ fn speed_test_all(n: usize) {
 }
 
 #[instrument]
-async fn speed_test(n: Option<usize>) -> TestDbs {
+async fn speed_test(n: Option<usize>) -> TestEnvs {
     let num = n.unwrap_or(DEFAULT_NUM);
 
     // ////////////
@@ -132,7 +131,7 @@ async fn speed_test(n: Option<usize>) -> TestDbs {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "need_for_speed_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: vec![TestWasm::Anchor.into()].into(),
         },
@@ -304,14 +303,14 @@ async fn speed_test(n: Option<usize>) -> TestDbs {
     }
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
     test_env
 }
 
 pub async fn setup_app(
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
     dna_store: MockDnaStore,
-) -> (TestDbs, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
     let envs = test_environments();
 
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)

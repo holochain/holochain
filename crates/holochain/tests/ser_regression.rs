@@ -11,7 +11,7 @@ use holochain::conductor::api::ZomeCall;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 
-use holochain_sqlite::test_utils::test_environments;
+use holochain_state::prelude::test_environments;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 pub use holochain_zome_types::capability::CapSecret;
@@ -51,7 +51,7 @@ async fn ser_regression_test() {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "ser_regression_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: vec![TestWasm::SerRegression.into()].into(),
         },
@@ -175,7 +175,7 @@ async fn ser_regression_test() {
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }
 
 pub async fn setup_app(

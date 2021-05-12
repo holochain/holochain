@@ -15,9 +15,7 @@ use holochain_keystore::KeystoreSender;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_sqlite::db::DbWrite;
-use holochain_sqlite::test_utils::test_environments;
-use holochain_sqlite::test_utils::TestDbs;
+use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -29,7 +27,8 @@ use tempdir::TempDir;
 /// A "factory" for HostFnCaller, which will produce them when given a ZomeName
 pub struct CellHostFnCaller {
     pub cell_id: CellId,
-    pub env: DbWrite,
+    pub env: EnvWrite,
+    pub cache: EnvWrite,
     pub ribosome: RealRibosome,
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
@@ -41,6 +40,7 @@ pub struct CellHostFnCaller {
 impl CellHostFnCaller {
     pub async fn new(cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) -> Self {
         let env = handle.get_cell_env(cell_id).await.unwrap();
+        let cache = handle.get_cache_env(cell_id).await.unwrap();
         let keystore = env.keystore().clone();
         let network = handle
             .holochain_p2p()
@@ -53,6 +53,7 @@ impl CellHostFnCaller {
         CellHostFnCaller {
             cell_id: cell_id.clone(),
             env,
+            cache,
             ribosome,
             network,
             keystore,
@@ -69,6 +70,7 @@ impl CellHostFnCaller {
         let call_zome_handle = self.cell_conductor_api.clone().into_call_zome_handle();
         HostFnCaller {
             env: self.env.clone(),
+            cache: self.cache.clone(),
             ribosome: self.ribosome.clone(),
             zome_path,
             network: self.network.clone(),
@@ -89,7 +91,7 @@ pub struct ConductorTestData {
 
 impl ConductorTestData {
     pub async fn new(
-        envs: TestDbs,
+        envs: TestEnvs,
         dna_files: Vec<DnaFile>,
         agents: Vec<AgentPubKey>,
         network_config: KitsuneP2pConfig,
@@ -165,7 +167,7 @@ impl ConductorTestData {
         let dna_file = DnaFile::new(
             DnaDef {
                 name: "conductor_test".to_string(),
-                uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 zomes: zomes.clone().into_iter().map(Into::into).collect(),
             },
@@ -194,7 +196,7 @@ impl ConductorTestData {
     pub async fn shutdown_conductor(&mut self) {
         let shutdown = self.handle.take_shutdown_handle().await.unwrap();
         self.handle.shutdown().await;
-        shutdown.await.unwrap();
+        shutdown.await.unwrap().unwrap();
     }
 
     /// Bring bob online if he isn't already

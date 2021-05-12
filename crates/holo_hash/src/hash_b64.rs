@@ -8,8 +8,7 @@ use super::*;
 use crate::HoloHash;
 use crate::{error::HoloHashResult, HashType};
 
-/// A wrapper around HoloHash to denote that deserialization should use
-/// base-64 strings rather than raw byte arrays
+/// A wrapper around HoloHash to denote that deserialization should /// base-64 strings rather than raw byte arrays
 #[derive(
     Debug,
     Clone,
@@ -25,6 +24,7 @@ use crate::{error::HoloHashResult, HashType};
     derive_more::Into,
     derive_more::AsRef,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[serde(transparent)]
 pub struct HoloHashB64<T: HashType>(HoloHash<T>);
 

@@ -17,12 +17,11 @@ pub fn capability_grants(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::{conductor::ConductorBuilder, test_utils::sweetest::SweetConductor};
-    use crate::{
-        core::workflow::call_zome_workflow::CallZomeWorkspace, test_utils::sweetest::SweetDnaFile,
-    };
+    use crate::{conductor::ConductorBuilder, sweettest::SweetConductor};
+    use crate::{sweettest::SweetDnaFile};
     use ::fixt::prelude::*;
     use hdk::prelude::*;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_types::fixt::CapSecretFixturator;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
@@ -35,16 +34,16 @@ pub mod wasm_test {
     async fn ribosome_capability_secret_test<'a>() {
         observability::test_run().ok();
         // test workspace boilerplate
-        let test_env = holochain_sqlite::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        host_access.workspace = workspace.clone();
 
         let _output: CapSecret =
             crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ());
@@ -54,16 +53,16 @@ pub mod wasm_test {
     async fn ribosome_transferable_cap_grant<'a>() {
         observability::test_run().ok();
         // test workspace boilerplate
-        let test_env = holochain_sqlite::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        host_access.workspace = workspace.clone();
 
         let secret: CapSecret =
             crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ());
@@ -117,7 +116,8 @@ pub mod wasm_test {
                 &[alice_agent_id.clone(), bob_agent_id.clone()],
                 &[dna_file.into()],
             )
-            .await;
+            .await
+            .unwrap();
 
         let ((alice,), (bobbo,)) = apps.into_tuples();
         // There's only one zome to call, so let's peel that off now.

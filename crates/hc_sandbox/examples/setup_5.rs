@@ -54,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
             agent_key,
             source: AppBundleSource::Bundle(bundle),
             membrane_proofs: Default::default(),
+            uid: None,
         };
 
         let r = AdminRequest::InstallAppBundle(Box::new(payload));
@@ -68,7 +69,7 @@ async fn main() -> anyhow::Result<()> {
         hc_sandbox::calls::activate_app(
             &mut cmd,
             ActivateApp {
-                app_id: installed_app.installed_app_id().clone(),
+                app_id: installed_app.installed_app_id,
             },
         )
         .await?;

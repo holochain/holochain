@@ -427,7 +427,7 @@ async fn cancel_response() {
             .unwrap();
 
         let r = sender
-            .request::<_, TestString, _, _>(TestString("Hey from server".into()))
+            .request::<_, TestString>(TestString("Hey from server".into()))
             .instrument(tracing::debug_span!(
                 "server_sending_request:cancel_response"
             ))

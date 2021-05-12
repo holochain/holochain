@@ -100,7 +100,7 @@ fn get_activity(
 #[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
     // grant unrestricted access to accept_cap_claim so other agents can send us claims
-    let mut functions: GrantedFunctions = HashSet::new();
+    let mut functions: GrantedFunctions = BTreeSet::new();
     functions.insert((zome_info()?.zome_name, "create_entry".into()));
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
@@ -148,6 +148,6 @@ fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
     match zome_call_response {
         ZomeCallResponse::Ok(v) => Ok(v.decode()?),
         // Handle this in real code.
-        _ => unreachable!(),
+        e => Err(WasmError::CallError(format!("{:?}", e))),
     }
 }

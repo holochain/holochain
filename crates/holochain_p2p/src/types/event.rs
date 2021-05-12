@@ -5,8 +5,22 @@ use crate::*;
 use holochain_zome_types::signature::Signature;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+/// The data required for a get request.
+pub enum GetRequest {
+    /// Get all the integrated data.
+    All,
+    /// Get only the integrated content.
+    Content,
+    /// Get only the metadata.
+    /// If you already have the content this is all you need.
+    Metadata,
+    /// Get the content even if it's still pending.
+    Pending,
+}
+
 /// Get options help control how the get is processed at various levels.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct GetOptions {
     /// Whether the remote-end should follow redirects or just return the
     /// requested entry.
@@ -14,6 +28,8 @@ pub struct GetOptions {
     /// Return all live headers even if there is deletes.
     /// Useful for metadata calls.
     pub all_live_headers_with_metadata: bool,
+    /// The type of data this get request requires.
+    pub request_type: GetRequest,
 }
 
 impl From<&actor::GetOptions> for GetOptions {
@@ -21,7 +37,14 @@ impl From<&actor::GetOptions> for GetOptions {
         Self {
             follow_redirects: a.follow_redirects,
             all_live_headers_with_metadata: a.all_live_headers_with_metadata,
+            request_type: a.request_type.clone(),
         }
+    }
+}
+
+impl Default for GetRequest {
+    fn default() -> Self {
+        GetRequest::All
     }
 }
 
@@ -55,6 +78,16 @@ pub struct GetActivityOptions {
     /// Include the full signed headers and hashes in the response
     /// instead of just the hashes.
     pub include_full_headers: bool,
+}
+
+impl Default for GetActivityOptions {
+    fn default() -> Self {
+        Self {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_full_headers: false,
+        }
+    }
 }
 
 impl From<&actor::GetActivityOptions> for GetActivityOptions {
@@ -116,7 +149,7 @@ ghost_actor::ghost_chan! {
             to_agent: AgentPubKey,
             dht_hash: holo_hash::AnyDhtHash,
             options: GetOptions,
-        ) -> GetElementResponse;
+        ) -> WireOps;
 
         /// A remote node is requesting metadata from us.
         fn get_meta(
@@ -130,9 +163,9 @@ ghost_actor::ghost_chan! {
         fn get_links(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            link_key: WireLinkMetaKey,
+            link_key: WireLinkKey,
             options: GetLinksOptions,
-        ) -> GetLinksResponse;
+        ) -> WireLinkOps;
 
         /// A remote node is requesting agent activity from us.
         fn get_agent_activity(
@@ -141,7 +174,7 @@ ghost_actor::ghost_chan! {
             agent: AgentPubKey,
             query: ChainQueryFilter,
             options: GetActivityOptions,
-        ) -> AgentActivityResponse;
+        ) -> AgentActivityResponse<HeaderHash>;
 
         /// A remote node has sent us a validation receipt.
         fn validation_receipt_received(

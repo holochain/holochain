@@ -18,24 +18,19 @@ struct FakeProperties {
     test: String,
 }
 
-/// simple DnaWasm fixture
-pub fn fake_dna_wasm() -> DnaWasm {
-    DnaWasm::from(vec![0_u8])
+/// A fixture example dna for unit testing.
+pub fn fake_dna_file(uid: &str) -> DnaFile {
+    fake_dna_zomes(uid, vec![("test".into(), vec![].into())])
 }
 
 /// A fixture example dna for unit testing.
-pub fn fake_dna_file(uuid: &str) -> DnaFile {
-    fake_dna_zomes(uuid, vec![("test".into(), vec![].into())])
-}
-
-/// A fixture example dna for unit testing.
-pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
+pub fn fake_dna_zomes(uid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     let mut dna = DnaDef {
         name: "test".to_string(),
         properties: YamlProperties::new(serde_yaml::from_str("p: hi").unwrap())
             .try_into()
             .unwrap(),
-        uuid: uuid.to_string(),
+        uid: uid.to_string(),
         zomes: Vec::new(),
     };
     tokio_helper::block_forever_on(async move {
@@ -106,4 +101,31 @@ pub async fn fake_unique_element(
         SignedHeaderHashed::new(&keystore, HeaderHashed::from_content_sync(header_1)).await?,
         entry,
     ))
+}
+
+/// Generate a test keystore pre-populated with a couple test keypairs.
+pub fn test_keystore() -> holochain_keystore::KeystoreSender {
+    use holochain_keystore::KeystoreSenderExt;
+
+    tokio_helper::block_on(
+        async move {
+            let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
+                .await
+                .unwrap();
+
+            // pre-populate with our two fixture agent keypairs
+            keystore
+                .generate_sign_keypair_from_pure_entropy()
+                .await
+                .unwrap();
+            keystore
+                .generate_sign_keypair_from_pure_entropy()
+                .await
+                .unwrap();
+
+            keystore
+        },
+        std::time::Duration::from_secs(1),
+    )
+    .expect("timeout elapsed")
 }
