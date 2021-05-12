@@ -5,7 +5,7 @@ use criterion::Criterion;
 
 use holo_hash::EntryHash;
 use holo_hash::EntryHashes;
-use holochain::test_utils::sweetest::*;
+use holochain::sweettest::*;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::InterfaceDriver;
@@ -111,7 +111,7 @@ async fn setup() -> (Producer, Consumer) {
     };
     let configs = vec![config(), config()];
     let mut conductors = SweetConductorBatch::from_configs(configs.clone()).await;
-    let apps = conductors.setup_app("app", &[dna]).await;
+    let apps = conductors.setup_app("app", &[dna]).await.unwrap();
     let ((alice,), (bobbo,)) = apps.into_tuples();
     conductors.exchange_peer_info().await;
     let mut conductors = conductors.into_inner().into_iter();
