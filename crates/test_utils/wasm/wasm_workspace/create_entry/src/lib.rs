@@ -148,6 +148,6 @@ fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
     match zome_call_response {
         ZomeCallResponse::Ok(v) => Ok(v.decode()?),
         // Handle this in real code.
-        _ => unreachable!(),
+        e => Err(WasmError::CallError(format!("{:?}", e))),
     }
 }
