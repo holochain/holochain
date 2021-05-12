@@ -56,7 +56,6 @@ pub fn test_envs_with_keystore(keystore: KeystoreSender) -> TestEnvs {
     TestEnvs::with_keystore(tempdir, keystore)
 }
 
-
 /// Create a fresh set of test environments with a new TempDir
 pub fn test_environments() -> TestEnvs {
     let tempdir = TempDir::new("holochain-test-environments").unwrap();
@@ -197,12 +196,11 @@ impl TestEnvs {
             tempdir: Arc::new(tempdir),
         }
     }
-    
+
     /// Create all three non-cell environments at once with a test keystore
     pub fn new(tempdir: TempDir) -> Self {
         Self::with_keystore(tempdir, test_keystore())
     }
-
 
     pub fn conductor(&self) -> EnvWrite {
         self.conductor.clone()
