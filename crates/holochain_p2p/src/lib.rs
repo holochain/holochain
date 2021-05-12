@@ -31,6 +31,11 @@ pub trait HolochainP2pCellT {
     /// owned getter
     fn from_agent(&self) -> AgentPubKey;
 
+    /// Construct the CellId from the defined DnaHash and AgentPubKey
+    fn cell_id(&self) -> CellId {
+        CellId::new(self.dna_hash(), self.from_agent())
+    }
+
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
     async fn join(&mut self) -> actor::HolochainP2pResult<()>;
 

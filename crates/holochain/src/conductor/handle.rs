@@ -1,5 +1,3 @@
-#![deny(missing_docs)]
-
 //! Defines [ConductorHandle], a lightweight cloneable reference to a Conductor
 //! with a limited public interface.
 //!
@@ -53,18 +51,20 @@ use super::p2p_store::put_agent_info_signed;
 use super::p2p_store::query_agent_info_signed;
 use super::Cell;
 use super::Conductor;
-use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::core::workflow::ZomeCallResult;
+use crate::core::{queue_consumer::InitialQueueTriggers, ribosome::real_ribosome::RealRibosome};
 use derive_more::From;
 use futures::future::FutureExt;
 use futures::StreamExt;
 use holochain_conductor_api::InstalledAppInfo;
+use holochain_lmdb::env::EnvironmentRead;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use std::sync::Arc;
+use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
+use std::{collections::HashSet, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::*;
 
@@ -85,21 +85,24 @@ pub trait ConductorHandleT: Send + Sync {
     /// Returns error if conductor is shutting down
     async fn check_running(&self) -> ConductorResult<()>;
 
-    /// Add a collection of Admin interfaces and spawn the necessary tasks.
+    /// Initialize the task manager, add admin interfaces from config,
+    /// start up app interfaces from db, and register all tasks.
     ///
     /// This requires a concrete ConductorHandle to be passed into the
     /// interface tasks. This is a bit weird to do, but it was the only way
     /// around having a circular reference in the types.
     ///
     /// Never use a ConductorHandle for different Conductor here!
+    async fn initialize_conductor(
+        self: Arc<Self>,
+        admin_configs: Vec<AdminInterfaceConfig>,
+    ) -> ConductorResult<()>;
+
+    /// Add a collection of admin interfaces from config
     async fn add_admin_interfaces(
         self: Arc<Self>,
         configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<()>;
-
-    /// Start up persisted app interfaces.
-    /// Should only be run once at Conductor initialization.
-    async fn startup_app_interfaces(self: Arc<Self>) -> ConductorResult<()>;
 
     /// Add an app interface
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16>;
@@ -119,6 +122,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// Get a [Dna] from the [DnaStore]
     async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
 
+    /// Get an instance of a [RealRibosome] for the DnaHash
+    async fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome>;
+
     /// Get a [EntryDef] from the [EntryDefBuffer]
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
@@ -126,6 +132,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn load_dnas(&self) -> ConductorResult<()>;
 
     /// Dispatch a network event to the correct cell.
+    /// Warning: returning an error from this function kills the network for the conductor.
     async fn dispatch_holochain_p2p_event(
         &self,
         cell_id: &CellId,
@@ -141,9 +148,6 @@ pub trait ConductorHandleT: Send + Sync {
         invocation: ZomeCall,
         workspace_lock: CallZomeWorkspaceLock,
     ) -> ConductorApiResult<ZomeCallResult>;
-
-    /// Cue the autonomic system to perform some action early (experimental)
-    async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
 
     /// Get a Websocket port which will
     async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16>;
@@ -185,7 +189,10 @@ pub trait ConductorHandleT: Send + Sync {
     async fn install_app_bundle(
         self: Arc<Self>,
         payload: InstallAppBundlePayload,
-    ) -> ConductorResult<InstalledApp>;
+    ) -> ConductorResult<InactiveApp>;
+
+    /// Uninstall an app from the state DB and remove all running Cells
+    async fn uninstall_app(&self, app: &InstalledAppId) -> ConductorResult<()>;
 
     /// Setup the cells from the database
     /// Only creates any cells that are not already created
@@ -195,13 +202,23 @@ pub trait ConductorHandleT: Send + Sync {
     async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()>;
 
     /// Deactivate an app
-    async fn deactivate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()>;
+    async fn deactivate_app(
+        &self,
+        installed_app_id: InstalledAppId,
+        reason: DeactivationReason,
+    ) -> ConductorResult<()>;
 
     /// List Cell Ids
     async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>>;
 
     /// List Active AppIds
     async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
+
+    /// Get the IDs of all active installed Apps which use this Cell
+    async fn list_active_apps_for_cell_id(
+        &self,
+        cell_id: &CellId,
+    ) -> ConductorResult<HashSet<InstalledAppId>>;
 
     /// Dump the cells state
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
@@ -227,6 +244,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Print the current setup in a machine readable way.
     async fn print_setup(&self);
+
+    /// Retrieve the LMDB environment for this cell.
+    async fn get_cell_env_readonly(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentRead>;
 
     /// Retrieve the LMDB environment for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -280,11 +300,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
     }
 
-    async fn startup_app_interfaces(self: Arc<Self>) -> ConductorResult<()> {
-        let _ = self
-            .conductor
-            .write()
-            .await
+    async fn initialize_conductor(
+        self: Arc<Self>,
+        admin_configs: Vec<AdminInterfaceConfig>,
+    ) -> ConductorResult<()> {
+        let mut conductor = self.conductor.write().await;
+        conductor.start_task_manager(self.clone()).await?;
+        conductor
+            .add_admin_interfaces_via_handle(admin_configs, self.clone())
+            .await?;
+        conductor
             .startup_app_interfaces_via_handle(self.clone())
             .await?;
         Ok(())
@@ -336,12 +361,15 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.dna_store().get(hash)
     }
 
+    async fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome> {
+        self.conductor.read().await.get_ribosome(dna_hash)
+    }
+
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         self.conductor.read().await.dna_store().get_entry_def(key)
     }
 
     #[instrument(skip(self))]
-    /// Warning: returning an error from this function kills the network for the conductor.
     async fn dispatch_holochain_p2p_event(
         &self,
         cell_id: &CellId,
@@ -408,12 +436,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         debug!(cell_id = ?call.cell_id);
         let cell = self.cell_by_id(&call.cell_id).await?;
         Ok(cell.call_zome(call, Some(workspace_lock)).await?)
-    }
-
-    async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()> {
-        let cell = self.cell_by_id(cell_id).await?;
-        let _ = cell.handle_autonomic_process(cue.into()).await;
-        Ok(())
     }
 
     async fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle> {
@@ -489,7 +511,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await?;
 
         let cell_data = cell_data.into_iter().map(|(c, _)| c);
-        let app = InstalledApp::new_legacy(installed_app_id, cell_data)?;
+        let app = InstalledAppCommon::new_legacy(installed_app_id, cell_data)?;
 
         // Update the db
         let _ = self
@@ -505,7 +527,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn install_app_bundle(
         self: Arc<Self>,
         payload: InstallAppBundlePayload,
-    ) -> ConductorResult<InstalledApp> {
+    ) -> ConductorResult<InactiveApp> {
         let InstallAppBundlePayload {
             source,
             agent_key,
@@ -544,10 +566,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await?;
 
         let slots = ops.slots;
-        let app = InstalledApp::new(installed_app_id, agent_key, slots);
+        let app = InstalledAppCommon::new(installed_app_id, agent_key, slots);
 
         // Update the db
-        self.conductor
+        let app = self
+            .conductor
             .write()
             .await
             .add_inactive_app_to_db(app.clone())
@@ -590,20 +613,27 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         // MD: Should we be doing `Conductor::add_cells()` here? (see below comment)
     }
 
-    async fn deactivate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()> {
-        let cell_ids_to_remove = self
-            .conductor
-            .write()
-            .await
-            .deactivate_app_in_db(installed_app_id)
+    async fn deactivate_app(
+        &self,
+        installed_app_id: InstalledAppId,
+        reason: DeactivationReason,
+    ) -> ConductorResult<()> {
+        let mut conductor = self.conductor.write().await;
+        let cell_ids_to_remove = conductor
+            .deactivate_app_in_db(installed_app_id, reason)
             .await?;
         // MD: I'm not sure about this. We never add the cells back in after re-activating an app,
         //     so it seems either we shouldn't remove them here, or we should be sure to add them
         //     back in when re-activating.
-        self.conductor
-            .write()
-            .await
-            .remove_cells(cell_ids_to_remove);
+        conductor.remove_cells(cell_ids_to_remove).await;
+        Ok(())
+    }
+
+    async fn uninstall_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<()> {
+        let mut conductor = self.conductor.write().await;
+        if let Some(cell_ids_to_remove) = conductor.remove_app_from_db(installed_app_id).await? {
+            conductor.remove_cells(cell_ids_to_remove).await;
+        }
         Ok(())
     }
 
@@ -613,6 +643,17 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
         self.conductor.read().await.list_active_apps().await
+    }
+
+    async fn list_active_apps_for_cell_id(
+        &self,
+        cell_id: &CellId,
+    ) -> ConductorResult<HashSet<InstalledAppId>> {
+        self.conductor
+            .read()
+            .await
+            .list_active_apps_for_cell_id(cell_id)
+            .await
     }
 
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
@@ -649,6 +690,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn print_setup(&self) {
         self.conductor.read().await.print_setup()
+    }
+
+    async fn get_cell_env_readonly(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentRead> {
+        let cell = self.cell_by_id(cell_id).await?;
+        Ok(cell.env().clone().into())
     }
 
     #[cfg(any(test, feature = "test_utils"))]
@@ -706,8 +752,14 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         // space retries joining all cells every 5 minutes.
         futures::stream::iter(networks)
             .for_each_concurrent(100, |mut network| async move {
-                if let Err(e) = network.join().await {
-                    tracing::info!(failed_to_join_network = ?e);
+                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
+                    Ok(Err(e)) => {
+                        tracing::info!(failed_to_join_network = ?e);
+                    }
+                    Err(_) => {
+                        tracing::info!("Timed out trying to join the network");
+                    }
+                    Ok(Ok(_)) => (),
                 }
             })
             .await;

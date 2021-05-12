@@ -1,6 +1,6 @@
 //! Abstraction traits / types for tx2 networking transport.
 
-use crate::tx2::tx2_adapter::Uniq;
+use crate::tx2::tx2_adapter::{Tx2ConDir, Uniq};
 use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
 use crate::*;
@@ -12,11 +12,14 @@ pub trait AsConHnd: std::fmt::Debug + 'static + Send + Sync + Unpin {
     /// Get the opaque Uniq identifier for this connection.
     fn uniq(&self) -> Uniq;
 
+    /// Get the directionality of this connection.
+    fn dir(&self) -> Tx2ConDir;
+
     /// Get the remote address of this connection.
     fn peer_addr(&self) -> KitsuneResult<TxUrl>;
 
-    /// Get the certificate digest of the remote.
-    fn peer_digest(&self) -> KitsuneResult<CertDigest>;
+    /// Get the certificate digest of the remote peer.
+    fn peer_cert(&self) -> Tx2Cert;
 
     /// Is this connection closed?
     fn is_closed(&self) -> bool;
@@ -48,7 +51,7 @@ pub trait AsEpHnd: 'static + Send + Sync + Unpin {
     fn local_addr(&self) -> KitsuneResult<TxUrl>;
 
     /// Get the local certificate digest.
-    fn local_digest(&self) -> KitsuneResult<CertDigest>;
+    fn local_cert(&self) -> Tx2Cert;
 
     /// Is this endpoint closed?
     fn is_closed(&self) -> bool;
@@ -133,9 +136,28 @@ pub struct EpIncomingData {
     pub data: PoolBuf,
 }
 
+/// Data associated with an IncomingError EpEvent
+#[derive(Debug)]
+pub struct EpIncomingError {
+    /// handle to the remote connection that send this data
+    pub con: ConHnd,
+
+    /// the remote url from which this data originated
+    pub url: TxUrl,
+
+    /// message_id associated with this incoming data
+    pub msg_id: MsgId,
+
+    /// the actual bytes of incoming data
+    pub err: KitsuneError,
+}
+
 /// Data associated with a ConnectionClosed EpEvent
 #[derive(Debug)]
 pub struct EpConnectionClosed {
+    /// handle to the closed connection
+    pub con: ConHnd,
+
     /// the remote url this used to be connected to
     pub url: TxUrl,
 
@@ -157,6 +179,9 @@ pub enum EpEvent {
 
     /// We've received incoming data on an open connection.
     IncomingData(EpIncomingData),
+
+    /// We've received incoming error on an open connection.
+    IncomingError(EpIncomingError),
 
     /// A connection has closed (Url, Code, Reason).
     ConnectionClosed(EpConnectionClosed),

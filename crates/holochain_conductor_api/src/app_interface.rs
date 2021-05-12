@@ -65,7 +65,7 @@ pub enum AppResponse {
     /// The succesful response to an [`AppRequest::AppInfo`].
     ///
     /// Option will be `None` if there is no installed app with the given `installed_app_id` value from the request.
-    /// Check out [`InstalledApp`] for details on when the Option is `Some<InstalledApp>`
+    /// Check out [`InstalledApp`] for details on when the Option is `Some<InstalledAppInfo>`
     ///
     /// [`InstalledApp`]: ../../../holochain_types/app/struct.InstalledApp.html
     /// [`AppRequest::AppInfo`]: enum.AppRequest.html#variant.AppInfo
@@ -118,7 +118,7 @@ pub enum CryptoRequest {
     Encrypt(String),
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
 pub struct InstalledAppInfo {
     /// The unique identifier for an installed app in this conductor
@@ -126,12 +126,13 @@ pub struct InstalledAppInfo {
     /// Info about the Cells installed in this app
     pub cell_data: Vec<InstalledCell>,
     /// Is this app currently active?
-    pub active: bool,
+    pub status: InstalledAppStatus,
 }
 
 impl InstalledAppInfo {
-    pub fn from_installed_app(app: &InstalledApp, active: bool) -> Self {
+    pub fn from_installed_app(app: &InstalledApp) -> Self {
         let installed_app_id = app.installed_app_id().clone();
+        let status = app.status();
         let cell_data = app
             .provisioned_cells()
             .map(|(nick, id)| InstalledCell::new(id.clone(), nick.clone()))
@@ -139,7 +140,13 @@ impl InstalledAppInfo {
         Self {
             installed_app_id,
             cell_data,
-            active,
+            status,
         }
+    }
+}
+
+impl From<&InstalledApp> for InstalledAppInfo {
+    fn from(app: &InstalledApp) -> Self {
+        Self::from_installed_app(app)
     }
 }

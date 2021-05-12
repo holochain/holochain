@@ -45,6 +45,20 @@ impl SweetApp {
     pub fn agent(&self) -> &AgentPubKey {
         self.cells[0].agent_pubkey()
     }
+
+    /// Helper to destructure into a tuple of SweetCells.
+    /// Can only be used for up to 4 cells. For more, please use `into_cells`.
+    pub fn into_tuple<Inner>(self) -> Inner
+    where
+        Inner: HomogeneousTuple<Item = SweetCell>,
+        Inner::Buffer: std::convert::AsRef<[Option<SweetCell>]>,
+        Inner::Buffer: std::convert::AsMut<[Option<SweetCell>]>,
+    {
+        self.into_cells()
+            .into_iter()
+            .collect_tuple::<Inner>()
+            .expect("Can't destructure more than 4 Cells")
+    }
 }
 
 /// A collection of installed apps

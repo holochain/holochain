@@ -10,6 +10,7 @@ pub use crate::crdt::*;
 pub use crate::element::*;
 pub use crate::entry::*;
 pub use crate::entry_def::*;
+pub use crate::genesis::*;
 pub use crate::header::conversions::*;
 pub use crate::header::*;
 pub use crate::info::*;

@@ -339,7 +339,6 @@ pub mod tests {
     use holochain_types::test_utils::fake_dna_hash;
     use holochain_zome_types::capability::CapAccess;
     use holochain_zome_types::capability::ZomeCallCapGrant;
-
     use std::collections::BTreeSet;
 
     #[tokio::test(flavor = "multi_thread")]

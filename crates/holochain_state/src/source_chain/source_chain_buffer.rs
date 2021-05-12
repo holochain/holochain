@@ -75,7 +75,7 @@ impl SourceChainBuf {
     // TODO: TK-01747: Make this check more robust maybe?
     // PERF: This call must be fast
     pub fn has_genesis(&self) -> bool {
-        self.sequence.len() >= 3
+        self.sequence.len() >= POST_GENESIS_SEQ_THRESHOLD as usize
     }
 
     pub fn get_at_index(&self, i: u32) -> SourceChainResult<Option<Element>> {

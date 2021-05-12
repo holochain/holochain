@@ -11,9 +11,10 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for Publish workflow
-#[instrument(skip(env, stop, cell_network))]
+#[instrument(skip(env, conductor_handle, stop, cell_network))]
 pub fn spawn_publish_dht_ops_consumer(
     env: EnvironmentWrite,
+    conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
     mut cell_network: HolochainP2pCell,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
@@ -32,12 +33,18 @@ pub fn spawn_publish_dht_ops_consumer(
             // Run the workflow
             let workspace = PublishDhtOpsWorkspace::new(env.clone().into())
                 .expect("Could not create Workspace");
-            if let WorkComplete::Incomplete =
-                publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)
-                    .await
-                    .expect("Error running Workflow")
-            {
-                trigger_self.trigger()
+            match publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network).await {
+                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
+                Err(err) => {
+                    handle_workflow_error(
+                        conductor_handle.clone(),
+                        cell_network.cell_id(),
+                        err,
+                        "publish_dht_ops failure",
+                    )
+                    .await?
+                }
+                _ => (),
             };
         }
         Ok(())
