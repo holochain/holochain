@@ -8,10 +8,12 @@ use derive_more::Into;
 use futures::Future;
 use holo_hash::DnaHash;
 use holochain_zome_types::cell::CellId;
+use kitsune_p2p::KitsuneSpace;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 mod p2p;
 pub use p2p::*;
@@ -123,8 +125,8 @@ pub enum DbKind {
     Conductor,
     /// Specifies the environment used to save wasm
     Wasm,
-    /// State of the p2p network
-    P2p,
+    /// State of the p2p network (one per space).
+    P2p(Arc<KitsuneSpace>),
 }
 
 impl DbKind {
@@ -135,7 +137,7 @@ impl DbKind {
             DbKind::Cache(dna) => ["cache", &format!("cache-{}", dna)].iter().collect(),
             DbKind::Conductor => ["conductor", "conductor"].iter().collect(),
             DbKind::Wasm => ["wasm", "wasm"].iter().collect(),
-            DbKind::P2p => ["p2p", "p2p"].iter().collect(),
+            DbKind::P2p(space) => ["p2p", &format!("p2p-{}", space)].iter().collect(),
         };
         path.set_extension("sqlite3");
         path

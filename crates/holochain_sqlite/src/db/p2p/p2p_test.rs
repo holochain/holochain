@@ -1,8 +1,9 @@
+use crate::db::PConn;
 use crate::prelude::*;
 use kitsune_p2p::agent_store::{AgentInfo, AgentInfoSigned, AgentMetaInfo};
 use kitsune_p2p::{KitsuneAgent, KitsuneSignature, KitsuneSpace};
 use rand::Rng;
-use rusqlite::*;
+use std::sync::Arc;
 
 fn rand_space() -> KitsuneSpace {
     let mut rng = rand::thread_rng();
@@ -28,10 +29,10 @@ fn rand_signed_at_ms() -> u64 {
         .unwrap()
         .as_millis() as u64;
 
-    now - rng.gen_range(100, 1000)
+    now - rng.gen_range(1000, 2000)
 }
 
-fn rand_insert(tx: &Transaction, space: &KitsuneSpace, agent: &KitsuneAgent) {
+fn rand_insert(con: &mut PConn, space: &KitsuneSpace, agent: &KitsuneAgent) {
     use std::convert::TryInto;
 
     let mut rng = rand::thread_rng();
@@ -66,70 +67,42 @@ fn rand_insert(tx: &Transaction, space: &KitsuneSpace, agent: &KitsuneAgent) {
     )
     .unwrap();
 
-    tx.p2p_put(&signed).unwrap();
+    con.p2p_put(&signed).unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_p2p_store_sanity() {
     let tmp_dir = tempdir::TempDir::new("p2p_store_sanity").unwrap();
-    let db = DbWrite::test(&tmp_dir, DbKind::P2p).unwrap();
-    let mut con = db.connection_pooled().unwrap();
 
     let space = rand_space();
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64;
+    let db = DbWrite::test(&tmp_dir, DbKind::P2p(Arc::new(space.clone()))).unwrap();
+    let mut con = db.connection_pooled().unwrap();
 
     let mut example_agent = rand_agent();
 
-    con.with_commit(|writer| {
-        for _ in 0..20 {
-            example_agent = rand_agent();
+    for _ in 0..20 {
+        example_agent = rand_agent();
 
-            for _ in 0..3 {
-                rand_insert(writer, &space, &example_agent);
-            }
+        for _ in 0..3 {
+            rand_insert(&mut con, &space, &example_agent);
         }
+    }
 
-        let all = writer.p2p_list(&space).unwrap();
-        assert_eq!(20, all.len());
-        println!("after insert select all count: {}", all.len());
-        let signed = writer.p2p_get(&space, &example_agent).unwrap();
-        assert!(signed.is_some());
+    let all = con.p2p_list().unwrap();
+    assert_eq!(20, all.len());
+    println!("after insert select all count: {}", all.len());
+    let signed = con.p2p_get(&example_agent).unwrap();
+    assert!(signed.is_some());
 
-        DatabaseResult::Ok(())
-    })
-    .unwrap();
+    // prune everything by expires time
+    con.p2p_prune().unwrap();
 
-    con.with_commit(|writer| {
-        // prune duplicates, but not any expirations
-        writer.p2p_prune(now - 2000).unwrap();
-
-        let all = writer.p2p_list(&space).unwrap();
-        assert_eq!(20, all.len());
-        println!("after prune select all count: {}", all.len());
-        let signed = writer.p2p_get(&space, &example_agent).unwrap();
-        assert!(signed.is_some());
-
-        DatabaseResult::Ok(())
-    })
-    .unwrap();
-
-    con.with_commit(|writer| {
-        // prune everything by expires time
-        writer.p2p_prune(now + 2000).unwrap();
-
-        let all = writer.p2p_list(&space).unwrap();
-        assert_eq!(0, all.len());
-        println!("after prune_all select all count: {}", all.len());
-        let signed = writer.p2p_get(&space, &example_agent).unwrap();
-        assert!(signed.is_none());
-
-        DatabaseResult::Ok(())
-    })
-    .unwrap();
+    let all = con.p2p_list().unwrap();
+    assert_eq!(0, all.len());
+    println!("after prune_all select all count: {}", all.len());
+    let signed = con.p2p_get(&example_agent).unwrap();
+    assert!(signed.is_none());
 
     tmp_dir.close().unwrap();
 }

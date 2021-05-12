@@ -81,6 +81,14 @@ impl std::convert::TryFrom<&AgentInfoSigned> for Vec<u8> {
     }
 }
 
+impl std::convert::TryFrom<&AgentInfoSigned> for KitsuneSpace {
+    type Error = KitsuneP2pError;
+    fn try_from(signed: &AgentInfoSigned) -> Result<Self, Self::Error> {
+        let info = AgentInfo::try_from(signed)?;
+        Ok(info.as_space_ref().clone())
+    }
+}
+
 impl std::convert::TryFrom<&[u8]> for AgentInfoSigned {
     type Error = KitsuneP2pError;
     fn try_from(mut bytes: &[u8]) -> Result<Self, Self::Error> {

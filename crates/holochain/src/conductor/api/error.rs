@@ -103,6 +103,17 @@ pub enum ConductorApiError {
 
     #[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
+
+    /// Other
+    #[error("Other: {0}")]
+    Other(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl ConductorApiError {
+    /// promote a custom error type to a KitsuneP2pError
+    pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        Self::Other(e.into())
+    }
 }
 
 /// All the serialization errors that can occur

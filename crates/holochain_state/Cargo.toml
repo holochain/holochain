@@ -22,6 +22,7 @@ holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
 holochain_wasm_test_utils = { path = "../test_utils/wasm", optional = true }
 holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types", features = [ "full" ] }
+kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 mockall = "0.8"
 shrinkwraprs = "0.3.0"
 serde = { version = "1.0", features = [ "derive" ] }

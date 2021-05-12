@@ -27,7 +27,7 @@ pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
 ) -> StateMutationResult<()> {
     Ok(env.conn()?.with_commit(|writer| {
         for agent_info_signed in iter {
-            holochain_state::agent_info::put(writer, agent_info_signed)?;
+            writer.p2p_put(&agent_info_signed)?;
         }
         StateMutationResult::Ok(())
     })?)
@@ -35,18 +35,17 @@ pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
 
 /// Helper function to get all the peer data from this conductor
 pub fn all_agent_infos(env: EnvRead) -> StateQueryResult<Vec<AgentInfoSigned>> {
-    fresh_reader!(env, |r| { holochain_state::agent_info::get_all_values(&r) })
+    fresh_reader!(env, |r| Ok(r.p2p_list()?))
 }
 
 /// Helper function to get a single agent info
 pub fn get_single_agent_info(
     env: EnvRead,
-    space: DnaHash,
+    _space: DnaHash,
     agent: AgentPubKey,
 ) -> StateQueryResult<Option<AgentInfoSigned>> {
-    fresh_reader!(env, |r| {
-        holochain_state::agent_info::get_agent_info(&r, space, agent)
-    })
+    let agent = kitsune_p2p::KitsuneAgent(agent.get_raw_36().to_vec());
+    fresh_reader!(env, |r| Ok(r.p2p_get(&agent)?))
 }
 
 /// Interconnect every provided pair of conductors via their peer store databases
@@ -66,64 +65,18 @@ pub fn exchange_peer_info(envs: Vec<EnvWrite>) {
 /// Get agent info for a single agent
 pub fn get_agent_info_signed(
     environ: EnvWrite,
-    kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+    _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
 ) -> ConductorResult<Option<AgentInfoSigned>> {
-    environ.conn()?.with_commit(|writer| {
-        let res =
-            holochain_state::agent_info::get(writer, (&*kitsune_space, &*kitsune_agent).into())?;
-
-        let res = match res {
-            None => return Ok(None),
-            Some(res) => res,
-        };
-
-        let info = kitsune_p2p::agent_store::AgentInfo::try_from(&res)?;
-        let now = now();
-
-        if is_expired(now, &info) {
-            holochain_state::agent_info::delete(writer, (&*kitsune_space, &*kitsune_agent).into())?;
-            return Ok(None);
-        }
-
-        Ok(Some(res))
-    })
+    Ok(environ.conn()?.p2p_get(&kitsune_agent)?)
 }
 
 /// Get agent info for a single space
 pub fn query_agent_info_signed(
     environ: EnvWrite,
-    kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+    _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
 ) -> ConductorResult<Vec<AgentInfoSigned>> {
-    let mut out = Vec::new();
-    environ.conn()?.with_commit(|writer| {
-        let mut expired = Vec::new();
-
-        {
-            let iter = holochain_state::agent_info::get_all(writer)?.into_iter();
-
-            let now = now();
-
-            for (k, v) in iter {
-                let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
-                if is_expired(now, &info) {
-                    expired.push(k);
-                } else if info.as_space_ref() == kitsune_space.as_ref() {
-                    out.push(v);
-                }
-            }
-        }
-
-        if !expired.is_empty() {
-            for exp in expired {
-                holochain_state::agent_info::delete(writer, exp)?;
-            }
-        }
-
-        ConductorResult::Ok(())
-    })?;
-
-    Ok(out)
+    Ok(environ.conn()?.p2p_list()?)
 }
 
 /// Get the peer density an agent is currently seeing within
@@ -134,12 +87,8 @@ pub fn query_peer_density(
     dht_arc: DhtArc,
 ) -> ConductorResult<PeerDensity> {
     let now = now();
-    let arcs = fresh_reader!(env, |r| {
-        fallible_iterator::convert(
-            holochain_state::agent_info::get_all_values(&r)?
-                .into_iter()
-                .map(ConductorResult::Ok),
-        )
+    let arcs = env.conn()?.p2p_list()?;
+    let arcs = fallible_iterator::convert(arcs.into_iter().map(ConductorResult::Ok))
         .filter_map(|v| {
             if dht_arc.contains(v.as_agent_ref().get_loc()) {
                 let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
@@ -152,8 +101,7 @@ pub fn query_peer_density(
                 Ok(None)
             }
         })
-        .collect()
-    })?;
+        .collect()?;
 
     // contains is already checked in the iterator
     let bucket = DhtArcBucket::new_unchecked(dht_arc, arcs);
@@ -166,9 +114,7 @@ pub fn put_agent_info_signed(
     environ: EnvWrite,
     agent_info_signed: kitsune_p2p::agent_store::AgentInfoSigned,
 ) -> ConductorResult<()> {
-    Ok(environ
-        .conn()?
-        .with_commit(|writer| holochain_state::agent_info::put(writer, agent_info_signed))?)
+    Ok(environ.conn()?.p2p_put(&agent_info_signed)?)
 }
 
 fn now() -> u64 {
@@ -261,27 +207,8 @@ pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2p
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use holochain_sqlite::db::ReadManager;
-    use holochain_sqlite::db::WriteManager;
-    use holochain_state::agent_info::AgentKvKey;
     use holochain_state::test_utils::test_p2p_env;
-    use kitsune_p2p::fixt::AgentInfoFixturator;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
-    use kitsune_p2p::KitsuneBinType;
-    use std::convert::TryInto;
-
-    #[test]
-    fn kv_key_from() {
-        let agent_info = fixt!(AgentInfo);
-
-        let kv_key = AgentKvKey::from(&agent_info);
-
-        let bytes = kv_key.as_ref().to_owned();
-
-        assert_eq!(&bytes[..32], agent_info.as_space_ref().get_bytes(),);
-
-        assert_eq!(&bytes[32..], agent_info.as_agent_ref().get_bytes(),);
-    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_store_agent_info_signed() {
@@ -292,18 +219,12 @@ mod tests {
 
         let agent_info_signed = fixt!(AgentInfoSigned);
 
-        env.conn()
-            .unwrap()
-            .with_commit(|txn| holochain_state::agent_info::put(txn, agent_info_signed.clone()))
-            .unwrap();
+        env.conn().unwrap().p2p_put(&agent_info_signed).unwrap();
 
-        env.conn().unwrap().with_reader_test(|txn| {
-            let ret =
-                holochain_state::agent_info::get(&txn, (&agent_info_signed).try_into().unwrap())
-                    .unwrap();
+        let agent = kitsune_p2p::KitsuneAgent::try_from(agent_info_signed.clone()).unwrap();
+        let ret = env.conn().unwrap().p2p_get(&agent).unwrap();
 
-            assert_eq!(ret, Some(agent_info_signed),);
-        })
+        assert_eq!(ret, Some(agent_info_signed));
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -313,10 +234,7 @@ mod tests {
         let env = t_env.env();
 
         // - Check no data in the store to start
-        let count = env
-            .conn()
-            .unwrap()
-            .with_reader_test(|txn| holochain_state::agent_info::get_all(&txn).unwrap().len());
+        let count = env.conn().unwrap().p2p_list().unwrap().len();
 
         assert_eq!(count, 0);
 

@@ -1,8 +1,6 @@
 SELECT agent
 FROM p2p_store
-WHERE space = :space -- correct space
-  AND expires_at_ms > :now -- not expired
-  AND signed_at_ms >= :since_ms -- between given signed_at range
+WHERE signed_at_ms >= :since_ms -- between given signed_at range
   AND signed_at_ms <= :until_ms
   AND (
     -- if the input has two ranges, check them both
@@ -33,6 +31,4 @@ WHERE space = :space -- correct space
     )
     -- if the input has no ranges, no records will match
   )
--- filter out any entries shadowed by a newer signed_at_ms
-GROUP BY space, agent HAVING signed_at_ms = max(signed_at_ms)
 ;

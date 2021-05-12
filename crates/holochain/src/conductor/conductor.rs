@@ -43,7 +43,8 @@ use crate::conductor::error::ConductorResult;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::{
-    conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
+    conductor::api::error::{ConductorApiError, ConductorApiResult},
+    core::ribosome::real_ribosome::RealRibosome,
 };
 pub use builder::*;
 use futures::future;
@@ -63,6 +64,7 @@ use holochain_state::prelude::StateMutationResult;
 use holochain_state::source_chain;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p::KitsuneSpace;
 use rusqlite::OptionalExtension;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -113,7 +115,7 @@ where
     wasm_env: EnvWrite,
 
     /// The database for storing AgentInfoSigned
-    p2p_env: EnvWrite,
+    p2p_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
 
     /// The database for persisting [ConductorState]
     // state_db: ConductorStateDb,
@@ -825,7 +827,23 @@ where
         &self,
         agent_infos: Vec<AgentInfoSigned>,
     ) -> ConductorApiResult<()> {
-        Ok(inject_agent_infos(self.p2p_env.clone(), agent_infos)?)
+        let mut space_map = HashMap::new();
+        for agent_info_signed in agent_infos {
+            let space: Arc<KitsuneSpace> = Arc::new(
+                (&agent_info_signed)
+                    .try_into()
+                    .map_err(ConductorApiError::other)?,
+            );
+            space_map
+                .entry(space)
+                .or_insert_with(Vec::new)
+                .push(agent_info_signed);
+        }
+        for (space, agent_infos) in space_map {
+            let env = self.p2p_env(space);
+            inject_agent_infos(env, agent_infos)?;
+        }
+        Ok(())
     }
 
     pub(super) fn get_agent_infos(
@@ -835,11 +853,21 @@ where
         match cell_id {
             Some(c) => {
                 let (d, a) = c.into_dna_and_agent();
-                Ok(get_single_agent_info(self.p2p_env.clone().into(), d, a)?
+                let space: Arc<KitsuneSpace> = Arc::new(KitsuneSpace(d.get_raw_36().to_vec()));
+                let env = self.p2p_env(space);
+                Ok(get_single_agent_info(env.into(), d, a)?
                     .map(|a| vec![a])
                     .unwrap_or_default())
             }
-            None => Ok(all_agent_infos(self.p2p_env.clone().into())?),
+            None => {
+                let mut out = Vec::new();
+                // collecting so the mutex lock can close
+                let envs = self.p2p_env.lock().values().cloned().collect::<Vec<_>>();
+                for env in envs {
+                    out.append(&mut all_agent_infos(env.into())?);
+                }
+                Ok(out)
+            }
         }
     }
 
@@ -906,7 +934,15 @@ where
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.env();
 
-        let peer_dump = p2p_store::dump_state(self.p2p_env.clone().into(), Some(cell_id.clone()))?;
+        let space = Arc::new(KitsuneSpace(cell_id.dna_hash().get_raw_36().to_vec()));
+        let p2p_env = self
+            .p2p_env
+            .lock()
+            .get(&space)
+            .cloned()
+            .expect("invalid cell space");
+
+        let peer_dump = p2p_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
         let source_chain_dump =
             source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey()).await?;
 
@@ -920,8 +956,17 @@ where
         Ok(serde_json::to_string_pretty(&out)?)
     }
 
-    pub(super) fn p2p_env(&self) -> EnvWrite {
-        self.p2p_env.clone()
+    pub(super) fn p2p_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
+        let mut p2p_env = self.p2p_env.lock();
+        p2p_env
+            .entry(space.clone())
+            .or_insert_with(move || {
+                let root_env_dir = self.root_env_dir.as_ref();
+                let keystore = self.keystore.clone();
+                EnvWrite::open(root_env_dir, DbKind::P2p(space), keystore)
+                    .expect("failed to open p2p_store database")
+            })
+            .clone()
     }
 
     pub(super) fn print_setup(&self) {
@@ -966,7 +1011,6 @@ where
     async fn new(
         env: EnvWrite,
         wasm_env: EnvWrite,
-        p2p_env: EnvWrite,
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
@@ -975,7 +1019,7 @@ where
         Ok(Self {
             env,
             wasm_env,
-            p2p_env,
+            p2p_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             caches: std::sync::Mutex::new(HashMap::new()),
             cells: HashMap::new(),
             shutting_down: false,
@@ -1163,8 +1207,6 @@ mod builder {
             let wasm_environment =
                 EnvWrite::open(env_path.as_ref(), DbKind::Wasm, keystore.clone())?;
 
-            let p2p_environment = EnvWrite::open(env_path.as_ref(), DbKind::P2p, keystore.clone())?;
-
             #[cfg(any(test, feature = "test_utils"))]
             let state = self.state;
 
@@ -1190,7 +1232,6 @@ mod builder {
             let conductor = Conductor::new(
                 environment,
                 wasm_environment,
-                p2p_environment,
                 dna_store,
                 keystore,
                 env_path,
@@ -1287,7 +1328,6 @@ mod builder {
             let conductor = Conductor::new(
                 envs.conductor(),
                 envs.wasm(),
-                envs.p2p(),
                 self.dna_store,
                 keystore,
                 envs.tempdir().path().to_path_buf().into(),

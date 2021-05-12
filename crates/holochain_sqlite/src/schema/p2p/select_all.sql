@@ -1,7 +1,4 @@
--- select all only uses primary key, no need for an extra index
+-- simple select the whole table
 SELECT encoded
 FROM p2p_store
-WHERE space = :space
--- filter out any entries shadowed by a newer signed_at_ms
-GROUP BY space, agent HAVING signed_at_ms = max(signed_at_ms)
 ;

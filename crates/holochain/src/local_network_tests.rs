@@ -71,7 +71,9 @@ fn conductors_call_remote(num_conductors: usize) {
 
         let mut envs = Vec::with_capacity(handles.len());
         for h in &handles {
-            envs.push(h.get_p2p_env().await);
+            let space = h.cell_id.dna_hash().get_raw_36().to_vec();
+            let space = Arc::new(kitsune_p2p::KitsuneSpace(space));
+            envs.push(h.get_p2p_env(space).await);
         }
 
         exchange_peer_info(envs);
@@ -290,7 +292,9 @@ async fn conductors_gossip_inner(
 
     let mut envs = Vec::with_capacity(handles.len() + second_handles.len());
     for h in handles.iter().chain(second_handles.iter()) {
-        envs.push(h.get_p2p_env().await);
+        let space = h.cell_id.dna_hash().get_raw_36().to_vec();
+        let space = Arc::new(kitsune_p2p::KitsuneSpace(space));
+        envs.push(h.get_p2p_env(space).await);
     }
 
     if share_peers {
@@ -321,7 +325,9 @@ async fn conductors_gossip_inner(
 
     let mut envs = Vec::with_capacity(third_handles.len() + second_handles.len());
     for h in third_handles.iter().chain(second_handles.iter()) {
-        envs.push(h.get_p2p_env().await);
+        let space = h.cell_id.dna_hash().get_raw_36().to_vec();
+        let space = Arc::new(kitsune_p2p::KitsuneSpace(space));
+        envs.push(h.get_p2p_env(space).await);
     }
 
     if share_peers {
