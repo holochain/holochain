@@ -85,7 +85,7 @@ pub async fn fake_unique_element(
 ) -> anyhow::Result<(SignedHeaderHashed, EntryHashed)> {
     let content: SerializedBytes =
         UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned()).into();
-    let entry = EntryHashed::from_content_sync(Entry::App(content.try_into().unwrap()));
+    let entry = Entry::App(content.try_into().unwrap()).into_hashed();
     let app_entry_type = AppEntryTypeFixturator::new(visibility).next().unwrap();
     let header_1 = Header::Create(Create {
         author: agent_key,
@@ -98,7 +98,7 @@ pub async fn fake_unique_element(
     });
 
     Ok((
-        SignedHeaderHashed::new(&keystore, HeaderHashed::from_content_sync(header_1)).await?,
+        SignedHeaderHashed::new(&keystore, header_1.into_hashed()).await?,
         entry,
     ))
 }

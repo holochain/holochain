@@ -550,7 +550,7 @@ fn make_store_element(element: Element) -> Option<(DhtOpHash, DhtOp)> {
 
     // Create the hash and op
     let op = DhtOp::StoreElement(signature, header, maybe_entry_box);
-    let hash = DhtOpHash::with_data_sync(&op);
+    let hash = op.to_hash();
     Some((hash, op))
 }
 
@@ -573,7 +573,7 @@ fn make_store_entry(element: Element) -> Option<(DhtOpHash, DhtOp)> {
 
     // Create the hash and op
     let op = DhtOp::StoreEntry(signature, header, entry_box);
-    let hash = DhtOpHash::with_data_sync(&op);
+    let hash = op.to_hash();
     Some((hash, op))
 }
 
@@ -593,7 +593,7 @@ fn make_register_add_link(element: Element) -> Option<(DhtOpHash, DhtOp)> {
 
     // Create the hash and op
     let op = DhtOp::RegisterAddLink(signature, header);
-    let hash = DhtOpHash::with_data_sync(&op);
+    let hash = op.to_hash();
     Some((hash, op))
 }
 
@@ -613,6 +613,6 @@ fn make_register_agent_activity(element: Element) -> Option<(DhtOpHash, DhtOp)> 
 
     // Create the hash and op
     let op = DhtOp::RegisterAgentActivity(signature, header);
-    let hash = DhtOpHash::with_data_sync(&op);
+    let hash = op.to_hash();
     Some((hash, op))
 }

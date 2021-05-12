@@ -209,7 +209,7 @@ async fn get_from_another_agent() {
 
     // Bob store element
     let entry = Post("Bananas are good for you".into());
-    let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
+    let entry_hash = Entry::try_from(entry.clone()).unwrap().to_hash();
     let header_hash = {
         let call_data = HostFnCaller::create(&bob_cell_id, &handle, &dna_file).await;
         let header_hash = call_data
@@ -354,8 +354,8 @@ async fn get_links_from_another_agent() {
     // Bob store links
     let base = Post("Bananas are good for you".into());
     let target = Post("Potassium is radioactive".into());
-    let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
-    let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
+    let base_entry_hash = Entry::try_from(base.clone()).unwrap().to_hash();
+    let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
     let link_tag = fixt!(LinkTag);
     let link_add_hash = {
         let call_data = HostFnCaller::create(&bob_cell_id, &handle, &dna_file).await;

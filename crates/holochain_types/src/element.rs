@@ -110,7 +110,7 @@ impl<'a> ElementGroup<'a> {
         let iter = headers_iter.into_iter();
         let mut valid = Vec::with_capacity(iter.size_hint().0);
         let mut rejected = Vec::with_capacity(iter.size_hint().0);
-        let entry = EntryHashed::from_content_sync(entry);
+        let entry = entry.into_hashed();
         let entry_hash = entry.as_hash().clone();
         let entry = Cow::Owned(entry);
         for wire in iter {
@@ -285,7 +285,7 @@ impl SignedHeaderHashedExt for SignedHeaderHashed {
         Self: Sized,
     {
         let (header, signature) = signed_header.into();
-        Self::with_presigned(HeaderHashed::from_content_sync(header), signature)
+        Self::with_presigned(header.into_hashed(), signature)
     }
     /// SignedHeader constructor
     async fn new(keystore: &KeystoreSender, header: HeaderHashed) -> Result<Self, KeystoreError> {

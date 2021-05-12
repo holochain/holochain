@@ -162,7 +162,7 @@ fn expected_invalid_remove_link(
 
     // Get the hash of the entry that makes the link invalid
     let sb = SerializedBytes::try_from(&MaybeLinkable::NeverLinkable).unwrap();
-    let invalid_link_entry_hash = EntryHash::with_data_sync(&Entry::app(sb).unwrap());
+    let invalid_link_entry_hash = Entry::app(sb).unwrap().to_hash();
 
     // Link adds with these base / target are invalid
     if let Header::CreateLink(la) = el.header() {
@@ -443,7 +443,7 @@ async fn commit_invalid(
     dna_file: &DnaFile,
 ) -> (HeaderHash, EntryHash) {
     let entry = ThisWasmEntry::NeverValidates;
-    let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
+    let entry_hash = Entry::try_from(entry.clone()).unwrap().to_hash();
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
     // 4
     let invalid_header_hash = call_data
@@ -465,7 +465,7 @@ async fn commit_invalid_post(
 ) -> (HeaderHash, EntryHash) {
     // Bananas are not allowed
     let entry = Post("Banana".into());
-    let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
+    let entry_hash = Entry::try_from(entry.clone()).unwrap().to_hash();
     // Create call data for the 3rd zome Create
     let call_data = HostFnCaller::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
     // 9

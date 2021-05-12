@@ -6,11 +6,9 @@
 
 use crate::element::ElementGroup;
 use crate::header::NewEntryHeader;
-use crate::prelude::*;
 use error::DhtOpError;
 use error::DhtOpResult;
-use holo_hash::hash_type;
-use holo_hash::HashableContentBytes;
+use holo_hash::*;
 use holochain_zome_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -164,42 +162,42 @@ impl DhtOp {
         match self {
             DhtOp::StoreElement(_, h, _) => {
                 let e = h.entry_data().map(|(e, _)| e.clone());
-                let h = HeaderHash::with_data_sync(h);
+                let h = h.to_hash();
                 DhtOpLight::StoreElement(h, e, basis)
             }
             DhtOp::StoreEntry(_, h, _) => {
                 let e = h.entry().clone();
-                let h = HeaderHash::with_data_sync(&Header::from(h.clone()));
+                let h = Header::from(h.clone()).to_hash();
                 DhtOpLight::StoreEntry(h, e, basis)
             }
             DhtOp::RegisterAgentActivity(_, h) => {
-                let h = HeaderHash::with_data_sync(h);
+                let h = h.to_hash();
                 DhtOpLight::RegisterAgentActivity(h, basis)
             }
             DhtOp::RegisterUpdatedContent(_, h, _) => {
                 let e = h.entry_hash.clone();
-                let h = HeaderHash::with_data_sync(&Header::from(h.clone()));
+                let h = Header::from(h.clone()).to_hash();
                 DhtOpLight::RegisterUpdatedContent(h, e, basis)
             }
             DhtOp::RegisterUpdatedElement(_, h, _) => {
                 let e = h.entry_hash.clone();
-                let h = HeaderHash::with_data_sync(&Header::from(h.clone()));
+                let h = Header::from(h.clone()).to_hash();
                 DhtOpLight::RegisterUpdatedElement(h, e, basis)
             }
             DhtOp::RegisterDeletedBy(_, h) => {
-                let h = HeaderHash::with_data_sync(&Header::from(h.clone()));
+                let h = Header::from(h.clone()).to_hash();
                 DhtOpLight::RegisterDeletedBy(h, basis)
             }
             DhtOp::RegisterDeletedEntryHeader(_, h) => {
-                let h = HeaderHash::with_data_sync(&Header::from(h.clone()));
+                let h = Header::from(h.clone()).to_hash();
                 DhtOpLight::RegisterDeletedEntryHeader(h, basis)
             }
             DhtOp::RegisterAddLink(_, h) => {
-                let h = HeaderHash::with_data_sync(&Header::from(h.clone()));
+                let h = Header::from(h.clone()).to_hash();
                 DhtOpLight::RegisterAddLink(h, basis)
             }
             DhtOp::RegisterRemoveLink(_, h) => {
-                let h = HeaderHash::with_data_sync(&Header::from(h.clone()));
+                let h = Header::from(h.clone()).to_hash();
                 DhtOpLight::RegisterRemoveLink(h, basis)
             }
         }

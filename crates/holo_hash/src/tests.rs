@@ -131,7 +131,7 @@ fn agent_id_try_parse() {
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_id_debug() {
     tokio::task::spawn(async move {
-        let agent_id = HeaderHash::with_data_sync(&TestHeader("hi".to_string()));
+        let agent_id = TestHeader("hi".to_string()).to_hash();
         assert_eq!(
             "HeaderHash(uhCkkdwAAuHr_AKFTzF2vjvVzlkWTOxdAhqZ00jcBe9GZQs77BSjQ)",
             &format!("{:?}", agent_id),
@@ -144,7 +144,7 @@ async fn agent_id_debug() {
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_id_display() {
     tokio::task::spawn(async move {
-        let agent_id = HeaderHash::with_data_sync(&TestHeader("hi".to_string()));
+        let agent_id = TestHeader("hi".to_string()).to_hash();
         assert_eq!(
             "uhCkkdwAAuHr_AKFTzF2vjvVzlkWTOxdAhqZ00jcBe9GZQs77BSjQ",
             &format!("{}", agent_id.to_string()),
@@ -157,7 +157,7 @@ async fn agent_id_display() {
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_id_loc() {
     tokio::task::spawn(async move {
-        let agent_id = HeaderHash::with_data_sync(&TestHeader("hi".to_string()));
+        let agent_id = TestHeader("hi".to_string()).to_hash();
         assert_eq!(3_492_283_899, agent_id.get_loc());
     })
     .await

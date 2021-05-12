@@ -575,7 +575,7 @@ mod tests {
                         sig.clone(),
                         entry_create_header.clone().into_content(),
                     );
-                    let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
+                    let op_hash = expected_op.to_hash();
                     map.insert(
                         op_hash,
                         (expected_op, register_agent_activity_count.clone()),
@@ -586,7 +586,7 @@ mod tests {
                         entry_create_header.into_content().try_into().unwrap(),
                         None,
                     );
-                    let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
+                    let op_hash = expected_op.to_hash();
 
                     map.insert(op_hash, (expected_op, store_element_count.clone()));
 
@@ -598,7 +598,7 @@ mod tests {
                         entry_update_header.into_content().try_into().unwrap();
                     let expected_op =
                         DhtOp::StoreElement(sig.clone(), entry_update_header.clone().into(), None);
-                    let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
+                    let op_hash = expected_op.to_hash();
 
                     map.insert(op_hash, (expected_op, store_element_count.clone()));
 
@@ -607,7 +607,7 @@ mod tests {
                         entry_update_header.clone(),
                         None,
                     );
-                    let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
+                    let op_hash = expected_op.to_hash();
 
                     map.insert(op_hash, (expected_op, register_replaced_by_count.clone()));
                     let expected_op = DhtOp::RegisterUpdatedElement(
@@ -615,14 +615,14 @@ mod tests {
                         entry_update_header.clone(),
                         None,
                     );
-                    let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
+                    let op_hash = expected_op.to_hash();
 
                     map.insert(
                         op_hash,
                         (expected_op, register_updated_element_count.clone()),
                     );
                     let expected_op = DhtOp::RegisterAgentActivity(sig, entry_update_header.into());
-                    let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
+                    let op_hash = expected_op.to_hash();
                     map.insert(
                         op_hash,
                         (expected_op, register_agent_activity_count.clone()),

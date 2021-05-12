@@ -69,7 +69,7 @@ impl DnaBundle {
 
         let data = futures::future::join_all(intermediate.into_iter().map(
             |(zome_name, expected_hash, wasm)| async {
-                let hash = WasmHash::with_data(&wasm).await;
+                let hash = wasm.to_hash().await;
                 if let Some(expected) = expected_hash {
                     if hash != expected {
                         return Err(DnaError::WasmHashMismatch(expected, hash));
@@ -205,8 +205,8 @@ mod tests {
         let path2 = PathBuf::from("2");
         let wasm1 = vec![1, 2, 3];
         let wasm2 = vec![4, 5, 6];
-        let hash1 = WasmHash::with_data(&DnaWasm::from(wasm1.clone())).await;
-        let hash2 = WasmHash::with_data(&DnaWasm::from(wasm2.clone())).await;
+        let hash1 = DnaWasm::from(wasm1.clone()).to_hash().await;
+        let hash2 = DnaWasm::from(wasm2.clone()).to_hash().await;
         let mut manifest = DnaManifestCurrent {
             name: "name".into(),
             uid: Some("original uid".to_string()),
