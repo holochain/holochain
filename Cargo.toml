@@ -48,6 +48,10 @@ overflow-checks = false
 incremental = false
 codegen-units = 16
 
+# [profile.bench]
+# debug = true
+
+
 [patch.crates-io]
 
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }

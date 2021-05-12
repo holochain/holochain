@@ -93,6 +93,16 @@ fn initialize_connection(
     // enable foreign key support
     conn.pragma_update(None, "foreign_keys", &"ON".to_string())?;
 
+    // conn.profile(Some(|stmt, dur| {
+    //     if dur.as_millis() > 100 {
+    //         let s = tracing::debug_span!("sql_trace");
+    //         let _g = s.enter();
+    //         let len = std::cmp::min(stmt.len(), 200);
+    //         tracing::debug!(statement = %stmt[..len], ?dur);
+    //         tracing::trace!(%stmt);
+    //     }
+    // }));
+
     Ok(())
 }
 
