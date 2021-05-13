@@ -159,12 +159,12 @@ impl AsP2pTxExt for Transaction<'_> {
         let mut out = Vec::new();
         for r in stmt.query_map(
             named_params! {
-                ":since_ms": &since_ms,
-                ":until_ms": &until_ms,
-                ":storage_start_1": &storage_start_1,
-                ":storage_end_1": &storage_end_1,
-                ":storage_start_2": &storage_start_2,
-                ":storage_end_2": &storage_end_2,
+                ":since_ms": clamp64(since_ms),
+                ":until_ms": clamp64(until_ms),
+                ":storage_start_1": storage_start_1,
+                ":storage_end_1": storage_end_1,
+                ":storage_start_2": storage_start_2,
+                ":storage_end_2": storage_end_2,
             },
             |r| {
                 let agent: Vec<u8> = r.get(0)?;
@@ -197,8 +197,8 @@ struct P2pRecord {
     encoded: Vec<u8>,
 
     // additional queryable fields
-    signed_at_ms: u64,
-    expires_at_ms: u64,
+    signed_at_ms: i64,
+    expires_at_ms: i64,
     storage_center_loc: u32,
 
     // generated fields
@@ -245,6 +245,14 @@ fn split_arc(arc: &DhtArc) -> (Option<u32>, Option<u32>, Option<u32>, Option<u32
     )
 }
 
+fn clamp64(u: u64) -> i64 {
+    if u > i64::MAX as u64 {
+        i64::MAX
+    } else {
+        u as i64
+    }
+}
+
 impl P2pRecord {
     pub fn from_signed(signed: &AgentInfoSigned) -> DatabaseResult<Self> {
         use std::convert::TryFrom;
@@ -267,8 +275,8 @@ impl P2pRecord {
 
             encoded,
 
-            signed_at_ms,
-            expires_at_ms,
+            signed_at_ms: clamp64(signed_at_ms),
+            expires_at_ms: clamp64(expires_at_ms),
             storage_center_loc,
 
             storage_start_1,
