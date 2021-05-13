@@ -77,9 +77,6 @@ fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
         }]),
         environment_path: environment_path.into(),
         network: None,
-        signing_service_uri: None,
-        encryption_service_uri: None,
-        decryption_service_uri: None,
         dpki: None,
         passphrase_service: Some(PassphraseServiceConfig::FromConfig {
             passphrase: "password".into(),
@@ -169,6 +166,7 @@ how_many: 42
         &mut holochain,
         &mut client,
         orig_dna_hash,
+        fake_agent_pubkey_1(),
         fake_dna_path,
         Some(properties.clone()),
         "nick".into(),
@@ -206,10 +204,10 @@ pub async fn start_holochain(config_path: PathBuf) -> Child {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
-    let mut holochain = cmd.spawn().expect("Failed to spawn holochain");
-    spawn_output(&mut holochain);
-    check_started(&mut holochain).await;
-    holochain
+    let mut child = cmd.spawn().expect("Failed to spawn holochain");
+    spawn_output(&mut child);
+    check_started(&mut child).await;
+    child
 }
 
 pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &mut Child) {
@@ -294,6 +292,7 @@ async fn register_and_install_dna(
     mut holochain: &mut Child,
     client: &mut WebsocketSender,
     orig_dna_hash: DnaHash,
+    agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
     nick: String,
@@ -318,7 +317,6 @@ async fn register_and_install_dna(
         nick,
         membrane_proof: None,
     };
-    let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
         installed_app_id: "test".to_string(),
@@ -366,6 +364,7 @@ async fn call_zome() {
         &mut holochain,
         &mut client,
         original_dna_hash.clone(),
+        fake_agent_pubkey_1(),
         fake_dna_path,
         None,
         "".into(),
@@ -512,6 +511,7 @@ async fn emit_signals() {
         &mut holochain,
         &mut admin_tx,
         orig_dna_hash,
+        fake_agent_pubkey_1(),
         fake_dna_path,
         None,
         "".into(),

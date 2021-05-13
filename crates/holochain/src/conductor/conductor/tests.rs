@@ -8,8 +8,13 @@ use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };
 use ::fixt::prelude::*;
+use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppResponse, ZomeCall};
+use holochain_keystore::crude_mock_keystore::spawn_crude_mock_keystore;
 use holochain_lmdb::test_utils::test_environments;
 use holochain_types::test_utils::fake_cell_id;
+use holochain_wasm_test_utils::TestWasm;
+use holochain_websocket::WebsocketSender;
+use kitsune_p2p_types::dependencies::lair_keystore_api::LairError;
 use maplit::hashset;
 use matches::assert_matches;
 
@@ -416,6 +421,147 @@ async fn test_setup_cells_idempotency() {
 
     // - Ensure that the app is active
     assert_eq_retry_10s!(conductor.list_active_apps().await.unwrap().len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_signing_error_during_genesis() {
+    observability::test_run().ok();
+    let bad_keystore = spawn_crude_mock_keystore(|| LairError::other("test error"))
+        .await
+        .unwrap();
+
+    let envs = test_environments_with_keystore(bad_keystore);
+    let config = ConductorConfig::default();
+    let mut conductor = SweetConductor::new(
+        SweetConductor::handle_from_existing(&envs, &config).await,
+        envs,
+        config,
+    )
+    .await;
+
+    let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign])
+        .await
+        .unwrap();
+
+    let result = conductor
+        .setup_app_for_agents("app", &[fixt!(AgentPubKey)], &[dna])
+        .await;
+
+    // - Assert that we got an error during Genesis. However, this test is
+    //   pretty useless. What we really want is to ensure that the system is
+    //   resilient when this type of error comes up in a real setting.
+    let err = if let Err(err) = result {
+        err
+    } else {
+        panic!("this should have been an error")
+    };
+
+    assert_matches!(err, ConductorError::GenesisFailed { errors } if errors.len() == 1);
+}
+
+async fn make_signing_call(client: &mut WebsocketSender, cell: &SweetCell) -> AppResponse {
+    client
+        .request(AppRequest::ZomeCall(Box::new(ZomeCall {
+            cell_id: cell.cell_id().clone(),
+            zome_name: "sign".into(),
+            fn_name: "sign_ephemeral".into(),
+            payload: ExternIO::encode(()).unwrap(),
+            cap: None,
+            provenance: cell.agent_pubkey().clone(),
+        })))
+        .await
+        .unwrap()
+}
+
+/// A test which simulates Keystore errors with a test keystore which is designed
+/// to fail.
+///
+/// This test was written making the assumption that we could swap out the
+/// KeystoreSender for each Cell at runtime, but given our current concurrency
+/// model which puts each Cell in an Arc, this is not possible.
+/// In order to implement this test, we should probably have the "crude mock
+/// keystore" listen on a channel which toggles its behavior from always-correct
+/// to always-failing. However, the problem that this test is testing for does
+/// not seem to be an issue, therefore I'm not putting the effort into fixing it
+/// right now.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "we need a better mock keystore in order to implement this test"]
+#[allow(unreachable_code, unused_variables, unused_mut)]
+async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
+    observability::test_run().ok();
+    let good_keystore = spawn_test_keystore().await.unwrap();
+    let bad_keystore = spawn_crude_mock_keystore(|| LairError::other("test error"))
+        .await
+        .unwrap();
+
+    let envs = test_environments_with_keystore(good_keystore.clone());
+    let config = standard_config();
+    let mut conductor = SweetConductor::new(
+        SweetConductor::handle_from_existing(&envs, &config).await,
+        envs,
+        config,
+    )
+    .await;
+
+    let (agent1, agent2, agent3) = SweetAgents::three(good_keystore.clone()).await;
+
+    let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign])
+        .await
+        .unwrap();
+
+    let app1 = conductor
+        .setup_app_for_agent("app1", agent1.clone(), &[dna.clone()])
+        .await
+        .unwrap();
+
+    let app2 = conductor
+        .setup_app_for_agent("app2", agent2.clone(), &[dna.clone()])
+        .await
+        .unwrap();
+
+    let (cell1,) = app1.into_tuple();
+    let (cell2,) = app2.into_tuple();
+
+    let app_port = conductor.inner_handle().add_app_interface(0).await.unwrap();
+    let (mut app_client, _) = websocket_client_by_port(app_port).await.unwrap();
+    let (mut admin_client, _) = conductor.admin_ws_client().await;
+
+    // Now use the bad keystore to cause a signing error on the next zome call
+    todo!("switch keystore to always-erroring mode");
+
+    let response: AdminResponse = admin_client
+        .request(AdminRequest::InstallApp(Box::new(InstallAppPayload {
+            installed_app_id: "app3".into(),
+            agent_key: agent3.clone(),
+            dnas: vec![InstallAppDnaPayload {
+                nick: "whatever".into(),
+                hash: dna.dna_hash().clone(),
+                membrane_proof: None,
+            }],
+        })))
+        .await
+        .unwrap();
+
+    // TODO: match the errors more tightly
+    assert_matches!(response, AdminResponse::Error(_));
+    let response = make_signing_call(&mut app_client, &cell2).await;
+    dbg!(&response);
+
+    assert_matches!(response, AppResponse::Error(_));
+
+    // Go back to the good keystore, see if we can proceed
+    todo!("switch keystore to always-correct mode");
+
+    let response = make_signing_call(&mut app_client, &cell2).await;
+    assert_matches!(response, AppResponse::ZomeCall(_));
+
+    let response = make_signing_call(&mut app_client, &cell1).await;
+    assert_matches!(response, AppResponse::ZomeCall(_));
+
+    // conductor
+    //     .setup_app_for_agent("app3", agent3, &[dna.clone()])
+    //     .await
+    //     .unwrap();
 }
 
 fn simple_zome() -> InlineZome {

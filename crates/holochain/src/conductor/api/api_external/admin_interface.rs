@@ -538,8 +538,6 @@ mod test {
         let install_response = admin_api
             .handle_admin_request(AdminRequest::InstallApp(Box::new(path_install_payload)))
             .await;
-        dbg!(&install_response);
-        dbg!(&expected_installed_app_info);
         assert_matches!(
             install_response,
             AdminResponse::AppInstalled(info) if info == expected_installed_app_info
