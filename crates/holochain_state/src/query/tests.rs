@@ -23,7 +23,6 @@ mod chain_sequence;
 mod chain_test;
 mod details;
 mod links;
-#[cfg(todo_redo_old_tests)]
 mod links_test;
 mod store;
 #[cfg(todo_redo_old_tests)]
