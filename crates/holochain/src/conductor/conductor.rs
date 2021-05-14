@@ -107,7 +107,7 @@ where
 
     /// The caches databases. These are shared across cells.
     /// There is one per unique Dna.
-    caches: std::sync::Mutex<HashMap<DnaHash, EnvWrite>>,
+    caches: parking_lot::Mutex<HashMap<DnaHash, EnvWrite>>,
 
     /// A database for storing wasm
     wasm_env: EnvWrite,
@@ -492,10 +492,7 @@ where
     }
 
     fn get_or_create_cache(&self, dna_hash: &DnaHash) -> ConductorResult<EnvWrite> {
-        let mut caches = self
-            .caches
-            .lock()
-            .map_err(|_| ConductorError::CachesLockPoisoned)?;
+        let mut caches = self.caches.lock();
         match caches.get(dna_hash) {
             Some(env) => Ok(env.clone()),
             None => {
@@ -976,7 +973,7 @@ where
             env,
             wasm_env,
             p2p_env,
-            caches: std::sync::Mutex::new(HashMap::new()),
+            caches: parking_lot::Mutex::new(HashMap::new()),
             cells: HashMap::new(),
             shutting_down: false,
             app_interfaces: HashMap::new(),
