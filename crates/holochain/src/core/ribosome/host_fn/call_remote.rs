@@ -43,7 +43,7 @@ pub mod wasm_test {
     use crate::test_utils::conductor_setup::*;
     use crate::test_utils::new_invocation;
     use crate::{conductor::dna_store::MockDnaStore, test_utils::wait_for_integration};
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
     use holochain_types::app::InstalledCell;
     use holochain_types::cell::CellId;
     use holochain_types::dna::DnaDef;
@@ -174,7 +174,7 @@ pub mod wasm_test {
         shutdown.await.unwrap().unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn call_remote_regression_test() {
         observability::test_run().ok();
         // Check if the correct number of ops are integrated
