@@ -51,6 +51,9 @@ pub enum KitsuneDirectEvt {
     },
 }
 
+/// Stream of KitsuneDirectEvt instances
+pub type KitsuneDirectEvtStream = Box<dyn futures::Stream<Item = KitsuneDirectEvt> + 'static + Send + Unpin>;
+
 /// Trait representing a kitsune direct api implementation
 pub trait AsKitsuneDirect: 'static + Send + Sync {
     /// Get a uniq val that assists with Eq/Hash of trait objects.

@@ -14,11 +14,12 @@ edition = "2018"
 arrayref = "0.3.6"
 base64 = "0.13"
 futures = "0.3.14"
+hyper = { version = "0.14", features = ["server","http1","http2","tcp"] }
 kitsune_p2p_types = { version = "0.0.1", path = "../types" }
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p" }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 sodoken = "0.0.1-alpha.3"
-
-[dev-dependencies]
-tokio = { version = "1.5", features = ["macros", "rt", "rt-multi-thread"] }
+tokio = { version = "1.5", features = ["full"] }
+tokio-tungstenite = "0.14"
+tungstenite = "0.13"
