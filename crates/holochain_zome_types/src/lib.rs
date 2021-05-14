@@ -173,7 +173,7 @@ macro_rules! secure_primitive {
         /// This type of attack has been successfully demonstrated over a network despite varied latencies.
         impl PartialEq for $t {
             fn eq(&self, other: &Self) -> bool {
-                use $crate::subtle::ConstantTimeEq;
+                use $crate::dependencies::subtle::ConstantTimeEq;
                 self.0.ct_eq(&other.0).into()
             }
         }
