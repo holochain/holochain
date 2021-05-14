@@ -36,6 +36,7 @@ fixturators = ["fixt", "rand", "serialized-bytes", "string-encoding"]
 serialized-bytes = ["holochain_serialized_bytes"]
 string-encoding = ["base64", "blake2b_simd", "derive_more"]
 hashing = ["blake2b_simd", "serialized-bytes"]
+test_utils = []
 
 [package.metadata.cargo-udeps.ignore]
 normal = ["tracing"]
