@@ -1,19 +1,17 @@
 #![deny(missing_docs)]
 //! Errors occurring during a [Ribosome] call
 
-use crate::{
-    conductor::{api::error::ConductorApiError, interface::error::InterfaceError},
-    core::state::{cascade::error::CascadeError, source_chain::SourceChainError},
-};
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::interface::error::InterfaceError;
+use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use holo_hash::AnyDhtHash;
+use holochain_cascade::error::CascadeError;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
-use holochain_types::dna::error::DnaError;
+use holochain_state::source_chain::SourceChainError;
+use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome::ZomeName;
 use thiserror::Error;
 use tokio::task::JoinError;
-use tokio_safe_block_on::BlockOnError;
 
 /// Errors occurring during a [Ribosome] call
 #[derive(Error, Debug)]
@@ -39,7 +37,7 @@ pub enum RibosomeError {
     ZomeFnNotExists(ZomeName, FunctionName),
 
     /// a problem with entry defs
-    #[error("An error with entry defs: {0}")]
+    #[error("An error with entry defs in zome '{0}': {1}")]
     EntryDefs(ZomeName, String),
 
     /// a mandatory dependency for an element doesn't exist
@@ -59,7 +57,7 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
-    DatabaseError(#[from] holochain_state::error::DatabaseError),
+    DatabaseError(#[from] holochain_lmdb::error::DatabaseError),
 
     /// ident
     #[error(transparent)]
@@ -79,15 +77,33 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
-    BlockOnError(#[from] BlockOnError),
-
-    /// ident
-    #[error(transparent)]
     JoinError(#[from] JoinError),
 
     /// ident
     #[error(transparent)]
+    InlineZomeError(#[from] InlineZomeError),
+
+    /// ident
+    #[error(transparent)]
     P2pError(#[from] holochain_p2p::HolochainP2pError),
+
+    /// ident
+    #[error(transparent)]
+    DhtOpConvertError(#[from] Box<DhtOpConvertError>),
+
+    /// ident
+    #[error("xsalsa20poly1305 error {0}")]
+    Aead(String),
+
+    /// ident
+    #[error(transparent)]
+    SecurePrimitive(#[from] holochain_zome_types::SecurePrimitiveError),
+}
+
+impl From<xsalsa20poly1305::aead::Error> for RibosomeError {
+    fn from(error: xsalsa20poly1305::aead::Error) -> Self {
+        Self::Aead(error.to_string())
+    }
 }
 
 impl From<ring::error::Unspecified> for RibosomeError {

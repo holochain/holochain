@@ -1,28 +1,26 @@
 // Error types are self-explanatory
 #![allow(missing_docs)]
 
-use super::{
-    app_validation_workflow::AppValidationError,
-    produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError,
-};
-use crate::{
-    conductor::{api::error::ConductorApiError, CellError},
-    core::{
-        queue_consumer::QueueTriggerClosedError,
-        ribosome::error::RibosomeError,
-        state::{
-            cascade::error::CascadeError, source_chain::SourceChainError, workspace::WorkspaceError,
-        },
-        SysValidationError,
-    },
-};
+use super::app_validation_workflow::AppValidationError;
+use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::CellError;
+use crate::core::queue_consumer::QueueTriggerClosedError;
+use crate::core::ribosome::error::RibosomeError;
+use crate::core::SysValidationError;
+use holochain_cascade::error::CascadeError;
+use holochain_lmdb::error::DatabaseError;
 use holochain_p2p::HolochainP2pError;
-use holochain_state::error::DatabaseError;
-use holochain_types::{dht_op::error::DhtOpError, prelude::*};
+use holochain_state::source_chain::SourceChainError;
+use holochain_state::workspace::WorkspaceError;
+use holochain_types::prelude::*;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum WorkflowError {
+    #[error("The genesis self-check failed. App cannot be installed. Reason: {0}")]
+    GenesisFailure(String),
+
     #[error(transparent)]
     AppValidationError(#[from] AppValidationError),
 
@@ -67,6 +65,9 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     HolochainP2pError(#[from] HolochainP2pError),
+
+    #[error(transparent)]
+    HoloHashError(#[from] holo_hash::error::HoloHashError),
 
     #[error(transparent)]
     DhtOpError(#[from] DhtOpError),

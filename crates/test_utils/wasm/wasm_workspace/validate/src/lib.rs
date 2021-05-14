@@ -1,8 +1,7 @@
-use element::ElementEntry;
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 /// an example inner value that can be serialized into the contents of Entry::App()
-#[derive(Deserialize, Serialize, SerializedBytes)]
+#[derive(Deserialize, Serialize, SerializedBytes, Debug)]
 enum ThisWasmEntry {
     AlwaysValidates,
     NeverValidates,
@@ -54,10 +53,36 @@ impl TryFrom<&Entry> for ThisWasmEntry {
         match entry {
             Entry::App(eb) => Ok(Self::try_from(SerializedBytes::from(eb.to_owned()))?),
             _ => Err(
-                SerializedBytesError::FromBytes("failed to deserialize ThisWasmEntry".into())
+                SerializedBytesError::Deserialize("failed to deserialize ThisWasmEntry".into())
                     .into(),
             ),
         }
+    }
+}
+
+impl TryFrom<&ThisWasmEntry> for Entry {
+    type Error = WasmError;
+    fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
+        Ok(
+            Entry::App(
+                match AppEntryBytes::try_from(
+                    SerializedBytes::try_from(this_wasm_entry)?
+                ) {
+                    Ok(app_entry_bytes) => app_entry_bytes,
+                    Err(entry_error) => match entry_error {
+                        EntryError::SerializedBytes(serialized_bytes_error) => return Err(WasmError::Serialize(serialized_bytes_error)),
+                        EntryError::EntryTooLarge(_) => return Err(WasmError::Guest(entry_error.to_string())),
+                    },
+                }
+            )
+        )
+    }
+}
+
+impl TryFrom<&ThisWasmEntry> for EntryWithDefId {
+    type Error = WasmError;
+    fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
+        Ok(Self::new(EntryDefId::from(this_wasm_entry), Entry::try_from(this_wasm_entry)?))
     }
 }
 
@@ -87,7 +112,7 @@ fn validate(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn _commit_validate(to_commit: ThisWasmEntry) -> ExternResult<HeaderHash> {
-    Ok(create_entry(&to_commit)?)
+    create_entry(&to_commit)
 }
 
 #[hdk_extern]

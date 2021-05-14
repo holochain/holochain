@@ -1,11 +1,15 @@
 use crate::*;
-use futures::{future::FutureExt, sink::SinkExt, stream::StreamExt};
+use futures::future::FutureExt;
+use futures::sink::SinkExt;
+use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
-use kitsune_p2p_types::{
-    dependencies::{ghost_actor, ghost_actor::GhostControlSender, serde_json, url2},
-    transport::*,
-};
-use std::{collections::HashMap, net::SocketAddr};
+use kitsune_p2p_types::dependencies::ghost_actor;
+use kitsune_p2p_types::dependencies::ghost_actor::GhostControlSender;
+use kitsune_p2p_types::dependencies::serde_json;
+use kitsune_p2p_types::dependencies::url2;
+use kitsune_p2p_types::transport::*;
+use std::collections::HashMap;
+use std::net::SocketAddr;
 
 /// Convert quinn async read/write streams into Vec<u8> senders / receivers.
 /// Quic bi-streams are Async Read/Write - But the kitsune transport api
@@ -16,7 +20,7 @@ fn tx_bi_chan(
 ) -> (TransportChannelWrite, TransportChannelRead) {
     let (write_send, mut write_recv) = futures::channel::mpsc::channel::<Vec<u8>>(10);
     let write_send = write_send.sink_map_err(TransportError::other);
-    tokio::task::spawn(async move {
+    metric_task(async move {
         while let Some(data) = write_recv.next().await {
             bi_send
                 .write_all(&data)
@@ -27,7 +31,7 @@ fn tx_bi_chan(
         TransportResult::Ok(())
     });
     let (mut read_send, read_recv) = futures::channel::mpsc::channel::<Vec<u8>>(10);
-    tokio::task::spawn(async move {
+    metric_task(async move {
         let mut buf = [0_u8; 4096];
         while let Some(read) = bi_recv
             .read(&mut buf)
@@ -167,7 +171,7 @@ impl ListenerInnerHandler for TransportListenerQuic {
 
             // pass any incoming channels off to our actor
             let url_clone = url.clone();
-            tokio::task::spawn(async move {
+            metric_task(async move {
                 while let Some(Ok((bi_send, bi_recv))) = bi_streams.next().await {
                     let (write, read) = tx_bi_chan(bi_send, bi_recv);
                     if incoming_channel_sender
@@ -182,6 +186,7 @@ impl ListenerInnerHandler for TransportListenerQuic {
                         break;
                     }
                 }
+                <Result<(), ()>>::Ok(())
             });
 
             Ok(out.map(move |(write, read)| (url, write, read)))
@@ -214,7 +219,7 @@ impl TransportListenerHandler for TransportListenerQuic {
         Ok(async move {
             Ok(serde_json::json! {{
                 "url": url,
-                "connections": connections,
+                "connection_count": connections.len(),
             }})
         }
         .boxed()
@@ -280,7 +285,7 @@ pub async fn spawn_transport_listener_quic(
         .map_err(|e| TransportError::from(format!("cert error: {:?}", e)))?;
     let mut builder = quinn::Endpoint::builder();
     builder.listen(server_config);
-    builder.default_client_config(danger::configure_client());
+    builder.default_client_config(danger::configure_client()?);
     let (quinn_endpoint, incoming) = builder
         .bind(&crate::url_to_addr(&bind_to, crate::SCHEME).await?)
         .map_err(TransportError::other)?;
@@ -294,7 +299,7 @@ pub async fn spawn_transport_listener_quic(
     let sender = builder.channel_factory().create_channel().await?;
 
     let i_s = internal_sender.clone();
-    tokio::task::spawn(async move {
+    metric_task(async move {
         incoming
             .for_each_concurrent(10, |maybe_con| async {
                 let res: TransportResult<()> = async {
@@ -348,19 +353,52 @@ pub async fn spawn_transport_listener_quic(
         connections: HashMap::new(),
     };
 
-    tokio::task::spawn(builder.spawn(actor));
+    metric_task(builder.spawn(actor));
 
     Ok((sender, receiver))
 }
 
 // TODO - modernize all this taking hints from TLS code in proxy crate.
 mod danger {
-    use kitsune_p2p_types::transport::{TransportError, TransportResult};
-    use quinn::{
-        Certificate, CertificateChain, ClientConfig, ClientConfigBuilder, PrivateKey, ServerConfig,
-        ServerConfigBuilder, TransportConfig,
-    };
+    use kitsune_p2p_types::transport::TransportError;
+    use kitsune_p2p_types::transport::TransportResult;
+    use once_cell::sync::Lazy;
+    use quinn::Certificate;
+    use quinn::CertificateChain;
+    use quinn::ClientConfig;
+    use quinn::ClientConfigBuilder;
+    use quinn::PrivateKey;
+    use quinn::ServerConfig;
+    use quinn::ServerConfigBuilder;
+    use quinn::TransportConfig;
     use std::sync::Arc;
+
+    // TODO: make this a prop error type
+    static TRANSPORT: Lazy<Result<Arc<quinn::TransportConfig>, String>> = Lazy::new(|| {
+        let mut transport = quinn::TransportConfig::default();
+
+        // We don't use uni streams in kitsune - only bidi streams
+        transport
+            .max_concurrent_uni_streams(0)
+            .map_err(|e| e.to_string())?;
+
+        // We don't use "Application" datagrams in kitsune -
+        // only bidi streams.
+        transport.datagram_receive_buffer_size(None);
+
+        // Disable spin bit - we'd like the extra privacy
+        // any metrics we implement will be opt-in self reporting
+        transport.allow_spin(false);
+
+        // see also `keep_alive_interval`.
+        // right now keep_alive_interval is None,
+        // so connections will idle timeout after 20 seconds.
+        transport
+            .max_idle_timeout(Some(std::time::Duration::from_millis(30_000)))
+            .unwrap();
+
+        Ok(Arc::new(transport))
+    });
 
     #[allow(dead_code)]
     pub(crate) async fn configure_server(
@@ -387,7 +425,9 @@ mod danger {
         let tcert_priv = PrivateKey::from_der(&cert_priv).map_err(TransportError::other)?;
 
         let mut transport_config = TransportConfig::default();
-        transport_config.stream_window_uni(0);
+        transport_config
+            .max_concurrent_uni_streams(0)
+            .map_err(TransportError::other)?;
         let mut server_config = ServerConfig::default();
         server_config.transport = Arc::new(transport_config);
         let mut cfg_builder = ServerConfigBuilder::new(server_config);
@@ -395,7 +435,10 @@ mod danger {
             .certificate(CertificateChain::from_certs(vec![tcert]), tcert_priv)
             .map_err(TransportError::other)?;
 
-        Ok(cfg_builder.build())
+        let mut cfg = cfg_builder.build();
+
+        cfg.transport = TRANSPORT.clone()?;
+        Ok(cfg)
     }
 
     /// Dummy certificate verifier that treats any certificate as valid.
@@ -420,13 +463,15 @@ mod danger {
         }
     }
 
-    pub(crate) fn configure_client() -> ClientConfig {
+    pub(crate) fn configure_client() -> Result<ClientConfig, String> {
         let mut cfg = ClientConfigBuilder::default().build();
         let tls_cfg: &mut rustls::ClientConfig = Arc::get_mut(&mut cfg.crypto).unwrap();
         // this is only available when compiled with "dangerous_configuration" feature
         tls_cfg
             .dangerous()
             .set_certificate_verifier(SkipServerVerification::new());
-        cfg
+
+        cfg.transport = TRANSPORT.clone()?;
+        Ok(cfg)
     }
 }

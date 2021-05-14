@@ -1,32 +1,33 @@
-use super::{
-    app_validation_workflow, error::WorkflowResult, sys_validation_workflow::sys_validate_element,
-};
+use super::app_validation_workflow;
+use super::error::WorkflowResult;
+use super::sys_validation_workflow::sys_validate_element;
+use crate::conductor::api::CellConductorApiT;
 use crate::conductor::interface::SignalBroadcaster;
+use crate::core::queue_consumer::OneshotWriter;
+use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::error::RibosomeError;
+use crate::core::ribosome::error::RibosomeResult;
+use crate::core::ribosome::RibosomeT;
+use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
-use crate::core::state::metadata::MetadataBufT;
-use crate::core::state::source_chain::SourceChainError;
-use crate::core::state::workspace::Workspace;
-use crate::core::{
-    queue_consumer::{OneshotWriter, TriggerSender},
-    state::{
-        cascade::Cascade, element_buf::ElementBuf, metadata::MetadataBuf,
-        source_chain::SourceChain, workspace::WorkspaceResult,
-    },
-};
-use crate::{
-    conductor::api::CellConductorApiT,
-    core::state::cascade::{DbPair, DbPairMut},
-};
 pub use call_zome_workspace_lock::CallZomeWorkspaceLock;
 use either::Either;
+use holochain_cascade::Cascade;
+use holochain_cascade::DbPair;
+use holochain_cascade::DbPairMut;
 use holochain_keystore::KeystoreSender;
+use holochain_lmdb::prelude::*;
 use holochain_p2p::HolochainP2pCell;
-use holochain_state::prelude::*;
-use holochain_types::element::Element;
-use holochain_zome_types::header::Header;
-use holochain_zome_types::ZomeCallResponse;
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::metadata::MetadataBuf;
+use holochain_state::metadata::MetadataBufT;
+use holochain_state::source_chain::SourceChain;
+use holochain_state::source_chain::SourceChainError;
+use holochain_state::workspace::Workspace;
+use holochain_state::workspace::WorkspaceResult;
+use holochain_zome_types::element::Element;
+
+use holochain_types::prelude::*;
 use std::sync::Arc;
 use tracing::instrument;
 
@@ -36,8 +37,7 @@ pub mod call_zome_workspace_lock;
 mod validation_test;
 
 /// Placeholder for the return value of a zome invocation
-/// TODO: do we want this to be the same as ZomeCallInvocationRESPONSE?
-pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallResponse>;
+pub type ZomeCallResult = RibosomeResult<ZomeCallResponse>;
 
 #[derive(Debug)]
 pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT + Send, C: CellConductorApiT> {
@@ -67,7 +67,7 @@ pub async fn call_zome_workflow<
     writer: OneshotWriter,
     args: CallZomeWorkflowArgs<Ribosome, C>,
     mut trigger_produce_dht_ops: TriggerSender,
-) -> WorkflowResult<ZomeCallInvocationResult> {
+) -> WorkflowResult<ZomeCallResult> {
     let should_write = args.is_root_zome_call;
     let result = call_zome_workflow_inner(workspace_lock.clone(), network, keystore, args).await?;
 
@@ -94,7 +94,7 @@ async fn call_zome_workflow_inner<
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     args: CallZomeWorkflowArgs<Ribosome, C>,
-) -> WorkflowResult<ZomeCallInvocationResult> {
+) -> WorkflowResult<ZomeCallResult> {
     let CallZomeWorkflowArgs {
         ribosome,
         invocation,
@@ -104,8 +104,7 @@ async fn call_zome_workflow_inner<
     } = args;
 
     let call_zome_handle = conductor_api.clone().into_call_zome_handle();
-
-    let zome_name = invocation.zome_name.clone();
+    let zome = invocation.zome.clone();
 
     // Get the current head
     let chain_head_start_len = workspace_lock.read().await.source_chain.len();
@@ -197,7 +196,7 @@ async fn call_zome_workflow_inner<
                     let link_add = Arc::new(link_add.clone());
                     Either::Left(
                         app_validation_workflow::run_create_link_validation_callback(
-                            zome_name.clone(),
+                            zome.clone(),
                             link_add,
                             base,
                             target,
@@ -209,7 +208,7 @@ async fn call_zome_workflow_inner<
                 }
                 Header::DeleteLink(delete_link) => Either::Left(
                     app_validation_workflow::run_delete_link_validation_callback(
-                        zome_name.clone(),
+                        zome.clone(),
                         delete_link.clone(),
                         &ribosome,
                         workspace_lock.clone(),
@@ -218,7 +217,7 @@ async fn call_zome_workflow_inner<
                 ),
                 Header::Create(_) | Header::Update(_) | Header::Delete(_) => Either::Right(
                     app_validation_workflow::run_validation_callback_direct(
-                        zome_name.clone(),
+                        zome.clone(),
                         chain_element,
                         &ribosome,
                         workspace_lock.clone(),
@@ -230,7 +229,7 @@ async fn call_zome_workflow_inner<
             };
             match outcome {
                 Either::Left(outcome) => match outcome {
-                    app_validation_workflow::Outcome::Accepted => (),
+                    app_validation_workflow::Outcome::Accepted => {}
                     app_validation_workflow::Outcome::Rejected(reason) => {
                         return Err(SourceChainError::InvalidLink(reason).into());
                     }
@@ -239,7 +238,7 @@ async fn call_zome_workflow_inner<
                     }
                 },
                 Either::Right(outcome) => match outcome {
-                    app_validation_workflow::Outcome::Accepted => (),
+                    app_validation_workflow::Outcome::Accepted => {}
                     app_validation_workflow::Outcome::Rejected(reason) => {
                         return Err(SourceChainError::InvalidCommit(reason).into());
                     }
@@ -266,6 +265,8 @@ pub struct CallZomeWorkspace {
     pub meta_authored: MetadataBuf<AuthoredPrefix>,
     pub element_integrated: ElementBuf<IntegratedPrefix>,
     pub meta_integrated: MetadataBuf<IntegratedPrefix>,
+    pub element_rejected: ElementBuf<RejectedPrefix>,
+    pub meta_rejected: MetadataBuf<RejectedPrefix>,
     pub element_cache: ElementBuf,
     pub meta_cache: MetadataBuf,
 }
@@ -276,6 +277,8 @@ impl<'a> CallZomeWorkspace {
         let meta_authored = MetadataBuf::authored(env.clone())?;
         let element_integrated = ElementBuf::vault(env.clone(), true)?;
         let meta_integrated = MetadataBuf::vault(env.clone())?;
+        let element_rejected = ElementBuf::rejected(env.clone())?;
+        let meta_rejected = MetadataBuf::rejected(env.clone())?;
         let element_cache = ElementBuf::cache(env.clone())?;
         let meta_cache = MetadataBuf::cache(env)?;
 
@@ -284,6 +287,8 @@ impl<'a> CallZomeWorkspace {
             meta_authored,
             element_integrated,
             meta_integrated,
+            element_rejected,
+            meta_rejected,
             element_cache,
             meta_cache,
         })
@@ -296,6 +301,8 @@ impl<'a> CallZomeWorkspace {
             &self.meta_authored,
             &self.element_integrated,
             &self.meta_integrated,
+            &self.element_rejected,
+            &self.meta_rejected,
             &mut self.element_cache,
             &mut self.meta_cache,
             network,
@@ -331,23 +338,24 @@ impl Workspace for CallZomeWorkspace {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::conductor::{api::CellConductorApi, handle::MockConductorHandleT};
-    use crate::core::{
-        ribosome::MockRibosomeT,
-        workflow::{error::WorkflowError, genesis_workflow::tests::fake_genesis},
-    };
+    use crate::conductor::api::CellConductorApi;
+    use crate::conductor::handle::MockConductorHandleT;
+    use crate::core::ribosome::MockRibosomeT;
+    use crate::core::workflow::error::WorkflowError;
+    use crate::core::workflow::genesis_workflow::tests::fake_genesis;
     use crate::fixt::*;
     use ::fixt::prelude::*;
-    use holo_hash::fixt::*;
+
+    use holochain_lmdb::env::ReadManager;
+    use holochain_lmdb::test_utils::test_cell_env;
     use holochain_p2p::HolochainP2pCellFixturator;
-    use holochain_serialized_bytes::prelude::*;
-    use holochain_state::{env::ReadManager, test_utils::test_cell_env};
-    use holochain_types::{cell::CellId, observability, test_utils::fake_agent_pubkey_1};
+    use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::cell::CellId;
     use holochain_zome_types::entry::Entry;
-    use holochain_zome_types::ExternInput;
-    use holochain_zome_types::ExternOutput;
+    use holochain_zome_types::ExternIO;
     use matches::assert_matches;
+    use observability;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
     struct Payload {
@@ -358,10 +366,10 @@ pub mod tests {
         workspace: CallZomeWorkspace,
         ribosome: Ribosome,
         invocation: ZomeCallInvocation,
-    ) -> WorkflowResult<ZomeCallInvocationResult> {
+    ) -> WorkflowResult<ZomeCallResult> {
         let keystore = fixt!(KeystoreSender);
         let network = fixt!(HolochainP2pCell);
-        let cell_id = CellId::new(ribosome.dna_file().dna_hash().clone(), fixt!(AgentPubKey));
+        let cell_id = CellId::new(ribosome.dna_def().as_hash().clone(), fixt!(AgentPubKey));
         let conductor_api = Arc::new(MockConductorHandleT::new());
         let conductor_api = CellConductorApi::new(conductor_api, cell_id);
         let args = CallZomeWorkflowArgs {
@@ -388,18 +396,17 @@ pub mod tests {
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let ribosome = MockRibosomeT::new();
         // FIXME: CAP: Set this function to private
-        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
-            crate::core::ribosome::NamedInvocation(
-                holochain_types::fixt::CellIdFixturator::new(fixt::Unpredictable)
+        let invocation =
+            crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
+                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
-            ),
-        )
-        .next()
-        .unwrap();
+                ExternIO::encode(Payload { a: 1 }).unwrap(),
+            ))
+            .next()
+            .unwrap();
         invocation.cap = todo!("Make secret cap token");
         let error = run_call_zome(workspace, ribosome, invocation)
             .await
@@ -437,7 +444,7 @@ pub mod tests {
     // - Check entry content matches entry schema
     //   Depending on the type of the commit, validate all possible validations for the
     //   DHT Op that would be produced by it
-    #[ignore = "TODO: B-01100 Make sure this test is in the right place when SysValidation 
+    #[ignore = "TODO: B-01100 Make sure this test is in the right place when SysValidation
     complete so we aren't duplicating the unit test inside sys val."]
     #[tokio::test]
     async fn calls_system_validation<'a>() {
@@ -456,22 +463,22 @@ pub mod tests {
         ribosome
             .expect_call_zome_function()
             .returning(move |_workspace, _invocation| {
-                let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
-                Ok(ZomeCallResponse::Ok(ExternOutput::new(x)))
+                Ok(ZomeCallResponse::Ok(
+                    ExternIO::encode(Payload { a: 3 }).unwrap(),
+                ))
             });
 
-        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
-            crate::core::ribosome::NamedInvocation(
-                holochain_types::fixt::CellIdFixturator::new(fixt::Unpredictable)
+        let invocation =
+            crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
+                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
-            ),
-        )
-        .next()
-        .unwrap();
+                ExternIO::encode(Payload { a: 1 }).unwrap(),
+            ))
+            .next()
+            .unwrap();
         // IDEA: Mock the system validation and check it's called
         /* This is one way to test the correctness of the calls to sys val
         let mut sys_val = MockSystemValidation::new();
@@ -496,18 +503,17 @@ pub mod tests {
         let env = test_env.env();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let ribosome = MockRibosomeT::new();
-        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
-            crate::core::ribosome::NamedInvocation(
-                holochain_types::fixt::CellIdFixturator::new(fixt::Unpredictable)
+        let invocation =
+            crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
+                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
-            ),
-        )
-        .next()
-        .unwrap();
+                ExternIO::encode(Payload { a: 1 }).unwrap(),
+            ))
+            .next()
+            .unwrap();
         // TODO: B-01093: Mock the app validation and check it's called
         // TODO: B-01093: How can I pass a app validation into this?
         // These are just static calls
@@ -519,31 +525,29 @@ pub mod tests {
     // 4.3. Write output results via SC gatekeeper (wrap in transaction): (MVI)
     // This is handled by the workflow runner however I should test that
     // we can create outputs
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn creates_outputs() {
         let test_env = test_cell_env();
         let env = test_env.env();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let mut ribosome = MockRibosomeT::new();
-        ribosome.expect_dna_file().return_const(fixt!(DnaFile));
-        ribosome.expect_call_zome_function().returning(|_, _| {
-            Ok(ZomeCallResponse::Ok(ExternOutput::new(
-                ().try_into().unwrap(),
-            )))
-        });
+        let dna_def = fixt!(DnaFile).dna().clone();
+        ribosome.expect_dna_def().return_const(dna_def);
+        ribosome
+            .expect_call_zome_function()
+            .returning(|_, _| Ok(ZomeCallResponse::Ok(ExternIO::encode(()).unwrap())));
         // TODO: Make this mock return an output
-        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
-            crate::core::ribosome::NamedInvocation(
-                holochain_types::fixt::CellIdFixturator::new(fixt::Unpredictable)
+        let invocation =
+            crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
+                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
-            ),
-        )
-        .next()
-        .unwrap();
+                ExternIO::encode(Payload { a: 1 }).unwrap(),
+            ))
+            .next()
+            .unwrap();
         let _result = run_call_zome(workspace, ribosome, invocation)
             .await
             .unwrap();

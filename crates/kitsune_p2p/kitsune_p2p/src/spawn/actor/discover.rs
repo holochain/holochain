@@ -2,7 +2,6 @@
 use super::*;
 use crate::agent_store::AgentInfo;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
-use kitsune_p2p_types::codec::Codec;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 
@@ -14,8 +13,7 @@ pub(crate) enum PeerDiscoverResult {
     OkShortcut,
     OkRemote {
         url: url2::Url2,
-        write: TransportChannelWrite,
-        read: TransportChannelRead,
+        con_hnd: Tx2ConHnd<wire::Wire>,
     },
     Err(KitsuneP2pError),
 }
@@ -25,18 +23,21 @@ pub(crate) fn peer_discover(
     space: &mut Space,
     to_agent: Arc<KitsuneAgent>,
     from_agent: Arc<KitsuneAgent>,
+    // TODO - FIXME - upgrade to KitsuneTimeout
     timeout_ms: u64,
 ) -> MustBoxFuture<'static, PeerDiscoverResult> {
+    let timeout = KitsuneTimeout::from_millis(timeout_ms);
+
     let i_s = space.i_s.clone();
     let evt_sender = space.evt_sender.clone();
-    let tx = space.transport.clone();
+    let ep_hnd = space.ep_hnd.clone();
     let bootstrap_service = space.config.bootstrap_service.clone();
     let space = space.space.clone();
     async move {
         // run tx.create_channel an conver success result into our return type
-        let try_connect = |url| async {
-            let (url, write, read) = tx.create_channel(url).await?;
-            KitsuneP2pResult::Ok(PeerDiscoverResult::OkRemote { url, write, read })
+        let try_connect = |url: url2::Url2| async {
+            let con_hnd = ep_hnd.get_connection(url.clone(), timeout).await?;
+            KitsuneP2pResult::Ok(PeerDiscoverResult::OkRemote { url, con_hnd })
         };
 
         // check if this agent is locally joined
@@ -86,7 +87,7 @@ pub(crate) fn peer_discover(
             let (req_info, _) = futures::future::select_ok(nodes.into_iter().take(3).map(|info| {
                 // grr we need to move info in but not everything else...
                 // thus, we have to shadow all these with references
-                let tx = &tx;
+                let ep_hnd = &ep_hnd;
                 let space = &space;
                 let to_agent = &to_agent;
                 async move {
@@ -95,24 +96,17 @@ pub(crate) fn peer_discover(
                         .get(0)
                         .ok_or_else(|| KitsuneP2pError::from("no url"))?
                         .clone();
-                    let (_, mut write, read) = tx.create_channel(url).await?;
+                    let con_hnd = ep_hnd.get_connection(url, timeout).await?;
 
                     // write the query request
-                    write
-                        .write_and_close(
-                            wire::Wire::agent_info_query(
-                                space.clone(),
-                                Arc::new(info.as_agent_ref().clone()),
-                                Some(to_agent.clone()),
-                                None,
-                            )
-                            .encode_vec()?,
-                        )
-                        .await?;
+                    let msg = wire::Wire::agent_info_query(
+                        space.clone(),
+                        Arc::new(info.as_agent_ref().clone()),
+                        Some(to_agent.clone()),
+                        None,
+                    );
+                    let res = con_hnd.request(&msg, timeout).await?;
 
-                    // parse the response
-                    let res = read.read_to_end().await;
-                    let (_, res) = wire::Wire::decode_ref(&res)?;
                     match res {
                         wire::Wire::AgentInfoQueryResp(wire::AgentInfoQueryResp {
                             mut agent_infos,
@@ -176,7 +170,7 @@ pub(crate) fn peer_discover(
                 interval_ms = timeout_ms - elapsed_ms;
             }
 
-            tokio::time::delay_for(std::time::Duration::from_millis(interval_ms)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(interval_ms)).await;
         }
     }
     .boxed()
@@ -200,9 +194,13 @@ where
     T: 'static + Send,
     F: Fn(Arc<KitsuneAgent>, wire::Wire) -> Result<T, ()> + 'static + Send + Sync,
 {
+    // TODO - FIXME - this maybe we want to init two timeouts here
+    //                for the if any / even if none distinction?
+    let timeout_even_if_none = KitsuneTimeout::from_millis(stage_2_timeout_even_if_none_ms);
+
     let i_s = space.i_s.clone();
     let evt_sender = space.evt_sender.clone();
-    let tx = space.transport.clone();
+    let ep_hnd = space.ep_hnd.clone();
     let bootstrap_service = space.config.bootstrap_service.clone();
     let space = space.space.clone();
     let accept_result_cb = Arc::new(accept_result_cb);
@@ -255,12 +253,12 @@ where
                             None => continue,
                             Some(url) => url.clone(),
                         };
-                        let fut = tx.create_channel(url);
+                        let fut = ep_hnd.get_connection(url, timeout_even_if_none);
                         let mut payload = payload.clone();
                         let accept_result_cb = accept_result_cb.clone();
                         let out = out.clone();
                         tokio::task::spawn(async move {
-                            let (_, mut write, read) = fut.await?;
+                            let con_hnd = fut.await?;
                             match &mut payload {
                                 wire::Wire::Notify(n) => {
                                     n.to_agent = to_agent.clone();
@@ -270,10 +268,7 @@ where
                                 }
                                 _ => panic!("cannot message {:?}", payload),
                             }
-                            let payload = payload.encode_vec()?;
-                            write.write_and_close(payload).await?;
-                            let res = read.read_to_end().await;
-                            let (_, res) = wire::Wire::decode_ref(&res)?;
+                            let res = con_hnd.request(&payload, timeout_even_if_none).await?;
                             if let Ok(res) = accept_result_cb(to_agent, res) {
                                 out.lock().await.push(res);
                             }
@@ -295,7 +290,7 @@ where
                 interval_ms = stage_2_timeout_even_if_none_ms - elapsed_ms;
             }
 
-            tokio::time::delay_for(std::time::Duration::from_millis(interval_ms)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(interval_ms)).await;
         }
 
         let mut lock = out.lock().await;
@@ -385,6 +380,50 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
         }
 
         Ok(out)
+    }
+    .boxed()
+    .into()
+}
+
+pub(crate) fn add_5_or_less_non_local_agents(
+    space: Arc<KitsuneSpace>,
+    from_agent: Arc<KitsuneAgent>,
+    i_s: ghost_actor::GhostSender<SpaceInternal>,
+    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    bootstrap_service: url2::Url2,
+) -> MustBoxFuture<'static, KitsuneP2pResult<()>> {
+    async move {
+        if let Ok(list) = super::bootstrap::random(
+            Some(bootstrap_service),
+            super::bootstrap::RandomQuery {
+                space: space.clone(),
+                limit: 8.into(),
+            },
+        )
+        .await
+        {
+            for item in list {
+                // TODO - someday some validation here
+                if let Ok(info) = AgentInfo::try_from(&item) {
+                    if let Ok(is_local) = i_s
+                        .is_agent_local(Arc::new(info.as_agent_ref().clone()))
+                        .await
+                    {
+                        if !is_local {
+                            // we got a result - let's add it to our store for the future
+                            let _ = evt_sender
+                                .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                    space: space.clone(),
+                                    agent: from_agent.clone(),
+                                    agent_info_signed: item.clone(),
+                                })
+                                .await;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
     .boxed()
     .into()

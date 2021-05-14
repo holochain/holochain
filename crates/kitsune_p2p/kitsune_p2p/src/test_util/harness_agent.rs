@@ -31,7 +31,11 @@ pub(crate) async fn spawn_test_agent(
     ),
     KitsuneP2pError,
 > {
-    let (p2p, evt) = spawn_kitsune_p2p(config).await?;
+    let (p2p, evt) = spawn_kitsune_p2p(
+        config,
+        kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap(),
+    )
+    .await?;
 
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
 
@@ -50,11 +54,8 @@ pub(crate) async fn spawn_test_agent(
     Ok((agent, p2p, control))
 }
 
-use lair_keystore_api::{
-    entry::EntrySignEd25519,
-    //actor::SignEd25519PubKey,
-    internal::sign_ed25519::*,
-};
+use lair_keystore_api::entry::EntrySignEd25519;
+use lair_keystore_api::internal::sign_ed25519::*;
 
 struct AgentHarness {
     agent: Arc<KitsuneAgent>,

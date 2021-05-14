@@ -1,8 +1,10 @@
 use crate::*;
-use futures::{sink::SinkExt, stream::StreamExt};
+use futures::sink::SinkExt;
+use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use rustls::Session;
-use std::io::{Read, Write};
+use std::io::Read;
+use std::io::Write;
 
 pub(crate) fn spawn_tls_client(
     short: String,
@@ -14,7 +16,7 @@ pub(crate) fn spawn_tls_client(
     read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) -> tokio::sync::oneshot::Receiver<TransportResult<()>> {
     let (setup_send, setup_recv) = tokio::sync::oneshot::channel();
-    tokio::task::spawn(tls_client(
+    metric_task(tls_client(
         short,
         setup_send,
         expected_proxy_url,
@@ -37,7 +39,7 @@ async fn tls_client(
     recv: TransportChannelRead,
     mut write: futures::channel::mpsc::Sender<ProxyWire>,
     read: futures::channel::mpsc::Receiver<ProxyWire>,
-) {
+) -> TransportResult<()> {
     let mut setup_send = Some(setup_send);
     let res: TransportResult<()> = async {
         let nr = webpki::DNSNameRef::try_from_ascii_str("stub.stub").unwrap();
@@ -110,15 +112,23 @@ async fn tls_client(
                             short,
                             data.channel_data.len()
                         );
+                        in_pre.get_mut().clear();
+                        in_pre.set_position(0);
                         in_pre.get_mut().extend_from_slice(&data.channel_data);
-                        cli.read_tls(&mut in_pre).map_err(TransportError::other)?;
-                        cli.process_new_packets().map_err(TransportError::other)?;
-                        while let Ok(size) = cli.read(&mut buf) {
-                            tracing::trace!("{}: CLI incoming decrypted {} bytes", short, size);
-                            if size == 0 {
+                        let in_buf_len = in_pre.get_ref().len();
+                        loop {
+                            if in_pre.position() >= in_buf_len as u64 {
                                 break;
                             }
-                            send.send(buf[..size].to_vec()).await?;
+                            cli.read_tls(&mut in_pre).map_err(TransportError::other)?;
+                            cli.process_new_packets().map_err(TransportError::other)?;
+                            while let Ok(size) = cli.read(&mut buf) {
+                                tracing::trace!("{}: CLI incoming decrypted {} bytes", short, size);
+                                if size == 0 {
+                                    break;
+                                }
+                                send.send(buf[..size].to_vec()).await?;
+                            }
                         }
                     }
                     _ => return Err(format!("invalid wire: {:?}", wire).into()),
@@ -140,4 +150,6 @@ async fn tls_client(
         }
         let _ = write.send(fail).await.map_err(TransportError::other);
     }
+
+    Ok(())
 }

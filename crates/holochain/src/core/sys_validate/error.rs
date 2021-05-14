@@ -1,20 +1,18 @@
 use std::convert::TryFrom;
 
 use super::SourceChainError;
-use crate::{
-    conductor::entry_def_store::error::EntryDefStoreError,
-    core::state::cascade::error::CascadeError, core::state::workspace::WorkspaceError,
-    core::validation::OutcomeOrError, core::workflow::error::WorkflowError, from_sub_error,
-};
-use holo_hash::{AnyDhtHash, HeaderHash};
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::entry_def_store::error::EntryDefStoreError;
+use crate::core::validation::OutcomeOrError;
+use crate::core::workflow::error::WorkflowError;
+use crate::from_sub_error;
+use holo_hash::AnyDhtHash;
+use holo_hash::HeaderHash;
+use holochain_cascade::error::CascadeError;
 use holochain_keystore::KeystoreError;
-use holochain_state::error::DatabaseError;
-use holochain_types::cell::CellId;
-use holochain_zome_types::signature::Signature;
-use holochain_zome_types::{
-    header::{AppEntryType, EntryType},
-    Header,
-};
+use holochain_lmdb::error::DatabaseError;
+use holochain_state::workspace::WorkspaceError;
+use holochain_types::prelude::*;
 use thiserror::Error;
 
 /// Validation can result in either
@@ -46,6 +44,8 @@ pub enum SysValidationError {
     WorkflowError(#[from] Box<WorkflowError>),
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
+    #[error(transparent)]
+    ConductorApiError(#[from] Box<ConductorApiError>),
 }
 
 #[deprecated = "This will be replaced with SysValidationOutcome as we shouldn't treat outcomes as errors"]

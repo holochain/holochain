@@ -1,51 +1,39 @@
 #![cfg(test)]
+#![cfg(feature = "test_utils")]
 
 use super::*;
 
+use crate::core::queue_consumer::TriggerSender;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::core::ribosome::host_fn;
+use crate::core::ribosome::MockRibosomeT;
+use crate::core::workflow::CallZomeWorkspaceLock;
+use crate::fixt::CallContextFixturator;
 use crate::fixt::ZomeCallHostAccessFixturator;
+use crate::fixt::*;
 use crate::here;
 use crate::test_utils::test_network;
-use crate::{core::state::metadata::ChainItemKey, fixt::CallContextFixturator};
-use crate::{
-    core::{
-        queue_consumer::TriggerSender,
-        ribosome::{guest_callback::entry_defs::EntryDefsResult, host_fn, MockRibosomeT},
-        state::{metadata::LinkMetaKey, workspace::WorkspaceError},
-        workflow::CallZomeWorkspaceLock,
-    },
-    fixt::*,
-};
 use ::fixt::prelude::*;
-use holo_hash::*;
-use holochain_state::{
-    env::{EnvironmentWrite, ReadManager, WriteManager},
-    error::DatabaseError,
-    test_utils::test_cell_env,
-};
-use holochain_types::{
-    dht_op::{DhtOp, DhtOpHashed},
-    fixt::*,
-    header::NewEntryHeader,
-    metadata::TimedHeaderHash,
-    observability,
-    validate::ValidationStatus,
-    Entry, EntryHashed, HeaderHashed,
-};
-use holochain_zome_types::signature::Signature;
-use holochain_zome_types::{
-    entry::GetOptions,
-    entry_def::EntryDefs,
-    header::{builder, CreateLink, Delete, DeleteLink, Update, ZomeId},
-    link::{LinkTag, Links},
-    zome::ZomeName,
-    CreateInput, CreateLinkInput, GetInput, GetLinksInput, Header,
-};
-use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
-use std::{
-    collections::BTreeMap,
-    convert::{TryFrom, TryInto},
-    sync::Arc,
-};
+
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::env::ReadManager;
+use holochain_lmdb::env::WriteManager;
+use holochain_lmdb::error::DatabaseError;
+use holochain_lmdb::test_utils::test_cell_env;
+use holochain_state::metadata::ChainItemKey;
+use holochain_state::metadata::LinkMetaKey;
+use holochain_state::workspace::WorkspaceError;
+
+use holochain_zome_types::Entry;
+use holochain_zome_types::HeaderHashed;
+use holochain_zome_types::ValidationStatus;
+use observability;
+use produce_dht_ops_workflow::produce_dht_ops_workflow;
+use produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
+use std::collections::BTreeMap;
+use std::convert::TryFrom;
+use std::convert::TryInto;
+use std::sync::Arc;
 
 #[derive(Clone)]
 struct TestData {
@@ -142,7 +130,7 @@ impl TestData {
             Header::Update(eu) => {
                 eu.entry_hash = original_entry_hash.clone();
             }
-            _ => (),
+            _ => {}
         };
 
         // Dna Header
@@ -207,7 +195,8 @@ impl Db {
                     let value = IntegratedDhtOpsValue {
                         validation_status: ValidationStatus::Valid,
                         op: op.to_light(),
-                        when_integrated: Timestamp::now().into(),
+                        when_integrated: timestamp::now().into(),
+                        send_receipt: false,
                     };
                     let mut r = workspace
                         .integrated_dht_ops
@@ -221,6 +210,7 @@ impl Db {
                     let value = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
                         op: op.to_light(),
+                        send_receipt: false,
                     };
                     let res = workspace
                         .integration_limbo
@@ -477,6 +467,7 @@ impl Db {
                     let val = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
                         op: op.to_light(),
+                        send_receipt: false,
                     };
                     workspace
                         .integration_limbo
@@ -542,7 +533,8 @@ impl Db {
 async fn call_workflow<'env>(env: EnvironmentWrite) {
     let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
     let (mut qt, _rx) = TriggerSender::new();
-    integrate_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
+    let (mut qt2, _rx) = TriggerSender::new();
+    integrate_dht_ops_workflow(workspace, env.clone().into(), &mut qt, &mut qt2)
         .await
         .unwrap();
 }
@@ -817,7 +809,7 @@ fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
 }
 
 // This runs the above tests
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_ops_state() {
     observability::test_run().ok();
     let test_env = test_cell_env();
@@ -838,6 +830,7 @@ async fn test_ops_state() {
 
     for t in tests.iter() {
         clear_dbs(env.clone());
+        println!("test_ops_state on function {:?}", t);
         let td = TestData::new().await;
         let (pre_state, expect, name) = t(td);
         Db::set(pre_state, env.clone()).await;
@@ -885,19 +878,19 @@ async fn commit_entry<'env>(
     );
 
     // Create a dna file with the correct zome name in the desired position (ZomeId)
-    let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
-    dna_file.dna.zomes.clear();
-    dna_file
-        .dna
-        .zomes
-        .push((zome_name.clone().into(), fixt!(Zome)));
+    let dna_file = DnaFileFixturator::new(Empty).next().unwrap();
+    let mut dna_def = dna_file.dna_def().clone();
+    let zome = Zome::new(zome_name.clone().into(), fixt!(ZomeDef));
+    dna_def.zomes.clear();
+    dna_def.zomes.push(zome.clone().into());
+    let dna_def = DnaDefHashed::from_content_sync(dna_def);
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
     let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_dna_file().return_const(dna_file);
+    ribosome.expect_dna_def().return_const(dna_def);
     ribosome
-        .expect_zome_name_to_id()
+        .expect_zome_to_id()
         .returning(|_| Ok(ZomeId::from(1)));
 
     ribosome
@@ -905,7 +898,7 @@ async fn commit_entry<'env>(
         .returning(move |_, _| Ok(EntryDefsResult::Defs(entry_defs_map.clone())));
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-    call_context.zome_name = zome_name.clone();
+    call_context.zome = zome.clone();
 
     // Collect the entry from the pre-state to commit
     let entry = pre_state
@@ -923,7 +916,7 @@ async fn commit_entry<'env>(
         .next()
         .unwrap();
 
-    let input = CreateInput::new((entry_def_id.clone(), entry.clone()));
+    let input = EntryWithDefId::new(entry_def_id.clone(), entry.clone());
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -944,7 +937,7 @@ async fn commit_entry<'env>(
 
     let entry_hash = holochain_types::entry::EntryHashed::from_content_sync(entry).into_hash();
 
-    (entry_hash, output.into_inner().try_into().unwrap())
+    (entry_hash, output)
 }
 
 async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry> {
@@ -957,7 +950,7 @@ async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
 
-    let input = GetInput::new((entry_hash.clone().into(), GetOptions::default()));
+    let input = GetInput::new(entry_hash.clone().into(), GetOptions::latest());
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -967,7 +960,7 @@ async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry
         let call_context = Arc::new(call_context);
         host_fn::get::get(ribosome.clone(), call_context.clone(), input).unwrap()
     };
-    output.into_inner().and_then(|el| el.into())
+    output.and_then(|el| el.into())
 }
 
 async fn create_link(
@@ -980,27 +973,27 @@ async fn create_link(
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
-    // Create data for calls
-    let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
-    dna_file.dna.zomes.clear();
-    dna_file
-        .dna
-        .zomes
-        .push((zome_name.clone().into(), fixt!(Zome)));
+    // Create a dna file with the correct zome name in the desired position (ZomeId)
+    let dna_file = DnaFileFixturator::new(Empty).next().unwrap();
+    let mut dna_def = dna_file.dna_def().clone();
+    let zome = Zome::new(zome_name.clone().into(), fixt!(ZomeDef));
+    dna_def.zomes.clear();
+    dna_def.zomes.push(zome.clone().into());
+    let dna_def = DnaDefHashed::from_content_sync(dna_def);
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
     let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_dna_file().return_const(dna_file);
+    ribosome.expect_dna_def().return_const(dna_def);
     ribosome
-        .expect_zome_name_to_id()
+        .expect_zome_to_id()
         .returning(|_| Ok(ZomeId::from(1)));
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-    call_context.zome_name = zome_name.clone();
+    call_context.zome = zome.clone();
 
     // Call create_link
-    let input = CreateLinkInput::new((base_address.into(), target_address.into(), link_tag));
+    let input = CreateLinkInput::new(base_address.into(), target_address.into(), link_tag);
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -1021,7 +1014,7 @@ async fn create_link(
     }
 
     // Get the CreateLink HeaderHash back
-    output.into_inner()
+    output
 }
 
 async fn get_links(
@@ -1033,53 +1026,47 @@ async fn get_links(
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
-    // Create data for calls
-    let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
-    dna_file.dna.zomes.clear();
-    dna_file
-        .dna
-        .zomes
-        .push((zome_name.clone().into(), fixt!(Zome)));
+    // Create a dna file with the correct zome name in the desired position (ZomeId)
+    let dna_file = DnaFileFixturator::new(Empty).next().unwrap();
+    let mut dna_def = dna_file.dna_def().clone();
+    let zome = Zome::new(zome_name.clone().into(), fixt!(ZomeDef));
+    dna_def.zomes.clear();
+    dna_def.zomes.push(zome.clone().into());
+    let dna_def = DnaDefHashed::from_content_sync(dna_def);
 
-    let test_network = test_network(Some(dna_file.dna_hash().clone()), None).await;
+    let test_network = test_network(Some(dna_def.as_hash().clone()), None).await;
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
     let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_dna_file().return_const(dna_file);
+    ribosome.expect_dna_def().return_const(dna_def);
     ribosome
-        .expect_zome_name_to_id()
+        .expect_zome_to_id()
         .returning(|_| Ok(ZomeId::from(1)));
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-    call_context.zome_name = zome_name.clone();
+    call_context.zome = zome.clone();
 
     // Call get links
-    let input = GetLinksInput::new((base_address.into(), Some(link_tag)));
+    let input = GetLinksInput::new(base_address.into(), Some(link_tag));
 
-    let output = {
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
-        host_access.network = test_network.cell_network();
-        call_context.host_access = host_access.into();
-        let ribosome = Arc::new(ribosome);
-        let call_context = Arc::new(call_context);
-        host_fn::get_links::get_links(ribosome.clone(), call_context.clone(), input)
-            .unwrap()
-            .into_inner()
-    };
-
-    output
+    let mut host_access = fixt!(ZomeCallHostAccess);
+    host_access.workspace = workspace_lock;
+    host_access.network = test_network.cell_network();
+    call_context.host_access = host_access.into();
+    let ribosome = Arc::new(ribosome);
+    let call_context = Arc::new(call_context);
+    host_fn::get_links::get_links(ribosome.clone(), call_context.clone(), input).unwrap()
 }
 
 // This test is designed to run like the
 // register_add_link test except all the
 // pre-state is added through real host fn calls
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_metadata_from_wasm_api() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let test_env = holochain_state::test_utils::test_cell_env();
+    let test_env = holochain_lmdb::test_utils::test_cell_env();
     let env = test_env.env();
     clear_dbs(env.clone());
 
@@ -1141,11 +1128,11 @@ async fn test_metadata_from_wasm_api() {
 }
 
 // This doesn't work without inline integration
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_wasm_api_without_integration_links() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let test_env = holochain_state::test_utils::test_cell_env();
+    let test_env = holochain_lmdb::test_utils::test_cell_env();
     let env = test_env.env();
     clear_dbs(env.clone());
 
@@ -1193,11 +1180,11 @@ async fn test_wasm_api_without_integration_links() {
 }
 
 #[ignore = "Evaluate if this test adds any value or remove"]
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_wasm_api_without_integration_delete() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let test_env = holochain_state::test_utils::test_cell_env();
+    let test_env = holochain_lmdb::test_utils::test_cell_env();
     let env = test_env.env();
     let env_ref = env.guard();
     clear_dbs(env.clone());
@@ -1260,7 +1247,7 @@ async fn test_wasm_api_without_integration_delete() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "write this test"]
 async fn test_integrate_single_register_replaced_by_for_header() {
     // For RegisterUpdatedContent with intended_for Header
@@ -1268,7 +1255,7 @@ async fn test_integrate_single_register_replaced_by_for_header() {
     todo!("write this test")
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "write this test"]
 async fn test_integrate_single_register_replaced_by_for_entry() {
     // For RegisterUpdatedContent with intended_for Entry
@@ -1276,7 +1263,7 @@ async fn test_integrate_single_register_replaced_by_for_entry() {
     todo!("write this test")
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "write this test"]
 async fn test_integrate_single_register_delete_on_headerd_by() {
     // For RegisterDeletedBy
@@ -1284,7 +1271,7 @@ async fn test_integrate_single_register_delete_on_headerd_by() {
     todo!("write this test")
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "write this test"]
 async fn test_integrate_single_register_add_link() {
     // For RegisterAddLink
@@ -1292,7 +1279,7 @@ async fn test_integrate_single_register_add_link() {
     todo!("write this test")
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "write this test"]
 async fn test_integrate_single_register_delete_link() {
     // For RegisterAddLink
@@ -1302,35 +1289,29 @@ async fn test_integrate_single_register_delete_link() {
 
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
+    use std::convert::TryFrom;
+    use std::convert::TryInto;
+    use std::time::Duration;
 
-    use std::{
-        convert::{TryFrom, TryInto},
-        time::Duration,
-    };
-
+    use crate::test_utils::host_fn_caller::*;
     use crate::test_utils::setup_app;
-    use crate::{
-        core::state::dht_op_integration::IntegratedDhtOpsStore, core::state::metadata::LinkMetaKey,
-        core::state::metadata::MetadataBuf, core::state::metadata::MetadataBufT,
-        test_utils::host_fn_api::*,
-    };
-    use crate::{fixt::*, test_utils::wait_for_integration};
+    use crate::test_utils::wait_for_integration;
+    use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
-    use fixt::prelude::*;
     use holo_hash::EntryHash;
+    use holochain_lmdb::db::GetDb;
+    use holochain_lmdb::db::INTEGRATED_DHT_OPS;
+    use holochain_lmdb::env::ReadManager;
     use holochain_serialized_bytes::SerializedBytes;
-    use holochain_state::{db::GetDb, db::INTEGRATED_DHT_OPS, env::ReadManager};
-    use holochain_types::{
-        app::InstalledCell, cell::CellId, dna::DnaDef, dna::DnaFile, observability,
-        test_utils::fake_agent_pubkey_1, Entry,
-    };
+    use holochain_state::prelude::*;
+    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::test_utils::fake_agent_pubkey_2;
+    use observability;
     use tracing::*;
 
     /// The aim of this test is to show from a high level that committing
     /// data on one agent results in integrated data on another agent
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "flaky"]
     async fn commit_entry_add_link() {
         //////////////
@@ -1341,7 +1322,7 @@ mod slow_tests {
         let dna_file = DnaFile::new(
             DnaDef {
                 name: "integration_workflow_test".to_string(),
-                uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 zomes: vec![TestWasm::Create.into()].into(),
             },
@@ -1383,7 +1364,7 @@ mod slow_tests {
         // Commit the base and target.
         // Link them together.
         {
-            let call_data = HostFnApi::create(&alice_cell_id, &conductor, &dna_file).await;
+            let call_data = HostFnCaller::create(&alice_cell_id, &conductor, &dna_file).await;
 
             // 3
             call_data
@@ -1412,7 +1393,7 @@ mod slow_tests {
 
         // Check the ops
         {
-            let call_data = HostFnApi::create(&bob_cell_id, &conductor, &dna_file).await;
+            let call_data = HostFnCaller::create(&bob_cell_id, &conductor, &dna_file).await;
 
             // Wait for the ops to integrate but early exit if they do
             // 14 ops for genesis and 9 ops for two commits and a link
@@ -1448,14 +1429,14 @@ mod slow_tests {
 
             // Check bob can get the target
             let e = call_data
-                .get(target_entry_hash.clone().into(), Default::default())
+                .get(target_entry_hash.clone().into(), GetOptions::content())
                 .await
                 .unwrap();
             assert_eq!(e.into_inner().1.into_option().unwrap(), target_entry);
 
             // Check bob can get the base
             let e = call_data
-                .get(base_entry_hash.clone().into(), Default::default())
+                .get(base_entry_hash.clone().into(), GetOptions::content())
                 .await
                 .unwrap();
             assert_eq!(e.into_inner().1.into_option().unwrap(), base_entry);
@@ -1464,6 +1445,6 @@ mod slow_tests {
         // Shut everything down
         let shutdown = conductor.take_shutdown_handle().await.unwrap();
         conductor.shutdown().await;
-        shutdown.await.unwrap();
+        shutdown.await.unwrap().unwrap();
     }
 }

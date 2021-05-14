@@ -1,9 +1,23 @@
 #![allow(missing_docs)]
 
-use crate::{
-    encode::holo_dht_location_bytes, hash_type, AgentPubKey, AnyDhtHash, DhtOpHash, DnaHash,
-    EntryHash, HeaderHash, NetIdHash, WasmHash,
-};
+use crate::encode::holo_dht_location_bytes;
+use crate::hash_type;
+use crate::AgentPubKey;
+use crate::AgentPubKeyB64;
+use crate::AnyDhtHash;
+use crate::AnyDhtHashB64;
+use crate::DhtOpHash;
+use crate::DhtOpHashB64;
+use crate::DnaHash;
+use crate::DnaHashB64;
+use crate::EntryHash;
+use crate::EntryHashB64;
+use crate::HeaderHash;
+use crate::HeaderHashB64;
+use crate::NetIdHash;
+use crate::NetIdHashB64;
+use crate::WasmHash;
+use crate::WasmHashB64;
 use ::fixt::prelude::*;
 use std::convert::TryFrom;
 
@@ -75,38 +89,70 @@ fixturator!(
         agents[get_fixt_index!() % agents.len()].clone()
     };
 );
+fixturator!(
+    AgentPubKeyB64;
+    constructor fn new(AgentPubKey);
+);
 
 fixturator!(
     EntryHash;
     constructor fn from_raw_36(ThirtySixHashBytes);
+);
+fixturator!(
+    EntryHashB64;
+    constructor fn new(EntryHash);
 );
 
 fixturator!(
     DnaHash;
     constructor fn from_raw_36(ThirtySixHashBytes);
 );
+fixturator!(
+    DnaHashB64;
+    constructor fn new(DnaHash);
+);
 
 fixturator!(
     DhtOpHash;
     constructor fn from_raw_36(ThirtySixHashBytes);
+);
+fixturator!(
+    DhtOpHashB64;
+    constructor fn new(DhtOpHash);
 );
 
 fixturator!(
     HeaderHash;
     constructor fn from_raw_36(ThirtySixHashBytes);
 );
+fixturator!(
+    HeaderHashB64;
+    constructor fn new(HeaderHash);
+);
 
 fixturator!(
     NetIdHash;
     constructor fn from_raw_36(ThirtySixHashBytes);
+);
+fixturator!(
+    NetIdHashB64;
+    constructor fn new(NetIdHash);
 );
 
 fixturator!(
     WasmHash;
     constructor fn from_raw_36(ThirtySixHashBytes);
 );
+fixturator!(
+    WasmHashB64;
+    constructor fn new(WasmHash);
+);
 
 fixturator!(
     AnyDhtHash;
     constructor fn from_raw_36_and_type(ThirtySixHashBytes, HashTypeAnyDht);
+);
+fixturator!(
+    AnyDhtHashB64;
+    constructor fn new(AnyDhtHash);
 );

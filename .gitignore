@@ -15,4 +15,7 @@ perf.data.old
 *.svg
 
 .todo.md
-admin/
+result
+test_cert
+
+.vscode

@@ -1,15 +1,14 @@
-use hdk3::prelude::*;
-use test_wasm_common::TestString;
+use hdk::prelude::*;
 
 #[hdk_extern]
-fn foo(_: ()) -> ExternResult<TestString> {
-    Ok(TestString::from(String::from("foo")))
+fn foo(_: ()) -> ExternResult<String> {
+    Ok(String::from("foo"))
 }
 
 #[hdk_extern]
-fn bar(_: ()) -> ExternResult<TestString> {
+fn bar(_: ()) -> ExternResult<String> {
     // It should be possible to call our extern functions just like regular functions.
     #[allow(clippy::blacklisted_name)]
-    let foo: TestString = foo(())?;
-    Ok(TestString::from(format!("{}{}", foo.0, "bar")))
+    let foo: String = foo(())?;
+    Ok(format!("{}{}", foo, "bar"))
 }

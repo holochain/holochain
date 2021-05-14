@@ -1,17 +1,22 @@
 //! This is a temporary quick-hack gossip module for use with the
 //! in-memory / full-sync / non-sharded networking module
 
-use crate::agent_store::AgentInfoSigned;
-use crate::{types::actor::KitsuneP2pResult, types::gossip::*, *};
-use ghost_actor::dependencies::{tracing, tracing_futures};
+use crate::types::actor::KitsuneP2pResult;
+use crate::types::gossip::*;
+use crate::*;
+use ghost_actor::dependencies::tracing;
+use ghost_actor::GhostError;
 use kitsune_p2p_types::dht_arc::DhtArc;
-use std::{collections::HashSet, iter::FromIterator, sync::Arc};
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::iter::FromIterator;
+use std::sync::Arc;
 
 ghost_actor::ghost_chan! {
     /// "Event" requests emitted by the gossip module
     pub chan GossipEvent<crate::KitsuneP2pError> {
         /// get a list of agents we know about
-        fn list_neighbor_agents() -> Vec<Arc<KitsuneAgent>>;
+        fn list_neighbor_agents() -> ListNeighborAgents;
 
         /// fetch op list from/to with constraints
         fn req_op_hashes(
@@ -25,10 +30,7 @@ ghost_actor::ghost_chan! {
 
         /// we have gossip to forward
         fn gossip_ops(
-            from_agent: Arc<KitsuneAgent>,
-            to_agent: Arc<KitsuneAgent>,
-            ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
-            agents: Vec<AgentInfoSigned>,
+            input: GossipEvt,
         ) -> ();
     }
 }
@@ -36,31 +38,45 @@ ghost_actor::ghost_chan! {
 pub type GossipEventReceiver = futures::channel::mpsc::Receiver<GossipEvent>;
 
 /// spawn a gossip module to control gossip for a space
-pub fn spawn_gossip_module() -> GossipEventReceiver {
+pub fn spawn_gossip_module(config: Arc<KitsuneP2pConfig>) -> GossipEventReceiver {
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
 
-    tokio::task::spawn(gossip_loop(evt_send));
+    tokio::task::spawn(gossip_loop(config, evt_send));
 
     evt_recv
 }
 
-#[tracing::instrument(skip(evt_send))]
+#[tracing::instrument(skip(config, evt_send))]
 /// the gossip module is not an actor because we want to pause while
 /// awaiting requests - not process requests in parallel.
 async fn gossip_loop(
+    config: Arc<KitsuneP2pConfig>,
     evt_send: futures::channel::mpsc::Sender<GossipEvent>,
 ) -> KitsuneP2pResult<()> {
     let mut gossip_data = GossipData::new(evt_send);
     loop {
-        gossip_data.take_action().await?;
+        match gossip_data.take_action().await {
+            Err(KitsuneP2pError::GhostError(GhostError::Disconnected)) => {
+                tracing::warn!("Ghost actor is shutting down so gossip loop is exiting");
+                return Ok(());
+            }
+            Err(e) => {
+                tracing::warn!(msg = "gossip loop error", ?e);
+            }
+            Ok(_) => (),
+        }
 
-        tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(
+            config.tuning_params.gossip_loop_iteration_delay_ms as u64,
+        ))
+        .await;
     }
 }
 
 struct GossipData {
     evt_send: futures::channel::mpsc::Sender<GossipEvent>,
     pending_gossip_list: Vec<(Arc<KitsuneAgent>, Arc<KitsuneAgent>)>,
+    last_counts: HashMap<Arc<KitsuneAgent>, (u64, u64)>,
 }
 
 impl GossipData {
@@ -68,6 +84,7 @@ impl GossipData {
         Self {
             evt_send,
             pending_gossip_list: Vec::new(),
+            last_counts: HashMap::new(),
         }
     }
 
@@ -81,24 +98,31 @@ impl GossipData {
     }
 
     async fn fetch_pending_gossip_list(&mut self) -> KitsuneP2pResult<()> {
-        let list = self.evt_send.list_neighbor_agents().await?;
+        let (local_agents, remote_agents) = self.evt_send.list_neighbor_agents().await?;
         // super naive gossip just processes all combinations
         // also causes duplication because it runs pairs from both sides
-        tracing::debug!(?list);
-        for a1 in list.iter() {
-            for a2 in list.iter() {
+        for (i, a1) in local_agents.iter().enumerate() {
+            for a2 in local_agents.iter().skip(i) {
                 // at the very least, avoid gossiping with ourselves
                 if a1 != a2 {
                     self.pending_gossip_list.push((a1.clone(), a2.clone()));
                 }
             }
+            for a2 in remote_agents.iter() {
+                self.pending_gossip_list.push((a1.clone(), a2.clone()));
+            }
         }
         Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     async fn process_next_gossip(&mut self) -> KitsuneP2pResult<()> {
         // !is_empty() checked above in take_action
         let (from_agent, to_agent) = self.pending_gossip_list.remove(0);
+        let span = tracing::debug_span!("next_gossip", ?from_agent, ?to_agent);
+
+        // Get the last count for this interaction
+        let last_count = self.last_counts.entry(to_agent.clone()).or_insert((0, 0));
 
         // required so from_iters below know the build_hasher type
         type S = HashSet<Arc<KitsuneOpHash>>;
@@ -113,10 +137,34 @@ impl GossipData {
                 DhtArc::new(0, u32::MAX),
                 i64::MIN,
                 i64::MAX,
+                Default::default(), // This is ignored because requesting from self
             ))
             .await?;
+        let op_hashes_from = match op_hashes_from {
+            OpConsistency::Variance(h) => h,
+            // Not currently used
+            OpConsistency::Consistent => {
+                unreachable!("We don't track consistency of hashes for local requests")
+            }
+        };
+        let op_count = if last_count.0 == op_hashes_from.len() as u64 {
+            // We have nothing new for them but
+            // they might still have something new
+            // for us.
+            OpCount::Consistent(last_count.1)
+        } else {
+            // We have new gossip for them so
+            // they need to tell us what they have
+            // so we can compute the difference.
+            OpCount::Variance
+        };
+        last_count.0 = op_hashes_from.len() as u64;
+
         let op_hashes_from: S = HashSet::from_iter(op_hashes_from);
         let agent_info_from: A = HashSet::from_iter(agent_info_from);
+        span.in_scope(|| {
+            tracing::debug!(from_has_len = ?op_hashes_from.len());
+        });
 
         // we'll just fetch all with no constraints for now
         let (op_hashes_to, agent_info_to) = self
@@ -127,10 +175,25 @@ impl GossipData {
                 DhtArc::new(0, u32::MAX),
                 i64::MIN,
                 i64::MAX,
+                op_count,
             ))
             .await?;
+        let op_hashes_to = match op_hashes_to {
+            OpConsistency::Variance(h) => {
+                last_count.1 = h.len() as u64;
+                h
+            }
+            // There's no new gossip from us or them
+            // so our job is done.
+            OpConsistency::Consistent => {
+                return Ok(());
+            }
+        };
         let op_hashes_to: S = HashSet::from_iter(op_hashes_to);
         let agent_info_to: A = HashSet::from_iter(agent_info_to);
+        span.in_scope(|| {
+            tracing::debug!(to_has_len = ?op_hashes_to.len());
+        });
 
         // values that to_agent has, and from_agent needs
         let from_needs = op_hashes_to
@@ -142,6 +205,10 @@ impl GossipData {
             .cloned()
             .map(|(ai, _)| ai)
             .collect::<Vec<_>>();
+        span.in_scope(|| {
+            tracing::debug!(?from_needs_agents);
+            tracing::debug!(from_needs_len = ?from_needs.len());
+        });
 
         // values that from_agent has, and to_agent needs
         let to_needs = op_hashes_from
@@ -153,6 +220,10 @@ impl GossipData {
             .cloned()
             .map(|(ai, _)| ai)
             .collect::<Vec<_>>();
+        span.in_scope(|| {
+            tracing::debug!(?to_needs_agents);
+            tracing::debug!(to_needs_len = ?to_needs.len());
+        });
 
         // fetch values that to_agent needs from from_agent
         if !to_needs.is_empty() || !to_needs_agents.is_empty() {
@@ -169,10 +240,17 @@ impl GossipData {
                 if !r_ops.is_empty() || !r_peers.is_empty() {
                     if let Err(e) = self
                         .evt_send
-                        .gossip_ops(from_agent.clone(), to_agent.clone(), r_ops, r_peers)
+                        .gossip_ops(GossipEvt::new(
+                            from_agent.clone(),
+                            to_agent.clone(),
+                            r_ops,
+                            r_peers,
+                        ))
                         .await
                     {
-                        tracing::error!(?e);
+                        span.in_scope(|| {
+                            tracing::error!(gossip_failed_to_send = ?e, ?to_agent);
+                        });
                     }
                 }
             }
@@ -193,15 +271,17 @@ impl GossipData {
                 if !r_ops.is_empty() || !r_peers.is_empty() {
                     if let Err(e) = self
                         .evt_send
-                        .gossip_ops(
+                        .gossip_ops(GossipEvt::new(
                             to_agent.clone(), // we fetched from to
                             from_agent.clone(),
                             r_ops,
                             r_peers,
-                        )
+                        ))
                         .await
                     {
-                        tracing::error!(?e);
+                        span.in_scope(|| {
+                            tracing::error!(gossip_failed_to_get_from = ?e, ?to_agent);
+                        });
                     }
                 }
             }

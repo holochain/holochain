@@ -7,7 +7,7 @@ use crate::prelude::*;
 /// A lot of that is handled by the holochain_wasmer crates but this handles the boilerplate of
 /// writing an extern function as they have awkward input and output signatures:
 ///
-/// - requires remembering #[no_mangle]
+/// - requires remembering `#[no_mangle]`
 /// - requires remembering pub extern "C"
 /// - requires juggling GuestPtr on the input and output with the memory/serialization
 /// - doesn't support Result returns at all, so breaks things as simple as `?`
@@ -23,32 +23,49 @@ use crate::prelude::*;
 /// ```
 #[macro_export]
 macro_rules! map_extern {
-    ( $name:tt, $f:ident ) => {
+    ( $name:tt, $f:ident, $input:ty, $output:ty ) => {
         $crate::paste::paste! {
             mod [< __ $name _extern >] {
-                use $crate::prelude::*;
-                use std::convert::TryFrom;
+                use super::*;
 
                 #[no_mangle]
-                pub extern "C" fn $name(ptr: GuestPtr) -> GuestPtr {
-                    let input: ExternInput = host_args!(ptr);
-                    let result = super::$f(try_result!(
-                        input.into_inner().try_into(),
-                        "failed to deserialize args"
-                    ));
-                    let result_value = try_result!(
-                        result,
-                        concat!("inner function '", stringify!($f), "' failed")
+                pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr) -> $crate::prelude::GuestPtr {
+                    // Setup tracing.
+                    // @TODO feature flag this?
+                    let _subscriber_guard = $crate::prelude::tracing::subscriber::set_default(
+                        $crate::trace::WasmSubscriber::default()
                     );
-                    let result_sb = try_result!(
-                        SerializedBytes::try_from(result_value),
-                        "inner function result serialization error"
-                    );
-                    ret!(ExternOutput::new(result_sb));
+
+                    // Deserialize the input from the host.
+                    let extern_io: $crate::prelude::ExternIO = match $crate::prelude::host_args(guest_ptr) {
+                        Ok(v) => v,
+                        Err(err_ptr) => return err_ptr,
+                    };
+                    let inner: $input = match extern_io.decode() {
+                        Ok(v) => v,
+                        Err(e) => {
+                            let bytes = extern_io.0;
+                            $crate::prelude::error!(output_type = std::any::type_name::<$output>(), bytes = ?bytes, "{}", e);
+                            return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Deserialize(bytes));
+                        }
+                    };
+
+                    // Call the function.
+                    let output: $output = match super::$f(inner) {
+                        Ok(v) => Ok(v),
+                        Err(wasm_error) => return $crate::prelude::return_err_ptr(wasm_error),
+                    };
+
+                    // Serialize the output for the host.
+                    match $crate::prelude::ExternIO::encode(output.unwrap()) {
+                        Ok(v) => $crate::prelude::return_ptr::<$crate::prelude::ExternIO>(v),
+                        Err(serialized_bytes_error) => $crate::prelude::return_err_ptr($crate::prelude::WasmError::Serialize(serialized_bytes_error)),
+                    }
                 }
             }
         }
     };
 }
 
-pub type ExternResult<T> = Result<T, HdkError>;
+/// Every extern _must_ retern a `WasmError` in the case of failure.
+pub type ExternResult<T> = Result<T, WasmError>;

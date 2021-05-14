@@ -1,13 +1,13 @@
 //! Utilities to make kitsune testing a little more sane.
 
-use crate::{
-    types::{actor::*, agent_store::*, event::*},
-    *,
-};
+use crate::types::actor::*;
+use crate::types::agent_store::*;
+use crate::types::event::*;
+use crate::*;
 use futures::future::FutureExt;
 use ghost_actor::dependencies::tracing;
-use std::{collections::HashMap, sync::Arc};
-use tokio::stream::StreamExt;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Utility trait for test values
 pub trait TestVal: Sized {

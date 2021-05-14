@@ -30,7 +30,15 @@ jobs:
     steps:
       - checkout
       - run:
-          command: nix-shell --run hc-merge-test
+         name: Unset CircleCI's forced conversion of HTTPS->SSH
+         command: git config --global --unset "url.ssh://git@github.com.insteadof"
+      - run:
+         name: Set up Hydra cache
+         command: $(nix-build . --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
+      - run:
+         name: Run the merge tests
+         no_output_timeout: 30m
+         command: nix-shell --pure --argstr flavor "coreDev" --run hc-merge-test
 
   merge-test-mac:
    macos:
@@ -50,7 +58,7 @@ jobs:
         sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume
         . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
         # do tests
-        nix-shell --run hc-merge-test
+        nix-shell --argstr flavor ci --run hc-merge-test
 
   docker-build-latest:
    resource_class: large
@@ -72,6 +80,7 @@ workflows:
   jobs:
    - merge-test
    # - merge-test-mac
+
  docker-builds:
   triggers:
    - schedule:

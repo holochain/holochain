@@ -1,10 +1,10 @@
 [package]
-name = "hdk3"
-version = "0.0.1"
-description = "third iteration of the holochain hdk"
-license = "Apache-2.0"
-homepage = "https://github.com/holochain/holochain"
-documentation = "https://github.com/holochain/holochain"
+name = "hdk"
+version = "0.0.101-alpha.0"
+description = "The Holochain HDK"
+license-file = "LICENSE_CAL-1.0"
+homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdk"
+documentation = "https://docs.rs/hdk/"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "hdk" ]
 categories = [ "cryptography" ]
@@ -14,15 +14,26 @@ edition = "2018"
 crate-type = [ "cdylib", "rlib" ]
 path = "src/lib.rs"
 
+[features]
+default = []
+mock = ["hdk_derive/mock", "mockall"]
+
 [dependencies]
-hdk3_derive = { version = "0.0.1", path = "../hdk_derive" }
-holo_hash = { path = "../holo_hash" }
-holochain_wasmer_guest = "=0.0.50"
-holochain_zome_types = { path = "../zome_types" }
-serde = "1.0.104"
+hdk_derive = { version = "^0.0.2-alpha.1", path = "../hdk_derive" }
+holo_hash = { version = "0.0.2-alpha.1", path = "../holo_hash" }
+holochain_wasmer_guest = "=0.0.67"
+holochain_zome_types = { version = "0.0.2-alpha.1", path = "../holochain_zome_types" }
+paste = "=1.0.5"
+serde = "1.0"
 serde_bytes = "0.11"
 thiserror = "1.0.22"
-paste = "=1.0.3"
+tracing = "0.1"
+tracing-core = "0.1"
+mockall = { version = "0.9", optional = true }
+
+[dependencies.tracing-subscriber]
+version = "0.2"
+features = []
 
 [dev-dependencies]
 fixt = { path = "../fixt" }

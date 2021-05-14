@@ -1,4 +1,4 @@
-use holochain_state::{error::DatabaseResult, transaction::Reader};
+use holochain_lmdb::{error::DatabaseResult, prelude::IntKey, transaction::Reader};
 
 const BYTE_SIZE_MARKERS: [char; 6] = [' ', 'K', 'M', 'G', 'T', 'P'];
 
@@ -56,7 +56,7 @@ pub fn dump_kv(reader: &Reader, name: &str, db: rkv::SingleStore) -> DatabaseRes
     dump_iter(name, db.iter_start(reader)?)
 }
 
-pub fn dump_kvi(reader: &Reader, name: &str, db: rkv::IntegerStore<u32>) -> DatabaseResult<()> {
+pub fn dump_kvi(reader: &Reader, name: &str, db: rkv::IntegerStore<IntKey>) -> DatabaseResult<()> {
     dump_iter(name, db.iter_start(reader)?)
 }
 

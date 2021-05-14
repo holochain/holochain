@@ -1,6 +1,6 @@
 use crate::display::{dump_kv, dump_kvi};
-use holochain_state::{db, env::EnvironmentWrite, prelude::*};
 use holochain_types::{app::CellNick, cell::CellId};
+use holochain_lmdb::{db, env::EnvironmentWrite, prelude::*};
 
 pub async fn dump_cell_state(
     env: EnvironmentWrite,
@@ -50,7 +50,7 @@ pub async fn dump_cell_state(
     kv!("metadata cache - links", CACHE_LINKS_META);
     kv!("metadata cache - status", CACHE_STATUS_META);
 
-    kv!("integration queue", integration_limbo);
+    kv!("integration queue", INTEGRATION_LIMBO);
     kv!("integrated dht ops", INTEGRATED_DHT_OPS);
     kv!("authored dht ops", AUTHORED_DHT_OPS);
 

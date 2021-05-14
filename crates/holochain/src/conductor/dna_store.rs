@@ -1,19 +1,13 @@
-use super::entry_def_store::EntryDefBufferKey;
 use fallible_iterator::FallibleIterator;
-use holochain_state::{
-    buffer::CasBufFreshAsync,
-    env::EnvironmentRead,
-    error::{DatabaseError, DatabaseResult},
-    exports::SingleStore,
-    fresh_reader,
-    prelude::*,
-};
-use holochain_types::{
-    dna::{DnaDef, DnaDefHashed, DnaFile},
-    prelude::*,
-};
+use holochain_lmdb::buffer::CasBufFreshSync;
+use holochain_lmdb::env::EnvironmentRead;
+use holochain_lmdb::error::DatabaseError;
+use holochain_lmdb::error::DatabaseResult;
+use holochain_lmdb::exports::SingleStore;
+use holochain_lmdb::fresh_reader;
+use holochain_lmdb::prelude::*;
+use holochain_types::prelude::*;
 use holochain_zome_types::entry_def::EntryDef;
-use mockall::automock;
 use std::collections::HashMap;
 use tracing::*;
 
@@ -25,27 +19,12 @@ pub struct RealDnaStore {
 }
 
 pub struct DnaDefBuf {
-    dna_defs: CasBufFreshAsync<DnaDef>,
-}
-
-#[automock]
-pub trait DnaStore: Default + Send + Sync {
-    fn add(&mut self, dna: DnaFile);
-    fn add_dnas<T: IntoIterator<Item = (DnaHash, DnaFile)> + 'static>(&mut self, dnas: T);
-    fn add_entry_def(&mut self, k: EntryDefBufferKey, entry_def: EntryDef);
-    fn add_entry_defs<T: IntoIterator<Item = (EntryDefBufferKey, EntryDef)> + 'static>(
-        &mut self,
-        entry_defs: T,
-    );
-    // TODO: FAST: Make this return an iterator to avoid allocating
-    fn list(&self) -> Vec<DnaHash>;
-    fn get(&self, hash: &DnaHash) -> Option<DnaFile>;
-    fn get_entry_def(&self, k: &EntryDefBufferKey) -> Option<EntryDef>;
+    dna_defs: CasBufFreshSync<DnaDef>,
 }
 
 impl DnaStore for RealDnaStore {
     #[instrument]
-    fn add(&mut self, dna: DnaFile) {
+    fn add_dna(&mut self, dna: DnaFile) {
         self.dnas.insert(dna.dna_hash().clone(), dna);
     }
     fn add_dnas<T: IntoIterator<Item = (DnaHash, DnaFile)> + 'static>(&mut self, dnas: T) {
@@ -85,16 +64,16 @@ impl RealDnaStore {
 impl DnaDefBuf {
     pub fn new(env: EnvironmentRead, dna_def_store: SingleStore) -> DatabaseResult<Self> {
         Ok(Self {
-            dna_defs: CasBufFreshAsync::new(env, dna_def_store),
+            dna_defs: CasBufFreshSync::new(env, dna_def_store),
         })
     }
 
     pub async fn get(&self, dna_hash: &DnaHash) -> DatabaseResult<Option<DnaDefHashed>> {
-        self.dna_defs.get(dna_hash).await
+        self.dna_defs.get(dna_hash)
     }
 
     pub async fn put(&mut self, dna_def: DnaDef) -> DatabaseResult<()> {
-        self.dna_defs.put(DnaDefHashed::from_content(dna_def).await);
+        self.dna_defs.put(DnaDefHashed::from_content_sync(dna_def));
         Ok(())
     }
 

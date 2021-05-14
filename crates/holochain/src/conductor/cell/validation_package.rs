@@ -1,15 +1,19 @@
 use call_zome_workflow::CallZomeWorkspaceLock;
+use holochain_lmdb::env::EnvironmentRead;
+use holochain_lmdb::error::DatabaseResult;
+use holochain_lmdb::prelude::*;
 use holochain_p2p::HolochainP2pCell;
-use holochain_state::{env::EnvironmentRead, error::DatabaseResult, prelude::*};
-use holochain_types::{dna::DnaFile, HeaderHashed};
+use holochain_types::dna::DnaFile;
+use holochain_zome_types::HeaderHashed;
 
-use crate::core::{
-    ribosome::{guest_callback::validation_package::ValidationPackageResult, RibosomeT},
-    state::cascade::{Cascade, DbPair, DbPairMut},
-    workflow::app_validation_workflow::validation_package::{
-        get_as_author_custom, get_as_author_full, get_as_author_sub_chain,
-    },
-};
+use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
+use crate::core::ribosome::RibosomeT;
+use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_custom;
+use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_full;
+use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_sub_chain;
+use holochain_cascade::Cascade;
+use holochain_cascade::DbPair;
+use holochain_cascade::DbPairMut;
 
 use super::*;
 
@@ -70,7 +74,7 @@ pub(super) async fn get_as_author(
     let entry_def = get_entry_def_from_ids(
         app_entry_type.zome_id(),
         app_entry_type.id(),
-        ribosome.dna_file(),
+        ribosome.dna_def(),
         conductor_api,
     )
     .await?;
@@ -147,7 +151,10 @@ pub(super) async fn get_as_author(
                     Ok(None.into())
                 }
                 ValidationPackageResult::NotImplemented => {
-                    error!(msg = "Entry definition specifies a custom validation package but the callback isn't defined", ?header);
+                    error!(
+                        msg = "Entry definition specifies a custom validation package but the callback isn't defined",
+                        ?header
+                    );
                     Ok(None.into())
                 }
             }
@@ -178,7 +185,7 @@ pub(super) async fn get_as_authority(
     let entry_def = get_entry_def_from_ids(
         app_entry_type.zome_id(),
         app_entry_type.id(),
-        dna_file,
+        dna_file.dna(),
         conductor_api,
     )
     .await?;

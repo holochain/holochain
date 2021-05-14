@@ -3,7 +3,7 @@ use holochain_serialized_bytes::prelude::*;
 
 /// Any implementor of HashableContent may be used in a HoloHashed to pair
 /// data with its HoloHash representation. It also has an associated HashType.
-pub trait HashableContent: Sized + Send + Sync {
+pub trait HashableContent: Sized {
     /// The HashType which this content will be hashed to
     type HashType: HashType;
 

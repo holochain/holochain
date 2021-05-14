@@ -1,32 +1,26 @@
 //! The workflow and queue consumer for DhtOp integration
 
-use super::{
-    error::WorkflowResult,
-    integrate_dht_ops_workflow::{integrate_single_data, integrate_single_metadata},
-    produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult,
-    sys_validation_workflow::counterfeit_check,
-};
-use crate::core::{
-    queue_consumer::TriggerSender,
-    state::{
-        dht_op_integration::{IntegratedDhtOpsStore, IntegrationLimboStore},
-        element_buf::ElementBuf,
-        metadata::MetadataBuf,
-        metadata::MetadataBufT,
-        validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
-        workspace::{Workspace, WorkspaceResult},
-    },
-};
-use holo_hash::{AgentPubKey, DhtOpHash};
-use holochain_state::{
-    buffer::BufferedStore,
-    buffer::KvBufFresh,
-    db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
-    env::EnvironmentWrite,
-    error::DatabaseResult,
-    prelude::{EnvironmentRead, GetDb, IntegratedPrefix, PendingPrefix, Writer},
-};
-use holochain_types::{dht_op::DhtOp, Timestamp};
+use super::error::WorkflowResult;
+use super::integrate_dht_ops_workflow::integrate_single_data;
+use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
+use super::sys_validation_workflow::counterfeit_check;
+use crate::core::queue_consumer::TriggerSender;
+use holo_hash::AgentPubKey;
+use holo_hash::DhtOpHash;
+use holochain_cascade::integrate_single_metadata;
+use holochain_lmdb::buffer::BufferedStore;
+use holochain_lmdb::buffer::KvBufFresh;
+use holochain_lmdb::db::INTEGRATED_DHT_OPS;
+use holochain_lmdb::db::INTEGRATION_LIMBO;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::error::DatabaseResult;
+use holochain_lmdb::prelude::EnvironmentRead;
+use holochain_lmdb::prelude::GetDb;
+use holochain_lmdb::prelude::IntegratedPrefix;
+use holochain_lmdb::prelude::PendingPrefix;
+use holochain_lmdb::prelude::Writer;
+use holochain_state::prelude::*;
+use holochain_types::prelude::*;
 use holochain_zome_types::query::HighestObserved;
 use tracing::instrument;
 
@@ -39,6 +33,7 @@ pub async fn incoming_dht_ops_workflow(
     mut sys_validation_trigger: TriggerSender,
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     from_agent: Option<AgentPubKey>,
+    request_validation_receipt: bool,
 ) -> WorkflowResult<()> {
     // set up our workspace
     let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into())?;
@@ -48,14 +43,22 @@ pub async fn incoming_dht_ops_workflow(
         if !workspace.op_exists(&hash)? {
             tracing::debug!(?hash, ?op);
             if should_keep(&op).await? {
-                workspace
-                    .add_to_pending(hash, op, from_agent.clone())
-                    .await?;
+                workspace.add_to_pending(
+                    hash,
+                    op,
+                    from_agent.clone(),
+                    request_validation_receipt,
+                )?;
             } else {
                 tracing::warn!(
                     msg = "Dropping op because it failed counterfeit checks",
                     ?op
                 );
+            }
+        } else {
+            // Check if we should set receipt to send.
+            if needs_receipt(&op, &from_agent) && request_validation_receipt {
+                workspace.set_send_receipt(hash)?;
             }
         }
     }
@@ -71,6 +74,14 @@ pub async fn incoming_dht_ops_workflow(
     Ok(())
 }
 
+fn needs_receipt(op: &DhtOp, from_agent: &Option<AgentPubKey>) -> bool {
+    from_agent
+        .as_ref()
+        .map(|a| a == op.header().author())
+        .unwrap_or(false)
+}
+
+#[instrument(skip(op))]
 /// If this op fails the counterfeit check it should be dropped
 async fn should_keep(op: &DhtOp) -> WorkflowResult<bool> {
     let header = op.header();
@@ -123,12 +134,14 @@ impl IncomingDhtOpsWorkspace {
         })
     }
 
-    async fn add_to_pending(
+    fn add_to_pending(
         &mut self,
         hash: DhtOpHash,
         op: DhtOp,
         from_agent: Option<AgentPubKey>,
+        request_validation_receipt: bool,
     ) -> DhtOpConvertResult<()> {
+        let send_receipt = needs_receipt(&op, &from_agent) && request_validation_receipt;
         let basis = op.dht_basis();
         let op_light = op.to_light();
         tracing::debug!(?op_light);
@@ -154,10 +167,11 @@ impl IncomingDhtOpsWorkspace {
             status: ValidationLimboStatus::Pending,
             op: op_light,
             basis,
-            time_added: Timestamp::now(),
+            time_added: timestamp::now(),
             last_try: None,
             num_tries: 0,
             from_agent,
+            send_receipt,
         };
         self.validation_limbo.put(hash, vlv)?;
         Ok(())
@@ -167,5 +181,19 @@ impl IncomingDhtOpsWorkspace {
         Ok(self.integrated_dht_ops.contains(&hash)?
             || self.integration_limbo.contains(&hash)?
             || self.validation_limbo.contains(&hash)?)
+    }
+
+    pub fn set_send_receipt(&mut self, hash: DhtOpHash) -> DatabaseResult<()> {
+        if let Some(mut v) = self.integrated_dht_ops.get(&hash)? {
+            v.send_receipt = true;
+            self.integrated_dht_ops.put(hash, v)?;
+        } else if let Some(mut v) = self.integration_limbo.get(&hash)? {
+            v.send_receipt = true;
+            self.integration_limbo.put(hash, v)?;
+        } else if let Some(mut v) = self.validation_limbo.get(&hash)? {
+            v.send_receipt = true;
+            self.validation_limbo.put(hash, v)?;
+        }
+        Ok(())
     }
 }

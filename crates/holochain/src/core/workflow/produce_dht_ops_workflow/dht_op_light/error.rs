@@ -1,7 +1,9 @@
 use crate::core::SourceChainError;
-use holo_hash::{AnyDhtHash, HeaderHash};
+use holo_hash::AnyDhtHash;
+use holo_hash::HeaderHash;
+use holochain_cascade::error::CascadeError;
+use holochain_lmdb::error::DatabaseError;
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_state::error::DatabaseError;
 use holochain_types::dht_op::error::DhtOpError;
 use holochain_zome_types::header::conversions::WrongHeaderError;
 use thiserror::Error;
@@ -14,7 +16,9 @@ pub enum DhtOpConvertError {
     SerializedBytesError(#[from] SerializedBytesError),
     #[error("The header is expected to contain EntryData, but doesn't: {0}")]
     MissingEntryDataForHeader(HeaderHash),
-    #[error("Data for a DhtOp was missing from the source chain. Make sure that elements are always integrated before metadata")]
+    #[error(
+        "Data for a DhtOp was missing from the source chain. Make sure that elements are always integrated before metadata"
+    )]
     MissingData(AnyDhtHash),
     #[error("Tried to create a StoreEntry with a header that is not Create or Update")]
     HeaderEntryMismatch,
@@ -28,6 +32,8 @@ pub enum DhtOpConvertError {
     HeaderMismatch(String, String),
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
+    #[error(transparent)]
+    CascadeError(#[from] CascadeError),
     #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
     #[error("Tried to use the wrong header for this op: {0}")]

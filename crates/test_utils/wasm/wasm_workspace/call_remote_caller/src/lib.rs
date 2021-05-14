@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 #[hdk_extern]
 fn get_links_from_other_zome(agent_pubkey: AgentPubKey) -> ExternResult<Links> {

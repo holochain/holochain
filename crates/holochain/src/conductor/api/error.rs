@@ -1,36 +1,36 @@
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
-use crate::{
-    conductor::{
-        error::{ConductorError, CreateAppError},
-        interface::error::InterfaceError,
-        CellError,
-    },
-    core::{
-        ribosome::error::RibosomeError,
-        state::{source_chain::SourceChainError, workspace::WorkspaceError},
-        workflow::error::WorkflowError,
-    },
-};
-use holochain_serialized_bytes::prelude::*;
-use holochain_state::error::DatabaseError;
-use holochain_types::cell::CellId;
+use crate::conductor::error::ConductorError;
+use crate::conductor::error::CreateAppError;
+use crate::conductor::interface::error::InterfaceError;
+use crate::conductor::CellError;
+use crate::core::ribosome::error::RibosomeError;
+use crate::core::workflow::error::WorkflowError;
+use holo_hash::DnaHash;
+use holochain_lmdb::error::DatabaseError;
+use holochain_state::source_chain::SourceChainError;
+use holochain_state::workspace::WorkspaceError;
+use holochain_types::prelude::*;
+use holochain_zome_types::cell::CellId;
+use mr_bundle::error::MrBundleError;
 use thiserror::Error;
 
 /// Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 #[derive(Error, Debug)]
 pub enum ConductorApiError {
-    /// Cell was referenced, but is missing from the conductor.
-    #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
-    CellMissing(CellId),
+    /// The Dna for this Cell is not installed in the conductor.
+    #[error("The Dna for this Cell is not installed in the conductor! DnaHash: {0}")]
+    DnaMissing(DnaHash),
 
     /// Cell was referenced, but is missing from the conductor.
-    #[error("A Cell attempted to use an CellConductorApi it was not given.\nAPI CellId: {api_cell_id:?}\nInvocation CellId: {invocation_cell_id:?}")]
-    ZomeCallInvocationCellMismatch {
+    #[error(
+        "A Cell attempted to use an CellConductorApi it was not given.\nAPI CellId: {api_cell_id:?}\nInvocation CellId: {call_cell_id:?}"
+    )]
+    ZomeCallCellMismatch {
         /// The CellId which is referenced by the CellConductorApi
         api_cell_id: CellId,
         /// The CellId which is referenced by the ZomeCallInvocation
-        invocation_cell_id: CellId,
+        call_cell_id: CellId,
     },
 
     /// Conductor threw an error during API call.
@@ -75,12 +75,25 @@ pub enum ConductorApiError {
     #[error(transparent)]
     CellError(#[from] CellError),
 
+    /// App error
+    #[error(transparent)]
+    AppError(#[from] AppError),
+
     /// Error in the Interface
     #[error("An error occurred in the interface: {0:?}")]
     InterfaceError(#[from] InterfaceError),
 
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
+
+    #[error(transparent)]
+    AppBundleError(#[from] AppBundleError),
+
+    #[error(transparent)]
+    MrBundleError(#[from] MrBundleError),
+
+    #[error(transparent)]
+    JsonDumpError(#[from] serde_json::Error),
 }
 
 /// All the serialization errors that can occur
@@ -98,37 +111,7 @@ pub enum SerializationError {
 /// Type alias
 pub type ConductorApiResult<T> = Result<T, ConductorApiError>;
 
-/// Error type that goes over the websocket wire.
-/// This intends to be application developer facing
-/// so it should be readable and relevant
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
-pub enum ExternalApiWireError {
-    // TODO: B-01506 Constrain these errors so they are relevant to
-    // application developers and what they would need
-    // to react to using code (i.e. not just print)
-    /// Any internal error
-    InternalError(String),
-    /// The input to the api failed to Deseralize
-    Deserialization(String),
-    /// The dna path provided was invalid
-    DnaReadError(String),
-    /// There was an error in the ribosome
-    RibosomeError(String),
-    /// Error activating app
-    ActivateApp(String),
-    /// The zome call is unauthorized
-    ZomeCallUnauthorized(String),
-}
-
-impl ExternalApiWireError {
-    /// Convert the error from the display.
-    pub fn internal<T: std::fmt::Display>(e: T) -> Self {
-        // Display format is used because
-        // this version intended for users.
-        ExternalApiWireError::InternalError(e.to_string())
-    }
-}
+pub use holochain_conductor_api::ExternalApiWireError;
 
 impl From<ConductorApiError> for ExternalApiWireError {
     fn from(err: ConductorApiError) -> Self {

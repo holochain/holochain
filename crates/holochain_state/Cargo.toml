@@ -1,0 +1,50 @@
+[package]
+name = "holochain_state"
+version = "0.0.1"
+description = "TODO minimize deps"
+license-file = "LICENSE_CAL-1.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://github.com/holochain/holochain"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+edition = "2018"
+
+[dependencies]
+byteorder = "1.3.4"
+chrono = "0.4.6"
+derive_more = "0.99.3"
+holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }
+holo_hash = { version = "^0.0.2-alpha.1", path = "../holo_hash", features = ["full"] }
+fallible-iterator = "0.2.0"
+serde = { version = "1.0", features = [ "derive" ] }
+tracing = "=0.1.21"
+tracing-futures = "0.2.4"
+holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
+holochain_serialized_bytes = "=0.0.50"
+holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
+holochain_types = { version = "0.0.1", path = "../holochain_types" }
+holochain_wasm_test_utils = { path = "../test_utils/wasm", optional = true }
+holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
+mockall = "0.8"
+shrinkwraprs = "0.3.0"
+serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
+thiserror = "1.0.22"
+tokio = { version = "1.3", features = [ "full" ] }
+tokio_helper = { version = "0.0.1", path = "../tokio_helper" }
+
+[dev-dependencies]
+anyhow = "1.0.26"
+fixt = { version = "^0.0.2-alpha.1", path = "../fixt" }
+hdk = { version = "^0.0.101-alpha.0", path = "../hdk" }
+holochain_wasm_test_utils = { path = "../test_utils/wasm" }
+matches = "0.1.8"
+observability = "0.1.3"
+pretty_assertions = "0.6.1"
+
+[features]
+default = ["test_utils"]
+
+test_utils = [
+    "holochain_types/test_utils",
+    "holochain_zome_types/test_utils",
+    "holochain_wasm_test_utils",
+]

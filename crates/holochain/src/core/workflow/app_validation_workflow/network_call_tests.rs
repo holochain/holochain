@@ -1,35 +1,31 @@
 use fallible_iterator::FallibleIterator;
-use hdk3::prelude::{Element, EntryType, ValidationPackage};
+use hdk::prelude::Element;
+use hdk::prelude::EntryType;
+use hdk::prelude::ValidationPackage;
 use holo_hash::HeaderHash;
-use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCellT};
-use holochain_state::{env::EnvironmentRead, fresh_reader_test};
-use holochain_types::{
-    activity::{AgentActivity, ChainItems},
-    HeaderHashed,
-};
+use holochain_lmdb::env::EnvironmentRead;
+use holochain_lmdb::fresh_reader_test;
+use holochain_p2p::actor::GetActivityOptions;
+use holochain_p2p::HolochainP2pCellT;
+use holochain_test_wasm_common::AgentActivitySearch;
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{
-    query::{ActivityRequest, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved},
-    validate::ValidationStatus,
-    ZomeCallResponse,
-};
 use matches::assert_matches;
-use std::convert::TryInto;
-use test_wasm_common::AgentActivitySearch;
 
-use crate::{
-    conductor::ConductorHandle,
-    core::state::cascade::Cascade,
-    core::state::cascade::DbPair,
-    core::state::cascade::DbPairMut,
-    core::state::element_buf::ElementBuf,
-    core::state::metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
-    test_utils::host_fn_api::Post,
-    test_utils::{conductor_setup::CellHostFnApi, new_invocation, wait_for_integration},
-};
-use crate::{
-    core::state::source_chain::SourceChain, test_utils::conductor_setup::ConductorTestData,
-};
+use crate::conductor::ConductorHandle;
+use crate::test_utils::conductor_setup::CellHostFnCaller;
+use crate::test_utils::conductor_setup::ConductorTestData;
+use crate::test_utils::host_fn_caller::Post;
+use crate::test_utils::new_zome_call;
+use crate::test_utils::wait_for_integration;
+use holochain_cascade::Cascade;
+use holochain_cascade::DbPair;
+use holochain_cascade::DbPairMut;
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::metadata::ChainItemKey;
+use holochain_state::metadata::MetadataBuf;
+use holochain_state::metadata::MetadataBufT;
+use holochain_state::source_chain::SourceChain;
 
 const NUM_COMMITS: usize = 5;
 const GET_AGENT_ACTIVITY_TIMEOUT_MS: u64 = 1000;
@@ -39,7 +35,7 @@ const GET_AGENT_ACTIVITY_TIMEOUT_MS: u64 = 1000;
 const NUM_ATTEMPTS: usize = 100;
 const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn get_validation_package_test() {
     observability::test_run().ok();
 
@@ -196,7 +192,7 @@ async fn get_validation_package_test() {
     conductor_test.shutdown_conductor().await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity_test() {
     observability::test_run().ok();
 
@@ -228,7 +224,7 @@ async fn get_agent_activity_test() {
             hash: vec![last.header_address().clone()],
         });
 
-        AgentActivity {
+        AgentActivityResponse {
             valid_activity: ChainItems::Full(valid_activity),
             rejected_activity: ChainItems::NotRequested,
             status,
@@ -248,8 +244,8 @@ async fn get_agent_activity_test() {
         activity
     };
 
-    // Helper closure for changing to AgentActivity<Element> type
-    let get_expected_cascade = |activity: AgentActivity| {
+    // Helper closure for changing to AgentActivityResponse<Element> type
+    let get_expected_cascade = |activity: AgentActivityResponse| {
         let valid_activity = match activity.valid_activity {
             ChainItems::Full(headers) => ChainItems::Full(
                 headers
@@ -270,7 +266,7 @@ async fn get_agent_activity_test() {
             ChainItems::Hashes(h) => ChainItems::Hashes(h),
             ChainItems::NotRequested => ChainItems::NotRequested,
         };
-        let activity: AgentActivity<Element> = AgentActivity {
+        let activity: AgentActivityResponse<Element> = AgentActivityResponse {
             agent: activity.agent,
             valid_activity,
             rejected_activity,
@@ -477,7 +473,7 @@ async fn get_agent_activity_test() {
     conductor_test.shutdown_conductor().await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn get_custom_package_test() {
     observability::test_run().ok();
 
@@ -488,7 +484,7 @@ async fn get_custom_package_test() {
     let bob_call_data = conductor_test.bob_call_data().unwrap();
     let alice_cell_id = &alice_call_data.cell_id;
 
-    let invocation = new_invocation(
+    let invocation = new_zome_call(
         &alice_cell_id,
         "commit_artist",
         (),
@@ -499,7 +495,7 @@ async fn get_custom_package_test() {
 
     assert_matches!(result, Err(_));
 
-    let invocation = new_invocation(
+    let invocation = new_zome_call(
         &alice_cell_id,
         "commit_songs",
         (),
@@ -510,7 +506,7 @@ async fn get_custom_package_test() {
 
     assert_matches!(result, ZomeCallResponse::Ok(_));
 
-    let invocation = new_invocation(
+    let invocation = new_zome_call(
         &alice_cell_id,
         "commit_artist",
         (),
@@ -573,7 +569,7 @@ async fn get_custom_package_test() {
     conductor_test.shutdown_conductor().await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity_host_fn_test() {
     observability::test_run().ok();
 
@@ -644,7 +640,7 @@ async fn get_agent_activity_host_fn_test() {
         query: ChainQueryFilter::new(),
         request: ActivityRequest::Full,
     };
-    let invocation = new_invocation(
+    let invocation = new_zome_call(
         &alice_call_data.cell_id,
         "get_activity",
         search,
@@ -652,29 +648,29 @@ async fn get_agent_activity_host_fn_test() {
     )
     .unwrap();
     let result = handle.call_zome(invocation).await.unwrap().unwrap();
-    let result = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
-        .clone()
-        .into_inner();
-    let agent_activity: holochain_zome_types::query::AgentActivity = result.try_into().unwrap();
+    let agent_activity: holochain_zome_types::query::AgentActivity =
+        unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+            .decode()
+            .unwrap();
     assert_eq!(agent_activity, expected_activity);
     conductor_test.shutdown_conductor().await;
 }
 
 async fn commit_some_data(
     call: &str,
-    alice_call_data: &CellHostFnApi,
+    alice_call_data: &CellHostFnCaller,
     handle: &ConductorHandle,
 ) -> HeaderHash {
     let mut header_hash = None;
     // Commit 5 entries
     for _ in 0..NUM_COMMITS {
         let invocation =
-            new_invocation(&alice_call_data.cell_id, call, (), TestWasm::Create).unwrap();
+            new_zome_call(&alice_call_data.cell_id, call, (), TestWasm::Create).unwrap();
         let result = handle.call_zome(invocation).await.unwrap().unwrap();
-        let result = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
-            .clone()
-            .into_inner();
-        header_hash = Some(result.try_into().unwrap());
+        let result: HeaderHash = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+            .decode()
+            .unwrap();
+        header_hash = Some(result);
     }
     header_hash.unwrap()
 }
@@ -682,7 +678,7 @@ async fn commit_some_data(
 // Cascade helper function for easily getting the validation package
 async fn check_cascade(
     header_hashed: &HeaderHashed,
-    call_data: &CellHostFnApi,
+    call_data: &CellHostFnCaller,
 ) -> Option<ValidationPackage> {
     let mut element_cache = ElementBuf::cache(call_data.env.clone().into()).unwrap();
     let mut meta_cache = MetadataBuf::cache(call_data.env.clone().into()).unwrap();
@@ -699,7 +695,7 @@ async fn check_cascade(
     validation_package
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "Only shows a potential problem, doesn't prove something is correct"]
 /// This test shows a potential slow read issue.
 /// The exact same code running here in this test is 10x
@@ -721,7 +717,7 @@ async fn slow_lmdb_reads_test() {
     // Commit some data to put some load on the network
     let mut invocations = vec![];
     invocations.push(
-        new_invocation(
+        new_zome_call(
             &alice_call_data.cell_id,
             "create_entry",
             (),
@@ -729,11 +725,10 @@ async fn slow_lmdb_reads_test() {
         )
         .unwrap(),
     );
+    invocations
+        .push(new_zome_call(&alice_call_data.cell_id, "create_msg", (), TestWasm::Create).unwrap());
     invocations.push(
-        new_invocation(&alice_call_data.cell_id, "create_msg", (), TestWasm::Create).unwrap(),
-    );
-    invocations.push(
-        new_invocation(
+        new_zome_call(
             &alice_call_data.cell_id,
             "create_priv_msg",
             (),
@@ -746,7 +741,7 @@ async fn slow_lmdb_reads_test() {
             let r = handle.call_zome(invocation.clone()).await.unwrap().unwrap();
             assert_matches!(r, ZomeCallResponse::Ok(_));
         }
-        let invocation = new_invocation(
+        let invocation = new_zome_call(
             &alice_call_data.cell_id,
             "create_post",
             Post(format!("{}", i)),

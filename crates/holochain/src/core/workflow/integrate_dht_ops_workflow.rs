@@ -1,63 +1,54 @@
 //! The workflow and queue consumer for DhtOp integration
 
+use super::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
 use super::*;
-use crate::core::{
-    queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
-    state::{
-        cascade::error::CascadeResult,
-        cascade::Cascade,
-        cascade::DbPair,
-        dht_op_integration::{
-            IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationLimboStore,
-            IntegrationLimboValue,
-        },
-        element_buf::ElementBuf,
-        metadata::{MetadataBuf, MetadataBufT},
-        validation_db::ValidationLimboStore,
-        workspace::{Workspace, WorkspaceResult},
-    },
-    validation::DhtOpOrder,
-    validation::OrderedOp,
-};
+use crate::core::queue_consumer::OneshotWriter;
+use crate::core::queue_consumer::TriggerSender;
+use crate::core::queue_consumer::WorkComplete;
+use crate::core::validation::DhtOpOrder;
+use crate::core::validation::OrderedOp;
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::{DhtOpHash, EntryHash, HeaderHash};
-use holochain_state::{
-    buffer::BufferedStore,
-    buffer::KvBufFresh,
-    db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
-    error::DatabaseResult,
-    fresh_reader,
-    prelude::*,
-};
-use holochain_types::{
-    dht_op::{produce_op_lights_from_elements, DhtOp, DhtOpLight, UniqueForm},
-    element::{Element, SignedHeaderHashed, SignedHeaderHashedExt},
-    header::NewEntryHeader,
-    validate::ValidationStatus,
-    Entry, EntryHashed, Timestamp,
-};
-use holochain_zome_types::{
-    element::ElementEntry, query::ChainHead, query::ChainStatus, signature::Signature,
-};
-use holochain_zome_types::{element::SignedHeader, Header};
-use produce_dht_ops_workflow::dht_op_light::{
-    error::{DhtOpConvertError, DhtOpConvertResult},
-    light_to_op,
-};
-use std::{collections::BinaryHeap, convert::TryInto};
+use holo_hash::DhtOpHash;
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
+use holochain_cascade::error::CascadeResult;
+use holochain_cascade::Cascade;
+use holochain_cascade::DbPair;
+use holochain_cascade::{error::CascadeError, integrate_single_metadata};
+use holochain_conductor_api::IntegrationStateDump;
+use holochain_lmdb::buffer::BufferedStore;
+use holochain_lmdb::buffer::KvBufFresh;
+use holochain_lmdb::db::INTEGRATED_DHT_OPS;
+use holochain_lmdb::db::INTEGRATION_LIMBO;
+use holochain_lmdb::error::DatabaseResult;
+use holochain_lmdb::fresh_reader;
+use holochain_lmdb::prelude::*;
+use holochain_state::prelude::*;
+use holochain_types::prelude::*;
+
+use holochain_zome_types::Entry;
+use holochain_zome_types::ValidationStatus;
+
+use produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
+use produce_dht_ops_workflow::dht_op_light::light_to_op;
+use std::collections::BinaryHeap;
+use std::convert::TryInto;
 use tracing::*;
 
 pub use disintegrate::*;
 
 mod disintegrate;
+
+#[cfg(feature = "test_utils")]
 mod tests;
 
-#[instrument(skip(workspace, writer, trigger_sys))]
+#[instrument(skip(workspace, writer, trigger_sys, trigger_receipt))]
 pub async fn integrate_dht_ops_workflow(
     mut workspace: IntegrateDhtOpsWorkspace,
     writer: OneshotWriter,
     trigger_sys: &mut TriggerSender,
+    trigger_receipt: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // one of many possible ways to access the env
     let env = workspace.elements.headers().env().clone();
@@ -152,6 +143,7 @@ pub async fn integrate_dht_ops_workflow(
 
     if total_integrated > 0 {
         trigger_sys.trigger();
+        trigger_receipt.trigger();
     }
 
     Ok(result)
@@ -187,7 +179,8 @@ async fn integrate_single_dht_op(
                 let integrated = IntegratedDhtOpsValue {
                     validation_status: iv.validation_status,
                     op: iv.op,
-                    when_integrated: Timestamp::now(),
+                    when_integrated: timestamp::now(),
+                    send_receipt: iv.send_receipt,
                 };
                 Ok(Outcome::Integrated(integrated))
             }
@@ -209,7 +202,8 @@ fn integrate_data_and_meta<P: PrefixType>(
     let integrated = IntegratedDhtOpsValue {
         validation_status: iv.validation_status,
         op: iv.op,
-        when_integrated: Timestamp::now(),
+        when_integrated: timestamp::now(),
+        send_receipt: iv.send_receipt,
     };
     debug!("integrating");
     Ok(Outcome::Integrated(integrated))
@@ -225,7 +219,8 @@ fn integrate_data<P: PrefixType>(
     let integrated = IntegratedDhtOpsValue {
         validation_status: iv.validation_status,
         op: iv.op,
-        when_integrated: Timestamp::now(),
+        when_integrated: timestamp::now(),
+        send_receipt: iv.send_receipt,
     };
     debug!("integrating");
     Ok(Outcome::Integrated(integrated))
@@ -257,7 +252,7 @@ fn update_validation_status(
     match op {
         DhtOp::StoreElement(_, h, _) => meta_integrated.register_rejected_element_header(h)?,
         DhtOp::StoreEntry(_, h, _) => meta_integrated.register_rejected_header(h.clone())?,
-        _ => (),
+        _ => {}
     }
     Ok(())
 }
@@ -269,7 +264,7 @@ async fn op_dependencies_held(
 ) -> CascadeResult<bool> {
     {
         match op {
-            DhtOp::StoreElement(_, _, _) | DhtOp::StoreEntry(_, _, _) => (),
+            DhtOp::StoreElement(_, _, _) | DhtOp::StoreEntry(_, _, _) => {}
             DhtOp::RegisterAgentActivity(_, header) => {
                 // RegisterAgentActivity is the exception where we need to make
                 // sure that we have integrated the previous RegisterAgentActivity DhtOp
@@ -287,8 +282,8 @@ async fn op_dependencies_held(
                             let op_hash = DhtOpHash::with_data_sync(
                                 &UniqueForm::RegisterAgentActivity(prev_header.header()),
                             );
-                            if workspace.integration_limbo.contains(&op_hash)? {
-                                return Ok(true);
+                            if !workspace.integrated_dht_ops.contains(&op_hash)? {
+                                return Ok(false);
                             }
                         }
                         None => return Ok(false),
@@ -354,7 +349,7 @@ async fn header_with_entry_is_stored(
     {
         Some(el) => match el.entry() {
             ElementEntry::Present(_) | ElementEntry::Hidden => Ok(true),
-            ElementEntry::NotApplicable => Err(DhtOpConvertError::HeaderEntryMismatch.into()),
+            ElementEntry::NotApplicable => Err(CascadeError::EntryMissing(hash.clone())),
             // This means we have just the header (probably through register agent activity)
             ElementEntry::NotStored => Ok(false),
         },
@@ -384,55 +379,6 @@ async fn header_is_stored(hash: &HeaderHash, mut cascade: Cascade<'_>) -> Cascad
         Some(_) => Ok(true),
         None => Ok(false),
     }
-}
-
-pub fn integrate_single_metadata<C, P>(
-    op: DhtOpLight,
-    element_store: &ElementBuf<P>,
-    meta_store: &mut C,
-) -> DhtOpConvertResult<()>
-where
-    P: PrefixType,
-    C: MetadataBufT<P>,
-{
-    match op {
-        DhtOpLight::StoreElement(hash, _, _) => {
-            let header = get_header(hash, element_store)?;
-            meta_store.register_element_header(&header)?;
-        }
-        DhtOpLight::StoreEntry(hash, _, _) => {
-            let new_entry_header = get_header(hash, element_store)?.try_into()?;
-            if let NewEntryHeader::Update(update) = &new_entry_header {
-                meta_store.register_update(update.clone())?;
-            }
-            // Reference to headers
-            meta_store.register_header(new_entry_header)?;
-        }
-        DhtOpLight::RegisterAgentActivity(hash, _) => {
-            let header = get_header(hash, element_store)?;
-            // register agent activity on this agents pub key
-            meta_store.register_activity(&header, ValidationStatus::Valid)?;
-        }
-        DhtOpLight::RegisterUpdatedContent(hash, _, _)
-        | DhtOpLight::RegisterUpdatedElement(hash, _, _) => {
-            let header = get_header(hash, element_store)?.try_into()?;
-            meta_store.register_update(header)?;
-        }
-        DhtOpLight::RegisterDeletedEntryHeader(hash, _)
-        | DhtOpLight::RegisterDeletedBy(hash, _) => {
-            let header = get_header(hash, element_store)?.try_into()?;
-            meta_store.register_delete(header)?
-        }
-        DhtOpLight::RegisterAddLink(hash, _) => {
-            let header = get_header(hash, element_store)?.try_into()?;
-            meta_store.add_link(header)?;
-        }
-        DhtOpLight::RegisterRemoveLink(hash, _) => {
-            let header = get_header(hash, element_store)?.try_into()?;
-            meta_store.delete_link(header)?;
-        }
-    }
-    Ok(())
 }
 
 /// Store a DhtOp's data in an element buf
@@ -488,18 +434,6 @@ fn put_data<P: PrefixType>(
     };
     element_store.put(signed_header, maybe_entry_hashed)?;
     Ok(())
-}
-
-fn get_header<P: PrefixType>(
-    hash: HeaderHash,
-    element_store: &ElementBuf<P>,
-) -> DhtOpConvertResult<Header> {
-    Ok(element_store
-        .get_header(&hash)?
-        .ok_or_else(|| DhtOpConvertError::MissingData(hash.into()))?
-        .into_header_and_signature()
-        .0
-        .into_content())
 }
 
 /// After writing an Element to our chain, we want to integrate the meta ops
@@ -646,4 +580,20 @@ impl IntegrateDhtOpsWorkspace {
         }
         Ok(())
     }
+}
+
+pub fn dump_state(env: EnvironmentRead) -> WorkspaceResult<IntegrationStateDump> {
+    let workspace = IncomingDhtOpsWorkspace::new(env.clone())?;
+    let (validation_limbo, integration_limbo, integrated) = fresh_reader!(env, |r| {
+        let v = workspace.validation_limbo.iter(&r)?.count()?;
+        let il = workspace.integration_limbo.iter(&r)?.count()?;
+        let i = workspace.integrated_dht_ops.iter(&r)?.count()?;
+        DatabaseResult::Ok((v, il, i))
+    })?;
+
+    Ok(IntegrationStateDump {
+        validation_limbo,
+        integration_limbo,
+        integrated,
+    })
 }

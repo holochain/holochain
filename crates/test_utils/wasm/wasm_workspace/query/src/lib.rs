@@ -1,22 +1,19 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 entry_defs![Path::entry_def()];
-
-#[derive(Serialize, Deserialize, SerializedBytes)]
-struct PathString(String);
 
 fn path(s: &str) -> ExternResult<EntryHash> {
     let path = Path::from(s);
     path.ensure()?;
-    Ok(path.hash()?)
+    path.hash()
 }
 
 #[hdk_extern]
-fn query(args: QueryFilter) -> ExternResult<ElementVec> {
-    Ok(hdk3::prelude::query(args)?)
+fn query(args: QueryFilter) -> ExternResult<Vec<Element>> {
+    hdk::prelude::query(args)
 }
 
 #[hdk_extern]
-fn add_path(s: PathString) -> ExternResult<EntryHash> {
-    path(&s.0)
+fn add_path(s: String) -> ExternResult<EntryHash> {
+    path(&s)
 }

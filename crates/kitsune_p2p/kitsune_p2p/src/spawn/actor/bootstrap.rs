@@ -62,9 +62,9 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
                     &mut res.bytes().await?.as_ref(),
                 )?))
             } else {
-                Err(crate::KitsuneP2pError::Bootstrap(std::sync::Arc::new(
-                    res.text().await?,
-                )))
+                Err(crate::KitsuneP2pError::Bootstrap(
+                    res.text().await?.into_boxed_str(),
+                ))
             }
         }
         None => Ok(None),
@@ -202,16 +202,20 @@ pub async fn random(
 mod tests {
     use super::*;
     use crate::fixt::*;
-    use crate::spawn::actor::space::AGENT_INFO_EXPIRES_AFTER_MS;
     use crate::types::agent_store::*;
     use crate::types::KitsuneAgent;
     use crate::types::KitsuneBinType;
     use crate::types::KitsuneSignature;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use lair_keystore_api::internal::sign_ed25519::sign_ed25519_keypair_new_from_entropy;
     use std::convert::TryInto;
 
-    #[tokio::test(threaded_scheduler)]
+    // TODO - FIXME - davidb
+    // I'm disabling all these tests that depend on outside systems
+    // we need local testing to prove these out in a ci environment.
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "flaky"]
     async fn test_bootstrap() {
         let keypair = sign_ed25519_keypair_new_from_entropy().await.unwrap();
         let space = fixt!(KitsuneSpace);
@@ -227,7 +231,7 @@ mod tests {
             agent.clone(),
             urls,
             (millis - 100).try_into().unwrap(),
-            AGENT_INFO_EXPIRES_AFTER_MS,
+            1000 * 60 * 20,
         );
         let mut data = Vec::new();
         kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info).unwrap();
@@ -256,7 +260,8 @@ mod tests {
         .is_err());
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "flaky"]
     async fn test_now() {
         let local_now = std::time::SystemTime::now();
         let local_millis: u64 = local_now
@@ -288,7 +293,7 @@ mod tests {
         assert!(super::NOW_OFFSET_MILLIS.get().is_some());
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "flaky"]
     // Fixturator seed: 17591570467001263546
     // thread 'spawn::actor::bootstrap::tests::test_random' panicked at 'dispatch dropped without returning error', /rustc/d3fb005a39e62501b8b0b356166e515ae24e2e54/src/libstd/macros.rs:13:23
@@ -312,7 +317,7 @@ mod tests {
                 kitsune_agent.clone(),
                 fixt!(Urls),
                 now,
-                AGENT_INFO_EXPIRES_AFTER_MS,
+                1000 * 60 * 20,
             );
             let mut data = Vec::new();
             kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info).unwrap();

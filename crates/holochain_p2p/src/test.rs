@@ -1,10 +1,11 @@
+use crate::actor::*;
 use crate::HolochainP2pCell;
-use crate::{actor::*, *};
+use crate::*;
 use ::fixt::prelude::*;
-use holo_hash::{
-    fixt::{AgentPubKeyFixturator, DnaHashFixturator},
-    AgentPubKey, DnaHash,
-};
+use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::fixt::DnaHashFixturator;
+use holo_hash::AgentPubKey;
+use holo_hash::DnaHash;
 
 struct StubNetwork;
 
@@ -35,7 +36,7 @@ impl HolochainP2pHandler for StubNetwork {
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
-        request: SerializedBytes,
+        payload: ExternIO,
     ) -> HolochainP2pHandlerResult<SerializedBytes> {
         Err("stub".into())
     }
@@ -90,7 +91,7 @@ impl HolochainP2pHandler for StubNetwork {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> HolochainP2pHandlerResult<Vec<AgentActivity>> {
+    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse>> {
         Err("stub".into())
     }
     fn handle_send_validation_receipt(
@@ -124,7 +125,7 @@ pub async fn stub_network() -> ghost_actor::GhostSender<HolochainP2p> {
 fixturator!(
     HolochainP2pCell;
     curve Empty {
-        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+        tokio_helper::block_forever_on(async {
             let holochain_p2p = crate::test::stub_network().await;
             holochain_p2p.to_cell(
                 DnaHashFixturator::new(Empty).next().unwrap(),
@@ -146,11 +147,10 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use holochain_types::{
-        element::{Element, ElementStatus, SignedHeaderHashed, WireElement},
-        validate::ValidationStatus,
-    };
-    use holochain_types::{fixt::*, HeaderHashed};
+
+    use holochain_zome_types::HeaderHashed;
+    use holochain_zome_types::ValidationStatus;
+    use kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig;
     use kitsune_p2p::KitsuneP2pConfig;
 
     macro_rules! newhash {
@@ -174,16 +174,19 @@ mod tests {
         )
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_call_remote_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
-            .await
-            .unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            KitsuneP2pConfig::default(),
+            TlsConfig::new_ephemeral().await.unwrap(),
+        )
+        .await
+        .unwrap();
 
         let r_task = tokio::task::spawn(async move {
-            use tokio::stream::StreamExt;
+            use tokio_stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
@@ -195,12 +198,12 @@ mod tests {
                         ));
                     }
                     SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         });
@@ -216,7 +219,7 @@ mod tests {
                 "".into(),
                 "".into(),
                 None,
-                UnsafeBytes::from(b"yippo".to_vec()).into(),
+                ExternIO::encode(b"yippo").unwrap(),
             )
             .await
             .unwrap();
@@ -228,16 +231,19 @@ mod tests {
         r_task.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_send_validation_receipt_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
-            .await
-            .unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            KitsuneP2pConfig::default(),
+            TlsConfig::new_ephemeral().await.unwrap(),
+        )
+        .await
+        .unwrap();
 
         let r_task = tokio::task::spawn(async move {
-            use tokio::stream::StreamExt;
+            use tokio_stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
@@ -249,12 +255,12 @@ mod tests {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
                     SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         });
@@ -275,19 +281,22 @@ mod tests {
         r_task.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_publish_workflow() {
         let (dna, a1, a2, a3) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
-            .await
-            .unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            KitsuneP2pConfig::default(),
+            TlsConfig::new_ephemeral().await.unwrap(),
+        )
+        .await
+        .unwrap();
 
         let recv_count = Arc::new(std::sync::atomic::AtomicU8::new(0));
 
         let recv_count_clone = recv_count.clone();
         let r_task = tokio::task::spawn(async move {
-            use tokio::stream::StreamExt;
+            use tokio_stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
@@ -296,7 +305,7 @@ mod tests {
                         recv_count_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
                     SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
@@ -304,7 +313,7 @@ mod tests {
                     QueryAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         });
@@ -328,13 +337,18 @@ mod tests {
         r_task.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_get_workflow() {
+        observability::test_run().ok();
+
         let (dna, a1, a2, _a3) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
-            .await
-            .unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            KitsuneP2pConfig::default(),
+            TlsConfig::new_ephemeral().await.unwrap(),
+        )
+        .await
+        .unwrap();
 
         let test_1 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
             ElementStatus::new(
@@ -367,7 +381,7 @@ mod tests {
 
         let mut respond_queue = vec![test_1.clone(), test_2.clone()];
         let r_task = tokio::task::spawn(async move {
-            use tokio::stream::StreamExt;
+            use tokio_stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
@@ -377,20 +391,29 @@ mod tests {
                         } else {
                             panic!("too many requests!")
                         };
+                        tracing::info!("test - get respond");
                         respond.r(Ok(async move { Ok(resp) }.boxed().into()));
                     }
                     SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
-                    _ => (),
+                    QueryAgentInfoSigned { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    }
+                    FetchOpHashesForConstraints { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    }
+                    evt => println!("unhandled: {:?}", evt),
                 }
             }
         });
 
+        tracing::info!("test - join1");
         p2p.join(dna.clone(), a1.clone()).await.unwrap();
+        tracing::info!("test - join2");
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
 
         let hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
@@ -398,28 +421,36 @@ mod tests {
             holo_hash::hash_type::AnyDht::Header,
         );
 
+        tracing::info!("test - get");
         let res = p2p
             .get(dna, a1, hash, actor::GetOptions::default())
             .await
             .unwrap();
 
+        tracing::info!("test - check res");
         assert_eq!(2, res.len());
 
         for r in res {
             assert!(r == test_1 || r == test_2);
         }
 
+        tracing::info!("test - end of test shutdown p2p");
         p2p.ghost_actor_shutdown().await.unwrap();
+        tracing::info!("test - end of test await task end");
         r_task.await.unwrap();
+        tracing::info!("test - end of test - final done.");
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_get_links_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
-            .await
-            .unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            KitsuneP2pConfig::default(),
+            TlsConfig::new_ephemeral().await.unwrap(),
+        )
+        .await
+        .unwrap();
 
         let test_1 = GetLinksResponse {
             link_adds: vec![(fixt!(CreateLink), fixt!(Signature))],
@@ -428,7 +459,7 @@ mod tests {
 
         let test_1_clone = test_1.clone();
         let r_task = tokio::task::spawn(async move {
-            use tokio::stream::StreamExt;
+            use tokio_stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 let test_1_clone = test_1_clone.clone();
                 use crate::types::event::HolochainP2pEvent::*;
@@ -437,12 +468,12 @@ mod tests {
                         respond.r(Ok(async move { Ok(test_1_clone) }.boxed().into()));
                     }
                     SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         });

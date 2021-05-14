@@ -1,17 +1,13 @@
-use crate::core::state::element_buf::ElementBuf;
-use error::{DhtOpConvertError, DhtOpConvertResult};
-use holo_hash::{EntryHash, HeaderHash};
-use holochain_types::{
-    dht_op::{DhtOp, DhtOpLight},
-    header::NewEntryHeader,
-};
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::header::{self, Header};
-use holochain_zome_types::signature::Signature;
+use error::DhtOpConvertError;
+use error::DhtOpConvertResult;
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
+use holochain_state::element_buf::ElementBuf;
+use holochain_types::prelude::*;
 
 pub mod error;
 
-use holochain_state::prelude::PrefixType;
+use holochain_lmdb::prelude::PrefixType;
 use tracing::*;
 
 #[cfg(test)]
@@ -145,7 +141,7 @@ pub fn light_to_op<P: PrefixType>(
                     return Err(DhtOpConvertError::HeaderMismatch(
                         format!("{:?}", h),
                         op_name,
-                    ))
+                    ));
                 }
             };
             Ok(DhtOp::RegisterRemoveLink(sig, header))

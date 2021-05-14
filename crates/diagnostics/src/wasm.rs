@@ -1,5 +1,5 @@
 use crate::display::dump_kv;
-use holochain_state::{db, env::EnvironmentWrite, prelude::*};
+use holochain_lmdb::{db, env::EnvironmentWrite, prelude::*};
 
 pub async fn dump_wasm_state(env: EnvironmentWrite) -> anyhow::Result<()> {
     use db::*;

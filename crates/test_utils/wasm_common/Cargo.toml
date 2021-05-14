@@ -1,16 +1,16 @@
 [package]
-name = "test_wasm_common"
+name = "holochain_test_wasm_common"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
 
 [lib]
-name = "test_wasm_common"
+name = "holochain_test_wasm_common"
 crate-type = [ "cdylib", "rlib" ]
-path = "src/common.rs"
+path = "src/lib.rs"
 
 [dependencies]
-holochain_serialized_bytes = "=0.0.45"
-serde = "=1.0.104"
+hdk = { path = "../../hdk" }
+holochain_serialized_bytes = "=0.0.50"
+serde = "1.0"
 serde_bytes = "0.11"
-hdk3 = { path = "../../hdk" }

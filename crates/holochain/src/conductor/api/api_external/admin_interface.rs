@@ -1,24 +1,24 @@
 use super::InterfaceApi;
-use crate::conductor::api::error::{
-    ConductorApiError, ConductorApiResult, ExternalApiWireError, SerializationError,
-};
-use crate::conductor::{
-    config::AdminInterfaceConfig,
-    error::CreateAppError,
-    interface::error::{InterfaceError, InterfaceResult},
-    ConductorHandle,
-};
-use holo_hash::*;
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::api::error::ConductorApiResult;
+
+use crate::conductor::api::error::SerializationError;
+
+use crate::conductor::error::CreateAppError;
+use crate::conductor::interface::error::InterfaceError;
+use crate::conductor::interface::error::InterfaceResult;
+use crate::conductor::ConductorHandle;
 use holochain_keystore::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::{
-    app::{InstallAppDnaPayload, InstallAppPayload, InstalledApp, InstalledAppId, InstalledCell},
-    cell::CellId,
-    dna::{DnaFile, JsonProperties},
-};
-use kitsune_p2p::agent_store::AgentInfoSigned;
-use std::path::PathBuf;
+use holochain_types::dna::DnaBundle;
+use holochain_types::prelude::*;
+use mr_bundle::Bundle;
+
+use holochain_zome_types::cell::CellId;
+
 use tracing::*;
+
+pub use holochain_conductor_api::*;
 
 /// A trait for the interface that a Conductor exposes to the outside world to use for administering the conductor.
 /// This trait has a one mock implementation and one "Real" implementation
@@ -73,6 +73,68 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AdminInterfacesAdded)
             }
+            RegisterDna(payload) => {
+                trace!(register_dna_payload = ?payload);
+                let RegisterDnaPayload {
+                    uid,
+                    properties,
+                    source,
+                } = *payload;
+                // uid and properties from the register call will override any in the bundle
+                let dna = match source {
+                    DnaSource::Hash(ref hash) => {
+                        if properties.is_none() && uid.is_none() {
+                            return Err(ConductorApiError::DnaReadError(
+                                "Hash Dna source requires properties or uid to create a derived Dna"
+                                    .to_string(),
+                            ));
+                        }
+                        let mut dna =
+                            self.conductor_handle.get_dna(hash).await.ok_or_else(|| {
+                                ConductorApiError::DnaReadError(format!(
+                                    "Unable to create derived Dna: {} not registered",
+                                    hash
+                                ))
+                            })?;
+                        if let Some(props) = properties {
+                            let properties = SerializedBytes::try_from(props)
+                                .map_err(SerializationError::from)?;
+                            dna = dna.with_properties(properties).await?;
+                        }
+                        if let Some(uid) = uid {
+                            dna = dna.with_uid(uid).await?;
+                        }
+                        dna
+                    }
+                    DnaSource::Path(ref path) => {
+                        let bundle = Bundle::read_from_file(path).await?;
+                        let bundle: DnaBundle = bundle.into();
+                        let (dna_file, _original_hash) =
+                            bundle.into_dna_file(uid, properties).await?;
+                        dna_file
+                    }
+                    DnaSource::Bundle(bundle) => {
+                        let (dna_file, _original_hash) =
+                            bundle.into_dna_file(uid, properties).await?;
+                        dna_file
+                    }
+                };
+
+                let hash = dna.dna_hash().clone();
+                let dna_list = self.conductor_handle.list_dnas().await?;
+                if !dna_list.contains(&hash) {
+                    self.conductor_handle.register_dna(dna).await?;
+                }
+                Ok(AdminResponse::DnaRegistered(hash))
+            }
+            CreateCloneCell(payload) => {
+                let cell_id = payload.cell_id();
+                self.conductor_handle
+                    .clone()
+                    .create_clone_cell(*payload)
+                    .await?;
+                Ok(AdminResponse::CloneCellCreated(cell_id))
+            }
             InstallApp(payload) => {
                 trace!(?payload.dnas);
                 let InstallAppPayload {
@@ -84,15 +146,20 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 // Install Dnas
                 let tasks = dnas.into_iter().map(|dna_payload| async {
                     let InstallAppDnaPayload {
-                        path,
-                        properties,
+                        hash,
                         membrane_proof,
                         nick,
                     } = dna_payload;
-                    let dna = read_parse_dna(path, properties).await?;
-                    let hash = dna.dna_hash().clone();
+
+                    // confirm that hash has been installed
+                    let dna_list = self.conductor_handle.list_dnas().await?;
+                    if !dna_list.contains(&hash) {
+                        return Err(ConductorApiError::DnaReadError(format!(
+                            "Given dna has not been registered: {}",
+                            hash
+                        )));
+                    }
                     let cell_id = CellId::from((hash.clone(), agent_key.clone()));
-                    self.conductor_handle.install_dna(dna).await?;
                     ConductorApiResult::Ok((InstalledCell::new(cell_id, nick), membrane_proof))
                 });
 
@@ -109,15 +176,26 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .install_app(installed_app_id.clone(), cell_ids_with_proofs.clone())
                     .await?;
 
-                let cell_data = cell_ids_with_proofs
+                let installed_cells = cell_ids_with_proofs
                     .into_iter()
-                    .map(|(cell_data, _)| cell_data)
-                    .collect();
-                let app = InstalledApp {
+                    .map(|(cell_data, _)| cell_data);
+                let app = InstalledApp::new_inactive(InstalledAppCommon::new_legacy(
                     installed_app_id,
-                    cell_data,
-                };
-                Ok(AdminResponse::AppInstalled(app))
+                    installed_cells,
+                )?);
+                let info = InstalledAppInfo::from_installed_app(&app);
+                Ok(AdminResponse::AppInstalled(info))
+            }
+            InstallAppBundle(payload) => {
+                let app: InstalledApp = self
+                    .conductor_handle
+                    .clone()
+                    .install_app_bundle(*payload)
+                    .await?
+                    .into();
+                Ok(AdminResponse::AppBundleInstalled(
+                    InstalledAppInfo::from_installed_app(&app),
+                ))
             }
             ListDnas => {
                 let dna_list = self.conductor_handle.list_dnas().await?;
@@ -167,7 +245,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             DeactivateApp { installed_app_id } => {
                 // Activate app
                 self.conductor_handle
-                    .deactivate_app(installed_app_id.clone())
+                    .deactivate_app(installed_app_id.clone(), DeactivationReason::Normal)
                     .await?;
                 Ok(AdminResponse::AppDeactivated)
             }
@@ -179,6 +257,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .add_app_interface(port)
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
+            }
+            ListAppInterfaces => {
+                let interfaces = self.conductor_handle.list_app_interfaces().await?;
+                Ok(AdminResponse::AppInterfacesListed(interfaces))
             }
             DumpState { cell_id } => {
                 let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
@@ -196,20 +278,26 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
     }
 }
 
-/// Reads the [Dna] from disk and parses to [SerializedBytes]
-async fn read_parse_dna(
-    dna_path: PathBuf,
-    properties: Option<JsonProperties>,
-) -> ConductorApiResult<DnaFile> {
-    let dna_content = tokio::fs::read(dna_path)
-        .await
-        .map_err(|e| ConductorApiError::DnaReadError(format!("{:?}", e)))?;
-    let mut dna = DnaFile::from_file_content(&dna_content).await?;
-    if let Some(properties) = properties {
-        let properties = SerializedBytes::try_from(properties).map_err(SerializationError::from)?;
-        dna = dna.with_properties(properties).await?;
-    }
-    Ok(dna)
+/// Return the proper phenotype for a Dna, given a manifest and some optional
+/// overrides
+fn _resolve_phenotype(
+    manifest: &DnaManifest,
+    payload_uid: Option<&Uid>,
+    payload_properties: Option<&YamlProperties>,
+) -> (Option<Uid>, Option<YamlProperties>) {
+    let bundle_uid = manifest.uid();
+    let bundle_properties = manifest.properties();
+    let properties = if payload_properties.is_some() {
+        payload_properties.cloned()
+    } else {
+        bundle_properties
+    };
+    let uid = if payload_uid.is_some() {
+        payload_uid.cloned()
+    } else {
+        bundle_uid
+    };
+    (uid, properties)
 }
 
 #[async_trait::async_trait]
@@ -236,348 +324,145 @@ impl InterfaceApi for RealAdminInterfaceApi {
     }
 }
 
-/// Represents the available conductor functions to call over an Admin interface
-/// and will result in a corresponding [`AdminResponse`] message being sent back over the
-/// interface connection.
-/// Enum variants follow a general convention of `verb_noun` as opposed to
-/// the `noun_verb` of `AdminResponse`.
-///
-/// Expects a serialized object with any contents of the enum on a key `data`
-/// and the enum variant on a key `type`, e.g.
-/// `{ type: 'activate_app', data: { installed_app_id: 'test_app' } }`
-///
-/// [`AdminResponse`]: enum.AdminResponse.html
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[cfg_attr(test, derive(Clone))]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
-pub enum AdminRequest {
-    /// Set up and register one or more new Admin interfaces
-    /// as specified by a list of configurations. See [`AdminInterfaceConfig`]
-    /// for details on the configuration.
-    ///
-    /// Will be responded to with an [`AdminResponse::AdminInterfacesAdded`]
-    /// or an [`AdminResponse::Error`]
-    ///
-    /// [`AdminInterfaceConfig`]: ../config/struct.AdminInterfaceConfig.html
-    /// [`AdminResponse::AdminInterfacesAdded`]: enum.AdminResponse.html#variant.AdminInterfacesAdded
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    AddAdminInterfaces(Vec<AdminInterfaceConfig>),
-    /// Install an app from a list of `Dna` paths.
-    /// Triggers genesis to be run on all `Cell`s and to be stored.
-    /// An `App` is intended for use by
-    /// one and only one Agent and for that reason it takes an `AgentPubKey` and
-    /// installs all the Dnas with that `AgentPubKey` forming new `Cell`s.
-    /// See [`InstallAppPayload`] for full details on the configuration.
-    ///
-    /// Note that the new `App` will not be "activated" automatically after installation
-    /// and can be activated by calling [`AdminRequest::ActivateApp`].
-    ///
-    /// Will be responded to with an [`AdminResponse::AppInstalled`]
-    /// or an [`AdminResponse::Error`]
-    ///
-    /// [`InstallAppPayload`]: ../../../holochain_types/app/struct.InstallAppPayload.html
-    /// [`AdminRequest::ActivateApp`]: enum.AdminRequest.html#variant.ActivateApp
-    /// [`AdminResponse::AppInstalled`]: enum.AdminResponse.html#variant.AppInstalled
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    InstallApp(Box<InstallAppPayload>),
-    /// List the hashes of all installed `Dna`s.
-    /// Takes no arguments.
-    ///
-    /// Will be responded to with an [`AdminResponse::DnasListed`]
-    /// or an [`AdminResponse::Error`]
-    ///
-    /// [`AdminResponse::DnasListed`]: enum.AdminResponse.html#variant.DnasListed
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    ListDnas,
-    /// Generate a new AgentPubKey.
-    /// Takes no arguments.
-    ///
-    /// Will be responded to with an [`AdminResponse::AgentPubKeyGenerated`]
-    /// or an [`AdminResponse::Error`]
-    ///
-    /// [`AdminResponse::AgentPubKeyGenerated`]: enum.AdminResponse.html#variant.AgentPubKeyGenerated
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    GenerateAgentPubKey,
-    /// List all the cell ids in the conductor.
-    /// Takes no arguments.
-    ///
-    /// Will be responded to with an [`AdminResponse::CellIdsListed`]
-    /// or an [`AdminResponse::Error`]
-    ///
-    /// [`AdminResponse::CellIdsListed`]: enum.AdminResponse.html#variant.CellIdsListed
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    ListCellIds,
-    /// List the ids of all the active (activated) Apps in the conductor.
-    /// Takes no arguments.
-    ///
-    /// Will be responded to with an [`AdminResponse::ActiveAppsListed`]
-    /// or an [`AdminResponse::Error`]
-    ///
-    /// [`AdminResponse::ActiveAppsListed`]: enum.AdminResponse.html#variant.ActiveAppsListed
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    ListActiveApps,
-    /// Changes the `App` specified by argument `installed_app_id` from an inactive state to an active state in the conductor,
-    /// meaning that Zome calls can now be made and the `App` will be loaded on a reboot of the conductor.
-    /// It is likely to want to call this after calling [`AdminRequest::InstallApp`], since a freshly
-    /// installed `App` is not activated automatically.
-    ///
-    /// Will be responded to with an [`AdminResponse::AppActivated`]
-    /// or an [`AdminResponse::Error`]
-    ///
-    /// [`AdminRequest::InstallApp`]: enum.AdminRequest.html#variant.InstallApp
-    /// [`AdminResponse::AppActivated`]: enum.AdminResponse.html#variant.AppActivated
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    ActivateApp {
-        /// The InstalledAppId to activate
-        installed_app_id: InstalledAppId,
-    },
-    /// Changes the `App` specified by argument `installed_app_id` from an active state to an inactive state in the conductor,
-    /// meaning that Zome calls can no longer be made, and the `App` will not be loaded on a
-    /// reboot of the conductor.
-    ///
-    /// Will be responded to with an [`AdminResponse::AppDeactivated`]
-    /// or an [`AdminResponse::Error`]
-    ///
-    /// [`AdminResponse::AppDeactivated`]: enum.AdminResponse.html#variant.AppDeactivated
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    DeactivateApp {
-        /// The InstalledAppId to deactivate
-        installed_app_id: InstalledAppId,
-    },
-    /// Open up a new websocket interface at the networking port
-    /// (optionally) specified by argument `port` (or using any free port if argument `port` is `None`)
-    /// over which you can then use the [`AppRequest`] API.
-    /// Any active `App` will be callable via this interface.
-    /// The successful [`AdminResponse::AppInterfaceAttached`] message will contain
-    /// the port chosen by the conductor if `None` was passed.
-    ///
-    /// Will be responded to with an [`AdminResponse::AppInterfaceAttached`]
-    /// or an [`AdminResponse::Error`]
-    ///
-    /// [`AdminResponse::AppInterfaceAttached`]: enum.AdminResponse.html#variant.AppInterfaceAttached
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    AttachAppInterface {
-        /// Optional port, use None to let the
-        /// OS choose a free port
-        port: Option<u16>,
-    },
-    /// Dump the full state of the `Cell` specified by argument `cell_id`,
-    /// including its chain, as a string containing JSON.
-    ///
-    /// Will be responded to with an [`AdminResponse::StateDumped`]
-    /// or an [`AdminResponse::Error`]
-    ///
-    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    /// [`AdminResponse::StateDumped`]: enum.AdminResponse.html#variant.StateDumped
-    DumpState {
-        /// The `CellId` for which to dump state
-        cell_id: Box<CellId>,
-    },
-    /// Add a list [AgentInfoSigned] to this conductor's peer store.
-    /// This is another way of finding peers on a dht.
-    ///
-    /// This can be useful for testing.
-    ///
-    /// It is also helpful if you know other
-    /// agents on the network and they can send you
-    /// their agent info.
-    AddAgentInfo {
-        /// Vec of signed agent info to add to peer store
-        agent_infos: Vec<AgentInfoSigned>,
-    },
-    /// Request the [AgentInfoSigned] stored in this conductor's
-    /// peer store.
-    ///
-    /// You can:
-    /// - Get all agent info by leaving cell id to None.
-    /// - Get a specific agent info by setting the cell id.
-    ///
-    /// This is how you can send your agent info to another agent.
-    /// It is also useful for testing across networks.
-    RequestAgentInfo {
-        /// Optionally choose a specific agent info
-        cell_id: Option<CellId>,
-    },
-}
-
-/// Represents the possible responses to an [`AdminRequest`]
-/// and follows a general convention of `noun_verb` as opposed to
-/// the `verb_noun` of `AdminRequest`.
-///
-/// Will serialize as an object with any contents of the enum on a key `data`
-/// and the enum variant on a key `type`, e.g.
-/// `{ type: 'app_interface_attached', data: { port: 4000 } }`
-///
-/// [`AdminRequest`]: enum.AdminRequest.html
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[cfg_attr(test, derive(Clone))]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
-pub enum AdminResponse {
-    /// Can occur in response to any [`AdminRequest`].
-    ///
-    /// There has been an error during the handling of the request.
-    /// See [`ExternalApiWireError`] for variants.
-    ///
-    /// [`AdminRequest`]: enum.AdminRequest.html
-    /// [`ExternalApiWireError`]: error/enum.ExternalApiWireError.html
-    Error(ExternalApiWireError),
-    /// The succesful response to an [`AdminRequest::InstallApp`].
-    ///
-    /// The resulting [`InstalledApp`] contains the App id,
-    /// the [`CellNick`]s and, most usefully, the new [`CellId`]s
-    /// of the newly installed `Dna`s. See the [`InstalledApp`] docs for details.
-    ///
-    /// [`AdminRequest::InstallApp`]: enum.AdminRequest.html#variant.InstallApp
-    /// [`InstalledApp`]: ../../../holochain_types/app/struct.InstalledApp.html
-    /// [`CellNick`]: ../../../holochain_types/app/type.CellNick.html
-    /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
-    AppInstalled(InstalledApp),
-    /// The succesful response to an [`AdminRequest::AddAdminInterfaces`].
-    ///
-    /// It means the `AdminInterface`s have successfully been added
-    ///
-    /// [`AdminRequest::AddAdminInterfaces`]: enum.AdminRequest.html#variant.AddAdminInterfaces
-    AdminInterfacesAdded,
-    /// The succesful response to an [`AdminRequest::GenerateAgentPubKey`].
-    ///
-    /// Contains a new `AgentPubKey` generated by the Keystore
-    ///
-    /// [`AdminRequest::GenerateAgentPubKey`]: enum.AdminRequest.html#variant.GenerateAgentPubKey
-    AgentPubKeyGenerated(AgentPubKey),
-    /// The successful response to an [`AdminRequest::ListDnas`].
-    ///
-    /// Contains a list of the hashes of all installed `Dna`s
-    ///
-    /// [`AdminRequest::ListDnas`]: enum.AdminRequest.html#variant.ListDnas
-    DnasListed(Vec<DnaHash>),
-    /// The succesful response to an [`AdminRequest::ListCellIds`].
-    ///
-    /// Contains a list of all the `Cell` ids in the conductor
-    ///
-    /// [`AdminRequest::ListCellIds`]: enum.AdminRequest.html#variant.ListCellIds
-    CellIdsListed(Vec<CellId>),
-    /// The succesful response to an [`AdminRequest::ListActiveApps`].
-    ///
-    /// Contains a list of all the active `App` ids in the conductor
-    ///
-    /// [`AdminRequest::ListActiveApps`]: enum.AdminRequest.html#variant.ListActiveApps
-    ActiveAppsListed(Vec<InstalledAppId>),
-    /// The succesful response to an [`AdminRequest::AttachAppInterface`].
-    ///
-    /// `AppInterfaceApi` successfully attached.
-    /// Contains the port number that was selected (if not specified) by Holochain
-    /// for running this App interface
-    ///
-    /// [`AdminRequest::AttachAppInterface`]: enum.AdminRequest.html#variant.AttachAppInterface
-    AppInterfaceAttached {
-        /// Networking port of the new `AppInterfaceApi`
-        port: u16,
-    },
-    /// The succesful response to an [`AdminRequest::ActivateApp`].
-    ///
-    /// It means the `App` was activated successfully
-    ///
-    /// [`AdminRequest::ActivateApp`]: enum.AdminRequest.html#variant.ActivateApp
-    AppActivated,
-    /// The succesful response to an [`AdminRequest::DeactivateApp`].
-    ///
-    /// It means the `App` was deactivated successfully.
-    ///
-    /// [`AdminRequest::DeactivateApp`]: enum.AdminRequest.html#variant.DeactivateApp
-    AppDeactivated,
-    /// The succesful response to an [`AdminRequest::DumpState`].
-    ///
-    /// The result contains a string of serialized JSON data which can be deserialized to access the
-    /// full state dump, and inspect the source chain.
-    ///
-    /// [`AdminRequest::DumpState`]: enum.AdminRequest.html#variant.DumpState
-    StateDumped(String),
-    /// The succesful response to an [`AdminRequest::AddAgentInfo`].
-    ///
-    /// This means the agent info was successfully added to the peer store.
-    ///
-    /// [`AdminRequest::AddAgentInfo`]: enum.AdminRequest.html#variant.AddAgentInfo
-    AgentInfoAdded,
-    /// The succesful response to an [`AdminRequest::RequestAgentInfo`].
-    ///
-    /// This is all the agent info that was found for the request.
-    ///
-    /// [`AdminRequest::RequestAgentInfo`]: enum.AdminRequest.html#variant.RequestAgentInfo
-    AgentInfoRequested(Vec<AgentInfoSigned>),
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::conductor::Conductor;
     use anyhow::Result;
-    use holochain_state::test_utils::test_environments;
-    use holochain_types::{
-        app::InstallAppDnaPayload,
-        observability,
-        test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
-    };
+    use holochain_lmdb::test_utils::test_environments;
+    use holochain_types::app::InstallAppDnaPayload;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::test_utils::fake_dna_zomes;
+    use holochain_types::test_utils::write_fake_dna_file;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
+    use observability;
     use uuid::Uuid;
 
-    #[tokio::test(threaded_scheduler)]
-    async fn install_list_dna_app() -> Result<()> {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn register_list_dna_app() -> Result<()> {
         observability::test_run().ok();
         let envs = test_environments();
         let handle = Conductor::builder().test(&envs).await?;
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
-        let uuid = Uuid::new_v4();
+        let uid = Uuid::new_v4();
         let dna = fake_dna_zomes(
-            &uuid.to_string(),
+            &uid.to_string(),
             vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
         );
-        let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-        let dna_payload = InstallAppDnaPayload::path_only(dna_path, "".to_string());
         let dna_hash = dna.dna_hash().clone();
-        let agent_key = fake_agent_pubkey_1();
-        let cell_id = CellId::new(dna.dna_hash().clone(), agent_key.clone());
-        let expected_cell_ids = InstalledApp {
-            installed_app_id: "test".to_string(),
-            cell_data: vec![InstalledCell::new(cell_id.clone(), "".to_string())],
+        let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
+        let path_payload = RegisterDnaPayload {
+            uid: None,
+            properties: None,
+            source: DnaSource::Path(dna_path.clone()),
         };
-        let payload = InstallAppPayload {
-            dnas: vec![dna_payload],
-            installed_app_id: "test".to_string(),
-            agent_key,
+        let path_install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload)))
+            .await;
+        assert_matches!(
+            path_install_response,
+            AdminResponse::DnaRegistered(h) if h == dna_hash
+        );
+
+        // re-register idempotent
+        let path_payload = RegisterDnaPayload {
+            uid: None,
+            properties: None,
+            source: DnaSource::Path(dna_path.clone()),
+        };
+        let path1_install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload)))
+            .await;
+        assert_matches!(
+            path1_install_response,
+            AdminResponse::DnaRegistered(h) if h == dna_hash
+        );
+
+        let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
+        let expects = vec![dna_hash.clone()];
+        assert_matches!(dna_list, AdminResponse::DnasListed(a) if a == expects);
+
+        // register by hash
+        let hash_payload = RegisterDnaPayload {
+            uid: None,
+            properties: None,
+            source: DnaSource::Hash(dna_hash.clone()),
         };
 
+        // without properties or uid should throw error
+        let hash_install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
+            .await;
+        assert_matches!(
+            hash_install_response,
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Hash Dna source requires properties or uid to create a derived Dna")
+        );
+
+        // with a property should install and produce a different hash
+        let json: serde_yaml::Value = serde_yaml::from_str("some prop: \"foo\"").unwrap();
+        let hash_payload = RegisterDnaPayload {
+            uid: None,
+            properties: Some(YamlProperties::new(json.clone())),
+            source: DnaSource::Hash(dna_hash.clone()),
+        };
         let install_response = admin_api
-            .handle_admin_request(AdminRequest::InstallApp(Box::new(payload)))
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
             .await;
         assert_matches!(
             install_response,
-            AdminResponse::AppInstalled(cell_ids) if cell_ids == expected_cell_ids
+            AdminResponse::DnaRegistered(hash) if hash != dna_hash
         );
-        let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
-        let expects = vec![dna_hash];
-        assert_matches!(dna_list, AdminResponse::DnasListed(a) if a == expects);
 
-        let res = admin_api
-            .handle_admin_request(AdminRequest::ActivateApp {
-                installed_app_id: "test".to_string(),
-            })
+        // with a uid should install and produce a different hash
+        let hash_payload = RegisterDnaPayload {
+            uid: Some(String::from("12345678900000000000000")),
+            properties: None,
+            source: DnaSource::Hash(dna_hash.clone()),
+        };
+        let hash2_install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
             .await;
 
-        assert_matches!(res, AdminResponse::AppActivated);
+        let new_hash = if let AdminResponse::DnaRegistered(ref h) = hash2_install_response {
+            h.clone()
+        } else {
+            unreachable!()
+        };
 
-        let res = admin_api
-            .handle_admin_request(AdminRequest::ListCellIds)
+        assert_matches!(
+            hash2_install_response,
+            AdminResponse::DnaRegistered(hash) if hash != dna_hash
+        );
+
+        // from a path with a same uid should return the already registered hash so it's idempotent
+        let path_payload = RegisterDnaPayload {
+            uid: Some(String::from("12345678900000000000000")),
+            properties: None,
+            source: DnaSource::Path(dna_path.clone()),
+        };
+        let path2_install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload)))
             .await;
+        assert_matches!(
+            path2_install_response,
+            AdminResponse::DnaRegistered(hash) if hash == new_hash
+        );
 
-        assert_matches!(res, AdminResponse::CellIdsListed(v) if v == vec![cell_id]);
-
-        let res = admin_api
-            .handle_admin_request(AdminRequest::ListActiveApps)
+        // from a path with different uid should produce different hash
+        let path_payload = RegisterDnaPayload {
+            uid: Some(String::from("foo")),
+            properties: None,
+            source: DnaSource::Path(dna_path),
+        };
+        let path3_install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload)))
             .await;
-
-        assert_matches!(res, AdminResponse::ActiveAppsListed(v) if v == vec!["test".to_string()]);
+        assert_matches!(
+            path3_install_response,
+            AdminResponse::DnaRegistered(hash) if hash != dna_hash
+        );
 
         handle.shutdown().await;
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
@@ -586,21 +471,115 @@ mod test {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn dna_read_parses() -> Result<()> {
-        let uuid = Uuid::new_v4();
-        let dna = fake_dna_file(&uuid.to_string());
-        let (dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await?;
-        let json = serde_json::json!({
-            "test": "example",
-            "how_many": 42,
-        });
-        let properties = Some(JsonProperties::new(json.clone()));
-        let result = read_parse_dna(dna_path, properties).await?;
-        let properties = JsonProperties::new(json);
-        let mut dna = dna.dna().clone();
-        dna.properties = properties.try_into().unwrap();
-        assert_eq!(&dna, result.dna());
+    #[tokio::test(flavor = "multi_thread")]
+    async fn install_list_dna_app() -> Result<()> {
+        observability::test_run().ok();
+        let envs = test_environments();
+        let handle = Conductor::builder().test(&envs).await?;
+        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        let admin_api = RealAdminInterfaceApi::new(handle.clone());
+        let uid = Uuid::new_v4();
+        let dna = fake_dna_zomes(
+            &uid.to_string(),
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+        let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
+        let agent_key1 = fake_agent_pubkey_1();
+
+        // attempt install with a hash before the DNA has been registered
+        let dna_hash = dna.dna_hash().clone();
+        let hash_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
+        let hash_install_payload = InstallAppPayload {
+            dnas: vec![hash_payload],
+            installed_app_id: "test-by-hash".to_string(),
+            agent_key: agent_key1,
+        };
+        let install_response = admin_api
+            .handle_admin_request(AdminRequest::InstallApp(Box::new(
+                hash_install_payload.clone(),
+            )))
+            .await;
+        assert_matches!(
+            install_response,
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == format!("Given dna has not been registered: {}", dna_hash)
+        );
+
+        // now register a DNA
+        let path_payload = RegisterDnaPayload {
+            uid: None,
+            properties: None,
+            source: DnaSource::Path(dna_path),
+        };
+        let path_install_response = admin_api
+            .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload)))
+            .await;
+        assert_matches!(
+            path_install_response,
+            AdminResponse::DnaRegistered(h) if h == dna_hash
+        );
+
+        let agent_key2 = fake_agent_pubkey_2();
+        let path_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
+        let cell_id2 = CellId::new(dna_hash.clone(), agent_key2.clone());
+        let expected_installed_app = InstalledApp::new_inactive(
+            InstalledAppCommon::new_legacy(
+                "test-by-path".to_string(),
+                vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
+            )
+            .unwrap(),
+        );
+        let expected_installed_app_info: InstalledAppInfo = (&expected_installed_app).into();
+        let path_install_payload = InstallAppPayload {
+            dnas: vec![path_payload],
+            installed_app_id: "test-by-path".to_string(),
+            agent_key: agent_key2,
+        };
+
+        let install_response = admin_api
+            .handle_admin_request(AdminRequest::InstallApp(Box::new(path_install_payload)))
+            .await;
+        assert_matches!(
+            install_response,
+            AdminResponse::AppInstalled(info) if info == expected_installed_app_info
+        );
+        let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
+        let expects = vec![dna_hash.clone()];
+        assert_matches!(dna_list, AdminResponse::DnasListed(a) if a == expects);
+
+        let res = admin_api
+            .handle_admin_request(AdminRequest::ActivateApp {
+                installed_app_id: "test-by-path".to_string(),
+            })
+            .await;
+        assert_matches!(res, AdminResponse::AppActivated);
+
+        let res = admin_api
+            .handle_admin_request(AdminRequest::ListCellIds)
+            .await;
+
+        assert_matches!(res, AdminResponse::CellIdsListed(v) if v == vec![cell_id2]);
+
+        // now try to install the happ using the hash
+        let _install_response = admin_api
+            .handle_admin_request(AdminRequest::InstallApp(Box::new(hash_install_payload)))
+            .await;
+        let _res = admin_api
+            .handle_admin_request(AdminRequest::ActivateApp {
+                installed_app_id: "test-by-hash".to_string(),
+            })
+            .await;
+
+        let res = admin_api
+            .handle_admin_request(AdminRequest::ListActiveApps)
+            .await;
+
+        assert_matches!(res, AdminResponse::ActiveAppsListed(v) if v.contains(&"test-by-path".to_string()) && v.contains(&"test-by-hash".to_string())
+        );
+
+        handle.shutdown().await;
+        tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
+            .await
+            .ok();
         Ok(())
     }
 }

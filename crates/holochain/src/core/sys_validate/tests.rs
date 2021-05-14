@@ -1,32 +1,29 @@
 use super::*;
-use crate::{conductor::api::MockCellConductorApi, meta_mock};
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::api::MockCellConductorApi;
+use crate::meta_mock;
 use ::fixt::prelude::*;
 use error::SysValidationError;
-use holo_hash::fixt::*;
+
 use holochain_keystore::AgentPubKeyExt;
+use holochain_lmdb::env::EnvironmentRead;
+use holochain_lmdb::test_utils::test_cell_env;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{env::EnvironmentRead, test_utils::test_cell_env};
-use holochain_types::{
-    dna::{DnaDef, DnaFile},
-    fixt::*,
-    observability,
-    test_utils::fake_agent_pubkey_1,
-    Timestamp,
-};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
 use matches::assert_matches;
+use observability;
 use std::convert::TryFrom;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn verify_header_signature_test() {
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_lmdb::test_utils::test_keystore();
     let author = fake_agent_pubkey_1();
     let mut header = fixt!(CreateLink);
     header.author = author.clone();
     let header = Header::CreateLink(header);
     let real_signature = author.sign(&keystore, &header).await.unwrap();
-    let wrong_signature = Signature(vec![1; 64]);
+    let wrong_signature = Signature([1_u8; 64]);
 
     assert_matches!(
         verify_header_signature(&wrong_signature, &header).await,
@@ -39,7 +36,7 @@ async fn verify_header_signature_test() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_previous_header() {
     let mut header = fixt!(CreateLink);
     header.prev_header = fixt!(HeaderHash);
@@ -57,7 +54,7 @@ async fn check_previous_header() {
     assert_matches!(check_prev_header(&header.into()), Ok(()));
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_valid_if_dna_test() {
     let env: EnvironmentRead = test_cell_env().env().into();
     // Test data
@@ -90,11 +87,11 @@ async fn check_valid_if_dna_test() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_previous_timestamp() {
     let mut header = fixt!(CreateLink);
     let mut prev_header = fixt!(CreateLink);
-    header.timestamp = Timestamp::now().into();
+    header.timestamp = timestamp::now().into();
     let before = chrono::Utc::now() - chrono::Duration::weeks(1);
     let after = chrono::Utc::now() + chrono::Duration::weeks(1);
 
@@ -112,7 +109,7 @@ async fn check_previous_timestamp() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_previous_seq() {
     let mut header = fixt!(CreateLink);
     let mut prev_header = fixt!(CreateLink);
@@ -156,7 +153,7 @@ async fn check_previous_seq() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_entry_type_test() {
     let entry_fixt = EntryFixturator::new(Predictable);
     let et_fixt = EntryTypeFixturator::new(Predictable);
@@ -180,7 +177,7 @@ async fn check_entry_type_test() {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_entry_hash_test() {
     let mut ec = fixt!(Create);
     let entry = fixt!(Entry);
@@ -209,7 +206,7 @@ async fn check_entry_hash_test() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_entry_size_test() {
     // let tiny = Entry::App(SerializedBytes::from(UnsafeBytes::from(vec![0; 1])));
     // let bytes = (0..16_000_000).map(|_| 0u8).into_iter().collect::<Vec<_>>();
@@ -222,7 +219,7 @@ async fn check_entry_size_test() {
     // );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_update_reference_test() {
     let mut ec = fixt!(Create);
     let mut eu = fixt!(Update);
@@ -257,7 +254,7 @@ async fn check_update_reference_test() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_link_tag_size_test() {
     let tiny = LinkTag(vec![0; 1]);
     let bytes = (0..401).map(|_| 0u8).into_iter().collect::<Vec<_>>();
@@ -270,14 +267,14 @@ async fn check_link_tag_size_test() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_app_entry_type_test() {
     observability::test_run().ok();
     // Setup test data
     let dna_file = DnaFile::new(
         DnaDef {
             name: "app_entry_type_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: vec![TestWasm::EntryDefs.into()].into(),
         },
@@ -285,6 +282,7 @@ async fn check_app_entry_type_test() {
     )
     .await
     .unwrap();
+    let dna_hash = dna_file.dna_hash().to_owned().clone();
     let mut entry_def = fixt!(EntryDef);
     entry_def.visibility = EntryVisibility::Public;
 
@@ -293,13 +291,17 @@ async fn check_app_entry_type_test() {
     conductor_api.expect_cell_id().return_const(fixt!(CellId));
     // # No dna or entry def
     conductor_api.expect_sync_get_entry_def().return_const(None);
-    conductor_api.expect_sync_get_this_dna().return_const(None);
+    conductor_api.expect_sync_get_dna().return_const(None);
+    conductor_api
+        .expect_sync_get_this_dna()
+        .returning(move || Err(ConductorApiError::DnaMissing(dna_hash.clone())));
 
     // ## Dna is missing
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,
-        Err(SysValidationError::DnaMissing(_))
+        Err(SysValidationError::ConductorApiError(e))
+        if matches!(*e, ConductorApiError::DnaMissing(_))
     );
 
     // # Dna but no entry def in buffer
@@ -307,8 +309,11 @@ async fn check_app_entry_type_test() {
     conductor_api.checkpoint();
     conductor_api.expect_sync_get_entry_def().return_const(None);
     conductor_api
+        .expect_sync_get_dna()
+        .return_const(Some(dna_file.clone()));
+    conductor_api
         .expect_sync_get_this_dna()
-        .return_const(Some(dna_file));
+        .returning(move || Ok(dna_file.clone()));
     let aet = AppEntryType::new(0.into(), 1.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,
@@ -341,7 +346,7 @@ async fn check_app_entry_type_test() {
     assert_matches!(check_app_entry_type(&aet, &conductor_api).await, Ok(_));
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_entry_not_private_test() {
     let mut ed = fixt!(EntryDef);
     ed.visibility = EntryVisibility::Public;

@@ -1,15 +1,14 @@
 use super::error::WorkflowResult;
-use crate::core::queue_consumer::{OneshotWriter, TriggerSender, WorkComplete};
-use crate::core::state::{
-    dht_op_integration::{AuthoredDhtOpsStore, AuthoredDhtOpsValue},
-    source_chain::SourceChain,
-    workspace::{Workspace, WorkspaceResult},
-};
-use holochain_state::{
-    buffer::KvBufFresh,
-    db::AUTHORED_DHT_OPS,
-    prelude::{BufferedStore, EnvironmentRead, GetDb, Writer},
-};
+use crate::core::queue_consumer::OneshotWriter;
+use crate::core::queue_consumer::TriggerSender;
+use crate::core::queue_consumer::WorkComplete;
+use holochain_lmdb::buffer::KvBufFresh;
+use holochain_lmdb::db::AUTHORED_DHT_OPS;
+use holochain_lmdb::prelude::BufferedStore;
+use holochain_lmdb::prelude::EnvironmentRead;
+use holochain_lmdb::prelude::GetDb;
+use holochain_lmdb::prelude::Writer;
+use holochain_state::prelude::*;
 use holochain_types::dht_op::DhtOpHashed;
 use tracing::*;
 
@@ -85,26 +84,25 @@ impl Workspace for ProduceDhtOpsWorkspace {
 mod tests {
     use super::super::genesis_workflow::tests::fake_genesis;
     use super::*;
-    use crate::core::state::source_chain::SourceChain;
+    use holochain_state::source_chain::SourceChain;
 
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
     use holo_hash::*;
 
-    use holochain_state::{
-        env::{ReadManager, WriteManager},
-        test_utils::test_cell_env,
-    };
-    use holochain_types::{
-        dht_op::{produce_ops_from_element, DhtOp},
-        fixt::*,
-        observability, Entry, EntryHashed,
-    };
-    use holochain_zome_types::{
-        entry_def::EntryVisibility,
-        header::{builder, EntryType},
-    };
+    use holochain_lmdb::env::ReadManager;
+    use holochain_lmdb::env::WriteManager;
+    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_types::dht_op::produce_ops_from_element;
+    use holochain_types::dht_op::DhtOp;
+    use holochain_types::fixt::*;
+    use holochain_types::EntryHashed;
+    use holochain_zome_types::entry_def::EntryVisibility;
+    use holochain_zome_types::header::builder;
+    use holochain_zome_types::header::EntryType;
+    use holochain_zome_types::Entry;
     use matches::assert_matches;
+    use observability;
     use std::collections::HashSet;
 
     struct TestData {
@@ -146,7 +144,7 @@ mod tests {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn elements_produce_ops() {
         observability::test_run().ok();
         let test_env = test_cell_env();
@@ -229,11 +227,14 @@ mod tests {
                 .iter(&reader)
                 .unwrap()
                 .map(|(k, v)| {
-                    assert_matches!(v, AuthoredDhtOpsValue {
-                        receipt_count: 0,
-                        last_publish_time: None,
-                        ..
-                    });
+                    assert_matches!(
+                        v,
+                        AuthoredDhtOpsValue {
+                            receipt_count: 0,
+                            last_publish_time: None,
+                            ..
+                        }
+                    );
 
                     Ok(DhtOpHash::from_raw_39_panicky(k.to_vec()))
                 })

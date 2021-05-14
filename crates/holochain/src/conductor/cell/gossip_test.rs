@@ -1,17 +1,19 @@
-use crate::{
-    conductor::p2p_store::{AgentKv, AgentKvKey},
-    test_utils::{conductor_setup::ConductorTestData, new_invocation, wait_for_integration},
-};
+use crate::conductor::p2p_store::AgentKv;
+use crate::conductor::p2p_store::AgentKvKey;
+use crate::test_utils::conductor_setup::ConductorTestData;
+use crate::test_utils::new_zome_call;
+use crate::test_utils::wait_for_integration;
 use fallible_iterator::FallibleIterator;
-use hdk3::prelude::*;
-use holochain_state::buffer::KvStoreT;
-use holochain_state::fresh_reader_test;
+use hdk::prelude::*;
+use holochain_lmdb::buffer::KvStoreT;
+use holochain_lmdb::fresh_reader_test;
+use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p::{KitsuneBinType, KitsuneP2pConfig};
+use kitsune_p2p::KitsuneBinType;
+use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
-use test_wasm_common::{AnchorInput, TestString};
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn gossip_test() {
     observability::test_run().ok();
     const NUM: usize = 1;
@@ -25,7 +27,7 @@ async fn gossip_test() {
 
     let anchor_invocation = |anchor: &str, cell_id, i: usize| {
         let anchor = AnchorInput(anchor.into(), i.to_string());
-        new_invocation(cell_id, "anchor", anchor, TestWasm::Anchor)
+        new_zome_call(cell_id, "anchor", anchor, TestWasm::Anchor)
     };
 
     for i in 0..NUM {
@@ -35,7 +37,7 @@ async fn gossip_test() {
     }
 
     // Give publish time to finish
-    tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     // Bring Bob online
     conductor_test.bring_bob_online().await;
@@ -57,18 +59,17 @@ async fn gossip_test() {
     .await;
 
     // Bob list anchors
-    let invocation = new_invocation(
+    let invocation = new_zome_call(
         bob_cell_id,
         "list_anchor_addresses",
-        TestString("alice".into()),
+        "alice".to_string(),
         TestWasm::Anchor,
     )
     .unwrap();
     let response = handle.call_zome(invocation).await.unwrap().unwrap();
     match response {
         ZomeCallResponse::Ok(r) => {
-            let response: SerializedBytes = r.into_inner();
-            let hashes: EntryHashes = response.try_into().unwrap();
+            let hashes: EntryHashes = r.decode().unwrap();
             assert_eq!(hashes.0.len(), NUM);
         }
         _ => unreachable!(),
@@ -77,7 +78,7 @@ async fn gossip_test() {
     conductor_test.shutdown_conductor().await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn signature_smoke_test() {
     observability::test_run().ok();
     let mut network_config = KitsuneP2pConfig::default();
@@ -91,7 +92,7 @@ async fn signature_smoke_test() {
     conductor_test.shutdown_conductor().await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "Conductors are not currently talking to each other"]
 async fn agent_info_test() {
     observability::test_run().ok();
@@ -144,7 +145,7 @@ async fn agent_info_test() {
     let bob_key: AgentKvKey = (&dna_kit, &bob_kit).into();
 
     // Give publish time to finish
-    tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     let p2p_kv = AgentKv::new(p2p_env.clone().into()).unwrap();
     let (alice_agent_info, bob_agent_info, len) = fresh_reader_test!(p2p_env, |r| {

@@ -2,44 +2,33 @@
 #![allow(deprecated)]
 
 use super::*;
-use crate::{
-    conductor::api::CellConductorApiT,
-    core::{
-        queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
-        state::{
-            cascade::Cascade,
-            cascade::DbPair,
-            cascade::DbPairMut,
-            dht_op_integration::{IntegrationLimboStore, IntegrationLimboValue},
-            element_buf::ElementBuf,
-            metadata::MetadataBuf,
-            validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
-            workspace::{Workspace, WorkspaceError, WorkspaceResult},
-        },
-        sys_validate::*,
-        validation::*,
-    },
-};
-use error::{WorkflowError, WorkflowResult};
+use crate::conductor::api::CellConductorApiT;
+use crate::core::queue_consumer::OneshotWriter;
+use crate::core::queue_consumer::TriggerSender;
+use crate::core::queue_consumer::WorkComplete;
+use crate::core::sys_validate::*;
+use crate::core::validation::*;
+use error::WorkflowError;
+use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::DhtOpHash;
-use holochain_p2p::{HolochainP2pCell, HolochainP2pCellT};
-use holochain_state::{
-    buffer::{BufferedStore, KvBufFresh},
-    db::INTEGRATION_LIMBO,
-    fresh_reader,
-    prelude::*,
-};
-use holochain_types::{
-    dht_op::DhtOp, header::NewEntryHeaderRef, test_utils::which_agent, validate::ValidationStatus,
-    Entry, Timestamp,
-};
-use holochain_zome_types::{entry_def::EntryVisibility, signature::Signature};
-use holochain_zome_types::{
-    header::{CreateLink, Delete, DeleteLink, EntryType, Update},
-    Header,
-};
-use std::{collections::BinaryHeap, convert::TryFrom, convert::TryInto};
+use holochain_cascade::Cascade;
+use holochain_cascade::DbPair;
+use holochain_cascade::DbPairMut;
+use holochain_lmdb::buffer::BufferedStore;
+use holochain_lmdb::buffer::KvBufFresh;
+use holochain_lmdb::db::INTEGRATION_LIMBO;
+use holochain_lmdb::fresh_reader;
+use holochain_lmdb::prelude::*;
+use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pCellT;
+use holochain_state::prelude::*;
+use holochain_types::prelude::*;
+use holochain_zome_types::Entry;
+use holochain_zome_types::ValidationStatus;
+use std::collections::BinaryHeap;
+use std::convert::TryFrom;
+use std::convert::TryInto;
 use tracing::*;
 
 use produce_dht_ops_workflow::dht_op_light::light_to_op;
@@ -165,6 +154,7 @@ async fn sys_validation_workflow_inner(
                 let iv = IntegrationLimboValue {
                     op: vlv.op,
                     validation_status: ValidationStatus::Valid,
+                    send_receipt: vlv.send_receipt,
                 };
                 workspace.put_int_limbo(op_hash, iv)?;
             }
@@ -189,6 +179,7 @@ async fn sys_validation_workflow_inner(
                 let iv = IntegrationLimboValue {
                     op: vlv.op,
                     validation_status: ValidationStatus::Rejected,
+                    send_receipt: vlv.send_receipt,
                 };
                 workspace.put_int_limbo(op_hash, iv)?;
             }
@@ -439,7 +430,7 @@ async fn sys_validate_element_inner(
         Header::DeleteLink(header) => {
             register_delete_link(header, workspace, network, incoming_dht_ops_sender).await?;
         }
-        _ => (),
+        _ => {}
     }
     Ok(())
 }
@@ -713,7 +704,7 @@ pub struct SysValidationWorkspace {
 }
 
 impl<'a> SysValidationWorkspace {
-    pub fn cascade<Network: HolochainP2pCellT + Clone>(
+    pub fn cascade<Network: HolochainP2pCellT + Clone + Send + 'static>(
         &'a mut self,
         network: Network,
     ) -> Cascade<'a, Network> {
@@ -723,6 +714,8 @@ impl<'a> SysValidationWorkspace {
             &self.meta_authored,
             &self.element_vault,
             &self.meta_vault,
+            &self.element_rejected,
+            &self.meta_rejected,
             &mut self.element_cache,
             &mut self.meta_cache,
             network,
@@ -773,7 +766,7 @@ impl SysValidationWorkspace {
         hash: DhtOpHash,
         mut vlv: ValidationLimboValue,
     ) -> WorkflowResult<()> {
-        vlv.last_try = Some(Timestamp::now());
+        vlv.last_try = Some(timestamp::now());
         vlv.num_tries += 1;
         self.validation_limbo.put(hash, vlv)?;
         Ok(())
@@ -861,6 +854,8 @@ impl TryFrom<&CallZomeWorkspace> for SysValidationWorkspace {
             meta_authored,
             element_integrated,
             meta_integrated,
+            element_rejected,
+            meta_rejected,
             element_cache,
             meta_cache,
         } = call_zome;
@@ -869,6 +864,8 @@ impl TryFrom<&CallZomeWorkspace> for SysValidationWorkspace {
         sys_val.meta_authored = meta_authored.into();
         sys_val.element_vault = element_integrated.into();
         sys_val.meta_vault = meta_integrated.into();
+        sys_val.element_rejected = element_rejected.into();
+        sys_val.meta_rejected = meta_rejected.into();
         sys_val.element_cache = element_cache.into();
         sys_val.meta_cache = meta_cache.into();
         Ok(sys_val)

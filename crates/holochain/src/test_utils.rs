@@ -1,57 +1,58 @@
 //! Utils for Holochain tests
 
-use crate::{
-    conductor::{
-        api::RealAppInterfaceApi,
-        config::{AdminInterfaceConfig, ConductorConfig, InterfaceDriver},
-        ConductorBuilder, ConductorHandle,
-    },
-    core::ribosome::ZomeCallInvocation,
-    core::state::cascade::Cascade,
-    core::state::cascade::DbPair,
-    core::state::element_buf::ElementBuf,
-    core::state::metadata::MetadataBuf,
-    core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
-};
+use crate::conductor::api::RealAppInterfaceApi;
+use crate::conductor::api::ZomeCall;
+use crate::conductor::config::AdminInterfaceConfig;
+use crate::conductor::config::ConductorConfig;
+use crate::conductor::config::InterfaceDriver;
+use crate::conductor::p2p_store;
+use crate::conductor::ConductorBuilder;
+use crate::conductor::ConductorHandle;
+use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
+use crate::core::workflow::integrate_dht_ops_workflow;
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
+use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
-use holochain_keystore::KeystoreSender;
-use holochain_p2p::{
-    actor::HolochainP2pRefToCell, event::HolochainP2pEvent, spawn_holochain_p2p, HolochainP2pCell,
-    HolochainP2pRef, HolochainP2pSender,
-};
-use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
-use holochain_state::{
-    env::EnvironmentWrite, fresh_reader_test, test_utils::test_environments,
-    test_utils::TestEnvironments,
-};
-use holochain_types::{
-    app::InstalledCell,
-    cell::CellId,
-    dna::DnaFile,
-    element::{SignedHeaderHashed, SignedHeaderHashedExt},
-    fixt::CapSecretFixturator,
-    test_utils::fake_header_hash,
-    Entry, EntryHashed, HeaderHashed, Timestamp,
-};
+use holochain_cascade::Cascade;
+use holochain_cascade::DbPair;
+use holochain_conductor_api::IntegrationStateDump;
+use holochain_conductor_api::IntegrationStateDumps;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::fresh_reader_test;
+use holochain_lmdb::test_utils::test_environments;
+use holochain_lmdb::test_utils::TestEnvironments;
+use holochain_p2p::actor::HolochainP2pRefToCell;
+use holochain_p2p::event::HolochainP2pEvent;
+use holochain_p2p::spawn_holochain_p2p;
+use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pRef;
+use holochain_p2p::HolochainP2pSender;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_serialized_bytes::SerializedBytesError;
+use holochain_state::metadata::MetadataBuf;
+use holochain_state::{element_buf::ElementBuf, prelude::SourceChain};
+use holochain_types::prelude::*;
+
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{entry_def::EntryVisibility, zome::ZomeName};
-use holochain_zome_types::{
-    header::{Create, EntryType, Header},
-    ExternInput,
-};
 use kitsune_p2p::KitsuneP2pConfig;
-use std::{convert::TryInto, sync::Arc, time::Duration};
+use std::collections::HashSet;
+use std::sync::Arc;
+use std::time::Duration;
 use tempdir::TempDir;
 use tokio::sync::mpsc;
 
-#[cfg(any(test, feature = "test_utils"))]
-pub mod host_fn_api;
+pub use itertools;
 
-#[cfg(any(test, feature = "test_utils"))]
+use crate::sweettest::SweetCell;
+
 pub mod conductor_setup;
+pub mod host_fn_caller;
+
+mod wait_for_any;
+pub use wait_for_any::*;
 
 /// Produce file and line number info at compile-time
 #[macro_export]
@@ -66,14 +67,14 @@ macro_rules! here {
 #[macro_export]
 macro_rules! meta_mock {
     () => {{
-        $crate::core::state::metadata::MockMetadataBuf::new()
+        holochain_state::metadata::MockMetadataBuf::new()
     }};
     ($fun:ident) => {{
         let d: Vec<holochain_types::metadata::TimedHeaderHash> = Vec::new();
         meta_mock!($fun, d)
     }};
     ($fun:ident, $data:expr) => {{
-        let mut metadata = $crate::core::state::metadata::MockMetadataBuf::new();
+        let mut metadata = holochain_state::metadata::MockMetadataBuf::new();
         metadata.$fun().returning({
             move |_| {
                 Ok(Box::new(fallible_iterator::convert(
@@ -88,7 +89,7 @@ macro_rules! meta_mock {
         metadata
     }};
     ($fun:ident, $data:expr, $match_fn:expr) => {{
-        let mut metadata = $crate::core::state::metadata::MockMetadataBuf::new();
+        let mut metadata = holochain_state::metadata::MockMetadataBuf::new();
         metadata.$fun().returning({
             move |a| {
                 if $match_fn(a) {
@@ -112,34 +113,6 @@ macro_rules! meta_mock {
         });
         metadata
     }};
-}
-
-/// Create a fake SignedHeaderHashed and EntryHashed pair with random content
-pub async fn fake_unique_element(
-    keystore: &KeystoreSender,
-    agent_key: AgentPubKey,
-    visibility: EntryVisibility,
-) -> anyhow::Result<(SignedHeaderHashed, EntryHashed)> {
-    let content: SerializedBytes =
-        UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned()).into();
-    let entry = EntryHashed::from_content_sync(Entry::App(content.try_into().unwrap()));
-    let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
-        .next()
-        .unwrap();
-    let header_1 = Header::Create(Create {
-        author: agent_key,
-        timestamp: Timestamp::now().into(),
-        header_seq: 0,
-        prev_header: fake_header_hash(1),
-
-        entry_type: EntryType::App(app_entry_type),
-        entry_hash: entry.as_hash().to_owned(),
-    });
-
-    Ok((
-        SignedHeaderHashed::new(&keystore, HeaderHashed::from_content_sync(header_1)).await?,
-        entry,
-    ))
 }
 
 /// A running test network with a joined cell.
@@ -220,13 +193,17 @@ async fn test_network_inner<F>(
 where
     F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
 {
-    let (network, mut recv) =
-        spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
+    let (network, mut recv) = spawn_holochain_p2p(
+        holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
+        holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral()
             .await
-            .unwrap();
+            .unwrap(),
+    )
+    .await
+    .unwrap();
     let respond_task = tokio::task::spawn(async move {
         use futures::future::FutureExt;
-        use tokio::stream::StreamExt;
+        use tokio_stream::StreamExt;
         while let Some(evt) = recv.next().await {
             if let Some((filter, tx)) = &mut events {
                 if filter(&evt) {
@@ -237,7 +214,7 @@ where
             use holochain_p2p::event::HolochainP2pEvent::*;
             match evt {
                 SignNetworkData { respond, .. } => {
-                    respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                    respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                 }
                 PutAgentInfoSigned { respond, .. } => {
                     respond.r(Ok(async move { Ok(()) }.boxed().into()));
@@ -245,7 +222,7 @@ where
                 QueryAgentInfoSigned { respond, .. } => {
                     respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                 }
-                _ => (),
+                _ => {}
             }
         }
     });
@@ -265,7 +242,7 @@ pub async fn install_app(
     conductor_handle: ConductorHandle,
 ) {
     for dna in dnas {
-        conductor_handle.install_dna(dna).await.unwrap();
+        conductor_handle.register_dna(dna).await.unwrap();
     }
     conductor_handle
         .clone()
@@ -332,7 +309,7 @@ pub async fn setup_app_inner(
 
     (
         envs.tempdir(),
-        RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+        RealAppInterfaceApi::new(conductor_handle, Default::default()),
         handle,
     )
 }
@@ -341,11 +318,151 @@ pub async fn setup_app_inner(
 pub fn warm_wasm_tests() {
     if let Some(_path) = std::env::var_os("HC_WASM_CACHE_PATH") {
         let wasms: Vec<_> = TestWasm::iter().collect();
-        crate::fixt::WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
+        crate::fixt::RealRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
             .next()
             .unwrap();
     }
 }
+
+/// Number of ops per sourechain change
+pub struct WaitOps;
+
+#[allow(missing_docs)]
+impl WaitOps {
+    pub const GENESIS: usize = 7;
+    pub const INIT: usize = 2;
+    pub const CAP_TOKEN: usize = 2;
+    pub const ENTRY: usize = 3;
+    pub const LINK: usize = 3;
+    pub const DELETE_LINK: usize = 2;
+    pub const UPDATE: usize = 5;
+    pub const DELETE: usize = 4;
+
+    /// Added the app but haven't made any zome calls
+    /// so init hasn't happened.
+    pub const fn cold_start() -> usize {
+        Self::GENESIS
+    }
+
+    /// Genesis and init.
+    pub const fn start() -> usize {
+        Self::GENESIS + Self::INIT
+    }
+
+    /// Start but there's a cap grant in init.
+    pub const fn start_with_cap() -> usize {
+        Self::GENESIS + Self::INIT + Self::CAP_TOKEN
+    }
+
+    /// Path to a set depth.
+    /// This doesn't take into account paths
+    /// with sharding strategy.
+    pub const fn path(depth: usize) -> usize {
+        Self::ENTRY + (Self::LINK + Self::ENTRY) * depth
+    }
+}
+
+/// Wait for all cells to reach consistency for 10 seconds
+pub async fn consistency_10s(all_cells: &[&SweetCell]) {
+    const NUM_ATTEMPTS: usize = 100;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
+    consistency(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
+}
+
+/// Wait for all cells to reach consistency
+#[tracing::instrument(skip(all_cells))]
+pub async fn consistency(all_cells: &[&SweetCell], num_attempts: usize, delay: Duration) {
+    let all_cell_envs: Vec<_> = all_cells.iter().map(|c| c.env()).collect();
+    consistency_envs(&all_cell_envs[..], num_attempts, delay).await
+}
+
+/// Wait for all cell envs to reach consistency
+pub async fn consistency_envs(
+    all_cell_envs: &[&EnvironmentWrite],
+    num_attempts: usize,
+    delay: Duration,
+) {
+    let mut expected_count = 0;
+    for &env in all_cell_envs.iter() {
+        let count = get_authored_ops(env).len();
+        expected_count += count;
+    }
+    for &env in all_cell_envs.iter() {
+        wait_for_integration(env, expected_count, num_attempts, delay).await
+    }
+}
+
+/// Same as wait_for_integration but with a default wait time of 60 seconds
+/// Wait for all cells to reach consistency for 10 seconds
+pub async fn consistency_10s_others(all_cells: &[&SweetCell]) {
+    const NUM_ATTEMPTS: usize = 100;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
+    consistency_others(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
+}
+
+/// Wait for all cells to reach consistency
+#[tracing::instrument(skip(all_cells))]
+pub async fn consistency_others(all_cells: &[&SweetCell], num_attempts: usize, delay: Duration) {
+    let all_cell_envs: Vec<_> = all_cells.iter().map(|c| c.env()).collect();
+    consistency_envs_others(&all_cell_envs[..], num_attempts, delay).await
+}
+
+async fn consistency_envs_others(
+    all_cell_envs: &[&EnvironmentWrite],
+    num_attempts: usize,
+    delay: Duration,
+) {
+    let mut expected_count = 0;
+    for &env in all_cell_envs.iter() {
+        let count = get_authored_ops(env).len();
+        expected_count += count;
+    }
+    let start = Some(std::time::Instant::now());
+    for (i, &env) in all_cell_envs.iter().enumerate() {
+        let mut others = all_cell_envs.to_vec();
+        others.remove(i);
+        wait_for_integration_with_others(env, &others, expected_count, num_attempts, delay, start)
+            .await
+    }
+}
+
+fn get_authored_ops(env: &EnvironmentWrite) -> Vec<DhtOpLight> {
+    let query = ChainQueryFilter::new().include_entries(true);
+    let chain = SourceChain::new(env.clone().into()).unwrap();
+    let elements = chain.query(&query).unwrap();
+    let elements = elements.iter().collect::<Vec<_>>();
+    let private = elements
+        .iter()
+        .filter(|el| {
+            el.header()
+                .entry_type()
+                .map(|e| *e.visibility() == EntryVisibility::Private)
+                .unwrap_or(false)
+        })
+        .map(|el| el.header_address().clone())
+        .collect::<HashSet<_>>();
+    produce_op_lights_from_elements(elements)
+        .unwrap()
+        .into_iter()
+        .filter(|op| {
+            if let DhtOpLight::StoreEntry(_, _, _) = &op {
+                if private.contains(op.header_hash()) {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect()
+}
+
+/// Same as wait_for_integration but with a default wait time of 10 seconds
+#[tracing::instrument(skip(env))]
+pub async fn wait_for_integration_1m(env: &EnvironmentWrite, expected_count: usize) {
+    const NUM_ATTEMPTS: usize = 120;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(500);
+    wait_for_integration(env, expected_count, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
+}
+
 /// Exit early if the expected number of ops
 /// have been integrated or wait for num_attempts * delay
 #[tracing::instrument(skip(env))]
@@ -356,82 +473,301 @@ pub async fn wait_for_integration(
     delay: Duration,
 ) {
     for i in 0..num_attempts {
-        let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
-
-        let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
-            workspace
-                .validation_limbo
-                .iter(&r)
-                .unwrap()
-                .map(|(_, v)| Ok(v))
-                .collect()
-                .unwrap()
-        });
-        tracing::debug!(?val_limbo);
-
-        let int_limbo: Vec<_> = fresh_reader_test!(env, |r| {
-            workspace
-                .integration_limbo
-                .iter(&r)
-                .unwrap()
-                .map(|(_, v)| Ok(v))
-                .collect()
-                .unwrap()
-        });
-        tracing::debug!(?int_limbo);
-
-        let int: Vec<_> = fresh_reader_test!(env, |r| {
-            workspace
-                .integrated_dht_ops
-                .iter(&r)
-                .unwrap()
-                .map(|(_, v)| Ok(v))
-                .collect()
-                .unwrap()
-        });
-        let count = int.len();
-
-        {
-            let s = tracing::trace_span!("wait_for_integration_deep");
-            let _g = s.enter();
-            let element_integrated = ElementBuf::vault(env.clone().into(), false).unwrap();
-            let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
-            let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
-            let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
-            let mut cascade = Cascade::empty()
-                .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
-                .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
-            for iv in int {
-                tracing::trace!(op = ?iv.op, el = ?cascade.retrieve(iv.op.header_hash().clone().into(), Default::default()).await.unwrap());
-            }
-        }
-
+        let count = display_integration(env).await;
         if count == expected_count {
             return;
         } else {
             let total_time_waited = delay * i as u32;
             tracing::debug!(?count, ?total_time_waited);
         }
-        tokio::time::delay_for(delay).await;
+        tokio::time::sleep(delay).await;
+    }
+}
+
+fn int_ops(env: &EnvironmentWrite) -> Vec<DhtOpLight> {
+    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
+    fresh_reader_test!(env, |r| {
+        workspace
+            .integrated_dht_ops
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v.op))
+            .collect()
+            .unwrap()
+    })
+}
+
+/// Same as wait for integration but can print other states at the same time
+pub async fn wait_for_integration_with_others_10s(
+    env: &EnvironmentWrite,
+    others: &[&EnvironmentWrite],
+    expected_count: usize,
+    start: Option<std::time::Instant>,
+) {
+    const NUM_ATTEMPTS: usize = 100;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
+    wait_for_integration_with_others(
+        env,
+        others,
+        expected_count,
+        NUM_ATTEMPTS,
+        DELAY_PER_ATTEMPT,
+        start,
+    )
+    .await
+}
+
+#[tracing::instrument(skip(env, others, start))]
+/// Same as wait for integration but can print other states at the same time
+pub async fn wait_for_integration_with_others(
+    env: &EnvironmentWrite,
+    others: &[&EnvironmentWrite],
+    expected_count: usize,
+    num_attempts: usize,
+    delay: Duration,
+    start: Option<std::time::Instant>,
+) {
+    let mut last_total = 0;
+    let this_start = std::time::Instant::now();
+    for _ in 0..num_attempts {
+        let count = count_integration(env).await;
+        let counts = get_counts(others).await;
+        let total: usize = counts.0.clone().into_iter().map(|i| i.integrated).sum();
+        let num_conductors = counts.0.len() + 1;
+        let total_expected = num_conductors * expected_count;
+        let progress = if total_expected == 0 {
+            0.0
+        } else {
+            total as f64 / total_expected as f64 * 100.0
+        };
+        let change = total.checked_sub(last_total).expect("LOST A VALUE");
+        last_total = total;
+        if count.integrated == expected_count {
+            return;
+        } else {
+            let time_waited = this_start.elapsed().as_secs();
+            let total_time_waited = start.map(|s| s.elapsed().as_secs()).unwrap_or(0);
+            let ops_per_s = if total_time_waited == 0 {
+                0.0
+            } else {
+                total as f64 / total_time_waited as f64
+            };
+            tracing::debug!(
+                "Count: {}, val: {}, int: {}\nTime waited: {}s (total {}s),\nCounts: {:?}\nTotal: {} out of {} {:.4}% change:{} {:.4}ops/s\n",
+                count.integrated,
+                count.validation_limbo,
+                count.integration_limbo,
+                time_waited,
+                total_time_waited,
+                counts,
+                total,
+                total_expected,
+                progress,
+                change,
+                ops_per_s,
+            );
+        }
+        tokio::time::sleep(delay).await;
+    }
+}
+
+#[tracing::instrument(skip(envs))]
+/// Show authored data for each cell environment
+pub fn show_authored(envs: &[&EnvironmentWrite]) {
+    for (i, &env) in envs.iter().enumerate() {
+        let chain = SourceChain::new(env.clone().into()).unwrap();
+        let mut items = chain.iter_back().collect::<Vec<_>>().unwrap();
+        items.reverse();
+        for item in items {
+            let header = item.header();
+            let seq_num = header.header_seq();
+            let header_type = header.header_type();
+            let entry = header
+                .entry_hash()
+                .and_then(|e| chain.get_entry(e).unwrap());
+            tracing::debug!(chain = %i, %seq_num, ?header_type, ?entry);
+        }
+    }
+}
+
+#[tracing::instrument(skip(envs))]
+/// Show authored op data for each cell environment
+pub async fn show_authored_ops(envs: &[&EnvironmentWrite]) {
+    let mut all_auth = Vec::new();
+    for (i, env) in envs.iter().enumerate() {
+        let auth = get_authored_ops(env);
+        all_auth.extend(auth.clone());
+        for (j, op) in auth.iter().enumerate() {
+            tracing::debug!(chain = %i, op_num = %j, ?op);
+        }
+    }
+    for (i, env) in envs.iter().enumerate() {
+        let int = int_ops(env);
+        for op in &all_auth {
+            if int.iter().find(|&a| a == op).is_none() {
+                tracing::warn!(is_missing = ?op, for_env = %i);
+                show_data(env, op).await;
+            }
+        }
+    }
+}
+
+async fn show_data(env: &EnvironmentWrite, op: &DhtOpLight) {
+    let element_integrated = ElementBuf::vault(env.clone().into(), true).unwrap();
+    let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
+    let element_authored = ElementBuf::authored(env.clone().into(), true).unwrap();
+    let meta_authored = MetadataBuf::authored(env.clone().into()).unwrap();
+    let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
+    let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
+    let mut cascade = Cascade::empty()
+        .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
+        .with_authored(DbPair::new(&element_authored, &meta_authored))
+        .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
+    if let Some(el) = cascade
+        .retrieve(op.header_hash().clone().into(), Default::default())
+        .await
+        .unwrap()
+    {
+        let header = el.header();
+        let entry = format!("{:?}", el.entry());
+        tracing::debug!(seq_num = %header.header_seq(), header_type = ?header.header_type(), op_type = %op.to_string(), ?entry);
+    }
+}
+
+async fn get_counts(envs: &[&EnvironmentWrite]) -> IntegrationStateDumps {
+    let mut output = Vec::new();
+    for env in envs {
+        let env = *env;
+        output.push(count_integration(env).await);
+    }
+    IntegrationStateDumps(output)
+}
+
+async fn count_integration(env: &EnvironmentWrite) -> IntegrationStateDump {
+    integrate_dht_ops_workflow::dump_state(env.clone().into()).unwrap()
+}
+
+async fn display_integration(env: &EnvironmentWrite) -> usize {
+    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
+
+    let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+        workspace
+            .validation_limbo
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v))
+            .collect()
+            .unwrap()
+    });
+    tracing::debug!(?val_limbo);
+
+    let int_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+        workspace
+            .integration_limbo
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v))
+            .collect()
+            .unwrap()
+    });
+    tracing::debug!(?int_limbo);
+
+    let int: Vec<_> = fresh_reader_test!(env, |r| {
+        workspace
+            .integrated_dht_ops
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v))
+            .collect()
+            .unwrap()
+    });
+    let count = int.len();
+
+    {
+        let s = tracing::trace_span!("wait_for_integration_deep");
+        let _g = s.enter();
+        let element_integrated = ElementBuf::vault(env.clone().into(), false).unwrap();
+        let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
+        let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
+        let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
+        let mut cascade = Cascade::empty()
+            .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
+            .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
+        let mut headers_to_display = Vec::with_capacity(int.len());
+        for iv in int {
+            let el = cascade
+                .retrieve(iv.op.header_hash().clone().into(), Default::default())
+                .await
+                .unwrap()
+                .unwrap();
+            tracing::trace!(op = ?iv.op, ?el);
+            let header = el.header();
+            let entry = format!("{:?}", el.entry());
+            headers_to_display.push((
+                header.header_seq(),
+                header.header_type(),
+                iv.op.to_string(),
+                entry,
+            ))
+        }
+        headers_to_display.sort_by_key(|i| i.0);
+        for (i, h) in headers_to_display.into_iter().enumerate() {
+            tracing::debug!(?i, seq_num = %h.0, header_type = ?h.1, op_type = %h.2, entry = ?h.3);
+        }
+    }
+    count
+}
+
+/// Helper for displaying agent infos stored on a conductor
+pub async fn display_agent_infos(conductor: &ConductorHandle) {
+    let env = conductor.get_p2p_env().await;
+    for cell_id in conductor.list_cell_ids().await.unwrap() {
+        let info = p2p_store::dump_state(env.clone().into(), Some(cell_id)).unwrap();
+        tracing::debug!(%info);
     }
 }
 
 /// Helper to create a zome invocation for tests
-pub fn new_invocation<P, Z: Into<ZomeName>>(
+pub fn new_zome_call<P, Z: Into<ZomeName>>(
     cell_id: &CellId,
     func: &str,
     payload: P,
-    zome_name: Z,
+    zome: Z,
+) -> Result<ZomeCall, SerializedBytesError>
+where
+    P: serde::Serialize + std::fmt::Debug,
+{
+    Ok(ZomeCall {
+        cell_id: cell_id.clone(),
+        zome_name: zome.into(),
+        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        fn_name: func.into(),
+        payload: ExternIO::encode(payload)?,
+        provenance: cell_id.agent_pubkey().clone(),
+    })
+}
+
+/// Helper to create a zome invocation for tests
+pub fn new_invocation<P, Z: Into<Zome>>(
+    cell_id: &CellId,
+    func: &str,
+    payload: P,
+    zome: Z,
 ) -> Result<ZomeCallInvocation, SerializedBytesError>
 where
-    P: TryInto<SerializedBytes, Error = SerializedBytesError>,
+    P: serde::Serialize + std::fmt::Debug,
 {
     Ok(ZomeCallInvocation {
         cell_id: cell_id.clone(),
-        zome_name: zome_name.into(),
+        zome: zome.into(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
-        payload: ExternInput::new(payload.try_into()?),
+        payload: ExternIO::encode(payload)?,
         provenance: cell_id.agent_pubkey().clone(),
     })
+}
+
+/// A fixture example dna for unit testing.
+pub fn fake_valid_dna_file(uid: &str) -> DnaFile {
+    fake_dna_zomes(uid, vec![(TestWasm::Foo.into(), TestWasm::Foo.into())])
 }

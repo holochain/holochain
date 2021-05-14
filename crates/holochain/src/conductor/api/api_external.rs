@@ -3,10 +3,8 @@ use holochain_serialized_bytes::prelude::*;
 
 mod admin_interface;
 mod app_interface;
-mod signal_subscription;
 pub use admin_interface::*;
 pub use app_interface::*;
-pub use signal_subscription::*;
 
 /// A trait that unifies both the admin and app interfaces
 #[async_trait::async_trait]

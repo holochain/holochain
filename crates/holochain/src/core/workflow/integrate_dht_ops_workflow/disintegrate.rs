@@ -1,5 +1,6 @@
 use super::*;
 use holo_hash::EntryHash;
+use holochain_cascade::get_header;
 
 pub fn disintegrate_single_metadata<C, P>(
     op: DhtOpLight,

@@ -3,22 +3,17 @@
 
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::activity::AgentActivity;
-use holochain_zome_types::{capability::CapSecret, zome::ZomeName};
-use holochain_zome_types::{query::ChainQueryFilter, zome::FunctionName};
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 mod types;
-pub use types::actor::{HolochainP2pRef, HolochainP2pSender};
+pub use types::actor::HolochainP2pRef;
+pub use types::actor::HolochainP2pSender;
 pub use types::*;
 
 mod spawn;
-use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
-use holochain_types::{element::GetElementResponse, validate::ValidationPackageResponse};
-use holochain_types::{
-    link::{GetLinksResponse, WireLinkMetaKey},
-    metadata::MetadataSet,
-};
+use ghost_actor::dependencies::tracing;
+use ghost_actor::dependencies::tracing_futures::Instrument;
 pub use spawn::*;
 pub use test::stub_network;
 pub use test::HolochainP2pCellFixturator;
@@ -36,6 +31,11 @@ pub trait HolochainP2pCellT {
     /// owned getter
     fn from_agent(&self) -> AgentPubKey;
 
+    /// Construct the CellId from the defined DnaHash and AgentPubKey
+    fn cell_id(&self) -> CellId {
+        CellId::new(self.dna_hash(), self.from_agent())
+    }
+
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
     async fn join(&mut self) -> actor::HolochainP2pResult<()>;
 
@@ -49,7 +49,7 @@ pub trait HolochainP2pCellT {
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
-        request: SerializedBytes,
+        payload: ExternIO,
     ) -> actor::HolochainP2pResult<SerializedBytes>;
 
     /// Publish data to the correct neighborhood.
@@ -96,7 +96,7 @@ pub trait HolochainP2pCellT {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivity>>;
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>>;
 
     /// Send a validation receipt to a remote node.
     async fn send_validation_receipt(
@@ -148,7 +148,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
-        request: SerializedBytes,
+        payload: ExternIO,
     ) -> actor::HolochainP2pResult<SerializedBytes> {
         self.sender
             .call_remote(
@@ -158,7 +158,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
                 zome_name,
                 fn_name,
                 cap,
-                request,
+                payload,
             )
             .await
     }
@@ -254,7 +254,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivity>> {
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>> {
         self.sender
             .get_agent_activity(
                 (*self.dna_hash).clone(),

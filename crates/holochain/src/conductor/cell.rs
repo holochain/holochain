@@ -4,77 +4,55 @@
 //! Elements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
-use super::{interface::SignalBroadcaster, manager::ManagedTaskAdd};
+use super::api::ZomeCall;
+use super::interface::SignalBroadcaster;
+use super::manager::ManagedTaskAdd;
+use crate::conductor::api::CellConductorApi;
+use crate::conductor::api::CellConductorApiT;
+use crate::conductor::cell::error::CellResult;
+use crate::conductor::entry_def_store::get_entry_def_from_ids;
 use crate::conductor::handle::ConductorHandle;
-use crate::conductor::{api::error::ConductorApiError, entry_def_store::get_entry_def_from_ids};
-use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
+use crate::core::queue_consumer::spawn_queue_consumer_tasks;
+use crate::core::queue_consumer::InitialQueueTriggers;
+use crate::core::queue_consumer::QueueTriggers;
+use crate::core::ribosome::guest_callback::init::InitResult;
+use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::{
-    conductor::api::CellConductorApiT,
-    core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op,
-};
+use crate::core::workflow::call_zome_workflow;
+use crate::core::workflow::error::WorkflowError;
+use crate::core::workflow::genesis_workflow::genesis_workflow;
+use crate::core::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
+use crate::core::workflow::initialize_zomes_workflow;
+use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op;
+use crate::core::workflow::CallZomeWorkflowArgs;
+use crate::core::workflow::CallZomeWorkspace;
+use crate::core::workflow::GenesisWorkflowArgs;
+use crate::core::workflow::GenesisWorkspace;
+use crate::core::workflow::InitializeZomesWorkflowArgs;
+use crate::core::workflow::ZomeCallResult;
+use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
 use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
-use holochain_types::activity::AgentActivity;
-use holochain_zome_types::header::EntryType;
-use holochain_zome_types::validate::ValidationPackage;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::{query::ChainQueryFilter, validate::ValidationStatus};
-use validation_package::ValidationPackageDb;
-
-use crate::{
-    conductor::{api::CellConductorApi, cell::error::CellResult},
-    core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
-    core::{
-        state::{
-            dht_op_integration::IntegratedDhtOpsBuf,
-            element_buf::ElementBuf,
-            metadata::{MetadataBuf, MetadataBufT},
-            source_chain::{SourceChain, SourceChainBuf},
-        },
-        workflow::{
-            call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
-            incoming_dht_ops_workflow::incoming_dht_ops_workflow, initialize_zomes_workflow,
-            CallZomeWorkflowArgs, CallZomeWorkspace, GenesisWorkflowArgs, GenesisWorkspace,
-            InitializeZomesWorkflowArgs, ZomeCallInvocationResult,
-        },
-    },
-};
 use error::CellError;
 use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_cascade::authority;
+use holochain_lmdb::db::GetDb;
+use holochain_lmdb::env::EnvironmentRead;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::env::ReadManager;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{
-    db::GetDb,
-    env::{EnvironmentRead, EnvironmentWrite, ReadManager},
-};
-use holochain_types::{
-    autonomic::AutonomicProcess,
-    cell::CellId,
-    element::GetElementResponse,
-    link::{GetLinksResponse, WireLinkMetaKey},
-    metadata::MetadataSet,
-    validate::ValidationPackageResponse,
-    Timestamp,
-};
-use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::signature::Signature;
-use holochain_zome_types::validate::RequiredValidationType;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use holochain_state::prelude::*;
+use holochain_types::prelude::*;
 use observability::OpenSpanExt;
-use std::{
-    convert::TryInto,
-    hash::{Hash, Hasher},
-};
+use std::hash::Hash;
+use std::hash::Hasher;
 use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
+use validation_package::ValidationPackageDb;
 
-#[allow(missing_docs)]
-pub mod authority;
 mod validation_package;
 
 #[allow(missing_docs)]
@@ -122,21 +100,26 @@ where
     conductor_api: Api,
     env: EnvironmentWrite,
     holochain_p2p_cell: P2pCell,
-    queue_triggers: InitialQueueTriggers,
+    queue_triggers: QueueTriggers,
 }
 
 impl Cell {
-    /// Constructor for a Cell. The SourceChain will be created, and genesis
-    /// will be run if necessary. A Cell will not be created if the SourceChain
-    /// is not ready to be used.
+    /// Constructor for a Cell, which ensure the Cell is fully initialized
+    /// before returning.
+    ///
+    /// If it hasn't happened already, a SourceChain will be created, and
+    /// genesis will be run. If these have already happened, those steps are
+    /// skipped.
+    ///
+    /// No Cell will be created if the SourceChain is not ready to be used.
     pub async fn create(
         id: CellId,
         conductor_handle: ConductorHandle,
         env: EnvironmentWrite,
-        mut holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+        holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
-    ) -> CellResult<Self> {
+    ) -> CellResult<(Self, InitialQueueTriggers)> {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
 
         // check if genesis has been run
@@ -146,49 +129,49 @@ impl Cell {
         };
 
         if has_genesis {
-            holochain_p2p_cell.join().await?;
-            let queue_triggers = spawn_queue_consumer_tasks(
+            let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 &env,
                 holochain_p2p_cell.clone(),
+                conductor_handle.clone(),
                 conductor_api.clone(),
                 managed_task_add_sender,
                 managed_task_stop_broadcaster,
             )
             .await;
 
-            Ok(Self {
-                id,
-                conductor_api,
-                env,
-                holochain_p2p_cell,
-                queue_triggers,
-            })
+            Ok((
+                Self {
+                    id,
+                    conductor_api,
+                    env,
+                    holochain_p2p_cell,
+                    queue_triggers,
+                },
+                initial_queue_triggers,
+            ))
         } else {
             Err(CellError::CellWithoutGenesis(id))
         }
     }
 
-    /// Initialize all the workflows once.
-    /// This will run only once even if called
-    /// multiple times.
-    pub fn initialize_workflows(&mut self) {
-        self.queue_triggers.initialize_workflows();
-    }
-
     /// Performs the Genesis workflow the Cell, ensuring that its initial
     /// elements are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
-    pub async fn genesis(
+    pub async fn genesis<Ribosome>(
         id: CellId,
         conductor_handle: ConductorHandle,
         cell_env: EnvironmentWrite,
+        ribosome: Ribosome,
         membrane_proof: Option<SerializedBytes>,
-    ) -> CellResult<()> {
+    ) -> CellResult<()>
+    where
+        Ribosome: RibosomeT + Send + 'static,
+    {
         // get the dna
         let dna_file = conductor_handle
             .get_dna(id.dna_hash())
             .await
-            .ok_or(CellError::DnaMissing)?;
+            .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
 
         let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
 
@@ -197,7 +180,13 @@ impl Cell {
             .await
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
-        let args = GenesisWorkflowArgs::new(dna_file, id.agent_pubkey().clone(), membrane_proof);
+
+        let args = GenesisWorkflowArgs::new(
+            dna_file,
+            id.agent_pubkey().clone(),
+            membrane_proof,
+            ribosome,
+        );
 
         genesis_workflow(workspace, cell_env.clone().into(), conductor_api, args)
             .await
@@ -250,12 +239,12 @@ impl Cell {
                 fn_name,
                 cap,
                 respond,
-                request,
+                payload,
                 ..
             } => {
                 async {
                     let res = self
-                        .handle_call_remote(from_agent, zome_name, fn_name, cap, request)
+                        .handle_call_remote(from_agent, zome_name, fn_name, cap, payload)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -434,12 +423,12 @@ impl Cell {
         Ok(())
     }
 
-    #[instrument(skip(self, _request_validation_receipt, _dht_hash, ops))]
+    #[instrument(skip(self, request_validation_receipt, _dht_hash, ops))]
     /// we are receiving a "publish" event from the network
     async fn handle_publish(
         &self,
         from_agent: AgentPubKey,
-        _request_validation_receipt: bool,
+        request_validation_receipt: bool,
         _dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
@@ -448,6 +437,7 @@ impl Cell {
             self.queue_triggers.sys_validation.clone(),
             ops,
             Some(from_agent),
+            request_validation_receipt,
         )
         .await
         .map_err(Box::new)
@@ -528,13 +518,13 @@ impl Cell {
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<GetElementResponse> {
         let env = self.env.clone();
-        authority::handle_get_entry(env, hash, options)
+        authority::handle_get_entry(env, hash, options).map_err(Into::into)
     }
 
     #[tracing::instrument(skip(self))]
     async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
         let env = self.env.clone();
-        authority::handle_get_element(env, hash)
+        authority::handle_get_element(env, hash).map_err(Into::into)
     }
 
     #[instrument(skip(self, _dht_hash, _options))]
@@ -559,7 +549,7 @@ impl Cell {
     ) -> CellResult<GetLinksResponse> {
         debug!(id = ?self.id());
         let env = self.env.clone();
-        authority::handle_get_links(env.into(), link_key, options)
+        authority::handle_get_links(env.into(), link_key, options).map_err(Into::into)
     }
 
     #[instrument(skip(self, options))]
@@ -568,15 +558,46 @@ impl Cell {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: holochain_p2p::event::GetActivityOptions,
-    ) -> CellResult<AgentActivity> {
+    ) -> CellResult<AgentActivityResponse> {
         let env = self.env.clone();
-        authority::handle_get_agent_activity(env.into(), agent, query, options)
+        authority::handle_get_agent_activity(env.into(), agent, query, options).map_err(Into::into)
     }
 
     /// a remote agent is sending us a validation receipt.
     #[tracing::instrument(skip(self))]
-    async fn handle_validation_receipt(&self, _receipt: SerializedBytes) -> CellResult<()> {
-        unimplemented!()
+    async fn handle_validation_receipt(&self, receipt: SerializedBytes) -> CellResult<()> {
+        let receipt: SignedValidationReceipt = receipt.try_into()?;
+
+        // Add to authored
+        let db = self.env.get_db(&*AUTHORED_DHT_OPS)?;
+        let mut authored_dht_ops: AuthoredDhtOpsStore =
+            KvBufFresh::new(self.env.clone().into(), db);
+        match authored_dht_ops.get(&receipt.receipt.dht_op_hash)? {
+            Some(mut auth) => {
+                auth.receipt_count += 1;
+                authored_dht_ops.put(receipt.receipt.dht_op_hash.clone(), auth)?;
+            }
+            None => {
+                warn!(
+                    "Got receipt {:?} but it's missing from authored db so throwing receipt away",
+                    receipt
+                );
+                return Err(CellError::OpMissingForReceipt(receipt.receipt.dht_op_hash));
+            }
+        }
+
+        // Add to receipts db
+        let mut receipts_db = ValidationReceiptsBuf::new(&self.env)?;
+        receipts_db.add_if_unique(receipt)?;
+
+        // Write to db
+        self.env.with_commit(|w| {
+            authored_dht_ops.flush_to_txn_ref(w)?;
+            receipts_db.flush_to_txn_ref(w)?;
+            DatabaseResult::Ok(())
+        })?;
+
+        Ok(())
     }
 
     #[instrument(skip(self, dht_arc, since, until))]
@@ -635,17 +656,7 @@ impl Cell {
     /// the network module would like this cell/agent to sign some data
     #[tracing::instrument(skip(self))]
     async fn handle_sign_network_data(&self) -> CellResult<Signature> {
-        Ok(vec![0; 64].into())
-    }
-
-    /// When the Conductor determines that it's time to execute some [AutonomicProcess],
-    /// whether scheduled or through an [AutonomicCue], this function gets called
-    #[tracing::instrument(skip(self, process))]
-    pub async fn handle_autonomic_process(&self, process: AutonomicProcess) -> CellResult<()> {
-        match process {
-            AutonomicProcess::SlowHeal => unimplemented!(),
-            AutonomicProcess::HealthCheck => unimplemented!(),
-        }
+        Ok([0; 64].into())
     }
 
     #[instrument(skip(self, from_agent, fn_name, cap, payload))]
@@ -656,29 +667,29 @@ impl Cell {
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
-        payload: SerializedBytes,
+        payload: ExternIO,
     ) -> CellResult<SerializedBytes> {
-        let invocation = ZomeCallInvocation {
+        let invocation = ZomeCall {
             cell_id: self.id.clone(),
-            zome_name: zome_name.clone(),
+            zome_name,
             cap,
-            payload: ExternInput::new(payload),
+            payload,
             provenance: from_agent,
             fn_name,
         };
         // double ? because
         // - ConductorApiResult
-        // - ZomeCallInvocationResult
+        // - ZomeCallResult
         Ok(self.call_zome(invocation, None).await??.try_into()?)
     }
 
     /// Function called by the Conductor
-    #[instrument(skip(self, invocation, workspace_lock))]
+    #[instrument(skip(self, call, workspace_lock))]
     pub async fn call_zome(
         &self,
-        invocation: ZomeCallInvocation,
+        call: ZomeCall,
         workspace_lock: Option<CallZomeWorkspaceLock>,
-    ) -> CellResult<ZomeCallInvocationResult> {
+    ) -> CellResult<ZomeCallResult> {
         // Check if init has run if not run it
         self.check_or_run_zome_init().await?;
 
@@ -695,6 +706,7 @@ impl Cell {
         let conductor_api = self.conductor_api.clone();
         let signal_tx = self.signal_broadcaster().await;
         let ribosome = self.get_ribosome().await?;
+        let invocation = ZomeCallInvocation::from_interface_call(conductor_api.clone(), call).await;
 
         let args = CallZomeWorkflowArgs {
             ribosome,
@@ -738,11 +750,11 @@ impl Cell {
         let dna_file = conductor_api
             .get_dna(id.dna_hash())
             .await
-            .ok_or(CellError::DnaMissing)?;
-        let dna_def = dna_file.dna().clone();
+            .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
+        let dna_def = dna_file.dna_def().clone();
 
         // Get the ribosome
-        let ribosome = WasmRibosome::new(dna_file);
+        let ribosome = RealRibosome::new(dna_file);
 
         // Run the workflow
         let args = InitializeZomesWorkflowArgs { dna_def, ribosome };
@@ -757,18 +769,38 @@ impl Cell {
         .map_err(Box::new)?;
         trace!(?init_result);
         match init_result {
-            InitResult::Pass => (),
+            InitResult::Pass => {}
             r => return Err(CellError::InitFailed(r)),
         }
         Ok(())
     }
 
-    /// Delete all data associated with this Cell by deleting the associated
+    /// Clean up long-running managed tasks.
+    //
+    // FIXME: this should ensure that the long-running managed tasks,
+    //        i.e. the queue consumers, are stopped. Currently, they
+    //        will continue running because we have no way to target a specific
+    //        Cell's tasks for shutdown.
+    //
+    //        Consider using a separate TaskManager for each Cell, so that all
+    //        of a Cell's tasks can be shut down at once. Perhaps the Conductor
+    //        TaskManager can have these Cell TaskManagers as children.
+    //        [ B-04176 ]
+    pub async fn cleanup(&self) -> CellResult<()> {
+        tracing::info!("Cell removed, but cleanup is not yet implemented.");
+        Ok(())
+    }
+
+    /// Delete all data associated with this Cell by DELETING the associated
     /// LMDB environment. Completely reverses Cell creation.
+    /// NB: This is NOT meant to be a Drop impl! This destroys all data
+    ///     associated with a Cell, i.e. this Cell can never be instantiated again!
+    //
+
     #[tracing::instrument(skip(self))]
     pub async fn destroy(self) -> CellResult<()> {
+        self.cleanup().await?;
         let path = self.env.path().clone();
-        // Remove db from global map
         // Delete directory
         self.env
             .remove()
@@ -779,10 +811,10 @@ impl Cell {
 
     /// Instantiate a Ribosome for use by this Cell's workflows
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
-    pub(crate) async fn get_ribosome(&self) -> CellResult<WasmRibosome> {
+    pub(crate) async fn get_ribosome(&self) -> CellResult<RealRibosome> {
         match self.conductor_api.get_dna(self.dna_hash()).await {
-            Some(dna) => Ok(WasmRibosome::new(dna)),
-            None => Err(CellError::DnaMissing),
+            Some(dna) => Ok(RealRibosome::new(dna)),
+            None => Err(DnaError::DnaMissing(self.dna_hash().to_owned()).into()),
         }
     }
 
@@ -796,7 +828,7 @@ impl Cell {
     /// Get the triggers for the cell
     /// Useful for testing when you want to
     /// Cause workflows to trigger
-    pub(crate) fn triggers(&self) -> &InitialQueueTriggers {
+    pub(crate) fn triggers(&self) -> &QueueTriggers {
         &self.queue_triggers
     }
 }

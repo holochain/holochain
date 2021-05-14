@@ -1,13 +1,13 @@
 //! A mem-only transport - largely for testing
 
 use crate::transport::*;
-use futures::{future::FutureExt, sink::SinkExt};
+use futures::future::FutureExt;
+use futures::sink::SinkExt;
 
 use once_cell::sync::Lazy;
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    sync::Arc,
-};
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
 const SCHEME: &str = "kitsune-mem";
@@ -39,9 +39,11 @@ async fn put_core(url: url2::Url2, send: TransportEventSender) -> TransportResul
 }
 
 fn drop_core(url: url2::Url2) {
-    tokio::task::spawn(async move {
+    crate::metrics::metric_task(async move {
         let mut lock = CORE.lock().await;
         lock.remove(&url);
+
+        <Result<(), ()>>::Ok(())
     });
 }
 
@@ -63,7 +65,7 @@ pub async fn spawn_bind_transport_mem() -> TransportResult<(
 
     put_core(url.clone(), evt_send).await?;
 
-    tokio::task::spawn(builder.spawn(InnerListen::new(url)));
+    crate::metrics::metric_task(builder.spawn(InnerListen::new(url)));
 
     Ok((sender, evt_recv))
 }
@@ -96,7 +98,7 @@ impl TransportListenerHandler for InnerListen {
             let listeners = listeners.await?;
             Ok(serde_json::json! {{
                 "url": url,
-                "listeners": listeners,
+                "listener_count": listeners.len(),
             }})
         }
         .boxed()
@@ -122,11 +124,13 @@ impl TransportListenerHandler for InnerListen {
             // if we don't spawn here there can be a deadlock on
             // incoming_channel trying to process all channel data
             // before we've returned our halves here.
-            tokio::task::spawn(async move {
+            crate::metrics::metric_task(async move {
                 // it's ok if this errors... the channels will close.
                 let _ = evt_send
                     .send(TransportEvent::IncomingChannel(this_url, send1, recv1))
                     .await;
+
+                <Result<(), ()>>::Ok(())
             });
             Ok((url, send2, recv2))
         }
@@ -141,7 +145,7 @@ mod tests {
     use futures::stream::StreamExt;
 
     fn test_receiver(mut recv: TransportEventReceiver) {
-        tokio::task::spawn(async move {
+        crate::metrics::metric_task(async move {
             while let Some(evt) = recv.next().await {
                 match evt {
                     TransportEvent::IncomingChannel(url, mut write, read) => {
@@ -155,7 +159,7 @@ mod tests {
         });
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn it_can_mem_transport() -> TransportResult<()> {
         let (bind1, evt1) = spawn_bind_transport_mem().await?;
         test_receiver(evt1);

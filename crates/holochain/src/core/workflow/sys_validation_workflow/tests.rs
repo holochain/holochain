@@ -1,38 +1,39 @@
-use crate::{
-    conductor::ConductorHandle,
-    core::{
-        state::{element_buf::ElementBuf, validation_db::ValidationLimboStatus},
-        workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
-    },
-    test_utils::{host_fn_api::*, setup_app, wait_for_integration},
-};
+use crate::conductor::ConductorHandle;
+use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
+use crate::test_utils::host_fn_caller::*;
+use crate::test_utils::setup_app;
+use crate::test_utils::wait_for_integration;
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
-use hdk3::prelude::LinkTag;
-use holo_hash::{AnyDhtHash, DhtOpHash, EntryHash, HeaderHash};
+use hdk::prelude::LinkTag;
+use holo_hash::AnyDhtHash;
+use holo_hash::DhtOpHash;
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
+use holochain_lmdb::fresh_reader_test;
+use holochain_lmdb::prelude::ReadManager;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{fresh_reader_test, prelude::ReadManager};
-use holochain_types::{
-    app::InstalledCell, cell::CellId, dht_op::DhtOpLight, dna::DnaDef, dna::DnaFile, fixt::*,
-    test_utils::fake_agent_pubkey_1, test_utils::fake_agent_pubkey_2, validate::ValidationStatus,
-    Entry,
-};
+use holochain_state::element_buf::ElementBuf;
+use holochain_state::validation_db::ValidationLimboStatus;
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::cell::CellId;
+use holochain_zome_types::Entry;
+use holochain_zome_types::ValidationStatus;
 use matches::assert_matches;
-use std::{
-    convert::{TryFrom, TryInto},
-    time::Duration,
-};
+use std::convert::TryFrom;
+use std::convert::TryInto;
+use std::time::Duration;
 use tracing::*;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn sys_validation_workflow_test() {
     observability::test_run().ok();
 
     let dna_file = DnaFile::new(
         DnaDef {
             name: "sys_validation_workflow_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: vec![TestWasm::Create.into()].into(),
         },
@@ -62,7 +63,7 @@ async fn sys_validation_workflow_test() {
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }
 
 async fn run_test(
@@ -275,7 +276,11 @@ async fn run_test(
                         let s = debug_span!("inspect_ops");
                         let _g = s.enter();
                         debug!(?i.op);
-                        assert_matches!(i.status, ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingAppDeps(_));
+                        assert_matches!(
+                            i.status,
+                            ValidationLimboStatus::Pending
+                                | ValidationLimboStatus::AwaitingAppDeps(_)
+                        );
                         Ok(())
                     })
                     .count()
@@ -308,7 +313,7 @@ async fn bob_links_in_a_legit_way(
     let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
     let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
     let link_tag = fixt!(LinkTag);
-    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
     // 3
     call_data
         .commit_entry(base.clone().try_into().unwrap(), POST_ID)
@@ -351,7 +356,7 @@ async fn bob_makes_a_large_link(
     let bytes = (0..401).map(|_| 0u8).into_iter().collect::<Vec<_>>();
     let link_tag = LinkTag(bytes);
 
-    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
 
     // 6
     let original_header_address = call_data
@@ -395,7 +400,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
     let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
     let link_tag = fixt!(LinkTag);
-    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
 
     // 11
     call_data

@@ -37,6 +37,7 @@ pub struct SignNetworkDataEvt {
     /// The "agent" context.
     pub agent: Arc<super::KitsuneAgent>,
     /// The data to sign.
+    #[allow(clippy::rc_buffer)]
     pub data: Arc<Vec<u8>>,
 }
 

@@ -1,8 +1,10 @@
 use crate::*;
-use futures::{sink::SinkExt, stream::StreamExt};
+use futures::sink::SinkExt;
+use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use rustls::Session;
-use std::io::{Read, Write};
+use std::io::Read;
+use std::io::Write;
 
 pub(crate) fn spawn_tls_server(
     short: String,
@@ -12,7 +14,7 @@ pub(crate) fn spawn_tls_server(
     write: futures::channel::mpsc::Sender<ProxyWire>,
     read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) {
-    tokio::task::spawn(tls_server(
+    metric_task(tls_server(
         short,
         incoming_base_url,
         tls_server_config,
@@ -29,7 +31,7 @@ async fn tls_server(
     mut evt_send: TransportEventSender,
     mut write: futures::channel::mpsc::Sender<ProxyWire>,
     read: futures::channel::mpsc::Receiver<ProxyWire>,
-) {
+) -> TransportResult<()> {
     let res: TransportResult<()> = async {
         let mut srv = rustls::ServerSession::new(&tls_server_config);
         let mut buf = [0_u8; 4096];
@@ -101,15 +103,24 @@ async fn tls_server(
                             short,
                             data.channel_data.len()
                         );
+                        in_pre.get_mut().clear();
+                        in_pre.set_position(0);
                         in_pre.get_mut().extend_from_slice(&data.channel_data);
-                        srv.read_tls(&mut in_pre).map_err(TransportError::other)?;
-                        srv.process_new_packets().map_err(TransportError::other)?;
-                        while let Ok(size) = srv.read(&mut buf) {
-                            tracing::trace!("{}: SRV incoming decrypted {} bytes", short, size);
-                            if size == 0 {
+                        let in_buf_len = in_pre.get_ref().len();
+                        loop {
+                            if in_pre.position() >= in_buf_len as u64 {
                                 break;
                             }
-                            send1.send(buf[..size].to_vec()).await?;
+
+                            srv.read_tls(&mut in_pre).map_err(TransportError::other)?;
+                            srv.process_new_packets().map_err(TransportError::other)?;
+                            while let Ok(size) = srv.read(&mut buf) {
+                                tracing::trace!("{}: SRV incoming decrypted {} bytes", short, size);
+                                if size == 0 {
+                                    break;
+                                }
+                                send1.send(buf[..size].to_vec()).await?;
+                            }
                         }
                     }
                     _ => return Err(format!("invalid wire: {:?}", wire).into()),
@@ -130,4 +141,6 @@ async fn tls_server(
             .await
             .map_err(TransportError::other);
     }
+
+    Ok(())
 }

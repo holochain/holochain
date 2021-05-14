@@ -1,27 +1,24 @@
-use crate::{
-    core::state::element_buf::ElementBuf,
-    fixt::{
-        AgentValidationPkgFixturator, CloseChainFixturator, CreateFixturator, CreateLinkFixturator,
-        DeleteLinkFixturator, DnaFixturator, EntryFixturator, EntryHashFixturator,
-        EntryTypeFixturator, InitZomesCompleteFixturator, OpenChainFixturator, UpdateFixturator,
-    },
-};
+use crate::fixt::AgentValidationPkgFixturator;
+use crate::fixt::CloseChainFixturator;
+use crate::fixt::CreateFixturator;
+use crate::fixt::CreateLinkFixturator;
+use crate::fixt::DeleteLinkFixturator;
+use crate::fixt::DnaFixturator;
+use crate::fixt::EntryFixturator;
+use crate::fixt::EntryHashFixturator;
+use crate::fixt::EntryTypeFixturator;
+use crate::fixt::InitZomesCompleteFixturator;
+use crate::fixt::OpenChainFixturator;
+use crate::fixt::UpdateFixturator;
 use ::fixt::prelude::*;
-use holo_hash::{fixt::HeaderHashFixturator, *};
-use holochain_state::test_utils::test_cell_env;
-use holochain_types::{
-    dht_op::{produce_ops_from_element, DhtOp},
-    element::{Element, SignedHeaderHashed},
-    fixt::{HeaderBuilderCommonFixturator, SignatureFixturator},
-    header::NewEntryHeader,
-    observability, Entry, EntryHashed, HeaderHashed,
-};
-use holochain_zome_types::header::{
-    builder::{self, HeaderBuilder},
-    AgentValidationPkg, CloseChain, Create, CreateLink, DeleteLink, Dna, EntryType, Header,
-    HeaderBuilderCommon, InitZomesComplete, OpenChain, Update,
-};
-use holochain_zome_types::signature::Signature;
+use holo_hash::fixt::HeaderHashFixturator;
+use holo_hash::*;
+use holochain_lmdb::test_utils::test_cell_env;
+use holochain_state::element_buf::ElementBuf;
+use holochain_types::prelude::*;
+use holochain_zome_types::Entry;
+use holochain_zome_types::HeaderHashed;
+use observability;
 use pretty_assertions::assert_eq;
 use tracing::*;
 
@@ -217,7 +214,7 @@ impl ElementTest {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_all_ops() {
     observability::test_run().ok();
     let builder = ElementTest::new();
@@ -249,7 +246,7 @@ async fn test_all_ops() {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_dht_basis() {
     let test_env = test_cell_env();
     let env = test_env.env();

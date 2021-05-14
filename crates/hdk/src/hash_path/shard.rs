@@ -22,7 +22,7 @@ pub type ShardDepth = u32;
 /// @todo stretch short shards out in a nice balanced way (append some bytes from the hash?)
 pub struct ShardStrategy(ShardWidth, ShardDepth);
 
-/// impl ShardStrategy as an immutable/read-only thingy.
+/// impl [ `ShardStrategy` ] as an immutable/read-only thingy.
 impl ShardStrategy {
     fn width(&self) -> ShardWidth {
         self.0
@@ -35,11 +35,17 @@ impl ShardStrategy {
 
 #[derive(Debug)]
 pub enum ParseShardStrategyError {
+    /// Could not parse the shard depth.
     BadDepth,
+    /// Could not parse the shard width.
     BadWidth,
+    /// Failed to find the separator between width and depth.
     ShardSplitNotFound,
+    /// Failed to find the end of the sharding definition.
     ShardEndNotFound,
+    /// The sharding definition does not start with a number.
     FirstCharNotADigit,
+    /// The sharding definition is empty.
     EmptyString,
 }
 
@@ -97,8 +103,8 @@ impl FromStr for ShardStrategy {
 impl From<(&ShardStrategy, &[u8])> for Path {
     fn from((strategy, bytes): (&ShardStrategy, &[u8])) -> Path {
         let full_length = strategy.width() * strategy.depth();
-        // Fold a flat slice of bytes into `strategy.depth` number of `strategy.width` length byte.
-        // Components.
+        // Fold a flat slice of bytes into `strategy.depth` number of `strategy.width` length byte
+        // [ `Component` ]s.
         let sharded: Vec<Component> = bytes
             .iter()
             .take(full_length as _)
@@ -135,7 +141,7 @@ impl From<(&ShardStrategy, Vec<u8>)> for Path {
         Path::from((strategy, bytes))
     }
 }
-/// Create paths from strings.
+/// Create [ `Path` ] from [ `String` ].
 /// To ensure that this works for all utf8, which can have anywhere from 1-4 bytes for a single
 /// character, we first represent each character as a utf32 so it gets padded out with 0 bytes.
 /// This means the width is 4x what it would be for raw bytes with the same strategy.
@@ -158,13 +164,13 @@ impl From<(&ShardStrategy, &str)> for Path {
         ))
     }
 }
-/// &String wrapper mimicing &str for path building.
+/// [ `&String` ] wrapper mimicing [ `&str` ] for [ `Path` ] building.
 impl From<(&ShardStrategy, &String)> for Path {
     fn from((strategy, s): (&ShardStrategy, &String)) -> Path {
         Path::from((strategy, s.as_str()))
     }
 }
-// String wrapper mimicing &str for path building.
+// [ `String` ] wrapper mimicing [ `&str` ] for [ `Path` ] building.
 impl From<(&ShardStrategy, String)> for Path {
     fn from((strategy, s): (&ShardStrategy, String)) -> Path {
         Path::from((strategy, s.as_str()))

@@ -1,9 +1,25 @@
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use kitsune_p2p_types::tx2::tx2_utils::*;
+use kitsune_p2p_types::*;
 use url2::Url2;
 
+/// TODO - FIXME - holochain bootstrap should not be encoded in kitsune
 /// The default production bootstrap service url.
-pub const BOOTSTRAP_SERVICE_DEFAULT: &str = "https://bootstrap.holo.host";
+pub const BOOTSTRAP_SERVICE_DEFAULT: &str = "https://bootstrap-staging.holo.host";
+
+/// TODO - FIXME - holochain bootstrap should not be encoded in kitsune
 /// The default development bootstrap service url.
 pub const BOOTSTRAP_SERVICE_DEV: &str = "https://bootstrap-dev.holohost.workers.dev";
+
+pub(crate) enum KitsuneP2pTx2Backend {
+    Mem,
+    Quic { bind_to: TxUrl },
+}
+
+pub(crate) struct KitsuneP2pTx2Config {
+    pub backend: KitsuneP2pTx2Backend,
+    pub use_proxy: Option<TxUrl>,
+}
 
 /// Configure the kitsune actor
 #[non_exhaustive]
@@ -13,6 +29,14 @@ pub struct KitsuneP2pConfig {
     pub transport_pool: Vec<TransportConfig>,
     /// The service used for peers to discover each before they are peers.
     pub bootstrap_service: Option<Url2>,
+    /// Network tuning parameters. These are managed loosely,
+    /// as they are subject to change. If you specify a tuning parameter
+    /// that no longer exists, or a value that does not parse,
+    /// a warning will be printed in the tracing log.
+    #[serde(default)]
+    pub tuning_params: KitsuneP2pTuningParams,
+    /// The network used for connecting to other peers
+    pub network_type: NetworkType,
 }
 
 impl Default for KitsuneP2pConfig {
@@ -20,6 +44,54 @@ impl Default for KitsuneP2pConfig {
         Self {
             transport_pool: Vec::new(),
             bootstrap_service: None,
+            tuning_params: KitsuneP2pTuningParams::default(),
+            network_type: NetworkType::QuicBootstrap,
+        }
+    }
+}
+
+fn cnv_bind_to(bind_to: &Option<url2::Url2>) -> TxUrl {
+    match bind_to {
+        Some(bind_to) => bind_to.clone().into(),
+        None => "kitsune-quic://0.0.0.0:0".into(),
+    }
+}
+
+impl KitsuneP2pConfig {
+    /// tx2 is currently designed to use exactly one proxy wrapped transport
+    /// so, convert a bunch of the options from the previous transport
+    /// paradigm into that pattern.
+    pub(crate) fn to_tx2(&self) -> KitsuneResult<KitsuneP2pTx2Config> {
+        match self.transport_pool.get(0) {
+            Some(TransportConfig::Proxy {
+                sub_transport,
+                proxy_config,
+            }) => {
+                let backend = match &**sub_transport {
+                    TransportConfig::Mem {} => KitsuneP2pTx2Backend::Mem,
+                    TransportConfig::Quic { bind_to, .. } => {
+                        let bind_to = cnv_bind_to(bind_to);
+                        KitsuneP2pTx2Backend::Quic { bind_to }
+                    }
+                    _ => return Err("kitsune tx2 backend must be mem or quic".into()),
+                };
+                let use_proxy = match proxy_config {
+                    ProxyConfig::RemoteProxyClient { proxy_url } => Some(proxy_url.clone().into()),
+                    ProxyConfig::LocalProxyServer { .. } => None,
+                };
+                Ok(KitsuneP2pTx2Config { backend, use_proxy })
+            }
+            Some(TransportConfig::Quic { bind_to, .. }) => {
+                let bind_to = cnv_bind_to(bind_to);
+                Ok(KitsuneP2pTx2Config {
+                    backend: KitsuneP2pTx2Backend::Quic { bind_to },
+                    use_proxy: None,
+                })
+            }
+            None | Some(TransportConfig::Mem {}) => Ok(KitsuneP2pTx2Config {
+                backend: KitsuneP2pTx2Backend::Mem,
+                use_proxy: None,
+            }),
         }
     }
 }
@@ -90,4 +162,14 @@ pub enum ProxyAcceptConfig {
 
     /// We will reject all requests to proxy for remotes
     RejectAll,
+}
+
+/// Method for connecting to other peers and broadcasting our AgentInfo
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum NetworkType {
+    /// Via bootstrap server to the WAN
+    QuicBootstrap,
+    /// Via MDNS to the LAN
+    QuicMdns,
 }

@@ -1,46 +1,44 @@
 #![allow(missing_docs)]
 
-use super::{host_fn_api::HostFnApi, install_app, setup_app_inner};
-use crate::{
-    conductor::{
-        api::{CellConductorApi, CellConductorApiT},
-        interface::SignalBroadcaster,
-        ConductorHandle,
-    },
-    core::queue_consumer::InitialQueueTriggers,
-    core::ribosome::{wasm_ribosome::WasmRibosome, RibosomeT},
-};
-use holo_hash::{AgentPubKey, DnaHash};
+use super::host_fn_caller::HostFnCaller;
+use super::install_app;
+use super::setup_app_inner;
+use crate::conductor::api::CellConductorApi;
+use crate::conductor::api::CellConductorApiT;
+use crate::conductor::interface::SignalBroadcaster;
+use crate::conductor::ConductorHandle;
+use crate::core::queue_consumer::QueueTriggers;
+use crate::core::ribosome::real_ribosome::RealRibosome;
+use holo_hash::AgentPubKey;
+use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
-use holochain_p2p::{actor::HolochainP2pRefToCell, HolochainP2pCell};
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::test_utils::test_environments;
+use holochain_lmdb::test_utils::TestEnvironments;
+use holochain_p2p::actor::HolochainP2pRefToCell;
+use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{
-    env::EnvironmentWrite,
-    test_utils::{test_environments, TestEnvironments},
-};
-use holochain_types::{
-    app::InstalledCell, cell::CellId, dna::DnaDef, dna::DnaFile, test_utils::fake_agent_pubkey_1,
-    test_utils::fake_agent_pubkey_2,
-};
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::zome::ZomeName;
 use kitsune_p2p::KitsuneP2pConfig;
-use std::{collections::HashMap, convert::TryFrom, sync::Arc};
+use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::sync::Arc;
 use tempdir::TempDir;
 
-/// A "factory" for HostFnApi, which will produce them when given a ZomeName
-pub struct CellHostFnApi {
+/// A "factory" for HostFnCaller, which will produce them when given a ZomeName
+pub struct CellHostFnCaller {
     pub cell_id: CellId,
     pub env: EnvironmentWrite,
-    pub ribosome: WasmRibosome,
+    pub ribosome: RealRibosome,
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
     pub signal_tx: SignalBroadcaster,
-    pub triggers: InitialQueueTriggers,
+    pub triggers: QueueTriggers,
     pub cell_conductor_api: CellConductorApi,
 }
 
-impl CellHostFnApi {
+impl CellHostFnCaller {
     pub async fn new(cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) -> Self {
         let env = handle.get_cell_env(cell_id).await.unwrap();
         let keystore = env.keystore().clone();
@@ -50,9 +48,9 @@ impl CellHostFnApi {
         let triggers = handle.get_cell_triggers(cell_id).await.unwrap();
         let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 
-        let ribosome = WasmRibosome::new(dna_file.clone());
+        let ribosome = RealRibosome::new(dna_file.clone());
         let signal_tx = handle.signal_broadcaster().await;
-        CellHostFnApi {
+        CellHostFnCaller {
             cell_id: cell_id.clone(),
             env,
             ribosome,
@@ -64,12 +62,12 @@ impl CellHostFnApi {
         }
     }
 
-    /// Create a HostFnApi for a specific zome and call
-    pub fn get_api<I: Into<ZomeName>>(&self, zome_name: I) -> HostFnApi {
+    /// Create a HostFnCaller for a specific zome and call
+    pub fn get_api<I: Into<ZomeName>>(&self, zome_name: I) -> HostFnCaller {
         let zome_name: ZomeName = zome_name.into();
         let zome_path = (self.cell_id.clone(), zome_name).into();
         let call_zome_handle = self.cell_conductor_api.clone().into_call_zome_handle();
-        HostFnApi {
+        HostFnCaller {
             env: self.env.clone(),
             ribosome: self.ribosome.clone(),
             zome_path,
@@ -86,7 +84,7 @@ impl CellHostFnApi {
 pub struct ConductorTestData {
     __tmpdir: Arc<TempDir>,
     handle: ConductorHandle,
-    cell_apis: HashMap<CellId, CellHostFnApi>,
+    cell_apis: HashMap<CellId, CellHostFnCaller>,
 }
 
 impl ConductorTestData {
@@ -100,12 +98,12 @@ impl ConductorTestData {
         let num_dnas = dna_files.len();
         let mut cells = Vec::with_capacity(num_dnas * num_agents);
         let mut cell_id_by_dna_file = Vec::with_capacity(num_dnas);
-        for dna_file in dna_files.iter() {
+        for (i, dna_file) in dna_files.iter().enumerate() {
             let mut cell_ids = Vec::with_capacity(num_agents);
-            for (i, agent_id) in agents.iter().enumerate() {
+            for (j, agent_id) in agents.iter().enumerate() {
                 let cell_id = CellId::new(dna_file.dna_hash().to_owned(), agent_id.clone());
                 cells.push((
-                    InstalledCell::new(cell_id.clone(), format!("agent-{}", i)),
+                    InstalledCell::new(cell_id.clone(), format!("agent-{}-{}", i, j)),
                     None,
                 ));
                 cell_ids.push(cell_id);
@@ -127,7 +125,7 @@ impl ConductorTestData {
             for cell_id in cell_ids {
                 cell_apis.insert(
                     cell_id.clone(),
-                    CellHostFnApi::new(&cell_id, &handle, &dna_file).await,
+                    CellHostFnCaller::new(&cell_id, &handle, &dna_file).await,
                 );
             }
         }
@@ -167,7 +165,7 @@ impl ConductorTestData {
         let dna_file = DnaFile::new(
             DnaDef {
                 name: "conductor_test".to_string(),
-                uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 zomes: zomes.clone().into_iter().map(Into::into).collect(),
             },
@@ -196,7 +194,7 @@ impl ConductorTestData {
     pub async fn shutdown_conductor(&mut self) {
         let shutdown = self.handle.take_shutdown_handle().await.unwrap();
         self.handle.shutdown().await;
-        shutdown.await.unwrap();
+        shutdown.await.unwrap().unwrap();
     }
 
     /// Bring bob online if he isn't already
@@ -204,13 +202,13 @@ impl ConductorTestData {
         let dna_file = self.alice_call_data().ribosome.dna_file().clone();
         if self.bob_call_data().is_none() {
             let bob_agent_id = fake_agent_pubkey_2();
-            let bob_cell_id = CellId::new(dna_file.dna_hash.clone(), bob_agent_id.clone());
+            let bob_cell_id = CellId::new(dna_file.dna_hash().clone(), bob_agent_id.clone());
             let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
             let cell_data = vec![(bob_installed_cell, None)];
             install_app("bob_app", cell_data, vec![dna_file.clone()], self.handle()).await;
             self.cell_apis.insert(
                 bob_cell_id.clone(),
-                CellHostFnApi::new(&bob_cell_id, &self.handle(), &dna_file).await,
+                CellHostFnCaller::new(&bob_cell_id, &self.handle(), &dna_file).await,
             );
         }
     }
@@ -220,21 +218,21 @@ impl ConductorTestData {
     }
 
     #[allow(clippy::iter_nth_zero)]
-    pub fn alice_call_data(&self) -> &CellHostFnApi {
+    pub fn alice_call_data(&self) -> &CellHostFnCaller {
         &self.cell_apis.values().nth(0).unwrap()
     }
 
-    pub fn bob_call_data(&self) -> Option<&CellHostFnApi> {
+    pub fn bob_call_data(&self) -> Option<&CellHostFnCaller> {
         self.cell_apis.values().nth(1)
     }
 
     #[allow(clippy::iter_nth_zero)]
-    pub fn alice_call_data_mut(&mut self) -> &mut CellHostFnApi {
+    pub fn alice_call_data_mut(&mut self) -> &mut CellHostFnCaller {
         let key = self.cell_apis.keys().nth(0).unwrap().clone();
         self.cell_apis.get_mut(&key).unwrap()
     }
 
-    pub fn get_cell(&mut self, cell_id: &CellId) -> Option<&mut CellHostFnApi> {
+    pub fn get_cell(&mut self, cell_id: &CellId) -> Option<&mut CellHostFnCaller> {
         self.cell_apis.get_mut(cell_id)
     }
 }

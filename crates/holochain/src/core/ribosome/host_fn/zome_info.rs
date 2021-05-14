@@ -1,39 +1,39 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::zome_info::ZomeInfo;
-use holochain_zome_types::ZomeInfoInput;
-use holochain_zome_types::ZomeInfoOutput;
+use holo_hash::HasHash;
+use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 
 pub fn zome_info(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    _input: ZomeInfoInput,
-) -> RibosomeResult<ZomeInfoOutput> {
-    Ok(ZomeInfoOutput::new(ZomeInfo {
-        dna_name: ribosome.dna_file().dna().name.clone(),
-        zome_name: call_context.zome_name.clone(),
-        dna_hash: ribosome.dna_file().dna_hash().clone(), // @TODO
-        zome_id: ribosome.zome_name_to_id(&call_context.zome_name)?,
-        properties: ribosome.dna_file().dna().properties.clone(),
+    _input: (),
+) -> Result<ZomeInfo, WasmError> {
+    Ok(ZomeInfo {
+        dna_name: ribosome.dna_def().name.clone(),
+        zome_name: call_context.zome.zome_name().clone(),
+        dna_hash: ribosome.dna_def().as_hash().clone(),
+        zome_id: ribosome
+            .zome_to_id(&call_context.zome)
+            .expect("Failed to get ID for current zome"),
+        properties: ribosome.dna_def().properties.clone(),
         // @TODO
         // public_token: "".into(),
-    }))
+    })
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
-
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::ZomeInfoOutput;
+    use holochain_zome_types::prelude::*;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn invoke_import_zome_info_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
@@ -45,8 +45,8 @@ pub mod test {
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        let zome_info: ZomeInfoOutput =
+        let zome_info: ZomeInfo =
             crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "zome_info", ());
-        assert_eq!(zome_info.inner_ref().dna_name, "test",);
+        assert_eq!(zome_info.dna_name, "test",);
     }
 }

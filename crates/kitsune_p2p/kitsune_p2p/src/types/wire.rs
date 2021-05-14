@@ -1,6 +1,8 @@
 //! KitsuneP2p Wire Protocol Encoding Decoding
 
-use crate::{agent_store::AgentInfoSigned, types::*};
+use crate::agent_store::AgentInfoSigned;
+use crate::types::gossip::{OpConsistency, OpCount};
+use crate::types::*;
 use derive_more::*;
 use kitsune_p2p_types::dht_arc::DhtArc;
 use std::sync::Arc;
@@ -52,11 +54,12 @@ kitsune_p2p_types::write_codec_enum! {
             dht_arc.3: DhtArc,
             since_utc_epoch_s.4: i64,
             until_utc_epoch_s.5: i64,
+            last_count.6: OpCount,
         },
 
         /// List of hashes response to FetchOpHashes
         FetchOpHashesResponse(0x32) {
-            hashes.0: Vec<Arc<KitsuneOpHash>>,
+            hashes.0: OpConsistency,
             peer_hashes.1: Vec<(Arc<KitsuneAgent>, u64)>,
         },
 
@@ -86,6 +89,19 @@ kitsune_p2p_types::write_codec_enum! {
         /// Response type for agent info query
         AgentInfoQueryResp(0x41) {
             agent_infos.0: Vec<AgentInfoSigned>,
+        },
+
+        /// Fetch DhtOp data and AgentInfo for hashes lists
+        Gossip(0x50) {
+            space.0: Arc<KitsuneSpace>,
+            from_agent.1: Arc<KitsuneAgent>,
+            to_agent.2: Arc<KitsuneAgent>,
+            ops.3: Vec<(Arc<KitsuneOpHash>, WireData)>,
+            agents.4: Vec<AgentInfoSigned>,
+        },
+
+        /// Lists of data in response to FetchOpData
+        GossipResp(0x51) {
         },
     }
 }

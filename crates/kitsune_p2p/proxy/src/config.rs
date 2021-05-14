@@ -1,5 +1,7 @@
 use crate::*;
 
+pub use kitsune_p2p_types::tls::TlsConfig;
+
 /// Callback function signature for proxy accept/deny.
 pub type AcceptProxyCallbackFn =
     Arc<dyn Fn(CertDigest) -> MustBoxFuture<'static, bool> + 'static + Send + Sync>;
@@ -17,35 +19,6 @@ impl AcceptProxyCallback {
     /// Callback that blanket accepts all proxy requests.
     pub fn accept_all() -> Self {
         Self(Arc::new(|_| async { true }.boxed().into()))
-    }
-}
-
-/// Tls Configuration for proxy.
-#[derive(Clone)]
-pub struct TlsConfig {
-    /// Cert
-    pub cert: Cert,
-
-    /// Cert Priv Key
-    pub cert_priv_key: CertPrivKey,
-
-    /// Cert Digest
-    pub cert_digest: CertDigest,
-}
-
-impl TlsConfig {
-    /// Create a new ephemeral tls certificate that will not be persisted.
-    pub async fn new_ephemeral() -> TransportResult<Self> {
-        let mut options = lair_keystore_api::actor::TlsCertOptions::default();
-        options.alg = lair_keystore_api::actor::TlsCertAlg::PkcsEcdsaP256Sha256;
-        let cert = lair_keystore_api::internal::tls::tls_cert_self_signed_new_from_entropy(options)
-            .await
-            .map_err(TransportError::other)?;
-        Ok(Self {
-            cert: cert.cert_der,
-            cert_priv_key: cert.priv_key_der,
-            cert_digest: cert.cert_digest,
-        })
     }
 }
 
@@ -91,72 +64,12 @@ impl ProxyConfig {
 /// Tls ALPN identifier for kitsune proxy handshaking
 const ALPN_KITSUNE_PROXY_0: &[u8] = b"kitsune-proxy/0";
 
-/// Allow only these cipher suites for kitsune proxy Tls.
-static CIPHER_SUITES: &[&rustls::SupportedCipherSuite] = &[
-    &rustls::ciphersuite::TLS13_CHACHA20_POLY1305_SHA256,
-    &rustls::ciphersuite::TLS13_AES_256_GCM_SHA384,
-];
-
 /// Helper to generate rustls configs given a TlsConfig reference.
 #[allow(dead_code)]
 pub(crate) fn gen_tls_configs(
     tls: &TlsConfig,
+    tuning_params: kitsune_p2p_types::config::KitsuneP2pTuningParams,
 ) -> TransportResult<(Arc<rustls::ServerConfig>, Arc<rustls::ClientConfig>)> {
-    let cert = rustls::Certificate(tls.cert.0.to_vec());
-    let cert_priv_key = rustls::PrivateKey(tls.cert_priv_key.0.to_vec());
-
-    let root_cert = rustls::Certificate(lair_keystore_api::internal::tls::WK_CA_CERT_DER.to_vec());
-    let mut root_store = rustls::RootCertStore::empty();
-    root_store.add(&root_cert).unwrap();
-
-    let mut tls_server_config = rustls::ServerConfig::with_ciphersuites(
-        rustls::AllowAnyAuthenticatedClient::new(root_store),
-        CIPHER_SUITES,
-    );
-
-    tls_server_config
-        .set_single_cert(vec![cert.clone()], cert_priv_key.clone())
-        .map_err(TransportError::other)?;
-    // no storage is more wire overhead,
-    // but ensures cert verification for every channel coming in.
-    tls_server_config.set_persistence(Arc::new(rustls::NoServerSessionStorage {}));
-    tls_server_config.set_protocols(&[ALPN_KITSUNE_PROXY_0.to_vec()]);
-    let tls_server_config = Arc::new(tls_server_config);
-
-    let mut tls_client_config = rustls::ClientConfig::with_ciphersuites(CIPHER_SUITES);
-    tls_client_config
-        .set_single_client_cert(vec![cert], cert_priv_key)
-        .map_err(TransportError::other)?;
-    tls_client_config
-        .dangerous()
-        .set_certificate_verifier(TlsServerVerifier::new());
-    // no storage is more wire overhead,
-    // but ensures cert verification for every channel coming in.
-    tls_client_config.set_persistence(Arc::new(rustls::NoClientSessionStorage {}));
-    tls_client_config.set_protocols(&[ALPN_KITSUNE_PROXY_0.to_vec()]);
-    let tls_client_config = Arc::new(tls_client_config);
-
-    Ok((tls_server_config, tls_client_config))
-}
-
-struct TlsServerVerifier;
-
-impl TlsServerVerifier {
-    fn new() -> Arc<Self> {
-        Arc::new(Self)
-    }
-}
-
-impl rustls::ServerCertVerifier for TlsServerVerifier {
-    fn verify_server_cert(
-        &self,
-        _roots: &rustls::RootCertStore,
-        _presented_certs: &[rustls::Certificate],
-        _dns_name: webpki::DNSNameRef,
-        _ocsp_response: &[u8],
-    ) -> Result<rustls::ServerCertVerified, rustls::TLSError> {
-        // TODO - check acceptable cert digest
-
-        Ok(rustls::ServerCertVerified::assertion())
-    }
+    kitsune_p2p_types::tls::gen_tls_configs(ALPN_KITSUNE_PROXY_0, tls, tuning_params)
+        .map_err(TransportError::other)
 }

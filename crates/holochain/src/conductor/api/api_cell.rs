@@ -2,20 +2,17 @@
 
 use std::sync::Arc;
 
-use super::error::{ConductorApiError, ConductorApiResult};
-use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::workflow::ZomeCallInvocationResult;
-use crate::{
-    conductor::{
-        entry_def_store::EntryDefBufferKey, interface::SignalBroadcaster, ConductorHandle,
-    },
-    core::workflow::CallZomeWorkspaceLock,
-};
+use super::error::ConductorApiError;
+use super::error::ConductorApiResult;
+use crate::conductor::interface::SignalBroadcaster;
+use crate::conductor::ConductorHandle;
+use crate::core::workflow::call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
+use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
+use holochain_conductor_api::ZomeCall;
 use holochain_keystore::KeystoreSender;
-use holochain_types::{autonomic::AutonomicCue, cell::CellId, dna::DnaFile};
-use holochain_zome_types::entry_def::EntryDef;
+use holochain_types::prelude::*;
 use tracing::*;
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
@@ -50,17 +47,17 @@ impl CellConductorApiT for CellConductorApi {
     async fn call_zome(
         &self,
         cell_id: &CellId,
-        invocation: ZomeCallInvocation,
-    ) -> ConductorApiResult<ZomeCallInvocationResult> {
-        if *cell_id == invocation.cell_id {
+        call: ZomeCall,
+    ) -> ConductorApiResult<ZomeCallResult> {
+        if *cell_id == call.cell_id {
             self.conductor_handle
-                .call_zome(invocation)
+                .call_zome(call)
                 .await
                 .map_err(Into::into)
         } else {
-            Err(ConductorApiError::ZomeCallInvocationCellMismatch {
+            Err(ConductorApiError::ZomeCallCellMismatch {
                 api_cell_id: cell_id.clone(),
-                invocation_cell_id: invocation.cell_id,
+                call_cell_id: call.cell_id,
             })
         }
     }
@@ -68,12 +65,6 @@ impl CellConductorApiT for CellConductorApi {
     async fn dpki_request(&self, _method: String, _args: String) -> ConductorApiResult<String> {
         warn!("Using placeholder dpki");
         Ok("TODO".to_string())
-    }
-
-    async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()> {
-        self.conductor_handle
-            .autonomic_cue(cue, &self.cell_id)
-            .await
     }
 
     fn keystore(&self) -> &KeystoreSender {
@@ -88,8 +79,21 @@ impl CellConductorApiT for CellConductorApi {
         self.conductor_handle.get_dna(dna_hash).await
     }
 
-    async fn get_this_dna(&self) -> Option<DnaFile> {
-        self.conductor_handle.get_dna(self.cell_id.dna_hash()).await
+    async fn get_this_dna(&self) -> ConductorApiResult<DnaFile> {
+        Ok(self
+            .conductor_handle
+            .get_dna(self.cell_id.dna_hash())
+            .await
+            .ok_or_else(|| ConductorApiError::DnaMissing(self.cell_id.dna_hash().clone()))?)
+    }
+
+    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
+        Ok(self
+            .get_dna(dna_hash)
+            .await
+            .ok_or_else(|| ConductorApiError::DnaMissing(dna_hash.clone()))?
+            .dna_def()
+            .get_zome(zome_name)?)
     }
 
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
@@ -108,20 +112,16 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     fn cell_id(&self) -> &CellId;
 
     /// Invoke a zome function on any cell in this conductor.
-    /// An invocation on a different Cell than this one corresponds to a bridged call.
+    /// A zome call on a different Cell than this one corresponds to a bridged call.
     async fn call_zome(
         &self,
         cell_id: &CellId,
-        invocation: ZomeCallInvocation,
-    ) -> ConductorApiResult<ZomeCallInvocationResult>;
+        call: ZomeCall,
+    ) -> ConductorApiResult<ZomeCallResult>;
 
     /// Make a request to the DPKI service running for this Conductor.
     /// TODO: decide on actual signature
     async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
-
-    /// Cue the autonomic system to run an [AutonomicProcess] earlier than its scheduled time.
-    /// This is basically a heuristic designed to help things run more smoothly.
-    async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
 
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &KeystoreSender;
@@ -134,7 +134,10 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
 
     /// Get the [Dna] of this cell from the [DnaStore]
-    async fn get_this_dna(&self) -> Option<DnaFile>;
+    async fn get_this_dna(&self) -> ConductorApiResult<DnaFile>;
+
+    /// Get a [Zome] from this cell's Dna
+    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 
     /// Get a [EntryDef] from the [EntryDefBuf]
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
@@ -149,12 +152,16 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
 pub trait CellConductorReadHandleT: Send + Sync {
     /// Get this cell id
     fn cell_id(&self) -> &CellId;
+
     /// Invoke a zome function on a Cell
     async fn call_zome(
         &self,
-        invocation: ZomeCallInvocation,
+        call: ZomeCall,
         workspace_lock: &CallZomeWorkspaceLock,
-    ) -> ConductorApiResult<ZomeCallInvocationResult>;
+    ) -> ConductorApiResult<ZomeCallResult>;
+
+    /// Get a zome from this cell's Dna
+    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 }
 
 #[async_trait]
@@ -162,17 +169,22 @@ impl CellConductorReadHandleT for CellConductorApi {
     fn cell_id(&self) -> &CellId {
         &self.cell_id
     }
+
     async fn call_zome(
         &self,
-        invocation: ZomeCallInvocation,
+        call: ZomeCall,
         workspace_lock: &CallZomeWorkspaceLock,
-    ) -> ConductorApiResult<ZomeCallInvocationResult> {
-        if self.cell_id == invocation.cell_id {
+    ) -> ConductorApiResult<ZomeCallResult> {
+        if self.cell_id == call.cell_id {
             self.conductor_handle
-                .call_zome_with_workspace(invocation, workspace_lock.clone())
+                .call_zome_with_workspace(call, workspace_lock.clone())
                 .await
         } else {
-            self.conductor_handle.call_zome(invocation).await
+            self.conductor_handle.call_zome(call).await
         }
+    }
+
+    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
+        CellConductorApiT::get_zome(self, dna_hash, zome_name).await
     }
 }

@@ -10,7 +10,7 @@
 use cell::dump_cell_state;
 use conductor::dump_conductor_state;
 use holochain_keystore::test_keystore::spawn_test_keystore;
-use holochain_state::env::{EnvironmentKind, EnvironmentWrite};
+use holochain_lmdb::env::{EnvironmentKind, EnvironmentWrite};
 use std::path::PathBuf;
 use structopt::StructOpt;
 use wasm::dump_wasm_state;
@@ -29,7 +29,7 @@ async fn run() -> anyhow::Result<()> {
     let opt = Opt::from_args();
 
     // throwaway keystore that we'll never use.
-    let keystore = spawn_test_keystore(Vec::new()).await.unwrap();
+    let keystore = spawn_test_keystore().await.unwrap();
 
     // set up the various environments
     let wasm_env = EnvironmentWrite::new(
@@ -80,10 +80,7 @@ async fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::main(threaded_scheduler)]
-async fn main() {
-    if let Err(err) = run().await {
-        eprintln!("holochain-analyzer: {}", err);
-        std::process::exit(1);
-    }
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> anyhow::Result<()> {
+    run().await
 }

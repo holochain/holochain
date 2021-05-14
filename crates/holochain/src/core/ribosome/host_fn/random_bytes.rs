@@ -1,9 +1,7 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::bytes::Bytes;
-use holochain_zome_types::RandomBytesInput;
-use holochain_zome_types::RandomBytesOutput;
+use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::WasmError;
 use ring::rand::SecureRandom;
 use std::sync::Arc;
 
@@ -11,13 +9,15 @@ use std::sync::Arc;
 pub fn random_bytes(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    input: RandomBytesInput,
-) -> RibosomeResult<RandomBytesOutput> {
+    input: u32,
+) -> Result<Bytes, WasmError> {
     let system_random = ring::rand::SystemRandom::new();
-    let mut bytes = vec![0; input.into_inner() as _];
-    system_random.fill(&mut bytes)?;
+    let mut bytes = vec![0; input as _];
+    system_random
+        .fill(&mut bytes)
+        .map_err(|ring_unspecified_error| WasmError::Host(ring_unspecified_error.to_string()))?;
 
-    Ok(RandomBytesOutput::new(Bytes::from(bytes)))
+    Ok(Bytes::from(bytes))
 }
 
 #[cfg(test)]
@@ -26,39 +26,35 @@ pub mod wasm_test {
     use crate::core::ribosome::host_fn::random_bytes::random_bytes;
 
     use crate::fixt::CallContextFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::RandomBytesInput;
-    use holochain_zome_types::RandomBytesOutput;
-    use std::convert::TryInto;
     use std::sync::Arc;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn directly
     async fn random_bytes_test() {
-        let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
+        let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
-        let call_context = CallContextFixturator::new(fixt::Unpredictable)
+        let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        const LEN: usize = 10;
-        let input = RandomBytesInput::new(LEN.try_into().unwrap());
+        const LEN: u32 = 10;
 
-        let output: RandomBytesOutput =
-            random_bytes(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
+        let output: holochain_zome_types::prelude::Bytes =
+            random_bytes(Arc::new(ribosome), Arc::new(call_context), LEN).unwrap();
 
         println!("{:?}", output);
 
-        assert_ne!(&[0; LEN], output.into_inner().as_ref(),);
+        assert_ne!(&[0; LEN as usize], output.as_ref(),);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn via. a wasm call
     async fn ribosome_random_bytes_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
@@ -67,16 +63,12 @@ pub mod wasm_test {
             .unwrap();
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
-        const LEN: usize = 5;
+        const LEN: u32 = 5;
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        let output: RandomBytesOutput = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::RandomBytes,
-            "random_bytes",
-            RandomBytesInput::new(5 as _)
-        );
+        let output: hdk::prelude::Bytes =
+            crate::call_test_ribosome!(host_access, TestWasm::RandomBytes, "random_bytes", LEN);
 
-        assert_ne!(&[0; LEN], output.into_inner().as_ref(),);
+        assert_ne!(&vec![0; LEN as usize], &output.to_vec());
     }
 }

@@ -1,7 +1,10 @@
 //! Defines the serialization rules for HoloHashes
 
-use crate::{HashType, HoloHash};
-use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
+use crate::HashType;
+use crate::HoloHash;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_serialized_bytes::SerializedBytesError;
+use holochain_serialized_bytes::UnsafeBytes;
 
 impl<T: HashType> serde::Serialize for HoloHash<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -56,6 +59,23 @@ impl<'de, T: HashType> serde::de::Visitor<'de> for HoloHashVisitor<T> {
 
         self.visit_bytes(&vec)
     }
+
+    #[cfg(feature = "string-encoding")]
+    fn visit_str<E>(self, b64: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        let h = crate::holo_hash_decode_unchecked(b64)
+            .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))?;
+        if !h.len() == 39 {
+            Err(serde::de::Error::custom(
+                "HoloHash serialized representation must be exactly 39 bytes",
+            ))
+        } else {
+            HoloHash::from_raw_39(h.to_vec())
+                .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))
+        }
+    }
 }
 
 impl<T: HashType> std::convert::TryFrom<&HoloHash<T>> for SerializedBytes {
@@ -63,7 +83,7 @@ impl<T: HashType> std::convert::TryFrom<&HoloHash<T>> for SerializedBytes {
     fn try_from(t: &HoloHash<T>) -> std::result::Result<SerializedBytes, SerializedBytesError> {
         match holochain_serialized_bytes::encode(t) {
             Ok(v) => Ok(SerializedBytes::from(UnsafeBytes::from(v))),
-            Err(e) => Err(SerializedBytesError::ToBytes(e.to_string())),
+            Err(e) => Err(SerializedBytesError::Serialize(e.to_string())),
         }
     }
 }
@@ -80,7 +100,7 @@ impl<T: HashType> std::convert::TryFrom<SerializedBytes> for HoloHash<T> {
     fn try_from(sb: SerializedBytes) -> std::result::Result<HoloHash<T>, SerializedBytesError> {
         match holochain_serialized_bytes::decode(sb.bytes()) {
             Ok(v) => Ok(v),
-            Err(e) => Err(SerializedBytesError::FromBytes(e.to_string())),
+            Err(e) => Err(SerializedBytesError::Deserialize(e.to_string())),
         }
     }
 }
@@ -91,7 +111,7 @@ mod tests {
     use holochain_serialized_bytes::prelude::*;
     use std::convert::TryInto;
 
-    #[derive(serde::Deserialize)]
+    #[derive(serde::Deserialize, Debug)]
     #[serde(transparent)]
     struct TestByteArray(#[serde(with = "serde_bytes")] Vec<u8>);
 

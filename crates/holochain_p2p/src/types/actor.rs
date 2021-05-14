@@ -2,8 +2,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::*;
-use holochain_zome_types::request::MetadataRequest;
-use holochain_zome_types::zome::FunctionName;
+use holochain_types::activity::AgentActivityResponse;
 
 /// Request a validation package.
 #[derive(Clone, Debug)]
@@ -137,20 +136,11 @@ pub struct GetLinksOptions {
     /// Note - if all requests time-out you will receive an empty result,
     /// not a timeout error.
     pub timeout_ms: Option<u64>,
-    // TODO: move this to an exposed zome type
-    /// [Local]
-    /// For full sharding should the call wait for
-    /// new data on each get or just return what is
-    /// integrated locally.
-    pub wait_for_new_data: bool,
 }
 
 impl Default for GetLinksOptions {
     fn default() -> Self {
-        Self {
-            timeout_ms: None,
-            wait_for_new_data: false,
-        }
+        Self { timeout_ms: None }
     }
 }
 
@@ -215,7 +205,7 @@ ghost_actor::ghost_chan! {
             zome_name: ZomeName,
             fn_name: FunctionName,
             cap: Option<CapSecret>,
-            request: SerializedBytes,
+            payload: ExternIO,
         ) -> SerializedBytes;
 
         /// Publish data to the correct neighborhood.
@@ -262,7 +252,7 @@ ghost_actor::ghost_chan! {
             agent: AgentPubKey,
             query: ChainQueryFilter,
             options: GetActivityOptions,
-        ) -> Vec<AgentActivity>;
+        ) -> Vec<AgentActivityResponse>;
 
         /// Send a validation receipt to a remote node.
         fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, from_agent: AgentPubKey, receipt: SerializedBytes) -> ();
