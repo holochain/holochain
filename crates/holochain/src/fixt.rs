@@ -76,11 +76,11 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
         let ribosome = RealRibosome::new(dna_file);
 
         // warm the module cache for each wasm in the ribosome
-        for zome in self.0.curve.0.clone() {
-            let mut call_context = CallContextFixturator::new(Empty).next().unwrap();
-            call_context.zome = zome.into();
-            ribosome.module(call_context.zome.zome_name()).unwrap();
-        }
+        // for zome in self.0.curve.0.clone() {
+        //     let mut call_context = CallContextFixturator::new(Empty).next().unwrap();
+        //     call_context.zome = zome.into();
+        //     ribosome.module(call_context.zome.zome_name()).unwrap();
+        // }
 
         self.0.index += 1;
 

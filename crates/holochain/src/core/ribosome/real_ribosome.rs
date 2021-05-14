@@ -73,12 +73,13 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::Mutex;
 
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 /// Path to the wasm cache path
-const WASM_CACHE_PATH_ENV: &str = "HC_WASM_CACHE_PATH";
+// const WASM_CACHE_PATH_ENV: &str = "HC_WASM_CACHE_PATH";
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -101,40 +102,48 @@ impl RealRibosome {
         &self.dna_file
     }
 
-    pub fn module(&self, zome_name: &ZomeName) -> RibosomeResult<Module> {
-        let wasm: Arc<Box<[u8]>> = self.dna_file.get_wasm_for_zome(zome_name)?.code();
-        Ok(holochain_wasmer_host::instantiate::module(
-            &self.wasm_cache_key(zome_name)?,
-            &wasm,
-            std::env::var_os(WASM_CACHE_PATH_ENV),
-        )?)
-    }
+    // pub fn module(&self, zome_name: &ZomeName) -> RibosomeResult<Module> {
+    //     let wasm: Arc<Box<[u8]>> = self.dna_file.get_wasm_for_zome(zome_name)?.code();
+    //     Ok(holochain_wasmer_host::instantiate::module(
+    //         &self.wasm_cache_key(zome_name)?,
+    //         &wasm,
+    //         std::env::var_os(WASM_CACHE_PATH_ENV),
+    //     )?)
+    // }
 
-    pub fn wasm_cache_key(&self, zome_name: &ZomeName) -> Result<&[u8], DnaError> {
-        // TODO: make this actually the hash of the wasm once we can do that
-        // watch out for cache misses in the tests that make things slooow if you change this!
-        // format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
-        Ok(self
-            .dna_file
-            .dna()
-            .get_wasm_zome(zome_name)?
-            .wasm_hash
-            .get_raw_39())
-    }
+    // pub fn wasm_cache_key(&self, zome_name: &ZomeName) -> Result<[u8; 32], DnaError> {
+    //     // TODO: make this actually the hash of the wasm once we can do that
+    //     // watch out for cache misses in the tests that make things slooow if you change this!
+    //     // format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
+    //     Ok(self
+    //         .dna_file
+    //         .dna()
+    //         .get_wasm_zome(zome_name)?
+    //         .wasm_hash
+    //         .get_raw_32())
+    // }
 
-    pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Instance> {
+    pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Arc<Mutex<Instance>>> {
         let zome_name = call_context.zome.zome_name().clone();
         let wasm: Arc<Box<[u8]>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
-        let imports: ImportObject = Self::imports(self, call_context);
-        Ok(holochain_wasmer_host::instantiate::instantiate(
-            self.wasm_cache_key(&zome_name)?,
-            &wasm,
-            &imports,
-            std::env::var_os(WASM_CACHE_PATH_ENV),
-        )?)
+        let store = Store::new(&JIT::new(Singlepass::new()).engine());
+        let module = Module::from_binary(&store, &*wasm).map_err(|e| WasmError::Compile(e.to_string()))?;
+        let env = Env::default();
+        let import_object: ImportObject = self.imports(call_context, &store, &env);
+        Ok(
+            Arc::new(
+                Mutex::new(
+                    Instance::new(
+                        &module,
+                        &import_object
+                    ).map_err(|e| WasmError::Compile(e.to_string()))?
+                )
+            )
+        )
+        // Ok(INSTANCE_CACHE.write().get(self.wasm_cache_key(&zome_name)?, &wasm, Self::imports))
     }
 
-    fn imports(&self, call_context: CallContext) -> ImportObject {
+    fn imports(&self, call_context: CallContext, store: &Store, env: &Env) -> ImportObject {
         let host_fn_access = (&call_context.host_access()).into();
 
         // it is important that RealRibosome and ZomeCallInvocation are cheap to clone here
@@ -145,10 +154,10 @@ impl RealRibosome {
             ( $host_function:ident ) => {{
                 let closure_self_arc = std::sync::Arc::clone(&self_arc);
                 let closure_call_context_arc = std::sync::Arc::clone(&call_context_arc);
-                move |ctx: &mut Ctx, guest_allocation_ptr: GuestPtr| -> Result<Len, WasmError> {
-                    let result = match $crate::holochain_wasmer_host::guest::from_guest_ptr(
-                        ctx,
+                move |guest_allocation_ptr: GuestPtr, len: Len| -> Result<(), WasmError> {
+                    let result = match env.consume_bytes_from_guest(
                         guest_allocation_ptr,
+                        len,
                     ) {
                         Ok(input) => {
                             match $host_function(
@@ -162,24 +171,49 @@ impl RealRibosome {
                         }
                         Err(wasm_error) => Err::<_, WasmError>(wasm_error),
                     };
-                    $crate::holochain_wasmer_host::import::set_context_data(ctx, result)
+                    Ok(env.set_data(result)?)
                 }
             }};
         }
-        let mut imports = imports! {};
-        let mut ns = Namespace::new();
+        let mut imports = ImportObject::new();
+        let mut ns = Exports::new();
+        let signature = FunctionType::new(vec![Type::I32, Type::I32], vec![]);
 
         // standard memory handling used by the holochain_wasmer guest and host macros
         ns.insert(
             "__import_data",
-            func!(holochain_wasmer_host::import::__import_data),
+            Function::new_native_with_env(
+                store,
+                env.clone(),
+                holochain_wasmer_host::import::__import_data,
+            )
         );
 
         // imported host functions for core
-        ns.insert("__trace", func!(invoke_host_function!(trace)));
-        ns.insert("__hash_entry", func!(invoke_host_function!(hash_entry)));
-        ns.insert("__version", func!(invoke_host_function!(version)));
-        ns.insert("__unreachable", func!(invoke_host_function!(unreachable)));
+        ns.insert(
+            "__trace",
+            Function::new_with_env(
+                store,
+                &signature,
+                env.clone(),
+                invoke_host_function!(trace)
+            )
+        );
+        ns.insert("__hash_entry", Function::new_native_with_env(
+            store,
+            env.clone(),
+            invoke_host_function!(hash_entry)
+        ));
+        ns.insert("__version", Function::new_native_with_env(
+            store,
+            env.clone(),
+            invoke_host_function!(version)
+        ));
+        ns.insert("__unreachable", Function::new_native_with_env(
+            store,
+            env.clone(),
+            invoke_host_function!(unreachable)
+        ));
 
         if let HostFnAccess {
             keystore: Permission::Allow,
@@ -188,62 +222,65 @@ impl RealRibosome {
         {
             ns.insert(
                 "__verify_signature",
-                func!(invoke_host_function!(verify_signature)),
+                Function::new_native_with_env(
+                    store,
+                    env.clone(),
+                    invoke_host_function!(verify_signature)),
             );
-            ns.insert("__sign", func!(invoke_host_function!(sign)));
+            ns.insert("__sign", Function::new_native_with_env(store, env.clone(), invoke_host_function!(sign)));
             ns.insert(
                 "__sign_ephemeral",
-                func!(invoke_host_function!(sign_ephemeral)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(sign_ephemeral)),
             );
             ns.insert(
                 "__create_x25519_keypair",
-                func!(invoke_host_function!(create_x25519_keypair)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(create_x25519_keypair)),
             );
             ns.insert(
                 "__x_salsa20_poly1305_encrypt",
-                func!(invoke_host_function!(x_salsa20_poly1305_encrypt)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(x_salsa20_poly1305_encrypt)),
             );
             ns.insert(
                 "__x_salsa20_poly1305_decrypt",
-                func!(invoke_host_function!(x_salsa20_poly1305_decrypt)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(x_salsa20_poly1305_decrypt)),
             );
             ns.insert(
                 "__x_25519_x_salsa20_poly1305_encrypt",
-                func!(invoke_host_function!(x_25519_x_salsa20_poly1305_encrypt)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(x_25519_x_salsa20_poly1305_encrypt)),
             );
             ns.insert(
                 "__x_25519_x_salsa20_poly1305_decrypt",
-                func!(invoke_host_function!(x_25519_x_salsa20_poly1305_decrypt)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(x_25519_x_salsa20_poly1305_decrypt)),
             );
         } else {
             ns.insert(
                 "__verify_signature",
-                func!(invoke_host_function!(unreachable)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)),
             );
-            ns.insert("__sign", func!(invoke_host_function!(unreachable)));
+            ns.insert("__sign", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
             ns.insert(
                 "__sign_ephemeral",
-                func!(invoke_host_function!(unreachable)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)),
             );
             ns.insert(
                 "__create_x25519_keypair",
-                func!(invoke_host_function!(unreachable)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)),
             );
             ns.insert(
                 "__x_salsa20_poly1305_encrypt",
-                func!(invoke_host_function!(unreachable)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)),
             );
             ns.insert(
                 "__x_salsa20_poly1305_decrypt",
-                func!(invoke_host_function!(unreachable)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)),
             );
             ns.insert(
                 "__x_25519_x_salsa20_poly1305_encrypt",
-                func!(invoke_host_function!(unreachable)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)),
             );
             ns.insert(
                 "__x_25519_x_salsa20_poly1305_decrypt",
-                func!(invoke_host_function!(unreachable)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)),
             );
         }
 
@@ -252,15 +289,15 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__zome_info", func!(invoke_host_function!(zome_info)));
-            ns.insert("__app_info", func!(invoke_host_function!(app_info)));
-            ns.insert("__dna_info", func!(invoke_host_function!(dna_info)));
-            ns.insert("__call_info", func!(invoke_host_function!(call_info)));
+            ns.insert("__zome_info", Function::new_native_with_env(store, env.clone(), invoke_host_function!(zome_info)));
+            ns.insert("__app_info", Function::new_native_with_env(store, env.clone(), invoke_host_function!(app_info)));
+            ns.insert("__dna_info", Function::new_native_with_env(store, env.clone(), invoke_host_function!(dna_info)));
+            ns.insert("__call_info", Function::new_native_with_env(store, env.clone(), invoke_host_function!(call_info)));
         } else {
-            ns.insert("__zome_info", func!(invoke_host_function!(unreachable)));
-            ns.insert("__app_info", func!(invoke_host_function!(unreachable)));
-            ns.insert("__dna_info", func!(invoke_host_function!(unreachable)));
-            ns.insert("__call_info", func!(invoke_host_function!(unreachable)));
+            ns.insert("__zome_info", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
+            ns.insert("__app_info", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
+            ns.insert("__dna_info", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
+            ns.insert("__call_info", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
         }
 
         if let HostFnAccess {
@@ -268,13 +305,13 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__random_bytes", func!(invoke_host_function!(random_bytes)));
-            ns.insert("__sys_time", func!(invoke_host_function!(sys_time)));
-            ns.insert("__sleep", func!(invoke_host_function!(sleep)));
+            ns.insert("__random_bytes", Function::new_native_with_env(store, env.clone(), invoke_host_function!(random_bytes)));
+            ns.insert("__sys_time", Function::new_native_with_env(store, env.clone(), invoke_host_function!(sys_time)));
+            ns.insert("__sleep", Function::new_native_with_env(store, env.clone(), invoke_host_function!(sleep)));
         } else {
-            ns.insert("__random_bytes", func!(invoke_host_function!(unreachable)));
-            ns.insert("__sys_time", func!(invoke_host_function!(unreachable)));
-            ns.insert("__sleep", func!(invoke_host_function!(unreachable)));
+            ns.insert("__random_bytes", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
+            ns.insert("__sys_time", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
+            ns.insert("__sleep", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
         }
 
         if let HostFnAccess {
@@ -282,32 +319,32 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__agent_info", func!(invoke_host_function!(agent_info)));
+            ns.insert("__agent_info", Function::new_native_with_env(store, env.clone(), invoke_host_function!(agent_info)));
             ns.insert(
                 "__capability_claims",
-                func!(invoke_host_function!(capability_claims)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(capability_claims)),
             );
             ns.insert(
                 "__capability_grants",
-                func!(invoke_host_function!(capability_grants)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(capability_grants)),
             );
             ns.insert(
                 "__capability_info",
-                func!(invoke_host_function!(capability_info)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(capability_info)),
             );
         } else {
-            ns.insert("__agent_info", func!(invoke_host_function!(unreachable)));
+            ns.insert("__agent_info", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
             ns.insert(
                 "__capability_claims",
-                func!(invoke_host_function!(unreachable)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)),
             );
             ns.insert(
                 "__capability_grants",
-                func!(invoke_host_function!(unreachable)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)),
             );
             ns.insert(
                 "__capability_info",
-                func!(invoke_host_function!(unreachable)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)),
             );
         }
 
@@ -316,31 +353,31 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__get", func!(invoke_host_function!(get)));
-            ns.insert("__get_details", func!(invoke_host_function!(get_details)));
-            ns.insert("__get_links", func!(invoke_host_function!(get_links)));
+            ns.insert("__get", Function::new_native_with_env(store, env.clone(), invoke_host_function!(get)));
+            ns.insert("__get_details", Function::new_native_with_env(store, env.clone(), invoke_host_function!(get_details)));
+            ns.insert("__get_links", Function::new_native_with_env(store, env.clone(), invoke_host_function!(get_links)));
             ns.insert(
                 "__get_link_details",
-                func!(invoke_host_function!(get_link_details)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(get_link_details)),
             );
             ns.insert(
                 "__get_agent_activity",
-                func!(invoke_host_function!(get_agent_activity)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(get_agent_activity)),
             );
-            ns.insert("__query", func!(invoke_host_function!(query)));
+            ns.insert("__query", Function::new_native_with_env(store, env.clone(), invoke_host_function!(query)));
         } else {
-            ns.insert("__get", func!(invoke_host_function!(unreachable)));
-            ns.insert("__get_details", func!(invoke_host_function!(unreachable)));
-            ns.insert("__get_links", func!(invoke_host_function!(unreachable)));
+            ns.insert("__get", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
+            ns.insert("__get_details", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
+            ns.insert("__get_links", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
             ns.insert(
                 "__get_link_details",
-                func!(invoke_host_function!(unreachable)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)),
             );
             ns.insert(
                 "__get_agent_activity",
-                func!(invoke_host_function!(unreachable)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)),
             );
-            ns.insert("__query", func!(invoke_host_function!(unreachable)));
+            ns.insert("__query", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
         }
 
         if let HostFnAccess {
@@ -348,14 +385,14 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__call_remote", func!(invoke_host_function!(call_remote)));
+            ns.insert("__call_remote", Function::new_native_with_env(store, env.clone(), invoke_host_function!(call_remote)));
             ns.insert(
                 "__remote_signal",
-                func!(invoke_host_function!(remote_signal)),
+                Function::new_native_with_env(store, env.clone(), invoke_host_function!(remote_signal)),
             );
         } else {
-            ns.insert("__call_remote", func!(invoke_host_function!(unreachable)));
-            ns.insert("__remote_signal", func!(invoke_host_function!(unreachable)));
+            ns.insert("__call_remote", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
+            ns.insert("__remote_signal", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
         }
 
         if let HostFnAccess {
@@ -363,23 +400,23 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__call", func!(invoke_host_function!(call)));
-            ns.insert("__create", func!(invoke_host_function!(create)));
-            ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
-            ns.insert("__create_link", func!(invoke_host_function!(create_link)));
-            ns.insert("__delete_link", func!(invoke_host_function!(delete_link)));
-            ns.insert("__update", func!(invoke_host_function!(update)));
-            ns.insert("__delete", func!(invoke_host_function!(delete)));
-            ns.insert("__schedule", func!(invoke_host_function!(schedule)));
+            ns.insert("__call", Function::new_native_with_env(store, env.clone(), invoke_host_function!(call)));
+            ns.insert("__create", Function::new_native_with_env(store, env.clone(), invoke_host_function!(create)));
+            ns.insert("__emit_signal", Function::new_native_with_env(store, env.clone(), invoke_host_function!(emit_signal)));
+            ns.insert("__create_link", Function::new_native_with_env(store, env.clone(), invoke_host_function!(create_link)));
+            ns.insert("__delete_link", Function::new_native_with_env(store, env.clone(), invoke_host_function!(delete_link)));
+            ns.insert("__update", Function::new_native_with_env(store, env.clone(), invoke_host_function!(update)));
+            ns.insert("__delete", Function::new_native_with_env(store, env.clone(), invoke_host_function!(delete)));
+            ns.insert("__schedule", Function::new_native_with_env(store, env.clone(), invoke_host_function!(schedule)));
         } else {
-            ns.insert("__call", func!(invoke_host_function!(unreachable)));
-            ns.insert("__create", func!(invoke_host_function!(unreachable)));
-            ns.insert("__emit_signal", func!(invoke_host_function!(unreachable)));
-            ns.insert("__create_link", func!(invoke_host_function!(unreachable)));
-            ns.insert("__delete_link", func!(invoke_host_function!(unreachable)));
-            ns.insert("__update", func!(invoke_host_function!(unreachable)));
-            ns.insert("__delete", func!(invoke_host_function!(unreachable)));
-            ns.insert("__schedule", func!(invoke_host_function!(unreachable)));
+            ns.insert("__call", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
+            ns.insert("__create", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
+            ns.insert("__emit_signal", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
+            ns.insert("__create_link", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
+            ns.insert("__delete_link", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
+            ns.insert("__update", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
+            ns.insert("__delete", Function::new_native_with_env(store, env.clone(), invoke_host_function!(unreachable)));
+            ns.insert("__schedule", Function::new_with_env(store, &signature, env.clone(), invoke_host_function!(unreachable)));
         }
         imports.register("env", ns);
 
@@ -431,16 +468,21 @@ impl RibosomeT for RealRibosome {
 
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
-                let module = self.module(zome.zome_name())?;
+                let instance: Arc<Mutex<Instance>> = self.instance(call_context)?;
 
-                if module.info().exports.contains_key(to_call.as_ref()) {
+                let contains_call = {
+                    let instance = instance.lock();
+                    instance.exports.contains(to_call.as_ref())
+                };
+
+                if contains_call {
                     // there is a callback to_call and it is implemented in the wasm
                     // it is important to fully instantiate this (e.g. don't try to use the module above)
                     // because it builds guards against memory leaks and handles imports correctly
-                    let mut instance = self.instance(call_context)?;
+                    // let instance = self.instance(call_context)?;
 
                     let result: Result<ExternIO, WasmError> = holochain_wasmer_host::guest::call(
-                        &mut instance,
+                        instance,
                         to_call.as_ref(),
                         // be aware of this clone!
                         // the whole invocation is cloned!
