@@ -19,6 +19,7 @@ use holochain_serialized_bytes::prelude::*;
 /// a chain element which is a triple containing the signature of the header along with the
 /// entry if the header type has one.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Element {
     /// The signed header for this element
     signed_header: SignedHeaderHashed,
@@ -89,6 +90,7 @@ impl Element {
 /// Represents the different ways the entry_address reference within a Header
 /// can be intepreted
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum ElementEntry {
     /// The Header has an entry_address reference, and the Entry is accessible.
     Present(Entry),
@@ -158,6 +160,7 @@ impl ElementEntry {
 ///
 /// Has implementations From and Into its tuple form.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct SignedHeader(pub Header, pub Signature);
 
 impl SignedHeader {
@@ -190,6 +193,7 @@ impl HashableContent for SignedHeader {
 
 /// The header and the signature that signed it
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct SignedHeaderHashed {
     header: HeaderHashed,
     signature: Signature,

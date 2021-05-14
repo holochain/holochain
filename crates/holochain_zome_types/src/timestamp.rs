@@ -37,6 +37,7 @@ pub use error::{TimestampError, TimestampResult};
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize, SerializedBytes,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Timestamp(
     pub i64, // seconds from UNIX Epoch, positive or negative
     pub u32, // nanoseconds, always a positive offset

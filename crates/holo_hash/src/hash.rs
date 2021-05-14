@@ -64,10 +64,23 @@ macro_rules! assert_length {
 ///
 /// There is custom de/serialization implemented in [ser.rs]
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct HoloHash<T: HashType> {
     hash: Vec<u8>,
     hash_type: T,
+}
+
+#[cfg(feature = "arbitrary")]
+impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHash<P> {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut buf = [0; HOLO_HASH_FULL_LEN];
+        buf[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(P::static_prefix());
+        buf[HOLO_HASH_PREFIX_LEN..]
+            .copy_from_slice(u.bytes(HOLO_HASH_FULL_LEN - HOLO_HASH_PREFIX_LEN)?);
+        Ok(HoloHash {
+            hash: buf.to_vec(),
+            hash_type: P::new(),
+        })
+    }
 }
 
 impl<T: HashType> HoloHash<T> {

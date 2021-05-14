@@ -23,6 +23,7 @@ pub mod error;
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, derive_more::Display,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum DhtOp {
     #[display(fmt = "StoreElement")]
     /// Used to notify the authority for a header that it has been created.

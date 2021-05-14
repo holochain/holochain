@@ -17,6 +17,15 @@ pub type CapSecretBytes = [u8; CAP_SECRET_BYTES];
 #[derive(Clone, Copy, SerializedBytes)]
 pub struct CapSecret(CapSecretBytes);
 
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for CapSecret {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut buf = [0; CAP_SECRET_BYTES];
+        u.fill_buffer(&mut buf)?;
+        Ok(CapSecret(buf))
+    }
+}
+
 // Capability secrets are not cryptographic secrets.
 // They aren't used in any cryptographic algorithm.
 // They are closer to API keys in that they may provide access to specific functions on a specific
