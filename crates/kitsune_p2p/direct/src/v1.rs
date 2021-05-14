@@ -25,10 +25,7 @@ pub async fn new_kitsune_direct_v1(
     // v1 is only set up to run through a proxy
     // specify the proxy addr here
     proxy: TxUrl,
-) -> KitsuneResult<(
-    KitsuneDirect,
-    KitsuneDirectEvtStream,
-)> {
+) -> KitsuneResult<(KitsuneDirect, KitsuneDirectEvtStream)> {
     let mut config = KitsuneP2pConfig::default();
 
     let tuning_params = config.tuning_params.clone();

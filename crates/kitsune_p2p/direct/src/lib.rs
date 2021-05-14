@@ -15,6 +15,9 @@ pub mod types;
 mod persist_mem;
 pub use persist_mem::*;
 
+mod srv;
+pub use srv::*;
+
 mod v1;
 pub use v1::*;
 
@@ -30,10 +33,12 @@ pub mod dependencies {
 /// kdirect prelude
 pub mod prelude {
     pub use crate::persist_mem::*;
-    pub use crate::types::direct::{KitsuneDirect, KitsuneDirectEvt};
+    pub use crate::srv::*;
+    pub use crate::types::direct::{KitsuneDirect, KitsuneDirectEvt, KitsuneDirectEvtStream};
     pub use crate::types::kdentry::{KdEntry, KdEntryData};
     pub use crate::types::kdhash::KdHash;
     pub use crate::types::persist::KdPersist;
+    pub use crate::types::srv::{HttpRespondCb, HttpResponse, KdSrv, KdSrvEvt, KdSrvEvtStream};
     pub use crate::v1::*;
     pub use crate::{KitsuneError, KitsuneResult};
     pub use kitsune_p2p::dht_arc::DhtArc;

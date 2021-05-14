@@ -13,11 +13,25 @@ pub struct HttpResponse {
     pub body: Vec<u8>,
 
     /// response headers
-    pub headers: Vec<(String, String)>,
+    pub headers: Vec<(String, Vec<u8>)>,
+}
+
+impl Default for HttpResponse {
+    fn default() -> Self {
+        Self {
+            status: 200,
+            body: Vec::new(),
+            headers: vec![("Content-Type".to_string(), b"application/json".to_vec())],
+        }
+    }
 }
 
 /// Respond to an incoming http request
-pub type HttpRespondCb = Box<dyn FnOnce(HttpResponse) -> BoxFuture<'static, KitsuneResult<()>> + 'static + Send>;
+pub type HttpRespondCb = Box<
+    dyn FnOnce(KitsuneResult<HttpResponse>) -> BoxFuture<'static, KitsuneResult<()>>
+        + 'static
+        + Send,
+>;
 
 /// Events emitted from a KdSrv instance.
 pub enum KdSrvEvt {
@@ -30,13 +44,22 @@ pub enum KdSrvEvt {
         method: String,
 
         /// incoming headers
-        headers: Vec<(String, String)>,
+        headers: Vec<(String, Vec<u8>)>,
 
         /// incoming body
         body: Vec<u8>,
 
         /// response callback
         respond_cb: HttpRespondCb,
+    },
+
+    /// An incoming websocket json blob
+    Websocket {
+        /// Connection Ref
+        con: Uniq,
+
+        /// json blob
+        data: serde_json::Value,
     },
 }
 
@@ -53,6 +76,20 @@ pub trait AsKdSrv: 'static + Send + Sync {
 
     /// Explicitly close this persist instance
     fn close(&self) -> BoxFuture<'static, ()>;
+
+    /// Get the bound addr of this KdSrv instance
+    fn local_addr(&self) -> KitsuneResult<std::net::SocketAddr>;
+
+    /// Broadcast to all connected websockets
+    fn websocket_broadcast(&self, data: serde_json::Value)
+        -> BoxFuture<'static, KitsuneResult<()>>;
+
+    /// Send data to a specific websocket connection
+    fn websocket_send(
+        &self,
+        con: Uniq,
+        data: serde_json::Value,
+    ) -> BoxFuture<'static, KitsuneResult<()>>;
 }
 
 /// Handle to a Srv instance.
@@ -82,5 +119,27 @@ impl KdSrv {
     /// Explicitly close this persist instance
     pub fn close(&self) -> impl Future<Output = ()> + 'static + Send {
         AsKdSrv::close(&*self.0)
+    }
+
+    /// Get the bound addr of this KdSrv instance
+    pub fn local_addr(&self) -> KitsuneResult<std::net::SocketAddr> {
+        AsKdSrv::local_addr(&*self.0)
+    }
+
+    /// Broadcast to all connected websockets
+    pub fn websocket_broadcast(
+        &self,
+        data: serde_json::Value,
+    ) -> impl Future<Output = KitsuneResult<()>> + 'static + Send {
+        AsKdSrv::websocket_broadcast(&*self.0, data)
+    }
+
+    /// Send data to a specific websocket connection
+    pub fn websocket_send(
+        &self,
+        con: Uniq,
+        data: serde_json::Value,
+    ) -> impl Future<Output = KitsuneResult<()>> + 'static + Send {
+        AsKdSrv::websocket_send(&*self.0, con, data)
     }
 }
