@@ -324,8 +324,7 @@ pub mod tests {
     use holochain_types::test_utils::fake_dna_hash;
     use holochain_zome_types::capability::CapAccess;
     use holochain_zome_types::capability::ZomeCallCapGrant;
-
-    use std::collections::HashSet;
+    use std::collections::BTreeSet;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
@@ -337,7 +336,7 @@ pub mod tests {
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
         let function: GrantedFunction = ("foo".into(), "bar".into());
-        let mut functions: GrantedFunctions = HashSet::new();
+        let mut functions: GrantedFunctions = BTreeSet::new();
         functions.insert(function.clone());
         let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), functions.clone());
         let mut agents = AgentPubKeyFixturator::new(Predictable);
@@ -398,7 +397,7 @@ pub mod tests {
         }
 
         // let's roll the secret and assign the grant to bob specifically
-        let mut assignees = HashSet::new();
+        let mut assignees = BTreeSet::new();
         assignees.insert(bob.clone());
         let updated_secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let updated_access = CapAccess::from((updated_secret.clone().unwrap(), assignees));

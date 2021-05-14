@@ -38,6 +38,20 @@ impl From<()> for YamlProperties {
     }
 }
 
+impl Default for YamlProperties {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
+/// Not a great implementation: always returns null
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for YamlProperties {
+    fn arbitrary(_: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(serde_yaml::Value::Null.into())
+    }
+}
+
 /// The definition of a DNA: the hash of this data is what produces the DnaHash.
 ///
 /// Historical note: This struct was written before `DnaManifest` appeared.
@@ -56,9 +70,9 @@ pub struct DnaDef {
     #[builder(default = "\"Generated DnaDef\".to_string()")]
     pub name: String,
 
-    /// A UUID for uniquifying this Dna.
+    /// A UID for uniquifying this Dna.
     // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
-    pub uuid: String,
+    pub uid: String,
 
     /// Any arbitrary application properties can be included in this object.
     #[builder(default = "().try_into().unwrap()")]
@@ -70,12 +84,12 @@ pub struct DnaDef {
 
 #[cfg(feature = "test_utils")]
 impl DnaDef {
-    /// Create a DnaDef with a random UUID, useful for testing
+    /// Create a DnaDef with a random UID, useful for testing
     pub fn unique_from_zomes(zomes: Vec<Zome>) -> DnaDef {
         let zomes = zomes.into_iter().map(|z| z.into_inner()).collect();
         DnaDefBuilder::default()
             .zomes(zomes)
-            .random_uuid()
+            .random_uid()
             .build()
             .unwrap()
     }
@@ -108,25 +122,25 @@ impl DnaDef {
             })
     }
 
-    /// Change the "phenotype" of this DNA -- the UUID and properties -- while
+    /// Change the "phenotype" of this DNA -- the UID and properties -- while
     /// leaving the "genotype" of actual DNA code intact
-    pub fn modify_phenotype(&self, uuid: Uuid, properties: YamlProperties) -> DnaResult<Self> {
+    pub fn modify_phenotype(&self, uid: Uid, properties: YamlProperties) -> DnaResult<Self> {
         let mut clone = self.clone();
         clone.properties = properties.try_into()?;
-        clone.uuid = uuid;
+        clone.uid = uid;
         Ok(clone)
     }
 }
 
-/// Get a random UUID
-pub fn random_uuid() -> String {
+/// Get a random UID
+pub fn random_uid() -> String {
     nanoid::nanoid!()
 }
 
 impl DnaDefBuilder {
-    /// Provide a random UUID
-    pub fn random_uuid(&mut self) -> &mut Self {
-        self.uuid = Some(random_uuid());
+    /// Provide a random UID
+    pub fn random_uid(&mut self) -> &mut Self {
+        self.uid = Some(random_uid());
         self
     }
 }

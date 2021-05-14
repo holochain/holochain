@@ -145,9 +145,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
 ) {
     while let Some(msg) = rx_from_iface.next().await {
         match handle_incoming_message(msg, api.clone()).await {
-            Err(e) => {
-                error!(error = &e as &dyn std::error::Error)
-            }
+            Err(e) => error!(error = &e as &dyn std::error::Error),
             Ok(()) => {}
         }
     }
@@ -283,7 +281,6 @@ pub mod test {
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
-    use holochain_types::test_utils::fake_dna_file;
     use holochain_types::test_utils::fake_dna_hash;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_types::{app::InstallAppDnaPayload, prelude::InstallAppPayload};
@@ -297,7 +294,7 @@ pub mod test {
     use matches::assert_matches;
     use mockall::predicate;
     use observability;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use std::convert::TryInto;
     use tempdir::TempDir;
     use uuid::Uuid;
@@ -474,10 +471,12 @@ pub mod test {
     async fn activate_app() {
         observability::test_run().ok();
         let agent_key = fake_agent_pubkey_1();
-        let dnas = [Uuid::new_v4(); 2]
-            .iter()
-            .map(|uuid| fake_dna_file(&uuid.to_string()))
-            .collect::<Vec<_>>();
+        let mut dnas = Vec::new();
+        for _i in 0..2 as u32 {
+            let zomes = vec![TestWasm::Foo.into()];
+            let def = DnaDef::unique_from_zomes(zomes.clone());
+            dnas.push(DnaFile::new(def, vec![TestWasm::Foo.into()]).await.unwrap());
+        }
         let dna_map = dnas
             .iter()
             .cloned()
@@ -530,7 +529,7 @@ pub mod test {
         assert_eq!(r, None);
 
         // Check it is in active apps
-        let cell_ids: Vec<CellId> = state
+        let cell_ids: HashSet<CellId> = state
             .active_apps
             .get("test app")
             .unwrap()
@@ -542,7 +541,7 @@ pub mod test {
         let expected = dna_hashes
             .into_iter()
             .map(|hash| CellId::from((hash, agent_key.clone())))
-            .collect::<Vec<_>>();
+            .collect::<HashSet<_>>();
 
         assert_eq!(expected, cell_ids);
 
@@ -550,7 +549,7 @@ pub mod test {
         let maybe_info = state.get_app_info(&"test app".to_string());
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, "test app");
-            assert!(info.active);
+            assert_matches!(info.status, InstalledAppStatus::Active);
         } else {
             assert!(false);
         }
@@ -580,7 +579,7 @@ pub mod test {
         assert_eq!(r, None);
 
         // Check it's added to inactive
-        let cell_ids: Vec<CellId> = state
+        let cell_ids: HashSet<CellId> = state
             .inactive_apps
             .get("test app")
             .unwrap()
@@ -594,7 +593,7 @@ pub mod test {
         let maybe_info = state.get_app_info(&"test app".to_string());
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, "test app");
-            assert!(!info.active);
+            assert_matches!(info.status, InstalledAppStatus::Inactive {..});
         } else {
             assert!(false);
         }
@@ -671,11 +670,11 @@ pub mod test {
         shutdown.await.unwrap().unwrap();
     }
 
-    async fn make_dna(uuid: &str, zomes: Vec<TestWasm>) -> DnaFile {
+    async fn make_dna(uid: &str, zomes: Vec<TestWasm>) -> DnaFile {
         DnaFile::new(
             DnaDef {
                 name: "conductor_test".to_string(),
-                uuid: uuid.to_string(),
+                uid: uid.to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 zomes: zomes.clone().into_iter().map(Into::into).collect(),
             },
@@ -709,7 +708,7 @@ pub mod test {
         let p2p_store = AgentKv::new(env.clone().into()).unwrap();
 
         // - Give time for the agents to join the network.
-        crate::wait_for_any_10s!(
+        crate::assert_eq_retry_10s!(
             {
                 fresh_reader_test!(env, |r| p2p_store
                     .as_store_ref()
@@ -718,8 +717,7 @@ pub mod test {
                     .count()
                     .unwrap())
             },
-            |&count| count == 4,
-            |count| assert_eq!(count, 4)
+            4
         );
 
         // - Get agents and space

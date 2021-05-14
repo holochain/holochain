@@ -34,11 +34,12 @@ const TIMEOUT_ERROR: &'static str = "inner function \'call_create_entry_remotely
 #[test_case(2)]
 #[test_case(5)]
 // #[test_case(10)] 10 works but might be too slow for our regular test run
+// FIXME: this test is flaky!
 fn conductors_call_remote(num_conductors: usize) {
     let f = async move {
         observability::test_run().ok();
 
-        let uuid = nanoid::nanoid!().to_string();
+        let uid = nanoid::nanoid!().to_string();
         let zomes = vec![TestWasm::Create];
         let mut network = KitsuneP2pConfig::default();
         network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
@@ -46,7 +47,7 @@ fn conductors_call_remote(num_conductors: usize) {
             override_host: None,
             override_port: None,
         }];
-        let handles = setup(zomes, Some(network), num_conductors, uuid).await;
+        let handles = setup(zomes, Some(network), num_conductors, uid).await;
 
         init_all(&handles[..]).await;
 
@@ -267,14 +268,14 @@ async fn conductors_gossip_inner(
     share_peers: bool,
 ) {
     observability::test_run().ok();
-    let uuid = nanoid::nanoid!().to_string();
+    let uid = nanoid::nanoid!().to_string();
 
     let zomes = vec![TestWasm::Create];
     let handles = setup(
         zomes.clone(),
         Some(network.clone()),
         num_committers,
-        uuid.clone(),
+        uid.clone(),
     )
     .await;
 
@@ -284,7 +285,7 @@ async fn conductors_gossip_inner(
         zomes.clone(),
         Some(network.clone()),
         num_conductors,
-        uuid.clone(),
+        uid.clone(),
     )
     .await;
 
@@ -317,7 +318,7 @@ async fn conductors_gossip_inner(
 
     shutdown(handles).await;
 
-    let third_handles = setup(zomes.clone(), Some(network.clone()), new_conductors, uuid).await;
+    let third_handles = setup(zomes.clone(), Some(network.clone()), new_conductors, uid).await;
 
     let mut envs = Vec::with_capacity(third_handles.len() + second_handles.len());
     for h in third_handles.iter().chain(second_handles.iter()) {
@@ -506,12 +507,12 @@ async fn setup(
     zomes: Vec<TestWasm>,
     network: Option<KitsuneP2pConfig>,
     num_conductors: usize,
-    uuid: String,
+    uid: String,
 ) -> Vec<TestHandle> {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "conductor_test".to_string(),
-            uuid,
+            uid,
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: zomes.clone().into_iter().map(Into::into).collect(),
         },

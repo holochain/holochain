@@ -10,6 +10,9 @@ mod error;
 pub use error::*;
 use futures::future::join_all;
 
+#[cfg(test)]
+mod tests;
+
 /// A bundle of an AppManifest and collection of DNAs
 #[derive(Debug, Serialize, Deserialize, derive_more::From, shrinkwraprs::Shrinkwrap)]
 pub struct AppBundle(mr_bundle::Bundle<AppManifest>);
@@ -35,6 +38,11 @@ impl AppBundle {
         mr_bundle::Bundle::decode(bytes)
             .map(Into::into)
             .map_err(Into::into)
+    }
+
+    /// Convert to the inner Bundle
+    pub fn into_inner(self) -> mr_bundle::Bundle<AppManifest> {
+        self.0
     }
 
     /// Given a DnaGamut, decide which of the available DNAs or Cells should be
@@ -80,7 +88,13 @@ impl AppBundle {
                                     .slots
                                     .push((slot_id, AppSlot::new(cell_id, false, clone_limit)));
                             }
-                            _ => todo!(),
+                            other => {
+                                tracing::error!(
+                                    "Encountered unexpected CellProvisioningOp: {:?}",
+                                    other
+                                );
+                                unimplemented!()
+                            }
                         }
                         Ok(resolution)
                     } else {
@@ -102,9 +116,11 @@ impl AppBundle {
                 location,
                 version,
                 clone_limit,
-                ..
+                properties,
+                uid,
+                deferred: _,
             } => {
-                self.resolve_cell_create(&location, version.as_ref(), clone_limit)
+                self.resolve_cell_create(&location, version.as_ref(), clone_limit, uid, properties)
                     .await?
             }
 
@@ -114,18 +130,26 @@ impl AppBundle {
             AppSlotManifestValidated::UseExisting {
                 version,
                 clone_limit,
-                ..
+                deferred: _,
             } => self.resolve_cell_existing(&version, clone_limit),
             AppSlotManifestValidated::CreateIfNotExists {
                 location,
                 version,
                 clone_limit,
-                ..
+                properties,
+                uid,
+                deferred: _,
             } => match self.resolve_cell_existing(&version, clone_limit) {
                 op @ CellProvisioningOp::Existing(_, _) => op,
                 CellProvisioningOp::NoMatch => {
-                    self.resolve_cell_create(&location, Some(&version), clone_limit)
-                        .await?
+                    self.resolve_cell_create(
+                        &location,
+                        Some(&version),
+                        clone_limit,
+                        uid,
+                        properties,
+                    )
+                    .await?
                 }
                 CellProvisioningOp::Conflict(_) => {
                     unimplemented!("conflicts are not handled, or even possible yet")
@@ -152,12 +176,14 @@ impl AppBundle {
         location: &mr_bundle::Location,
         version: Option<&DnaVersionSpec>,
         clone_limit: u32,
+        uid: Option<Uid>,
+        properties: Option<YamlProperties>,
     ) -> AppBundleResult<CellProvisioningOp> {
         let bytes = self.resolve(location).await?;
         let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(&bytes)?.into();
-        let dna_file = dna_bundle.into_dna_file().await?;
+        let (dna_file, original_dna_hash) = dna_bundle.into_dna_file(uid, properties).await?;
         if let Some(spec) = version {
-            if !spec.matches(dna_file.dna_hash().clone()) {
+            if !spec.matches(original_dna_hash) {
                 return Ok(CellProvisioningOp::NoMatch);
             }
         }
@@ -171,6 +197,13 @@ impl AppBundle {
     ) -> CellProvisioningOp {
         unimplemented!("Reusing existing cells is not yet implemented")
     }
+}
+
+/// This function is called in places where it will be necessary to rework that
+/// area after use_existing has been implemented
+#[deprecated = "Raising visibility into a change that needs to happen after `use_existing` is implemented"]
+pub fn we_must_remember_to_rework_cell_panic_handling_after_implementing_use_existing_cell_resolution(
+) {
 }
 
 /// The result of running Cell resolution
@@ -209,8 +242,9 @@ impl CellSlotResolution {
     }
 }
 
-#[warn(missing_docs)]
 /// Specifies what step should be taken to provision a cell while installing an App
+#[warn(missing_docs)]
+#[derive(Debug)]
 pub enum CellProvisioningOp {
     /// Create a new Cell
     Create(DnaFile, u32),
@@ -226,67 +260,5 @@ pub enum CellProvisioningOp {
 }
 
 /// Uninhabitable placeholder
+#[derive(Debug)]
 pub enum CellProvisioningConflict {}
-
-#[cfg(test)]
-mod tests {
-    use std::path::PathBuf;
-
-    use crate::prelude::*;
-    use ::fixt::prelude::*;
-    use app_manifest_v1::tests::app_manifest_fixture;
-
-    use super::AppBundle;
-
-    async fn app_bundle_fixture() -> (AppBundle, DnaFile) {
-        let dna_wasm = DnaWasmHashed::from_content(DnaWasm::new_invalid()).await;
-        let fake_wasms = vec![dna_wasm.clone().into_content()];
-        let fake_zomes = vec![Zome::new(
-            "hi".into(),
-            ZomeDef::from(WasmZome::new(dna_wasm.as_hash().clone())),
-        )];
-        let dna_def_1 = DnaDef::unique_from_zomes(fake_zomes.clone());
-        let dna_def_2 = DnaDef::unique_from_zomes(fake_zomes);
-
-        let dna1 = DnaFile::new(dna_def_1, fake_wasms.clone()).await.unwrap();
-        let dna2 = DnaFile::new(dna_def_2, fake_wasms.clone()).await.unwrap();
-
-        let path1 = PathBuf::from(format!("{}", dna1.dna_hash()));
-
-        let (manifest, _dna_hashes) = app_manifest_fixture(
-            Some(DnaLocation::Bundled(path1.clone())),
-            vec![dna1.dna_def().clone(), dna2.dna_def().clone()],
-        )
-        .await;
-
-        let resources = vec![(path1, DnaBundle::from_dna_file(dna1.clone()).await.unwrap())];
-
-        let bundle = AppBundle::new(manifest, resources, PathBuf::from("."))
-            .await
-            .unwrap();
-        (bundle, dna1)
-    }
-
-    /// Test that an app with a single Created cell can be provisioned
-    #[tokio::test]
-    async fn provisioning_1_create() {
-        let agent = fixt!(AgentPubKey);
-        let (bundle, dna) = app_bundle_fixture().await;
-        let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
-
-        let resolution = bundle
-            .resolve_cells(agent.clone(), DnaGamut::placeholder(), Default::default())
-            .await
-            .unwrap();
-
-        // Build the expected output.
-        // NB: this relies heavily on the particulars of the `app_manifest_fixture`
-        let slot = AppSlot::new(cell_id, true, 50);
-        let expected = CellSlotResolution {
-            agent,
-            dnas_to_register: vec![(dna, None)],
-            slots: vec![("nick".into(), slot)],
-        };
-        assert_eq!(resolution, expected);
-    }
-}

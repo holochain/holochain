@@ -1,5 +1,5 @@
+use crate::sweettest::*;
 use crate::test_utils::consistency_10s;
-use crate::test_utils::sweetest::*;
 use fallible_iterator::FallibleIterator;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
@@ -40,7 +40,7 @@ async fn test_validation_receipt() {
         .await
         .unwrap();
 
-    let apps = conductors.setup_app("app", &[dna_file]).await;
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
@@ -63,7 +63,7 @@ async fn test_validation_receipt() {
     // Wait for receipts to be sent
     let db = ValidationReceiptsBuf::new(&env).unwrap();
 
-    crate::wait_for_any_10s!(
+    crate::assert_eq_retry_10s!(
         {
             let mut counts = Vec::new();
             for hash in &ops {
@@ -76,8 +76,7 @@ async fn test_validation_receipt() {
             }
             counts
         },
-        |counts| counts == &vec![2, 2, 2],
-        |_| ()
+        vec![2, 2, 2],
     );
 
     // Check alice has receipts from both bobbo and carol
@@ -102,14 +101,15 @@ async fn test_validation_receipt() {
     // Check alice has 2 receipts in their authored dht ops table.
     let db = env.get_db(&*AUTHORED_DHT_OPS).unwrap();
     let authored_dht_ops: AuthoredDhtOpsStore = KvBufFresh::new(env.clone(), db);
-    let vals: Vec<_> = fresh_reader_test!(env, |r| authored_dht_ops
-        .iter(&r)
-        .unwrap()
-        .map(|(_, v)| Ok(v))
-        .collect()
-        .unwrap());
-
-    for AuthoredDhtOpsValue { receipt_count, .. } in vals {
-        assert_eq!(receipt_count, 2);
-    }
+    crate::assert_eq_retry_10s!(
+        {
+            fresh_reader_test!(env, |mut r| authored_dht_ops
+                .iter(&mut r)
+                .unwrap()
+                .map(|(_, v)| Ok(v.receipt_count))
+                .collect::<Vec<_>>()
+                .unwrap())
+        },
+        vec![2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+    );
 }

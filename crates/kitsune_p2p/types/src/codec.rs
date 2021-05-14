@@ -28,6 +28,9 @@ where
 
 /// Apply to a data item to indicate it can be encoded / decoded.
 pub trait Codec: Clone + Sized {
+    /// Variant identifier (for debugging or as a cheap discriminant).
+    fn variant_type(&self) -> &'static str;
+
     /// Encode this item to given writer.
     /// You may wish to first wrap your writer in a BufWriter.
     fn encode<W>(&self, w: &mut W) -> Result<(), std::io::Error>
@@ -56,29 +59,6 @@ pub trait Codec: Clone + Sized {
         let item = Self::decode(&mut r)?;
         Ok((r.position(), item))
     }
-}
-
-/// Most items that implement serde Serialize and Deserialize
-/// can just use this macro to implement Codec.
-#[macro_export]
-macro_rules! default_impl_codec {
-    ($item:ident) => {
-        impl $crate::codec::Codec for $item {
-            fn encode<W>(&self, w: &mut W) -> ::std::io::Result<()>
-            where
-                W: ::std::io::Write,
-            {
-                $crate::codec::rmp_encode(w, self)
-            }
-
-            fn decode<R>(r: &mut R) -> ::std::io::Result<Self>
-            where
-                R: ::std::io::Read,
-            {
-                $crate::codec::rmp_decode(r)
-            }
-        }
-    };
 }
 
 /// DSL-style macro for generating a serialization protocol message enum.
@@ -133,6 +113,14 @@ macro_rules! write_codec_enum {
                 }
 
                 impl $crate::codec::Codec for [< $var_name:camel >] {
+                    fn variant_type(&self) -> &'static str {
+                        concat!(
+                            stringify!([< $codec_name:camel >]),
+                            "::",
+                            stringify!([< $var_name:camel >]),
+                        )
+                    }
+
                     fn encode<W>(&self, w: &mut W) -> ::std::io::Result<()>
                     where
                         W: ::std::io::Write
@@ -198,6 +186,15 @@ macro_rules! write_codec_enum {
             }
 
             impl $crate::codec::Codec for [< $codec_name:camel >] {
+                fn variant_type(&self) -> &'static str {
+                    match self {
+                        $(
+                            Self::[< $var_name:camel >](data) =>
+                                $crate::codec::Codec::variant_type(data),
+                        )*
+                    }
+                }
+
                 fn encode<W>(&self, w: &mut W) -> ::std::io::Result<()>
                 where
                     W: ::std::io::Write

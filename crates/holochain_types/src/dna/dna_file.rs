@@ -139,11 +139,11 @@ impl DnaFile {
         DnaFile::new(dna, wasm).await
     }
 
-    /// Transform this DnaFile into a new DnaFile with a different UUID
+    /// Transform this DnaFile into a new DnaFile with a different UID
     /// and, hence, a different DnaHash.
-    pub async fn with_uuid(self, uuid: String) -> Result<Self, DnaError> {
+    pub async fn with_uid(self, uid: String) -> Result<Self, DnaError> {
         let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
-        dna.uuid = uuid;
+        dna.uid = uid;
         DnaFile::new(dna, wasm).await
     }
 
@@ -176,11 +176,11 @@ impl DnaFile {
         .expect("blocking thread panic!d - panicing here too")
     }
 
-    /// Change the "phenotype" of this DNA -- the UUID and properties -- while
+    /// Change the "phenotype" of this DNA -- the UID and properties -- while
     /// leaving the "genotype" of actual DNA code intact
-    pub fn modify_phenotype(&self, uuid: Uuid, properties: YamlProperties) -> DnaResult<Self> {
+    pub fn modify_phenotype(&self, uid: Uid, properties: YamlProperties) -> DnaResult<Self> {
         let mut clone = self.clone();
-        clone.dna = DnaDefHashed::from_content_sync(clone.dna.modify_phenotype(uuid, properties)?);
+        clone.dna = DnaDefHashed::from_content_sync(clone.dna.modify_phenotype(uid, properties)?);
         Ok(clone)
     }
 }

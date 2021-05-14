@@ -89,7 +89,7 @@ mod tests {
 ---
 manifest_version: "1"
 name: test_dna
-uuid: blablabla
+uid: blablabla
 properties:
   some: 42
   props: yay
@@ -150,12 +150,11 @@ zomes:
 
         let (bundle_path, bundle) = pack::<DnaManifest>(
             &dir,
-            Some(dbg!(dir.parent().unwrap().to_path_buf())),
+            Some(dir.parent().unwrap().to_path_buf()),
             "test_dna".to_string(),
         )
         .await
         .unwrap();
-        dbg!(&bundle_path);
 
         // Now remove the directory altogether, unpack again, and check that
         // all of the same files are present
