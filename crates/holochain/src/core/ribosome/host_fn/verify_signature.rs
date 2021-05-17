@@ -10,7 +10,7 @@ pub fn verify_signature(
     _call_context: Arc<CallContext>,
     input: VerifySignature,
 ) -> Result<bool, WasmError> {
-    Ok(tokio_helper::block_forever_on(async move {
+    Ok(tokio_helper::runtime_block_on(async move {
         input
             .key
             .verify_signature_raw(input.as_ref(), input.as_data_ref())

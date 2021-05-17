@@ -64,7 +64,7 @@ pub fn update<'a>(
     // if the validation fails this update will be rolled back by virtue of the DB transaction
     // being atomic
     let entry = AsRef::<Entry>::as_ref(&entry_with_def_id).to_owned();
-    tokio_helper::block_forever_on(async move {
+    tokio_helper::runtime_block_on(async move {
         let source_chain = workspace.source_chain();
         // push the header and the entry into the source chain
         let header_hash = source_chain

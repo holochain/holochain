@@ -21,7 +21,7 @@ pub fn delete<'a>(
     let host_access = call_context.host_access();
 
     // handle timeouts at the source chain layer
-    tokio_helper::block_forever_on(async move {
+    tokio_helper::runtime_block_on(async move {
         let source_chain = host_access.workspace().source_chain();
         let header_builder = builder::Delete {
             deletes_address: input,
@@ -43,7 +43,7 @@ pub(crate) fn get_original_address<'a>(
     let network = call_context.host_access.network().clone();
     let workspace = call_context.host_access.workspace();
 
-    tokio_helper::block_forever_on(async move {
+    tokio_helper::runtime_block_on(async move {
         let mut cascade = Cascade::from_workspace_network(workspace, network);
         // TODO: Think about what options to use here
         let maybe_original_element: Option<SignedHeaderHashed> = cascade

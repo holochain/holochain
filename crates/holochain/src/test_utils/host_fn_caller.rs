@@ -189,7 +189,9 @@ impl HostFnCaller {
     ) -> HeaderHash {
         let (_, ribosome, call_context, workspace_lock) = self.unpack();
         let input = EntryWithDefId::new(entry_def_id.into(), entry);
-        let output = host_fn::create::create(ribosome, call_context, input).unwrap();
+        let output = tokio::task::block_in_place(|| {
+            host_fn::create::create(ribosome, call_context, input).unwrap()
+        });
 
         // Write
         workspace_lock.flush().unwrap();
@@ -200,7 +202,9 @@ impl HostFnCaller {
     pub async fn delete_entry<'env>(&self, hash: HeaderHash) -> HeaderHash {
         let (_, ribosome, call_context, workspace_lock) = self.unpack();
         let output = {
-            let r = host_fn::delete::delete(ribosome, call_context, hash);
+            let r = tokio::task::block_in_place(|| {
+                host_fn::delete::delete(ribosome, call_context, hash)
+            });
             let r = r.map_err(|e| {
                 debug!(%e);
                 e
@@ -225,7 +229,11 @@ impl HostFnCaller {
             original_header_hash,
             EntryWithDefId::new(entry_def_id.into(), entry),
         );
-        let output = { host_fn::update::update(ribosome, call_context, input).unwrap() };
+        let output = {
+            tokio::task::block_in_place(|| {
+                host_fn::update::update(ribosome, call_context, input).unwrap()
+            })
+        };
 
         // Write
         workspace_lock.flush().unwrap();
@@ -236,7 +244,7 @@ impl HostFnCaller {
     pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Option<Element> {
         let (_, ribosome, call_context, _) = self.unpack();
         let input = GetInput::new(entry_hash, options);
-        host_fn::get::get(ribosome, call_context, input).unwrap()
+        tokio::task::block_in_place(|| host_fn::get::get(ribosome, call_context, input).unwrap())
     }
 
     pub async fn get_details<'env>(
@@ -246,7 +254,9 @@ impl HostFnCaller {
     ) -> Option<Details> {
         let (_, ribosome, call_context, _) = self.unpack();
         let input = GetInput::new(entry_hash, options);
-        host_fn::get_details::get_details(ribosome, call_context, input).unwrap()
+        tokio::task::block_in_place(|| {
+            host_fn::get_details::get_details(ribosome, call_context, input).unwrap()
+        })
     }
 
     pub async fn create_link<'env>(
@@ -257,7 +267,11 @@ impl HostFnCaller {
     ) -> HeaderHash {
         let (_, ribosome, call_context, workspace_lock) = self.unpack();
         let input = CreateLinkInput::new(base, target, link_tag);
-        let output = { host_fn::create_link::create_link(ribosome, call_context, input).unwrap() };
+        let output = {
+            tokio::task::block_in_place(|| {
+                host_fn::create_link::create_link(ribosome, call_context, input).unwrap()
+            })
+        };
 
         // Write
         workspace_lock.flush().unwrap();
@@ -267,8 +281,11 @@ impl HostFnCaller {
 
     pub async fn delete_link<'env>(&self, link_add_hash: HeaderHash) -> HeaderHash {
         let (_, ribosome, call_context, workspace_lock) = self.unpack();
-        let output =
-            { host_fn::delete_link::delete_link(ribosome, call_context, link_add_hash).unwrap() };
+        let output = {
+            tokio::task::block_in_place(|| {
+                host_fn::delete_link::delete_link(ribosome, call_context, link_add_hash).unwrap()
+            })
+        };
 
         // Write
         workspace_lock.flush().unwrap();
@@ -284,7 +301,11 @@ impl HostFnCaller {
     ) -> Vec<Link> {
         let (_, ribosome, call_context, workspace_lock) = self.unpack();
         let input = GetLinksInput::new(base, link_tag);
-        let output = { host_fn::get_links::get_links(ribosome, call_context, input).unwrap() };
+        let output = {
+            tokio::task::block_in_place(|| {
+                host_fn::get_links::get_links(ribosome, call_context, input).unwrap()
+            })
+        };
 
         // Write
         workspace_lock.flush().unwrap();
@@ -300,8 +321,11 @@ impl HostFnCaller {
     ) -> Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)> {
         let (_, ribosome, call_context, workspace_lock) = self.unpack();
         let input = GetLinksInput::new(base, Some(tag));
-        let output =
-            { host_fn::get_link_details::get_link_details(ribosome, call_context, input).unwrap() };
+        let output = {
+            tokio::task::block_in_place(|| {
+                host_fn::get_link_details::get_link_details(ribosome, call_context, input).unwrap()
+            })
+        };
 
         // Write
         workspace_lock.flush().unwrap();
@@ -317,7 +341,9 @@ impl HostFnCaller {
     ) -> AgentActivity {
         let (_, ribosome, call_context, _) = self.unpack();
         let input = GetAgentActivityInput::new(agent.clone(), query.clone(), request);
-        host_fn::get_agent_activity::get_agent_activity(ribosome, call_context, input).unwrap()
+        tokio::task::block_in_place(|| {
+            host_fn::get_agent_activity::get_agent_activity(ribosome, call_context, input).unwrap()
+        })
     }
 
     pub async fn call_zome_direct(&self, invocation: ZomeCallInvocation) -> ExternIO {
@@ -326,7 +352,7 @@ impl HostFnCaller {
         let output = {
             let host_access = call_context.host_access();
             let zcha = unwrap_to!(host_access => HostAccess::ZomeCall).clone();
-            ribosome.call_zome_function(zcha, invocation).unwrap()
+            tokio::task::block_in_place(|| ribosome.call_zome_function(zcha, invocation).unwrap())
         };
 
         // Write

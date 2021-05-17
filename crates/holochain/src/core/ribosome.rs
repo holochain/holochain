@@ -572,14 +572,15 @@ pub mod wasm_test {
                     ))
                     .next()
                     .unwrap();
-                let zome_invocation_response =
-                    match ribosome.call_zome_function(host_access, invocation.clone()) {
-                        Ok(v) => v,
-                        Err(e) => {
-                            dbg!("call_zome_function error", &invocation, &e);
-                            panic!();
-                        }
-                    };
+                let zome_invocation_response = match tokio::task::block_in_place(|| {
+                    ribosome.call_zome_function(host_access, invocation.clone())
+                }) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        dbg!("call_zome_function error", &invocation, &e);
+                        panic!();
+                    }
+                };
 
                 let output = match zome_invocation_response {
                     crate::core::ribosome::ZomeCallResponse::Ok(guest_output) => {

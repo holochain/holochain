@@ -53,7 +53,7 @@ pub fn create<'a>(
     // if the validation fails this commit will be rolled back by virtue of the DB transaction
     // being atomic
     let entry = AsRef::<Entry>::as_ref(&input).to_owned();
-    tokio_helper::block_forever_on(async move {
+    tokio_helper::runtime_block_on(async move {
         // push the header and the entry into the source chain
         let header_hash = call_context
             .host_access
@@ -151,7 +151,7 @@ pub mod wasm_test {
         let entry_def_id = EntryDefId::App("post".into());
         let input = EntryWithDefId::new(entry_def_id, app_entry.clone());
 
-        let output = create(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
+        let output = tokio::task::block_in_place(|| create(Arc::new(ribosome), Arc::new(call_context), input).unwrap());
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {

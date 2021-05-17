@@ -25,7 +25,7 @@ pub fn get_link_details<'a>(
     // Get the network from the context
     let network = call_context.host_access.network().clone();
 
-    tokio_helper::block_forever_on(async move {
+    tokio_helper::runtime_block_on(async move {
         // Create the key
         let key = WireLinkKey {
             base: base_address,

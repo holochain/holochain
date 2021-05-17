@@ -23,7 +23,7 @@ pub fn delete_link<'a>(
     let call_context_2 = call_context.clone();
 
     // handle timeouts at the network layer
-    let maybe_add_link: Option<SignedHeaderHashed> = tokio_helper::block_forever_on(async move {
+    let maybe_add_link: Option<SignedHeaderHashed> = tokio_helper::runtime_block_on(async move {
         let workspace = call_context_2.host_access.workspace();
         CascadeResult::Ok(
             Cascade::from_workspace_network(workspace, network)
@@ -57,7 +57,7 @@ pub fn delete_link<'a>(
     // handle timeouts at the source chain layer
 
     // add a DeleteLink to the source chain
-    tokio_helper::block_forever_on(async move {
+    tokio_helper::runtime_block_on(async move {
         let header_builder = builder::DeleteLink {
             link_add_address: input,
             base_address,

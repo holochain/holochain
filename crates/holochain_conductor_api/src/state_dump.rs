@@ -8,6 +8,7 @@ use serde::Serialize;
 pub struct JsonDump {
     pub peer_dump: P2pStateDump,
     pub source_chain_dump: SourceChainJsonDump,
+    pub integration_dump: IntegrationStateDump,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

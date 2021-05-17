@@ -21,7 +21,6 @@ fn block_on_given<F>(f: F, runtime: &Runtime) -> F::Output
 where
     F: futures::future::Future,
 {
-    let _g = runtime.enter();
     tokio::task::block_in_place(|| runtime.block_on(async { f.await }))
 }
 
@@ -42,6 +41,14 @@ where
     F: futures::future::Future,
 {
     block_on_given(f, &TOKIO)
+}
+
+pub fn runtime_block_on<F, R>(f: F) -> F::Output
+where
+    F: futures::future::Future<Output = R>,
+    R: Send,
+{
+    TOKIO.block_on(f)
 }
 
 #[cfg(test)]
@@ -72,6 +79,15 @@ mod test {
         let r = "works";
         let test =
             super::block_forever_on(tokio::task::spawn(async move { r.to_string() })).unwrap();
+        assert_eq!("works", &test);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn block_on_recursive() {
+        let r = "works";
+        let test = super::block_forever_on(async move {
+            super::block_forever_on(async move { r.to_string() })
+        });
         assert_eq!("works", &test);
     }
 }

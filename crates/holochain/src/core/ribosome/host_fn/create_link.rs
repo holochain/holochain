@@ -26,7 +26,7 @@ pub fn create_link<'a>(
     // Construct the link add
     let header_builder = builder::CreateLink::new(base_address, target_address, zome_id, tag);
 
-    let header_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
+    let header_hash = tokio_helper::runtime_block_on(tokio::task::spawn(async move {
         // push the header into the source chain
         let header_hash = call_context
             .host_access

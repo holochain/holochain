@@ -26,11 +26,12 @@ macro_rules! host_fn_api_impls {
         impl<Ribosome: RibosomeT> HostFnApiT for HostFnApi<Ribosome> {
             $(
                 fn $f(&self, input: $input) -> Result<$output, HostFnApiError> {
+                    tokio::task::block_in_place(||
                     $f::$f(
                         self.ribosome.clone(),
                         self.call_context.clone(),
                         input.into()
-                    ).map_err(|e| HostFnApiError::RibosomeError(Box::new(e)))
+                    ).map_err(|e| HostFnApiError::RibosomeError(Box::new(e))))
                 }
             )*
         }

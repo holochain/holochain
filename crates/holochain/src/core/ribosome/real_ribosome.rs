@@ -439,14 +439,16 @@ impl RibosomeT for RealRibosome {
                     // because it builds guards against memory leaks and handles imports correctly
                     let mut instance = self.instance(call_context)?;
 
-                    let result: Result<ExternIO, WasmError> = holochain_wasmer_host::guest::call(
-                        &mut instance,
-                        to_call.as_ref(),
-                        // be aware of this clone!
-                        // the whole invocation is cloned!
-                        // @todo - is this a problem for large payloads like entries?
-                        invocation.to_owned().host_input()?,
-                    );
+                    let result: Result<ExternIO, WasmError> = tokio::task::block_in_place(|| {
+                        holochain_wasmer_host::guest::call(
+                            &mut instance,
+                            to_call.as_ref(),
+                            // be aware of this clone!
+                            // the whole invocation is cloned!
+                            // @todo - is this a problem for large payloads like entries?
+                            invocation.to_owned().host_input()?,
+                        )
+                    });
 
                     Ok(Some(result?))
                 } else {

@@ -62,4 +62,3 @@ codegen-units = 16
 # lair_keystore_client = { git = "https://github.com/holochain/lair.git", branch = "pr/tokio-1" }
 # lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
 # lair_keystore_client = { path = "../lair/crates/lair_keystore_client" }
-# observability = { path = "../../rust/observability" }
