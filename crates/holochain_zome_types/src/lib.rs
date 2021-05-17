@@ -72,6 +72,10 @@ pub mod test_utils;
 pub use entry::Entry;
 pub use header::Header;
 pub use prelude::*;
+/// Re-exported dependencies
+pub mod dependencies {
+    pub use ::subtle;
+}
 
 #[allow(missing_docs)]
 pub trait CallbackResult {
@@ -170,7 +174,7 @@ macro_rules! secure_primitive {
         /// This type of attack has been successfully demonstrated over a network despite varied latencies.
         impl PartialEq for $t {
             fn eq(&self, other: &Self) -> bool {
-                use subtle::ConstantTimeEq;
+                use $crate::dependencies::subtle::ConstantTimeEq;
                 self.0.ct_eq(&other.0).into()
             }
         }
@@ -203,7 +207,7 @@ macro_rules! secure_primitive {
 
         impl TryFrom<&[u8]> for $t {
             type Error = $crate::SecurePrimitiveError;
-            fn try_from(slice: &[u8]) -> Result<$t, Self::Error> {
+            fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
                 if slice.len() == $len {
                     let mut inner = [0; $len];
                     inner.copy_from_slice(slice);
@@ -211,6 +215,13 @@ macro_rules! secure_primitive {
                 } else {
                     Err($crate::SecurePrimitiveError::BadSize)
                 }
+            }
+        }
+
+        impl TryFrom<Vec<u8>> for $t {
+            type Error = $crate::SecurePrimitiveError;
+            fn try_from(v: Vec<u8>) -> Result<Self, Self::Error> {
+                Self::try_from(v.as_ref())
             }
         }
 

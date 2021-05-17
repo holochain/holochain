@@ -9,7 +9,9 @@ use holochain_serialized_bytes::prelude::*;
 // TODO: consider making lazy with OnceCell
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HoloHashed<C: HashableContent> {
+    /// Whatever type C is as data.
     pub(crate) content: C,
+    /// The hash of the content C.
     pub(crate) hash: HoloHashOf<C>,
 }
 
@@ -37,6 +39,14 @@ where
     /// Accessor for content
     pub fn as_content(&self) -> &C {
         &self.content
+    }
+
+    /// Mutable accessor for content.
+    /// Only useful for heavily mocked/fixturated data in testing.
+    /// Guaranteed the hash will no longer match the content if mutated.
+    #[cfg(feature = "test_utils")]
+    pub fn as_content_mut(&mut self) -> &mut C {
+        &mut self.content
     }
 
     /// Convert to content

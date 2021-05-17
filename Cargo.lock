@@ -2184,13 +2184,10 @@ dependencies = [
 name = "holochain_zome_types"
 version = "0.0.2-alpha.1"
 dependencies = [
- "byteorder",
  "chrono",
- "derive_more",
  "fixt",
  "holo_hash",
  "holochain_serialized_bytes",
- "itertools 0.10.0",
  "num_enum",
  "paste 1.0.5",
  "rand 0.7.3",

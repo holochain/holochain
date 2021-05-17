@@ -13,9 +13,7 @@
 use crate::ValidationStatus;
 use holochain_serialized_bytes::prelude::*;
 
-#[derive(
-    Clone, Debug, PartialEq, Eq, Hash, derive_more::From, derive_more::Into, Serialize, Deserialize,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 /// Data with an optional validation status.
 pub struct Judged<T> {
     /// The data that the status applies to.
@@ -90,5 +88,17 @@ impl<T> HasValidationStatus for Judged<T> {
 
     fn data(&self) -> &Self::Data {
         &self.data
+    }
+}
+
+impl<T> From<(T, Option<ValidationStatus>)> for Judged<T> {
+    fn from((data, status): (T, Option<ValidationStatus>)) -> Self {
+        Self { data, status }
+    }
+}
+
+impl<T> Into<(T, Option<ValidationStatus>)> for Judged<T> {
+    fn into(self) -> (T, Option<ValidationStatus>) {
+        (self.data, self.status)
     }
 }
