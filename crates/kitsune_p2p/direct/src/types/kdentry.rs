@@ -239,47 +239,55 @@ impl KdEntry {
     }
 
     /// Sign entry data into a full KdEntry instance
-    pub async fn sign(persist: &KdPersist, decoded: KdEntryData) -> KitsuneResult<Self> {
-        Self::sign_with_binary(persist, decoded, &[]).await
+    pub fn sign(persist: &KdPersist, decoded: KdEntryData) -> impl Future<Output = KitsuneResult<Self>> + 'static + Send {
+        Self::sign_with_binary(persist, decoded, &[])
     }
 
     /// Sign entry data into a full KdEntry instance with additional binary data
-    pub async fn sign_with_binary(
+    pub fn sign_with_binary(
         persist: &KdPersist,
         decoded: KdEntryData,
         binary: &[u8],
-    ) -> KitsuneResult<Self> {
-        let encoded = serde_json::to_string_pretty(&decoded)
-            .map_err(KitsuneError::other)?
-            .into_bytes();
-        let encoded_len = (encoded.len() as u64).to_le_bytes();
-        let mut wire = Vec::with_capacity(
-            8 // len
-            + encoded.len() // encoded
-            + binary.len() // binary
-            + 64, // sig
-        );
-        wire.extend_from_slice(&encoded_len[..]);
-        wire.extend_from_slice(&encoded);
-        wire.extend_from_slice(binary);
+    ) -> impl Future<Output = KitsuneResult<Self>> + 'static + Send {
+        let wire = (|| {
+            let encoded = serde_json::to_string_pretty(&decoded)
+                .map_err(KitsuneError::other)?
+                .into_bytes();
+            let encoded_len = (encoded.len() as u64).to_le_bytes();
+            let mut wire = Vec::with_capacity(
+                8 // len
+                + encoded.len() // encoded
+                + binary.len() // binary
+                + 64, // sig
+            );
+            wire.extend_from_slice(&encoded_len[..]);
+            wire.extend_from_slice(&encoded);
+            wire.extend_from_slice(binary);
+            KitsuneResult::Ok(wire)
+        })();
 
-        // these two ops don't include the signature bytes
-        // for obvious reasons
-        let signature = persist.sign(decoded.author.clone(), &wire).await?;
-        let hash = KdHash::from_data(&wire).await?;
+        let persist = persist.clone();
+        async move {
+            let mut wire = wire?;
 
-        wire.extend_from_slice(&signature[..]);
+            // these two ops don't include the signature bytes
+            // for obvious reasons
+            let signature = persist.sign(decoded.author.clone(), &wire).await?;
+            let hash = KdHash::from_data(&wire).await?;
 
-        let wire = wire.into_boxed_slice();
+            wire.extend_from_slice(&signature[..]);
 
-        let db = db_from_wire(&wire);
+            let wire = wire.into_boxed_slice();
 
-        Ok(Self(Arc::new(KdEntryInner {
-            wire,
-            db,
-            decoded,
-            hash,
-        })))
+            let db = db_from_wire(&wire);
+
+            Ok(Self(Arc::new(KdEntryInner {
+                wire,
+                db,
+                decoded,
+                hash,
+            })))
+        }
     }
 }
 

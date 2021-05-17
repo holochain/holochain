@@ -72,6 +72,12 @@ pub trait AsKdPersist: 'static + Send + Sync {
         created_at_end_s: f32,
         dht_arc: DhtArc,
     ) -> BoxFuture<'static, KitsuneResult<Vec<KdEntry>>>;
+
+    /// Get ui file
+    fn get_ui_file(
+        &self,
+        path: &str,
+    ) -> BoxFuture<'static, KitsuneResult<(String, Vec<u8>)>>;
 }
 
 /// Handle to a persistence store.
@@ -188,5 +194,13 @@ impl KdPersist {
             created_at_end_s,
             dht_arc,
         )
+    }
+
+    /// Get ui file
+    pub fn get_ui_file(
+        &self,
+        path: &str,
+    ) -> impl Future<Output = KitsuneResult<(String, Vec<u8>)>> + 'static + Send {
+        AsKdPersist::get_ui_file(&*self.0, path)
     }
 }

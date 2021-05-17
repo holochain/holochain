@@ -10,6 +10,7 @@ pub use kitsune_p2p_types::{KitsuneError, KitsuneResult};
 use sodoken::Buffer;
 
 use std::sync::Arc;
+use std::future::Future;
 
 pub mod types;
 

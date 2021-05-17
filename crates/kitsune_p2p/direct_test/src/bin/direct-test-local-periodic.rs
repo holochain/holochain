@@ -15,14 +15,14 @@ async fn main() {
         async move {
             let AgentHookInput {
                 root,
-                root_entry_hash,
+                app_entry_hash,
                 agent,
                 kdirect,
             } = input;
 
             let new_entry = KdEntryData {
                 type_hint: "u.foo".to_string(),
-                parent: root_entry_hash,
+                parent: app_entry_hash,
                 author: agent.clone(),
                 should_shard: true,
                 reverify_interval_s: u32::MAX,

@@ -32,7 +32,7 @@ pub struct AgentHookInput {
     pub root: KdHash,
 
     /// the root entry hash to hang additional entries from
-    pub root_entry_hash: KdHash,
+    pub app_entry_hash: KdHash,
 
     /// the agent pubkey
     pub agent: KdHash,
@@ -101,11 +101,11 @@ impl KdTestNodeHandle {
 
 /// kdirect test harness
 pub struct KdTestHarness {
-    /// the root app hash
+    /// the root hash
     pub root: KdHash,
 
-    /// the root entry hash to hang additional entries from
-    pub root_entry_hash: KdHash,
+    /// the app entry hash to hang additional entries from
+    pub app_entry_hash: KdHash,
 
     /// the list of nodes created for this test run
     pub nodes: Vec<KdTestNodeHandle>,
@@ -177,8 +177,8 @@ impl KdTestHarness {
         let root = root_persist.generate_signing_keypair().await?;
         tracing::info!(%root);
 
-        let root_entry = KdEntryData {
-            type_hint: "s.root".to_string(),
+        let app_entry = KdEntryData {
+            type_hint: "s.app".to_string(),
             parent: root.clone(),
             author: root.clone(),
             should_shard: false,
@@ -186,10 +186,10 @@ impl KdTestHarness {
             verify: "".to_string(),
             data: serde_json::json!({}),
         };
-        let root_entry = KdEntry::sign(&root_persist, root_entry).await?;
-        tracing::debug!(?root_entry);
+        let app_entry = KdEntry::sign(&root_persist, app_entry).await?;
+        tracing::debug!(?app_entry);
 
-        let root_entry_hash = root_entry.as_hash().clone();
+        let app_entry_hash = app_entry.as_hash().clone();
 
         for _ in 0..config.node_count {
             let persist = new_persist_mem();
@@ -235,12 +235,12 @@ impl KdTestHarness {
                 kdirect.join(root.clone(), agent.clone()).await?;
 
                 kdirect
-                    .publish_entry(root.clone(), agent.clone(), root_entry.clone())
+                    .publish_entry(root.clone(), agent.clone(), app_entry.clone())
                     .await?;
 
                 let input = AgentHookInput {
                     root: root.clone(),
-                    root_entry_hash: root_entry_hash.clone(),
+                    app_entry_hash: app_entry_hash.clone(),
                     agent: agent.clone(),
                     kdirect: kdirect.clone(),
                 };
@@ -260,7 +260,7 @@ impl KdTestHarness {
             metric_task(periodic_agent_hook_task(
                 interval_ms,
                 root.clone(),
-                root_entry_hash.clone(),
+                app_entry_hash.clone(),
                 nodes.clone(),
                 config.periodic_agent_hook,
             ));
@@ -291,7 +291,7 @@ impl KdTestHarness {
 
         Ok(Self {
             root,
-            root_entry_hash: root_entry.as_hash().clone(),
+            app_entry_hash: app_entry.as_hash().clone(),
             nodes,
             proxy_hnd,
         })
@@ -301,7 +301,7 @@ impl KdTestHarness {
 async fn periodic_agent_hook_task(
     interval_ms: u64,
     root: KdHash,
-    root_entry_hash: KdHash,
+    app_entry_hash: KdHash,
     nodes: Vec<KdTestNodeHandle>,
     mut periodic_agent_hook: AgentHook,
 ) -> KitsuneResult<()> {
@@ -312,7 +312,7 @@ async fn periodic_agent_hook_task(
             for agent in node.local_agents.iter() {
                 let input = AgentHookInput {
                     root: root.clone(),
-                    root_entry_hash: root_entry_hash.clone(),
+                    app_entry_hash: app_entry_hash.clone(),
                     agent: agent.clone(),
                     kdirect: node.kdirect.clone(),
                 };
@@ -339,14 +339,14 @@ mod tests {
             async move {
                 let AgentHookInput {
                     root,
-                    root_entry_hash,
+                    app_entry_hash,
                     agent,
                     kdirect,
                 } = input;
 
                 let new_entry = KdEntryData {
                     type_hint: "u.foo".to_string(),
-                    parent: root_entry_hash,
+                    parent: app_entry_hash,
                     author: agent.clone(),
                     should_shard: true,
                     reverify_interval_s: u32::MAX,

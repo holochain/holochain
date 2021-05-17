@@ -82,7 +82,7 @@ pub async fn new_kitsune_direct_v1(
     logic_chan
         .handle()
         .clone()
-        .capture_logic(handle_srv_events(tuning_params, srv_evt))
+        .capture_logic(handle_srv_events(tuning_params, kdirect.clone(), srv_evt))
         .await?;
 
     let kdirect = KitsuneDirect(kdirect);
@@ -215,7 +215,13 @@ impl AsKitsuneDirect for Kd1 {
     }
 }
 
-async fn handle_srv_events(tuning_params: KitsuneP2pTuningParams, srv_evt: KdSrvEvtStream) {
+async fn handle_srv_events(
+    tuning_params: KitsuneP2pTuningParams,
+    kdirect: Arc<Kd1>,
+    srv_evt: KdSrvEvtStream,
+) {
+    let kdirect = &kdirect;
+
     srv_evt
         .for_each_concurrent(
             tuning_params.concurrent_limit_per_thread,
@@ -226,12 +232,22 @@ async fn handle_srv_events(tuning_params: KitsuneP2pTuningParams, srv_evt: KdSrv
                     } => {
                         // for now just echoing the incoming uri
                         let r = async move {
+                            let (mime, data) = match kdirect.persist.get_ui_file(&uri).await {
+                                Ok(r) => r,
+                                Err(e) => {
+                                    let mut r = HttpResponse::default();
+                                    r.status = 500;
+                                    r.body = format!("{:?}", e).into_bytes();
+                                    return Ok(r);
+                                }
+                            };
                             let mut r = HttpResponse::default();
-                            r.body = serde_json::to_string_pretty(&serde_json::json!({
-                                "uri": uri,
-                            }))
-                            .map_err(KitsuneError::other)?
-                            .into_bytes();
+                            r.headers.clear();
+                            r.headers.push((
+                                "Content-Type".to_string(),
+                                mime.into_bytes(),
+                            ));
+                            r.body = data;
                             Ok(r)
                         }
                         .await;
