@@ -77,9 +77,6 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
-/// Path to the wasm cache path
-// const WASM_CACHE_PATH_ENV: &str = "HC_WASM_CACHE_PATH";
-
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
 #[derive(Clone, Debug)]
@@ -131,12 +128,6 @@ impl RealRibosome {
         Ok(Arc::new(Mutex::new(
             Instance::new(&module, &imports).map_err(|e| WasmError::Compile(e.to_string()))?,
         )))
-        // Ok(holochain_wasmer_host::instantiate::instantiate(
-        //     self.wasm_cache_key(&zome_name)?,
-        //     &wasm,
-        //     &imports,
-        //     std::env::var_os(WASM_CACHE_PATH_ENV),
-        // )?)
     }
 
     fn imports(&self, call_context: CallContext, store: &Store, env: &Env) -> ImportObject {
