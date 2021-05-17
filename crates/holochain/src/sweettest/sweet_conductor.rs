@@ -34,7 +34,8 @@ pub struct SweetConductor {
     signal_stream: Option<SignalStream>,
 }
 
-pub(super) fn standard_config() -> ConductorConfig {
+/// Standard config for SweetConductors
+pub fn standard_config() -> ConductorConfig {
     let mut network = KitsuneP2pConfig::default();
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
         bind_to: None,
@@ -53,7 +54,7 @@ pub(super) fn standard_config() -> ConductorConfig {
 
 impl SweetConductor {
     /// Create a SweetConductor from an already-built ConductorHandle and environments
-    ///DnaStore
+    /// DnaStore
     /// The conductor will be supplied with a single test AppInterface named
     /// "sweet-interface" so that signals may be emitted
     pub async fn new(
@@ -82,7 +83,7 @@ impl SweetConductor {
     /// Create a SweetConductor with a new set of TestEnvironments from the given config
     pub async fn from_config(config: ConductorConfig) -> SweetConductor {
         let envs = test_environments();
-        let handle = Self::from_existing(&envs, &config).await;
+        let handle = Self::handle_from_existing(&envs, &config).await;
         Self::new(handle, envs, config).await
     }
 
@@ -97,7 +98,10 @@ impl SweetConductor {
     }
 
     /// Create a handle from an existing environment and config
-    async fn from_existing(envs: &TestEnvironments, config: &ConductorConfig) -> ConductorHandle {
+    pub async fn handle_from_existing(
+        envs: &TestEnvironments,
+        config: &ConductorConfig,
+    ) -> ConductorHandle {
         Conductor::builder()
             .config(config.clone())
             .test(envs)
@@ -293,7 +297,7 @@ impl SweetConductor {
     pub async fn startup(&mut self) {
         if self.handle.is_none() {
             self.handle = Some(SweetConductorHandle(
-                Self::from_existing(&self.envs, &self.config).await,
+                Self::handle_from_existing(&self.envs, &self.config).await,
             ));
 
             // MD: this feels wrong, why should we have to reinstall DNAs on restart?

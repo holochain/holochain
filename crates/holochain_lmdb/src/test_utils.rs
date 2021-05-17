@@ -72,6 +72,12 @@ pub fn test_environments() -> TestEnvironments {
     TestEnvironments::new(tempdir)
 }
 
+/// Create a fresh set of test environments with a new TempDir and custom KeystoreSender
+pub fn test_environments_with_keystore(keystore: KeystoreSender) -> TestEnvironments {
+    let tempdir = TempDir::new("holochain-test-environments").unwrap();
+    TestEnvironments::with_keystore(tempdir, keystore)
+}
+
 /// A test lmdb environment with test directory
 #[derive(Clone, Shrinkwrap)]
 pub struct TestEnvironment {
@@ -111,10 +117,9 @@ pub struct TestEnvironments {
 
 #[allow(missing_docs)]
 impl TestEnvironments {
-    /// Create all three non-cell environments at once
-    pub fn new(tempdir: TempDir) -> Self {
+    /// Create all three non-cell environments at once with a custom keystore
+    pub fn with_keystore(tempdir: TempDir, keystore: KeystoreSender) -> Self {
         use EnvironmentKind::*;
-        let keystore = test_keystore();
         let conductor =
             EnvironmentWrite::new(&tempdir.path(), Conductor, keystore.clone()).unwrap();
         let wasm = EnvironmentWrite::new(&tempdir.path(), Wasm, keystore.clone()).unwrap();
@@ -126,6 +131,11 @@ impl TestEnvironments {
             tempdir: Arc::new(tempdir),
             keystore,
         }
+    }
+
+    /// Create all three non-cell environments at once with a test keystore
+    pub fn new(tempdir: TempDir) -> Self {
+        Self::with_keystore(tempdir, test_keystore())
     }
 
     pub fn conductor(&self) -> EnvironmentWrite {
