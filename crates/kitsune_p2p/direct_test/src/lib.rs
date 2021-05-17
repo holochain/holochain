@@ -189,7 +189,7 @@ impl KdTestHarness {
         let root_entry = KdEntry::sign(&root_persist, root_entry).await?;
         tracing::debug!(?root_entry);
 
-        let root_entry_hash = root_entry.hash().clone();
+        let root_entry_hash = root_entry.as_hash().clone();
 
         for _ in 0..config.node_count {
             let persist = new_persist_mem();
@@ -291,7 +291,7 @@ impl KdTestHarness {
 
         Ok(Self {
             root,
-            root_entry_hash: root_entry.hash().clone(),
+            root_entry_hash: root_entry.as_hash().clone(),
             nodes,
             proxy_hnd,
         })
@@ -388,7 +388,7 @@ mod tests {
                     .await
                     .unwrap();
                 let entry_count = entries.len();
-                let entry_hashes = entries.iter().map(|e| e.hash()).collect::<Vec<_>>();
+                let entry_hashes = entries.iter().map(|e| e.as_hash()).collect::<Vec<_>>();
                 tracing::info!(%entry_count, ?entry_hashes);
                 assert_eq!(5, entry_count);
             }

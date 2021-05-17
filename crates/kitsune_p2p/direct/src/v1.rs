@@ -455,9 +455,9 @@ async fn handle_gossip(
     op_hash: Arc<KitsuneOpHash>,
     op_data: Vec<u8>,
 ) -> KitsuneResult<()> {
-    let entry = KdEntry::decode_checked(&op_data).await?;
+    let entry = KdEntry::from_wire_checked(op_data.into_boxed_slice()).await?;
     let op_hash: KdHash = op_hash.into();
-    if &op_hash != entry.hash() {
+    if &op_hash != entry.as_hash() {
         return Err("data did not hash to given hash".into());
     }
     let root = space.into();
@@ -498,7 +498,7 @@ async fn handle_fetch_op_hashes_for_constraints(
 
     Ok(entries
         .into_iter()
-        .map(|e| e.hash().clone().into())
+        .map(|e| e.as_hash().clone().into())
         .collect())
 }
 
@@ -526,7 +526,7 @@ async fn handle_fetch_op_hash_data(
             .get_entry(root.clone(), agent.clone(), hash)
             .await
         {
-            out.push((op_hash, entry.encode().to_vec()));
+            out.push((op_hash, entry.as_wire().to_vec()));
         }
     }
 

@@ -1,7 +1,6 @@
 //! kdirect kdentry type
 
 use crate::*;
-use kitsune_p2p_types::tx2::tx2_utils::*;
 use types::kdhash::KdHash;
 use types::persist::KdPersist;
 
@@ -53,29 +52,67 @@ impl KdEntryData {
 pub struct KdEntryInner {
     /// the encoded bytes of this entry.
     /// this (and the signature) should be sent over the network,
-    /// and is what should be used to verify signature.
-    pub encoded: String,
+    /// and is what should be used to verify the signature.
+    pub wire: Box<[u8]>,
 
-    /// the additional binary data associated with this entry.
-    pub binary: Box<[u8]>,
+    /// the more human readable encoding of this entry.
+    /// this should be stored in databases / sent over websocket connections.
+    pub db: String,
 
     /// the decoded content of this entry, use this for logic.
     pub decoded: KdEntryData,
 
     /// the hash of this entry, this should be a direct hash
-    /// of the encoded bytes.
+    /// of the wire bytes (not including the signature).
     pub hash: KdHash,
+}
 
-    /// the signature of the encoded bytes
-    pub signature: Arc<[u8; 64]>,
+fn db_from_wire(wire: &[u8]) -> String {
+    let wire_len = wire.len();
+    let enc_len = u64::from_le_bytes(*arrayref::array_ref![wire, 0, 8]) as usize;
+    let enc = String::from_utf8_lossy(&wire[8..8 + enc_len]);
+    let bin = &wire[8 + enc_len..wire_len - 64];
+    let bin = base64::encode(bin);
+    let sig = &wire[wire_len - 64..wire_len];
+    let sig = base64::encode(sig);
+    format!("[\n{}\n,\"{}\",\"{}\"]\n", enc, bin, sig)
+}
+
+fn wire_from_db(db: &str) -> KitsuneResult<Box<[u8]>> {
+    let (_, bin, sig): (serde_json::Value, String, String) =
+        serde_json::from_str(db).map_err(KitsuneError::other)?;
+    let bin = base64::decode(&bin).map_err(KitsuneError::other)?;
+    let sig = base64::decode(&sig).map_err(KitsuneError::other)?;
+
+    let db = db.as_bytes();
+    let mut idx = db.len() - 2;
+    while idx > 0 {
+        if db[idx] == b'\n' {
+            break;
+        }
+        idx -= 1;
+    }
+    let enc = &db[2..idx];
+
+    let mut wire = Vec::with_capacity(
+        8 // len
+        + enc.len() // encoded
+        + bin.len() // binary
+        + 64, // sig
+    );
+
+    let enc_len = (enc.len() as u64).to_le_bytes();
+    wire.extend_from_slice(&enc_len[..]);
+    wire.extend_from_slice(&enc);
+    wire.extend_from_slice(&bin);
+    wire.extend_from_slice(&sig);
+
+    Ok(wire.into_boxed_slice())
 }
 
 impl std::fmt::Debug for KdEntryInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("KdEntry")
-            .field(&self.hash)
-            .field(&self.decoded)
-            .finish()
+        f.debug_tuple("KdEntry").field(&self.db).finish()
     }
 }
 
@@ -121,19 +158,84 @@ impl std::ops::Deref for KdEntry {
 }
 
 impl KdEntry {
+    async fn from_checked(wire: Box<[u8]>, db: String) -> KitsuneResult<Self> {
+        let enc_len = u64::from_le_bytes(*arrayref::array_ref![&wire, 0, 8]) as usize;
+        let enc = &wire[8..8 + enc_len];
+        let decoded = serde_json::from_slice(enc).map_err(KitsuneError::other)?;
+        let wire_len = wire.len();
+        // the signature bytes are not included in the hash
+        let hash = KdHash::from_data(&wire[0..wire_len - 64]).await?;
+        let entry = Self(Arc::new(KdEntryInner {
+            wire,
+            db,
+            decoded,
+            hash,
+        }));
+        entry.verify_signature().await?;
+        Ok(entry)
+    }
+
+    /// Build out a full, checked entry from wire encoding
+    pub async fn from_wire_checked(wire: Box<[u8]>) -> KitsuneResult<Self> {
+        let db = db_from_wire(&wire);
+        Self::from_checked(wire, db).await
+    }
+
+    /// Build out a full, checked entry from db encoding
+    pub async fn from_db_checked(db: String) -> KitsuneResult<Self> {
+        let wire = wire_from_db(&db)?;
+        Self::from_checked(wire, db).await
+    }
+
     /// Access the data of this entry
     pub fn as_data(&self) -> &KdEntryData {
         self.0.as_data()
     }
 
     /// Get the hash of this entry
-    pub fn hash(&self) -> &KdHash {
+    pub fn as_hash(&self) -> &KdHash {
         &self.0.hash
     }
 
     /// Get the binary data associated with this entry
-    pub fn binary(&self) -> &[u8] {
-        &self.0.binary
+    pub fn as_binary(&self) -> &[u8] {
+        let wire_len = self.0.wire.len();
+        let enc_len = u64::from_le_bytes(*arrayref::array_ref![&self.0.wire, 0, 8]) as usize;
+        &self.0.wire[8 + enc_len..wire_len - 64]
+    }
+
+    /// Get the signature bytes associated with this entry
+    pub fn as_signature(&self) -> &[u8; 64] {
+        let len = self.0.wire.len();
+        arrayref::array_ref![&self.0.wire, len - 64, 64]
+    }
+
+    /// Get the wire encoding for this entry
+    pub fn as_wire(&self) -> &[u8] {
+        &self.0.wire
+    }
+
+    /// Get the db encoding for this entry
+    pub fn as_db(&self) -> &str {
+        &self.0.db
+    }
+
+    /// Returns `Ok(())` if the signature is valid for the internal data
+    pub async fn verify_signature(&self) -> KitsuneResult<()> {
+        let wire_len = self.0.wire.len();
+        let signature = Arc::new(*self.as_signature());
+        let data = &self.0.wire[0..wire_len - 64];
+        let data = Buffer::from_ref(data);
+        if self
+            .as_data()
+            .author
+            .verify_signature(data, signature)
+            .await
+        {
+            Ok(())
+        } else {
+            Err("invalid signature".into())
+        }
     }
 
     /// Sign entry data into a full KdEntry instance
@@ -147,63 +249,36 @@ impl KdEntry {
         decoded: KdEntryData,
         binary: &[u8],
     ) -> KitsuneResult<Self> {
-        let encoded = serde_json::to_string(&decoded).map_err(KitsuneError::other)?;
-        let binary = binary.to_vec().into_boxed_slice();
-        let hash = KdHash::from_data(encoded.as_bytes()).await?;
-        let signature = persist
-            .sign(decoded.author.clone(), encoded.as_bytes())
-            .await?;
-        Ok(Self(Arc::new(KdEntryInner {
-            encoded,
-            binary,
-            decoded,
-            hash,
-            signature,
-        })))
-    }
-
-    /// Encode this entry for storage or transmition
-    pub fn encode(&self) -> PoolBuf {
-        let sig_b64 = base64::encode_config(&self.0.signature[..], base64::URL_SAFE_NO_PAD);
-        // the binary is separate specifically so we DON'T have to b64 encode it
-        // eventually, it will just be tagged onto the end
-        // but for now this is easier to debug
-        let bin_b64 = base64::encode_config(&self.0.binary[..], base64::URL_SAFE_NO_PAD);
-        let full = serde_json::to_string(&(sig_b64, &self.0.encoded, bin_b64)).unwrap();
-        let full = full.as_bytes();
-        let mut out = PoolBuf::new();
-        out.extend_from_slice(full);
-        out
-    }
-
-    /// Decode and check signature on an encoded signature + entry
-    pub async fn decode_checked(entry: &[u8]) -> KitsuneResult<Self> {
-        let (sig, encoded, bin): (String, String, String) =
-            serde_json::from_slice(entry).map_err(KitsuneError::other)?;
-        let mut signature = [0; 64];
-        let sig =
-            base64::decode_config(sig, base64::URL_SAFE_NO_PAD).map_err(KitsuneError::other)?;
-        let binary = base64::decode_config(bin, base64::URL_SAFE_NO_PAD)
+        let encoded = serde_json::to_string_pretty(&decoded)
             .map_err(KitsuneError::other)?
-            .into_boxed_slice();
-        signature.copy_from_slice(&sig);
-        let signature = Arc::new(signature);
-        let decoded: KdEntryData = serde_json::from_str(&encoded).map_err(KitsuneError::other)?;
-        let data = Buffer::from_ref(encoded.as_bytes());
-        if !decoded
-            .author
-            .verify_signature(data, signature.clone())
-            .await
-        {
-            return Err("invalid signature".into());
-        }
-        let hash = KdHash::from_data(encoded.as_bytes()).await?;
+            .into_bytes();
+        let encoded_len = (encoded.len() as u64).to_le_bytes();
+        let mut wire = Vec::with_capacity(
+            8 // len
+            + encoded.len() // encoded
+            + binary.len() // binary
+            + 64, // sig
+        );
+        wire.extend_from_slice(&encoded_len[..]);
+        wire.extend_from_slice(&encoded);
+        wire.extend_from_slice(binary);
+
+        // these two ops don't include the signature bytes
+        // for obvious reasons
+        let signature = persist.sign(decoded.author.clone(), &wire).await?;
+        let hash = KdHash::from_data(&wire).await?;
+
+        wire.extend_from_slice(&signature[..]);
+
+        let wire = wire.into_boxed_slice();
+
+        let db = db_from_wire(&wire);
+
         Ok(Self(Arc::new(KdEntryInner {
-            encoded,
-            binary,
+            wire,
+            db,
             decoded,
             hash,
-            signature,
         })))
     }
 }
@@ -233,10 +308,17 @@ mod tests {
             .await
             .unwrap();
         println!("{:?}", &entry);
-        let wire = entry.encode();
-        println!("wire: {}", String::from_utf8_lossy(&wire));
-        let e2 = KdEntry::decode_checked(&wire).await.unwrap();
+        let wire = entry.as_wire();
+        println!("wire: {}", String::from_utf8_lossy(wire));
+        let e2 = KdEntry::from_wire_checked(wire.to_vec().into_boxed_slice())
+            .await
+            .unwrap();
         assert_eq!(e2, entry);
-        assert_eq!(&[0, 1, 2, 3][..], e2.binary());
+        assert_eq!(&[0, 1, 2, 3][..], e2.as_binary());
+        let db = entry.as_db();
+        println!("db: {}", db);
+        let e3 = KdEntry::from_db_checked(db.to_string()).await.unwrap();
+        assert_eq!(e3, entry);
+        assert_eq!(&[0, 1, 2, 3][..], e3.as_binary());
     }
 }

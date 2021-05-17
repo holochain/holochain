@@ -192,7 +192,7 @@ impl AsKdPersist for PersistMem {
         entry: KdEntry,
     ) -> BoxFuture<'static, KitsuneResult<()>> {
         let r = self.0.share_mut(move |i, _| {
-            let hash = entry.hash().clone();
+            let hash = entry.as_hash().clone();
 
             let root_map = i.entries.entry(root).or_insert_with(HashMap::new);
             let agent_map = root_map.entry(agent).or_insert_with(HashMap::new);
