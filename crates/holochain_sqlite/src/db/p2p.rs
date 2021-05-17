@@ -1,7 +1,7 @@
 //! p2p_store sql logic
 
 use crate::prelude::*;
-use crate::schema::*;
+use crate::sql::*;
 use kitsune_p2p::agent_store::{AgentInfo, AgentInfoSigned};
 use kitsune_p2p::dht_arc::DhtArc;
 use kitsune_p2p::KitsuneAgent;
