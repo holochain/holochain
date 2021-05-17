@@ -28,7 +28,7 @@ macro_rules! sql_insert {
         let fieldnames = &[ $( { $field } ,)+ ].join(",");
         let fieldvars = &[ $( { format!(":{}", $field) } ,)+ ].join(",");
         let sql = format!("INSERT INTO {} ({}) VALUES ({})", table, fieldnames, fieldvars);
-        $txn.execute_named(&sql, &[$(
+        $txn.execute(&sql, &[$(
             (format!(":{}", $field).as_str(), &$val as &dyn holochain_sqlite::rusqlite::ToSql),
         )+])
     }};
@@ -48,24 +48,6 @@ macro_rules! dht_op_update {
             $(
             (format!(":{}", $field).as_str(), &$val as &dyn holochain_sqlite::rusqlite::ToSql),
         )+])
-    }};
-}
-
-macro_rules! dht_op_add_one {
-    ($txn:expr, $hash:expr, $field:literal) => {{
-        let fieldvars = format!("{} = IFNULL({}, 0) + 1", $field, $field);
-        let sql = format!(
-            "
-            UPDATE DhtOp 
-            SET {}
-            WHERE DhtOp.hash = :hash
-            ",
-            fieldvars
-        );
-        $txn.execute(
-            &sql,
-            &[(":hash", &$hash as &dyn holochain_sqlite::rusqlite::ToSql)],
-        )
     }};
 }
 
@@ -323,7 +305,10 @@ pub fn set_receipt_count(
 
 /// Add one to the receipt count for a [`DhtOp`].
 pub fn add_one_receipt_count(txn: &mut Transaction, hash: &DhtOpHash) -> StateMutationResult<()> {
-    dht_op_add_one!(txn, hash, "receipt_count")?;
+    txn.execute(
+        "UPDATE DhtOp SET receipt_count = IFNULL(receipt_count, 0) + 1 WHERE hash = :hash;",
+        named_params! { ":hash": hash },
+    )?;
     Ok(())
 }
 
