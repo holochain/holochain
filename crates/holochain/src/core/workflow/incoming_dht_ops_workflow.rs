@@ -131,18 +131,21 @@ fn add_to_pending(
 
 pub fn op_exists(vault: &EnvWrite, hash: &DhtOpHash) -> DatabaseResult<bool> {
     let exists = vault.conn()?.with_reader(|txn| {
-        let mut stmt = txn.prepare(
+        DatabaseResult::Ok(txn.query_row(
             "
-            SELECT 
-            *
-            FROM DhtOp
-            WHERE
-            DhtOp.hash = :hash
+            SELECT EXISTS(
+                SELECT 
+                1
+                FROM DhtOp
+                WHERE
+                DhtOp.hash = :hash
+            )
             ",
-        )?;
-        DatabaseResult::Ok(stmt.exists(named_params! {
-            ":hash": hash,
-        })?)
+            named_params! {
+                ":hash": hash,
+            },
+            |row| row.get(0),
+        )?)
     })?;
     Ok(exists)
 }

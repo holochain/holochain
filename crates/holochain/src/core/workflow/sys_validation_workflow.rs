@@ -31,7 +31,6 @@ pub mod types;
 
 pub mod validation_query;
 
-// #[cfg(test)]
 #[cfg(todo_redo_old_tests)]
 mod chain_test;
 #[cfg(test)]
@@ -699,24 +698,27 @@ impl SysValidationWorkspace {
         let seq = header.header_seq();
         let hash = HeaderHash::with_data_sync(header);
         let header_seq_is_not_empty = self.vault.conn()?.with_reader(|txn| {
-            let mut stmt = txn.prepare(
+            DatabaseResult::Ok(txn.query_row(
                 "
-            SELECT 
-            *
-            FROM Header
-            WHERE
-            Header.author = :author
-            AND
-            Header.seq = :seq
-            AND
-            Header.hash != :hash
-            ",
-            )?;
-            DatabaseResult::Ok(stmt.exists(named_params! {
-                ":author": author,
-                ":seq": seq,
-                ":hash": hash,
-            })?)
+                SELECT EXISTS(
+                    SELECT 
+                    1
+                    FROM Header
+                    WHERE
+                    Header.author = :author
+                    AND
+                    Header.seq = :seq
+                    AND
+                    Header.hash != :hash
+                )
+                ",
+                named_params! {
+                    ":author": author,
+                    ":seq": seq,
+                    ":hash": hash,
+                },
+                |row| row.get(0),
+            )?)
         })?;
         let header_seq_is_not_empty = match &self.scratch {
             Some(scratch) => {

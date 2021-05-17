@@ -28,6 +28,24 @@ pub struct Element {
 }
 
 impl Element {
+    /// Mutable reference to the Header content.
+    /// This is useless and dangerous in production usage.
+    /// Guaranteed to make hashes and signatures mismatch whatever the Header is mutated to (at least).
+    /// This may be useful for tests that rely heavily on mocked and fixturated data.
+    #[cfg(feature = "test_utils")]
+    pub fn as_header_mut(&mut self) -> &mut Header {
+        self.signed_header.header.as_content_mut()
+    }
+
+    /// Mutable reference to the ElementEntry.
+    /// This is useless and dangerous in production usage.
+    /// Guaranteed to make hashes and signatures mismatch whatever the ElementEntry is mutated to (at least).
+    /// This may be useful for tests that rely heavily on mocked and fixturated data.
+    #[cfg(feature = "test_utils")]
+    pub fn as_entry_mut(&mut self) -> &mut ElementEntry {
+        &mut self.entry
+    }
+
     /// Raw element constructor.  Used only when we know that the values are valid.
     pub fn new(signed_header: SignedHeaderHashed, maybe_entry: Option<Entry>) -> Self {
         let maybe_visibilty = signed_header
@@ -191,7 +209,9 @@ impl HashableContent for SignedHeader {
 /// The header and the signature that signed it
 #[derive(Clone, Debug, Eq, Serialize, Deserialize)]
 pub struct SignedHeaderHashed {
+    /// The hashed but unsigned header.
     header: HeaderHashed,
+    /// The signature of the header.
     signature: Signature,
 }
 

@@ -45,7 +45,6 @@ use holochain_zome_types::ValidationStatus;
 use tracing::*;
 pub use types::Outcome;
 
-// #[cfg(test)]
 #[cfg(todo_redo_old_tests)]
 mod network_call_tests;
 #[cfg(test)]
@@ -570,6 +569,7 @@ async fn get_validation_package_remote(
                     return Ok(Some(validation_package));
                 }
 
+                // TODO: When we implement validation package then we might need this again.
                 // Fallback to gossiper if author is unavailable
                 // if let Some(from_agent) = from_agent {
                 //     if let Some(validation_package) = cascade
@@ -647,6 +647,7 @@ async fn get_validation_package_remote(
                 match &validation_package {
                     Some(_) => validation_package,
                     None => {
+                        // TODO: When we implement validation package then we might need this again.
                         // if let Some(from_agent) = from_agent {
                         //     cascade
                         //         .get_validation_package(from_agent, header_hashed)
