@@ -3,6 +3,7 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
+use kitsune_p2p_types::dependencies::ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::tx2::tx2_adapter::Uniq;
 pub use kitsune_p2p_types::{KitsuneError, KitsuneResult};
 

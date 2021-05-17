@@ -69,6 +69,9 @@ pub trait AsKitsuneDirect: 'static + Send + Sync {
     /// Get a handle to the persist store used by this kdirect instance.
     fn get_persist(&self) -> KdPersist;
 
+    /// Get the local ui address of this instance.
+    fn get_ui_addr(&self) -> KitsuneResult<std::net::SocketAddr>;
+
     /// List transport bindings
     fn list_transport_bindings(&self) -> BoxFuture<'static, KitsuneResult<Vec<TxUrl>>>;
 
@@ -127,6 +130,11 @@ impl KitsuneDirect {
     /// operations to do on the store.)
     pub fn get_persist(&self) -> KdPersist {
         AsKitsuneDirect::get_persist(&*self.0)
+    }
+
+    /// Get the local ui address of this instance.
+    pub fn get_ui_addr(&self) -> KitsuneResult<std::net::SocketAddr> {
+        AsKitsuneDirect::get_ui_addr(&*self.0)
     }
 
     /// List transport bindings

@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use crate::*;
 
 use futures::future::{BoxFuture, FutureExt};
@@ -17,20 +18,34 @@ use types::kdentry::KdEntry;
 use types::kdhash::KdHash;
 use types::persist::*;
 
+/// Config for v1 impl of KitsuneDirect
+pub struct KitsuneDirectV1Config {
+    /// persistence module to use for this kdirect instance
+    pub persist: KdPersist,
+
+    /// v1 is only set up to run through a proxy
+    /// specify the proxy addr here
+    pub proxy: TxUrl,
+
+    /// the localhost port to run the control websocket / ui server on
+    pub ui_port: u16,
+}
+
 /// create a new v1 instance of the kitsune direct api
 pub async fn new_kitsune_direct_v1(
-    // persistence module to use for this kdirect instance
-    persist: KdPersist,
-
-    // v1 is only set up to run through a proxy
-    // specify the proxy addr here
-    proxy: TxUrl,
+    conf: KitsuneDirectV1Config,
 ) -> KitsuneResult<(KitsuneDirect, KitsuneDirectEvtStream)> {
-    let mut config = KitsuneP2pConfig::default();
+    let KitsuneDirectV1Config {
+        persist,
+        proxy,
+        ui_port,
+    } = conf;
 
-    let tuning_params = config.tuning_params.clone();
+    let mut sub_config = KitsuneP2pConfig::default();
 
-    config.transport_pool.push(TransportConfig::Proxy {
+    let tuning_params = sub_config.tuning_params.clone();
+
+    sub_config.transport_pool.push(TransportConfig::Proxy {
         sub_transport: Box::new(TransportConfig::Quic {
             bind_to: None,
             override_host: None,
@@ -43,19 +58,31 @@ pub async fn new_kitsune_direct_v1(
 
     let tls = persist.singleton_tls_config().await?;
 
-    let (p2p, evt) = spawn_kitsune_p2p(config, tls)
+    let (p2p, evt) = spawn_kitsune_p2p(sub_config, tls)
         .await
         .map_err(KitsuneError::other)?;
 
     let logic_chan = LogicChan::new(tuning_params.concurrent_limit_per_thread);
     let lhnd = logic_chan.handle().clone();
 
-    let kdirect = Kd1::new(persist, p2p);
+    let (srv, srv_evt) = new_srv(Default::default(), ui_port).await?;
+    let kdirect = Kd1::new(srv, persist, p2p);
 
     logic_chan
         .handle()
         .clone()
-        .capture_logic(handle_events(tuning_params, kdirect.clone(), lhnd, evt))
+        .capture_logic(handle_events(
+            tuning_params.clone(),
+            kdirect.clone(),
+            lhnd,
+            evt,
+        ))
+        .await?;
+
+    logic_chan
+        .handle()
+        .clone()
+        .capture_logic(handle_srv_events(tuning_params, srv_evt))
         .await?;
 
     let kdirect = KitsuneDirect(kdirect);
@@ -66,6 +93,7 @@ pub async fn new_kitsune_direct_v1(
 // -- private -- //
 
 struct Kd1Inner {
+    srv: KdSrv,
     p2p: ghost_actor::GhostSender<actor::KitsuneP2p>,
 }
 
@@ -77,11 +105,15 @@ struct Kd1 {
 }
 
 impl Kd1 {
-    pub fn new(persist: KdPersist, p2p: ghost_actor::GhostSender<actor::KitsuneP2p>) -> Arc<Self> {
+    pub fn new(
+        srv: KdSrv,
+        persist: KdPersist,
+        p2p: ghost_actor::GhostSender<actor::KitsuneP2p>,
+    ) -> Arc<Self> {
         Arc::new(Self {
             uniq: Uniq::default(),
             persist,
-            inner: Share::new(Kd1Inner { p2p }),
+            inner: Share::new(Kd1Inner { srv, p2p }),
         })
     }
 }
@@ -111,6 +143,10 @@ impl AsKitsuneDirect for Kd1 {
 
     fn get_persist(&self) -> KdPersist {
         self.persist.clone()
+    }
+
+    fn get_ui_addr(&self) -> KitsuneResult<std::net::SocketAddr> {
+        self.inner.share_mut(|i, _| Ok(i.srv.local_addr()?))
     }
 
     fn list_transport_bindings(&self) -> BoxFuture<'static, KitsuneResult<Vec<TxUrl>>> {
@@ -177,6 +213,37 @@ impl AsKitsuneDirect for Kd1 {
         //        for now, we are just relying on gossip
         self.persist.store_entry(root, agent, entry).boxed()
     }
+}
+
+async fn handle_srv_events(tuning_params: KitsuneP2pTuningParams, srv_evt: KdSrvEvtStream) {
+    srv_evt
+        .for_each_concurrent(
+            tuning_params.concurrent_limit_per_thread,
+            move |evt| async move {
+                match evt {
+                    KdSrvEvt::HttpRequest {
+                        uri, respond_cb, ..
+                    } => {
+                        // for now just echoing the incoming uri
+                        let r = async move {
+                            let mut r = HttpResponse::default();
+                            r.body = serde_json::to_string_pretty(&serde_json::json!({
+                                "uri": uri,
+                            }))
+                            .map_err(KitsuneError::other)?
+                            .into_bytes();
+                            Ok(r)
+                        }
+                        .await;
+                        if let Err(err) = respond_cb(r).await {
+                            tracing::error!(?err, "http respond error");
+                        }
+                    }
+                    KdSrvEvt::Websocket { .. } => {}
+                }
+            },
+        )
+        .await;
 }
 
 async fn handle_events(

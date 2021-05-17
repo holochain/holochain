@@ -25,6 +25,7 @@ pub struct KdEntryData {
     pub should_shard: bool,
 
     /// interval after which this entry should be re-verified
+    /// TODO - FIXME - remove this, should be returned by verify fn
     #[serde(rename = "r")]
     pub reverify_interval_s: u32,
 
@@ -54,6 +55,9 @@ pub struct KdEntryInner {
     /// this (and the signature) should be sent over the network,
     /// and is what should be used to verify signature.
     pub encoded: String,
+
+    /// the additional binary data associated with this entry.
+    pub binary: Box<[u8]>,
 
     /// the decoded content of this entry, use this for logic.
     pub decoded: KdEntryData,
@@ -127,15 +131,31 @@ impl KdEntry {
         &self.0.hash
     }
 
+    /// Get the binary data associated with this entry
+    pub fn binary(&self) -> &[u8] {
+        &self.0.binary
+    }
+
     /// Sign entry data into a full KdEntry instance
     pub async fn sign(persist: &KdPersist, decoded: KdEntryData) -> KitsuneResult<Self> {
+        Self::sign_with_binary(persist, decoded, &[]).await
+    }
+
+    /// Sign entry data into a full KdEntry instance with additional binary data
+    pub async fn sign_with_binary(
+        persist: &KdPersist,
+        decoded: KdEntryData,
+        binary: &[u8],
+    ) -> KitsuneResult<Self> {
         let encoded = serde_json::to_string(&decoded).map_err(KitsuneError::other)?;
+        let binary = binary.to_vec().into_boxed_slice();
         let hash = KdHash::from_data(encoded.as_bytes()).await?;
         let signature = persist
             .sign(decoded.author.clone(), encoded.as_bytes())
             .await?;
         Ok(Self(Arc::new(KdEntryInner {
             encoded,
+            binary,
             decoded,
             hash,
             signature,
@@ -145,7 +165,11 @@ impl KdEntry {
     /// Encode this entry for storage or transmition
     pub fn encode(&self) -> PoolBuf {
         let sig_b64 = base64::encode_config(&self.0.signature[..], base64::URL_SAFE_NO_PAD);
-        let full = serde_json::to_string(&(sig_b64, &self.0.encoded)).unwrap();
+        // the binary is separate specifically so we DON'T have to b64 encode it
+        // eventually, it will just be tagged onto the end
+        // but for now this is easier to debug
+        let bin_b64 = base64::encode_config(&self.0.binary[..], base64::URL_SAFE_NO_PAD);
+        let full = serde_json::to_string(&(sig_b64, &self.0.encoded, bin_b64)).unwrap();
         let full = full.as_bytes();
         let mut out = PoolBuf::new();
         out.extend_from_slice(full);
@@ -154,11 +178,14 @@ impl KdEntry {
 
     /// Decode and check signature on an encoded signature + entry
     pub async fn decode_checked(entry: &[u8]) -> KitsuneResult<Self> {
-        let (sig, encoded): (String, String) =
+        let (sig, encoded, bin): (String, String, String) =
             serde_json::from_slice(entry).map_err(KitsuneError::other)?;
         let mut signature = [0; 64];
         let sig =
             base64::decode_config(sig, base64::URL_SAFE_NO_PAD).map_err(KitsuneError::other)?;
+        let binary = base64::decode_config(bin, base64::URL_SAFE_NO_PAD)
+            .map_err(KitsuneError::other)?
+            .into_boxed_slice();
         signature.copy_from_slice(&sig);
         let signature = Arc::new(signature);
         let decoded: KdEntryData = serde_json::from_str(&encoded).map_err(KitsuneError::other)?;
@@ -173,6 +200,7 @@ impl KdEntry {
         let hash = KdHash::from_data(encoded.as_bytes()).await?;
         Ok(Self(Arc::new(KdEntryInner {
             encoded,
+            binary,
             decoded,
             hash,
             signature,
@@ -188,6 +216,7 @@ mod tests {
     async fn test_kdentry_codec() {
         let persist = crate::persist_mem::new_persist_mem();
         let agent = persist.generate_signing_keypair().await.unwrap();
+        let binary = [0, 1, 2, 3];
 
         let edata = KdEntryData {
             type_hint: "s.root".to_string(),
@@ -200,11 +229,14 @@ mod tests {
                 "hello": "world",
             }),
         };
-        let entry = KdEntry::sign(&persist, edata).await.unwrap();
+        let entry = KdEntry::sign_with_binary(&persist, edata, &binary[..])
+            .await
+            .unwrap();
         println!("{:?}", &entry);
         let wire = entry.encode();
         println!("wire: {}", String::from_utf8_lossy(&wire));
         let e2 = KdEntry::decode_checked(&wire).await.unwrap();
         assert_eq!(e2, entry);
+        assert_eq!(&[0, 1, 2, 3][..], e2.binary());
     }
 }

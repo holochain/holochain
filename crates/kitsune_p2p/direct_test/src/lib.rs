@@ -196,8 +196,13 @@ impl KdTestHarness {
             let message_box = Share::new(Vec::new());
             let kdirect = match config.ver {
                 KdVerSpec::V1 => {
-                    let (kdirect, mut evt) =
-                        new_kitsune_direct_v1(persist, proxy_url.clone()).await?;
+                    let conf = KitsuneDirectV1Config {
+                        persist,
+                        proxy: proxy_url.clone(),
+                        ui_port: 0,
+                    };
+
+                    let (kdirect, mut evt) = new_kitsune_direct_v1(conf).await?;
                     let node_addrs = kdirect.list_transport_bindings().await?;
                     tracing::debug!(?node_addrs);
 

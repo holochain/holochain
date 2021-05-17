@@ -17,8 +17,11 @@ futures = "0.3.14"
 hyper = { version = "0.14", features = ["server","http1","http2","tcp"] }
 kitsune_p2p_types = { version = "0.0.1", path = "../types" }
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p" }
+kitsune_p2p_transport_quic = { version = "0.0.1", path = "../transport_quic" }
+kitsune_p2p_proxy = { version = "0.0.1", path = "../proxy" }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["preserve_order"] }
+structopt = "0.3.21"
 sodoken = "0.0.1-alpha.3"
 tokio = { version = "1.5", features = ["full"] }
 tokio-tungstenite = "0.14"
