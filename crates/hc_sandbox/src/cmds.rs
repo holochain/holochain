@@ -66,6 +66,8 @@ pub enum NetworkType {
     Mem,
     /// A transport that uses the QUIC protocol.
     Quic(Quic),
+    /// A transport that uses the MDNS protocol.
+    Mdns,
 }
 
 #[derive(Debug, StructOpt, Clone)]
@@ -175,6 +177,7 @@ impl From<Network> for KitsuneP2pConfig {
 
         match transport {
             NetworkType::Mem => (),
+            NetworkType::Mdns => kit.network_type = NetworkType::QuicMdns,
             NetworkType::Quic(Quic {
                 bind_to,
                 override_host,
