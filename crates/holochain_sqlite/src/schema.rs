@@ -2,9 +2,10 @@ use once_cell::sync::Lazy;
 use rusqlite::Connection;
 
 use crate::db::DbKind;
+use crate::sql::*;
 
 pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = Migration::initial(include_str!("schema/cell/initial.sql"));
+    let migration_0 = Migration::initial(sql_cell::SCHEMA);
 
     Schema {
         current_index: 0,
@@ -13,7 +14,7 @@ pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| {
 });
 
 pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = Migration::initial(include_str!("schema/conductor/initial.sql"));
+    let migration_0 = Migration::initial(sql_conductor::SCHEMA);
 
     Schema {
         current_index: 0,
@@ -22,7 +23,7 @@ pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| {
 });
 
 pub static SCHEMA_WASM: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = Migration::initial(include_str!("schema/wasm/initial.sql"));
+    let migration_0 = Migration::initial(sql_wasm::SCHEMA);
 
     Schema {
         current_index: 0,
@@ -31,7 +32,7 @@ pub static SCHEMA_WASM: Lazy<Schema> = Lazy::new(|| {
 });
 
 pub static SCHEMA_P2P: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = Migration::initial(super::sql::P2P_SCHEMA_INITIAL);
+    let migration_0 = Migration::initial(sql_p2p::SCHEMA);
 
     Schema {
         current_index: 0,
