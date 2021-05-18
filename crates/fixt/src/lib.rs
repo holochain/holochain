@@ -153,6 +153,47 @@ macro_rules! basic_test {
 /// and Predictable, in order
 #[macro_export]
 macro_rules! fixturator {
+    (
+        with_vec $min:literal $max:literal;
+        $type:tt;
+        $($munch:tt)*
+    ) => {
+        paste! {
+            pub type [<$type:camel Vec>] = Vec<$type>;
+            fixturator!(
+                [<$type:camel Vec>];
+                curve Empty vec![];
+                curve Unpredictable {
+                    let mut index = get_fixt_index!();
+                    let mut rng = $crate::rng();
+                    let len = rng.gen_range($min, $max);
+                    let mut fixturator = [<$type:camel Fixturator>]::new_indexed(Unpredictable, index);
+                    let mut v = vec![];
+                    for _ in 0..len {
+                        v.push(fixturator.next().unwrap());
+                    }
+                    index += 1;
+                    set_fixt_index!(index);
+                    v
+                };
+                curve Predictable {
+                    let mut index = get_fixt_index!();
+                    let mut fixturator = [<$type:camel Fixturator>]::new_indexed(Predictable, index);
+                    let mut v = vec![];
+                    let min = $min;
+                    let max = (index % ($max - min)) + min;
+                    for _ in min..max {
+                        v.push(fixturator.next().unwrap());
+                    }
+                    index += 1;
+                    set_fixt_index!(index);
+                    v
+                };
+            );
+        }
+        fixturator!($type; $($munch)*);
+    };
+
     // for an enum Foo with variants with a single inner type
     //
     // fixturator!(Foo; variants [ A(String) B(bool) ];);
