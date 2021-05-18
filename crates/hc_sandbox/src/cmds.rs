@@ -177,7 +177,7 @@ impl From<Network> for KitsuneP2pConfig {
 
         match transport {
             NetworkType::Mem => (),
-            NetworkType::Mdns => kit.network_type = NetworkType::QuicMdns,
+            NetworkType::Mdns => kit.network_type = holochain_p2p::kitsune_p2p::NetworkType::QuicMdns,
             NetworkType::Quic(Quic {
                 bind_to,
                 override_host,
