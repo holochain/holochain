@@ -228,7 +228,7 @@ impl std::fmt::Debug for KitsuneSignature {
 pub mod actor;
 pub mod agent_store;
 pub mod event;
-pub mod gossip;
+pub(crate) mod gossip;
 pub(crate) mod wire;
 
 pub use kitsune_p2p_types::dht_arc;

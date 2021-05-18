@@ -383,6 +383,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bit-vec"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bitflags"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -441,6 +450,17 @@ dependencies = [
  "fastrand",
  "futures-lite",
  "once_cell",
+]
+
+[[package]]
+name = "bloomfilter"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1cffe85a8b173164000edb6570ff7cf429acc9460b41d963e797df413f1765b4"
+dependencies = [
+ "bit-vec",
+ "rand 0.8.3",
+ "siphasher",
 ]
 
 [[package]]
@@ -2454,7 +2474,9 @@ dependencies = [
 name = "kitsune_p2p"
 version = "0.0.1"
 dependencies = [
+ "arrayref",
  "base64",
+ "bloomfilter",
  "derive_more",
  "fixt",
  "futures",
@@ -2477,6 +2499,31 @@ dependencies = [
  "tokio-stream",
  "tracing-subscriber",
  "url2",
+]
+
+[[package]]
+name = "kitsune_p2p_direct"
+version = "0.0.1"
+dependencies = [
+ "arrayref",
+ "base64",
+ "futures",
+ "kitsune_p2p",
+ "kitsune_p2p_types",
+ "serde",
+ "serde_json",
+ "sodoken",
+ "tokio",
+]
+
+[[package]]
+name = "kitsune_p2p_direct_test"
+version = "0.0.1"
+dependencies = [
+ "kitsune_p2p_direct",
+ "kitsune_p2p_proxy",
+ "kitsune_p2p_transport_quic",
+ "tokio",
 ]
 
 [[package]]
@@ -2647,6 +2694,17 @@ dependencies = [
  "rand 0.8.3",
  "socket2 0.3.19",
  "tokio",
+]
+
+[[package]]
+name = "libsodium-sys"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a685b64f837b339074115f2e7f7b431ac73681d08d75b389db7498b8892b8a58"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
 ]
 
 [[package]]
@@ -4529,6 +4587,9 @@ name = "siphasher"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cbce6d4507c7e4a3962091436e56e95290cb71fa302d0d270e32130b75fbff27"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "slab"
@@ -4579,6 +4640,22 @@ checksum = "9e3dfc207c526015c632472a77be09cf1b6e46866581aecae5cc38fb4235dea2"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "sodoken"
+version = "0.0.1-alpha.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e228d84d2c62a7cfebd521c724c7a9470596dc32674cd45a99953cb43d7436d"
+dependencies = [
+ "libc",
+ "libsodium-sys",
+ "num_cpus",
+ "once_cell",
+ "parking_lot 0.11.1",
+ "rayon",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
