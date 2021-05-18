@@ -653,6 +653,8 @@ pub async fn dump_state(
                 DhtOp.is_authored = 1
                 AND
                 Header.author = :author
+                AND
+                last_publish_time IS NOT NULL
                 ",
             named_params! {
             ":author": author,

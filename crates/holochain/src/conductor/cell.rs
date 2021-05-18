@@ -796,7 +796,11 @@ impl Cell {
         let ribosome = RealRibosome::new(dna_file);
 
         // Run the workflow
-        let args = InitializeZomesWorkflowArgs { dna_def, ribosome };
+        let args = InitializeZomesWorkflowArgs {
+            dna_def,
+            ribosome,
+            conductor_api,
+        };
         let init_result =
             initialize_zomes_workflow(workspace, self.holochain_p2p_cell.clone(), keystore, args)
                 .await

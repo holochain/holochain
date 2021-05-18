@@ -117,7 +117,7 @@ async fn app_validation_workflow_inner(
     Ok(WorkComplete::Complete)
 }
 
-fn to_single_zome(zomes_to_invoke: ZomesToInvoke) -> AppValidationResult<Zome> {
+pub fn to_single_zome(zomes_to_invoke: ZomesToInvoke) -> AppValidationResult<Zome> {
     match zomes_to_invoke {
         ZomesToInvoke::All => Err(AppValidationError::LinkMultipleZomes),
         ZomesToInvoke::One(z) => Ok(z),
@@ -147,8 +147,8 @@ async fn validate_op(
 
     // Get the EntryDefId associated with this Element if there is one
     let entry_def = {
-        let cascade = workspace.full_cascade(network.clone());
-        get_associated_entry_def(&element, dna_file.dna(), conductor_api, cascade).await?
+        let mut cascade = workspace.full_cascade(network.clone());
+        get_associated_entry_def(&element, dna_file.dna(), conductor_api, &mut cascade).await?
     };
 
     // Create the ribosome
@@ -169,8 +169,8 @@ async fn validate_op(
     let entry_def_id = entry_def.map(|ed| ed.id);
 
     // Get the zome names
-    let zomes_to_invoke =
-        get_zomes_to_invoke(&element, ribosome.dna_def(), workspace, network).await?;
+    let mut cascade = workspace.full_cascade(network.clone());
+    let zomes_to_invoke = get_zomes_to_invoke(&element, ribosome.dna_def(), &mut cascade).await?;
 
     let outcome = match element.header() {
         Header::DeleteLink(delete_link) => {
@@ -250,7 +250,7 @@ async fn get_associated_entry_def(
     element: &Element,
     dna_def: &DnaDefHashed,
     conductor_api: &impl CellConductorApiT,
-    cascade: Cascade,
+    cascade: &mut Cascade,
 ) -> AppValidationOutcome<Option<EntryDef>> {
     match get_app_entry_type(element, cascade).await? {
         Some(aet) => {
@@ -320,21 +320,17 @@ fn check_for_caps(element: &Element) -> AppValidationOutcome<()> {
 
 /// Get the zome name from the app entry type
 /// or get all zome names.
-async fn get_zomes_to_invoke(
+pub async fn get_zomes_to_invoke(
     element: &Element,
     dna_def: &DnaDef,
-    workspace: &mut AppValidationWorkspace,
-    network: &HolochainP2pCell,
+    cascade: &mut Cascade,
 ) -> AppValidationOutcome<ZomesToInvoke> {
-    let aet = {
-        let cascade = workspace.full_cascade(network.clone());
-        get_app_entry_type(element, cascade).await?
-    };
+    let aet = { get_app_entry_type(element, cascade).await? };
     match aet {
         Some(aet) => Ok(ZomesToInvoke::One(get_zome(&aet, &dna_def)?)),
         None => match element.header() {
             Header::CreateLink(_) | Header::DeleteLink(_) => {
-                get_link_zome(element, dna_def, workspace, network).await
+                get_link_zome(element, dna_def, cascade).await
             }
             _ => Ok(ZomesToInvoke::All),
         },
@@ -370,7 +366,7 @@ fn zome_id_to_zome(zome_id: ZomeId, dna_def: &DnaDef) -> AppValidationResult<Zom
 /// from this entry or from the dependency.
 async fn get_app_entry_type(
     element: &Element,
-    cascade: Cascade,
+    cascade: &mut Cascade,
 ) -> AppValidationOutcome<Option<AppEntryType>> {
     match element.header().entry_data() {
         Some((_, et)) => match et.clone() {
@@ -384,8 +380,7 @@ async fn get_app_entry_type(
 async fn get_link_zome(
     element: &Element,
     dna_def: &DnaDef,
-    workspace: &mut AppValidationWorkspace,
-    network: &HolochainP2pCell,
+    cascade: &mut Cascade,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     match element.header() {
         Header::CreateLink(cl) => {
@@ -393,7 +388,6 @@ async fn get_link_zome(
             Ok(ZomesToInvoke::One(zome))
         }
         Header::DeleteLink(dl) => {
-            let mut cascade = workspace.full_cascade(network.clone());
             let shh = cascade
                 .retrieve_header(dl.link_add_address.clone(), Default::default())
                 .await?
@@ -417,7 +411,7 @@ async fn get_link_zome(
 /// the app entry type so we know which zome to call
 async fn get_app_entry_type_from_dep(
     element: &Element,
-    mut cascade: Cascade,
+    cascade: &mut Cascade,
 ) -> AppValidationOutcome<Option<AppEntryType>> {
     match element.header() {
         Header::Delete(ed) => {
@@ -702,7 +696,7 @@ async fn get_validation_package_remote(
 }
 
 pub async fn run_validation_callback_direct(
-    zome: Zome,
+    zome: ZomesToInvoke,
     element: Element,
     ribosome: &impl RibosomeT,
     workspace: HostFnWorkspace,
@@ -710,8 +704,8 @@ pub async fn run_validation_callback_direct(
     conductor_api: &impl CellConductorApiT,
 ) -> AppValidationResult<Outcome> {
     let outcome = {
-        let cascade = Cascade::from_workspace_network(&workspace, network.clone());
-        get_associated_entry_def(&element, ribosome.dna_def(), conductor_api, cascade).await
+        let mut cascade = Cascade::from_workspace_network(&workspace, network.clone());
+        get_associated_entry_def(&element, ribosome.dna_def(), conductor_api, &mut cascade).await
     };
 
     // The outcome could be awaiting a dependency to get the entry def
@@ -737,7 +731,7 @@ pub async fn run_validation_callback_direct(
     let element = Arc::new(element);
 
     run_validation_callback_inner(
-        ZomesToInvoke::One(zome),
+        zome,
         element,
         validation_package,
         entry_def_id,
