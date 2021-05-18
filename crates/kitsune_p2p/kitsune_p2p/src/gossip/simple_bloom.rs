@@ -36,11 +36,12 @@ pub enum MetaOpData {
 impl MetaOpData {
     fn byte_count(&self) -> usize {
         match self {
-            MetaOpData::Op(_, d) => {
-                36 /* hash */ + d.len()
-            }
+            MetaOpData::Op(h, d) => (**h).len() + d.len(),
             MetaOpData::Agent(a) => {
-                36 /* hash */ + 64 /* sig */ + a.as_agent_info_ref().len()
+                let h = (**a.as_agent_ref()).len();
+                let s = (**a.as_signature_ref()).len();
+                let d = a.as_agent_info_ref().len();
+                h + s + d
             }
         }
     }
@@ -185,7 +186,7 @@ impl SimpleBloomModInner {
 
         // pick an old instant for initialization
         let old = std::time::Instant::now()
-            .checked_sub(std::time::Duration::from_secs(60 * 24))
+            .checked_sub(std::time::Duration::from_secs(60 * 60 * 24))
             .unwrap();
 
         Self {

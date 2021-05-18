@@ -330,6 +330,8 @@ mod tests {
         init_tracing();
 
         let mut config = KdTestConfig::default();
+        config.node_count = 2;
+        config.agents_per_node = 2;
         config.agent_init_hook = Box::new(|input| {
             async move {
                 let AgentHookInput {
@@ -385,6 +387,8 @@ mod tests {
                 let entry_count = entries.len();
                 let entry_hashes = entries.iter().map(|e| e.hash()).collect::<Vec<_>>();
                 tracing::info!(%entry_count, ?entry_hashes);
+
+                // each of 4 nodes publish 1 entry + the app entry == 5
                 assert_eq!(5, entry_count);
             }
         }

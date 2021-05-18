@@ -207,7 +207,7 @@ async fn data_map_get(
                 .map_err(KitsuneError::other)?;
 
             if op.len() != 1 {
-                return Err("invalid results".into());
+                return Err(format!("Error fetching op {:?}", &key).into());
             }
 
             let (key, data) = op.remove(0);
