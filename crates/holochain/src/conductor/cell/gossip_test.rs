@@ -2,11 +2,11 @@ use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::new_zome_call;
 use crate::test_utils::wait_for_integration;
 use hdk::prelude::*;
+use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p::KitsuneBinType;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
 
@@ -104,20 +104,11 @@ async fn agent_info_test() {
     let alice_agent_id = alice_cell_id.agent_pubkey();
 
     // Kitsune types
-    let dna_kit = kitsune_p2p::KitsuneSpace::new(
-        alice_call_data
-            .ribosome
-            .dna_file
-            .dna_hash()
-            .get_raw_36()
-            .to_vec(),
-    );
+    let dna_kit = alice_call_data.ribosome.dna_file.dna_hash().to_kitsune();
 
-    let alice_kit = kitsune_p2p::KitsuneAgent::new(alice_agent_id.get_raw_36().to_vec());
+    let alice_kit = alice_agent_id.to_kitsune();
 
-    let p2p_env = handle
-        .get_p2p_env(std::sync::Arc::new(dna_kit.clone()))
-        .await;
+    let p2p_env = handle.get_p2p_env(dna_kit.clone()).await;
 
     let (agent_info, len) = fresh_reader_test(p2p_env.clone(), |txn| {
         let agent_info = txn.p2p_get(&alice_kit).unwrap();
@@ -137,7 +128,7 @@ async fn agent_info_test() {
         .unwrap()
         .cell_id
         .agent_pubkey();
-    let bob_kit = kitsune_p2p::KitsuneAgent::new(bob_agent_id.get_raw_36().to_vec());
+    let bob_kit = bob_agent_id.to_kitsune();
 
     // Give publish time to finish
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;

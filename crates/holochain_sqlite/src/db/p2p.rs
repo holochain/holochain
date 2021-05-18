@@ -153,18 +153,17 @@ impl AsP2pTxExt for Transaction<'_> {
             .prepare(P2P_GOSSIP_QUERY)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
-        let (storage_start_1, storage_end_1, storage_start_2, storage_end_2) =
-            split_arc(&within_arc);
+        let (storage_1, storage_2) = split_arc(&within_arc);
 
         let mut out = Vec::new();
         for r in stmt.query_map(
             named_params! {
                 ":since_ms": clamp64(since_ms),
                 ":until_ms": clamp64(until_ms),
-                ":storage_start_1": storage_start_1,
-                ":storage_end_1": storage_end_1,
-                ":storage_start_2": storage_start_2,
-                ":storage_end_2": storage_end_2,
+                ":storage_start_1": storage_1.map(|s| s.0),
+                ":storage_end_1": storage_1.map(|s| s.1),
+                ":storage_start_2": storage_2.map(|s| s.0),
+                ":storage_end_2": storage_2.map(|s| s.1),
             },
             |r| {
                 let agent: Vec<u8> = r.get(0)?;
@@ -208,11 +207,10 @@ struct P2pRecord {
     storage_end_2: Option<u32>,
 }
 
-fn split_arc(arc: &DhtArc) -> (Option<(u32, u32)>, Option<(u32, u32)>) {
-    let mut storage_start_1 = None;
-    let mut storage_end_1 = None;
-    let mut storage_start_2 = None;
-    let mut storage_end_2 = None;
+type SplitRange = (u32, u32);
+fn split_arc(arc: &DhtArc) -> (Option<SplitRange>, Option<SplitRange>) {
+    let mut storage_1 = None;
+    let mut storage_2 = None;
 
     use std::ops::{Bound, RangeBounds};
     let r = arc.range();
@@ -224,25 +222,17 @@ fn split_arc(arc: &DhtArc) -> (Option<(u32, u32)>, Option<(u32, u32)>) {
         // the only other case for DhtArc is two included bounds
         (Bound::Included(s), Bound::Included(e)) => {
             if s > e {
-                storage_start_1 = Some(u32::MIN);
-                storage_end_1 = Some(*e);
-                storage_start_2 = Some(*s);
-                storage_end_2 = Some(u32::MAX);
+                storage_1 = Some((u32::MIN, *e));
+                storage_2 = Some((*s, u32::MAX));
             } else {
-                storage_start_1 = Some(*s);
-                storage_end_1 = Some(*e);
+                storage_1 = Some((*s, *e));
             }
         }
         // no other cases currently exist
         _ => unreachable!(),
     }
 
-    (
-        storage_start_1,
-        storage_end_1,
-        storage_start_2,
-        storage_end_2,
-    )
+    (storage_1, storage_2)
 }
 
 fn clamp64(u: u64) -> i64 {
@@ -268,7 +258,7 @@ impl P2pRecord {
 
         let storage_center_loc = arc.center_loc.into();
 
-        let (storage_start_1, storage_end_1, storage_start_2, storage_end_2) = split_arc(&arc);
+        let (storage_1, storage_2) = split_arc(&arc);
 
         Ok(Self {
             agent,
@@ -279,10 +269,10 @@ impl P2pRecord {
             expires_at_ms: clamp64(expires_at_ms),
             storage_center_loc,
 
-            storage_start_1,
-            storage_end_1,
-            storage_start_2,
-            storage_end_2,
+            storage_start_1: storage_1.map(|s| s.0),
+            storage_end_1: storage_1.map(|s| s.1),
+            storage_start_2: storage_2.map(|s| s.0),
+            storage_end_2: storage_2.map(|s| s.1),
         })
     }
 }

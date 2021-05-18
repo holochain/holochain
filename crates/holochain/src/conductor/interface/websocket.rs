@@ -272,6 +272,7 @@ pub mod test {
     use crate::test_utils::conductor_setup::ConductorTestData;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
+    use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
     use holochain_sqlite::prelude::*;
     use holochain_state::prelude::test_environments;
@@ -721,10 +722,10 @@ pub mod test {
             .collect::<Vec<_>>();
 
         let mut expect = to_key(agent_infos.clone());
-        let k00 = (cs(&dnas[0]), ca(&agents[0]));
-        let k01 = (cs(&dnas[0]), ca(&agents[1]));
-        let k10 = (cs(&dnas[1]), ca(&agents[0]));
-        let k11 = (cs(&dnas[1]), ca(&agents[1]));
+        let k00 = (dnas[0].to_kitsune(), agents[0].to_kitsune());
+        let k01 = (dnas[0].to_kitsune(), agents[1].to_kitsune());
+        let k10 = (dnas[1].to_kitsune(), agents[0].to_kitsune());
+        let k11 = (dnas[1].to_kitsune(), agents[1].to_kitsune());
         expect.push(k00.clone());
         expect.push(k01.clone());
         expect.push(k10.clone());
@@ -802,25 +803,17 @@ pub mod test {
         rx
     }
 
-    fn to_key(r: Vec<AgentInfoSigned>) -> Vec<(KitsuneSpace, KitsuneAgent)> {
+    fn to_key(r: Vec<AgentInfoSigned>) -> Vec<(Arc<KitsuneSpace>, Arc<KitsuneAgent>)> {
         let mut results = r
             .into_iter()
             .map(|a| {
                 (
-                    KitsuneSpace::try_from(&a).unwrap(),
-                    KitsuneAgent::try_from(a).unwrap(),
+                    Arc::new(KitsuneSpace::try_from(&a).unwrap()),
+                    Arc::new(KitsuneAgent::try_from(a).unwrap()),
                 )
             })
             .collect::<Vec<_>>();
         results.sort();
         results
-    }
-
-    fn cs(d: &DnaHash) -> KitsuneSpace {
-        KitsuneSpace(d.get_raw_36().to_vec())
-    }
-
-    fn ca(a: &AgentPubKey) -> KitsuneAgent {
-        KitsuneAgent(a.get_raw_36().to_vec())
     }
 }

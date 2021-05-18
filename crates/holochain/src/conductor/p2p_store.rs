@@ -9,6 +9,7 @@ use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::dht_arc::DhtArcBucket;
 use holochain_p2p::dht_arc::PeerDensity;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
+use holochain_p2p::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
@@ -44,7 +45,7 @@ pub fn get_single_agent_info(
     _space: DnaHash,
     agent: AgentPubKey,
 ) -> StateQueryResult<Option<AgentInfoSigned>> {
-    let agent = kitsune_p2p::KitsuneAgent(agent.get_raw_36().to_vec());
+    let agent = agent.to_kitsune();
     fresh_reader!(env, |r| Ok(r.p2p_get(&agent)?))
 }
 

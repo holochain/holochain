@@ -58,6 +58,7 @@ use futures::future::FutureExt;
 use futures::StreamExt;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_p2p::event::HolochainP2pEvent::*;
+use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
@@ -377,8 +378,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         cell_id: &CellId,
         event: holochain_p2p::event::HolochainP2pEvent,
     ) -> ConductorApiResult<()> {
-        let space = cell_id.dna_hash().get_raw_36().to_vec();
-        let space = Arc::new(KitsuneSpace(space));
+        let space = cell_id.dna_hash().to_kitsune();
         trace!(agent = ?cell_id.agent_pubkey(), dispatch_event = ?event);
         match event {
             PutAgentInfoSigned {

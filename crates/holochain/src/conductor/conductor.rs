@@ -57,6 +57,7 @@ use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::KeystoreSender;
 use holochain_keystore::KeystoreSenderExt;
+use holochain_p2p::DnaHashExt;
 use holochain_sqlite::db::DbKind;
 use holochain_sqlite::prelude::*;
 use holochain_state::mutations;
@@ -851,7 +852,7 @@ where
         match cell_id {
             Some(c) => {
                 let (d, a) = c.into_dna_and_agent();
-                let space: Arc<KitsuneSpace> = Arc::new(KitsuneSpace(d.get_raw_36().to_vec()));
+                let space = d.to_kitsune();
                 let env = self.p2p_env(space);
                 Ok(get_single_agent_info(env.into(), d, a)?
                     .map(|a| vec![a])
@@ -932,7 +933,7 @@ where
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.env();
 
-        let space = Arc::new(KitsuneSpace(cell_id.dna_hash().get_raw_36().to_vec()));
+        let space = cell_id.dna_hash().to_kitsune();
         let p2p_env = self
             .p2p_env
             .lock()
