@@ -26,6 +26,10 @@ impl LinkTag {
     {
         Self(t.into())
     }
+
+    pub fn into_inner(self) -> Vec<u8> {
+        self.0
+    }
 }
 
 impl From<Vec<u8>> for LinkTag {
