@@ -94,6 +94,7 @@ pub mod tests {
     use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_state::prelude::test_cache_env;
     use holochain_state::prelude::test_cell_env;
+    use holochain_types::prelude::DnaDefHashed;
     use holochain_zome_types::fake_agent_pubkey_1;
     use holochain_zome_types::CellId;
     use holochain_zome_types::Header;
@@ -112,15 +113,16 @@ pub mod tests {
         let workspace =
             HostFnWorkspace::new(env.clone(), test_cache.env(), author.clone()).unwrap();
         let mut ribosome = MockRibosomeT::new();
-
+        let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
+        let dna_hash = DnaHash::with_data_sync(&dna_def);
+        let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def.clone());
         // Setup the ribosome mock
         ribosome
             .expect_run_init()
             .returning(move |_workspace, _invocation| Ok(InitResult::Pass));
+        ribosome.expect_dna_def().return_const(dna_def_hashed);
 
-        let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
-
-        let cell_id = CellId::new(DnaHash::with_data_sync(&dna_def), fixt!(AgentPubKey));
+        let cell_id = CellId::new(dna_hash, fixt!(AgentPubKey));
         let conductor_api = Arc::new(MockConductorHandleT::new());
         let conductor_api = CellConductorApi::new(conductor_api, cell_id);
         let args = InitializeZomesWorkflowArgs {
