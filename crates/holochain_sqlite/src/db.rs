@@ -50,9 +50,13 @@ impl DbRead {
     /// Get a connection from the pool.
     /// TODO: We should eventually swap this for an async solution.
     fn connection_pooled(&self) -> DatabaseResult<PConn> {
-        tokio::task::block_in_place(move || {
-            Ok(PConn::new(self.connection_pool.get()?, self.kind.clone()))
-        })
+        let now = std::time::Instant::now();
+        let r = Ok(PConn::new(self.connection_pool.get()?, self.kind.clone()));
+        let el = now.elapsed();
+        if el.as_millis() > 20 {
+            tracing::error!("Connection pool took {:?} to be free'd", el);
+        }
+        r
     }
 }
 

@@ -31,7 +31,7 @@ use test_case::test_case;
 const TIMEOUT_ERROR: &'static str = "inner function \'call_create_entry_remotely\' failed: ZomeCallNetworkError(\"Other: timeout\")";
 
 #[test_case(2)]
-#[test_case(5)]
+// #[test_case(5)]
 // #[test_case(10)] 10 works but might be too slow for our regular test run
 // FIXME: this test is flaky!
 fn conductors_call_remote(num_conductors: usize) {
