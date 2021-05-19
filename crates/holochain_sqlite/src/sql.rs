@@ -1,5 +1,6 @@
-pub(crate) mod sql_cell {
+pub mod sql_cell {
     pub(crate) const SCHEMA: &str = include_str!("sql/cell/schema.sql");
+    pub const UPDATE_INTEGRATE_OPS: &str = include_str!("sql/cell/update_integrate_ops.sql");
 }
 
 pub(crate) mod sql_conductor {
@@ -18,5 +19,3 @@ pub(crate) mod sql_p2p {
     pub(crate) const GOSSIP_QUERY: &str = include_str!("sql/p2p/gossip_query.sql");
     pub(crate) const PRUNE: &str = include_str!("sql/p2p/prune.sql");
 }
-
-pub const UPDATE_INTEGRATE_OPS: &str = include_str!("sql/cell/update_integrate_ops.sql");
