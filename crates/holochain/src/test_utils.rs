@@ -35,6 +35,7 @@ use holochain_types::prelude::*;
 
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
+use rusqlite::named_params;
 use std::sync::Arc;
 use std::time::Duration;
 use tempdir::TempDir;
@@ -376,7 +377,7 @@ pub async fn consistency(all_cells: &[&SweetCell], num_attempts: usize, delay: D
 pub async fn consistency_envs(all_cell_envs: &[&EnvWrite], num_attempts: usize, delay: Duration) {
     let mut expected_count = 0;
     for &env in all_cell_envs.iter() {
-        let count = get_authored_ops(env).len();
+        let count = get_published_ops(env).len();
         expected_count += count;
     }
     for &env in all_cell_envs.iter() {
@@ -406,7 +407,7 @@ async fn consistency_envs_others(
 ) {
     let mut expected_count = 0;
     for &env in all_cell_envs.iter() {
-        let count = get_authored_ops(env).len();
+        let count = get_published_ops(env).len();
         expected_count += count;
     }
     let start = Some(std::time::Instant::now());
@@ -426,6 +427,34 @@ fn get_authored_ops(env: &EnvWrite) -> Vec<DhtOpLight> {
             .unwrap()
             .collect::<StateQueryResult<_>>()
             .unwrap()
+    })
+}
+
+fn get_published_ops(env: &EnvWrite) -> Vec<DhtOpLight> {
+    fresh_reader_test(env.clone(), |txn| {
+        txn.prepare(
+            "
+            SELECT 
+            DhtOp.blob 
+            FROM DhtOp
+            JOIN
+            Header ON DhtOp.header_hash = Header.hash
+            WHERE
+            DhtOp.is_authored = 1
+            AND
+            (DhtOp.type != :store_entry OR Header.private_entry = 0)
+        ",
+        )
+        .unwrap()
+        .query_and_then(
+            named_params! {
+                ":store_entry": DhtOpType::StoreEntry,
+            },
+            |row| from_blob(row.get("blob")?),
+        )
+        .unwrap()
+        .collect::<StateQueryResult<_>>()
+        .unwrap()
     })
 }
 
@@ -452,7 +481,7 @@ pub async fn wait_for_integration(
             return;
         } else {
             let total_time_waited = delay * i as u32;
-            tracing::debug!(?count, ?total_time_waited);
+            tracing::debug!(?count, ?total_time_waited, counts = ?count_integration(env).await);
         }
         tokio::time::sleep(delay).await;
     }
@@ -610,24 +639,7 @@ async fn get_counts(envs: &[&EnvWrite]) -> IntegrationStateDumps {
 }
 
 async fn count_integration(env: &EnvWrite) -> IntegrationStateDump {
-    fresh_reader_test(env.clone(), |txn| {
-        let integrated = txn
-            .query_row(
-                "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        let integration_limbo = txn.query_row("SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3", [], |row|row.get(0))
-            .unwrap();
-        let validation_limbo = txn.query_row("SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND (validation_stage IS NULL OR validation_stage < 3)", [], |row|row.get(0))
-            .unwrap();
-        IntegrationStateDump {
-            validation_limbo,
-            integration_limbo,
-            integrated,
-        }
-    })
+    crate::conductor::integration_dump(&env.clone().into()).unwrap()
 }
 
 async fn display_integration(env: &EnvWrite) -> usize {

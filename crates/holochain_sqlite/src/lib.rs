@@ -16,6 +16,8 @@ pub mod schema;
 pub mod swansong;
 // pub mod transaction;
 
+pub const UPDATE_INTEGRATE_OPS: &str = include_str!("schema/cell/update_integrate_ops.sql");
+
 mod table;
 
 #[cfg(any(test, feature = "test_utils"))]

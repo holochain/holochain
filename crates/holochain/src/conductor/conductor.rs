@@ -908,36 +908,10 @@ where
         let source_chain_dump =
             source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey()).await?;
 
-        let integration_dump = fresh_reader!(arc, |txn| {
-            let integrated = txn.query_row(
-                "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
-                [],
-                |row| row.get(0),
-            )?;
-            let integration_limbo = txn.query_row("SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3", [], |row|row.get(0))?;
-            let validation_limbo = txn.query_row(
-                "
-                SELECT count(hash) FROM DhtOp 
-                WHERE when_integrated IS NULL 
-                AND (
-                    (is_authored = 1 AND validation_stage IS NOT NULL AND validation_stage < 3)
-                    OR 
-                    (is_authored = 0 AND (validation_stage IS NULL OR validation_stage < 3))
-                )
-                ",
-                [],
-                |row| row.get(0),
-            )?;
-            ConductorApiResult::Ok(IntegrationStateDump {
-                validation_limbo,
-                integration_limbo,
-                integrated,
-            })
-        })?;
         let out = JsonDump {
             peer_dump,
             source_chain_dump,
-            integration_dump,
+            integration_dump: integration_dump(&arc.clone().into())?,
         };
         // Add summary
         let summary = out.to_string();
@@ -978,6 +952,40 @@ where
             .insert(id, AppInterfaceRuntime::Test { signal_tx });
         Ok(())
     }
+}
+
+/// Dump the integration json state.
+pub fn integration_dump(vault: &EnvRead) -> ConductorApiResult<IntegrationStateDump> {
+    fresh_reader!(vault, |txn| {
+        let integrated = txn.query_row(
+            "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
+            [],
+            |row| row.get(0),
+        )?;
+        let integration_limbo = txn.query_row(
+            "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
+            [],
+            |row| row.get(0),
+        )?;
+        let validation_limbo = txn.query_row(
+            "
+                SELECT count(hash) FROM DhtOp 
+                WHERE when_integrated IS NULL 
+                AND (
+                    (is_authored = 1 AND validation_stage IS NOT NULL AND validation_stage < 3)
+                    OR 
+                    (is_authored = 0 AND (validation_stage IS NULL OR validation_stage < 3))
+                )
+                ",
+            [],
+            |row| row.get(0),
+        )?;
+        ConductorApiResult::Ok(IntegrationStateDump {
+            validation_limbo,
+            integration_limbo,
+            integrated,
+        })
+    })
 }
 
 //-----------------------------------------------------------------------------
