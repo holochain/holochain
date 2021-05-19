@@ -19,4 +19,4 @@ pub(crate) mod sql_p2p {
     pub(crate) const PRUNE: &str = include_str!("sql/p2p/prune.sql");
 }
 
-pub const UPDATE_INTEGRATE_OPS: &str = include_str!("schema/cell/update_integrate_ops.sql");
+pub const UPDATE_INTEGRATE_OPS: &str = include_str!("sql/cell/update_integrate_ops.sql");
