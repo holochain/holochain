@@ -16,7 +16,7 @@ pub(crate) fn initialize_database(conn: &mut Connection, db_kind: &DbKind) -> ru
         DbKind::Wasm => {
             crate::schema::SCHEMA_WASM.initialize(conn, Some(db_kind))?;
         }
-        DbKind::P2p => {
+        DbKind::P2p(_) => {
             crate::schema::SCHEMA_P2P.initialize(conn, Some(db_kind))?;
         }
         DbKind::Cache(_) => {

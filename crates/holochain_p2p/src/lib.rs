@@ -9,6 +9,7 @@ use std::sync::Arc;
 mod types;
 pub use types::actor::HolochainP2pRef;
 pub use types::actor::HolochainP2pSender;
+pub use types::AgentPubKeyExt; // why is this not included by * above???
 pub use types::*;
 
 mod spawn;

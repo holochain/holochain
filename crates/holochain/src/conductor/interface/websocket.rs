@@ -272,9 +272,9 @@ pub mod test {
     use crate::test_utils::conductor_setup::ConductorTestData;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
+    use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
-    use holochain_state::agent_info::AgentKvKey;
-    use holochain_state::prelude::fresh_reader_test;
+    use holochain_sqlite::prelude::*;
     use holochain_state::prelude::test_environments;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
@@ -288,6 +288,7 @@ pub mod test {
     use holochain_zome_types::ExternIO;
     use kitsune_p2p::agent_store::AgentInfoSigned;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
+    use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
     use matches::assert_matches;
     use mockall::predicate;
     use observability;
@@ -687,7 +688,7 @@ pub mod test {
     async fn add_agent_info_via_admin() {
         observability::test_run().ok();
         let test_envs = test_environments();
-        let env = test_envs.p2p();
+        let p2p = test_envs.p2p();
         let agents = vec![fake_agent_pubkey_1(), fake_agent_pubkey_2()];
         let dnas = vec![
             make_dna("1", vec![TestWasm::Anchor]).await,
@@ -706,9 +707,11 @@ pub mod test {
         // - Give time for the agents to join the network.
         crate::assert_eq_retry_10s!(
             {
-                fresh_reader_test(env.clone(), |txn| {
-                    holochain_state::agent_info::get_all(&txn).unwrap().len()
-                })
+                let mut count = 0;
+                for env in p2p.lock().values() {
+                    count += env.conn().unwrap().p2p_list().unwrap().len();
+                }
+                count
             },
             4
         );
@@ -719,10 +722,10 @@ pub mod test {
             .collect::<Vec<_>>();
 
         let mut expect = to_key(agent_infos.clone());
-        let k00: AgentKvKey = (dnas[0].clone(), agents[0].clone()).into();
-        let k01: AgentKvKey = (dnas[0].clone(), agents[1].clone()).into();
-        let k10: AgentKvKey = (dnas[1].clone(), agents[0].clone()).into();
-        let k11: AgentKvKey = (dnas[1].clone(), agents[1].clone()).into();
+        let k00 = (dnas[0].to_kitsune(), agents[0].to_kitsune());
+        let k01 = (dnas[0].to_kitsune(), agents[1].to_kitsune());
+        let k10 = (dnas[1].to_kitsune(), agents[0].to_kitsune());
+        let k11 = (dnas[1].to_kitsune(), agents[1].to_kitsune());
         expect.push(k00.clone());
         expect.push(k01.clone());
         expect.push(k10.clone());
@@ -800,10 +803,15 @@ pub mod test {
         rx
     }
 
-    fn to_key(r: Vec<AgentInfoSigned>) -> Vec<AgentKvKey> {
+    fn to_key(r: Vec<AgentInfoSigned>) -> Vec<(Arc<KitsuneSpace>, Arc<KitsuneAgent>)> {
         let mut results = r
             .into_iter()
-            .map(|a| AgentKvKey::try_from(&a).unwrap())
+            .map(|a| {
+                (
+                    Arc::new(KitsuneSpace::try_from(&a).unwrap()),
+                    Arc::new(KitsuneAgent::try_from(a).unwrap()),
+                )
+            })
             .collect::<Vec<_>>();
         results.sort();
         results

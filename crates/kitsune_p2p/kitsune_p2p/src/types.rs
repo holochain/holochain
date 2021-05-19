@@ -172,6 +172,12 @@ macro_rules! make_kitsune_bin_type {
                     Ok(())
                 }
             }
+
+            impl std::fmt::Display for $name {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    base64::encode_config(&self.0, base64::URL_SAFE_NO_PAD).fmt(f)
+                }
+            }
         )*
     };
 }

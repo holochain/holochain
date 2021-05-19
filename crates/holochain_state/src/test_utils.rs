@@ -5,7 +5,9 @@ use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
 use holochain_zome_types::test_utils::fake_cell_id;
+use kitsune_p2p::KitsuneSpace;
 use shrinkwraprs::Shrinkwrap;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use tempdir::TempDir;
@@ -39,7 +41,7 @@ pub fn test_wasm_env() -> TestEnv {
 
 /// Create a [TestEnv] of [DbKind::P2p], backed by a temp directory.
 pub fn test_p2p_env() -> TestEnv {
-    test_env(DbKind::P2p)
+    test_env(DbKind::P2p(Arc::new(KitsuneSpace(vec![0; 36]))))
 }
 
 fn test_env(kind: DbKind) -> TestEnv {
@@ -176,7 +178,7 @@ pub struct TestEnvs {
     /// A test wasm environment
     wasm: EnvWrite,
     /// A test p2p environment
-    p2p: EnvWrite,
+    p2p: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
     /// The shared root temp dir for these environments
     tempdir: Arc<TempDir>,
 }
@@ -187,8 +189,8 @@ impl TestEnvs {
     pub fn with_keystore(tempdir: TempDir, keystore: KeystoreSender) -> Self {
         use DbKind::*;
         let conductor = EnvWrite::test(&tempdir, Conductor, keystore.clone()).unwrap();
-        let wasm = EnvWrite::test(&tempdir, Wasm, keystore.clone()).unwrap();
-        let p2p = EnvWrite::test(&tempdir, P2p, keystore).unwrap();
+        let wasm = EnvWrite::test(&tempdir, Wasm, keystore).unwrap();
+        let p2p = Arc::new(parking_lot::Mutex::new(HashMap::new()));
         Self {
             conductor,
             wasm,
@@ -210,7 +212,7 @@ impl TestEnvs {
         self.wasm.clone()
     }
 
-    pub fn p2p(&self) -> EnvWrite {
+    pub fn p2p(&self) -> Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>> {
         self.p2p.clone()
     }
 

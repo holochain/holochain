@@ -13,10 +13,9 @@ pub mod fatal;
 // pub mod key;
 pub mod prelude;
 pub mod schema;
+pub mod sql;
 pub mod swansong;
 // pub mod transaction;
-
-pub const UPDATE_INTEGRATE_OPS: &str = include_str!("schema/cell/update_integrate_ops.sql");
 
 mod table;
 

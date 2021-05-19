@@ -69,7 +69,8 @@ impl TestDbs {
         use DbKind::*;
         let conductor = DbWrite::new(&tempdir.path(), Conductor).unwrap();
         let wasm = DbWrite::new(&tempdir.path(), Wasm).unwrap();
-        let p2p = DbWrite::new(&tempdir.path(), P2p).unwrap();
+        let space = kitsune_p2p::KitsuneSpace(vec![0; 36]);
+        let p2p = DbWrite::new(&tempdir.path(), P2p(Arc::new(space))).unwrap();
         Self {
             conductor,
             wasm,

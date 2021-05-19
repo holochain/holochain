@@ -35,7 +35,6 @@
 #![allow(deprecated)]
 
 #[allow(missing_docs)]
-pub mod agent_info;
 pub mod dna_def;
 pub mod entry_def;
 pub mod host_fn_workspace;
