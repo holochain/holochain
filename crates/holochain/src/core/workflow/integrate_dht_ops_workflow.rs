@@ -25,7 +25,7 @@ pub async fn integrate_dht_ops_workflow(
     let mut conn = vault.conn()?;
     let changed = conn.with_commit(|txn| {
         let changed = txn
-            .prepare_cached(holochain_sqlite::UPDATE_INTEGRATE_OPS)?
+            .prepare_cached(holochain_sqlite::sql::UPDATE_INTEGRATE_OPS)?
             .execute(named_params! {
                 ":when_integrated": time,
                 ":when_integrated_ns": to_blob(time)?,
