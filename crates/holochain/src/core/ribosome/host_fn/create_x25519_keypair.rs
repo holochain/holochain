@@ -10,7 +10,7 @@ pub fn create_x25519_keypair(
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<X25519PubKey, WasmError> {
-    Ok(tokio_helper::block_forever_on(async move {
+    Ok(holochain_util::tokio_helper::block_forever_on(async move {
         call_context
             .host_access
             .keystore()

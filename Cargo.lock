@@ -1220,17 +1220,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ffs"
-version = "0.0.1"
-dependencies = [
- "backtrace",
- "cfg-if 0.1.10",
- "derive_more",
- "dunce",
- "tokio",
-]
-
-[[package]]
 name = "fixt"
 version = "0.0.2-alpha.1"
 dependencies = [
@@ -1662,6 +1651,7 @@ dependencies = [
  "holochain_state",
  "holochain_test_wasm_common",
  "holochain_types",
+ "holochain_util",
  "holochain_wasm_test_utils",
  "holochain_wasmer_host",
  "holochain_websocket",
@@ -1698,7 +1688,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
- "tokio_helper",
  "toml",
  "tracing",
  "tracing-futures",
@@ -1758,9 +1747,9 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "assert_cmd",
- "ffs",
  "holochain_serialized_bytes",
  "holochain_types",
+ "holochain_util",
  "matches",
  "mr_bundle",
  "predicates",
@@ -1857,6 +1846,7 @@ dependencies = [
  "holo_hash",
  "holochain_keystore",
  "holochain_serialized_bytes",
+ "holochain_util",
  "holochain_zome_types",
  "lazy_static",
  "must_future",
@@ -1873,7 +1863,6 @@ dependencies = [
  "tempdir",
  "thiserror",
  "tokio",
- "tokio_helper",
  "tracing",
  "tracing-futures",
 ]
@@ -1890,6 +1879,7 @@ dependencies = [
  "holochain_keystore",
  "holochain_serialized_bytes",
  "holochain_types",
+ "holochain_util",
  "holochain_zome_types",
  "kitsune_p2p",
  "kitsune_p2p_types",
@@ -1900,7 +1890,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
- "tokio_helper",
 ]
 
 [[package]]
@@ -1945,6 +1934,7 @@ dependencies = [
  "holochain_p2p",
  "holochain_serialized_bytes",
  "holochain_types",
+ "holochain_util",
  "holochain_wasm_test_utils",
  "holochain_zome_types",
  "matches",
@@ -1956,7 +1946,6 @@ dependencies = [
  "shrinkwraprs",
  "thiserror",
  "tokio",
- "tokio_helper",
  "tracing",
  "tracing-futures",
 ]
@@ -1986,13 +1975,13 @@ dependencies = [
  "derive_builder",
  "derive_more",
  "either",
- "ffs",
  "fixt",
  "flate2",
  "futures",
  "holo_hash",
  "holochain_keystore",
  "holochain_serialized_bytes",
+ "holochain_util",
  "holochain_zome_types",
  "itertools 0.10.0",
  "lazy_static",
@@ -2015,8 +2004,21 @@ dependencies = [
  "tempdir",
  "thiserror",
  "tokio",
- "tokio_helper",
  "tracing",
+]
+
+[[package]]
+name = "holochain_util"
+version = "0.0.1"
+dependencies = [
+ "backtrace",
+ "cfg-if 0.1.10",
+ "derive_more",
+ "dunce",
+ "futures",
+ "num_cpus",
+ "once_cell",
+ "tokio",
 ]
 
 [[package]]
@@ -2026,11 +2028,11 @@ dependencies = [
  "fixt",
  "holo_hash",
  "holochain_types",
+ "holochain_util",
  "holochain_zome_types",
  "rand 0.7.3",
  "strum",
  "strum_macros",
- "tokio_helper",
  "toml",
  "walkdir",
 ]
@@ -2835,9 +2837,9 @@ dependencies = [
  "bytes",
  "derive_more",
  "either",
- "ffs",
  "flate2",
  "futures",
+ "holochain_util",
  "maplit",
  "matches",
  "reqwest",
@@ -4736,16 +4738,6 @@ dependencies = [
  "futures-sink",
  "log",
  "pin-project-lite 0.2.6",
- "tokio",
-]
-
-[[package]]
-name = "tokio_helper"
-version = "0.0.1"
-dependencies = [
- "futures",
- "num_cpus",
- "once_cell",
  "tokio",
 ]
 

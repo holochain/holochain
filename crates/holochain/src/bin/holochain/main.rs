@@ -48,7 +48,7 @@ struct Opt {
 
 fn main() {
     // the async_main function should only end if our program is done
-    tokio_helper::block_forever_on(async_main())
+    holochain_util::tokio_helper::block_forever_on(async_main())
 }
 
 async fn async_main() {

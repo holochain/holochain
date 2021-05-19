@@ -20,7 +20,7 @@ path = "src/bin/hc-dna.rs"
 
 [dependencies]
 anyhow = "1.0"
-ffs = { path = "../ffs", features =["backtrace"] }
+holochain_util = { path = "../holochain_util", features = ["backtrace"] }
 holochain_serialized_bytes = "=0.0.50"
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
 mr_bundle = {version = "0.0.1", path = "../mr_bundle"}

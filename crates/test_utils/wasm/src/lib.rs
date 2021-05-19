@@ -226,7 +226,7 @@ fn get_code(path: &'static str) -> Vec<u8> {
 
 impl From<TestWasm> for ZomeDef {
     fn from(test_wasm: TestWasm) -> Self {
-        tokio_helper::block_forever_on(async move {
+        holochain_util::tokio_helper::block_forever_on(async move {
             let dna_wasm: DnaWasm = test_wasm.into();
             let (_, wasm_hash) = holochain_types::dna::wasm::DnaWasmHashed::from_content(dna_wasm)
                 .await

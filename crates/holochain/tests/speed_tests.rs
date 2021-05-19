@@ -118,7 +118,7 @@ async fn speed_test_persisted() {
 #[ignore = "speed tests are ignored by default; unignore to run"]
 fn speed_test_all(n: usize) {
     observability::test_run().unwrap();
-    tokio_helper::block_forever_on(speed_test(Some(n)));
+    holochain_util::tokio_helper::block_forever_on(speed_test(Some(n)));
 }
 
 #[instrument]

@@ -4,6 +4,7 @@ use crate::{
     manifest::Manifest,
     resource::ResourceBytes,
 };
+use holochain_util::ffs;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     borrow::Cow,
