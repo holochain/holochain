@@ -24,109 +24,9 @@ pub async fn integrate_dht_ops_workflow(
     let time = holochain_types::timestamp::now();
     let mut conn = vault.conn()?;
     let changed = conn.with_commit(|txn| {
-        let dep = "
-            SELECT 1 FROM Header AS H_DEP
-            JOIN DhtOp AS OP_DEP ON OP_DEP.header_hash = H_DEP.hash 
-            WHERE 
-            OP_DEP.when_integrated IS NOT NULL
-        ";
-        let activity = format!(
-            "{}
-            AND Header.prev_hash = H_DEP.hash
-            AND OP_DEP.type = :register_activity
-            ",
-            dep
-        );
-        let update_content = format!(
-            "{}
-			AND Header.original_header_hash = H_DEP.hash
-			AND OP_DEP.type = :store_entry 
-            ",
-            dep
-        );
-        let update_element = format!(
-            "{}
-			AND Header.original_header_hash = H_DEP.hash
-			AND OP_DEP.type = :store_element
-            ",
-            dep
-        );
-        let deleted_entry_header = format!(
-            "{}
-			AND Header.deletes_header_hash = H_DEP.hash
-			AND OP_DEP.type = :store_entry
-            ",
-            dep
-        );
-        let deleted_by = format!(
-            "{}
-			AND Header.deletes_header_hash = H_DEP.hash
-			AND OP_DEP.type = :store_element
-            ",
-            dep
-        );
-        let create_link = format!(
-            "{}
-			AND Header.base_hash = H_DEP.entry_hash
-			AND OP_DEP.type = :store_entry
-            ",
-            dep
-        );
-        let delete_link = format!(
-            "{}
-			AND Header.create_link_hash = H_DEP.hash
-			AND OP_DEP.type = :create_link
-            ",
-            dep
-        );
-        let ops = format!(
-            "
-            CASE DhtOp.type
-                WHEN :store_entry               THEN 1
-                WHEN :store_element             THEN 1
-                WHEN :register_activity         THEN (EXISTS({activity}) OR Header.prev_hash IS NULL)
-                WHEN :updated_content           THEN EXISTS({update_content})
-                WHEN :updated_element           THEN EXISTS({update_element})
-                WHEN :deleted_by                THEN EXISTS({deleted_by})
-                WHEN :deleted_entry_header      THEN EXISTS({deleted_entry_header})
-                WHEN :create_link               THEN EXISTS({create_link})
-                WHEN :delete_link               THEN EXISTS({delete_link})
-            END
-            ",
-            activity = activity,
-            update_content = update_content,
-            update_element = update_element,
-            deleted_by = deleted_by,
-            deleted_entry_header = deleted_entry_header,
-            create_link = create_link,
-            delete_link = delete_link,
-        );
-        let sql = format!(
-            "
-            UPDATE DhtOp
-            SET
-            when_integrated = :when_integrated,
-            when_integrated_ns = :when_integrated_ns,
-            validation_stage = NULL
-            WHERE 
-            validation_stage = 3
-            AND
-            validation_status IS NOT NULL
-            AND
-            DhtOp.header_hash IN (
-                SELECT Header.hash
-                FROM Header
-                WHERE
-                {}
-            )
-            ",
-            ops
-        );
-        let mut stmt = txn.prepare(&sql)?;
-
-        let changed = stmt.execute(
-            // &sql,
-            named_params! {
+        let changed = txn
+            .prepare_cached(holochain_sqlite::sql::UPDATE_INTEGRATE_OPS)?
+            .execute(named_params! {
                 ":when_integrated": time,
                 ":when_integrated_ns": to_blob(time)?,
                 ":store_entry": DhtOpType::StoreEntry,
@@ -139,8 +39,7 @@ pub async fn integrate_dht_ops_workflow(
                 ":create_link": DhtOpType::RegisterAddLink,
                 ":delete_link": DhtOpType::RegisterRemoveLink,
 
-            },
-        )?;
+            })?;
         WorkflowResult::Ok(changed)
     })?;
     tracing::debug!(?changed);
