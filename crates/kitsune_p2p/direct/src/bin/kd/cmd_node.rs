@@ -46,12 +46,7 @@ async fn mk_demo(kd: &KitsuneDirect) -> KitsuneResult<KdHash> {
     let persist = kd.get_persist();
     let root = persist.generate_signing_keypair().await?;
 
-    let mk_entry = |
-        t: &'static str,
-        p: &KdHash,
-        d: serde_json::Value,
-        b: &[u8],
-    | {
+    let mk_entry = |t: &'static str, p: &KdHash, d: serde_json::Value, b: &[u8]| {
         let e = KdEntryData {
             type_hint: t.to_string(),
             parent: p.clone(),
@@ -72,18 +67,35 @@ async fn mk_demo(kd: &KitsuneDirect) -> KitsuneResult<KdHash> {
 
     let app = mk_entry("s.app", &root, serde_json::json!({}), &[]).await?;
     let ui = mk_entry("s.ui", &app, serde_json::json!({}), &[]).await?;
-    let _favicon = mk_entry("s.file", &ui, serde_json::json!({
-        "name": "favicon.svg",
-        "mime": "image/svg+xml",
-    }), ICON).await?;
-    let _index_html = mk_entry("s.file", &ui, serde_json::json!({
-        "name": "index.html",
-        "mime": "text/html",
-    }), INDEX).await?;
-    let _index = mk_entry("s.index", &ui, serde_json::json!({
-        "path": "/index.html",
-    }), &[]).await?;
+    let _favicon = mk_entry(
+        "s.file",
+        &ui,
+        serde_json::json!({
+            "name": "favicon.svg",
+            "mime": "image/svg+xml",
+        }),
+        ICON,
+    )
+    .await?;
+    let _index_html = mk_entry(
+        "s.file",
+        &ui,
+        serde_json::json!({
+            "name": "index.html",
+            "mime": "text/html",
+        }),
+        INDEX,
+    )
+    .await?;
+    let _index = mk_entry(
+        "s.index",
+        &ui,
+        serde_json::json!({
+            "path": "/index.html",
+        }),
+        &[],
+    )
+    .await?;
 
     Ok(root)
 }
-

@@ -74,10 +74,7 @@ pub trait AsKdPersist: 'static + Send + Sync {
     ) -> BoxFuture<'static, KitsuneResult<Vec<KdEntry>>>;
 
     /// Get ui file
-    fn get_ui_file(
-        &self,
-        path: &str,
-    ) -> BoxFuture<'static, KitsuneResult<(String, Vec<u8>)>>;
+    fn get_ui_file(&self, path: &str) -> BoxFuture<'static, KitsuneResult<(String, Vec<u8>)>>;
 }
 
 /// Handle to a persistence store.

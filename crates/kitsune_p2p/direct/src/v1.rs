@@ -243,10 +243,8 @@ async fn handle_srv_events(
                             };
                             let mut r = HttpResponse::default();
                             r.headers.clear();
-                            r.headers.push((
-                                "Content-Type".to_string(),
-                                mime.into_bytes(),
-                            ));
+                            r.headers
+                                .push(("Content-Type".to_string(), mime.into_bytes()));
                             r.body = data;
                             Ok(r)
                         }

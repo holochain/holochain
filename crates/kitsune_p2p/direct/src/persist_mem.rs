@@ -262,10 +262,7 @@ impl AsKdPersist for PersistMem {
         async move { r }.boxed()
     }
 
-    fn get_ui_file(
-        &self,
-        path: &str,
-    ) -> BoxFuture<'static, KitsuneResult<(String, Vec<u8>)>> {
+    fn get_ui_file(&self, path: &str) -> BoxFuture<'static, KitsuneResult<(String, Vec<u8>)>> {
         let path = match path.to_lowercase().as_str() {
             "/" | "/index.html" => "index.html".to_string(),
             oth => String::from_utf8_lossy(&oth.as_bytes()[1..]).to_string(),
@@ -280,14 +277,11 @@ impl AsKdPersist for PersistMem {
                             if let Some(m) = e.as_data().data.as_object() {
                                 if let Some(n) = m.get("name") {
                                     if let Some(n) = n.as_str() {
-                                        if n == &path {
+                                        if n == path {
                                             if let Some(mime) = m.get("mime") {
                                                 if let Some(mime) = mime.as_str() {
                                                     let bin = e.as_binary().to_vec();
-                                                    return Ok((
-                                                        mime.to_string(),
-                                                        bin,
-                                                    ));
+                                                    return Ok((mime.to_string(), bin));
                                                 }
                                             }
                                         }

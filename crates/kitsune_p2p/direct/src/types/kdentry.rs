@@ -239,7 +239,10 @@ impl KdEntry {
     }
 
     /// Sign entry data into a full KdEntry instance
-    pub fn sign(persist: &KdPersist, decoded: KdEntryData) -> impl Future<Output = KitsuneResult<Self>> + 'static + Send {
+    pub fn sign(
+        persist: &KdPersist,
+        decoded: KdEntryData,
+    ) -> impl Future<Output = KitsuneResult<Self>> + 'static + Send {
         Self::sign_with_binary(persist, decoded, &[])
     }
 
