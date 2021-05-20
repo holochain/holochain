@@ -12,8 +12,8 @@ use tokio_stream::{Stream, StreamExt};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 const HC_SERVICE_PROTOCOL: &str = "._udp";
-const BROADCAST_INTERVAL_SEC: u64 = 8;
-const QUERY_INTERVAL_SEC: u64 = 5;
+const BROADCAST_INTERVAL_SEC: u64 = 12;
+const QUERY_INTERVAL_SEC: u64 = 8;
 const MAX_TXT_SIZE: usize = 192;
 
 #[derive(Debug, Error)]
@@ -74,9 +74,9 @@ pub fn mdns_create_broadcast_thread(
         // Create mdns responder
 
         let responder = libmdns::Responder::new().unwrap();
-        let _svc = responder.register(svc_type, service_name, 0, &txts);
         // Loop forever unless termination command received
         loop {
+            let _svc = responder.register(svc_type.clone(), service_name.clone(), 0, &txts);;
             tokio::time::sleep(::std::time::Duration::from_secs(BROADCAST_INTERVAL_SEC)).await;
             if !can_run_clone.load(Ordering::Relaxed) {
                 //println!("Terminating.");
