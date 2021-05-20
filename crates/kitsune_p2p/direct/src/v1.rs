@@ -395,7 +395,7 @@ async fn handle_put_agent_info_signed(
         agent_info_signed, ..
     } = input;
 
-    let agent_info = KdAgentInfo::new(agent_info_signed)?;
+    let agent_info = KdAgentInfo::from_kitsune(&agent_info_signed)?;
 
     kdirect.persist.store_agent_info(agent_info).await?;
 
@@ -413,7 +413,7 @@ async fn handle_get_agent_info_signed(
     let agent = KdHash::from_kitsune_agent(&agent);
 
     Ok(match kdirect.persist.get_agent_info(root, agent).await {
-        Ok(i) => Some(i.into()),
+        Ok(i) => Some(i.to_kitsune()),
         Err(_) => None,
     })
 }
@@ -428,7 +428,7 @@ async fn handle_query_agent_info_signed(
     let root = KdHash::from_kitsune_space(&space);
 
     let map = kdirect.persist.query_agent_info(root).await?;
-    Ok(map.into_iter().map(|a| a.into()).collect())
+    Ok(map.into_iter().map(|a| a.to_kitsune()).collect())
 }
 
 async fn handle_call(

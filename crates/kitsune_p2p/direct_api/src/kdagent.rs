@@ -3,7 +3,7 @@
 use crate::*;
 
 /// Additional types associated with the KdAgentInfo struct
-mod kd_agent_info {
+pub mod kd_agent_info {
     use super::*;
 
     /// the inner kd agent type
@@ -31,9 +31,13 @@ mod kd_agent_info {
         #[serde(rename = "expiresAtMs")]
         pub expires_at_ms: i64,
 
+        /// the signature data
+        #[serde(rename = "signature")]
+        pub signature: kd_entry::KdEntryBinary,
+
         /// the raw encoded kitsune agent info
-        #[serde(rename = "encoded")]
-        pub encoded: kd_entry::KdEntryBinary,
+        #[serde(rename = "encodedInfo")]
+        pub encoded_info: kd_entry::KdEntryBinary,
     }
 }
 
@@ -67,9 +71,14 @@ impl KdAgentInfo {
         std::str::FromStr::from_str(s)
     }
 
+    /// get the raw signature bytes of the kitsune AgentInfoSigned
+    pub fn as_signature_ref(&self) -> &[u8] {
+        &self.0.signature
+    }
+
     /// get the raw encoded bytes of the kitsune AgentInfoSigned
-    pub fn as_encoded_ref(&self) -> &[u8] {
-        &self.0.encoded
+    pub fn as_encoded_info_ref(&self) -> &[u8] {
+        &self.0.encoded_info
     }
 
     /// get the root app hash

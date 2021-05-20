@@ -131,14 +131,14 @@ impl AsKdPersist for PersistMem {
 
     fn store_agent_info(&self, agent_info: KdAgentInfo) -> BoxFuture<'static, KitsuneResult<()>> {
         let r = self.0.share_mut(move |i, _| {
-            let root = agent_info.root.clone();
-            let agent = agent_info.agent.clone();
+            let root = agent_info.root().clone();
+            let agent = agent_info.agent().clone();
 
             let root_map = i.agent_info.entry(root).or_insert_with(HashMap::new);
 
             match root_map.entry(agent) {
                 Entry::Occupied(mut e) => {
-                    if e.get().signed_at_ms < agent_info.signed_at_ms {
+                    if e.get().signed_at_ms() < agent_info.signed_at_ms() {
                         e.insert(agent_info);
                     }
                 }

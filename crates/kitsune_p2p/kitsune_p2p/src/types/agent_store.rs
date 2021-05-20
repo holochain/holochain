@@ -36,6 +36,19 @@ pub struct AgentInfoSigned {
 }
 
 impl AgentInfoSigned {
+    /// Build a new AgentInfoSigned struct.
+    pub fn new_unchecked(
+        agent: KitsuneAgent,
+        signature: KitsuneSignature,
+        agent_info: Vec<u8>,
+    ) -> Self {
+        Self {
+            agent,
+            signature,
+            agent_info,
+        }
+    }
+
     /// Build a new AgentInfoSigned struct given a valid signature of the AgentInfo.
     // @todo fail this if the signature does not verify against the agent info.
     // It should not be possible to express a signed agent info type  with no valid signature.
