@@ -32,8 +32,9 @@ serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 [features]
 
 default = ["serialized-bytes", "fixturators"]
-full = ["fixturators", "hashing", "string-encoding"]
+full = ["fixturators", "hashing", "string-encoding", "test_utils"]
 
+test_utils = ["full"]
 fixturators = ["fixt", "rand", "serialized-bytes", "string-encoding"]
 serialized-bytes = ["holochain_serialized_bytes"]
 string-encoding = ["base64", "blake2b_simd", "derive_more"]
