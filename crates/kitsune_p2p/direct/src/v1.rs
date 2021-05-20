@@ -161,9 +161,10 @@ impl AsKitsuneDirect for Kd1 {
     }
 
     fn join(&self, root: KdHash, agent: KdHash) -> BoxFuture<'static, KitsuneResult<()>> {
-        let fut = self
-            .inner
-            .share_mut(|i, _| Ok(i.p2p.join(root.into(), agent.into())));
+        let fut = self.inner.share_mut(|i, _| {
+            Ok(i.p2p
+                .join(root.to_kitsune_space(), agent.to_kitsune_agent()))
+        });
         async move {
             fut?.await.map_err(KitsuneError::other)?;
             Ok(())
@@ -186,9 +187,9 @@ impl AsKitsuneDirect for Kd1 {
             let res = inner
                 .share_mut(|i, _| {
                     Ok(i.p2p.rpc_single(
-                        root.into(),
-                        to_agent.into(),
-                        from_agent.into(),
+                        root.to_kitsune_space(),
+                        to_agent.to_kitsune_agent(),
+                        from_agent.to_kitsune_agent(),
                         payload,
                         None,
                     ))
@@ -408,8 +409,8 @@ async fn handle_get_agent_info_signed(
 ) -> KitsuneResult<Option<AgentInfoSigned>> {
     let GetAgentInfoSignedEvt { space, agent } = input;
 
-    let root = space.into();
-    let agent = agent.into();
+    let root = KdHash::from_kitsune_space(&space);
+    let agent = KdHash::from_kitsune_agent(&agent);
 
     Ok(match kdirect.persist.get_agent_info(root, agent).await {
         Ok(i) => Some(i.into()),
@@ -424,7 +425,7 @@ async fn handle_query_agent_info_signed(
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
     let QueryAgentInfoSignedEvt { space, .. } = input;
 
-    let root = space.into();
+    let root = KdHash::from_kitsune_space(&space);
 
     let map = kdirect.persist.query_agent_info(root).await?;
     Ok(map.into_iter().map(|a| a.into()).collect())
@@ -438,9 +439,9 @@ async fn handle_call(
     from_agent: Arc<KitsuneAgent>,
     payload: Vec<u8>,
 ) -> KitsuneResult<Vec<u8>> {
-    let root = space.into();
-    let to_agent = to_agent.into();
-    let from_agent = from_agent.into();
+    let root = KdHash::from_kitsune_space(&space);
+    let to_agent = KdHash::from_kitsune_agent(&to_agent);
+    let from_agent = KdHash::from_kitsune_agent(&from_agent);
 
     let (t, content): (String, serde_json::Value) =
         serde_json::from_slice(&payload).map_err(KitsuneError::other)?;
@@ -470,12 +471,12 @@ async fn handle_gossip(
     op_data: Vec<u8>,
 ) -> KitsuneResult<()> {
     let entry = KdEntry::from_wire_checked(op_data.into_boxed_slice()).await?;
-    let op_hash: KdHash = op_hash.into();
+    let op_hash = KdHash::from_kitsune_op_hash(&op_hash);
     if &op_hash != entry.as_hash() {
         return Err("data did not hash to given hash".into());
     }
-    let root = space.into();
-    let to_agent = to_agent.into();
+    let root = KdHash::from_kitsune_space(&space);
+    let to_agent = KdHash::from_kitsune_agent(&to_agent);
 
     kdirect.persist.store_entry(root, to_agent, entry).await?;
 
@@ -496,8 +497,8 @@ async fn handle_fetch_op_hashes_for_constraints(
         ..
     } = input;
 
-    let root = space.into();
-    let agent = agent.into();
+    let root = KdHash::from_kitsune_space(&space);
+    let agent = KdHash::from_kitsune_agent(&agent);
     let c_start = since_utc_epoch_s as f32;
     let c_end = until_utc_epoch_s as f32;
 
@@ -512,7 +513,7 @@ async fn handle_fetch_op_hashes_for_constraints(
 
     Ok(entries
         .into_iter()
-        .map(|e| e.as_hash().clone().into())
+        .map(|e| e.as_hash().clone().to_kitsune_op_hash())
         .collect())
 }
 
@@ -528,13 +529,13 @@ async fn handle_fetch_op_hash_data(
         ..
     } = input;
 
-    let root: KdHash = space.into();
-    let agent: KdHash = agent.into();
+    let root = KdHash::from_kitsune_space(&space);
+    let agent = KdHash::from_kitsune_agent(&agent);
 
     let mut out = Vec::new();
 
     for op_hash in op_hashes {
-        let hash = (&op_hash).into();
+        let hash = KdHash::from_kitsune_op_hash(&op_hash);
         if let Ok(entry) = kdirect
             .persist
             .get_entry(root.clone(), agent.clone(), hash)
@@ -554,7 +555,7 @@ async fn handle_sign_network_data(
 ) -> KitsuneResult<KitsuneSignature> {
     let SignNetworkDataEvt { agent, data, .. } = input;
 
-    let agent = agent.into();
+    let agent = KdHash::from_kitsune_agent(&agent);
 
     let sig = kdirect.persist.sign(agent, &data).await?;
     Ok(KitsuneSignature(sig.to_vec()))

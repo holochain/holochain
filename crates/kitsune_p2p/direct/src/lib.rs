@@ -13,6 +13,7 @@ use std::future::Future;
 use std::sync::Arc;
 
 pub mod types;
+use types::kdhash::KdHashExt;
 
 mod persist_mem;
 pub use persist_mem::*;
@@ -38,7 +39,7 @@ pub mod prelude {
     pub use crate::srv::*;
     pub use crate::types::direct::{KitsuneDirect, KitsuneDirectEvt, KitsuneDirectEvtStream};
     pub use crate::types::kdentry::{KdEntry, KdEntryData};
-    pub use crate::types::kdhash::KdHash;
+    pub use crate::types::kdhash::{KdHash, KdHashExt};
     pub use crate::types::persist::KdPersist;
     pub use crate::types::srv::{HttpRespondCb, HttpResponse, KdSrv, KdSrvEvt, KdSrvEvtStream};
     pub use crate::v1::*;

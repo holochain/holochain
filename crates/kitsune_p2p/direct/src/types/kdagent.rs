@@ -54,8 +54,8 @@ impl KdAgentInfo {
     pub fn new(f: AgentInfoSigned) -> KitsuneResult<Self> {
         let i = AgentInfo::try_from(&f).map_err(KitsuneError::other)?;
         assert_eq!(f.as_agent_ref(), i.as_agent_ref());
-        let root = i.as_space_ref().into();
-        let agent = i.as_agent_ref().into();
+        let root = KdHash::from_kitsune_space(i.as_space_ref());
+        let agent = KdHash::from_kitsune_agent(i.as_agent_ref());
         let signed_at_ms = i.signed_at_ms();
         let urls = i.as_urls_ref().iter().map(|u| u.clone().into()).collect();
         Ok(Self(Arc::new(KdAgentInfoInner {

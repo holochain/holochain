@@ -88,8 +88,9 @@ impl AsKdPersist for PersistMem {
                 .await
                 .map_err(KitsuneError::other)?;
 
-            let pk = pk.read_lock().to_vec();
-            let pk_hash = KdHash::from_coerced_pubkey(&pk).await?;
+            let mut pk_hash = [0; 32];
+            pk_hash.copy_from_slice(&pk.read_lock()[0..32]);
+            let pk_hash = KdHash::from_coerced_pubkey(pk_hash).await?;
 
             let pk_hash_clone = pk_hash.clone();
             inner.share_mut(move |i, _| {
