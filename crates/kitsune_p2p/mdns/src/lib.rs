@@ -74,7 +74,7 @@ pub fn mdns_create_broadcast_thread(
         // Create mdns responder
 
         let responder = libmdns::Responder::new().unwrap();
-        let _svc = responder.register(svc_type.clone(), service_name.clone(), 0, &txts);
+        let _svc = responder.register(svc_type, service_name, 0, &txts);
         // Loop forever unless termination command received
         loop {
             tokio::time::sleep(::std::time::Duration::from_secs(BROADCAST_INTERVAL_SEC)).await;
