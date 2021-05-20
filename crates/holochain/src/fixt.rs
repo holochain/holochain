@@ -133,14 +133,14 @@ fixturator!(
 );
 
 fixturator!(
-    DnaFile,
-    {
+    DnaFile;
+    curve Empty {
         DnaFile::from_parts(
             DnaDefFixturator::new(Empty).next().unwrap().into_hashed(),
             WasmMapFixturator::new(Empty).next().unwrap(),
         )
-    },
-    {
+    };
+    curve Unpredictable {
         // align the wasm hashes across the file and def
         let mut zome_name_fixturator = ZomeNameFixturator::new(Unpredictable);
         let wasms = WasmMapFixturator::new(Unpredictable).next().unwrap();
@@ -158,8 +158,8 @@ fixturator!(
         dna_def.zomes = zomes;
         let dna = dna_def.into_hashed();
         DnaFile::from_parts(dna, WasmMapFixturator::new(Unpredictable).next().unwrap())
-    },
-    {
+    };
+    curve Predictable {
         // align the wasm hashes across the file and def
         let mut zome_name_fixturator =
             ZomeNameFixturator::new_indexed(Predictable, get_fixt_index!());
@@ -187,7 +187,7 @@ fixturator!(
                 .next()
                 .unwrap(),
         )
-    }
+    };
 );
 
 fixturator!(
