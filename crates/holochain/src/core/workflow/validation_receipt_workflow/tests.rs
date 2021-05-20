@@ -10,8 +10,7 @@ use holochain_lmdb::db::AUTHORED_DHT_OPS;
 use holochain_lmdb::env::EnvironmentRead;
 use holochain_lmdb::fresh_reader_test;
 use holochain_state::prelude::*;
-use holochain_types::dht_op::produce_ops_from_element;
-use holochain_types::dna::zome::inline_zome::InlineZome;
+use holochain_types::prelude::*;
 
 fn simple_crud_zome() -> InlineZome {
     let entry_def = EntryDef::default_with_id("entrydef");

@@ -57,6 +57,9 @@ pub enum ConductorError {
     #[error("Error while trying to send a task to the task manager: {0}")]
     SubmitTaskError(String),
 
+    #[error("ZomeError: {0}")]
+    ZomeError(#[from] holochain_zome_types::zome::error::ZomeError),
+
     #[error("DnaError: {0}")]
     DnaError(#[from] holochain_types::dna::DnaError),
 

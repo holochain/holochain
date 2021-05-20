@@ -142,8 +142,6 @@ mod test {
     use crate::fixt::ZomeCallCapGrantFixturator;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
-    use holochain_types::dna::zome::HostFnAccess;
-    use holochain_types::dna::zome::Permission;
     use holochain_types::prelude::*;
     use rand::seq::SliceRandom;
     use std::sync::Arc;

@@ -59,8 +59,6 @@ mod tests {
     use crate::sweettest::{SweetAgents, SweetConductorBatch};
     use futures::future;
     use hdk::prelude::*;
-    use holochain_types::dna::zome::inline_zome::InlineZome;
-    use holochain_zome_types::signal::AppSignal;
     use matches::assert_matches;
 
     fn zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineZome {

@@ -9,10 +9,8 @@ use super::{
 };
 use crate::prelude::{SlotId, YamlProperties};
 use holo_hash::{DnaHash, DnaHashB64};
+use holochain_zome_types::Uid;
 use std::collections::HashMap;
-
-/// Placeholder for a real UID type
-pub type Uid = String;
 
 /// Version 1 of the App manifest schema
 #[derive(
@@ -284,8 +282,8 @@ pub mod tests {
     use futures::future::join_all;
 
     use super::*;
+    use crate::app::app_manifest::AppManifest;
     use crate::prelude::*;
-    use crate::{app::app_manifest::AppManifest, prelude::DnaDef};
     use ::fixt::prelude::*;
     use std::path::PathBuf;
 

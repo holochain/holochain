@@ -1,6 +1,8 @@
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
-use super::{DnaDef, DnaFile, WasmMap};
 use crate::prelude::*;
 use holo_hash::*;
 use mr_bundle::Location;
@@ -44,6 +46,14 @@ impl DnaBundle {
     /// Construct from raw bytes
     pub fn decode(bytes: &[u8]) -> DnaResult<Self> {
         mr_bundle::Bundle::decode(bytes)
+            .map(Into::into)
+            .map_err(Into::into)
+    }
+
+    /// Read from a bundle file
+    pub async fn read_from_file(path: &Path) -> DnaResult<Self> {
+        mr_bundle::Bundle::read_from_file(path)
+            .await
             .map(Into::into)
             .map_err(Into::into)
     }
@@ -197,7 +207,6 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::prelude::ZomeManifest;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dna_bundle_to_dna_file() {

@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
+use crate::prelude::*;
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_zome_types::prelude::*;
 use thiserror::Error;
 
 pub type InlineZomeResult<T> = Result<T, InlineZomeError>;

@@ -5,8 +5,7 @@
 //! having to go through the heavy machinery of wasm compilation
 
 use self::error::InlineZomeResult;
-use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::prelude::*;
+use crate::prelude::*;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
@@ -77,6 +76,11 @@ impl InlineZome {
             Ok(None)
         }
     }
+
+    /// Accessor
+    pub fn uuid(&self) -> String {
+        self.uuid.clone()
+    }
 }
 
 /// An inline zome function takes a Host API and an input, and produces an output.
@@ -118,8 +122,8 @@ impl std::hash::Hash for InlineZome {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prelude::GetOptions;
     use holo_hash::AnyDhtHash;
-    use holochain_zome_types::prelude::GetOptions;
 
     #[test]
     #[allow(unused_variables, unreachable_code)]
