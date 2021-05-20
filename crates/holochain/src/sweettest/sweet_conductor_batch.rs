@@ -27,17 +27,17 @@ impl SweetConductorBatch {
         Self::from_configs(std::iter::repeat_with(standard_config).take(num)).await
     }
 
-    /// Get the underlying data
+    /// Iterate over the SweetConductors
     pub fn iter(&self) -> impl Iterator<Item = &SweetConductor> {
         self.0.iter()
     }
 
-    /// Get the underlying data
+    /// Iterate over the SweetConductors, mutably
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut SweetConductor> {
         self.0.iter_mut()
     }
 
-    /// Get the underlying data
+    /// Convert to a Vec
     pub fn into_inner(self) -> Vec<SweetConductor> {
         self.0
     }
