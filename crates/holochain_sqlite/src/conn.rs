@@ -93,6 +93,19 @@ fn initialize_connection(
     // enable foreign key support
     conn.pragma_update(None, "foreign_keys", &"ON".to_string())?;
 
+    conn.profile(Some(|stmt, dur| {
+        if dur.as_millis()
+            > std::env::var_os("SQL_PROFILE_MS")
+                .and_then(|s| s.to_string_lossy().parse::<u128>().ok())
+                .unwrap_or(20)
+        {
+            let s = tracing::debug_span!("sql_trace");
+            let _g = s.enter();
+            let len = std::cmp::min(stmt.len(), 200);
+            tracing::debug!(statement = %stmt[..len], ?dur);
+            tracing::trace!(%stmt);
+        }
+    }));
     Ok(())
 }
 
@@ -112,10 +125,30 @@ pub struct PConn {
     #[shrinkwrap(main_field)]
     inner: PConnInner,
     _kind: DbKind,
+    // timer: std::time::Instant,
 }
 
 impl PConn {
     pub(crate) fn new(inner: PConnInner, _kind: DbKind) -> Self {
-        Self { inner, _kind }
+        Self {
+            inner,
+            _kind,
+            // timer: std::time::Instant::now(),
+        }
     }
 }
+
+// impl Drop for PConn {
+//     fn drop(&mut self) {
+//         let dur = self.timer.elapsed();
+//         if dur.as_millis()
+//             > std::env::var_os("CONN_PROFILE_MS")
+//                 .and_then(|s| s.to_string_lossy().parse::<u128>().ok())
+//                 .unwrap_or(20)
+//         {
+//             let s = tracing::debug_span!("conn_trace");
+//             let _g = s.enter();
+//             tracing::debug!(conn_took = ?dur);
+//         }
+//     }
+// }

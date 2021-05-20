@@ -194,8 +194,32 @@ impl<'e> ReadManager<'e> for PConn {
         E: From<DatabaseError>,
         F: 'e + FnOnce(Transaction) -> Result<R, E>,
     {
+        thread_local!(static LAST_T: std::cell::RefCell<String> = std::cell::RefCell::new("".to_string()));
+        let t_now = std::time::Instant::now();
+        // self.trace(Some(|s| {
+        //     LAST_T.with(|f| {
+        //         *f.borrow_mut() = s.to_string();
+        //     });
+        // }));
         let txn = self.transaction().map_err(DatabaseError::from)?;
-        f(txn)
+        let now = std::time::Instant::now();
+        let r = f(txn);
+        let dur = now.elapsed();
+        if dur.as_millis()
+            > std::env::var_os("CONN_PROFILE_MS")
+                .and_then(|s| s.to_string_lossy().parse::<u128>().ok())
+                .unwrap_or(20)
+        {
+            let s = tracing::debug_span!("conn_trace", ?dur, t_time = ?t_now.elapsed());
+            let _g = s.enter();
+            LAST_T.with(|f| {
+                let stmt = f.borrow_mut();
+                let len = std::cmp::min(stmt.len(), 200);
+                tracing::debug!(read_statement = %stmt[..len]);
+                tracing::trace!(%stmt);
+            });
+        }
+        r
     }
 
     #[cfg(feature = "test_utils")]
@@ -213,10 +237,34 @@ impl<'e> WriteManager<'e> for PConn {
         E: From<DatabaseError>,
         F: 'e + FnOnce(&mut Transaction) -> Result<R, E>,
     {
+        thread_local!(static LAST_T: std::cell::RefCell<String> = std::cell::RefCell::new("".to_string()));
+        let t_now = std::time::Instant::now();
+        // self.trace(Some(|s| {
+        //     LAST_T.with(|f| {
+        //         *f.borrow_mut() = s.to_string();
+        //     });
+        // }));
         let mut txn = self
             .transaction_with_behavior(TransactionBehavior::Exclusive)
             .map_err(DatabaseError::from)?;
+        let now = std::time::Instant::now();
         let result = f(&mut txn)?;
+
+        let dur = now.elapsed();
+        if dur.as_millis()
+            > std::env::var_os("CONN_PROFILE_MS")
+                .and_then(|s| s.to_string_lossy().parse::<u128>().ok())
+                .unwrap_or(20)
+        {
+            let s = tracing::debug_span!("conn_trace", ?dur, t_time = ?t_now.elapsed());
+            let _g = s.enter();
+            LAST_T.with(|f| {
+                let stmt = f.borrow_mut();
+                let len = std::cmp::min(stmt.len(), 200);
+                tracing::debug!(write_statement = %stmt[..len]);
+                tracing::trace!(%stmt);
+            });
+        }
         txn.commit().map_err(DatabaseError::from)?;
         Ok(result)
     }

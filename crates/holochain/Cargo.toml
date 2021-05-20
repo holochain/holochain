@@ -103,6 +103,10 @@ unwrap_to = { version = "0.1.0", optional = false }
 name = "bench"
 harness = false
 
+[[bench]]
+name = "consistency"
+harness = false
+
 [lib]
 name = "holochain"
 path = "src/lib.rs"
