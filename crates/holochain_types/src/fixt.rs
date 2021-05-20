@@ -26,29 +26,6 @@ fixturator!(
 );
 
 fixturator!(
-    Zome;
-    constructor fn new(ZomeName, ZomeDef);
-);
-
-fixturator!(
-    Zomes;
-    curve Empty Vec::new();
-    curve Unpredictable {
-        // @todo implement unpredictable zomes
-        ZomesFixturator::new(Empty).next().unwrap()
-    };
-    curve Predictable {
-        // @todo implement predictable zomes
-        ZomesFixturator::new(Empty).next().unwrap()
-    };
-);
-
-fixturator!(
-    ZomeDef;
-    constructor fn from_hash(WasmHash);
-);
-
-fixturator!(
     NewEntryHeader;
     variants [
         Create(Create)
@@ -138,52 +115,4 @@ fixturator!(
 fixturator!(
     ValidateData;
     constructor fn new_element_only (Element);
-);
-
-fixturator!(
-    DnaDef;
-    curve Empty DnaDef {
-        name: StringFixturator::new_indexed(Empty, get_fixt_index!())
-            .next()
-            .unwrap(),
-        uid: StringFixturator::new_indexed(Empty, get_fixt_index!())
-            .next()
-            .unwrap(),
-        properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
-            .next()
-            .unwrap(),
-        zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
-            .next()
-            .unwrap(),
-    };
-
-    curve Unpredictable DnaDef {
-        name: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        uid: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        zomes: ZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-    };
-
-    curve Predictable DnaDef {
-        name: StringFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        uid: StringFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        zomes: ZomesFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-    };
 );
