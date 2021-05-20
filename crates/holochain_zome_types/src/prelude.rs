@@ -39,7 +39,7 @@ pub use x_salsa20_poly1305::key_ref::*;
 pub use x_salsa20_poly1305::x25519::*;
 pub use x_salsa20_poly1305::*;
 
-// #[cfg(feature = "fixturators")]
+#[cfg(feature = "fixturators")]
 pub use crate::fixt::*;
 #[cfg(feature = "test_utils")]
 pub use crate::test_utils::*;
