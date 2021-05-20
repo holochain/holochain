@@ -85,7 +85,6 @@ impl DnaDef {
 
     /// Change the "phenotype" of this DNA -- the UID and properties -- while
     /// leaving the "genotype" of actual DNA code intact
-    #[cfg(feature = "full-dna-def")]
     pub fn modify_phenotype(&self, uid: Uid, properties: SerializedBytes) -> Self {
         let mut clone = self.clone();
         clone.properties = properties;
@@ -113,4 +112,5 @@ impl DnaDefBuilder {
 #[cfg(feature = "full-dna-def")]
 pub type DnaDefHashed = HoloHashed<DnaDef>;
 
+#[cfg(feature = "full-dna-def")]
 impl_hashable_content!(DnaDef, Dna);
