@@ -76,7 +76,7 @@ pub fn mdns_create_broadcast_thread(
         let responder = libmdns::Responder::new().unwrap();
         // Loop forever unless termination command received
         loop {
-            let _svc = responder.register(svc_type.clone(), service_name.clone(), 0, &txts);;
+            let _svc = responder.register(svc_type.clone(), service_name.clone(), 0, &txts);
             tokio::time::sleep(::std::time::Duration::from_secs(BROADCAST_INTERVAL_SEC)).await;
             if !can_run_clone.load(Ordering::Relaxed) {
                 //println!("Terminating.");
