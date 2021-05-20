@@ -66,7 +66,7 @@ pub fn update<'a>(
     // if the validation fails this update will be rolled back by virtue of the lmdb transaction
     // being atomic
     let entry = AsRef::<Entry>::as_ref(&entry_with_def_id).to_owned();
-    holochain_util::tokio_helper::block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         let mut guard = workspace_lock.write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;

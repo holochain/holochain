@@ -349,7 +349,7 @@ pub mod tests {
 
         let agent_entry = Entry::Agent(agent_pubkey.clone().into());
 
-        let (dna_header, agent_header) = holochain_util::tokio_helper::block_on(
+        let (dna_header, agent_header) = tokio_helper::block_on(
             async {
                 let dna_header = Header::Dna(header::Dna {
                     author: agent_pubkey.clone(),

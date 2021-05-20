@@ -19,7 +19,7 @@ pub fn get_details<'a>(
     let network = call_context.host_access.network().clone();
 
     // timeouts must be handled by the network
-    holochain_util::tokio_helper::block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         let maybe_details = call_context
             .host_access
             .workspace()

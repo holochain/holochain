@@ -5,6 +5,7 @@ use holochain::conductor::paths::ConfigFilePath;
 use holochain::conductor::Conductor;
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::ConductorConfigError;
+use holochain_util::tokio_helper;
 use observability::Output;
 #[cfg(unix)]
 use sd_notify::{notify, NotifyState};
@@ -48,7 +49,7 @@ struct Opt {
 
 fn main() {
     // the async_main function should only end if our program is done
-    holochain_util::tokio_helper::block_forever_on(async_main())
+    tokio_helper::block_forever_on(async_main())
 }
 
 async fn async_main() {

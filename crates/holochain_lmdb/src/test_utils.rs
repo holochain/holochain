@@ -4,6 +4,7 @@ use crate::env::EnvironmentKind;
 use crate::env::EnvironmentWrite;
 use crate::prelude::BufKey;
 use holochain_keystore::KeystoreSender;
+use holochain_util::tokio_helper;
 use holochain_zome_types::test_utils::fake_cell_id;
 use shrinkwraprs::Shrinkwrap;
 use std::sync::Arc;
@@ -34,7 +35,7 @@ pub fn test_p2p_env() -> TestEnvironment {
 pub fn test_keystore() -> holochain_keystore::KeystoreSender {
     use holochain_keystore::KeystoreSenderExt;
 
-    holochain_util::tokio_helper::block_on(
+    tokio_helper::block_on(
         async move {
             let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
                 .await

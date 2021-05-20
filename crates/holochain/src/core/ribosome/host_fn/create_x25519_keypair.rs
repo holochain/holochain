@@ -1,6 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
+use holochain_util::tokio_helper;
 use holochain_wasmer_host::prelude::WasmError;
 use holochain_zome_types::X25519PubKey;
 use std::sync::Arc;
@@ -10,7 +11,7 @@ pub fn create_x25519_keypair(
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<X25519PubKey, WasmError> {
-    Ok(holochain_util::tokio_helper::block_forever_on(async move {
+    Ok(tokio_helper::block_forever_on(async move {
         call_context
             .host_access
             .keystore()

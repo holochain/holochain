@@ -9,7 +9,7 @@ pub fn query(
     call_context: Arc<CallContext>,
     input: ChainQueryFilter,
 ) -> Result<Vec<Element>, WasmError> {
-    holochain_util::tokio_helper::block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         let elements: Vec<Element> = call_context
             .host_access
             .workspace()
