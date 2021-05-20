@@ -2107,13 +2107,16 @@ name = "holochain_zome_types"
 version = "0.0.2-alpha.1"
 dependencies = [
  "chrono",
+ "derive_builder",
  "fixt",
  "holo_hash",
  "holochain_serialized_bytes",
+ "nanoid",
  "paste 1.0.5",
  "rand 0.7.3",
  "serde",
  "serde_bytes",
+ "shrinkwraprs",
  "strum",
  "subtle 2.4.0",
  "thiserror",
