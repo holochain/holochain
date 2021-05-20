@@ -177,19 +177,19 @@ impl KdTestHarness {
         let root = root_persist.generate_signing_keypair().await?;
         tracing::info!(%root);
 
-        let app_entry = KdEntryData {
-            type_hint: "s.app".to_string(),
+        let app_entry = KdEntryContent {
+            kind: "s.app".to_string(),
             parent: root.clone(),
             author: root.clone(),
-            should_shard: false,
-            reverify_interval_s: u32::MAX,
             verify: "".to_string(),
             data: serde_json::json!({}),
         };
-        let app_entry = KdEntry::sign(&root_persist, app_entry).await?;
+        let app_entry = KdEntrySigned::from_content(&root_persist, app_entry)
+            .await
+            .map_err(KitsuneError::other)?;
         tracing::debug!(?app_entry);
 
-        let app_entry_hash = app_entry.as_hash().clone();
+        let app_entry_hash = app_entry.hash().clone();
 
         for _ in 0..config.node_count {
             let persist = new_persist_mem();
@@ -291,7 +291,7 @@ impl KdTestHarness {
 
         Ok(Self {
             root,
-            app_entry_hash: app_entry.as_hash().clone(),
+            app_entry_hash: app_entry.hash().clone(),
             nodes,
             proxy_hnd,
         })
@@ -346,12 +346,10 @@ mod tests {
                     kdirect,
                 } = input;
 
-                let new_entry = KdEntryData {
-                    type_hint: "u.foo".to_string(),
+                let new_entry = KdEntryContent {
+                    kind: "u.foo".to_string(),
                     parent: app_entry_hash,
                     author: agent.clone(),
-                    should_shard: true,
-                    reverify_interval_s: u32::MAX,
                     verify: "".to_string(),
                     data: serde_json::json!({
                         "nonce": std::time::SystemTime::now()
@@ -360,7 +358,9 @@ mod tests {
                             .as_secs_f64(),
                     }),
                 };
-                let new_entry = KdEntry::sign(&kdirect.get_persist(), new_entry).await?;
+                let new_entry = KdEntrySigned::from_content(&kdirect.get_persist(), new_entry)
+                    .await
+                    .map_err(KitsuneError::other)?;
                 tracing::debug!(?new_entry);
                 kdirect.publish_entry(root, agent, new_entry).await?;
 
@@ -390,7 +390,7 @@ mod tests {
                     .await
                     .unwrap();
                 let entry_count = entries.len();
-                let entry_hashes = entries.iter().map(|e| e.as_hash()).collect::<Vec<_>>();
+                let entry_hashes = entries.iter().map(|e| e.hash()).collect::<Vec<_>>();
                 tracing::info!(%entry_count, ?entry_hashes);
 
                 // each of 4 nodes publish 1 entry + the app entry == 5

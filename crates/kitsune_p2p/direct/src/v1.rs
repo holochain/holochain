@@ -5,6 +5,7 @@ use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
 use ghost_actor::GhostControlSender;
 //use ghost_actor::dependencies::tracing;
+use crate::types::direct::*;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::event::*;
@@ -12,11 +13,6 @@ use kitsune_p2p::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dependencies::ghost_actor;
 use kitsune_p2p_types::tx2::tx2_utils::*;
-use types::direct::*;
-use types::kdagent::KdAgentInfo;
-use types::kdentry::KdEntry;
-use types::kdhash::KdHash;
-use types::persist::*;
 
 /// Config for v1 impl of KitsuneDirect
 pub struct KitsuneDirectV1Config {
@@ -208,7 +204,7 @@ impl AsKitsuneDirect for Kd1 {
         &self,
         root: KdHash,
         agent: KdHash,
-        entry: KdEntry,
+        entry: KdEntrySigned,
     ) -> BoxFuture<'static, KitsuneResult<()>> {
         // TODO - someday this should actually publish...
         //        for now, we are just relying on gossip
@@ -470,9 +466,11 @@ async fn handle_gossip(
     op_hash: Arc<KitsuneOpHash>,
     op_data: Vec<u8>,
 ) -> KitsuneResult<()> {
-    let entry = KdEntry::from_wire_checked(op_data.into_boxed_slice()).await?;
+    let entry = KdEntrySigned::from_wire(op_data.into_boxed_slice())
+        .await
+        .map_err(KitsuneError::other)?;
     let op_hash = KdHash::from_kitsune_op_hash(&op_hash);
-    if &op_hash != entry.as_hash() {
+    if &op_hash != entry.hash() {
         return Err("data did not hash to given hash".into());
     }
     let root = KdHash::from_kitsune_space(&space);
@@ -513,7 +511,7 @@ async fn handle_fetch_op_hashes_for_constraints(
 
     Ok(entries
         .into_iter()
-        .map(|e| e.as_hash().clone().to_kitsune_op_hash())
+        .map(|e| e.hash().clone().to_kitsune_op_hash())
         .collect())
 }
 
@@ -541,7 +539,7 @@ async fn handle_fetch_op_hash_data(
             .get_entry(root.clone(), agent.clone(), hash)
             .await
         {
-            out.push((op_hash, entry.as_wire().to_vec()));
+            out.push((op_hash, entry.as_wire_data_ref().to_vec()));
         }
     }
 

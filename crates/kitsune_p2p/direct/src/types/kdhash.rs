@@ -35,10 +35,10 @@ pub trait KdHashExt: Sized {
     ) -> BoxFuture<'static, bool>;
 
     /// Generate a KdHash from data
-    fn from_data(data: &[u8]) -> BoxFuture<'static, KitsuneResult<Self>>;
+    fn from_data(data: &[u8]) -> BoxFuture<'static, KdResult<Self>>;
 
     /// Coerce 32 bytes of signing pubkey data into a KdHash
-    fn from_coerced_pubkey(data: [u8; 32]) -> BoxFuture<'static, KitsuneResult<Self>>;
+    fn from_coerced_pubkey(data: [u8; 32]) -> BoxFuture<'static, KdResult<Self>>;
 }
 
 impl KdHashExt for KdHash {
@@ -77,10 +77,10 @@ impl KdHashExt for KdHash {
         async move {
             match async {
                 let sig = Buffer::from_ref(&signature[..]);
-                KitsuneResult::Ok(
+                KdResult::Ok(
                     sodoken::sign::sign_verify_detached(&sig, &data, &pk)
                         .await
-                        .map_err(KitsuneError::other)?,
+                        .map_err(KdError::other)?,
                 )
             }
             .await
@@ -93,13 +93,13 @@ impl KdHashExt for KdHash {
     }
 
     /// Generate a KdHash from data
-    fn from_data(data: &[u8]) -> BoxFuture<'static, KitsuneResult<Self>> {
+    fn from_data(data: &[u8]) -> BoxFuture<'static, KdResult<Self>> {
         let r = Buffer::from_ref(data);
         async move {
             let mut hash = Buffer::new(32);
             sodoken::hash::generichash(&mut hash, &r, None)
                 .await
-                .map_err(KitsuneError::other)?;
+                .map_err(KdError::other)?;
             let mut out = [0; 32];
             out.copy_from_slice(&hash.read_lock()[0..32]);
 
@@ -111,7 +111,7 @@ impl KdHashExt for KdHash {
     }
 
     /// Coerce 32 bytes of signing pubkey data into a KdHash
-    fn from_coerced_pubkey(data: [u8; 32]) -> BoxFuture<'static, KitsuneResult<Self>> {
+    fn from_coerced_pubkey(data: [u8; 32]) -> BoxFuture<'static, KdResult<Self>> {
         async move {
             let r = Buffer::from_ref(data);
             let loc = loc_hash(r).await?;
@@ -126,13 +126,13 @@ impl KdHashExt for KdHash {
     }
 }
 
-async fn loc_hash(d: Buffer) -> KitsuneResult<[u8; 4]> {
+async fn loc_hash(d: Buffer) -> KdResult<[u8; 4]> {
     let mut out = [0; 4];
 
     let mut hash = Buffer::new(16);
     sodoken::hash::generichash(&mut hash, &d, None)
         .await
-        .map_err(KitsuneError::other)?;
+        .map_err(KdError::other)?;
 
     let hash = hash.read_lock();
     out[0] = hash[0];

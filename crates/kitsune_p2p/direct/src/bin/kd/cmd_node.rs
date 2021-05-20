@@ -47,19 +47,17 @@ async fn mk_demo(kd: &KitsuneDirect) -> KitsuneResult<KdHash> {
     let root = persist.generate_signing_keypair().await?;
 
     let mk_entry = |t: &'static str, p: &KdHash, d: serde_json::Value, b: &[u8]| {
-        let e = KdEntryData {
-            type_hint: t.to_string(),
+        let e = KdEntryContent {
+            kind: t.to_string(),
             parent: p.clone(),
             author: root.clone(),
-            should_shard: false,
-            reverify_interval_s: u32::MAX,
             verify: "".to_string(),
             data: d,
         };
-        let fut = KdEntry::sign_with_binary(&persist, e, b);
+        let fut = KdEntrySigned::from_content_with_binary(&persist, e, b);
         async {
-            let e = fut.await?;
-            let e_hash = e.as_hash().clone();
+            let e = fut.await.map_err(KitsuneError::other)?;
+            let e_hash = e.hash().clone();
             kd.publish_entry(root.clone(), root.clone(), e).await?;
             KitsuneResult::Ok(e_hash)
         }

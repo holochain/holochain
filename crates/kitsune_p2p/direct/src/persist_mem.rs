@@ -1,5 +1,6 @@
 //! in-memory persistence module for kitsune direct
 
+use crate::types::persist::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use kitsune_p2p_types::dht_arc::DhtArc;
@@ -7,10 +8,6 @@ use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use types::kdagent::*;
-use types::kdentry::KdEntry;
-use types::kdhash::KdHash;
-use types::persist::*;
 
 /// construct a new in-memory persistence module for kitsune direct
 pub fn new_persist_mem() -> KdPersist {
@@ -23,7 +20,7 @@ struct PersistMemInner {
     tls: Option<TlsConfig>,
     priv_keys: HashMap<KdHash, sodoken::Buffer>,
     agent_info: HashMap<KdHash, HashMap<KdHash, KdAgentInfo>>,
-    entries: HashMap<KdHash, HashMap<KdHash, HashMap<KdHash, KdEntry>>>,
+    entries: HashMap<KdHash, HashMap<KdHash, HashMap<KdHash, KdEntrySigned>>>,
 }
 
 struct PersistMem(Share<PersistMemInner>, Uniq);
@@ -90,7 +87,9 @@ impl AsKdPersist for PersistMem {
 
             let mut pk_hash = [0; 32];
             pk_hash.copy_from_slice(&pk.read_lock()[0..32]);
-            let pk_hash = KdHash::from_coerced_pubkey(pk_hash).await?;
+            let pk_hash = KdHash::from_coerced_pubkey(pk_hash)
+                .await
+                .map_err(KitsuneError::other)?;
 
             let pk_hash_clone = pk_hash.clone();
             inner.share_mut(move |i, _| {
@@ -190,10 +189,10 @@ impl AsKdPersist for PersistMem {
         &self,
         root: KdHash,
         agent: KdHash,
-        entry: KdEntry,
+        entry: KdEntrySigned,
     ) -> BoxFuture<'static, KitsuneResult<()>> {
         let r = self.0.share_mut(move |i, _| {
-            let hash = entry.as_hash().clone();
+            let hash = entry.hash().clone();
 
             let root_map = i.entries.entry(root).or_insert_with(HashMap::new);
             let agent_map = root_map.entry(agent).or_insert_with(HashMap::new);
@@ -217,7 +216,7 @@ impl AsKdPersist for PersistMem {
         root: KdHash,
         agent: KdHash,
         hash: KdHash,
-    ) -> BoxFuture<'static, KitsuneResult<KdEntry>> {
+    ) -> BoxFuture<'static, KitsuneResult<KdEntrySigned>> {
         let r = self.0.share_mut(|i, _| {
             let root_map = match i.entries.get(&root) {
                 None => return Err("root not found".into()),
@@ -244,7 +243,7 @@ impl AsKdPersist for PersistMem {
         _created_at_start_s: f32,
         _created_at_end_s: f32,
         _dht_arc: DhtArc,
-    ) -> BoxFuture<'static, KitsuneResult<Vec<KdEntry>>> {
+    ) -> BoxFuture<'static, KitsuneResult<Vec<KdEntrySigned>>> {
         // TODO - actually filter
 
         let r = self.0.share_mut(|i, _| {
@@ -274,14 +273,14 @@ impl AsKdPersist for PersistMem {
             for r in i.entries.values() {
                 for m in r.values() {
                     for e in m.values() {
-                        if e.as_data().type_hint == "s.file" {
-                            if let Some(m) = e.as_data().data.as_object() {
+                        if e.kind() == "s.file" {
+                            if let Some(m) = e.raw_data().as_object() {
                                 if let Some(n) = m.get("name") {
                                     if let Some(n) = n.as_str() {
                                         if n == path {
                                             if let Some(mime) = m.get("mime") {
                                                 if let Some(mime) = mime.as_str() {
-                                                    let bin = e.as_binary().to_vec();
+                                                    let bin = e.as_binary_ref().to_vec();
                                                     return Ok((mime.to_string(), bin));
                                                 }
                                             }

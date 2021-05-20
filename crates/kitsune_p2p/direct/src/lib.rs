@@ -3,13 +3,13 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
+pub use kitsune_p2p_direct_api::{KdError, KdResult};
 use kitsune_p2p_types::dependencies::ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::tx2::tx2_adapter::Uniq;
 pub use kitsune_p2p_types::{KitsuneError, KitsuneResult};
 
 use sodoken::Buffer;
 
-use std::future::Future;
 use std::sync::Arc;
 
 pub mod types;
@@ -38,7 +38,7 @@ pub mod prelude {
     pub use crate::srv::*;
     pub use crate::types::direct::{KitsuneDirect, KitsuneDirectEvt, KitsuneDirectEvtStream};
     pub use crate::types::kdagent::{KdAgentInfo, KdAgentInfoExt};
-    pub use crate::types::kdentry::{KdEntry, KdEntryData};
+    pub use crate::types::kdentry::{KdEntryContent, KdEntrySigned, KdEntrySignedExt};
     pub use crate::types::kdhash::{KdHash, KdHashExt};
     pub use crate::types::persist::KdPersist;
     pub use crate::types::srv::{HttpRespondCb, HttpResponse, KdSrv, KdSrvEvt, KdSrvEvtStream};

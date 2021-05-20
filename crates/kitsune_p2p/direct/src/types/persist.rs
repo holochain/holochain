@@ -5,9 +5,6 @@ use futures::future::BoxFuture;
 use kitsune_p2p_types::dht_arc::DhtArc;
 use kitsune_p2p_types::tls::TlsConfig;
 use std::future::Future;
-use types::kdagent::*;
-use types::kdentry::KdEntry;
-use types::kdhash::KdHash;
 
 /// Trait representing a persistence store.
 pub trait AsKdPersist: 'static + Send + Sync {
@@ -52,7 +49,7 @@ pub trait AsKdPersist: 'static + Send + Sync {
         &self,
         root: KdHash,
         agent: KdHash,
-        entry: KdEntry,
+        entry: KdEntrySigned,
     ) -> BoxFuture<'static, KitsuneResult<()>>;
 
     /// Get entry
@@ -61,7 +58,7 @@ pub trait AsKdPersist: 'static + Send + Sync {
         root: KdHash,
         agent: KdHash,
         hash: KdHash,
-    ) -> BoxFuture<'static, KitsuneResult<KdEntry>>;
+    ) -> BoxFuture<'static, KitsuneResult<KdEntrySigned>>;
 
     /// Get entry
     fn query_entries(
@@ -71,7 +68,7 @@ pub trait AsKdPersist: 'static + Send + Sync {
         created_at_start_s: f32,
         created_at_end_s: f32,
         dht_arc: DhtArc,
-    ) -> BoxFuture<'static, KitsuneResult<Vec<KdEntry>>>;
+    ) -> BoxFuture<'static, KitsuneResult<Vec<KdEntrySigned>>>;
 
     /// Get ui file
     fn get_ui_file(&self, path: &str) -> BoxFuture<'static, KitsuneResult<(String, Vec<u8>)>>;
@@ -159,7 +156,7 @@ impl KdPersist {
         &self,
         root: KdHash,
         agent: KdHash,
-        entry: KdEntry,
+        entry: KdEntrySigned,
     ) -> impl Future<Output = KitsuneResult<()>> + 'static + Send {
         AsKdPersist::store_entry(&*self.0, root, agent, entry)
     }
@@ -170,7 +167,7 @@ impl KdPersist {
         root: KdHash,
         agent: KdHash,
         hash: KdHash,
-    ) -> impl Future<Output = KitsuneResult<KdEntry>> + 'static + Send {
+    ) -> impl Future<Output = KitsuneResult<KdEntrySigned>> + 'static + Send {
         AsKdPersist::get_entry(&*self.0, root, agent, hash)
     }
 
@@ -182,7 +179,7 @@ impl KdPersist {
         created_at_start_s: f32,
         created_at_end_s: f32,
         dht_arc: DhtArc,
-    ) -> impl Future<Output = KitsuneResult<Vec<KdEntry>>> + 'static + Send {
+    ) -> impl Future<Output = KitsuneResult<Vec<KdEntrySigned>>> + 'static + Send {
         AsKdPersist::query_entries(
             &*self.0,
             root,

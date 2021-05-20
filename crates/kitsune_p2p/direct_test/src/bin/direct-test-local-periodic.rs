@@ -20,12 +20,10 @@ async fn main() {
                 kdirect,
             } = input;
 
-            let new_entry = KdEntryData {
-                type_hint: "u.foo".to_string(),
+            let new_entry = KdEntryContent {
+                kind: "u.foo".to_string(),
                 parent: app_entry_hash,
                 author: agent.clone(),
-                should_shard: true,
-                reverify_interval_s: u32::MAX,
                 verify: "".to_string(),
                 data: serde_json::json!({
                     "nonce": std::time::SystemTime::now()
@@ -34,7 +32,9 @@ async fn main() {
                         .as_secs_f64(),
                 }),
             };
-            let new_entry = KdEntry::sign(&kdirect.get_persist(), new_entry).await?;
+            let new_entry = KdEntrySigned::from_content(&kdirect.get_persist(), new_entry)
+                .await
+                .map_err(KitsuneError::other)?;
             tracing::debug!(?new_entry);
             kdirect.publish_entry(root, agent, new_entry).await?;
 

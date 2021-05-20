@@ -4,9 +4,6 @@ use crate::*;
 use futures::future::BoxFuture;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use std::future::Future;
-use types::kdentry::KdEntry;
-use types::kdhash::KdHash;
-use types::persist::KdPersist;
 
 /// Events emitted from a kitsune direct instance.
 #[derive(Debug)]
@@ -47,7 +44,7 @@ pub enum KitsuneDirectEvt {
         root: KdHash,
 
         /// the entry that was published
-        entry: KdEntry,
+        entry: KdEntrySigned,
     },
 }
 
@@ -92,7 +89,7 @@ pub trait AsKitsuneDirect: 'static + Send + Sync {
         &self,
         root: KdHash,
         agent: KdHash,
-        entry: KdEntry,
+        entry: KdEntrySigned,
     ) -> BoxFuture<'static, KitsuneResult<()>>;
 }
 
@@ -169,7 +166,7 @@ impl KitsuneDirect {
         &self,
         root: KdHash,
         agent: KdHash,
-        entry: KdEntry,
+        entry: KdEntrySigned,
     ) -> impl Future<Output = KitsuneResult<()>> + 'static + Send {
         AsKitsuneDirect::publish_entry(&*self.0, root, agent, entry)
     }

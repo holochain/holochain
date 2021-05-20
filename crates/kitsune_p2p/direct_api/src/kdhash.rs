@@ -83,6 +83,12 @@ impl AsRef<[u8]> for KdHash {
     }
 }
 
+impl AsRef<[u8; 39]> for KdHash {
+    fn as_ref(&self) -> &[u8; 39] {
+        &self.0 .1
+    }
+}
+
 impl std::fmt::Debug for KdHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("KdHash").field(&self.0 .0).finish()
