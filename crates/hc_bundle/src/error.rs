@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use holochain_serialized_bytes::SerializedBytesError;
+use holochain_util::ffs;
 
 /// HcBundleError type.
 #[derive(Debug, thiserror::Error)]

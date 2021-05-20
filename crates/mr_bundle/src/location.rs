@@ -2,6 +2,7 @@ use crate::{
     error::{BundleError, MrBundleResult},
     ResourceBytes,
 };
+use holochain_util::ffs;
 use std::path::{Path, PathBuf};
 
 /// Where to find a Resource.

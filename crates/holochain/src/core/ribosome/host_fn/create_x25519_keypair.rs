@@ -1,6 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
+use holochain_util::tokio_helper;
 use holochain_wasmer_host::prelude::WasmError;
 use holochain_zome_types::X25519PubKey;
 use std::sync::Arc;

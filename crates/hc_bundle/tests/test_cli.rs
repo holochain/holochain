@@ -1,5 +1,6 @@
 use assert_cmd::prelude::*;
 use holochain_types::prelude::*;
+use holochain_util::ffs;
 use std::{
     path::{Path, PathBuf},
     process::Command,
