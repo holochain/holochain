@@ -25,7 +25,7 @@ where
     tokio::task::block_in_place(|| runtime.block_on(async { f.await }))
 }
 
-/// Run a blocking thread on `TOKIO`.
+/// Run a blocking thread on `TOKIO` with a timeout.
 pub fn block_on<F>(
     f: F,
     timeout: std::time::Duration,
@@ -46,10 +46,11 @@ where
 
 #[cfg(test)]
 mod test {
+    use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn block_on_works() {
-        crate::block_forever_on(async { println!("stdio can block") });
+        block_forever_on(async { println!("stdio can block") });
         assert_eq!(1, super::block_forever_on(async { 1 }));
 
         let r = "1";
@@ -70,8 +71,7 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn block_on_allows_spawning() {
         let r = "works";
-        let test =
-            super::block_forever_on(tokio::task::spawn(async move { r.to_string() })).unwrap();
+        let test = block_forever_on(tokio::task::spawn(async move { r.to_string() })).unwrap();
         assert_eq!("works", &test);
     }
 }

@@ -84,7 +84,7 @@ fn conductors_call_remote(num_conductors: usize) {
         }
         shutdown(handles).await;
     };
-    tokio_helper::block_forever_on(f);
+    holochain_util::tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -111,7 +111,7 @@ fn conductors_local_gossip(num_committers: usize, num_conductors: usize, new_con
         network,
         true,
     );
-    tokio_helper::block_forever_on(f);
+    holochain_util::tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -139,7 +139,7 @@ fn conductors_boot_gossip(num_committers: usize, num_conductors: usize, new_cond
         network,
         false,
     );
-    tokio_helper::block_forever_on(f);
+    holochain_util::tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -171,7 +171,7 @@ fn conductors_local_boot_gossip(
         network,
         false,
     );
-    tokio_helper::block_forever_on(f);
+    holochain_util::tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -218,7 +218,7 @@ fn conductors_remote_gossip(num_committers: usize, num_conductors: usize, new_co
         network,
         true,
     );
-    tokio_helper::block_forever_on(f);
+    holochain_util::tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -257,7 +257,7 @@ fn conductors_remote_boot_gossip(
         network,
         false,
     );
-    tokio_helper::block_forever_on(f);
+    holochain_util::tokio_helper::block_forever_on(f);
 }
 
 async fn conductors_gossip_inner(

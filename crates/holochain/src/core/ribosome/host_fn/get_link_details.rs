@@ -25,7 +25,7 @@ pub fn get_link_details<'a>(
     // Get the network from the context
     let network = call_context.host_access.network().clone();
 
-    tokio_helper::block_forever_on(async move {
+    holochain_util::tokio_helper::block_forever_on(async move {
         // Create the key
         let key = match tag_prefix.as_ref() {
             Some(tag_prefix) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag_prefix),

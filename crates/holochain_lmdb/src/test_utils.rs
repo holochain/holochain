@@ -34,7 +34,7 @@ pub fn test_p2p_env() -> TestEnvironment {
 pub fn test_keystore() -> holochain_keystore::KeystoreSender {
     use holochain_keystore::KeystoreSenderExt;
 
-    tokio_helper::block_on(
+    holochain_util::tokio_helper::block_on(
         async move {
             let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
                 .await

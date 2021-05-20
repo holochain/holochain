@@ -19,6 +19,7 @@ use derive_more::Into;
 pub use dna_gamut::*;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::prelude::*;
+use holochain_util::ffs;
 use holochain_zome_types::prelude::*;
 use itertools::Itertools;
 use std::{

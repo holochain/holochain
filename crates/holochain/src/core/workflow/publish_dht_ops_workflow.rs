@@ -331,7 +331,7 @@ mod tests {
     #[test_case(100, 10)]
     #[test_case(100, 100)]
     fn test_sent_to_r_nodes(num_agents: u32, num_hash: u32) {
-        tokio_helper::block_forever_on(async {
+        holochain_util::tokio_helper::block_forever_on(async {
             observability::test_run().ok();
 
             // Create test env
@@ -382,7 +382,7 @@ mod tests {
     #[test_case(100, 10)]
     #[test_case(100, 100)]
     fn test_no_republish(num_agents: u32, num_hash: u32) {
-        tokio_helper::block_forever_on(async {
+        holochain_util::tokio_helper::block_forever_on(async {
             observability::test_run().ok();
 
             // Create test env
@@ -460,7 +460,7 @@ mod tests {
     #[test_case(10)]
     #[test_case(100)]
     fn test_private_entries(num_agents: u32) {
-        tokio_helper::block_forever_on(
+        holochain_util::tokio_helper::block_forever_on(
             async {
                 observability::test_run().ok();
 

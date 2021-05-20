@@ -55,7 +55,7 @@ pub fn create<'a>(
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
     let entry = AsRef::<Entry>::as_ref(&input).to_owned();
-    tokio_helper::block_forever_on(async move {
+    holochain_util::tokio_helper::block_forever_on(async move {
         let mut guard = call_context.host_access.workspace().write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
@@ -209,7 +209,7 @@ pub mod wasm_test {
         let output = create(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_helper::block_forever_on(async move {
+        let chain_head = holochain_util::tokio_helper::block_forever_on(async move {
             SourceChainResult::Ok(
                 workspace_lock
                     .read()
@@ -245,7 +245,7 @@ pub mod wasm_test {
             crate::call_test_ribosome!(host_access, TestWasm::Create, "create_entry", ());
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_helper::block_forever_on(async move {
+        let chain_head = holochain_util::tokio_helper::block_forever_on(async move {
             SourceChainResult::Ok(
                 workspace_lock
                     .read()

@@ -33,7 +33,7 @@ pub fn call(
     };
 
     // Make the call using this workspace
-    Ok(tokio_helper::block_forever_on(async move {
+    Ok(holochain_util::tokio_helper::block_forever_on(async move {
         conductor_handle
             .call_zome(invocation, workspace)
             .await
