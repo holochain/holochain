@@ -5,7 +5,7 @@ use holochain_types::{
         zome::{inline_zome::InlineZome, Zome, ZomeDef},
         DnaDefBuilder, DnaFile,
     },
-    prelude::DnaDef,
+    prelude::{DnaBundle, DnaDef},
 };
 use holochain_zome_types::zome::ZomeName;
 use std::path::Path;
@@ -15,9 +15,13 @@ use std::path::Path;
 pub struct SweetDnaFile(DnaFile);
 
 impl SweetDnaFile {
-    /// Create a DnaFile from a path to a *.dna.gz file
-    pub async fn from_file(path: &Path) -> DnaResult<DnaFile> {
-        DnaFile::from_file_content(&std::fs::read(path)?).await
+    /// Create a DnaFile from a path to a *.dna bundle
+    pub async fn from_bundle(path: &Path) -> DnaResult<DnaFile> {
+        Ok(DnaBundle::read_from_file(path)
+            .await?
+            .into_dna_file(None, None)
+            .await?
+            .0)
     }
 
     /// Create a DnaFile from a collection of Zomes

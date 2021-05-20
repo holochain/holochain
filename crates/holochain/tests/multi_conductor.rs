@@ -47,7 +47,6 @@ fn invalid_cell_zome() -> InlineZome {
         })
 }
 
-// TODO [ B-03669 ]: make much less verbose
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn multi_conductor() -> anyhow::Result<()> {
