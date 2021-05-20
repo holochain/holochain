@@ -10,7 +10,7 @@ pub fn x_25519_x_salsa20_poly1305_decrypt(
     call_context: Arc<CallContext>,
     input: X25519XSalsa20Poly1305Decrypt,
 ) -> Result<Option<XSalsa20Poly1305Data>, WasmError> {
-    Ok(holochain_util::tokio_helper::block_forever_on(async move {
+    Ok(tokio_helper::block_forever_on(async move {
         call_context
             .host_access
             .keystore()

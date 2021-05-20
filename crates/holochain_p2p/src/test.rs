@@ -125,7 +125,7 @@ pub async fn stub_network() -> ghost_actor::GhostSender<HolochainP2p> {
 fixturator!(
     HolochainP2pCell;
     curve Empty {
-        holochain_util::tokio_helper::block_forever_on(async {
+        tokio_helper::block_forever_on(async {
             let holochain_p2p = crate::test::stub_network().await;
             holochain_p2p.to_cell(
                 DnaHashFixturator::new(Empty).next().unwrap(),

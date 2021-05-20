@@ -368,7 +368,7 @@ mod slow_tests {
             crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_valid_link", ());
 
         // the chain head should be the committed entry header
-        let chain_head = holochain_util::tokio_helper::block_forever_on(async move {
+        let chain_head = tokio_helper::block_forever_on(async move {
             SourceChainResult::Ok(
                 workspace_lock
                     .read()
@@ -404,7 +404,7 @@ mod slow_tests {
             crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_invalid_link", ());
 
         // the chain head should be the committed entry header
-        let chain_head = holochain_util::tokio_helper::block_forever_on(async move {
+        let chain_head = tokio_helper::block_forever_on(async move {
             SourceChainResult::Ok(
                 workspace_lock
                     .read()

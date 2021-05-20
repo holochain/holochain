@@ -47,6 +47,7 @@ use rand::Rng;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
+use tokio_helper;
 
 pub use holochain_types::fixt::*;
 
@@ -108,7 +109,7 @@ fixturator!(
         for _ in 0..number_of_wasms {
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
-                holochain_util::tokio_helper::block_forever_on(
+                tokio_helper::block_forever_on(
                     async { WasmHash::with_data(&wasm).await },
                 ),
                 wasm,
@@ -122,7 +123,7 @@ fixturator!(
         for _ in 0..3 {
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
-                holochain_util::tokio_helper::block_forever_on(
+                tokio_helper::block_forever_on(
                     async { WasmHash::with_data(&wasm).await },
                 ),
                 wasm,
@@ -136,7 +137,7 @@ fixturator!(
     DnaFile;
     curve Empty {
         DnaFile::from_parts(
-            holochain_util::tokio_helper::block_forever_on(async move {
+            tokio_helper::block_forever_on(async move {
                 DnaDefHashed::from_content_sync(DnaDefFixturator::new(Empty).next().unwrap())
             }),
             WasmMapFixturator::new(Empty).next().unwrap(),
@@ -158,7 +159,7 @@ fixturator!(
         let mut dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
         dna_def.zomes = zomes;
         let dna =
-            holochain_util::tokio_helper::block_forever_on(async move { DnaDefHashed::from_content_sync(dna_def) });
+            tokio_helper::block_forever_on(async move { DnaDefHashed::from_content_sync(dna_def) });
         DnaFile::from_parts(dna, WasmMapFixturator::new(Unpredictable).next().unwrap())
     };
     curve Predictable {
@@ -182,7 +183,7 @@ fixturator!(
             .unwrap();
         dna_def.zomes = zomes;
         let dna =
-            holochain_util::tokio_helper::block_forever_on(async move { DnaDefHashed::from_content_sync(dna_def) });
+            tokio_helper::block_forever_on(async move { DnaDefHashed::from_content_sync(dna_def) });
         DnaFile::from_parts(
             dna,
             WasmMapFixturator::new_indexed(Predictable, get_fixt_index!())
@@ -235,14 +236,14 @@ fixturator!(
 fixturator!(
     KeystoreSender;
     curve Empty {
-        holochain_util::tokio_helper::block_forever_on(async {
+        tokio_helper::block_forever_on(async {
             // an empty keystore
             holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
         })
     };
     curve Unpredictable {
         // TODO: Make this unpredictable
-        holochain_util::tokio_helper::block_forever_on(async {
+        tokio_helper::block_forever_on(async {
             holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
         })
     };

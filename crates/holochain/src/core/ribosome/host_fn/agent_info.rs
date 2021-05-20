@@ -10,7 +10,7 @@ pub fn agent_info<'a>(
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<AgentInfo, WasmError> {
-    let agent_pubkey = holochain_util::tokio_helper::block_forever_on(async move {
+    let agent_pubkey = tokio_helper::block_forever_on(async move {
         let lock = call_context.host_access.workspace().read().await;
         lock.source_chain.agent_pubkey()
     })

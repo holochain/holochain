@@ -14,6 +14,7 @@ use holo_hash::HashableContent;
 use holo_hash::HoloHashOf;
 use holo_hash::HoloHashed;
 use holo_hash::PrimitiveHashType;
+use holochain_util::tokio_helper;
 
 /// A wrapper around a KvBufFresh where keys are always Addresses,
 /// and values are always AddressableContent.
@@ -104,7 +105,7 @@ where
     }
 
     fn deserialize_and_hash_blocking(hash: &[u8], content: C) -> HoloHashed<C> {
-        holochain_util::tokio_helper::block_forever_on(Self::deserialize_and_hash(hash, content))
+        tokio_helper::block_forever_on(Self::deserialize_and_hash(hash, content))
         // TODO: make this a stream?
     }
 

@@ -263,7 +263,7 @@ impl ZomeCallInvocation {
         let check_agent = self.provenance.clone();
         let check_secret = self.cap;
 
-        holochain_util::tokio_helper::block_forever_on(async move {
+        tokio_helper::block_forever_on(async move {
             let maybe_grant: Option<CapGrant> = host_access
                 .workspace
                 .read()

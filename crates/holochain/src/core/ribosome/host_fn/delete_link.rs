@@ -25,7 +25,7 @@ pub fn delete_link<'a>(
 
     // handle timeouts at the network layer
     let maybe_add_link: Option<SignedHeaderHashed> =
-        holochain_util::tokio_helper::block_forever_on(async move {
+        tokio_helper::block_forever_on(async move {
             CascadeResult::Ok(
                 call_context_2
                     .clone()
@@ -64,7 +64,7 @@ pub fn delete_link<'a>(
     // handle timeouts at the source chain layer
 
     // add a DeleteLink to the source chain
-    holochain_util::tokio_helper::block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         let mut guard = workspace_lock.write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;

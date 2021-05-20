@@ -1,6 +1,16 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
+use crate::conductor::p2p_store::all_agent_infos;
+use crate::conductor::p2p_store::exchange_peer_info;
+use crate::conductor::ConductorHandle;
+use crate::core::ribosome::error::RibosomeError;
+use crate::core::ribosome::error::RibosomeResult;
+use crate::test_utils::host_fn_caller::Post;
+use crate::test_utils::install_app;
+use crate::test_utils::new_zome_call;
+use crate::test_utils::setup_app_with_network;
+use crate::test_utils::wait_for_integration_with_others;
 use hdk::prelude::CellId;
 use hdk::prelude::WasmError;
 use holo_hash::AgentPubKey;
@@ -13,21 +23,11 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::ZomeCallResponse;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
-use tempdir::TempDir;
-use tracing::debug_span;
-
-use crate::conductor::p2p_store::all_agent_infos;
-use crate::conductor::p2p_store::exchange_peer_info;
-use crate::conductor::ConductorHandle;
-use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::error::RibosomeResult;
-use crate::test_utils::host_fn_caller::Post;
-use crate::test_utils::install_app;
-use crate::test_utils::new_zome_call;
-use crate::test_utils::setup_app_with_network;
-use crate::test_utils::wait_for_integration_with_others;
 use shrinkwraprs::Shrinkwrap;
+use tempdir::TempDir;
 use test_case::test_case;
+use tokio_helper;
+use tracing::debug_span;
 
 const TIMEOUT_ERROR: &'static str = "inner function \'call_create_entry_remotely\' failed: ZomeCallNetworkError(\"Other: timeout\")";
 
@@ -84,7 +84,7 @@ fn conductors_call_remote(num_conductors: usize) {
         }
         shutdown(handles).await;
     };
-    holochain_util::tokio_helper::block_forever_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -111,7 +111,7 @@ fn conductors_local_gossip(num_committers: usize, num_conductors: usize, new_con
         network,
         true,
     );
-    holochain_util::tokio_helper::block_forever_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -139,7 +139,7 @@ fn conductors_boot_gossip(num_committers: usize, num_conductors: usize, new_cond
         network,
         false,
     );
-    holochain_util::tokio_helper::block_forever_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -171,7 +171,7 @@ fn conductors_local_boot_gossip(
         network,
         false,
     );
-    holochain_util::tokio_helper::block_forever_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -218,7 +218,7 @@ fn conductors_remote_gossip(num_committers: usize, num_conductors: usize, new_co
         network,
         true,
     );
-    holochain_util::tokio_helper::block_forever_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -257,7 +257,7 @@ fn conductors_remote_boot_gossip(
         network,
         false,
     );
-    holochain_util::tokio_helper::block_forever_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 async fn conductors_gossip_inner(

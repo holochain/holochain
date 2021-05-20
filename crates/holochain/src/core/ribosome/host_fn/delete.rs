@@ -22,7 +22,7 @@ pub fn delete<'a>(
     let host_access = call_context.host_access();
 
     // handle timeouts at the source chain layer
-    holochain_util::tokio_helper::block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         let mut guard = host_access.workspace().write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
@@ -57,7 +57,7 @@ pub(crate) fn get_original_address<'a>(
     let network = call_context.host_access.network().clone();
     let workspace_lock = call_context.host_access.workspace();
 
-    holochain_util::tokio_helper::block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         let mut workspace = workspace_lock.write().await;
         let mut cascade = workspace.cascade(network);
         // TODO: Think about what options to use here
