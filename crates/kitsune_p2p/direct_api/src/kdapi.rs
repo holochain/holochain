@@ -230,6 +230,10 @@ pub enum KdApi {
         #[serde(rename = "msgId")]
         msg_id: String,
 
+        /// root app hash
+        #[serde(rename = "root")]
+        root: KdHash,
+
         /// the author pubkey for this entry
         #[serde(rename = "author")]
         author: KdHash,
@@ -263,6 +267,10 @@ pub enum KdApi {
         #[serde(rename = "msgId")]
         msg_id: String,
 
+        /// root app hash
+        #[serde(rename = "root")]
+        root: KdHash,
+
         /// hash
         #[serde(rename = "hash")]
         hash: KdHash,
@@ -286,6 +294,10 @@ pub enum KdApi {
         /// message id
         #[serde(rename = "msgId")]
         msg_id: String,
+
+        /// root app hash
+        #[serde(rename = "root")]
+        root: KdHash,
 
         /// hash of the parent
         #[serde(rename = "parent")]
