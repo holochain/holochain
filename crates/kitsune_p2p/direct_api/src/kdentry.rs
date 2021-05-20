@@ -153,7 +153,7 @@ pub struct KdEntrySigned(pub Arc<KdEntrySignedInner>);
 
 impl std::fmt::Display for KdEntrySigned {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = serde_json::to_string_pretty(&self).map_err(|_| std::fmt::Error)?;
+        let s = serde_json::to_string_pretty(&self.0).map_err(|_| std::fmt::Error)?;
         f.write_str(&s)?;
         Ok(())
     }

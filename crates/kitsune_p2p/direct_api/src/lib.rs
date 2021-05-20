@@ -11,7 +11,13 @@ pub use kderror::*;
 mod kdhash;
 pub use kdhash::*;
 
+mod kdagent;
+pub use kdagent::*;
+
 mod kdentry;
 pub use kdentry::*;
 
 pub mod kd_sys_kind;
+
+mod kdapi;
+pub use kdapi::*;
