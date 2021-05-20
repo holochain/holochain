@@ -292,11 +292,14 @@ name = "holochain_zome_types"
 version = "0.0.2-alpha.1"
 dependencies = [
  "chrono",
+ "fixt",
  "holo_hash",
  "holochain_serialized_bytes",
  "paste",
+ "rand",
  "serde",
  "serde_bytes",
+ "strum",
  "subtle",
  "thiserror",
  "tracing",
