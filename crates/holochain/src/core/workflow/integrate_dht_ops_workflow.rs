@@ -24,11 +24,9 @@ pub async fn integrate_dht_ops_workflow(
     let time = holochain_types::timestamp::now();
     let mut conn = vault.conn()?;
     let changed = conn.with_commit(|txn| {
-        let mut stmt = txn.prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_OPS)?;
-
-        let changed = stmt.execute(
-            // &sql,
-            named_params! {
+        let changed = txn
+            .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_OPS)?
+            .execute(named_params! {
                 ":when_integrated": time,
                 ":when_integrated_ns": to_blob(time)?,
                 ":store_entry": DhtOpType::StoreEntry,
@@ -41,8 +39,7 @@ pub async fn integrate_dht_ops_workflow(
                 ":create_link": DhtOpType::RegisterAddLink,
                 ":delete_link": DhtOpType::RegisterRemoveLink,
 
-            },
-        )?;
+            })?;
         WorkflowResult::Ok(changed)
     })?;
     tracing::debug!(?changed);
