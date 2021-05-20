@@ -252,8 +252,9 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
                         UninstallApp(cell_id.to_owned(), Box::new(err), name)
                     }
 
-                    // For all other errors, shut down the conductor
-                    _ => ShutdownConductor(Box::new(err), name),
+                    // For all other errors, deactivate the offending app
+                    // TODO: revisit this and handle in a more fine-grained way.
+                    _ => DeactivateApps(cell_id.to_owned(), Box::new(err), name),
                 },
                 // If the task panicked, deactivate the app.
                 // TODO: ideally, we could differentiate between the case of
@@ -266,8 +267,9 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
                     DeactivateApps(cell_id.to_owned(), Box::new(err), name)
                 }
 
-                // For all others, shut down conductor
-                _ => ShutdownConductor(Box::new(err), name),
+                // For all others, deactivate the offending app
+                // TODO: revisit this and handle in a more fine-grained way.
+                _ => DeactivateApps(cell_id.to_owned(), Box::new(err), name),
             },
         },
         TaskKind::Generic(f) => f(result),
