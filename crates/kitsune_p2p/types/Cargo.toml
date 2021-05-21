@@ -38,7 +38,7 @@ url2 = "0.0.6"
 webpki = "0.21.2"
 
 [dev-dependencies]
-criterion = "*"
+criterion = "0.3.4"
 tracing-subscriber = "0.2"
 
 [[bench]]
