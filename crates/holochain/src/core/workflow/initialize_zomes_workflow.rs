@@ -35,7 +35,9 @@ pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
         initialize_zomes_workflow_inner(workspace_lock.clone(), network, keystore, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
-    {
+
+    // only commit if the result was successful
+    if result == InitResult::Pass {
         let mut guard = workspace_lock.write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         // commit the workspace
@@ -77,12 +79,18 @@ pub mod tests {
     use crate::core::workflow::fake_genesis;
     use crate::fixt::DnaDefFixturator;
     use crate::fixt::KeystoreSenderFixturator;
+    use crate::sweettest::*;
     use ::fixt::prelude::*;
-    use fallible_iterator::FallibleIterator;
     use fixt::Unpredictable;
-    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_lmdb::{env::EnvironmentWrite, test_utils::test_cell_env};
     use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_state::prelude::SourceChainBuf;
+    use holochain_wasm_test_utils::TestWasm;
+    use matches::assert_matches;
+
+    fn get_chain(env: &EnvironmentWrite) -> SourceChainBuf {
+        SourceChainBuf::new(env.clone().into()).unwrap()
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn adds_init_marker() {
@@ -108,11 +116,103 @@ pub mod tests {
             .await
             .unwrap();
 
+        // - Ensure that the InitZomesComplete element got committed
         let source_chain = SourceChainBuf::new(env.into()).unwrap();
-        assert!(source_chain
-            .iter_back()
-            .find(|shh| Ok(matches!(shh.header(), Header::InitZomesComplete(_))))
-            .unwrap()
-            .is_some());
+        assert_matches!(
+            source_chain.get_at_index(3).unwrap().unwrap().header(),
+            Header::InitZomesComplete(_)
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn commit_during_init() {
+        // SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create, TestWasm::InitFail])
+        let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
+            .await
+            .unwrap();
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let (cell,) = app.into_tuple();
+        let zome = cell.zome("create_entry");
+
+        assert_eq!(get_chain(cell.env()).len(), 3);
+
+        let _: HeaderHash = conductor.call(&zome, "create_entry", ()).await;
+
+        let source_chain = SourceChainBuf::new(cell.env().clone().into()).unwrap();
+        // - Ensure that the InitZomesComplete element got committed after the
+        //   element committed during init()
+        assert_matches!(
+            source_chain.get_at_index(4).unwrap().unwrap().header(),
+            Header::InitZomesComplete(_)
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn commit_during_init_one_zome_passes_one_fails() {
+        let (dna, _) =
+            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create, TestWasm::InitFail])
+                .await
+                .unwrap();
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let (cell,) = app.into_tuple();
+        let zome = cell.zome("create_entry");
+
+        assert_eq!(get_chain(cell.env()).len(), 3);
+
+        // - Ensure that the chain does not advance due to init failing
+        let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
+        assert!(r.is_err());
+        let source_chain = get_chain(cell.env());
+        assert_eq!(source_chain.len(), 3);
+
+        // - Ensure idempotence of the above
+        let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
+        assert!(r.is_err());
+        let source_chain = get_chain(cell.env());
+        assert_eq!(source_chain.len(), 3);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn commit_during_init_one_zome_unimplemented_one_fails() {
+        let zome_fail = InlineZome::new_unique(vec![]).callback("init", |api, _: ()| {
+            api.create(EntryWithDefId::new(
+                EntryDefId::CapGrant,
+                Entry::CapGrant(CapGrantEntry {
+                    tag: "".into(),
+                    access: ().into(),
+                    functions: vec![("no-init".into(), "xxx".into())].into_iter().collect(),
+                }),
+            ))?;
+            Ok(InitCallbackResult::Fail("reason".into()))
+        });
+        let zome_no_init = crate::conductor::conductor::tests::simple_create_entry_zome();
+
+        let (dna, _) = SweetDnaFile::unique_from_inline_zomes(vec![
+            ("no-init", zome_no_init),
+            ("fail", zome_fail),
+        ])
+        .await
+        .unwrap();
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let (cell,) = app.into_tuple();
+        let zome = cell.zome("no-init");
+
+        assert_eq!(get_chain(cell.env()).len(), 3);
+
+        // - Ensure that the chain does not advance due to init failing
+        let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
+        assert!(r.is_err());
+        let source_chain = get_chain(cell.env());
+        assert_eq!(source_chain.len(), 3);
+
+        // - Ensure idempotence of the above
+        let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
+        assert!(r.is_err());
+        let source_chain = get_chain(cell.env());
+        assert_eq!(source_chain.len(), 3);
     }
 }
