@@ -36,7 +36,7 @@ pub fn ask_yn(prompt: String, default_yes: Option<bool>) -> std::io::Result<bool
             return Ok(false);
         } else {
             match default_yes {
-                Some(answer) if input == "" => return Ok(answer),
+                Some(answer) if input.is_empty() => return Ok(answer),
                 _ => println!("Invalid answer."),
             }
         }

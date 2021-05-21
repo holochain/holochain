@@ -14,6 +14,7 @@ use holo_hash::HashableContent;
 use holo_hash::HoloHashOf;
 use holo_hash::HoloHashed;
 use holo_hash::PrimitiveHashType;
+use holochain_util::tokio_helper;
 
 /// A wrapper around a KvBufFresh where keys are always Addresses,
 /// and values are always AddressableContent.
@@ -75,14 +76,10 @@ where
         hash: &'a HoloHashOf<C>,
     ) -> DatabaseResult<Option<HoloHashed<C>>> {
         let k = PrefixHashKey::new(hash.as_hash());
-        Ok(if let Some(content) = self.0.get(r, &k)? {
-            Some(Self::deserialize_and_hash_blocking(
-                k.as_hash_bytes(),
-                content,
-            ))
-        } else {
-            None
-        })
+        Ok(self
+            .0
+            .get(r, &k)?
+            .map(|content| Self::deserialize_and_hash_blocking(k.as_hash_bytes(), content)))
     }
 
     /// Check if a value is stored at this key

@@ -23,7 +23,7 @@ holochain_zome_types = { path = "../../holochain_zome_types" }
 rand = "0.7"
 strum = "0.18.0"
 strum_macros = "0.18.0"
-tokio_helper = { version = "0.0.1", path = "../../tokio_helper" }
+holochain_util = { version = "0.0.1", path = "../../holochain_util" }
 
 [build-dependencies]
 toml = "0.5"
