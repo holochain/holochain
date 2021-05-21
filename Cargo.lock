@@ -1730,7 +1730,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.1.0"
+version = "0.0.1-dev.0"
 dependencies = [
  "anyhow",
  "futures",
@@ -1764,7 +1764,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.1.0"
+version = "0.0.1-dev.0"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",

@@ -1,0 +1,38 @@
+[package]
+name = "release-automation"
+version = "0.1.0"
+authors = ["Stefan Junker <mail@stefanjunker.de>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+comrak = "0.10"
+yaml-rust = "0.4.5"
+structopt = "0.3"
+pulldown-cmark = "0.8"
+bstr = "0.2"
+cargo = "0.53"
+once_cell = "1.7"
+anyhow = "1.0"
+# needs to be in sync with what cargo is using
+semver = "0.10"
+serde = "1.0"
+serde_yaml = "0.8"
+educe = "0.4"
+indoc = "1.0"
+git2 = "0.13"
+linked_hash_set = "0.1"
+linked-hash-map = "0.5"
+custom_debug = "0.5"
+log = "0.4"
+env_logger = "0.8"
+fancy-regex = "0.6"
+enumflags2 = "0.7"
+enum-utils = "0.1"
+
+[dev-dependencies]
+ctor = "0.1"
+prettydiff = "0.4"
+tempfile = "3"
+cargo-test-support = { git = "https://github.com/rust-lang/cargo", branch = "rust-1.53.0" }
