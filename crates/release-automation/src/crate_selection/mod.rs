@@ -460,7 +460,7 @@ impl<'a> ReleaseWorkspace<'a> {
                     ( $i:expr ) => {
                         members_states.entry($i).or_insert(initial_state.clone())
                     };
-                };
+                }
                 macro_rules! insert_state {
                     ( $flag:expr ) => {
                         insert_state!($flag, member.name())
@@ -468,7 +468,7 @@ impl<'a> ReleaseWorkspace<'a> {
                     ( $flag:expr, $i:expr ) => {
                         get_state!($i).insert($flag)
                     };
-                };
+                }
 
                 // regex matching state
                 if criteria.selection_filter.is_match(&member.name())? {

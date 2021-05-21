@@ -178,7 +178,7 @@ pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
 ) -> DatabaseResult<()> {
     let p2p_store = AgentKv::new(env.clone().into())?;
     let env_ref = env.guard();
-    Ok(env_ref.with_commit(|writer| {
+    env_ref.with_commit(|writer| {
         for agent_info_signed in iter {
             p2p_store.as_store_ref().put(
                 writer,
@@ -187,7 +187,7 @@ pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
             )?
         }
         DatabaseResult::Ok(())
-    })?)
+    })
 }
 
 /// Helper function to get all the peer data from this conductor
