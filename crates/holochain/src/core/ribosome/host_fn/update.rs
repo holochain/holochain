@@ -53,10 +53,10 @@ pub fn update<'a>(
 
     // build a header for the entry being updated
     let header_builder = builder::Update {
+        original_entry_address,
+        original_header_address,
         entry_type,
         entry_hash,
-        original_header_address,
-        original_entry_address,
     };
 
     let workspace_lock = call_context.host_access.workspace();
