@@ -348,6 +348,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.67"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=2021-04-27-singlepass#3445a0a28868704564aef565570192c01c15981f"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -358,10 +359,10 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_guest"
 version = "0.0.67"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=2021-04-27-singlepass#3445a0a28868704564aef565570192c01c15981f"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
- "once_cell",
  "parking_lot 0.11.1",
  "serde",
  "tracing",
