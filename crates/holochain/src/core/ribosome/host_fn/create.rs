@@ -94,11 +94,10 @@ pub fn extract_entry_def(
             match maybe_entry_defs {
                 // convert the entry def id string into a numeric position in the defs
                 Some(entry_defs) => {
-                    match entry_defs.entry_def_index_from_id(entry_def_id.clone()) {
+                    entry_defs.entry_def_index_from_id(entry_def_id.clone()).map(|index| {
                         // build an app entry type from the entry def at the found position
-                        Some(index) => Some((index, entry_defs[index.0 as usize].visibility)),
-                        None => None,
-                    }
+                        (index, entry_defs[index.0 as usize].visibility)
+                                                      })
                 }
                 None => None,
             }

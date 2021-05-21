@@ -598,8 +598,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let r = futures::future::join_all(add_cells_tasks)
             .await
             .into_iter()
-            // Remove successful and collect the errors
-            .filter_map(|r| r)
+            .flatten()
             .collect();
         Ok(r)
     }

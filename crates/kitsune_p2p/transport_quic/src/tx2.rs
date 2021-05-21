@@ -65,6 +65,7 @@ impl QuicInChanRecvAdapt {
     pub fn new(recv: quinn::IncomingUniStreams) -> Self {
         Self(
             futures::stream::unfold(recv, move |mut recv| async move {
+                #[allow(clippy::style)]
                 match recv.next().await {
                     None => None,
                     Some(in_) => Some((
@@ -224,13 +225,12 @@ impl QuicConRecvAdapt {
             futures::stream::unfold(
                 (recv, local_cert),
                 move |(mut recv, local_cert)| async move {
-                    match recv.next().await {
-                        None => None,
-                        Some(con) => Some((
+                    recv.next().await.map(|con| {
+                        (
                             connecting(con, local_cert.clone(), Tx2ConDir::Incoming),
                             (recv, local_cert),
-                        )),
-                    }
+                        )
+                    })
                 },
             )
             .boxed(),
@@ -410,9 +410,10 @@ impl QuicBackendAdapt {
         quic_srv.transport = transport.clone();
         quic_srv.crypto = tls_srv;
 
-        let mut quic_cli = quinn::ClientConfig::default();
-        quic_cli.transport = transport;
-        quic_cli.crypto = tls_cli;
+        let quic_cli = quinn::ClientConfig {
+            transport,
+            crypto: tls_cli,
+        };
 
         tracing::debug!(?quic_srv, ?quic_cli, "build quinn configs");
 

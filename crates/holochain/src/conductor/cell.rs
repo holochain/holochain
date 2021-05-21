@@ -711,8 +711,8 @@ impl Cell {
         let args = CallZomeWorkflowArgs {
             ribosome,
             invocation,
-            conductor_api,
             signal_tx,
+            conductor_api,
             is_root_zome_call,
         };
         Ok(call_zome_workflow(

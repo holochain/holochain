@@ -9,7 +9,7 @@ fn hash(path_string: String) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 fn exists(path_string: String) -> ExternResult<bool> {
-    Ok(Path::from(path_string).exists()?)
+    Path::from(path_string).exists()
 }
 
 #[hdk_extern]

@@ -39,7 +39,7 @@ pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
         let mut guard = workspace_lock.write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         // commit the workspace
-        writer.with_writer(|writer| Ok(workspace.flush_to_txn_ref(writer)?))?;
+        writer.with_writer(|writer| workspace.flush_to_txn_ref(writer))?;
     }
     Ok(result)
 }

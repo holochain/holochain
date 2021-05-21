@@ -38,7 +38,7 @@ fn priv_msg() -> PrivMsg {
 
 #[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<HeaderHash> {
-    Ok(hdk::prelude::create_entry(&post())?)
+    hdk::prelude::create_entry(&post())
 }
 
 #[hdk_extern]
