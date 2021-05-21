@@ -348,7 +348,7 @@ macro_rules! test_entry_impl {
             type Error = SerializedBytesError;
             fn try_from(entry: Entry) -> Result<Self, Self::Error> {
                 let entry = unwrap_to!(entry => Entry::App).clone();
-                Ok($type::try_from(entry.into_sb())?)
+                $type::try_from(entry.into_sb())
             }
         }
     };

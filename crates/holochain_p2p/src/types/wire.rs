@@ -15,7 +15,7 @@ impl WireDhtOpData {
 
     pub fn decode(data: Vec<u8>) -> Result<Self, SerializedBytesError> {
         let request: SerializedBytes = UnsafeBytes::from(data).into();
-        Ok(request.try_into()?)
+        request.try_into()
     }
 }
 

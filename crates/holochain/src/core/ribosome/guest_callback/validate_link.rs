@@ -177,8 +177,8 @@ mod test {
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::*;
     use ::fixt::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
-    use holochain_types::dna::zome::Permission;
+    use holochain_types::access::Permission;
+    use holochain_types::prelude::*;
     use holochain_zome_types::validate_link::ValidateCreateLinkData;
     use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
     use holochain_zome_types::ExternIO;
@@ -288,7 +288,7 @@ mod slow_tests {
     use holo_hash::HeaderHash;
     use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_state::source_chain::SourceChainResult;
-    use holochain_types::dna::zome::Zome;
+    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::fake_agent_pubkey_1;
 

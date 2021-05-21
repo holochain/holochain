@@ -81,11 +81,10 @@ pub fn extract_entry_def(
             match maybe_entry_defs {
                 // convert the entry def id string into a numeric position in the defs
                 Some(entry_defs) => {
-                    match entry_defs.entry_def_index_from_id(entry_def_id.clone()) {
+                    entry_defs.entry_def_index_from_id(entry_def_id.clone()).map(|index| {
                         // build an app entry type from the entry def at the found position
-                        Some(index) => Some((index, entry_defs[index.0 as usize].visibility)),
-                        None => None,
-                    }
+                        (index, entry_defs[index.0 as usize].visibility)
+                                                      })
                 }
                 None => None,
             }
@@ -117,10 +116,7 @@ pub mod wasm_test {
     use holo_hash::EntryHash;
     use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_state::source_chain::SourceChainResult;
-    use holochain_types::app::InstalledCell;
-    use holochain_types::dna::DnaDef;
-    use holochain_types::dna::DnaFile;
-    use holochain_types::fixt::AppEntry;
+    use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;

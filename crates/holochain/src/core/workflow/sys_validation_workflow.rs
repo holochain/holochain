@@ -669,8 +669,8 @@ impl SysValidationWorkspace {
         let chain_not_empty = conn.with_reader(|txn| {
             let mut stmt = txn.prepare(
                 "
-                SELECT 
-                1 
+                SELECT
+                1
                 FROM Header
                 JOIN
                 DhtOp ON Header.hash = DhtOp.header_hash
@@ -701,7 +701,7 @@ impl SysValidationWorkspace {
             DatabaseResult::Ok(txn.query_row(
                 "
                 SELECT EXISTS(
-                    SELECT 
+                    SELECT
                     1
                     FROM Header
                     WHERE

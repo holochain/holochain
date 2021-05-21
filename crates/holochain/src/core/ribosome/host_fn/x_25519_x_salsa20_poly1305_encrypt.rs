@@ -10,14 +10,14 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
     call_context: Arc<CallContext>,
     input: X25519XSalsa20Poly1305Encrypt,
 ) -> Result<XSalsa20Poly1305EncryptedData, WasmError> {
-    Ok(tokio_helper::block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         call_context
             .host_access
             .keystore()
             .x_25519_x_salsa20_poly1305_encrypt(input)
             .await
     })
-    .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))?)
+    .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
 }
 
 #[cfg(test)]

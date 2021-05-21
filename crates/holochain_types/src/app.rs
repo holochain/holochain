@@ -11,7 +11,7 @@ mod app_bundle;
 mod app_manifest;
 mod dna_gamut;
 pub mod error;
-use crate::dna::{DnaBundle, YamlProperties};
+use crate::{dna::DnaBundle, properties::YamlProperties};
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
@@ -19,6 +19,7 @@ use derive_more::Into;
 pub use dna_gamut::*;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::prelude::*;
+use holochain_util::ffs;
 use holochain_zome_types::prelude::*;
 use itertools::Itertools;
 use std::{

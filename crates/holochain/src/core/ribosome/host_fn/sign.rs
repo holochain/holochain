@@ -10,10 +10,10 @@ pub fn sign(
     call_context: Arc<CallContext>,
     input: Sign,
 ) -> Result<Signature, WasmError> {
-    Ok(tokio_helper::block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         call_context.host_access.keystore().sign(input).await
     })
-    .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))?)
+    .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
 }
 
 #[cfg(test)]

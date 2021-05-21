@@ -1,6 +1,5 @@
 [workspace]
 members = [
-  "crates/ffs",
   "crates/fixt",
   "crates/fixt/test",
   "crates/hdk",
@@ -22,6 +21,7 @@ members = [
   "crates/holochain_sqlite",
   "crates/holochain_types",
   "crates/holochain_websocket",
+  "crates/holochain_util",
   "crates/holochain_zome_types",
 
   "crates/kitsune_p2p/kitsune_p2p",
@@ -35,7 +35,8 @@ members = [
 ]
 
 exclude = [
-  "crates/diagnostics"
+  "crates/diagnostics",
+  "crates/release-automation"
 ]
 
 # These are the default params for RELEASE target

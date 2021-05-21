@@ -33,14 +33,14 @@ pub fn call(
     };
 
     // Make the call using this workspace
-    Ok(tokio_helper::block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         conductor_handle
             .call_zome(invocation, workspace)
             .await
             .map_err(Box::new)
     })
     .map_err(|conductor_api_error| WasmError::Host(conductor_api_error.to_string()))?
-    .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?)
+    .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))
 }
 
 #[cfg(test)]
@@ -52,9 +52,7 @@ pub mod wasm_test {
     use holo_hash::HeaderHash;
     use holochain_serialized_bytes::SerializedBytes;
     use holochain_state::prelude::fresh_reader_test;
-    use holochain_types::app::InstalledCell;
-    use holochain_types::dna::DnaDef;
-    use holochain_types::dna::DnaFile;
+    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
     use holochain_zome_types::ExternIO;

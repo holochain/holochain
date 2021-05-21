@@ -60,7 +60,7 @@ fn set_authored_to_pending_integration(
         StateMutationResult::Ok(txn.query_row(
             "
             SELECT EXISTS(
-                SELECT 1 FROM DhtOp 
+                SELECT 1 FROM DhtOp
                 WHERE hash = :hash
                 AND is_authored = 1
                 AND when_integrated IS NULL
@@ -134,7 +134,7 @@ pub fn op_exists(vault: &EnvWrite, hash: &DhtOpHash) -> DatabaseResult<bool> {
         DatabaseResult::Ok(txn.query_row(
             "
             SELECT EXISTS(
-                SELECT 
+                SELECT
                 1
                 FROM DhtOp
                 WHERE

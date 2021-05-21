@@ -16,7 +16,7 @@ use holochain::{
     core::ribosome::guest_callback::validate::ValidateResult, test_utils::wait_for_integration_1m,
 };
 use holochain::{core::SourceChainError, test_utils::display_agent_infos};
-use holochain_types::{dna::zome::inline_zome::InlineZome, prelude::ZomeDef, signal::Signal};
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::element::ElementEntry;
 use tokio_stream::StreamExt;

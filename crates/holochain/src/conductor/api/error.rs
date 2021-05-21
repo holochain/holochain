@@ -59,6 +59,10 @@ pub enum ConductorApiError {
     #[error(transparent)]
     WorkflowError(#[from] Box<WorkflowError>),
 
+    /// ZomeError
+    #[error("ZomeError: {0}")]
+    ZomeError(#[from] holochain_zome_types::zome::error::ZomeError),
+
     /// DnaError
     #[error("DnaError: {0}")]
     DnaError(#[from] holochain_types::dna::DnaError),

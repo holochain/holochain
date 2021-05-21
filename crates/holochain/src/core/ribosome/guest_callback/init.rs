@@ -101,7 +101,7 @@ mod test {
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
+    use holochain_types::prelude::*;
     use holochain_zome_types::init::InitCallbackResult;
     use holochain_zome_types::ExternIO;
 

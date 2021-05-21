@@ -45,7 +45,7 @@ version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "796540673305a66d127804eef19ad696f1f204b8c1025aaca4958c17eab32877"
 dependencies = [
- "getrandom 0.2.2",
+ "getrandom 0.2.3",
  "once_cell",
  "version_check",
 ]
@@ -56,7 +56,7 @@ version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f200cbb1e856866d9eade941cf3aa0c5d7dd36f74311c4273b494f4ef036957"
 dependencies = [
- "getrandom 0.2.2",
+ "getrandom 0.2.3",
  "once_cell",
  "version_check",
 ]
@@ -96,9 +96,9 @@ checksum = "28b2cd92db5cbd74e8e5028f7e27dd7aa3090e89e4f2a197cc7c8dfb69c7063b"
 
 [[package]]
 name = "arbitrary"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "698b65a961a9d730fb45b6b0327e20207810c9f61ee421b082b27ba003f49e2b"
+checksum = "237430fd6ed3740afe94eefcc278ae21e050285be882804e0d6e8695f0c94691"
 dependencies = [
  "derive_arbitrary",
 ]
@@ -625,7 +625,7 @@ version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "615f6e27d000a2bffbc7f2f6a8669179378fa27ee4d0a509e985dfc0a7defb40"
 dependencies = [
- "getrandom 0.2.2",
+ "getrandom 0.2.3",
  "lazy_static",
  "proc-macro-hack",
  "tiny-keccak",
@@ -992,9 +992,9 @@ dependencies = [
 
 [[package]]
 name = "derive_arbitrary"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df89dd0d075dea5cc5fdd6d5df6b8a61172a710b3efac1d6bdb9dd8b78f82c1a"
+checksum = "5f1281ee141df08871db9fe261ab5312179eac32d1e314134ceaa8dd7c042f5a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1262,17 +1262,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ffs"
-version = "0.0.1"
-dependencies = [
- "backtrace",
- "cfg-if 0.1.10",
- "derive_more",
- "dunce",
- "tokio",
-]
-
-[[package]]
 name = "fixt"
 version = "0.0.2-alpha.1"
 dependencies = [
@@ -1506,9 +1495,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9495705279e7140bf035dde1f6e750c162df8b625267cd52cc44e0b156732c8"
+checksum = "7fcd999463524c52659517fe2cea98493cfe485d10565e7b0fb07dbba7ad2753"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
@@ -1724,6 +1713,7 @@ dependencies = [
  "holochain_state",
  "holochain_test_wasm_common",
  "holochain_types",
+ "holochain_util",
  "holochain_wasm_test_utils",
  "holochain_wasmer_host",
  "holochain_websocket",
@@ -1761,7 +1751,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
- "tokio_helper",
  "toml",
  "tracing",
  "tracing-futures",
@@ -1809,7 +1798,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.1.0"
+version = "0.0.1-dev.0"
 dependencies = [
  "anyhow",
  "futures",
@@ -1826,9 +1815,9 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "assert_cmd",
- "ffs",
  "holochain_serialized_bytes",
  "holochain_types",
+ "holochain_util",
  "matches",
  "mr_bundle",
  "predicates",
@@ -1843,7 +1832,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.1.0"
+version = "0.0.1-dev.0"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -1921,6 +1910,7 @@ dependencies = [
  "holochain_keystore",
  "holochain_serialized_bytes",
  "holochain_types",
+ "holochain_util",
  "holochain_zome_types",
  "kitsune_p2p",
  "kitsune_p2p_types",
@@ -1931,7 +1921,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
- "tokio_helper",
 ]
 
 [[package]]
@@ -1976,6 +1965,7 @@ dependencies = [
  "futures",
  "holo_hash",
  "holochain_serialized_bytes",
+ "holochain_util",
  "holochain_zome_types",
  "kitsune_p2p",
  "lazy_static",
@@ -1996,7 +1986,6 @@ dependencies = [
  "tempdir",
  "thiserror",
  "tokio",
- "tokio_helper",
  "tracing",
  "tracing-futures",
 ]
@@ -2020,6 +2009,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "holochain_sqlite",
  "holochain_types",
+ "holochain_util",
  "holochain_wasm_test_utils",
  "holochain_zome_types",
  "kitsune_p2p",
@@ -2034,7 +2024,6 @@ dependencies = [
  "tempdir",
  "thiserror",
  "tokio",
- "tokio_helper",
  "tracing",
  "tracing-futures",
 ]
@@ -2064,7 +2053,6 @@ dependencies = [
  "derive_builder",
  "derive_more",
  "either",
- "ffs",
  "fixt",
  "flate2",
  "futures",
@@ -2072,6 +2060,7 @@ dependencies = [
  "holochain_keystore",
  "holochain_serialized_bytes",
  "holochain_sqlite",
+ "holochain_util",
  "holochain_zome_types",
  "itertools 0.10.0",
  "lazy_static",
@@ -2096,8 +2085,21 @@ dependencies = [
  "tempdir",
  "thiserror",
  "tokio",
- "tokio_helper",
  "tracing",
+]
+
+[[package]]
+name = "holochain_util"
+version = "0.0.1"
+dependencies = [
+ "backtrace",
+ "cfg-if 0.1.10",
+ "derive_more",
+ "dunce",
+ "futures",
+ "num_cpus",
+ "once_cell",
+ "tokio",
 ]
 
 [[package]]
@@ -2107,11 +2109,11 @@ dependencies = [
  "fixt",
  "holo_hash",
  "holochain_types",
+ "holochain_util",
  "holochain_zome_types",
  "rand 0.7.3",
  "strum",
  "strum_macros",
- "tokio_helper",
  "toml",
  "walkdir",
 ]
@@ -2188,15 +2190,18 @@ name = "holochain_zome_types"
 version = "0.0.2-alpha.1"
 dependencies = [
  "chrono",
+ "derive_builder",
  "fixt",
  "holo_hash",
  "holochain_serialized_bytes",
+ "nanoid",
  "num_enum",
  "paste 1.0.5",
  "rand 0.7.3",
  "rusqlite",
  "serde",
  "serde_bytes",
+ "shrinkwraprs",
  "strum",
  "subtle 2.4.0",
  "thiserror",
@@ -2905,9 +2910,9 @@ dependencies = [
  "bytes",
  "derive_more",
  "either",
- "ffs",
  "flate2",
  "futures",
+ "holochain_util",
  "maplit",
  "matches",
  "reqwest",
@@ -3193,9 +3198,9 @@ dependencies = [
 
 [[package]]
 name = "os_type"
-version = "2.2.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7edc011af0ae98b7f88cf7e4a83b70a54a75d2b8cb013d6efd02e5956207e9eb"
+checksum = "96eaebe22d9f12429b1af6a0b5dd411ccfc5cb5968710abbb8c512046be9df90"
 dependencies = [
  "regex",
 ]
@@ -3630,9 +3635,9 @@ checksum = "bc881b2c22681370c6a780e47af9840ef841837bc98118431d4e1868bd0c1086"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.26"
+version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a152013215dca273577e18d2bf00fa862b89b24169fb78c4c95aeb07992c9cec"
+checksum = "f0d8caf72986c1a598726adc988bb5984792ef84f5ee5aa50209145ee8077038"
 dependencies = [
  "unicode-xid",
 ]
@@ -3839,7 +3844,7 @@ version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34cf66eb183df1c5876e2dcf6b13d57340741e8dc255b48e40a26de954d06ae7"
 dependencies = [
- "getrandom 0.2.2",
+ "getrandom 0.2.3",
 ]
 
 [[package]]
@@ -3944,9 +3949,9 @@ dependencies = [
 
 [[package]]
 name = "rayon"
-version = "1.5.0"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b0d8e0819fadc20c74ea8373106ead0600e3a67ef1fe8da56e39b9ae7275674"
+checksum = "c06aca804d41dbc8ba42dfd964f0d01334eceb64314b9ecf7c5fad5188a06d90"
 dependencies = [
  "autocfg 1.0.1",
  "crossbeam-deque",
@@ -3956,9 +3961,9 @@ dependencies = [
 
 [[package]]
 name = "rayon-core"
-version = "1.9.0"
+version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ab346ac5921dc62ffa9f89b7a773907511cdfa5490c572ae9be1be33e8afa4a"
+checksum = "d78120e2c850279833f1dd3582f730c4ab53ed95aeaaaa862a2a5c71b1656d8e"
 dependencies = [
  "crossbeam-channel",
  "crossbeam-deque",
@@ -4020,7 +4025,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "528532f3d801c87aec9def2add9ca802fe569e44a544afe633765267840abe64"
 dependencies = [
- "getrandom 0.2.2",
+ "getrandom 0.2.3",
  "redox_syscall 0.2.8",
 ]
 
@@ -4952,16 +4957,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio_helper"
-version = "0.0.1"
-dependencies = [
- "futures",
- "num_cpus",
- "once_cell",
- "tokio",
-]
-
-[[package]]
 name = "toml"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5243,7 +5238,7 @@ version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
- "getrandom 0.2.2",
+ "getrandom 0.2.3",
 ]
 
 [[package]]

@@ -116,8 +116,6 @@ mod tests {
     use crate::conductor::Conductor;
     use holo_hash::HasHash;
     use holochain_state::prelude::test_environments;
-    use holochain_types::dna::wasm::DnaWasmHashed;
-    use holochain_types::dna::zome::ZomeDef;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
