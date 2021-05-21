@@ -54,9 +54,6 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
-use holochain_zome_types::Entry;
-use holochain_zome_types::HeaderHashed;
-use holochain_zome_types::ValidationStatus;
 use tracing::*;
 pub use types::Outcome;
 
@@ -749,7 +746,7 @@ async fn get_validation_package_remote(
                         Some(EntryType::App(a)) => a.clone(),
                         _ => return Ok(None),
                     };
-                    let zome = ribosome
+                    let zome: Zome = ribosome
                         .dna_def()
                         .zomes
                         .get(app_entry_type.zome_id().index())

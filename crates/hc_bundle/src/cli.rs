@@ -2,6 +2,7 @@
 //! Binary `hc-dna` command executable.
 
 use holochain_types::prelude::{AppManifest, DnaManifest};
+use holochain_util::ffs;
 use mr_bundle::Manifest;
 use std::path::Path;
 use std::path::PathBuf;

@@ -132,10 +132,7 @@ pub mod wasm_test {
     use holochain_state::source_chain::ChainInvalidReason;
     use holochain_state::source_chain::SourceChainError;
     use holochain_state::source_chain::SourceChainResult;
-    use holochain_types::app::InstalledCell;
-    use holochain_types::dna::DnaDef;
-    use holochain_types::dna::DnaFile;
-    use holochain_types::fixt::AppEntry;
+    use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;

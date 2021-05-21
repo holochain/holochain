@@ -10,7 +10,7 @@ use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::workspace::Workspace;
-use holochain_types::dna::DnaDef;
+use holochain_types::prelude::*;
 use holochain_zome_types::header::builder;
 use tracing::*;
 

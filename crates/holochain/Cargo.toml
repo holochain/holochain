@@ -32,7 +32,6 @@ holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }
 holochain_serialized_bytes = "=0.0.50"
 holochain_state = { version = "0.0.1", path = "../holochain_state" }
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
-holochain_wasm_test_utils = { version = "0.0.1", path = "../test_utils/wasm" }
 holochain_wasmer_host = "=0.0.67"
 holochain_websocket = { version = "0.0.1", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
@@ -59,7 +58,7 @@ tempdir = "0.3.7"
 thiserror = "1.0.22"
 tokio = { version = "1.3", features = [ "full" ] }
 tokio-stream = "0.1"
-tokio_helper = { version = "0.0.1", path = "../tokio_helper" }
+holochain_util = { version = "0.0.1", path = "../holochain_util" }
 toml = "0.5.6"
 tracing = "=0.1.21"
 tracing-futures = "0.2.4"
@@ -73,6 +72,7 @@ xsalsa20poly1305 = "0.6.0"
 once_cell = "1.4.1"
 
 # Dependencies for test_utils: keep in sync with below
+holochain_wasm_test_utils = { version = "0.0.1", path = "../test_utils/wasm", optional = true }
 hdk = { path = "../hdk", optional = true }
 matches = {version = "0.1.8", optional = true }
 holochain_test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_common", optional = true  }
@@ -93,6 +93,7 @@ serial_test = "0.4.0"
 test-case = "1.0.0"
 
 # Dependencies for test_utils: keep in sync with above
+holochain_wasm_test_utils = { version = "0.0.1", path = "../test_utils/wasm", optional = false }
 hdk = { path = "../hdk", optional = false }
 matches = {version = "0.1.8", optional = false }
 holochain_test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_common", optional = false  }

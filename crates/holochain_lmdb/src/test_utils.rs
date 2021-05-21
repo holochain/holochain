@@ -4,6 +4,7 @@ use crate::env::EnvironmentKind;
 use crate::env::EnvironmentWrite;
 use crate::prelude::BufKey;
 use holochain_keystore::KeystoreSender;
+use holochain_util::tokio_helper;
 use holochain_zome_types::test_utils::fake_cell_id;
 use shrinkwraprs::Shrinkwrap;
 use std::sync::Arc;
