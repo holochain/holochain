@@ -165,9 +165,8 @@ impl<D: Into<core::time::Duration>> Add<D> for Timestamp {
     type Output = TimestampResult<Timestamp>;
 
     fn add(self, rhs: D) -> Self::Output {
-        Ok(self
-            .checked_add(&rhs.into())
-            .ok_or(TimestampError::Overflow)?)
+        self.checked_add(&rhs.into())
+            .ok_or(TimestampError::Overflow)
     }
 }
 
@@ -184,9 +183,8 @@ impl<D: Into<core::time::Duration>> Sub<D> for Timestamp {
     type Output = TimestampResult<Timestamp>;
 
     fn sub(self, rhs: D) -> Self::Output {
-        Ok(self
-            .checked_sub(&rhs.into())
-            .ok_or(TimestampError::Overflow)?)
+        self.checked_sub(&rhs.into())
+            .ok_or(TimestampError::Overflow)
     }
 }
 
@@ -338,9 +336,8 @@ impl Sub<Timestamp> for Timestamp {
     type Output = TimestampResult<chrono::Duration>;
 
     fn sub(self, rhs: Timestamp) -> Self::Output {
-        Ok(self
-            .checked_difference_signed(&rhs)
-            .ok_or(TimestampError::Overflow)?)
+        self.checked_difference_signed(&rhs)
+            .ok_or(TimestampError::Overflow)
     }
 }
 

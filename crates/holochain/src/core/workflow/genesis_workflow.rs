@@ -51,7 +51,7 @@ where
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
+    writer.with_writer(|writer| workspace.flush_to_txn(writer))?;
 
     Ok(())
 }
@@ -79,6 +79,7 @@ where
         GenesisSelfCheckHostAccess,
         GenesisSelfCheckInvocation {
             payload: GenesisSelfCheckData {
+                dna_def: dna_file.dna_def().clone(),
                 membrane_proof: membrane_proof.clone(),
                 agent_key: agent_pubkey.clone(),
             },

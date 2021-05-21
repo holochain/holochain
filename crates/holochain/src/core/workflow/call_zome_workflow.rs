@@ -77,7 +77,7 @@ pub async fn call_zome_workflow<
     if should_write {
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        writer.with_writer(|writer| Ok(workspace.flush_to_txn_ref(writer)?))?;
+        writer.with_writer(|writer| workspace.flush_to_txn_ref(writer))?;
     }
 
     trigger_produce_dht_ops.trigger();

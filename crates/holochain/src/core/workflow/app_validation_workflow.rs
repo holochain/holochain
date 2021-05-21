@@ -78,7 +78,7 @@ pub async fn app_validation_workflow(
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
+    writer.with_writer(|writer| workspace.flush_to_txn(writer))?;
 
     // trigger other workflows
     trigger_integration.trigger();
@@ -425,13 +425,13 @@ fn get_zome_info<'a>(
     dna_def: &'a DnaDef,
 ) -> AppValidationResult<&'a (ZomeName, ZomeDef)> {
     let zome_index = u8::from(entry_type.zome_id()) as usize;
-    Ok(dna_def
+    dna_def
         .zomes
         .get(zome_index)
-        .ok_or_else(|| AppValidationError::ZomeId(entry_type.zome_id()))?)
+        .ok_or_else(|| AppValidationError::ZomeId(entry_type.zome_id()))
 }
 
-fn get_zome<'a>(entry_type: &AppEntryType, dna_def: &'a DnaDef) -> AppValidationResult<Zome> {
+fn get_zome(entry_type: &AppEntryType, dna_def: &DnaDef) -> AppValidationResult<Zome> {
     zome_id_to_zome(entry_type.zome_id(), dna_def)
 }
 
@@ -958,12 +958,12 @@ impl AppValidationWorkspace {
             validation_limbo,
             element_vault,
             meta_vault,
-            element_authored,
-            meta_authored,
             element_pending,
             meta_pending,
             element_rejected,
             meta_rejected,
+            element_authored,
+            meta_authored,
             element_cache,
             meta_cache,
             call_zome_workspace_lock,
