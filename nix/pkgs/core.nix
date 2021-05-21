@@ -25,6 +25,34 @@ rec {
     cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
   '';
 
+  hcReleaseAutomationTest = let
+    releaseAutomationCmd = logLevel: ''
+      # todo: need a way to not make the hdk fail despite it being unreleasable
+      cargo run --manifest-path=crates/release-automation/Cargo.toml -- \
+          --workspace-path=$PWD \
+          --log-level=${logLevel}\
+        check \
+          --selection-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+          --disallowed-version-reqs=">=0.1" \
+          --allowed-selection-blockers=UnreleasableViaChangelogFrontmatter \
+          --allowed-dependency-blockers=UnreleasableViaChangelogFrontmatter \
+          --exclude-optional-deps \
+          --exclude-dep-kinds=development
+    '';
+    in writeShellScriptBin "hc-release-automation-test" ''
+    set -euxo pipefail
+
+    # run the release-automation tests
+    cargo test --manifest-path=crates/release-automation/Cargo.toml ''${@}
+
+    # check the state of the repository
+    (
+      ${releaseAutomationCmd "warn"}
+    ) || (
+      ${releaseAutomationCmd "trace"}
+    )
+  '';
+
   hcMergeTest = let
       pathPrefix = lib.makeBinPath
         (builtins.attrValues { inherit (holonix.pkgs)
@@ -39,6 +67,7 @@ rec {
 
     set -euxo pipefail
     export RUST_BACKTRACE=1
+    hc-release-automation-test
     hn-rust-fmt-check
     hn-rust-clippy
     hc-test
@@ -48,7 +77,7 @@ rec {
     cargo test speed_test_prep --test speed_tests --release --manifest-path=crates/holochain/Cargo.toml --features "build_wasms" -- --ignored
     cargo test speed_test_all --test speed_tests --release --manifest-path=crates/holochain/Cargo.toml --features "build_wasms" -- --ignored --nocapture
   '';
-  
+
   hcFlakyTest = writeShellScriptBin "hc-flaky-test" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1

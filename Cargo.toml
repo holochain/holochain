@@ -34,7 +34,8 @@ members = [
 ]
 
 exclude = [
-  "crates/diagnostics"
+  "crates/diagnostics",
+  "crates/release-automation"
 ]
 
 # These are the default params for RELEASE target

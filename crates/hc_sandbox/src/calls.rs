@@ -621,7 +621,7 @@ fn parse_dna_hash(arg: &str) -> anyhow::Result<DnaHash> {
 impl From<CellId> for DumpState {
     fn from(cell_id: CellId) -> Self {
         let (dna, agent_key) = cell_id.into_dna_and_agent();
-        Self { agent_key, dna }
+        Self { dna, agent_key }
     }
 }
 

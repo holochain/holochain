@@ -19,7 +19,7 @@ pub trait BufKey: Sized + Ord + Eq + AsRef<[u8]> + Send + Sync {
     ///
     /// This is provided by the AsRef impl by default, but can be overridden if
     /// there is a way to go into a Vec without an allocation
-    fn to_key_bytes(self) -> Vec<u8> {
+    fn into_key_bytes(self) -> Vec<u8> {
         self.as_ref().to_vec()
     }
 
@@ -111,7 +111,7 @@ impl AsRef<[u8]> for UnitDbKey {
 }
 
 impl BufKey for UnitDbKey {
-    fn to_key_bytes(self) -> Vec<u8> {
+    fn into_key_bytes(self) -> Vec<u8> {
         ARBITRARY_BYTE_SLICE.to_vec()
     }
 

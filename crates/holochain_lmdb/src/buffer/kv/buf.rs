@@ -67,7 +67,7 @@ where
     /// Clear all scratch and db, useful for tests
     pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         self.scratch.clear();
-        Ok(self.store.delete_all(writer)?)
+        self.store.delete_all(writer)
     }
 }
 
@@ -89,7 +89,7 @@ where
     /// Clear all scratch and db, useful for tests
     pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         self.scratch.clear();
-        Ok(self.store.delete_all(writer)?)
+        self.store.delete_all(writer)
     }
 }
 
@@ -144,21 +144,21 @@ where
     pub fn put(&mut self, k: K, v: V) -> DatabaseResult<()> {
         check_empty_key(&k)?;
         self.scratch
-            .insert(k.to_key_bytes(), KvOp::Put(Box::new(v)));
+            .insert(k.into_key_bytes(), KvOp::Put(Box::new(v)));
         Ok(())
     }
 
     /// Update the scratch space to record a Delete operation for the KV
     pub fn delete(&mut self, k: K) -> DatabaseResult<()> {
         check_empty_key(&k)?;
-        self.scratch.insert(k.to_key_bytes(), KvOp::Delete);
+        self.scratch.insert(k.into_key_bytes(), KvOp::Delete);
         Ok(())
     }
 
     /// Update the scratch space to remove a Delete operation for the KV
     pub fn cancel_delete(&mut self, k: K) -> DatabaseResult<()> {
         check_empty_key(&k)?;
-        let k = k.to_key_bytes();
+        let k = k.into_key_bytes();
         if let Some(&KvOp::Delete) = self.scratch.get(&k) {
             self.scratch.remove(&k);
         }
