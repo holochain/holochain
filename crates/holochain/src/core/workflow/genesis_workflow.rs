@@ -79,6 +79,7 @@ where
         GenesisSelfCheckHostAccess,
         GenesisSelfCheckInvocation {
             payload: GenesisSelfCheckData {
+                dna_def: dna_file.dna_def().clone(),
                 membrane_proof: membrane_proof.clone(),
                 agent_key: agent_pubkey.clone(),
             },
