@@ -78,11 +78,11 @@ pub mod tests {
     use crate::fixt::DnaDefFixturator;
     use crate::fixt::KeystoreSenderFixturator;
     use ::fixt::prelude::*;
+    use fallible_iterator::FallibleIterator;
     use fixt::Unpredictable;
     use holochain_lmdb::test_utils::test_cell_env;
     use holochain_p2p::HolochainP2pCellFixturator;
-    use holochain_zome_types::Header;
-    use matches::assert_matches;
+    use holochain_state::prelude::SourceChainBuf;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn adds_init_marker() {
@@ -104,22 +104,15 @@ pub mod tests {
         let args = InitializeZomesWorkflowArgs { ribosome, dna_def };
         let keystore = fixt!(KeystoreSender);
         let network = fixt!(HolochainP2pCell);
-        let workspace_lock = CallZomeWorkspaceLock::new(workspace);
-        initialize_zomes_workflow_inner(workspace_lock.clone(), network, keystore, args)
+        initialize_zomes_workflow(workspace, network, keystore, env.clone().into(), args)
             .await
             .unwrap();
 
-        // Check init is added to the workspace
-        assert_matches!(
-            workspace_lock
-                .read()
-                .await
-                .source_chain
-                .get_at_index(3)
-                .unwrap()
-                .unwrap()
-                .header(),
-            Header::InitZomesComplete(_)
-        );
+        let source_chain = SourceChainBuf::new(env.into()).unwrap();
+        assert!(source_chain
+            .iter_back()
+            .find(|shh| Ok(matches!(shh.header(), Header::InitZomesComplete(_))))
+            .unwrap()
+            .is_some());
     }
 }
