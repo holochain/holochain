@@ -25,25 +25,32 @@ rec {
     cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
   '';
 
-  hcReleaseAutomationTest = writeShellScriptBin "hc-release-automation-test" ''
+  hcReleaseAutomationTest = let
+    releaseAutomationCmd = logLevel: ''
+      # todo: need a way to not make the hdk fail despite it being unreleasable
+      cargo run --manifest-path=crates/release-automation/Cargo.toml -- \
+          --workspace-path=$PWD \
+          --log-level=${logLevel}\
+        check \
+          --selection-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+          --disallowed-version-reqs=">=0.1" \
+          --allowed-selection-blockers=UnreleasableViaChangelogFrontmatter \
+          --allowed-dependency-blockers=UnreleasableViaChangelogFrontmatter \
+          --exclude-optional-deps \
+          --exclude-dep-kinds=development
+    '';
+    in writeShellScriptBin "hc-release-automation-test" ''
     set -euxo pipefail
 
     # run the release-automation tests
     cargo test --manifest-path=crates/release-automation/Cargo.toml ''${@}
 
     # check the state of the repository
-    # todo: need a way to not make the hdk fail despite it being unreleasable
-    cargo run --manifest-path=crates/release-automation/Cargo.toml -- \
-        --workspace-path=$PWD \
-        --log-level=trace \
-      check \
-        --selection-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-        --disallowed-version-reqs=">=0.1" \
-        --allowed-selection-blockers=UnreleasableViaChangelogFrontmatter \
-        --allowed-dependency-blockers=UnreleasableViaChangelogFrontmatter \
-        --exclude-optional-deps \
-        --exclude-dep-kinds=development
-
+    (
+      ${releaseAutomationCmd "warn"}
+    ) || (
+      ${releaseAutomationCmd "trace"}
+    )
   '';
 
   hcMergeTest = let
