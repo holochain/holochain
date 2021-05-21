@@ -11,14 +11,14 @@ pub fn create_x25519_keypair(
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<X25519PubKey, WasmError> {
-    Ok(tokio_helper::block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         call_context
             .host_access
             .keystore()
             .create_x25519_keypair()
             .await
     })
-    .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))?)
+    .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
 }
 
 // See x_25519_x_salsa20_poly1305_encrypt for testing encryption using created keypairs.

@@ -140,10 +140,7 @@ impl SourceChainBuf {
         let header = HeaderHashed::from_content_sync(header);
         let header_address = header.as_hash().to_owned();
         let signed_header = SignedHeaderHashed::new(&self.keystore, header).await?;
-        let maybe_entry = match maybe_entry {
-            None => None,
-            Some(entry) => Some(EntryHashed::from_content_sync(entry)),
-        };
+        let maybe_entry = maybe_entry.map(EntryHashed::from_content_sync);
 
         /*
         FIXME: this needs to happen here.

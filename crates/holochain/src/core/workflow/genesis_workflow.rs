@@ -51,7 +51,7 @@ where
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
+    writer.with_writer(|writer| workspace.flush_to_txn(writer))?;
 
     Ok(())
 }
@@ -200,7 +200,11 @@ pub mod tests {
 
             assert_matches!(
                 headers.as_slice(),
-                [Header::Create(_), Header::AgentValidationPkg(_), Header::Dna(_)]
+                [
+                    Header::Create(_),
+                    Header::AgentValidationPkg(_),
+                    Header::Dna(_)
+                ]
             );
         }
 
