@@ -89,6 +89,8 @@ pub struct RealRibosome {
 }
 
 impl RealRibosome {
+    const SIGNATURE: ([Type; 2], [Type; 0]) = ([Type::I32, Type::I32], []);
+
     /// Create a new instance
     pub fn new(dna_file: DnaFile) -> Self {
         Self { dna_file }
@@ -133,53 +135,63 @@ impl RealRibosome {
     fn imports(&self, call_context: CallContext, store: &Store, env: &Env) -> ImportObject {
         let host_fn_access = (&call_context.host_access()).into();
 
+        let mut imports = imports! {};
+        let mut ns = Exports::new();
+
         // it is important that RealRibosome and ZomeCallInvocation are cheap to clone here
         let self_arc = std::sync::Arc::new((*self).clone());
         let call_context_arc = std::sync::Arc::new(call_context);
 
-        macro_rules! invoke_host_function {
-            ( $host_function:ident ) => {{
-                let closure_self_arc = std::sync::Arc::clone(&self_arc);
-                let closure_call_context_arc = std::sync::Arc::clone(&call_context_arc);
-                move |env: &Env, args: &[Value]| -> Result<Vec<Value>, RuntimeError> {
-                    let guest_ptr: GuestPtr = match args[0] {
-                        Value::I32(i) => i
-                            .try_into()
-                            .map_err(|_| RuntimeError::new(WasmError::PointerMap))?,
-                        _ => {
-                            return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
-                        }
-                    };
-                    let len: Len = match args[1] {
-                        Value::I32(i) => i
-                            .try_into()
-                            .map_err(|_| RuntimeError::new(WasmError::PointerMap))?,
-                        _ => {
-                            return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
-                        }
-                    };
-                    let result = match env.consume_bytes_from_guest(guest_ptr, len) {
-                        Ok(input) => {
-                            match $host_function(
-                                std::sync::Arc::clone(&closure_self_arc),
-                                std::sync::Arc::clone(&closure_call_context_arc),
-                                input,
-                            ) {
-                                Ok(output) => Ok::<_, WasmError>(output),
-                                Err(wasm_error) => Err::<_, WasmError>(wasm_error),
+        macro_rules! insert_host_function {
+            [ $host_function_name:literal; $host_function:ident; ] => {
+                ns.insert(
+                    $host_function_name,
+                    Function::new_with_env(
+                        store,
+                        Self::SIGNATURE,
+                        env.clone(),
+                        {
+                            let closure_self_arc = std::sync::Arc::clone(&self_arc);
+                            let closure_call_context_arc = std::sync::Arc::clone(&call_context_arc);
+                            move |env: &Env, args: &[Value]| -> Result<Vec<Value>, RuntimeError> {
+                                let guest_ptr: GuestPtr = match args[0] {
+                                    Value::I32(i) => i
+                                        .try_into()
+                                        .map_err(|_| RuntimeError::new(WasmError::PointerMap))?,
+                                    _ => {
+                                        return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
+                                    }
+                                };
+                                let len: Len = match args[1] {
+                                    Value::I32(i) => i
+                                        .try_into()
+                                        .map_err(|_| RuntimeError::new(WasmError::PointerMap))?,
+                                    _ => {
+                                        return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
+                                    }
+                                };
+                                let result = match env.consume_bytes_from_guest(guest_ptr, len) {
+                                    Ok(input) => {
+                                        match $host_function(
+                                            std::sync::Arc::clone(&closure_self_arc),
+                                            std::sync::Arc::clone(&closure_call_context_arc),
+                                            input,
+                                        ) {
+                                            Ok(output) => Ok::<_, WasmError>(output),
+                                            Err(wasm_error) => Err::<_, WasmError>(wasm_error),
+                                        }
+                                    }
+                                    Err(wasm_error) => Err::<_, WasmError>(wasm_error),
+                                };
+                                env.set_data(result)
+                                    .map_err(|e| RuntimeError::new(e.to_string()))?;
+                                Ok(vec![])
                             }
                         }
-                        Err(wasm_error) => Err::<_, WasmError>(wasm_error),
-                    };
-                    env.set_data(result)
-                        .map_err(|e| RuntimeError::new(e.to_string()))?;
-                    Ok(vec![])
-                }
-            }};
+                    )
+                )
+            };
         }
-        let mut imports = imports! {};
-        let mut ns = Exports::new();
-        let signature = FunctionType::new(vec![Type::I32, Type::I32], vec![]);
 
         // standard memory handling used by the holochain_wasmer guest and host macros
         ns.insert(
@@ -192,183 +204,33 @@ impl RealRibosome {
         );
 
         // imported host functions for core
-        ns.insert(
-            "__trace",
-            Function::new_with_env(store, &signature, env.clone(), invoke_host_function!(trace)),
-        );
-        ns.insert(
-            "__hash_entry",
-            Function::new_with_env(
-                store,
-                &signature,
-                env.clone(),
-                invoke_host_function!(hash_entry),
-            ),
-        );
-        ns.insert(
-            "__version",
-            Function::new_with_env(
-                store,
-                &signature,
-                env.clone(),
-                invoke_host_function!(version),
-            ),
-        );
-        ns.insert(
-            "__unreachable",
-            Function::new_with_env(
-                store,
-                &signature,
-                env.clone(),
-                invoke_host_function!(unreachable),
-            ),
-        );
+        insert_host_function![ "__trace"; trace; ];
+        insert_host_function![ "__hash_entry"; hash_entry; ];
+        insert_host_function![ "__version"; version; ];
+        insert_host_function![ "__unreachable"; unreachable; ];
 
         if let HostFnAccess {
             keystore: Permission::Allow,
             ..
         } = host_fn_access
         {
-            ns.insert(
-                "__verify_signature",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(verify_signature),
-                ),
-            );
-            ns.insert(
-                "__sign",
-                Function::new_with_env(store, &signature, env.clone(), invoke_host_function!(sign)),
-            );
-            ns.insert(
-                "__sign_ephemeral",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(sign_ephemeral),
-                ),
-            );
-            ns.insert(
-                "__create_x25519_keypair",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(create_x25519_keypair),
-                ),
-            );
-            ns.insert(
-                "__x_salsa20_poly1305_encrypt",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(x_salsa20_poly1305_encrypt),
-                ),
-            );
-            ns.insert(
-                "__x_salsa20_poly1305_decrypt",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(x_salsa20_poly1305_decrypt),
-                ),
-            );
-            ns.insert(
-                "__x_25519_x_salsa20_poly1305_encrypt",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(x_25519_x_salsa20_poly1305_encrypt),
-                ),
-            );
-            ns.insert(
-                "__x_25519_x_salsa20_poly1305_decrypt",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(x_25519_x_salsa20_poly1305_decrypt),
-                ),
-            );
+            insert_host_function![ "__verify_signature"; verify_signature; ];
+            insert_host_function![ "__sign"; sign; ];
+            insert_host_function![ "__sign_ephemeral"; sign_ephemeral; ];
+            insert_host_function![ "__create_x25519_keypair"; create_x25519_keypair; ];
+            insert_host_function![ "__x_salsa20_poly1305_encrypt"; x_salsa20_poly1305_encrypt; ];
+            insert_host_function![ "__x_salsa20_poly1305_decrypt"; x_salsa20_poly1305_decrypt; ];
+            insert_host_function![ "__x_25519_x_salsa20_poly1305_encrypt"; x_25519_x_salsa20_poly1305_encrypt; ];
+            insert_host_function![ "__x_25519_x_salsa20_poly1305_decrypt"; x_25519_x_salsa20_poly1305_decrypt; ];
         } else {
-            ns.insert(
-                "__verify_signature",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__sign",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__sign_ephemeral",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__create_x25519_keypair",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__x_salsa20_poly1305_encrypt",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__x_salsa20_poly1305_decrypt",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__x_25519_x_salsa20_poly1305_encrypt",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__x_25519_x_salsa20_poly1305_decrypt",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
+            insert_host_function![ "__verify_signature"; unreachable; ];
+            insert_host_function![ "__sign"; unreachable; ];
+            insert_host_function![ "__sign_ephemeral"; unreachable; ];
+            insert_host_function![ "__create_x25519_keypair"; unreachable; ];
+            insert_host_function![ "__x_salsa20_poly1305_encrypt"; unreachable; ];
+            insert_host_function![ "__x_salsa20_poly1305_decrypt"; unreachable; ];
+            insert_host_function![ "__x_25519_x_salsa20_poly1305_encrypt"; unreachable; ];
+            insert_host_function![ "__x_25519_x_salsa20_poly1305_decrypt"; unreachable; ];
         }
 
         if let HostFnAccess {
@@ -376,79 +238,15 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert(
-                "__zome_info",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(zome_info),
-                ),
-            );
-            ns.insert(
-                "__app_info",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(app_info),
-                ),
-            );
-            ns.insert(
-                "__dna_info",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(dna_info),
-                ),
-            );
-            ns.insert(
-                "__call_info",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(call_info),
-                ),
-            );
+            insert_host_function![ "__zome_info"; zome_info; ];
+            insert_host_function![ "__app_info"; app_info; ];
+            insert_host_function![ "__dna_info"; dna_info; ];
+            insert_host_function![ "__call_info"; call_info; ];
         } else {
-            ns.insert(
-                "__zome_info",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__app_info",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__dna_info",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__call_info",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
+            insert_host_function![ "__zome_info"; unreachable; ];
+            insert_host_function![ "__app_info"; unreachable; ];
+            insert_host_function![ "__dna_info"; unreachable; ];
+            insert_host_function![ "__call_info"; unreachable; ];
         }
 
         if let HostFnAccess {
@@ -456,61 +254,13 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert(
-                "__random_bytes",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(random_bytes),
-                ),
-            );
-            ns.insert(
-                "__sys_time",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(sys_time),
-                ),
-            );
-            ns.insert(
-                "__sleep",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(sleep),
-                ),
-            );
+            insert_host_function![ "__random_bytes"; random_bytes; ];
+            insert_host_function![ "__sys_time"; sys_time; ];
+            insert_host_function![ "__sleep"; sleep; ];
         } else {
-            ns.insert(
-                "__random_bytes",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__sys_time",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__sleep",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
+            insert_host_function![ "__random_bytes"; unreachable; ];
+            insert_host_function![ "__sys_time"; unreachable; ];
+            insert_host_function![ "__sleep"; unreachable; ];
         }
 
         if let HostFnAccess {
@@ -518,79 +268,15 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert(
-                "__agent_info",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(agent_info),
-                ),
-            );
-            ns.insert(
-                "__capability_claims",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(capability_claims),
-                ),
-            );
-            ns.insert(
-                "__capability_grants",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(capability_grants),
-                ),
-            );
-            ns.insert(
-                "__capability_info",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(capability_info),
-                ),
-            );
+            insert_host_function![ "__agent_info"; agent_info; ];
+            insert_host_function![ "__capability_claims"; capability_claims; ];
+            insert_host_function![ "__capability_grants"; capability_grants; ];
+            insert_host_function![ "__capability_info"; capability_info; ];
         } else {
-            ns.insert(
-                "__agent_info",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__capability_claims",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__capability_grants",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__capability_info",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
+            insert_host_function![ "__agent_info"; unreachable; ];
+            insert_host_function![ "__capability_claims"; unreachable; ];
+            insert_host_function![ "__capability_grants"; unreachable; ];
+            insert_host_function![ "__capability_info"; unreachable; ];
         }
 
         if let HostFnAccess {
@@ -598,110 +284,19 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert(
-                "__get",
-                Function::new_with_env(store, &signature, env.clone(), invoke_host_function!(get)),
-            );
-            ns.insert(
-                "__get_details",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(get_details),
-                ),
-            );
-            ns.insert(
-                "__get_links",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(get_links),
-                ),
-            );
-            ns.insert(
-                "__get_link_details",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(get_link_details),
-                ),
-            );
-            ns.insert(
-                "__get_agent_activity",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(get_agent_activity),
-                ),
-            );
-            ns.insert(
-                "__query",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(query),
-                ),
-            );
+            insert_host_function![ "__get"; get; ];
+            insert_host_function![ "__get_details"; get_details; ];
+            insert_host_function![ "__get_links"; get_links; ];
+            insert_host_function![ "__get_link_details"; get_link_details; ];
+            insert_host_function![ "__get_agent_activity"; get_agent_activity; ];
+            insert_host_function![ "__query"; query; ];
         } else {
-            ns.insert(
-                "__get",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__get_details",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__get_links",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__get_link_details",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__get_agent_activity",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__query",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
+            insert_host_function![ "__get"; unreachable; ];
+            insert_host_function![ "__get_details"; unreachable; ];
+            insert_host_function![ "__get_links"; unreachable; ];
+            insert_host_function![ "__get_link_details"; unreachable; ];
+            insert_host_function![ "__get_agent_activity"; unreachable; ];
+            insert_host_function![ "__query"; unreachable; ];
         }
 
         if let HostFnAccess {
@@ -709,43 +304,11 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert(
-                "__call_remote",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(call_remote),
-                ),
-            );
-            ns.insert(
-                "__remote_signal",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(remote_signal),
-                ),
-            );
+            insert_host_function![ "__call_remote"; call_remote; ];
+            insert_host_function![ "__remote_signal"; remote_signal; ];
         } else {
-            ns.insert(
-                "__call_remote",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__remote_signal",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
+            insert_host_function![ "__call_remote"; unreachable; ];
+            insert_host_function![ "__remote_signal"; unreachable; ];
         }
 
         if let HostFnAccess {
@@ -753,146 +316,23 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert(
-                "__call",
-                Function::new_with_env(store, &signature, env.clone(), invoke_host_function!(call)),
-            );
-            ns.insert(
-                "__create",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(create),
-                ),
-            );
-            ns.insert(
-                "__emit_signal",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(emit_signal),
-                ),
-            );
-            ns.insert(
-                "__create_link",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(create_link),
-                ),
-            );
-            ns.insert(
-                "__delete_link",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(delete_link),
-                ),
-            );
-            ns.insert(
-                "__update",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(update),
-                ),
-            );
-            ns.insert(
-                "__delete",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(delete),
-                ),
-            );
-            ns.insert(
-                "__schedule",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(schedule),
-                ),
-            );
+            insert_host_function![ "__call"; call; ];
+            insert_host_function![ "__create"; create; ];
+            insert_host_function![ "__emit_signal"; emit_signal; ];
+            insert_host_function![ "__create_link"; create_link; ];
+            insert_host_function![ "__delete_link"; delete_link; ];
+            insert_host_function![ "__update"; update; ];
+            insert_host_function![ "__delete"; delete; ];
+            insert_host_function![ "__schedule"; schedule; ];
         } else {
-            ns.insert(
-                "__call",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__create",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__emit_signal",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__create_link",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__delete_link",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__update",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__delete",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
-            ns.insert(
-                "__schedule",
-                Function::new_with_env(
-                    store,
-                    &signature,
-                    env.clone(),
-                    invoke_host_function!(unreachable),
-                ),
-            );
+            insert_host_function![ "__call"; unreachable; ];
+            insert_host_function![ "__create"; unreachable; ];
+            insert_host_function![ "__emit_signal"; unreachable; ];
+            insert_host_function![ "__create_link"; unreachable; ];
+            insert_host_function![ "__delete_link"; unreachable; ];
+            insert_host_function![ "__update"; unreachable; ];
+            insert_host_function![ "__delete"; unreachable; ];
+            insert_host_function![ "__schedule"; unreachable; ];
         }
         imports.register("env", ns);
 
