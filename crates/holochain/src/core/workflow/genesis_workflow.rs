@@ -187,7 +187,11 @@ pub mod tests {
 
             assert_matches!(
                 headers.as_slice(),
-                [Header::Dna(_), Header::AgentValidationPkg(_), Header::Create(_)]
+                [
+                    Header::Dna(_),
+                    Header::AgentValidationPkg(_),
+                    Header::Create(_)
+                ]
             );
         }
     }
