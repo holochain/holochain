@@ -73,6 +73,7 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
+use parking_lot::RwLock;
 
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -88,9 +89,79 @@ pub struct RealRibosome {
     pub dna_file: DnaFile,
 }
 
-impl RealRibosome {
+struct HostFnBuilder {
+    ns: RwLock<Exports>,
+    env: Env,
+    ribosome_arc: Arc<RealRibosome>,
+    context_arc: Arc<CallContext>,
+}
+
+impl HostFnBuilder {
     const SIGNATURE: ([Type; 2], [Type; 0]) = ([Type::I32, Type::I32], []);
 
+    fn into_ns(self) -> Exports {
+        self.ns.into_inner()
+    }
+
+    fn with_host_function<I: 'static, O: 'static>(
+        &self,
+        store: &Store,
+        host_function_name: &str,
+        host_function: fn(Arc<RealRibosome>, Arc<CallContext>, I) -> Result<O, WasmError>,
+    ) -> &Self
+    where
+        I: serde::de::DeserializeOwned + std::fmt::Debug,
+        O: serde::Serialize + std::fmt::Debug,
+    {
+        let ribosome_arc = Arc::clone(&self.ribosome_arc);
+        let context_arc = Arc::clone(&self.context_arc);
+        self.ns.write().insert(
+            host_function_name,
+            Function::new_with_env(
+                store,
+                Self::SIGNATURE,
+                self.env.clone(),
+                move |env: &Env, args: &[Value]| -> Result<Vec<Value>, RuntimeError> {
+                    let guest_ptr: GuestPtr = match args[0] {
+                        Value::I32(i) => i
+                            .try_into()
+                            .map_err(|_| RuntimeError::new(WasmError::PointerMap))?,
+                        _ => {
+                            return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
+                        }
+                    };
+                    let len: Len = match args[1] {
+                        Value::I32(i) => i
+                            .try_into()
+                            .map_err(|_| RuntimeError::new(WasmError::PointerMap))?,
+                        _ => {
+                            return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
+                        }
+                    };
+                    let result = match env.consume_bytes_from_guest(guest_ptr, len) {
+                        Ok(input) => {
+                            match host_function(
+                                Arc::clone(&ribosome_arc),
+                                Arc::clone(&context_arc),
+                                input,
+                            ) {
+                                Ok(output) => Ok::<_, WasmError>(output),
+                                Err(wasm_error) => Err::<_, WasmError>(wasm_error),
+                            }
+                        }
+                        Err(wasm_error) => Err::<_, WasmError>(wasm_error),
+                    };
+                    env.set_data(result)
+                        .map_err(|e| RuntimeError::new(e.to_string()))?;
+                    Ok(vec![])
+                },
+            ),
+        );
+        &self
+    }
+}
+
+impl RealRibosome {
     /// Create a new instance
     pub fn new(dna_file: DnaFile) -> Self {
         Self { dna_file }
@@ -125,73 +196,22 @@ impl RealRibosome {
     pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Arc<Mutex<Instance>>> {
         let zome_name = call_context.zome.zome_name().clone();
         let module = self.module(&zome_name)?;
-        let env = Env::default();
-        let imports: ImportObject = Self::imports(self, call_context, module.store(), &env);
+        let imports: ImportObject = Self::imports(self, call_context, module.store());
         Ok(Arc::new(Mutex::new(
             Instance::new(&module, &imports).map_err(|e| WasmError::Compile(e.to_string()))?,
         )))
     }
 
-    fn imports(&self, call_context: CallContext, store: &Store, env: &Env) -> ImportObject {
+    fn imports(&self, call_context: CallContext, store: &Store) -> ImportObject {
         let host_fn_access = (&call_context.host_access()).into();
 
+        let env = Env::default();
         let mut imports = imports! {};
         let mut ns = Exports::new();
 
         // it is important that RealRibosome and ZomeCallInvocation are cheap to clone here
-        let self_arc = std::sync::Arc::new((*self).clone());
-        let call_context_arc = std::sync::Arc::new(call_context);
-
-        macro_rules! insert_host_function {
-            [ $host_function_name:literal; $host_function:ident; ] => {
-                ns.insert(
-                    $host_function_name,
-                    Function::new_with_env(
-                        store,
-                        Self::SIGNATURE,
-                        env.clone(),
-                        {
-                            let closure_self_arc = std::sync::Arc::clone(&self_arc);
-                            let closure_call_context_arc = std::sync::Arc::clone(&call_context_arc);
-                            move |env: &Env, args: &[Value]| -> Result<Vec<Value>, RuntimeError> {
-                                let guest_ptr: GuestPtr = match args[0] {
-                                    Value::I32(i) => i
-                                        .try_into()
-                                        .map_err(|_| RuntimeError::new(WasmError::PointerMap))?,
-                                    _ => {
-                                        return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
-                                    }
-                                };
-                                let len: Len = match args[1] {
-                                    Value::I32(i) => i
-                                        .try_into()
-                                        .map_err(|_| RuntimeError::new(WasmError::PointerMap))?,
-                                    _ => {
-                                        return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
-                                    }
-                                };
-                                let result = match env.consume_bytes_from_guest(guest_ptr, len) {
-                                    Ok(input) => {
-                                        match $host_function(
-                                            std::sync::Arc::clone(&closure_self_arc),
-                                            std::sync::Arc::clone(&closure_call_context_arc),
-                                            input,
-                                        ) {
-                                            Ok(output) => Ok::<_, WasmError>(output),
-                                            Err(wasm_error) => Err::<_, WasmError>(wasm_error),
-                                        }
-                                    }
-                                    Err(wasm_error) => Err::<_, WasmError>(wasm_error),
-                                };
-                                env.set_data(result)
-                                    .map_err(|e| RuntimeError::new(e.to_string()))?;
-                                Ok(vec![])
-                            }
-                        }
-                    )
-                )
-            };
-        }
+        let ribosome_arc = std::sync::Arc::new((*self).clone());
+        let context_arc = std::sync::Arc::new(call_context);
 
         // standard memory handling used by the holochain_wasmer guest and host macros
         ns.insert(
@@ -203,34 +223,59 @@ impl RealRibosome {
             ),
         );
 
-        // imported host functions for core
-        insert_host_function![ "__trace"; trace; ];
-        insert_host_function![ "__hash_entry"; hash_entry; ];
-        insert_host_function![ "__version"; version; ];
-        insert_host_function![ "__unreachable"; unreachable; ];
+        let host_fn_builder = HostFnBuilder {
+            ns: RwLock::new(ns),
+            env,
+            ribosome_arc,
+            context_arc,
+        };
+
+        host_fn_builder
+            .with_host_function(store, "__trace", trace)
+            .with_host_function(store, "__hash_entry", hash_entry)
+            .with_host_function(store, "__version", version)
+            .with_host_function(store, "__unreachable", unreachable);
 
         if let HostFnAccess {
             keystore: Permission::Allow,
             ..
         } = host_fn_access
         {
-            insert_host_function![ "__verify_signature"; verify_signature; ];
-            insert_host_function![ "__sign"; sign; ];
-            insert_host_function![ "__sign_ephemeral"; sign_ephemeral; ];
-            insert_host_function![ "__create_x25519_keypair"; create_x25519_keypair; ];
-            insert_host_function![ "__x_salsa20_poly1305_encrypt"; x_salsa20_poly1305_encrypt; ];
-            insert_host_function![ "__x_salsa20_poly1305_decrypt"; x_salsa20_poly1305_decrypt; ];
-            insert_host_function![ "__x_25519_x_salsa20_poly1305_encrypt"; x_25519_x_salsa20_poly1305_encrypt; ];
-            insert_host_function![ "__x_25519_x_salsa20_poly1305_decrypt"; x_25519_x_salsa20_poly1305_decrypt; ];
+            host_fn_builder
+                .with_host_function(store, "__verify_signature", verify_signature)
+                .with_host_function(store, "__sign", sign)
+                .with_host_function(store, "__sign_ephemeral", sign_ephemeral)
+                .with_host_function(store, "__create_x25519_keypair", create_x25519_keypair)
+                .with_host_function(
+                    store,
+                    "__x_salsa20_poly1305_encrypt",
+                    x_salsa20_poly1305_encrypt,
+                )
+                .with_host_function(
+                    store,
+                    "__x_salsa20_poly1305_decrypt",
+                    x_salsa20_poly1305_decrypt,
+                )
+                .with_host_function(
+                    store,
+                    "__x_25519_x_salsa20_poly1305_encrypt",
+                    x_25519_x_salsa20_poly1305_encrypt,
+                )
+                .with_host_function(
+                    store,
+                    "__x_25519_x_salsa20_poly1305_decrypt",
+                    x_25519_x_salsa20_poly1305_decrypt,
+                );
         } else {
-            insert_host_function![ "__verify_signature"; unreachable; ];
-            insert_host_function![ "__sign"; unreachable; ];
-            insert_host_function![ "__sign_ephemeral"; unreachable; ];
-            insert_host_function![ "__create_x25519_keypair"; unreachable; ];
-            insert_host_function![ "__x_salsa20_poly1305_encrypt"; unreachable; ];
-            insert_host_function![ "__x_salsa20_poly1305_decrypt"; unreachable; ];
-            insert_host_function![ "__x_25519_x_salsa20_poly1305_encrypt"; unreachable; ];
-            insert_host_function![ "__x_25519_x_salsa20_poly1305_decrypt"; unreachable; ];
+            host_fn_builder
+                .with_host_function(store, "__verify_signature", unreachable)
+                .with_host_function(store, "__sign", unreachable)
+                .with_host_function(store, "__sign_ephemeral", unreachable)
+                .with_host_function(store, "__create_x25519_keypair", unreachable)
+                .with_host_function(store, "__x_salsa20_poly1305_encrypt", unreachable)
+                .with_host_function(store, "__x_salsa20_poly1305_decrypt", unreachable)
+                .with_host_function(store, "__x_25519_x_salsa20_poly1305_encrypt", unreachable)
+                .with_host_function(store, "__x_25519_x_salsa20_poly1305_decrypt", unreachable);
         }
 
         if let HostFnAccess {
@@ -238,29 +283,17 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            insert_host_function![ "__zome_info"; zome_info; ];
-            insert_host_function![ "__app_info"; app_info; ];
-            insert_host_function![ "__dna_info"; dna_info; ];
-            insert_host_function![ "__call_info"; call_info; ];
+            host_fn_builder
+                .with_host_function(store, "__zome_info", zome_info)
+                .with_host_function(store, "__app_info", app_info)
+                .with_host_function(store, "__dna_info", dna_info)
+                .with_host_function(store, "__call_info", call_info);
         } else {
-            insert_host_function![ "__zome_info"; unreachable; ];
-            insert_host_function![ "__app_info"; unreachable; ];
-            insert_host_function![ "__dna_info"; unreachable; ];
-            insert_host_function![ "__call_info"; unreachable; ];
-        }
-
-        if let HostFnAccess {
-            non_determinism: Permission::Allow,
-            ..
-        } = host_fn_access
-        {
-            insert_host_function![ "__random_bytes"; random_bytes; ];
-            insert_host_function![ "__sys_time"; sys_time; ];
-            insert_host_function![ "__sleep"; sleep; ];
-        } else {
-            insert_host_function![ "__random_bytes"; unreachable; ];
-            insert_host_function![ "__sys_time"; unreachable; ];
-            insert_host_function![ "__sleep"; unreachable; ];
+            host_fn_builder
+                .with_host_function(store, "__zome_info", unreachable)
+                .with_host_function(store, "__app_info", unreachable)
+                .with_host_function(store, "__dna_info", unreachable)
+                .with_host_function(store, "__call_info", unreachable);
         }
 
         if let HostFnAccess {
@@ -268,15 +301,15 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            insert_host_function![ "__agent_info"; agent_info; ];
-            insert_host_function![ "__capability_claims"; capability_claims; ];
-            insert_host_function![ "__capability_grants"; capability_grants; ];
-            insert_host_function![ "__capability_info"; capability_info; ];
+            host_fn_builder
+                .with_host_function(store, "__random_bytes", random_bytes)
+                .with_host_function(store, "__sys_time", sys_time)
+                .with_host_function(store, "__sleep", sleep);
         } else {
-            insert_host_function![ "__agent_info"; unreachable; ];
-            insert_host_function![ "__capability_claims"; unreachable; ];
-            insert_host_function![ "__capability_grants"; unreachable; ];
-            insert_host_function![ "__capability_info"; unreachable; ];
+            host_fn_builder
+                .with_host_function(store, "__random_bytes", unreachable)
+                .with_host_function(store, "__sys_time", unreachable)
+                .with_host_function(store, "__sleep", unreachable);
         }
 
         if let HostFnAccess {
@@ -284,19 +317,39 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            insert_host_function![ "__get"; get; ];
-            insert_host_function![ "__get_details"; get_details; ];
-            insert_host_function![ "__get_links"; get_links; ];
-            insert_host_function![ "__get_link_details"; get_link_details; ];
-            insert_host_function![ "__get_agent_activity"; get_agent_activity; ];
-            insert_host_function![ "__query"; query; ];
+            host_fn_builder
+                .with_host_function(store, "__agent_info", agent_info)
+                .with_host_function(store, "__capability_claims", capability_claims)
+                .with_host_function(store, "__capability_grants", capability_grants)
+                .with_host_function(store, "__capability_info", capability_info);
         } else {
-            insert_host_function![ "__get"; unreachable; ];
-            insert_host_function![ "__get_details"; unreachable; ];
-            insert_host_function![ "__get_links"; unreachable; ];
-            insert_host_function![ "__get_link_details"; unreachable; ];
-            insert_host_function![ "__get_agent_activity"; unreachable; ];
-            insert_host_function![ "__query"; unreachable; ];
+            host_fn_builder
+                .with_host_function(store, "__agent_info", unreachable)
+                .with_host_function(store, "__capability_claims", unreachable)
+                .with_host_function(store, "__capability_grants", unreachable)
+                .with_host_function(store, "__capability_info", unreachable);
+        }
+
+        if let HostFnAccess {
+            read_workspace: Permission::Allow,
+            ..
+        } = host_fn_access
+        {
+            host_fn_builder
+                .with_host_function(store, "__get", get)
+                .with_host_function(store, "__get_details", get_details)
+                .with_host_function(store, "__get_links", get_links)
+                .with_host_function(store, "__get_link_details", get_link_details)
+                .with_host_function(store, "__get_agent_activity", get_agent_activity)
+                .with_host_function(store, "__query", query);
+        } else {
+            host_fn_builder
+                .with_host_function(store, "__get", unreachable)
+                .with_host_function(store, "__get_details", unreachable)
+                .with_host_function(store, "__get_links", unreachable)
+                .with_host_function(store, "__get_link_details", unreachable)
+                .with_host_function(store, "__get_agent_activity", unreachable)
+                .with_host_function(store, "__query", unreachable);
         }
 
         if let HostFnAccess {
@@ -304,11 +357,13 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            insert_host_function![ "__call_remote"; call_remote; ];
-            insert_host_function![ "__remote_signal"; remote_signal; ];
+            host_fn_builder
+                .with_host_function(store, "__call_remote", call_remote)
+                .with_host_function(store, "__remote_signal", remote_signal);
         } else {
-            insert_host_function![ "__call_remote"; unreachable; ];
-            insert_host_function![ "__remote_signal"; unreachable; ];
+            host_fn_builder
+                .with_host_function(store, "__call_remote", unreachable)
+                .with_host_function(store, "__remote_signal", unreachable);
         }
 
         if let HostFnAccess {
@@ -316,25 +371,28 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            insert_host_function![ "__call"; call; ];
-            insert_host_function![ "__create"; create; ];
-            insert_host_function![ "__emit_signal"; emit_signal; ];
-            insert_host_function![ "__create_link"; create_link; ];
-            insert_host_function![ "__delete_link"; delete_link; ];
-            insert_host_function![ "__update"; update; ];
-            insert_host_function![ "__delete"; delete; ];
-            insert_host_function![ "__schedule"; schedule; ];
+            host_fn_builder
+                .with_host_function(store, "__call", call)
+                .with_host_function(store, "__create", create)
+                .with_host_function(store, "__emit_signal", emit_signal)
+                .with_host_function(store, "__create_link", create_link)
+                .with_host_function(store, "__delete_link", delete_link)
+                .with_host_function(store, "__update", update)
+                .with_host_function(store, "__delete", delete)
+                .with_host_function(store, "__schedule", schedule);
         } else {
-            insert_host_function![ "__call"; unreachable; ];
-            insert_host_function![ "__create"; unreachable; ];
-            insert_host_function![ "__emit_signal"; unreachable; ];
-            insert_host_function![ "__create_link"; unreachable; ];
-            insert_host_function![ "__delete_link"; unreachable; ];
-            insert_host_function![ "__update"; unreachable; ];
-            insert_host_function![ "__delete"; unreachable; ];
-            insert_host_function![ "__schedule"; unreachable; ];
+            host_fn_builder
+                .with_host_function(store, "__call", unreachable)
+                .with_host_function(store, "__create", unreachable)
+                .with_host_function(store, "__emit_signal", unreachable)
+                .with_host_function(store, "__create_link", unreachable)
+                .with_host_function(store, "__delete_link", unreachable)
+                .with_host_function(store, "__update", unreachable)
+                .with_host_function(store, "__delete", unreachable)
+                .with_host_function(store, "__schedule", unreachable);
         }
-        imports.register("env", ns);
+
+        imports.register("env", host_fn_builder.into_ns());
 
         imports
     }
