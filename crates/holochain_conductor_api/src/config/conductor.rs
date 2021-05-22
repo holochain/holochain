@@ -6,6 +6,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 mod admin_interface_config;
+mod dev_config;
 mod dpki_config;
 #[allow(missing_docs)]
 mod error;
@@ -16,6 +17,7 @@ pub mod paths;
 pub use paths::EnvironmentRootPath;
 
 pub use super::*;
+pub use dev_config::*;
 pub use dpki_config::DpkiConfig;
 //pub use logger_config::LoggerConfig;
 pub use error::*;
@@ -57,6 +59,11 @@ pub struct ConductorConfig {
 
     /// Config options for the network module. Optional.
     pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
+
+    /// Config used for debugging and diagnosing issues with Holochain.
+    /// Best to not touch this unless you know what you're doing!
+    /// NB: this part of the config is **not** guaranteed to be stable.
+    pub dev: Option<DevConfig>,
     //
     //
     // /// Which signals to emit
@@ -82,6 +89,13 @@ impl ConductorConfig {
             _ => err.into(),
         })?;
         config_from_yaml(&config_yaml)
+    }
+
+    /// Construct a config from the only required field, the environment path
+    pub fn from_environment_path(env_path: PathBuf) -> Self {
+        let mut config = Self::default();
+        config.environment_path = env_path.into();
+        config
     }
 }
 
@@ -129,6 +143,7 @@ pub mod tests {
                 keystore_path: None,
                 admin_interfaces: None,
                 use_dangerous_test_keystore: false,
+                dev: None,
             }
         );
     }
@@ -221,6 +236,7 @@ pub mod tests {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
                 network: Some(network_config),
+                dev: None,
             }
         );
     }
@@ -249,6 +265,7 @@ pub mod tests {
                 keystore_path: Some(PathBuf::from("/path/to/keystore").into()),
                 admin_interfaces: None,
                 use_dangerous_test_keystore: true,
+                dev: None,
             }
         );
     }

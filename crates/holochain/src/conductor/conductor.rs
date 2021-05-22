@@ -144,8 +144,10 @@ where
     /// Access to private keys for signing and encryption.
     keystore: KeystoreSender,
 
-    /// The root environment directory where all environments are created
-    root_env_dir: EnvironmentRootPath,
+    /// The config used to create the Conductor, which will be used to determine
+    /// things like the root environment directory where all environments are
+    /// created, and the dev config for overriding behavior
+    config: ConductorConfig,
 
     /// Handle to the network actor.
     holochain_p2p: holochain_p2p::HolochainP2pRef,
@@ -199,6 +201,10 @@ where
 
     pub(super) fn dna_store(&self) -> &DS {
         &self.dna_store
+    }
+
+    pub(super) fn config(&self) -> &ConductorConfig {
+        &self.config
     }
 
     pub(super) fn dna_store_mut(&mut self) -> &mut DS {
@@ -439,7 +445,7 @@ where
         cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
         conductor_handle: ConductorHandle,
     ) -> ConductorResult<()> {
-        let root_env_dir = std::path::PathBuf::from(self.root_env_dir.clone());
+        let root_env_dir = std::path::PathBuf::from(self.config.environment_path.clone());
 
         let cells_tasks = cell_ids_with_proofs
             .into_iter()
@@ -500,7 +506,7 @@ where
         match caches.get(dna_hash) {
             Some(env) => Ok(env.clone()),
             None => {
-                let dir = self.root_env_dir.clone();
+                let dir = self.config.environment_path.clone();
                 let env = EnvWrite::open(
                     dir.as_ref(),
                     DbKind::Cache(dna_hash.clone()),
@@ -521,7 +527,7 @@ where
         let active_apps = self.get_state().await?.active_apps;
 
         // Data required to create apps
-        let root_env_dir = self.root_env_dir.clone();
+        let root_env_dir = self.config.environment_path.clone();
         let keystore = self.keystore.clone();
         let task_manager = self
             .task_manager
@@ -961,7 +967,7 @@ where
         p2p_env
             .entry(space.clone())
             .or_insert_with(move || {
-                let root_env_dir = self.root_env_dir.as_ref();
+                let root_env_dir = self.config.environment_path.as_ref();
                 let keystore = self.keystore.clone();
                 EnvWrite::open(root_env_dir, DbKind::P2p(space), keystore)
                     .expect("failed to open p2p_store database")
@@ -1015,11 +1021,11 @@ pub fn integration_dump(vault: &EnvRead) -> ConductorApiResult<IntegrationStateD
         )?;
         let validation_limbo = txn.query_row(
             "
-                SELECT count(hash) FROM DhtOp 
-                WHERE when_integrated IS NULL 
+                SELECT count(hash) FROM DhtOp
+                WHERE when_integrated IS NULL
                 AND (
                     (is_authored = 1 AND validation_stage IS NOT NULL AND validation_stage < 3)
-                    OR 
+                    OR
                     (is_authored = 0 AND (validation_stage IS NULL OR validation_stage < 3))
                 )
                 ",
@@ -1048,7 +1054,7 @@ where
         p2p_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
         dna_store: DS,
         keystore: KeystoreSender,
-        root_env_dir: EnvironmentRootPath,
+        config: ConductorConfig,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
     ) -> ConductorResult<Self> {
         Ok(Self {
@@ -1063,7 +1069,7 @@ where
             admin_websocket_ports: Vec::new(),
             dna_store,
             keystore,
-            root_env_dir,
+            config,
             holochain_p2p,
         })
     }
@@ -1217,9 +1223,26 @@ mod builder {
 
             tracing::info!(?self.config);
 
+            #[cfg(any(test, feature = "test_utils"))]
+            let state = self.state;
+
+            let dna_store = self.dna_store;
+            let config = self.config;
+
+            let ConductorConfig {
+                environment_path,
+                use_dangerous_test_keystore,
+                dpki: _,
+                keystore_path,
+                passphrase_service: _,
+                admin_interfaces: _,
+                network,
+                dev,
+            } = &config;
+
             let keystore = if let Some(keystore) = self.keystore {
                 keystore
-            } else if self.config.use_dangerous_test_keystore {
+            } else if *use_dangerous_test_keystore {
                 let keystore = spawn_test_keystore().await?;
                 // pre-populate with our two fixture agent keypairs
                 keystore
@@ -1232,9 +1255,9 @@ mod builder {
                     .unwrap();
                 keystore
             } else {
-                spawn_lair_keystore(self.config.keystore_path.as_deref()).await?
+                spawn_lair_keystore(keystore_path.as_deref()).await?
             };
-            let env_path = self.config.environment_path.clone();
+            let env_path = environment_path.clone();
 
             let environment =
                 EnvWrite::open(env_path.as_ref(), DbKind::Conductor, keystore.clone())?;
@@ -1244,14 +1267,7 @@ mod builder {
 
             let p2p_env = Arc::new(parking_lot::Mutex::new(HashMap::new()));
 
-            #[cfg(any(test, feature = "test_utils"))]
-            let state = self.state;
-
-            let Self {
-                dna_store, config, ..
-            } = self;
-
-            let network_config = match &config.network {
+            let network_config = match network {
                 None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
                 Some(config) => config.clone(),
             };
@@ -1272,7 +1288,7 @@ mod builder {
                 p2p_env,
                 dna_store,
                 keystore,
-                env_path,
+                config,
                 holochain_p2p,
             )
             .await?;
@@ -1280,12 +1296,11 @@ mod builder {
             #[cfg(any(test, feature = "test_utils"))]
             let conductor = Self::update_fake_state(state, conductor).await?;
 
-            Self::finish(conductor, config, p2p_evt).await
+            Self::finish(conductor, p2p_evt).await
         }
 
         async fn finish(
             conductor: Conductor<DS>,
-            conductor_config: ConductorConfig,
             p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
         ) -> ConductorResult<ConductorHandle> {
             // Get data before handle
@@ -1299,8 +1314,7 @@ mod builder {
                 holochain_p2p,
             });
 
-            let configs = conductor_config.admin_interfaces.unwrap_or_default();
-            handle.clone().initialize_conductor(configs).await?;
+            handle.clone().initialize_conductor().await?;
 
             handle.load_dnas().await?;
 
@@ -1363,20 +1377,23 @@ mod builder {
                 holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
                     .await?;
 
+            let mut config = self.config;
+            config.environment_path = envs.tempdir().path().to_path_buf().into();
+
             let conductor = Conductor::new(
                 envs.conductor(),
                 envs.wasm(),
                 envs.p2p(),
                 self.dna_store,
                 keystore,
-                envs.tempdir().path().to_path_buf().into(),
+                config,
                 holochain_p2p,
             )
             .await?;
 
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
-            Self::finish(conductor, self.config, p2p_evt).await
+            Self::finish(conductor, p2p_evt).await
         }
     }
 }

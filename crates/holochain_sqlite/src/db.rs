@@ -7,7 +7,7 @@ use crate::{
 use derive_more::Into;
 use futures::Future;
 use holo_hash::DnaHash;
-use holochain_zome_types::cell::CellId;
+use holochain_zome_types::{cell::CellId, config::ConnectionPoolConfig};
 use kitsune_p2p::KitsuneSpace;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
@@ -75,13 +75,17 @@ impl DbWrite {
         if let Some(v) = DATABASE_HANDLES.get(&path) {
             Ok(v.clone())
         } else {
-            let db = Self::new(path_prefix, kind)?;
+            let db = Self::new(path_prefix, kind, None)?;
             DATABASE_HANDLES.insert_new(path, db.clone());
             Ok(db)
         }
     }
 
-    pub(crate) fn new(path_prefix: &Path, kind: DbKind) -> DatabaseResult<Self> {
+    pub(crate) fn new(
+        path_prefix: &Path,
+        kind: DbKind,
+        config: Option<ConnectionPoolConfig>,
+    ) -> DatabaseResult<Self> {
         let path = path_prefix.join(kind.filename());
         let parent = path
             .parent()
@@ -90,7 +94,7 @@ impl DbWrite {
             std::fs::create_dir_all(parent)
                 .map_err(|_e| DatabaseError::DatabaseMissing(parent.to_owned()))?;
         }
-        let pool = new_connection_pool(&path, kind.clone());
+        let pool = new_connection_pool(&path, kind.clone(), config.unwrap_or_default());
         let mut conn = pool.get()?;
         crate::table::initialize_database(&mut conn, &kind)?;
 
@@ -105,7 +109,18 @@ impl DbWrite {
     /// connection pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]
     pub fn test(tmpdir: &tempdir::TempDir, kind: DbKind) -> DatabaseResult<Self> {
-        Self::new(tmpdir.path(), kind)
+        Self::new(tmpdir.path(), kind, None)
+    }
+
+    /// Create a unique db in a temp dir with no static management of the
+    /// connection pool, useful for testing.
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn test_with_config(
+        tmpdir: &tempdir::TempDir,
+        kind: DbKind,
+        config: ConnectionPoolConfig,
+    ) -> DatabaseResult<Self> {
+        Self::new(tmpdir.path(), kind, Some(config))
     }
 
     /// Remove the db and directory

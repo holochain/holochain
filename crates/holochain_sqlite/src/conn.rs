@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use chashmap::CHashMap;
+use holochain_zome_types::config::ConnectionPoolConfig;
 use once_cell::sync::Lazy;
 use rusqlite::*;
 use std::{
@@ -39,15 +40,27 @@ pub(crate) static DATABASE_HANDLES: Lazy<CHashMap<PathBuf, DbWrite>> = Lazy::new
 pub type ConnectionPool = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
 pub type PConnInner = r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>;
 
-pub(crate) fn new_connection_pool(path: &Path, kind: DbKind) -> ConnectionPool {
+pub(crate) fn new_connection_pool(
+    path: &Path,
+    kind: DbKind,
+    config: ConnectionPoolConfig,
+) -> ConnectionPool {
     use r2d2_sqlite::SqliteConnectionManager;
     let manager = SqliteConnectionManager::file(path);
     let customizer = Box::new(ConnCustomizer { kind });
-    r2d2::Pool::builder()
+    let mut builder = r2d2::Pool::builder()
         .max_size(20)
-        .connection_customizer(customizer)
-        .build(manager)
-        .unwrap()
+        .min_idle(config.min_idle)
+        .idle_timeout(config.idle_timeout)
+        .connection_customizer(customizer);
+
+    if let Some(max_size) = config.max_size {
+        builder = builder.max_size(max_size);
+    }
+    if let Some(connection_timeout) = config.connection_timeout {
+        builder = builder.connection_timeout(connection_timeout);
+    }
+    builder.build(manager).unwrap()
 }
 
 #[derive(Debug)]

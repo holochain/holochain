@@ -83,6 +83,7 @@ fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
         }),
         keystore_path: None,
         use_dangerous_test_keystore: true,
+        dev: None,
     }
 }
 

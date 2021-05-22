@@ -16,7 +16,7 @@ pub fn test_cell_db() -> TestDb {
 fn test_db(kind: DbKind) -> TestDb {
     let tmpdir = Arc::new(TempDir::new("holochain-test-environments").unwrap());
     TestDb {
-        db: DbWrite::new(tmpdir.path(), kind).expect("Couldn't create test database"),
+        db: DbWrite::new(tmpdir.path(), kind, None).expect("Couldn't create test database"),
         tmpdir,
     }
 }
@@ -67,10 +67,10 @@ impl TestDbs {
     /// Create all three non-cell environments at once
     pub fn new(tempdir: TempDir) -> Self {
         use DbKind::*;
-        let conductor = DbWrite::new(&tempdir.path(), Conductor).unwrap();
-        let wasm = DbWrite::new(&tempdir.path(), Wasm).unwrap();
+        let conductor = DbWrite::new(&tempdir.path(), Conductor, None).unwrap();
+        let wasm = DbWrite::new(&tempdir.path(), Wasm, None).unwrap();
         let space = kitsune_p2p::KitsuneSpace(vec![0; 36]);
-        let p2p = DbWrite::new(&tempdir.path(), P2p(Arc::new(space))).unwrap();
+        let p2p = DbWrite::new(&tempdir.path(), P2p(Arc::new(space)), None).unwrap();
         Self {
             conductor,
             wasm,

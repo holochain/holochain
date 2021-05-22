@@ -92,10 +92,7 @@ pub trait ConductorHandleT: Send + Sync {
     /// around having a circular reference in the types.
     ///
     /// Never use a ConductorHandle for different Conductor here!
-    async fn initialize_conductor(
-        self: Arc<Self>,
-        admin_configs: Vec<AdminInterfaceConfig>,
-    ) -> ConductorResult<()>;
+    async fn initialize_conductor(self: Arc<Self>) -> ConductorResult<()>;
 
     /// Add a collection of admin interfaces from config
     async fn add_admin_interfaces(
@@ -303,11 +300,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
     }
 
-    async fn initialize_conductor(
-        self: Arc<Self>,
-        admin_configs: Vec<AdminInterfaceConfig>,
-    ) -> ConductorResult<()> {
+    async fn initialize_conductor(self: Arc<Self>) -> ConductorResult<()> {
         let mut conductor = self.conductor.write().await;
+        let admin_configs = conductor
+            .config()
+            .admin_interfaces
+            .clone()
+            .unwrap_or_default();
         conductor.start_task_manager(self.clone()).await?;
         conductor
             .add_admin_interfaces_via_handle(admin_configs, self.clone())
