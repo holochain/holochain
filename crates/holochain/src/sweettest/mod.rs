@@ -12,6 +12,7 @@
 //! Makes it easy to destructure the result of a SweetConductor::setup_app call
 //! into a collection of SweetCells which can be used for zome calls.
 
+pub mod inline_zome_defs;
 mod sweet_agents;
 mod sweet_app;
 mod sweet_cell;

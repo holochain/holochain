@@ -1,5 +1,4 @@
 use hdk::prelude::*;
-use holochain::conductor::config::ConductorConfig;
 use holochain::sweettest::SweetNetwork;
 use holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
 use holochain::test_utils::host_fn_caller::Post;
@@ -7,27 +6,14 @@ use holochain::test_utils::show_authored;
 use holochain::test_utils::wait_for_integration_1m;
 use holochain::test_utils::wait_for_integration_with_others_10s;
 use holochain::test_utils::WaitOps;
+use holochain::{
+    conductor::config::ConductorConfig, sweettest::inline_zome_defs::simple_crud_zome,
+};
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
 #[serde(transparent)]
 #[repr(transparent)]
 struct AppString(String);
-
-fn simple_crud_zome() -> InlineZome {
-    let entry_def = EntryDef::default_with_id("entrydef");
-
-    InlineZome::new_unique(vec![entry_def.clone()])
-        .callback("create", move |api, ()| {
-            let entry_def_id: EntryDefId = entry_def.id.clone();
-            let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
-            Ok(hash)
-        })
-        .callback("read", |api, hash: HeaderHash| {
-            api.get(GetInput::new(hash.into(), GetOptions::default()))
-                .map_err(Into::into)
-        })
-}
 
 fn invalid_cell_zome() -> InlineZome {
     let entry_def = EntryDef::default_with_id("entrydef");
