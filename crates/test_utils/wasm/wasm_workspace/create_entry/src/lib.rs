@@ -139,7 +139,7 @@ fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
 #[hdk_extern]
 fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
     let zome_call_response: ZomeCallResponse = call_remote(
-        agent,
+        agent.clone(),
         "create_entry".to_string().into(),
         "create_entry".to_string().into(),
         None,
