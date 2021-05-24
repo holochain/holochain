@@ -131,7 +131,8 @@ fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
     match zome_call_response {
         ZomeCallResponse::Ok(v) => Ok(v.decode()?),
         ZomeCallResponse::Unauthorized(cell_id, zome_name, function_name, agent_pubkey) => Err(WasmError::Guest(format!("Unauthorized: {} {} {} {}", cell_id, zome_name, function_name, agent_pubkey))),
-        ZomeCallResponse::NetworkError(e) => Err(WasmError::Guest(format!("NetworkError: {}", e))),
+        // ZomeCallResponse::NetworkError(e) => Err(WasmError::Guest(format!("NetworkError: {}", e))),
+        ZomeCallResponse::NetworkError(_) => call_create_entry(()),
     }
 }
 
@@ -148,6 +149,7 @@ fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
     match zome_call_response {
         ZomeCallResponse::Ok(v) => Ok(v.decode()?),
         ZomeCallResponse::Unauthorized(cell_id, zome_name, function_name, agent_pubkey) => Err(WasmError::Guest(format!("Unauthorized: {} {} {} {}", cell_id, zome_name, function_name, agent_pubkey))),
-        ZomeCallResponse::NetworkError(e) => Err(WasmError::Guest(format!("NetworkError: {}", e))),
+        // ZomeCallResponse::NetworkError(e) => Err(WasmError::Guest(format!("NetworkError: {}", e))),
+        ZomeCallResponse::NetworkError(_) => call_create_entry_remotely(agent),
     }
 }
