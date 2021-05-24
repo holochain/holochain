@@ -52,7 +52,7 @@ fn conductors_call_remote(num_conductors: usize) {
         init_all(&handles[..]).await;
 
         // 50 ms should be enough time to hit another conductor locally
-        let results = call_each_other(&handles[..], 50).await;
+        let results = call_each_other(&handles[..], 100).await;
         for (_, _, result) in results {
             match result {
                 Some(r) => match r {
