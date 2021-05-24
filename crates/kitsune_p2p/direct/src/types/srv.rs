@@ -4,6 +4,8 @@ use crate::*;
 use futures::future::BoxFuture;
 use std::future::Future;
 
+use kitsune_p2p_direct_api::KdApi;
+
 /// HttpResponse data
 pub struct HttpResponse {
     /// the response status code to send
@@ -53,13 +55,19 @@ pub enum KdSrvEvt {
         respond_cb: HttpRespondCb,
     },
 
+    /// We've received a new incoming websocket connection
+    WebsocketConnected {
+        /// Connection Ref
+        con: Uniq,
+    },
+
     /// An incoming websocket json blob
-    Websocket {
+    WebsocketMessage {
         /// Connection Ref
         con: Uniq,
 
-        /// json blob
-        data: serde_json::Value,
+        /// incoming structured message
+        data: KdApi,
     },
 }
 
@@ -81,15 +89,10 @@ pub trait AsKdSrv: 'static + Send + Sync {
     fn local_addr(&self) -> KitsuneResult<std::net::SocketAddr>;
 
     /// Broadcast to all connected websockets
-    fn websocket_broadcast(&self, data: serde_json::Value)
-        -> BoxFuture<'static, KitsuneResult<()>>;
+    fn websocket_broadcast(&self, data: KdApi) -> BoxFuture<'static, KitsuneResult<()>>;
 
     /// Send data to a specific websocket connection
-    fn websocket_send(
-        &self,
-        con: Uniq,
-        data: serde_json::Value,
-    ) -> BoxFuture<'static, KitsuneResult<()>>;
+    fn websocket_send(&self, con: Uniq, data: KdApi) -> BoxFuture<'static, KitsuneResult<()>>;
 }
 
 /// Handle to a Srv instance.
@@ -129,7 +132,7 @@ impl KdSrv {
     /// Broadcast to all connected websockets
     pub fn websocket_broadcast(
         &self,
-        data: serde_json::Value,
+        data: KdApi,
     ) -> impl Future<Output = KitsuneResult<()>> + 'static + Send {
         AsKdSrv::websocket_broadcast(&*self.0, data)
     }
@@ -138,7 +141,7 @@ impl KdSrv {
     pub fn websocket_send(
         &self,
         con: Uniq,
-        data: serde_json::Value,
+        data: KdApi,
     ) -> impl Future<Output = KitsuneResult<()>> + 'static + Send {
         AsKdSrv::websocket_send(&*self.0, con, data)
     }

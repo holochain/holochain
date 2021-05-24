@@ -1,7 +1,7 @@
 //! kdirect types
 
-pub mod api;
 pub mod direct;
+pub mod handle;
 pub mod kdagent;
 pub mod kdentry;
 pub mod kdhash;

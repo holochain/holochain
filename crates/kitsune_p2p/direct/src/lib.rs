@@ -20,6 +20,9 @@ pub use persist_mem::*;
 mod srv;
 pub use srv::*;
 
+mod handle_ws;
+pub use handle_ws::*;
+
 mod v1;
 pub use v1::*;
 
@@ -34,6 +37,7 @@ pub mod dependencies {
 
 /// kdirect prelude
 pub mod prelude {
+    pub use crate::handle_ws::*;
     pub use crate::persist_mem::*;
     pub use crate::srv::*;
     pub use crate::types::direct::{KitsuneDirect, KitsuneDirectEvt, KitsuneDirectEvtStream};
@@ -45,6 +49,10 @@ pub mod prelude {
     pub use crate::v1::*;
     pub use crate::{KitsuneError, KitsuneResult};
     pub use kitsune_p2p::dht_arc::DhtArc;
+    pub use kitsune_p2p_direct_api::{KdApi, KdError, KdResult};
 }
 
 use prelude::*;
+
+#[cfg(test)]
+mod test;

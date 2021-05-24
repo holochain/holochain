@@ -30,7 +30,7 @@ mod cmd_node;
 mod cmd_proxy;
 
 #[tokio::main(flavor = "multi_thread")]
-async fn main() -> KitsuneResult<()> {
+async fn main() -> KdResult<()> {
     let KdOpt { cmd } = KdOpt::from_args();
 
     match cmd {
@@ -38,7 +38,7 @@ async fn main() -> KitsuneResult<()> {
             cmd_proxy::run(proxy_opt).await?;
         }
         KdOptCmd::Node(node_opt) => {
-            cmd_node::run(node_opt).await?;
+            cmd_node::run(node_opt).await.map_err(KdError::other)?;
         }
     }
 

@@ -63,6 +63,12 @@ impl std::str::FromStr for KdAgentInfo {
     }
 }
 
+impl PartialEq for KdAgentInfo {
+    fn eq(&self, oth: &Self) -> bool {
+        self.0.encoded_info.eq(&*oth.0.encoded_info)
+    }
+}
+
 impl KdAgentInfo {
     /// Reconstruct this KdAgentINfo from a `to_string()` str.
     // this *does* implement the trait clippy...

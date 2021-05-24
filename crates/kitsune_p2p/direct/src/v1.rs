@@ -13,6 +13,7 @@ use kitsune_p2p::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dependencies::ghost_actor;
 use kitsune_p2p_types::tx2::tx2_utils::*;
+use std::collections::HashSet;
 
 /// Config for v1 impl of KitsuneDirect
 pub struct KitsuneDirectV1Config {
@@ -25,6 +26,54 @@ pub struct KitsuneDirectV1Config {
 
     /// the localhost port to run the control websocket / ui server on
     pub ui_port: u16,
+}
+
+/// run a v1 quick proxy instance, returning the url
+pub async fn new_quick_proxy_v1() -> KdResult<(TxUrl, BoxFuture<'static, ()>)> {
+    use crate::dependencies::*;
+    use kitsune_p2p_proxy::tx2::*;
+    use kitsune_p2p_transport_quic::tx2::*;
+    use kitsune_p2p_types::config::*;
+    use kitsune_p2p_types::tls::*;
+    use kitsune_p2p_types::tx2::tx2_pool_promote::*;
+
+    let tuning_params = KitsuneP2pTuningParams::default();
+
+    let p_tls = TlsConfig::new_ephemeral().await.map_err(KdError::other)?;
+    let mut conf = QuicConfig::default();
+    conf.tls = Some(p_tls.clone());
+    conf.tuning_params = Some(tuning_params.clone());
+
+    let f = QuicBackendAdapt::new(conf).await.map_err(KdError::other)?;
+    let f = tx2_pool_promote(f, tuning_params.clone());
+    let mut conf = ProxyConfig::default();
+    conf.tuning_params = Some(tuning_params.clone());
+    conf.allow_proxy_fwd = true;
+    let f = tx2_proxy(f, conf).map_err(KdError::other)?;
+
+    let mut proxy = f
+        .bind(
+            "kitsune-quic://0.0.0.0:0".into(),
+            tuning_params.implicit_timeout(),
+        )
+        .await
+        .map_err(KdError::other)?;
+
+    let proxy_url = proxy.handle().local_addr().map_err(KdError::other)?;
+
+    let (s, r) = tokio::sync::oneshot::channel();
+    tokio::task::spawn(async move {
+        while proxy.next().await.is_some() {}
+        let _ = s.send(());
+    });
+
+    Ok((
+        proxy_url,
+        async move {
+            let _ = r.await;
+        }
+        .boxed(),
+    ))
 }
 
 /// create a new v1 instance of the kitsune direct api
@@ -62,7 +111,7 @@ pub async fn new_kitsune_direct_v1(
     let lhnd = logic_chan.handle().clone();
 
     let (srv, srv_evt) = new_srv(Default::default(), ui_port).await?;
-    let kdirect = Kd1::new(srv, persist, p2p);
+    let kdirect = Kd1::new(srv.clone(), persist, p2p);
 
     logic_chan
         .handle()
@@ -78,7 +127,12 @@ pub async fn new_kitsune_direct_v1(
     logic_chan
         .handle()
         .clone()
-        .capture_logic(handle_srv_events(tuning_params, kdirect.clone(), srv_evt))
+        .capture_logic(handle_srv_events(
+            tuning_params,
+            kdirect.clone(),
+            srv,
+            srv_evt,
+        ))
         .await?;
 
     let kdirect = KitsuneDirect(kdirect);
@@ -91,6 +145,7 @@ pub async fn new_kitsune_direct_v1(
 struct Kd1Inner {
     srv: KdSrv,
     p2p: ghost_actor::GhostSender<actor::KitsuneP2p>,
+    auth_set: HashSet<Uniq>,
 }
 
 #[derive(Clone)]
@@ -109,7 +164,11 @@ impl Kd1 {
         Arc::new(Self {
             uniq: Uniq::default(),
             persist,
-            inner: Share::new(Kd1Inner { srv, p2p }),
+            inner: Share::new(Kd1Inner {
+                srv,
+                p2p,
+                auth_set: HashSet::new(),
+            }),
         })
     }
 }
@@ -215,8 +274,10 @@ impl AsKitsuneDirect for Kd1 {
 async fn handle_srv_events(
     tuning_params: KitsuneP2pTuningParams,
     kdirect: Arc<Kd1>,
+    srv: KdSrv,
     srv_evt: KdSrvEvtStream,
 ) {
+    let srv = &srv;
     let kdirect = &kdirect;
 
     srv_evt
@@ -250,7 +311,213 @@ async fn handle_srv_events(
                             tracing::error!(?err, "http respond error");
                         }
                     }
-                    KdSrvEvt::Websocket { .. } => {}
+                    KdSrvEvt::WebsocketConnected { con } => {
+                        if let Err(err) = srv.websocket_send(con, KdApi::HelloReq {
+                            msg_id: "".to_string(),
+                            salt: vec![1, 2, 3, 4].into_boxed_slice().into(),
+                        }).await {
+                            tracing::error!(?err, "ws send error");
+                        }
+                    }
+                    KdSrvEvt::WebsocketMessage { con, data } => {
+                        println!("GOT: {:?}", data);
+                        let msg_id = data.msg_id().to_string();
+                        if let KdApi::HelloRes { .. } = data {
+                            let _ = kdirect.inner.share_mut(|i, _| {
+                                i.auth_set.insert(con);
+                                Ok(())
+                            });
+                            return;
+                        }
+                        match kdirect.inner.share_mut(|i, _| {
+                            Ok(i.auth_set.contains(&con))
+                        }) {
+                            Ok(true) => (),
+                            _ => {
+                                if let Err(err) = srv.websocket_send(con, KdApi::ErrorRes {
+                                    msg_id,
+                                    reason: "unauthenticated".to_string(),
+                                }).await {
+                                    tracing::error!(?err, "ws send error");
+                                }
+                                return;
+                            }
+                        }
+                        let exec = |msg_id, fut| async {
+                            let res: KdResult<KdApi> = fut.await;
+                            let api = match res {
+                                Ok(api) => api,
+                                Err(err) => {
+                                    let reason = format!("{:?}", err);
+                                    KdApi::ErrorRes {
+                                        msg_id,
+                                        reason,
+                                    }
+                                }
+                            };
+                            if let Err(err) = srv.websocket_send(con, api).await {
+                                tracing::error!(?err, "ws send error");
+                            }
+                        };
+                        match data {
+                            KdApi::HelloRes { .. } => unreachable!(),
+                            KdApi::User { user } => {
+                                tracing::debug!(?user, "recv user data");
+                            }
+                            KdApi::KeypairGetOrCreateTaggedReq {
+                                msg_id,
+                                tag: _,
+                                ..
+                            } => {
+                                // TODO - tagging!!!
+                                exec(msg_id.clone(), async {
+                                    let pub_key = kdirect.persist.generate_signing_keypair().await.map_err(KdError::other)?;
+                                    Ok(KdApi::KeypairGetOrCreateTaggedRes {
+                                        msg_id,
+                                        pub_key,
+                                    })
+                                }.boxed()).await;
+                            }
+                            KdApi::AppJoinReq {
+                                msg_id,
+                                root,
+                                agent,
+                                ..
+                            } => {
+                                exec(msg_id.clone(), async {
+                                    kdirect.inner.share_mut(|i, _| {
+                                        Ok(i.p2p.join(root.to_kitsune_space(), agent.to_kitsune_agent()))
+                                    }).map_err(KdError::other)?.await.map_err(KdError::other)?;
+                                    Ok(KdApi::AppJoinRes {
+                                        msg_id,
+                                    })
+                                }.boxed()).await;
+                            }
+                            KdApi::AgentInfoStoreReq {
+                                msg_id,
+                                agent_info,
+                                ..
+                            } => {
+                                exec(msg_id.clone(), async {
+                                    kdirect.persist.store_agent_info(agent_info).await.map_err(KdError::other)?;
+                                    Ok(KdApi::AgentInfoStoreRes {
+                                        msg_id,
+                                    })
+                                }.boxed()).await;
+                            }
+                            KdApi::AgentInfoGetReq {
+                                msg_id,
+                                root,
+                                agent,
+                                ..
+                            } => {
+                                exec(msg_id.clone(), async {
+                                    let agent_info = kdirect.persist.get_agent_info(root, agent).await.map_err(KdError::other)?;
+                                    Ok(KdApi::AgentInfoGetRes {
+                                        msg_id,
+                                        agent_info,
+                                    })
+                                }.boxed()).await;
+                            }
+                            KdApi::AgentInfoQueryReq {
+                                msg_id,
+                                root,
+                                ..
+                            } => {
+                                exec(msg_id.clone(), async {
+                                    let agent_info_list = kdirect.persist.query_agent_info(root).await.map_err(KdError::other)?;
+                                    Ok(KdApi::AgentInfoQueryRes {
+                                        msg_id,
+                                        agent_info_list,
+                                    })
+                                }.boxed()).await;
+                            }
+                            KdApi::MessageSendReq {
+                                msg_id,
+                                root,
+                                to_agent,
+                                from_agent,
+                                content,
+                                binary,
+                                ..
+                            } => {
+                                exec(msg_id.clone(), async {
+                                    let space = root.to_kitsune_space();
+                                    let to_agent = to_agent.to_kitsune_agent();
+                                    let from_agent = from_agent.to_kitsune_agent();
+                                    let content = content.to_string().into_bytes();
+                                    let mut payload = Vec::with_capacity(4 + content.len() + binary.len());
+                                    let binary_len = (binary.len() as u32).to_le_bytes();
+                                    payload.extend_from_slice(&binary_len);
+                                    payload.extend_from_slice(&binary);
+                                    payload.extend_from_slice(&content);
+                                    let res = kdirect.inner.share_mut(move |i, _| {
+                                        Ok(i.p2p.rpc_single(space, to_agent, from_agent, payload, None))
+                                    }).map_err(KdError::other)?.await.map_err(KdError::other)?;
+                                    if res != b"success" {
+                                        return Err(format!("unexpected: {}", String::from_utf8_lossy(&res)).into());
+                                    }
+                                    Ok(KdApi::MessageSendRes {
+                                        msg_id,
+                                    })
+                                }.boxed()).await;
+                            }
+                            KdApi::EntryAuthorReq {
+                                msg_id,
+                                root,
+                                author,
+                                content,
+                                binary,
+                                ..
+                            } => {
+                                exec(msg_id.clone(), async {
+                                    if author != content.author {
+                                        return Err("author mismatch".into());
+                                    }
+                                    let entry_signed = KdEntrySigned::from_content_with_binary(&kdirect.persist, content, &binary).await?;
+                                    kdirect.persist.store_entry(root, author, entry_signed.clone()).await.map_err(KdError::other)?;
+                                    Ok(KdApi::EntryAuthorRes {
+                                        msg_id,
+                                        entry_signed,
+                                    })
+                                }.boxed()).await;
+                            }
+                            KdApi::EntryGetReq {
+                                msg_id,
+                                root,
+                                agent,
+                                hash,
+                                ..
+                            } => {
+                                exec(msg_id.clone(), async {
+                                    let entry_signed = kdirect.persist.get_entry(root, agent, hash).await.map_err(KdError::other)?;
+                                    Ok(KdApi::EntryGetRes {
+                                        msg_id,
+                                        entry_signed,
+                                    })
+                                }.boxed()).await;
+                            }
+                            KdApi::EntryGetChildrenReq {
+                                //msg_id,
+                                //root,
+                                //parent,
+                                //kind,
+                                ..
+                            } => {
+                                // TODO -- FIXME
+                                unimplemented!("TODO")
+                            }
+                            oth => {
+                                let reason = format!("unexpected {}", oth);
+                                if let Err(err) = srv.websocket_send(con, KdApi::ErrorRes {
+                                    msg_id,
+                                    reason,
+                                }).await {
+                                    tracing::error!(?err, "ws send error");
+                                }
+                            }
+                        }
+                    }
                 }
             },
         )
@@ -428,8 +695,8 @@ async fn handle_query_agent_info_signed(
 }
 
 async fn handle_call(
-    _kdirect: Arc<Kd1>,
-    lhnd: LogicChanHandle<KitsuneDirectEvt>,
+    kdirect: Arc<Kd1>,
+    _lhnd: LogicChanHandle<KitsuneDirectEvt>,
     space: Arc<KitsuneSpace>,
     to_agent: Arc<KitsuneAgent>,
     from_agent: Arc<KitsuneAgent>,
@@ -439,20 +706,42 @@ async fn handle_call(
     let to_agent = KdHash::from_kitsune_agent(&to_agent);
     let from_agent = KdHash::from_kitsune_agent(&from_agent);
 
-    let (t, content): (String, serde_json::Value) =
-        serde_json::from_slice(&payload).map_err(KitsuneError::other)?;
-    if t != "message" {
-        return Err(format!("unknown call type: {}", t).into());
+    if payload.len() < 4 {
+        return Err(format!("invalid msg size: {}", payload.len()).into());
     }
 
-    let msg = KitsuneDirectEvt::Message {
-        root,
-        from_agent,
-        to_agent,
-        content,
-    };
+    let binary_len = u32::from_le_bytes(*arrayref::array_ref![&payload, 0, 4]) as usize;
 
-    lhnd.emit(msg).await?;
+    if payload.len() < 4 + binary_len {
+        return Err(format!(
+            "invalid msg size: {} (binary_len: {})",
+            payload.len(),
+            binary_len
+        )
+        .into());
+    }
+
+    use kitsune_p2p_direct_api::kd_entry::KdEntryBinary;
+    let binary: KdEntryBinary = payload[4..4 + binary_len]
+        .to_vec()
+        .into_boxed_slice()
+        .into();
+
+    let content: serde_json::Value =
+        serde_json::from_slice(&payload[4 + binary_len..]).map_err(KitsuneError::other)?;
+
+    kdirect
+        .inner
+        .share_mut(move |i, _| {
+            Ok(i.srv.websocket_broadcast(KdApi::MessageRecvEvt {
+                root,
+                to_agent,
+                from_agent,
+                content,
+                binary,
+            }))
+        })?
+        .await?;
 
     Ok(b"success".to_vec())
 }

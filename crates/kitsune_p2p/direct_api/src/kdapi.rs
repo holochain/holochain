@@ -6,6 +6,13 @@ use crate::*;
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type")]
 pub enum KdApi {
+    /// A structured user-defined message
+    #[serde(rename = "user")]
+    User {
+        /// The structured user-data
+        user: serde_json::Value,
+    },
+
     /// Indicates an error occurred during a request
     #[serde(rename = "errorRes")]
     ErrorRes {
@@ -271,6 +278,10 @@ pub enum KdApi {
         #[serde(rename = "root")]
         root: KdHash,
 
+        /// the agent
+        #[serde(rename = "agent")]
+        agent: KdHash,
+
         /// hash
         #[serde(rename = "hash")]
         hash: KdHash,
@@ -326,6 +337,70 @@ impl std::fmt::Display for KdApi {
         let s = serde_json::to_string_pretty(&self).map_err(|_| std::fmt::Error)?;
         f.write_str(&s)?;
         Ok(())
+    }
+}
+
+impl std::str::FromStr for KdApi {
+    type Err = KdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_str(s).map_err(KdError::other)
+    }
+}
+
+impl KdApi {
+    /// Reconstruct this KdApi from a `to_string()` str.
+    // this *does* implement the trait clippy...
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> KdResult<Self> {
+        std::str::FromStr::from_str(s)
+    }
+
+    /// Get the msg_id (or empty string ("")) associated with this api.
+    pub fn msg_id(&self) -> &str {
+        match self {
+            Self::User { .. } => "",
+            Self::ErrorRes { msg_id, .. } => msg_id,
+            Self::HelloReq { msg_id, .. } => msg_id,
+            Self::HelloRes { msg_id, .. } => msg_id,
+            Self::KeypairGetOrCreateTaggedReq { msg_id, .. } => msg_id,
+            Self::KeypairGetOrCreateTaggedRes { msg_id, .. } => msg_id,
+            Self::AppJoinReq { msg_id, .. } => msg_id,
+            Self::AppJoinRes { msg_id, .. } => msg_id,
+            Self::AgentInfoStoreReq { msg_id, .. } => msg_id,
+            Self::AgentInfoStoreRes { msg_id, .. } => msg_id,
+            Self::AgentInfoGetReq { msg_id, .. } => msg_id,
+            Self::AgentInfoGetRes { msg_id, .. } => msg_id,
+            Self::AgentInfoQueryReq { msg_id, .. } => msg_id,
+            Self::AgentInfoQueryRes { msg_id, .. } => msg_id,
+            Self::MessageSendReq { msg_id, .. } => msg_id,
+            Self::MessageSendRes { msg_id, .. } => msg_id,
+            Self::MessageRecvEvt { .. } => "",
+            Self::EntryAuthorReq { msg_id, .. } => msg_id,
+            Self::EntryAuthorRes { msg_id, .. } => msg_id,
+            Self::EntryGetReq { msg_id, .. } => msg_id,
+            Self::EntryGetRes { msg_id, .. } => msg_id,
+            Self::EntryGetChildrenReq { msg_id, .. } => msg_id,
+            Self::EntryGetChildrenRes { msg_id, .. } => msg_id,
+        }
+    }
+
+    /// Returns true if the message is a response type.
+    pub fn is_res(&self) -> bool {
+        match self {
+            Self::ErrorRes { .. } => true,
+            Self::HelloRes { .. } => true,
+            Self::KeypairGetOrCreateTaggedRes { .. } => true,
+            Self::AppJoinRes { .. } => true,
+            Self::AgentInfoStoreRes { .. } => true,
+            Self::AgentInfoGetRes { .. } => true,
+            Self::AgentInfoQueryRes { .. } => true,
+            Self::MessageSendRes { .. } => true,
+            Self::EntryAuthorRes { .. } => true,
+            Self::EntryGetRes { .. } => true,
+            Self::EntryGetChildrenRes { .. } => true,
+            _ => false,
+        }
     }
 }
 

@@ -5,6 +5,10 @@ fn print(json: &serde_json::Value) {
     println!("{}", serde_json::to_string_pretty(&json).unwrap());
 }
 
+fn to_api(json: serde_json::Value) -> KdApi {
+    KdApi::User { user: json }
+}
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     let (srv, mut evt) = new_srv(Default::default(), 0).await.unwrap();
@@ -33,24 +37,25 @@ async fn main() {
                 resp.body = serde_json::to_string_pretty(&data).unwrap().into_bytes();
                 respond_cb(Ok(resp)).await.unwrap();
             }
-            KdSrvEvt::Websocket { con, data } => {
+            KdSrvEvt::WebsocketConnected { .. } => (),
+            KdSrvEvt::WebsocketMessage { con, data } => {
                 let data = serde_json::json!({
                     "event": "KdSrv.incoming_websocket",
                     "data": data,
                 });
                 print(&data);
-                srv.websocket_broadcast(serde_json::json!({
+                srv.websocket_broadcast(to_api(serde_json::json!({
                     "event": "KdSrv.websocket_broadcast",
                     "data": &data,
-                }))
+                })))
                 .await
                 .unwrap();
                 srv.websocket_send(
                     con,
-                    serde_json::json!({
+                    to_api(serde_json::json!({
                         "event": "KdSrv.websocket_send",
                         "data": &data,
-                    }),
+                    })),
                 )
                 .await
                 .unwrap();

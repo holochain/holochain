@@ -4,6 +4,7 @@ use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
+use kitsune_p2p_direct_api::KdApi;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use std::collections::HashMap;
@@ -26,7 +27,6 @@ pub async fn new_srv(
 
 // -- private -- //
 
-//type WsWrite = futures::stream::SplitSink<tokio_tungstenite::WebSocketStream<hyper::upgrade::Upgraded>, tungstenite::Message>;
 type WsWrite = futures::channel::mpsc::Sender<Result<tungstenite::Message, tungstenite::Error>>;
 
 struct SrvInner {
@@ -167,31 +167,45 @@ impl Srv {
             let (ws_write_snd, ws_write_rcv) = futures::channel::mpsc::channel(32);
             tokio::task::spawn(ws_write_rcv.forward(ws_write));
 
+            let mut ws_write_snd2 = ws_write_snd.clone();
             let uniq = Uniq::default();
             let lhnd = inner.share_mut(move |i, _| {
                 i.websockets.insert(uniq, ws_write_snd);
                 Ok(i.lhnd.clone())
             })?;
 
+            let lhnd2 = lhnd.clone();
             tokio::task::spawn(async move {
                 while let Some(msg) = ws_read.next().await {
-                    let json = match msg {
-                        Ok(tungstenite::Message::Text(json)) => match serde_json::from_str(&json) {
-                            Ok(json) => json,
-                            Err(_) => continue,
-                        },
-                        Ok(tungstenite::Message::Binary(json)) => {
-                            match serde_json::from_slice(&json) {
-                                Ok(json) => json,
-                                Err(_) => continue,
-                            }
+                    let api = match msg {
+                        Ok(tungstenite::Message::Text(json)) => {
+                            serde_json::from_str(&json).map_err(KdError::other)
                         }
-                        _ => continue,
+                        Ok(tungstenite::Message::Binary(json)) => {
+                            serde_json::from_slice(&json).map_err(KdError::other)
+                        }
+                        oth => Err(KdError::other(format!("unexpected: {:?}", oth))),
                     };
-                    if lhnd
-                        .emit(KdSrvEvt::Websocket {
+                    let api = match api {
+                        Ok(api) => api,
+                        Err(err) => {
+                            let err = format!("{:?}", err);
+                            let err = KdApi::ErrorRes {
+                                msg_id: "".to_string(),
+                                reason: err,
+                            };
+                            let err = err.to_string();
+                            let err = tungstenite::Message::Text(err);
+                            if ws_write_snd2.send(Ok(err)).await.is_err() {
+                                break;
+                            }
+                            continue;
+                        }
+                    };
+                    if lhnd2
+                        .emit(KdSrvEvt::WebsocketMessage {
                             con: uniq,
-                            data: json,
+                            data: api,
                         })
                         .await
                         .is_err()
@@ -200,6 +214,9 @@ impl Srv {
                     }
                 }
             });
+
+            lhnd.emit(KdSrvEvt::WebsocketConnected { con: uniq })
+                .await?;
 
             KitsuneResult::Ok(())
         });
@@ -226,13 +243,10 @@ impl AsKdSrv for Srv {
         self.inner.share_mut(|i, _| Ok(i.addr))
     }
 
-    fn websocket_broadcast(
-        &self,
-        data: serde_json::Value,
-    ) -> BoxFuture<'static, KitsuneResult<()>> {
+    fn websocket_broadcast(&self, data: KdApi) -> BoxFuture<'static, KitsuneResult<()>> {
         let inner = self.inner.clone();
         async move {
-            let data = serde_json::to_string(&data).map_err(KitsuneError::other)?;
+            let data = data.to_string();
             let data = tungstenite::Message::Text(data);
             let all = inner.share_mut(|i, _| {
                 let mut all = Vec::new();
@@ -251,14 +265,10 @@ impl AsKdSrv for Srv {
         .boxed()
     }
 
-    fn websocket_send(
-        &self,
-        con: Uniq,
-        data: serde_json::Value,
-    ) -> BoxFuture<'static, KitsuneResult<()>> {
+    fn websocket_send(&self, con: Uniq, data: KdApi) -> BoxFuture<'static, KitsuneResult<()>> {
         let inner = self.inner.clone();
         async move {
-            let data = serde_json::to_string(&data).map_err(KitsuneError::other)?;
+            let data = data.to_string();
             let data = tungstenite::Message::Text(data);
             inner
                 .share_mut(move |i, _| {
