@@ -18,31 +18,26 @@ pub trait AsKdPersist: 'static + Send + Sync {
     fn close(&self) -> BoxFuture<'static, ()>;
 
     /// Get or create and get the singleton tls cert creds for this store.
-    fn singleton_tls_config(&self) -> BoxFuture<'static, KitsuneResult<TlsConfig>>;
+    fn singleton_tls_config(&self) -> BoxFuture<'static, KdResult<TlsConfig>>;
 
     /// Generate a signature keypair, returning the pub key as a KdHash.
-    fn generate_signing_keypair(&self) -> BoxFuture<'static, KitsuneResult<KdHash>>;
+    fn generate_signing_keypair(&self) -> BoxFuture<'static, KdResult<KdHash>>;
 
     /// Sign arbitrary data with the secret key associated with given KdHash.
-    fn sign(
-        &self,
-        pub_key: KdHash,
-        data: &[u8],
-    ) -> BoxFuture<'static, KitsuneResult<Arc<[u8; 64]>>>;
+    fn sign(&self, pub_key: KdHash, data: &[u8]) -> BoxFuture<'static, KdResult<Arc<[u8; 64]>>>;
 
     /// Store agent info
-    fn store_agent_info(&self, agent_info: KdAgentInfo) -> BoxFuture<'static, KitsuneResult<()>>;
+    fn store_agent_info(&self, agent_info: KdAgentInfo) -> BoxFuture<'static, KdResult<()>>;
 
     /// Get agent info
     fn get_agent_info(
         &self,
         root: KdHash,
         agent: KdHash,
-    ) -> BoxFuture<'static, KitsuneResult<KdAgentInfo>>;
+    ) -> BoxFuture<'static, KdResult<KdAgentInfo>>;
 
     /// Query agent info
-    fn query_agent_info(&self, root: KdHash)
-        -> BoxFuture<'static, KitsuneResult<Vec<KdAgentInfo>>>;
+    fn query_agent_info(&self, root: KdHash) -> BoxFuture<'static, KdResult<Vec<KdAgentInfo>>>;
 
     /// Store entry
     fn store_entry(
@@ -50,7 +45,7 @@ pub trait AsKdPersist: 'static + Send + Sync {
         root: KdHash,
         agent: KdHash,
         entry: KdEntrySigned,
-    ) -> BoxFuture<'static, KitsuneResult<()>>;
+    ) -> BoxFuture<'static, KdResult<()>>;
 
     /// Get entry
     fn get_entry(
@@ -58,7 +53,7 @@ pub trait AsKdPersist: 'static + Send + Sync {
         root: KdHash,
         agent: KdHash,
         hash: KdHash,
-    ) -> BoxFuture<'static, KitsuneResult<KdEntrySigned>>;
+    ) -> BoxFuture<'static, KdResult<KdEntrySigned>>;
 
     /// Get entry
     fn query_entries(
@@ -68,10 +63,10 @@ pub trait AsKdPersist: 'static + Send + Sync {
         created_at_start_s: f32,
         created_at_end_s: f32,
         dht_arc: DhtArc,
-    ) -> BoxFuture<'static, KitsuneResult<Vec<KdEntrySigned>>>;
+    ) -> BoxFuture<'static, KdResult<Vec<KdEntrySigned>>>;
 
     /// Get ui file
-    fn get_ui_file(&self, path: &str) -> BoxFuture<'static, KitsuneResult<(String, Vec<u8>)>>;
+    fn get_ui_file(&self, path: &str) -> BoxFuture<'static, KdResult<(String, Vec<u8>)>>;
 }
 
 /// Handle to a persistence store.
@@ -106,14 +101,14 @@ impl KdPersist {
     /// Get or create and get the singleton tls cert creds for this store.
     pub fn singleton_tls_config(
         &self,
-    ) -> impl Future<Output = KitsuneResult<TlsConfig>> + 'static + Send {
+    ) -> impl Future<Output = KdResult<TlsConfig>> + 'static + Send {
         AsKdPersist::singleton_tls_config(&*self.0)
     }
 
     /// Generate a signature keypair, returning the pub key as a KdHash.
     pub fn generate_signing_keypair(
         &self,
-    ) -> impl Future<Output = KitsuneResult<KdHash>> + 'static + Send {
+    ) -> impl Future<Output = KdResult<KdHash>> + 'static + Send {
         AsKdPersist::generate_signing_keypair(&*self.0)
     }
 
@@ -122,7 +117,7 @@ impl KdPersist {
         &self,
         pub_key: KdHash,
         data: &[u8],
-    ) -> impl Future<Output = KitsuneResult<Arc<[u8; 64]>>> + 'static + Send {
+    ) -> impl Future<Output = KdResult<Arc<[u8; 64]>>> + 'static + Send {
         AsKdPersist::sign(&*self.0, pub_key, data)
     }
 
@@ -130,7 +125,7 @@ impl KdPersist {
     pub fn store_agent_info(
         &self,
         agent_info: KdAgentInfo,
-    ) -> impl Future<Output = KitsuneResult<()>> + 'static + Send {
+    ) -> impl Future<Output = KdResult<()>> + 'static + Send {
         AsKdPersist::store_agent_info(&*self.0, agent_info)
     }
 
@@ -139,7 +134,7 @@ impl KdPersist {
         &self,
         root: KdHash,
         agent: KdHash,
-    ) -> impl Future<Output = KitsuneResult<KdAgentInfo>> + 'static + Send {
+    ) -> impl Future<Output = KdResult<KdAgentInfo>> + 'static + Send {
         AsKdPersist::get_agent_info(&*self.0, root, agent)
     }
 
@@ -147,7 +142,7 @@ impl KdPersist {
     pub fn query_agent_info(
         &self,
         root: KdHash,
-    ) -> impl Future<Output = KitsuneResult<Vec<KdAgentInfo>>> + 'static + Send {
+    ) -> impl Future<Output = KdResult<Vec<KdAgentInfo>>> + 'static + Send {
         AsKdPersist::query_agent_info(&*self.0, root)
     }
 
@@ -157,7 +152,7 @@ impl KdPersist {
         root: KdHash,
         agent: KdHash,
         entry: KdEntrySigned,
-    ) -> impl Future<Output = KitsuneResult<()>> + 'static + Send {
+    ) -> impl Future<Output = KdResult<()>> + 'static + Send {
         AsKdPersist::store_entry(&*self.0, root, agent, entry)
     }
 
@@ -167,7 +162,7 @@ impl KdPersist {
         root: KdHash,
         agent: KdHash,
         hash: KdHash,
-    ) -> impl Future<Output = KitsuneResult<KdEntrySigned>> + 'static + Send {
+    ) -> impl Future<Output = KdResult<KdEntrySigned>> + 'static + Send {
         AsKdPersist::get_entry(&*self.0, root, agent, hash)
     }
 
@@ -179,7 +174,7 @@ impl KdPersist {
         created_at_start_s: f32,
         created_at_end_s: f32,
         dht_arc: DhtArc,
-    ) -> impl Future<Output = KitsuneResult<Vec<KdEntrySigned>>> + 'static + Send {
+    ) -> impl Future<Output = KdResult<Vec<KdEntrySigned>>> + 'static + Send {
         AsKdPersist::query_entries(
             &*self.0,
             root,
@@ -194,7 +189,7 @@ impl KdPersist {
     pub fn get_ui_file(
         &self,
         path: &str,
-    ) -> impl Future<Output = KitsuneResult<(String, Vec<u8>)>> + 'static + Send {
+    ) -> impl Future<Output = KdResult<(String, Vec<u8>)>> + 'static + Send {
         AsKdPersist::get_ui_file(&*self.0, path)
     }
 }

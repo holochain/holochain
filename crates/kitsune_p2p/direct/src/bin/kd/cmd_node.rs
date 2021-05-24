@@ -1,7 +1,7 @@
 use super::*;
 use futures::stream::StreamExt;
 
-pub(crate) async fn run(opt: KdOptNode) -> KitsuneResult<()> {
+pub(crate) async fn run(opt: KdOptNode) -> KdResult<()> {
     let persist = new_persist_mem();
 
     let conf = KitsuneDirectV1Config {
@@ -26,7 +26,7 @@ pub(crate) async fn run(opt: KdOptNode) -> KitsuneResult<()> {
     let _root = mk_demo(&kd).await?;
 
     println!("http://{}", ui_addr);
-    let _ = done_r.await.map_err(KitsuneError::other)?;
+    let _ = done_r.await.map_err(KdError::other)?;
 
     Ok(())
 }
@@ -47,7 +47,7 @@ const INDEX: &[u8] = br#"<!DOCTYPE html>
   </body>
 </html>"#;
 
-async fn mk_demo(kd: &KitsuneDirect) -> KitsuneResult<KdHash> {
+async fn mk_demo(kd: &KitsuneDirect) -> KdResult<KdHash> {
     let (hnd, mut evt) = kd.bind_control_handle().await?;
     tokio::task::spawn(async move { while evt.next().await.is_some() {} });
 
@@ -67,9 +67,9 @@ async fn mk_demo(kd: &KitsuneDirect) -> KitsuneResult<KdHash> {
             let e = hnd
                 .entry_author(root.clone(), root.clone(), e, b)
                 .await
-                .map_err(KitsuneError::other)?;
+                .map_err(KdError::other)?;
 
-            KitsuneResult::Ok(e.hash().clone())
+            KdResult::Ok(e.hash().clone())
         }
     };
 

@@ -29,11 +29,8 @@ impl Default for HttpResponse {
 }
 
 /// Respond to an incoming http request
-pub type HttpRespondCb = Box<
-    dyn FnOnce(KitsuneResult<HttpResponse>) -> BoxFuture<'static, KitsuneResult<()>>
-        + 'static
-        + Send,
->;
+pub type HttpRespondCb =
+    Box<dyn FnOnce(KdResult<HttpResponse>) -> BoxFuture<'static, KdResult<()>> + 'static + Send>;
 
 /// Events emitted from a KdSrv instance.
 pub enum KdSrvEvt {
@@ -86,13 +83,13 @@ pub trait AsKdSrv: 'static + Send + Sync {
     fn close(&self) -> BoxFuture<'static, ()>;
 
     /// Get the bound addr of this KdSrv instance
-    fn local_addr(&self) -> KitsuneResult<std::net::SocketAddr>;
+    fn local_addr(&self) -> KdResult<std::net::SocketAddr>;
 
     /// Broadcast to all connected websockets
-    fn websocket_broadcast(&self, data: KdApi) -> BoxFuture<'static, KitsuneResult<()>>;
+    fn websocket_broadcast(&self, data: KdApi) -> BoxFuture<'static, KdResult<()>>;
 
     /// Send data to a specific websocket connection
-    fn websocket_send(&self, con: Uniq, data: KdApi) -> BoxFuture<'static, KitsuneResult<()>>;
+    fn websocket_send(&self, con: Uniq, data: KdApi) -> BoxFuture<'static, KdResult<()>>;
 }
 
 /// Handle to a Srv instance.
@@ -125,7 +122,7 @@ impl KdSrv {
     }
 
     /// Get the bound addr of this KdSrv instance
-    pub fn local_addr(&self) -> KitsuneResult<std::net::SocketAddr> {
+    pub fn local_addr(&self) -> KdResult<std::net::SocketAddr> {
         AsKdSrv::local_addr(&*self.0)
     }
 
@@ -133,7 +130,7 @@ impl KdSrv {
     pub fn websocket_broadcast(
         &self,
         data: KdApi,
-    ) -> impl Future<Output = KitsuneResult<()>> + 'static + Send {
+    ) -> impl Future<Output = KdResult<()>> + 'static + Send {
         AsKdSrv::websocket_broadcast(&*self.0, data)
     }
 
@@ -142,7 +139,7 @@ impl KdSrv {
         &self,
         con: Uniq,
         data: KdApi,
-    ) -> impl Future<Output = KitsuneResult<()>> + 'static + Send {
+    ) -> impl Future<Output = KdResult<()>> + 'static + Send {
         AsKdSrv::websocket_send(&*self.0, con, data)
     }
 }

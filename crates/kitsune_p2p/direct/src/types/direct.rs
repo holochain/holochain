@@ -20,13 +20,13 @@ pub trait AsKitsuneDirect: 'static + Send + Sync {
     fn get_persist(&self) -> KdPersist;
 
     /// Get the local ui address of this instance.
-    fn get_ui_addr(&self) -> KitsuneResult<std::net::SocketAddr>;
+    fn get_ui_addr(&self) -> KdResult<std::net::SocketAddr>;
 
     /// List transport bindings
-    fn list_transport_bindings(&self) -> BoxFuture<'static, KitsuneResult<Vec<TxUrl>>>;
+    fn list_transport_bindings(&self) -> BoxFuture<'static, KdResult<Vec<TxUrl>>>;
 
     /// Bind a local control handle to this instance
-    fn bind_control_handle(&self) -> BoxFuture<'static, KitsuneResult<(KdHnd, KdHndEvtStream)>>;
+    fn bind_control_handle(&self) -> BoxFuture<'static, KdResult<(KdHnd, KdHndEvtStream)>>;
 }
 
 /// the driver future type for the kitsune direct instance
@@ -69,21 +69,21 @@ impl KitsuneDirect {
     }
 
     /// Get the local ui address of this instance.
-    pub fn get_ui_addr(&self) -> KitsuneResult<std::net::SocketAddr> {
+    pub fn get_ui_addr(&self) -> KdResult<std::net::SocketAddr> {
         AsKitsuneDirect::get_ui_addr(&*self.0)
     }
 
     /// List transport bindings
     pub fn list_transport_bindings(
         &self,
-    ) -> impl Future<Output = KitsuneResult<Vec<TxUrl>>> + 'static + Send {
+    ) -> impl Future<Output = KdResult<Vec<TxUrl>>> + 'static + Send {
         AsKitsuneDirect::list_transport_bindings(&*self.0)
     }
 
     /// Bind a local control handle to this instance
     pub fn bind_control_handle(
         &self,
-    ) -> impl Future<Output = KitsuneResult<(KdHnd, KdHndEvtStream)>> + 'static + Send {
+    ) -> impl Future<Output = KdResult<(KdHnd, KdHndEvtStream)>> + 'static + Send {
         AsKitsuneDirect::bind_control_handle(&*self.0)
     }
 }

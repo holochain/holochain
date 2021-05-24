@@ -13,7 +13,7 @@ pub trait KdAgentInfoExt: Sized {
     fn to_kitsune(&self) -> AgentInfoSigned;
 
     /// convert a kitsune AgentInfoSigned into KdAgentInfo
-    fn from_kitsune(kitsune: &AgentInfoSigned) -> KitsuneResult<Self>;
+    fn from_kitsune(kitsune: &AgentInfoSigned) -> KdResult<Self>;
 }
 
 fn clamp(u: u64) -> i64 {
@@ -32,8 +32,8 @@ impl KdAgentInfoExt for KdAgentInfo {
         AgentInfoSigned::new_unchecked(agent, signature, agent_info)
     }
 
-    fn from_kitsune(kitsune: &AgentInfoSigned) -> KitsuneResult<Self> {
-        let i = AgentInfo::try_from(kitsune).map_err(KitsuneError::other)?;
+    fn from_kitsune(kitsune: &AgentInfoSigned) -> KdResult<Self> {
+        let i = AgentInfo::try_from(kitsune).map_err(KdError::other)?;
         let root = KdHash::from_kitsune_space(i.as_space_ref());
         let agent = KdHash::from_kitsune_agent(i.as_agent_ref());
         let url_list = i.as_urls_ref().iter().map(|u| u.clone().into()).collect();

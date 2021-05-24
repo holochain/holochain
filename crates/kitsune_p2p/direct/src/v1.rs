@@ -76,7 +76,7 @@ pub async fn new_quick_proxy_v1() -> KdResult<(TxUrl, KitsuneDirectDriver, Close
 /// create a new v1 instance of the kitsune direct api
 pub async fn new_kitsune_direct_v1(
     conf: KitsuneDirectV1Config,
-) -> KitsuneResult<(KitsuneDirect, KitsuneDirectDriver)> {
+) -> KdResult<(KitsuneDirect, KitsuneDirectDriver)> {
     let KitsuneDirectV1Config {
         persist,
         proxy,
@@ -102,7 +102,7 @@ pub async fn new_kitsune_direct_v1(
 
     let (p2p, evt) = spawn_kitsune_p2p(sub_config, tls)
         .await
-        .map_err(KitsuneError::other)?;
+        .map_err(KdError::other)?;
 
     let mut logic_chan = <LogicChan<()>>::new(tuning_params.concurrent_limit_per_thread);
 
@@ -113,7 +113,8 @@ pub async fn new_kitsune_direct_v1(
         .handle()
         .clone()
         .capture_logic(handle_events(tuning_params.clone(), kdirect.clone(), evt))
-        .await?;
+        .await
+        .map_err(KdError::other)?;
 
     logic_chan
         .handle()
@@ -124,7 +125,8 @@ pub async fn new_kitsune_direct_v1(
             srv,
             srv_evt,
         ))
-        .await?;
+        .await
+        .map_err(KdError::other)?;
 
     let kdirect = KitsuneDirect(kdirect);
     let driver = async move { while logic_chan.next().await.is_some() {} }.boxed();
@@ -192,34 +194,31 @@ impl AsKitsuneDirect for Kd1 {
         self.persist.clone()
     }
 
-    fn get_ui_addr(&self) -> KitsuneResult<std::net::SocketAddr> {
-        self.inner.share_mut(|i, _| Ok(i.srv.local_addr()?))
+    fn get_ui_addr(&self) -> KdResult<std::net::SocketAddr> {
+        self.inner
+            .share_mut(|i, _| Ok(i.srv.local_addr().map_err(KitsuneError::other)?))
+            .map_err(KdError::other)
     }
 
-    fn list_transport_bindings(&self) -> BoxFuture<'static, KitsuneResult<Vec<TxUrl>>> {
+    fn list_transport_bindings(&self) -> BoxFuture<'static, KdResult<Vec<TxUrl>>> {
         let fut = self
             .inner
             .share_mut(|i, _| Ok(i.p2p.list_transport_bindings()));
         async move {
-            let res = fut?.await.map_err(KitsuneError::other)?;
+            let res = fut.map_err(KdError::other)?.await.map_err(KdError::other)?;
             Ok(res.into_iter().map(|u| u.into()).collect())
         }
         .boxed()
     }
 
-    fn bind_control_handle(&self) -> BoxFuture<'static, KitsuneResult<(KdHnd, KdHndEvtStream)>> {
+    fn bind_control_handle(&self) -> BoxFuture<'static, KdResult<(KdHnd, KdHndEvtStream)>> {
         let ws_addr = self.get_ui_addr().unwrap();
 
         // TODO - this should also be configured in v1 conf
         let pass = sodoken::Buffer::new_memlocked(4).unwrap();
         pass.write_lock().copy_from_slice(&[1, 2, 3, 4]);
 
-        async move {
-            new_handle_ws(ws_addr, pass)
-                .await
-                .map_err(KitsuneError::other)
-        }
-        .boxed()
+        async move { new_handle_ws(ws_addr, pass).await.map_err(KdError::other) }.boxed()
     }
 }
 
@@ -581,7 +580,7 @@ async fn handle_events(
 async fn handle_put_agent_info_signed(
     kdirect: Arc<Kd1>,
     input: PutAgentInfoSignedEvt,
-) -> KitsuneResult<()> {
+) -> KdResult<()> {
     let PutAgentInfoSignedEvt {
         agent_info_signed, ..
     } = input;
@@ -596,7 +595,7 @@ async fn handle_put_agent_info_signed(
 async fn handle_get_agent_info_signed(
     kdirect: Arc<Kd1>,
     input: GetAgentInfoSignedEvt,
-) -> KitsuneResult<Option<AgentInfoSigned>> {
+) -> KdResult<Option<AgentInfoSigned>> {
     let GetAgentInfoSignedEvt { space, agent } = input;
 
     let root = KdHash::from_kitsune_space(&space);
@@ -611,7 +610,7 @@ async fn handle_get_agent_info_signed(
 async fn handle_query_agent_info_signed(
     kdirect: Arc<Kd1>,
     input: QueryAgentInfoSignedEvt,
-) -> KitsuneResult<Vec<AgentInfoSigned>> {
+) -> KdResult<Vec<AgentInfoSigned>> {
     let QueryAgentInfoSignedEvt { space, .. } = input;
 
     let root = KdHash::from_kitsune_space(&space);
@@ -626,7 +625,7 @@ async fn handle_call(
     to_agent: Arc<KitsuneAgent>,
     from_agent: Arc<KitsuneAgent>,
     payload: Vec<u8>,
-) -> KitsuneResult<Vec<u8>> {
+) -> KdResult<Vec<u8>> {
     let root = KdHash::from_kitsune_space(&space);
     let to_agent = KdHash::from_kitsune_agent(&to_agent);
     let from_agent = KdHash::from_kitsune_agent(&from_agent);
@@ -653,7 +652,7 @@ async fn handle_call(
         .into();
 
     let content: serde_json::Value =
-        serde_json::from_slice(&payload[4 + binary_len..]).map_err(KitsuneError::other)?;
+        serde_json::from_slice(&payload[4 + binary_len..]).map_err(KdError::other)?;
 
     kdirect
         .inner
@@ -665,7 +664,8 @@ async fn handle_call(
                 content,
                 binary,
             }))
-        })?
+        })
+        .map_err(KdError::other)?
         .await?;
 
     Ok(b"success".to_vec())
@@ -678,10 +678,10 @@ async fn handle_gossip(
     _from_agent: Arc<KitsuneAgent>,
     op_hash: Arc<KitsuneOpHash>,
     op_data: Vec<u8>,
-) -> KitsuneResult<()> {
+) -> KdResult<()> {
     let entry = KdEntrySigned::from_wire(op_data.into_boxed_slice())
         .await
-        .map_err(KitsuneError::other)?;
+        .map_err(KdError::other)?;
     let op_hash = KdHash::from_kitsune_op_hash(&op_hash);
     if &op_hash != entry.hash() {
         return Err("data did not hash to given hash".into());
@@ -697,7 +697,7 @@ async fn handle_gossip(
 async fn handle_fetch_op_hashes_for_constraints(
     kdirect: Arc<Kd1>,
     input: FetchOpHashesForConstraintsEvt,
-) -> KitsuneResult<Vec<Arc<KitsuneOpHash>>> {
+) -> KdResult<Vec<Arc<KitsuneOpHash>>> {
     let FetchOpHashesForConstraintsEvt {
         space,
         agent,
@@ -730,7 +730,7 @@ async fn handle_fetch_op_hashes_for_constraints(
 async fn handle_fetch_op_hash_data(
     kdirect: Arc<Kd1>,
     input: FetchOpHashDataEvt,
-) -> KitsuneResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
+) -> KdResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
     let FetchOpHashDataEvt {
         space,
         agent,
@@ -760,7 +760,7 @@ async fn handle_fetch_op_hash_data(
 async fn handle_sign_network_data(
     kdirect: Arc<Kd1>,
     input: SignNetworkDataEvt,
-) -> KitsuneResult<KitsuneSignature> {
+) -> KdResult<KitsuneSignature> {
     let SignNetworkDataEvt { agent, data, .. } = input;
 
     let agent = KdHash::from_kitsune_agent(&agent);

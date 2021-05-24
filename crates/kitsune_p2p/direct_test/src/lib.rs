@@ -23,7 +23,7 @@ pub enum KdVerSpec {
 }
 
 /// response type for agent hook execution
-pub type AgentHookResp = BoxFuture<'static, KitsuneResult<()>>;
+pub type AgentHookResp = BoxFuture<'static, KdResult<()>>;
 
 /// input parameter type for agent hook execution
 pub struct AgentHookInput {
@@ -139,9 +139,9 @@ impl KdTestHarness {
 
 impl KdTestHarness {
     /// spawn a new kdirect test harness
-    pub async fn start_test(mut config: KdTestConfig) -> KitsuneResult<Self> {
+    pub async fn start_test(mut config: KdTestConfig) -> KdResult<Self> {
         let (proxy_url, driver, proxy_close) =
-            new_quick_proxy_v1().await.map_err(KitsuneError::other)?;
+            new_quick_proxy_v1().await.map_err(KdError::other)?;
         metric_task(async move {
             driver.await;
             KdResult::Ok(())
@@ -164,7 +164,7 @@ impl KdTestHarness {
         };
         let app_entry = KdEntrySigned::from_content(&root_persist, app_entry)
             .await
-            .map_err(KitsuneError::other)?;
+            .map_err(KdError::other)?;
         tracing::debug!(?app_entry);
 
         let app_entry_hash = app_entry.hash().clone();
@@ -205,7 +205,7 @@ impl KdTestHarness {
                                 break;
                             }
                         }
-                        KitsuneResult::Ok(())
+                        KdResult::Ok(())
                     });
 
                     (kdirect, kdhnd)
@@ -220,7 +220,7 @@ impl KdTestHarness {
                 kdhnd
                     .app_join(root.clone(), agent.clone())
                     .await
-                    .map_err(KitsuneError::other)?;
+                    .map_err(KdError::other)?;
 
                 // sneak this directly into the db : )
                 kdirect
@@ -296,7 +296,7 @@ async fn periodic_agent_hook_task(
     app_entry_hash: KdHash,
     nodes: Vec<KdTestNodeHandle>,
     mut periodic_agent_hook: AgentHook,
-) -> KitsuneResult<()> {
+) -> KdResult<()> {
     'top: loop {
         tokio::time::sleep(std::time::Duration::from_millis(interval_ms)).await;
 
@@ -360,7 +360,7 @@ mod tests {
                         vec![].into_boxed_slice().into(),
                     )
                     .await
-                    .map_err(KitsuneError::other)?;
+                    .map_err(KdError::other)?;
                 tracing::debug!(?new_entry);
 
                 Ok(())

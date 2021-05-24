@@ -40,8 +40,7 @@ async fn main() {
                     new_entry,
                     vec![].into_boxed_slice().into(),
                 )
-                .await
-                .map_err(KitsuneError::other)?;
+                .await?;
             tracing::debug!(?new_entry);
 
             Ok(())

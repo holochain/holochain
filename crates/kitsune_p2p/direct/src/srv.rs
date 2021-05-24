@@ -15,7 +15,7 @@ use types::srv::*;
 pub async fn new_srv(
     tuning_params: KitsuneP2pTuningParams,
     port: u16,
-) -> KitsuneResult<(KdSrv, KdSrvEvtStream)> {
+) -> KdResult<(KdSrv, KdSrvEvtStream)> {
     let logic_chan = LogicChan::new(tuning_params.concurrent_limit_per_thread);
     let lhnd = logic_chan.handle().clone();
     let kdsrv = Srv::new(port, lhnd).await?;
@@ -42,7 +42,7 @@ struct Srv {
 }
 
 impl Srv {
-    pub async fn new(port: u16, lhnd: LogicChanHandle<KdSrvEvt>) -> KitsuneResult<Arc<Self>> {
+    pub async fn new(port: u16, lhnd: LogicChanHandle<KdSrvEvt>) -> KdResult<Arc<Self>> {
         // kdirect only binds to local host for security reasons
         let addr = SocketAddr::from(([127, 0, 0, 1], port));
 
@@ -61,7 +61,7 @@ impl Srv {
             async move {
                 let srv_ref = srv_ref.clone();
 
-                KitsuneResult::Ok(hyper::service::service_fn(move |r| {
+                KdResult::Ok(hyper::service::service_fn(move |r| {
                     let srv_ref = srv_ref.clone();
 
                     async move { srv_ref.handle_incoming(r).await }
@@ -70,10 +70,13 @@ impl Srv {
         }));
 
         let addr = server.local_addr();
-        kdsrv.inner.share_mut(move |i, _| {
-            i.addr = addr;
-            Ok(())
-        })?;
+        kdsrv
+            .inner
+            .share_mut(move |i, _| {
+                i.addr = addr;
+                Ok(())
+            })
+            .map_err(KdError::other)?;
 
         tokio::task::spawn(async move {
             if let Err(err) = server.await {
@@ -87,13 +90,13 @@ impl Srv {
     async fn handle_incoming(
         &self,
         req: hyper::Request<hyper::Body>,
-    ) -> KitsuneResult<hyper::Response<hyper::Body>> {
+    ) -> KdResult<hyper::Response<hyper::Body>> {
         if req.headers().contains_key(hyper::header::UPGRADE) {
             // handle as a websocket
             let res = tungstenite::handshake::server::create_response_with_body(&req, || {
                 hyper::Body::empty()
             })
-            .map_err(KitsuneError::other)?;
+            .map_err(KdError::other)?;
 
             self.register_websocket(req).await?;
 
@@ -109,9 +112,7 @@ impl Srv {
                 .iter()
                 .map(|(k, v)| (k.as_str().to_string(), v.as_bytes().to_vec()))
                 .collect();
-            let body = hyper::body::to_bytes(req)
-                .await
-                .map_err(KitsuneError::other)?;
+            let body = hyper::body::to_bytes(req).await.map_err(KdError::other)?;
             let body = body.as_ref().to_vec();
             let respond_cb: HttpRespondCb = Box::new(move |resp| {
                 async move {
@@ -130,18 +131,19 @@ impl Srv {
             };
 
             self.inner
-                .share_mut(move |i, _| Ok(i.lhnd.emit(evt)))?
-                .await?;
+                .share_mut(move |i, _| Ok(i.lhnd.emit(evt)))
+                .map_err(KdError::other)?
+                .await
+                .map_err(KdError::other)?;
 
-            let resp = r_rcv.await.map_err(KitsuneError::other)??;
+            let resp = r_rcv.await.map_err(KdError::other)??;
             let body = hyper::Body::from(resp.body);
             let mut out = hyper::Response::new(body);
-            *out.status_mut() =
-                hyper::StatusCode::from_u16(resp.status).map_err(KitsuneError::other)?;
+            *out.status_mut() = hyper::StatusCode::from_u16(resp.status).map_err(KdError::other)?;
             for (k, v) in resp.headers {
                 let k = hyper::header::HeaderName::from_lowercase(k.to_lowercase().as_bytes())
-                    .map_err(KitsuneError::other)?;
-                let v = hyper::header::HeaderValue::from_bytes(&v).map_err(KitsuneError::other)?;
+                    .map_err(KdError::other)?;
+                let v = hyper::header::HeaderValue::from_bytes(&v).map_err(KdError::other)?;
                 out.headers_mut().insert(k, v);
             }
 
@@ -149,12 +151,10 @@ impl Srv {
         }
     }
 
-    async fn register_websocket(&self, mut req: hyper::Request<hyper::Body>) -> KitsuneResult<()> {
+    async fn register_websocket(&self, mut req: hyper::Request<hyper::Body>) -> KdResult<()> {
         let inner = self.inner.clone();
         tokio::task::spawn(async move {
-            let socket = hyper::upgrade::on(&mut req)
-                .await
-                .map_err(KitsuneError::other)?;
+            let socket = hyper::upgrade::on(&mut req).await.map_err(KdError::other)?;
 
             let ws_stream = tokio_tungstenite::WebSocketStream::from_raw_socket(
                 socket,
@@ -169,10 +169,12 @@ impl Srv {
 
             let mut ws_write_snd2 = ws_write_snd.clone();
             let uniq = Uniq::default();
-            let lhnd = inner.share_mut(move |i, _| {
-                i.websockets.insert(uniq, ws_write_snd);
-                Ok(i.lhnd.clone())
-            })?;
+            let lhnd = inner
+                .share_mut(move |i, _| {
+                    i.websockets.insert(uniq, ws_write_snd);
+                    Ok(i.lhnd.clone())
+                })
+                .map_err(KdError::other)?;
 
             let lhnd2 = lhnd.clone();
             tokio::task::spawn(async move {
@@ -216,9 +218,10 @@ impl Srv {
             });
 
             lhnd.emit(KdSrvEvt::WebsocketConnected { con: uniq })
-                .await?;
+                .await
+                .map_err(KdError::other)?;
 
-            KitsuneResult::Ok(())
+            KdResult::Ok(())
         });
 
         Ok(())
@@ -239,33 +242,37 @@ impl AsKdSrv for Srv {
         async move {}.boxed()
     }
 
-    fn local_addr(&self) -> KitsuneResult<std::net::SocketAddr> {
-        self.inner.share_mut(|i, _| Ok(i.addr))
+    fn local_addr(&self) -> KdResult<std::net::SocketAddr> {
+        self.inner
+            .share_mut(|i, _| Ok(i.addr))
+            .map_err(KdError::other)
     }
 
-    fn websocket_broadcast(&self, data: KdApi) -> BoxFuture<'static, KitsuneResult<()>> {
+    fn websocket_broadcast(&self, data: KdApi) -> BoxFuture<'static, KdResult<()>> {
         let inner = self.inner.clone();
         async move {
             let data = data.to_string();
             let data = tungstenite::Message::Text(data);
-            let all = inner.share_mut(|i, _| {
-                let mut all = Vec::new();
-                for ws in i.websockets.values() {
-                    let mut ws = ws.clone();
-                    let data = data.clone();
-                    all.push(async move { ws.send(Ok(data)).await });
-                }
-                Ok(all)
-            })?;
+            let all = inner
+                .share_mut(|i, _| {
+                    let mut all = Vec::new();
+                    for ws in i.websockets.values() {
+                        let mut ws = ws.clone();
+                        let data = data.clone();
+                        all.push(async move { ws.send(Ok(data)).await });
+                    }
+                    Ok(all)
+                })
+                .map_err(KdError::other)?;
             futures::future::try_join_all(all)
                 .await
-                .map_err(KitsuneError::other)?;
+                .map_err(KdError::other)?;
             Ok(())
         }
         .boxed()
     }
 
-    fn websocket_send(&self, con: Uniq, data: KdApi) -> BoxFuture<'static, KitsuneResult<()>> {
+    fn websocket_send(&self, con: Uniq, data: KdApi) -> BoxFuture<'static, KdResult<()>> {
         let inner = self.inner.clone();
         async move {
             let data = data.to_string();
@@ -278,9 +285,10 @@ impl AsKdSrv for Srv {
                     } else {
                         Err("no such websocket connection".into())
                     }
-                })?
+                })
+                .map_err(KdError::other)?
                 .await
-                .map_err(KitsuneError::other)?;
+                .map_err(KdError::other)?;
             Ok(())
         }
         .boxed()

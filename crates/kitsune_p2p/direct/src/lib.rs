@@ -6,7 +6,7 @@
 pub use kitsune_p2p_direct_api::{KdError, KdResult};
 use kitsune_p2p_types::dependencies::ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::tx2::tx2_adapter::Uniq;
-pub use kitsune_p2p_types::{KitsuneError, KitsuneResult};
+use kitsune_p2p_types::KitsuneError;
 
 use sodoken::Buffer;
 
@@ -48,7 +48,6 @@ pub mod prelude {
     pub use crate::types::persist::KdPersist;
     pub use crate::types::srv::{HttpRespondCb, HttpResponse, KdSrv, KdSrvEvt, KdSrvEvtStream};
     pub use crate::v1::*;
-    pub use crate::{KitsuneError, KitsuneResult};
     pub use kitsune_p2p::dht_arc::DhtArc;
     pub use kitsune_p2p_direct_api::{KdApi, KdError, KdResult};
 }
