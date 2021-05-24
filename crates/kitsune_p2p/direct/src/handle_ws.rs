@@ -48,9 +48,8 @@ pub async fn new_handle_ws(
 
     let hnd = Hnd::new(ws_write_snd);
 
-    logic_chan
-        .handle()
-        .clone()
+    let lhnd2 = lhnd.clone();
+    lhnd2
         .capture_logic(handle_ws_recv(
             tuning_params,
             ws_read.boxed(),
@@ -377,7 +376,6 @@ async fn handle_ws_recv(
                         let _ = snd.send(Ok(api));
                     }
                 } else {
-                    println!("unexpected: {:?}", api);
                     tracing::error!("unexpected: {:?}", api);
                 }
             },

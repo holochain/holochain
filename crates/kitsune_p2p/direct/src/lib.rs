@@ -40,7 +40,8 @@ pub mod prelude {
     pub use crate::handle_ws::*;
     pub use crate::persist_mem::*;
     pub use crate::srv::*;
-    pub use crate::types::direct::{KitsuneDirect, KitsuneDirectEvt, KitsuneDirectEvtStream};
+    pub use crate::types::direct::{KitsuneDirect, KitsuneDirectDriver};
+    pub use crate::types::handle::{KdHnd, KdHndEvt, KdHndEvtStream};
     pub use crate::types::kdagent::{KdAgentInfo, KdAgentInfoExt};
     pub use crate::types::kdentry::{KdEntryContent, KdEntrySigned, KdEntrySignedExt};
     pub use crate::types::kdhash::{KdHash, KdHashExt};

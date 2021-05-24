@@ -9,7 +9,6 @@ use futures::stream::StreamExt;
 use kitsune_p2p_direct::dependencies::*;
 use kitsune_p2p_direct::prelude::*;
 use kitsune_p2p_types::metrics::metric_task;
-use kitsune_p2p_types::tx2::tx2_pool::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 
 /// init tracing
@@ -39,6 +38,9 @@ pub struct AgentHookInput {
 
     /// the kdirect instance handle
     pub kdirect: KitsuneDirect,
+
+    /// the control handle to the node instance
+    pub kdhnd: KdHnd,
 }
 
 /// callback type for agent hook execution
@@ -84,15 +86,18 @@ pub struct KdTestNodeHandle {
     /// the agents that were created/joined on this node
     pub local_agents: Vec<KdHash>,
 
-    /// the handle to the kdirect node
+    /// the kdirect node instance
     pub kdirect: KitsuneDirect,
 
-    message_box: Share<Vec<KitsuneDirectEvt>>,
+    /// the control handle to the node instance
+    pub kdhnd: KdHnd,
+
+    message_box: Share<Vec<KdHndEvt>>,
 }
 
 impl KdTestNodeHandle {
     /// collect events emitted by this node
-    pub fn collect_events(&self) -> Vec<KitsuneDirectEvt> {
+    pub fn collect_events(&self) -> Vec<KdHndEvt> {
         self.message_box
             .share_mut(|i, _| Ok(i.drain(..).collect()))
             .unwrap()
@@ -110,14 +115,14 @@ pub struct KdTestHarness {
     /// the list of nodes created for this test run
     pub nodes: Vec<KdTestNodeHandle>,
 
-    proxy_hnd: EpHnd,
+    proxy_close: CloseCb,
 }
 
 impl KdTestHarness {
     /// shut down the test
     pub async fn close(self) {
         let Self {
-            nodes, proxy_hnd, ..
+            nodes, proxy_close, ..
         } = self;
 
         let mut all = Vec::new();
@@ -126,7 +131,7 @@ impl KdTestHarness {
         }
         futures::future::join_all(all).await;
 
-        proxy_hnd.close(0, "").await;
+        proxy_close(0, "").await;
 
         tracing::info!("DONE");
     }
@@ -135,41 +140,14 @@ impl KdTestHarness {
 impl KdTestHarness {
     /// spawn a new kdirect test harness
     pub async fn start_test(mut config: KdTestConfig) -> KitsuneResult<Self> {
-        use kitsune_p2p_proxy::tx2::*;
-        use kitsune_p2p_transport_quic::tx2::*;
-        use kitsune_p2p_types::config::*;
-        use kitsune_p2p_types::tls::*;
-        use kitsune_p2p_types::tx2::tx2_pool_promote::*;
-
-        let tuning_params = KitsuneP2pTuningParams::default();
-
-        let p_tls = TlsConfig::new_ephemeral().await?;
-        let mut conf = QuicConfig::default();
-        conf.tls = Some(p_tls.clone());
-        conf.tuning_params = Some(tuning_params.clone());
-
-        let f = QuicBackendAdapt::new(conf).await?;
-        let f = tx2_pool_promote(f, tuning_params.clone());
-        let mut conf = ProxyConfig::default();
-        conf.tuning_params = Some(tuning_params.clone());
-        conf.allow_proxy_fwd = true;
-        let f = tx2_proxy(f, conf)?;
-
-        let mut proxy = f
-            .bind(
-                "kitsune-quic://0.0.0.0:0".into(),
-                tuning_params.implicit_timeout(),
-            )
-            .await?;
-
-        let proxy_hnd = proxy.handle().clone();
-        let proxy_url = proxy_hnd.local_addr()?;
-        tracing::info!(%proxy_url);
-
+        let (proxy_url, driver, proxy_close) =
+            new_quick_proxy_v1().await.map_err(KitsuneError::other)?;
         metric_task(async move {
-            while proxy.next().await.is_some() {}
-            KitsuneResult::Ok(())
+            driver.await;
+            KdResult::Ok(())
         });
+
+        tracing::info!(%proxy_url);
 
         let mut nodes = Vec::new();
 
@@ -194,7 +172,7 @@ impl KdTestHarness {
         for _ in 0..config.node_count {
             let persist = new_persist_mem();
             let message_box = Share::new(Vec::new());
-            let kdirect = match config.ver {
+            let (kdirect, kdhnd) = match config.ver {
                 KdVerSpec::V1 => {
                     let conf = KitsuneDirectV1Config {
                         persist,
@@ -202,9 +180,16 @@ impl KdTestHarness {
                         ui_port: 0,
                     };
 
-                    let (kdirect, mut evt) = new_kitsune_direct_v1(conf).await?;
+                    let (kdirect, driver) = new_kitsune_direct_v1(conf).await?;
+                    metric_task(async move {
+                        driver.await;
+                        KdResult::Ok(())
+                    });
+
                     let node_addrs = kdirect.list_transport_bindings().await?;
                     tracing::debug!(?node_addrs);
+
+                    let (kdhnd, mut evt) = kdirect.bind_control_handle().await?;
 
                     let msg_box = message_box.clone();
                     metric_task(async move {
@@ -223,7 +208,7 @@ impl KdTestHarness {
                         KitsuneResult::Ok(())
                     });
 
-                    kdirect
+                    (kdirect, kdhnd)
                 }
             };
 
@@ -232,10 +217,15 @@ impl KdTestHarness {
                 let agent = kdirect.get_persist().generate_signing_keypair().await?;
                 tracing::info!(%agent);
 
-                kdirect.join(root.clone(), agent.clone()).await?;
+                kdhnd
+                    .app_join(root.clone(), agent.clone())
+                    .await
+                    .map_err(KitsuneError::other)?;
 
+                // sneak this directly into the db : )
                 kdirect
-                    .publish_entry(root.clone(), agent.clone(), app_entry.clone())
+                    .get_persist()
+                    .store_entry(root.clone(), agent.clone(), app_entry.clone())
                     .await?;
 
                 let input = AgentHookInput {
@@ -243,6 +233,7 @@ impl KdTestHarness {
                     app_entry_hash: app_entry_hash.clone(),
                     agent: agent.clone(),
                     kdirect: kdirect.clone(),
+                    kdhnd: kdhnd.clone(),
                 };
                 (config.agent_init_hook)(input).await?;
 
@@ -252,6 +243,7 @@ impl KdTestHarness {
             nodes.push(KdTestNodeHandle {
                 local_agents,
                 kdirect,
+                kdhnd,
                 message_box,
             });
         }
@@ -293,7 +285,7 @@ impl KdTestHarness {
             root,
             app_entry_hash: app_entry.hash().clone(),
             nodes,
-            proxy_hnd,
+            proxy_close,
         })
     }
 }
@@ -315,6 +307,7 @@ async fn periodic_agent_hook_task(
                     app_entry_hash: app_entry_hash.clone(),
                     agent: agent.clone(),
                     kdirect: node.kdirect.clone(),
+                    kdhnd: node.kdhnd.clone(),
                 };
                 if periodic_agent_hook(input).await.is_err() {
                     break 'top;
@@ -343,7 +336,8 @@ mod tests {
                     root,
                     app_entry_hash,
                     agent,
-                    kdirect,
+                    kdirect: _,
+                    kdhnd,
                 } = input;
 
                 let new_entry = KdEntryContent {
@@ -358,11 +352,16 @@ mod tests {
                             .as_secs_f64(),
                     }),
                 };
-                let new_entry = KdEntrySigned::from_content(&kdirect.get_persist(), new_entry)
+                let new_entry = kdhnd
+                    .entry_author(
+                        root.clone(),
+                        agent.clone(),
+                        new_entry,
+                        vec![].into_boxed_slice().into(),
+                    )
                     .await
                     .map_err(KitsuneError::other)?;
                 tracing::debug!(?new_entry);
-                kdirect.publish_entry(root, agent, new_entry).await?;
 
                 Ok(())
             }

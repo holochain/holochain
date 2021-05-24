@@ -17,7 +17,8 @@ async fn main() {
                 root,
                 app_entry_hash,
                 agent,
-                kdirect,
+                kdirect: _,
+                kdhnd,
             } = input;
 
             let new_entry = KdEntryContent {
@@ -32,11 +33,16 @@ async fn main() {
                         .as_secs_f64(),
                 }),
             };
-            let new_entry = KdEntrySigned::from_content(&kdirect.get_persist(), new_entry)
+            let new_entry = kdhnd
+                .entry_author(
+                    root.clone(),
+                    agent.clone(),
+                    new_entry,
+                    vec![].into_boxed_slice().into(),
+                )
                 .await
                 .map_err(KitsuneError::other)?;
             tracing::debug!(?new_entry);
-            kdirect.publish_entry(root, agent, new_entry).await?;
 
             Ok(())
         }

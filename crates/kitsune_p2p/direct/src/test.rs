@@ -4,7 +4,8 @@ use kitsune_p2p_direct_api::kd_sys_kind::{self, *};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_direct_sanity() {
-    let (proxy, _proxy_complete) = new_quick_proxy_v1().await.unwrap();
+    let (proxy, driver, proxy_close) = new_quick_proxy_v1().await.unwrap();
+    tokio::task::spawn(driver);
 
     let conf = KitsuneDirectV1Config {
         persist: new_persist_mem(),
@@ -12,9 +13,9 @@ async fn test_direct_sanity() {
         ui_port: 0,
     };
 
-    let (kd, mut kd_evt) = new_kitsune_direct_v1(conf).await.unwrap();
+    let (kd, driver) = new_kitsune_direct_v1(conf).await.unwrap();
 
-    tokio::task::spawn(async move { while kd_evt.next().await.is_some() {} });
+    tokio::task::spawn(driver);
 
     let ws_addr = kd.get_ui_addr().unwrap();
     println!("ws_addr: {}", ws_addr);
@@ -109,5 +110,10 @@ async fn test_direct_sanity() {
         .entry_get(root.clone(), root.clone(), app_entry.hash().clone())
         .await
         .unwrap();
+
     assert_eq!(app_entry, e);
+
+    proxy_close(0, "").await;
+    hnd.close(0, "").await;
+    kd.close(0, "").await;
 }

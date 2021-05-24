@@ -10,7 +10,13 @@ pub(crate) async fn run(opt: KdOptNode) -> KitsuneResult<()> {
         ui_port: 0,
     };
 
-    let (kd, mut evt) = new_kitsune_direct_v1(conf).await?;
+    let (kd, driver) = new_kitsune_direct_v1(conf).await?;
+    let (done_s, done_r) = tokio::sync::oneshot::channel();
+    tokio::task::spawn(async move {
+        driver.await;
+        let _ = done_s.send(());
+    });
+
     let node_addrs = kd.list_transport_bindings().await?;
     for addr in node_addrs {
         println!("{}", addr);
@@ -20,8 +26,7 @@ pub(crate) async fn run(opt: KdOptNode) -> KitsuneResult<()> {
     let _root = mk_demo(&kd).await?;
 
     println!("http://{}", ui_addr);
-
-    while evt.next().await.is_some() {}
+    let _ = done_r.await.map_err(KitsuneError::other)?;
 
     Ok(())
 }
@@ -43,10 +48,14 @@ const INDEX: &[u8] = br#"<!DOCTYPE html>
 </html>"#;
 
 async fn mk_demo(kd: &KitsuneDirect) -> KitsuneResult<KdHash> {
+    let (hnd, mut evt) = kd.bind_control_handle().await?;
+    tokio::task::spawn(async move { while evt.next().await.is_some() {} });
+
     let persist = kd.get_persist();
     let root = persist.generate_signing_keypair().await?;
 
     let mk_entry = |t: &'static str, p: &KdHash, d: serde_json::Value, b: &[u8]| {
+        let b = b.to_vec().into_boxed_slice().into();
         let e = KdEntryContent {
             kind: t.to_string(),
             parent: p.clone(),
@@ -54,12 +63,13 @@ async fn mk_demo(kd: &KitsuneDirect) -> KitsuneResult<KdHash> {
             verify: "".to_string(),
             data: d,
         };
-        let fut = KdEntrySigned::from_content_with_binary(&persist, e, b);
         async {
-            let e = fut.await.map_err(KitsuneError::other)?;
-            let e_hash = e.hash().clone();
-            kd.publish_entry(root.clone(), root.clone(), e).await?;
-            KitsuneResult::Ok(e_hash)
+            let e = hnd
+                .entry_author(root.clone(), root.clone(), e, b)
+                .await
+                .map_err(KitsuneError::other)?;
+
+            KitsuneResult::Ok(e.hash().clone())
         }
     };
 
