@@ -16,23 +16,205 @@ pub fn new_persist_mem() -> KdPersist {
 
 // -- private -- //
 
+struct AgentStoreInner {
+    pub_key_to_info_map: HashMap<KdHash, KdAgentInfo>,
+}
+
+struct AgentStore(Share<AgentStoreInner>);
+
+impl AgentStore {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self(Share::new(AgentStoreInner {
+            pub_key_to_info_map: HashMap::new(),
+        })))
+    }
+
+    pub fn insert(&self, agent_info: KdAgentInfo) -> KdResult<()> {
+        let agent = agent_info.agent().clone();
+        self.0
+            .share_mut(move |i, _| {
+                match i.pub_key_to_info_map.entry(agent) {
+                    Entry::Occupied(mut e) => {
+                        if e.get().signed_at_ms() < agent_info.signed_at_ms() {
+                            e.insert(agent_info);
+                        }
+                    }
+                    Entry::Vacant(e) => {
+                        e.insert(agent_info);
+                    }
+                }
+
+                Ok(())
+            })
+            .map_err(KdError::other)
+    }
+
+    pub fn get(&self, agent: &KdHash) -> KdResult<KdAgentInfo> {
+        self.0
+            .share_mut(move |i, _| match i.pub_key_to_info_map.get(agent) {
+                Some(agent_info) => Ok(agent_info.clone()),
+                None => Err("agent not found".into()),
+            })
+            .map_err(KdError::other)
+    }
+
+    pub fn get_all(&self) -> KdResult<Vec<KdAgentInfo>> {
+        self.0
+            .share_mut(move |i, _| Ok(i.pub_key_to_info_map.values().cloned().collect()))
+            .map_err(KdError::other)
+    }
+}
+
+struct EntryStoreInner {
+    hash_to_entry_map: HashMap<KdHash, KdEntrySigned>,
+}
+
+struct EntryStore(Share<EntryStoreInner>);
+
+impl EntryStore {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self(Share::new(EntryStoreInner {
+            hash_to_entry_map: HashMap::new(),
+        })))
+    }
+
+    pub fn insert(&self, entry_signed: KdEntrySigned) -> KdResult<()> {
+        let hash = entry_signed.hash().clone();
+        self.0
+            .share_mut(move |i, _| {
+                i.hash_to_entry_map.insert(hash, entry_signed);
+
+                Ok(())
+            })
+            .map_err(KdError::other)
+    }
+
+    pub fn get(&self, hash: &KdHash) -> KdResult<KdEntrySigned> {
+        self.0
+            .share_mut(move |i, _| match i.hash_to_entry_map.get(hash) {
+                Some(entry_signed) => Ok(entry_signed.clone()),
+                None => Err("hash not found".into()),
+            })
+            .map_err(KdError::other)
+    }
+
+    pub fn get_all(&self) -> KdResult<Vec<KdEntrySigned>> {
+        self.0
+            .share_mut(move |i, _| Ok(i.hash_to_entry_map.values().cloned().collect()))
+            .map_err(KdError::other)
+    }
+}
+
+struct AgentEntryStoreInner {
+    agent_to_entry_store_map: HashMap<KdHash, Arc<EntryStore>>,
+}
+
+struct AgentEntryStore(Share<AgentEntryStoreInner>);
+
+impl AgentEntryStore {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self(Share::new(AgentEntryStoreInner {
+            agent_to_entry_store_map: HashMap::new(),
+        })))
+    }
+
+    pub fn get(&self, agent: &KdHash) -> KdResult<Arc<EntryStore>> {
+        self.0
+            .share_mut(|i, _| match i.agent_to_entry_store_map.get(agent) {
+                None => Err("agent not found".into()),
+                Some(entry_store) => Ok(entry_store.clone()),
+            })
+            .map_err(KdError::other)
+    }
+
+    pub fn get_mut(&self, agent: KdHash) -> KdResult<Arc<EntryStore>> {
+        self.0
+            .share_mut(move |i, _| {
+                Ok(i.agent_to_entry_store_map
+                    .entry(agent)
+                    .or_insert_with(EntryStore::new)
+                    .clone())
+            })
+            .map_err(KdError::other)
+    }
+}
+
+struct UiEntry {
+    mime: String,
+    data: Box<[u8]>,
+}
+
+struct UiStoreInner {
+    uri_to_file_map: HashMap<String, Arc<UiEntry>>,
+}
+
+struct UiStore(Share<UiStoreInner>);
+
+impl UiStore {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self(Share::new(UiStoreInner {
+            uri_to_file_map: HashMap::new(),
+        })))
+    }
+
+    pub fn check_add(&self, root: &KdHash, entry: &KdEntrySigned) -> KdResult<()> {
+        use kitsune_p2p_direct_api::kd_sys_kind::*;
+
+        if entry.kind() == "s.file" {
+            return match KdSysKind::from_kind(&entry.kind(), entry.raw_data().clone()) {
+                Ok(KdSysKind::File(file)) => {
+                    let path = format!("/{}/{}", root, file.name);
+                    println!("caching ui file: {}", path);
+                    let data = entry.as_binary_ref().to_vec().into_boxed_slice();
+                    self.0
+                        .share_mut(|i, _| {
+                            i.uri_to_file_map.insert(
+                                path,
+                                Arc::new(UiEntry {
+                                    mime: file.mime.clone(),
+                                    data,
+                                }),
+                            );
+                            Ok(())
+                        })
+                        .map_err(KdError::other)
+                }
+                oth => Err(format!("UNEXPECTED: {:?}", oth).into()),
+            };
+        }
+
+        Ok(())
+    }
+
+    pub fn get(&self, path: &str) -> KdResult<Arc<UiEntry>> {
+        self.0
+            .share_mut(|i, _| match i.uri_to_file_map.get(path) {
+                None => Err(format!("404: {}", path).into()),
+                Some(ui_entry) => Ok(ui_entry.clone()),
+            })
+            .map_err(KdError::other)
+    }
+}
+
 struct PersistMemInner {
     tls: Option<TlsConfig>,
     priv_keys: HashMap<KdHash, sodoken::Buffer>,
-    agent_info: HashMap<KdHash, HashMap<KdHash, KdAgentInfo>>,
-    entries: HashMap<KdHash, HashMap<KdHash, HashMap<KdHash, KdEntrySigned>>>,
+    agent_info: HashMap<KdHash, Arc<AgentStore>>,
+    entries: HashMap<KdHash, Arc<AgentEntryStore>>,
+    ui_cache: Arc<UiStore>,
 }
 
 struct PersistMem(Share<PersistMemInner>, Uniq);
 
 impl PersistMem {
     pub fn new() -> Arc<Self> {
-        Arc::new(PersistMem(
+        Arc::new(Self(
             Share::new(PersistMemInner {
                 tls: None,
                 priv_keys: HashMap::new(),
                 agent_info: HashMap::new(),
                 entries: HashMap::new(),
+                ui_cache: UiStore::new(),
             }),
             Uniq::default(),
         ))
@@ -132,29 +314,14 @@ impl AsKdPersist for PersistMem {
     }
 
     fn store_agent_info(&self, agent_info: KdAgentInfo) -> BoxFuture<'static, KdResult<()>> {
-        let r = self
-            .0
-            .share_mut(move |i, _| {
-                let root = agent_info.root().clone();
-                let agent = agent_info.agent().clone();
-
-                let root_map = i.agent_info.entry(root).or_insert_with(HashMap::new);
-
-                match root_map.entry(agent) {
-                    Entry::Occupied(mut e) => {
-                        if e.get().signed_at_ms() < agent_info.signed_at_ms() {
-                            e.insert(agent_info);
-                        }
-                    }
-                    Entry::Vacant(e) => {
-                        e.insert(agent_info);
-                    }
-                }
-
-                Ok(())
-            })
-            .map_err(KdError::other);
-        async move { r }.boxed()
+        let root = agent_info.root().clone();
+        let root_map = self.0.share_mut(move |i, _| {
+            Ok(i.agent_info
+                .entry(root)
+                .or_insert_with(AgentStore::new)
+                .clone())
+        });
+        async move { root_map.map_err(KdError::other)?.insert(agent_info) }.boxed()
     }
 
     fn get_agent_info(
@@ -162,36 +329,26 @@ impl AsKdPersist for PersistMem {
         root: KdHash,
         agent: KdHash,
     ) -> BoxFuture<'static, KdResult<KdAgentInfo>> {
-        let r = self
-            .0
-            .share_mut(|i, _| {
-                let root_map = match i.agent_info.get(&root) {
-                    None => return Err("root not found".into()),
-                    Some(r) => r,
-                };
-
-                match root_map.get(&agent) {
-                    None => Err("agent not found".into()),
-                    Some(a) => Ok(a.clone()),
-                }
-            })
-            .map_err(KdError::other);
-        async move { r }.boxed()
+        let store = self.0.share_mut(move |i, _| match i.agent_info.get(&root) {
+            Some(store) => Ok(store.clone()),
+            None => Err("root not found".into()),
+        });
+        async move { store.map_err(KdError::other)?.get(&agent) }.boxed()
     }
 
     fn query_agent_info(&self, root: KdHash) -> BoxFuture<'static, KdResult<Vec<KdAgentInfo>>> {
-        let r = self
-            .0
-            .share_mut(|i, _| {
-                let root_map = match i.agent_info.get(&root) {
-                    None => return Err("root not found".into()),
-                    Some(r) => r,
-                };
-
-                Ok(root_map.values().cloned().collect())
-            })
-            .map_err(KdError::other);
-        async move { r }.boxed()
+        let store = self.0.share_mut(move |i, _| match i.agent_info.get(&root) {
+            Some(store) => Ok(store.clone()),
+            None => Err("root not found".into()),
+        });
+        async move {
+            let store = match store {
+                Err(_) => return Ok(vec![]),
+                Ok(store) => store,
+            };
+            store.get_all()
+        }
+        .boxed()
     }
 
     fn store_entry(
@@ -200,27 +357,22 @@ impl AsKdPersist for PersistMem {
         agent: KdHash,
         entry: KdEntrySigned,
     ) -> BoxFuture<'static, KdResult<()>> {
-        let r = self
-            .0
-            .share_mut(move |i, _| {
-                let hash = entry.hash().clone();
-
-                let root_map = i.entries.entry(root).or_insert_with(HashMap::new);
-                let agent_map = root_map.entry(agent).or_insert_with(HashMap::new);
-
-                match agent_map.entry(hash) {
-                    Entry::Occupied(mut e) => {
-                        e.insert(entry);
-                    }
-                    Entry::Vacant(e) => {
-                        e.insert(entry);
-                    }
-                }
-
-                Ok(())
-            })
-            .map_err(KdError::other);
-        async move { r }.boxed()
+        let root2 = root.clone();
+        let r = self.0.share_mut(move |i, _| {
+            let ui_cache = i.ui_cache.clone();
+            let agent_map = i
+                .entries
+                .entry(root2)
+                .or_insert_with(AgentEntryStore::new)
+                .clone();
+            Ok((ui_cache, agent_map))
+        });
+        async move {
+            let (ui_cache, agent_map) = r.map_err(KdError::other)?;
+            let _ = ui_cache.check_add(&root, &entry);
+            agent_map.get_mut(agent)?.insert(entry)
+        }
+        .boxed()
     }
 
     fn get_entry(
@@ -229,26 +381,11 @@ impl AsKdPersist for PersistMem {
         agent: KdHash,
         hash: KdHash,
     ) -> BoxFuture<'static, KdResult<KdEntrySigned>> {
-        let r = self
-            .0
-            .share_mut(|i, _| {
-                let root_map = match i.entries.get(&root) {
-                    None => return Err("root not found".into()),
-                    Some(r) => r,
-                };
-
-                let agent_map = match root_map.get(&agent) {
-                    None => return Err("agent not found".into()),
-                    Some(r) => r,
-                };
-
-                match agent_map.get(&hash) {
-                    None => Err("entry not found".into()),
-                    Some(e) => Ok(e.clone()),
-                }
-            })
-            .map_err(KdError::other);
-        async move { r }.boxed()
+        let agent_map = self.0.share_mut(move |i, _| match i.entries.get(&root) {
+            Some(agent_map) => Ok(agent_map.clone()),
+            None => Err("root not found".into()),
+        });
+        async move { agent_map.map_err(KdError::other)?.get(&agent)?.get(&hash) }.boxed()
     }
 
     fn query_entries(
@@ -261,61 +398,70 @@ impl AsKdPersist for PersistMem {
     ) -> BoxFuture<'static, KdResult<Vec<KdEntrySigned>>> {
         // TODO - actually filter
 
-        let r = self
-            .0
-            .share_mut(|i, _| {
-                let root_map = match i.entries.get(&root) {
-                    None => return Err("root not found".into()),
-                    Some(r) => r,
-                };
-
-                let agent_map = match root_map.get(&agent) {
-                    None => return Err("agent not found".into()),
-                    Some(r) => r,
-                };
-
-                Ok(agent_map.values().cloned().collect())
-            })
-            .map_err(KdError::other);
-        async move { r }.boxed()
+        let agent_map = self.0.share_mut(move |i, _| match i.entries.get(&root) {
+            Some(agent_map) => Ok(agent_map.clone()),
+            None => Err("root not found".into()),
+        });
+        async move {
+            let agent_map = match agent_map {
+                Err(_) => return Ok(vec![]),
+                Ok(agent_map) => agent_map,
+            };
+            agent_map.get(&agent)?.get_all()
+        }
+        .boxed()
     }
 
     fn get_ui_file(&self, path: &str) -> BoxFuture<'static, KdResult<(String, Vec<u8>)>> {
-        let path = match path.to_lowercase().as_str() {
-            "/" | "/index.html" => "index.html".to_string(),
-            oth => String::from_utf8_lossy(&oth.as_bytes()[1..]).to_string(),
-        };
-        // TODO - this is a horrible hack right now
-        //        we need to actually store / search this properly
-        let r = self
-            .0
-            .share_mut(|i, _| {
-                for r in i.entries.values() {
-                    for m in r.values() {
-                        for e in m.values() {
-                            if e.kind() == "s.file" {
-                                if let Some(m) = e.raw_data().as_object() {
-                                    if let Some(n) = m.get("name") {
-                                        if let Some(n) = n.as_str() {
-                                            if n == path {
-                                                if let Some(mime) = m.get("mime") {
-                                                    if let Some(mime) = mime.as_str() {
-                                                        let bin = e.as_binary_ref().to_vec();
-                                                        return Ok((mime.to_string(), bin));
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+        if path == "/favicon.svg" {
+            return async move {
+                Ok((
+                    "image/svg+xml".to_string(),
+                    br#"<?xml version="1.0" encoding="UTF-8"?>
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="256" height="256">
+    <path d="M 24 16 L 24 240 L 48 240 L 48 152 L 104 240 L 192 240 L 240 128 L 192 16 L 104 16 L 48 104 L 48 16 L 24 16 z M 128 32 L 128 224 L 64 128 L 128 32 z M 152 32 L 176 32 L 216 128 L 176 224 L 152 224 L 152 32 z " />
+</svg>"#.to_vec(),
+                ))
+            }.boxed();
+        } else if path.is_empty() || path == "/" || path == "/index.html" {
+            let roots = self
+                .0
+                .share_mut(|i, _| Ok(i.entries.keys().cloned().collect::<Vec<_>>()));
+            return async move {
+                let roots = roots
+                    .map_err(KdError::other)?
+                    .into_iter()
+                    .map(|h| format!(r#"<li><a href="/{}/index.html">{}</a></li>"#, h, h))
+                    .collect::<Vec<_>>();
+                let content = format!(
+                    r#"<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  </head>
+  <body>
+    <h1>App Index:</h1>
+    <ul>
+      {}
+    </ul>
+  </body>
+</html>"#,
+                    roots.join("\n")
+                )
+                .into_bytes();
+                Ok(("text/html".to_string(), content))
+            }
+            .boxed();
+        }
 
-                Err(format!("404: {}", path).into())
-            })
-            .map_err(KdError::other);
-        async move { r }.boxed()
+        let ui_cache = self.0.share_mut(|i, _| Ok(i.ui_cache.clone()));
+        let path = path.to_string();
+        async move {
+            let ui_cache = ui_cache.map_err(KdError::other)?;
+            let ui_entry = ui_cache.get(&path)?;
+            Ok((ui_entry.mime.clone(), ui_entry.data.to_vec()))
+        }
+        .boxed()
     }
 }

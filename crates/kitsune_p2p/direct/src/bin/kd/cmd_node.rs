@@ -40,10 +40,10 @@ const INDEX: &[u8] = br#"<!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   </head>
   <body>
-    <img src="/favicon.svg" />
+    <img src="favicon.svg" />
   </body>
 </html>"#;
 
