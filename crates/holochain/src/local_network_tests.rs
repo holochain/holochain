@@ -52,7 +52,7 @@ fn conductors_call_remote(num_conductors: usize) {
         init_all(&handles[..]).await;
 
         // 50 ms should be enough time to hit another conductor locally
-        let results = call_each_other(&handles[..], 100).await;
+        let results = call_each_other(&handles[..], 50).await;
         for (_, _, result) in results {
             match result {
                 Some(r) => match r {
@@ -78,7 +78,8 @@ fn conductors_call_remote(num_conductors: usize) {
         exchange_peer_info(envs);
 
         // Give a little longer timeout here because they must find each other to pass the test
-        let results = call_each_other(&handles[..], 700).await;
+        let results = call_each_other(&handles[..], 500).await;
+        dbg!(&results);
         for (_, _, result) in results {
             self::assert_matches!(result, Some(Ok(ZomeCallResponse::Ok(_))));
         }
