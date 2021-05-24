@@ -18,11 +18,11 @@ rec {
 
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
-    cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture --test-threads 1
+    cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture
     # run all the remaining cargo tests
-    cargo test --workspace --exclude holochain -- --nocapture  --test-threads 1
+    cargo test --workspace --exclude holochain -- --nocapture
     # run all the wasm tests (within wasm) with the conductor mocked
-    cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture  --test-threads 1
+    cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
   '';
 
   hcReleaseAutomationTest = let

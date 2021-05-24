@@ -33,8 +33,7 @@ const TIMEOUT_ERROR: &'static str = "inner function \'call_create_entry_remotely
 
 #[test_case(2)]
 #[test_case(5)]
-// 10 is flakey, maybe need more time?
-// #[test_case(10)]
+#[test_case(10)]
 fn conductors_call_remote(num_conductors: usize) {
     let f = async move {
         observability::test_run().ok();
@@ -78,7 +77,7 @@ fn conductors_call_remote(num_conductors: usize) {
         exchange_peer_info(envs);
 
         // Give a little longer timeout here because they must find each other to pass the test
-        let results = call_each_other(&handles[..], 700).await;
+        let results = call_each_other(&handles[..], 500).await;
         for (_, _, result) in results {
             self::assert_matches!(result, Some(Ok(ZomeCallResponse::Ok(_))));
         }
