@@ -50,7 +50,9 @@ fn conductors_call_remote(num_conductors: usize) {
 
         init_all(&handles[..]).await;
 
-        // 50 ms should be enough time to hit another conductor locally
+        // 100 ms should be enough time to hit another conductor locally.
+        // This can require multiple round trips if the head of the source chain keeps moving.
+        // Each time the chain head moves the call must be retried until a clean commit is made.
         let results = call_each_other(&handles[..], 100).await;
         for (_, _, result) in results {
             match result {
@@ -67,7 +69,7 @@ fn conductors_call_remote(num_conductors: usize) {
         }
 
         // Let the remote messages be dropped
-        tokio::time::sleep(std::time::Duration::from_secs(4)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
         let mut envs = Vec::with_capacity(handles.len());
         for h in &handles {
