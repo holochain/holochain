@@ -77,7 +77,8 @@ fn conductors_call_remote(num_conductors: usize) {
         exchange_peer_info(envs);
 
         // Give a little longer timeout here because they must find each other to pass the test
-        let results = call_each_other(&handles[..], 700).await;
+        let results = call_each_other(&handles[..], 1000).await;
+        dbg!(&results);
         for (_, _, result) in results {
             self::assert_matches!(result, Some(Ok(ZomeCallResponse::Ok(_))));
         }
@@ -410,7 +411,10 @@ async fn call_each_other(
                     // in this test as it's a controlled local network
                     match tokio::time::timeout(std::time::Duration::from_millis(timeout), f).await {
                         Ok(r) => (i, j, Some(r)),
-                        Err(_) => (i, j, None),
+                        Err(e) => {
+                            dbg!(e);
+                            (i, j, None)
+                        }
                     }
                 }
             };
