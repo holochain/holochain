@@ -206,7 +206,7 @@ version = "0.0.2-alpha.1"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
- "parking_lot",
+ "parking_lot 0.10.2",
  "paste",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -342,16 +342,13 @@ name = "holochain_test_wasm_common"
 version = "0.0.1"
 dependencies = [
  "hdk",
- "holochain_serialized_bytes",
  "serde",
- "serde_bytes",
 ]
 
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.67"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90cb4e0ce3995ed8fe5b7f1695b714bab5b7a343487fea8ae0ce14c38e225d24"
+source = "git+https://github.com/holochain/holochain-wasmer.git?tag=v0.0.68#64a4dbc8314cd4e9dbeef6552a01d75cc5556167"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -362,11 +359,11 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_guest"
 version = "0.0.67"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9c2f16b3f80ee23107b1c20de51aae8fcd90948833fed830ddbd61b86f5c0b2"
+source = "git+https://github.com/holochain/holochain-wasmer.git?tag=v0.0.68#64a4dbc8314cd4e9dbeef6552a01d75cc5556167"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
+ "parking_lot 0.11.1",
  "serde",
  "tracing",
 ]
@@ -409,6 +406,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "instant"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61124eeebbd69b8190558df225adf7e4caafce0d743919e5d6b19652314ec5ec"
+dependencies = [
+ "cfg-if 1.0.0",
+]
+
+[[package]]
 name = "itertools"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -440,6 +446,15 @@ name = "lock_api"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4da24a77a3d8a6d4862d95f72e6fdb9c09a643ecdb402d754004a557f2bec75"
+dependencies = [
+ "scopeguard",
+]
+
+[[package]]
+name = "lock_api"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0382880606dff6d15c9476c416d18690b72742aa7b605bb6dd6ec9030fbf07eb"
 dependencies = [
  "scopeguard",
 ]
@@ -541,8 +556,19 @@ version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3a704eb390aafdc107b0e392f56a82b668e3a71366993b5340f5833fd62505e"
 dependencies = [
- "lock_api",
- "parking_lot_core",
+ "lock_api 0.3.4",
+ "parking_lot_core 0.7.2",
+]
+
+[[package]]
+name = "parking_lot"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d7744ac029df22dca6284efe4e898991d28e3085c706c972bcd7da4a27a15eb"
+dependencies = [
+ "instant",
+ "lock_api 0.4.4",
+ "parking_lot_core 0.8.3",
 ]
 
 [[package]]
@@ -554,7 +580,21 @@ dependencies = [
  "cfg-if 0.1.10",
  "cloudabi",
  "libc",
- "redox_syscall",
+ "redox_syscall 0.1.57",
+ "smallvec",
+ "winapi",
+]
+
+[[package]]
+name = "parking_lot_core"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa7a782938e745763fe6907fc6ba86946d72f49fe7e21de074e08128a99fb018"
+dependencies = [
+ "cfg-if 1.0.0",
+ "instant",
+ "libc",
+ "redox_syscall 0.2.8",
  "smallvec",
  "winapi",
 ]
@@ -785,6 +825,15 @@ name = "redox_syscall"
 version = "0.1.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41cc0f7e4d5d4544e8861606a285bb08d3e70712ccc7d2b84d7c0ccfaf4b05ce"
+
+[[package]]
+name = "redox_syscall"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "742739e41cd49414de871ea5e549afb7e2a3ac77b589bcbebe8c82fab37147fc"
+dependencies = [
+ "bitflags",
+]
 
 [[package]]
 name = "regex"

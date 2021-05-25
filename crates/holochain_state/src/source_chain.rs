@@ -152,6 +152,7 @@ impl SourceChain {
         Ok(self.len()? == 0)
     }
 
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> SourceChainResult<u32> {
         Ok(self.scratch.apply(|scratch| {
             let scratch_max = chain_head_scratch(&(*scratch), self.author.as_ref()).map(|(_, s)| s);
@@ -276,7 +277,7 @@ impl SourceChain {
         };
         let mut elements = self.vault.conn()?.with_reader(|txn| {
             let mut sql = "
-                SELECT DISTINCT 
+                SELECT DISTINCT
                 Header.hash AS header_hash, Header.blob AS header_blob
             "
             .to_string();
@@ -611,7 +612,7 @@ pub async fn dump_state(
         let elements = txn
             .prepare(
                 "
-                SELECT DISTINCT 
+                SELECT DISTINCT
                 Header.blob AS header_blob, Entry.blob AS entry_blob,
                 Header.hash AS header_hash
                 FROM Header
