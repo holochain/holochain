@@ -1,3 +1,4 @@
+#![allow(clippy::field_reassign_with_default)]
 use futures::future::FutureExt;
 use kitsune_p2p_direct::dependencies::*;
 use kitsune_p2p_direct::prelude::*;
