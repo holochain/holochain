@@ -386,6 +386,7 @@ impl KdApi {
     }
 
     /// Returns true if the message is a response type.
+    #[allow(clippy::match_like_matches_macro)]
     pub fn is_res(&self) -> bool {
         match self {
             Self::ErrorRes { .. } => true,

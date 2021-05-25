@@ -47,9 +47,7 @@ where
 pub fn partial_key_match(partial_key: &[u8], key: &[u8]) -> bool {
     let len = partial_key.len();
     // Avoid slice panic
-    key.get(0..len)
-        .map(|a| a == &partial_key[..])
-        .unwrap_or(false)
+    key.get(0..len).map(|a| a == partial_key).unwrap_or(false)
 }
 
 /// Iterate from a key
@@ -220,18 +218,18 @@ where
         match scratch_current {
             // Return scratch value and keep db value
             Some(scratch) if compare(scratch.0, db.0) => {
-                trace!(msg = "r scratch key first", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
+                trace!(msg = "r scratch key first", k = %String::from_utf8_lossy(&scratch.0), v = ?scratch.1);
                 self.current = Some(db);
                 Some(scratch)
             }
             // Return scratch value (or db value) and throw the other away
             Some(scratch) if scratch.0 == db.0 => {
-                trace!(msg = "r scratch key ==", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
+                trace!(msg = "r scratch key ==", k = %String::from_utf8_lossy(&scratch.0), v = ?scratch.1);
                 Some(scratch)
             }
             // Return db value and keep the scratch
             _ => {
-                trace!(msg = "r db _", k = %String::from_utf8_lossy(&db.0[..]), v = ?db.1);
+                trace!(msg = "r db _", k = %String::from_utf8_lossy(&db.0), v = ?db.1);
                 self.scratch_current = scratch_current;
                 Some(db)
             }

@@ -32,8 +32,8 @@ impl CellConductorApi {
     /// this API instance is associated with
     pub fn new(conductor_handle: ConductorHandle, cell_id: CellId) -> Self {
         Self {
-            cell_id,
             conductor_handle,
+            cell_id,
         }
     }
 }

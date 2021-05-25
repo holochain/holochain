@@ -10,7 +10,7 @@ use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::workspace::Workspace;
-use holochain_types::dna::DnaDef;
+use holochain_types::prelude::*;
 use holochain_zome_types::header::builder;
 use tracing::*;
 
@@ -39,7 +39,7 @@ pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
         let mut guard = workspace_lock.write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         // commit the workspace
-        writer.with_writer(|writer| Ok(workspace.flush_to_txn_ref(writer)?))?;
+        writer.with_writer(|writer| workspace.flush_to_txn_ref(writer))?;
     }
     Ok(result)
 }

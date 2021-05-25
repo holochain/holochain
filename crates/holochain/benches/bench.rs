@@ -8,7 +8,6 @@ use hdk::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain::core::ribosome::RibosomeT;
 use holochain::core::ribosome::ZomeCallInvocation;
-use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;

@@ -11,7 +11,7 @@ async fn app_bundle_fixture() -> (AppBundle, DnaFile) {
     let fake_wasms = vec![dna_wasm.clone().into_content()];
     let fake_zomes = vec![Zome::new(
         "hi".into(),
-        ZomeDef::from(WasmZome::new(dna_wasm.as_hash().clone())),
+        ZomeDef::Wasm(WasmZome::new(dna_wasm.as_hash().clone())),
     )];
     let dna_def_1 = DnaDef::unique_from_zomes(fake_zomes.clone());
     let dna_def_2 = DnaDef::unique_from_zomes(fake_zomes);

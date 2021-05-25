@@ -1,3 +1,4 @@
+#![allow(clippy::field_reassign_with_default)]
 use crate::prelude::*;
 use crate::*;
 
@@ -196,7 +197,7 @@ impl AsKitsuneDirect for Kd1 {
 
     fn get_ui_addr(&self) -> KdResult<std::net::SocketAddr> {
         self.inner
-            .share_mut(|i, _| Ok(i.srv.local_addr().map_err(KitsuneError::other)?))
+            .share_mut(|i, _| i.srv.local_addr().map_err(KitsuneError::other))
             .map_err(KdError::other)
     }
 

@@ -75,7 +75,7 @@ impl KdHashExt for KdHash {
     ) -> BoxFuture<'static, bool> {
         let pk = Buffer::from_ref(self.as_core_bytes());
         async move {
-            match async {
+            async {
                 let sig = Buffer::from_ref(&signature[..]);
                 KdResult::Ok(
                     sodoken::sign::sign_verify_detached(&sig, &data, &pk)
@@ -84,10 +84,7 @@ impl KdHashExt for KdHash {
                 )
             }
             .await
-            {
-                Ok(r) => r,
-                Err(_) => false,
-            }
+            .unwrap_or(false)
         }
         .boxed()
     }

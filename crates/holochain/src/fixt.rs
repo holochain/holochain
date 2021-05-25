@@ -150,10 +150,9 @@ fixturator!(
         for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
-                WasmZome {
+                ZomeDef::Wasm(WasmZome {
                     wasm_hash: hash.to_owned(),
-                }
-                .into(),
+                }),
             ));
         }
         let mut dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
@@ -173,10 +172,9 @@ fixturator!(
         for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
-                WasmZome {
+                ZomeDef::Wasm(WasmZome {
                     wasm_hash: hash.to_owned(),
-                }
-                .into(),
+                }),
             ));
         }
         let mut dna_def = DnaDefFixturator::new_indexed(Predictable, get_fixt_index!())

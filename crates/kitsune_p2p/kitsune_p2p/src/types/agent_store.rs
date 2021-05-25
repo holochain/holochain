@@ -168,7 +168,7 @@ impl AgentInfo {
 
     /// Decode the meta info.
     pub fn meta_info(&self) -> Result<AgentMetaInfo, KitsuneP2pError> {
-        Ok(self.meta_info[..].try_into()?)
+        self.meta_info[..].try_into()
     }
 
     /// Get the [DhtArc] for this agent info

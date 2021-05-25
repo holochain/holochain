@@ -103,7 +103,7 @@ pub async fn validation_receipt_workflow(
     }
 
     // Write the acknowledgment to the db.
-    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
+    writer.with_writer(|writer| workspace.flush_to_txn(writer))?;
 
     Ok(WorkComplete::Complete)
 }

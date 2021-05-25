@@ -40,8 +40,8 @@ impl<'de> serde::Deserialize<'de> for KdHash {
     where
         D: serde::Deserializer<'de>,
     {
-        Ok(KdHash::from_str_slice(&String::deserialize(deserializer)?)
-            .map_err(serde::de::Error::custom)?)
+        KdHash::from_str_slice(&String::deserialize(deserializer)?)
+            .map_err(serde::de::Error::custom)
     }
 }
 

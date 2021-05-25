@@ -183,7 +183,7 @@ struct Parsed<'lt> {
 }
 
 /// internal helper to parse the contents of wire_data
-fn parse<'a>(wire: &'a [u8]) -> KdResult<Parsed<'a>> {
+fn parse(wire: &[u8]) -> KdResult<Parsed<'_>> {
     const S_BIN_LEN: usize = 4;
     const S_SIG: usize = S_BIN_LEN + 64;
     const S_HASH: usize = S_SIG + 39;

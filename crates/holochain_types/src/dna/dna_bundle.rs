@@ -3,7 +3,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::{DnaDef, DnaFile, WasmMap};
 use crate::prelude::*;
 use holo_hash::*;
 use mr_bundle::Location;
@@ -208,7 +207,6 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::prelude::ZomeManifest;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dna_bundle_to_dna_file() {

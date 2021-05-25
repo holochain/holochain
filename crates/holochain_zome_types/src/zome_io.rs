@@ -46,7 +46,7 @@ impl ExternIO {
     where
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        Ok(holochain_serialized_bytes::decode(&self.0)?)
+        holochain_serialized_bytes::decode(&self.0)
     }
 
     pub fn into_vec(self) -> Vec<u8> {
