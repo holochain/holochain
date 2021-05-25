@@ -1,9 +1,5 @@
 //! Some common testing helpers.
 
-use crate::dna::zome::WasmZome;
-use crate::dna::DnaDef;
-use crate::dna::DnaFile;
-use crate::dna::YamlProperties;
 use crate::element::SignedHeaderHashedExt;
 use crate::fixt::*;
 use crate::prelude::*;
@@ -38,7 +34,8 @@ pub fn fake_dna_zomes(uid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
         for (zome_name, wasm) in zomes {
             let wasm = crate::dna::wasm::DnaWasmHashed::from_content(wasm).await;
             let (wasm, wasm_hash) = wasm.into_inner();
-            dna.zomes.push((zome_name, WasmZome { wasm_hash }.into()));
+            dna.zomes
+                .push((zome_name, ZomeDef::Wasm(WasmZome { wasm_hash })));
             wasm_code.push(wasm);
         }
         DnaFile::new(dna, wasm_code).await

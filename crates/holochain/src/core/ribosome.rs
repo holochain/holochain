@@ -337,8 +337,8 @@ impl ZomeCallInvocation {
         Self {
             cell_id,
             zome,
-            fn_name,
             cap,
+            fn_name,
             payload,
             provenance,
         }

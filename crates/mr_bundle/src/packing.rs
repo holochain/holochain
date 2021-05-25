@@ -4,6 +4,7 @@ use crate::{
     util::prune_path,
     Manifest,
 };
+use holochain_util::ffs;
 use std::path::Path;
 
 impl<M: Manifest> Bundle<M> {

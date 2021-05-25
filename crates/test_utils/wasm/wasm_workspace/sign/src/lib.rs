@@ -2,7 +2,7 @@ use hdk::prelude::*;
 
 #[hdk_extern]
 fn sign(sign_input: Sign) -> ExternResult<Signature> {
-    Ok(hdk::prelude::sign_raw(sign_input.key, sign_input.data.to_vec())?)
+    hdk::prelude::sign_raw(sign_input.key, sign_input.data.to_vec())
 }
 
 #[hdk_extern]

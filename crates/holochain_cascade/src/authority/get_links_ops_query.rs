@@ -59,7 +59,7 @@ impl Query for GetLinksOpsQuery {
             Header.base_hash = :base_hash
             AND
             Header.zome_id = :zome_id
-            AND 
+            AND
             DhtOp.when_integrated IS NOT NULL
         ";
         // TODO: This should not be = but should be a partial match.
@@ -76,12 +76,12 @@ impl Query for GetLinksOpsQuery {
         let sub_create_query = format!("{}{}", sub_create, common_query);
         let delete_query = format!(
             "
-            SELECT Header.blob AS header_blob, DhtOp.type AS dht_type, 
+            SELECT Header.blob AS header_blob, DhtOp.type AS dht_type,
             DhtOp.validation_status AS status
             FROM DhtOp
             JOIN Header On DhtOp.header_hash = Header.hash
             WHERE DhtOp.type = :delete
-            AND 
+            AND
             DhtOp.when_integrated IS NOT NULL
             AND
             Header.create_link_hash IN ({})
@@ -112,7 +112,7 @@ impl Query for GetLinksOpsQuery {
             let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?)?;
             let op_type = row.get(row.column_index("dht_type")?)?;
             let validation_status = row.get(row.column_index("status")?)?;
-            Ok(Judged::raw(Item { op_type, header }, validation_status))
+            Ok(Judged::raw(Item { header, op_type }, validation_status))
         };
         Arc::new(f)
     }

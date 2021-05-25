@@ -10,13 +10,13 @@ pub fn verify_signature(
     _call_context: Arc<CallContext>,
     input: VerifySignature,
 ) -> Result<bool, WasmError> {
-    Ok(tokio_helper::block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         input
             .key
             .verify_signature_raw(input.as_ref(), input.as_data_ref())
             .await
     })
-    .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))?)
+    .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
 }
 
 #[cfg(test)]

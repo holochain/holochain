@@ -39,9 +39,6 @@ use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
-use holochain_zome_types::Entry;
-use holochain_zome_types::HeaderHashed;
-use holochain_zome_types::ValidationStatus;
 use tracing::*;
 pub use types::Outcome;
 
@@ -342,13 +339,13 @@ fn get_zome_info<'a>(
     dna_def: &'a DnaDef,
 ) -> AppValidationResult<&'a (ZomeName, ZomeDef)> {
     let zome_index = u8::from(entry_type.zome_id()) as usize;
-    Ok(dna_def
+    dna_def
         .zomes
         .get(zome_index)
-        .ok_or_else(|| AppValidationError::ZomeId(entry_type.zome_id()))?)
+        .ok_or_else(|| AppValidationError::ZomeId(entry_type.zome_id()))
 }
 
-fn get_zome<'a>(entry_type: &AppEntryType, dna_def: &'a DnaDef) -> AppValidationResult<Zome> {
+fn get_zome(entry_type: &AppEntryType, dna_def: &DnaDef) -> AppValidationResult<Zome> {
     zome_id_to_zome(entry_type.zome_id(), dna_def)
 }
 
@@ -664,7 +661,7 @@ async fn get_validation_package_remote(
                         Some(EntryType::App(a)) => a.clone(),
                         _ => return Ok(None),
                     };
-                    let zome = ribosome
+                    let zome: Zome = ribosome
                         .dna_def()
                         .zomes
                         .get(app_entry_type.zome_id().index())
@@ -821,6 +818,7 @@ impl AppValidationWorkspace {
     pub fn new(vault: EnvRead, cache: EnvWrite) -> Self {
         Self { vault, cache }
     }
+
     pub fn put_validation_limbo(
         &self,
         hash: DhtOpHash,
@@ -832,6 +830,7 @@ impl AppValidationWorkspace {
         })?;
         Ok(())
     }
+
     pub fn put_integration_limbo(
         &self,
         hash: DhtOpHash,
@@ -844,6 +843,7 @@ impl AppValidationWorkspace {
         })?;
         Ok(())
     }
+
     pub fn validation_workspace(
         &self,
         author: AgentPubKey,

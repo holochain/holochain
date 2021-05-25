@@ -5,8 +5,7 @@ use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
-use holochain_types::dna::zome::inline_zome::InlineZome;
-use holochain_types::{dht_op::produce_ops_from_element, env::EnvRead};
+use holochain_types::prelude::*;
 use rusqlite::Transaction;
 
 fn simple_crud_zome() -> InlineZome {

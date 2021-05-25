@@ -26,12 +26,12 @@ pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
     env: EnvWrite,
     iter: I,
 ) -> StateMutationResult<()> {
-    Ok(env.conn()?.with_commit(|writer| {
+    env.conn()?.with_commit(|writer| {
         for agent_info_signed in iter {
             writer.p2p_put(&agent_info_signed)?;
         }
         StateMutationResult::Ok(())
-    })?)
+    })
 }
 
 /// Helper function to get all the peer data from this conductor

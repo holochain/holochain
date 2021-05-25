@@ -20,6 +20,7 @@ pub mod capability;
 pub mod cell;
 #[allow(missing_docs)]
 pub mod crdt;
+pub mod dna_def;
 pub mod element;
 pub mod entry;
 #[allow(missing_docs)]

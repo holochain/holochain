@@ -97,8 +97,8 @@ impl<T> From<(T, Option<ValidationStatus>)> for Judged<T> {
     }
 }
 
-impl<T> Into<(T, Option<ValidationStatus>)> for Judged<T> {
-    fn into(self) -> (T, Option<ValidationStatus>) {
-        (self.data, self.status)
+impl<T> From<Judged<T>> for (T, Option<ValidationStatus>) {
+    fn from(judged: Judged<T>) -> (T, Option<ValidationStatus>) {
+        (judged.data, judged.status)
     }
 }

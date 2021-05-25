@@ -1,13 +1,4 @@
-use holochain_types::{
-    dna::{
-        error::DnaResult,
-        random_uid, wasm,
-        zome::{inline_zome::InlineZome, Zome, ZomeDef},
-        DnaDefBuilder, DnaFile,
-    },
-    prelude::DnaDef,
-};
-use holochain_zome_types::zome::ZomeName;
+use holochain_types::prelude::*;
 use std::path::Path;
 
 /// Helpful constructors for DnaFiles used in tests
@@ -15,9 +6,13 @@ use std::path::Path;
 pub struct SweetDnaFile(DnaFile);
 
 impl SweetDnaFile {
-    /// Create a DnaFile from a path to a *.dna.gz file
-    pub async fn from_file(path: &Path) -> DnaResult<DnaFile> {
-        DnaFile::from_file_content(&std::fs::read(path)?).await
+    /// Create a DnaFile from a path to a *.dna bundle
+    pub async fn from_bundle(path: &Path) -> DnaResult<DnaFile> {
+        Ok(DnaBundle::read_from_file(path)
+            .await?
+            .into_dna_file(None, None)
+            .await?
+            .0)
     }
 
     /// Create a DnaFile from a collection of Zomes

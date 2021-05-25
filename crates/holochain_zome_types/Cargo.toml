@@ -2,7 +2,7 @@
 name = "holochain_zome_types"
 version = "0.0.2-alpha.1"
 description = "Holochain zome types"
-license-file = "LICENSE_CAL-1.0"
+license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://github.com/holochain/holochain"
 readme = "README.md"
@@ -31,11 +31,20 @@ rand = {version = "0.7", optional = true}
 rusqlite = { version = "0.25", optional = true }
 num_enum = { version = "0.5", optional = true }
 
+# full-dna-def dependencies
+derive_builder = { version = "0.9", optional = true }
+nanoid = { version = "0.3", optional = true }
+shrinkwraprs = { version = "0.3", optional = true }
+
 [features]
-default = ["fixturators", "test_utils"]
+default = ["full-dna-def", "fixturators", "test_utils"]
+
+# Extra impls for DnaDef, including InlineZome, which are not used in Wasm
+# but used in Holochain
+full-dna-def = ["derive_builder", "nanoid", "shrinkwraprs"]
 
 full = ["default", "rusqlite", "num_enum"]
 
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
 
-test_utils = ["holo_hash/hashing", "holo_hash/test_utils"]
+test_utils = ["holo_hash/hashing", "holo_hash/test_utils", "full-dna-def"]

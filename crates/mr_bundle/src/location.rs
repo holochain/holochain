@@ -2,9 +2,10 @@ use crate::{
     error::{BundleError, MrBundleResult},
     ResourceBytes,
 };
+use holochain_util::ffs;
 use std::path::{Path, PathBuf};
 
-/// Where to find a file.
+/// Where to find a Resource.
 ///
 /// This representation, with named fields, is chosen so that in the yaml config
 /// either "path", "url", or "bundled" can be specified due to this field
@@ -25,6 +26,7 @@ pub enum Location {
 }
 
 impl Location {
+    /// Make a relative Path absolute if possible, given the `root_dir`
     pub fn normalize(&self, root_dir: Option<&PathBuf>) -> MrBundleResult<Location> {
         if let Location::Path(path) = self {
             if path.is_relative() {

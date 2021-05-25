@@ -108,7 +108,6 @@ mod test {
     use crate::fixt::MigrateAgentHostAccessFixturator;
     use crate::fixt::MigrateAgentInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
-    use holochain_types::dna::zome::HostFnAccess;
     use holochain_types::prelude::*;
     use rand::prelude::*;
 
@@ -162,7 +161,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn migrate_agent_invocation_allow_side_effects() {
-        use holochain_types::dna::zome::Permission::*;
+        use holochain_types::access::Permission::*;
         let migrate_agent_host_access =
             MigrateAgentHostAccessFixturator::new(::fixt::Unpredictable)
                 .next()

@@ -1,6 +1,5 @@
 [workspace]
 members = [
-  "crates/ffs",
   "crates/fixt",
   "crates/fixt/test",
   "crates/hdk",
@@ -22,6 +21,7 @@ members = [
   "crates/holochain_sqlite",
   "crates/holochain_types",
   "crates/holochain_websocket",
+  "crates/holochain_util",
   "crates/holochain_zome_types",
 
   "crates/kitsune_p2p/direct",
@@ -37,7 +37,8 @@ members = [
 ]
 
 exclude = [
-  "crates/diagnostics"
+  "crates/diagnostics",
+  "crates/release-automation"
 ]
 
 # These are the default params for RELEASE target
@@ -51,10 +52,8 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
-
-# holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
-# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
-# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
+# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", tag = "v0.0.68" }
+# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", tag = "v0.0.68" }
 # holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
 # observability = { git = "https://github.com/freesig/observability.git", branch = "main" }

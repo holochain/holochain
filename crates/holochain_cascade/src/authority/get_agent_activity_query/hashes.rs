@@ -52,7 +52,7 @@ impl Query for GetAgentActivityQuery {
             JOIN DhtOp ON DhtOp.header_hash = Header.hash
             WHERE Header.author = :author
             AND DhtOp.type = :op_type
-            ORDER BY Header.seq ASC 
+            ORDER BY Header.seq ASC
         "
         .to_string()
     }
@@ -77,7 +77,7 @@ impl Query for GetAgentActivityQuery {
         Arc::new(move |row| {
             let validation_status: Option<ValidationStatus> = row.get("validation_status")?;
             let hash: HeaderHash = row.get("hash")?;
-            let item = from_blob::<SignedHeader>(row.get("header_blob")?).and_then(|header| {
+            from_blob::<SignedHeader>(row.get("header_blob")?).and_then(|header| {
                 let integrated: Option<i32> = row.get("when_integrated")?;
                 let header = HeaderHashed::with_pre_hashed(header.0, hash);
                 let item = if integrated.is_some() {
@@ -86,8 +86,7 @@ impl Query for GetAgentActivityQuery {
                     Item::Pending(header)
                 };
                 Ok(Judged::raw(item, validation_status))
-            });
-            Ok(item?)
+            })
         })
     }
 

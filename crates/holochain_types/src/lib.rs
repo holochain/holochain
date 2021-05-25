@@ -12,6 +12,7 @@
 // We have a lot of usages of type aliases to `&String`, which clippy objects to.
 #![allow(clippy::ptr_arg)]
 
+pub mod access;
 pub mod activity;
 pub mod app;
 pub mod autonomic;
@@ -28,6 +29,7 @@ pub mod link;
 mod macros;
 pub mod metadata;
 pub mod prelude;
+pub mod properties;
 pub mod signal;
 pub mod timestamp;
 pub mod validate;

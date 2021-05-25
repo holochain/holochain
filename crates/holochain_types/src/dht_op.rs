@@ -871,8 +871,8 @@ impl RenderedOp {
         Ok(Self {
             header,
             op_light,
-            validation_status,
             op_hash,
+            validation_status,
         })
     }
 }
