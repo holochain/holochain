@@ -159,7 +159,7 @@ impl SweetConductor {
         for agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             self.setup_app_2_install_and_activate(&installed_app_id, agent.clone(), dna_files)
-            .await?;
+                .await?;
         }
         tracing::trace!("App setup, step 2 complete.");
 

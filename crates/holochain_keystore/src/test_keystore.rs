@@ -105,8 +105,8 @@ mod tests {
             );
 
             let agent_pubkey3 = holo_hash::AgentPubKey::new_from_pure_entropy(&keystore)
-            .await
-            .unwrap();
+                .await
+                .unwrap();
 
             #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
             struct MyData(Vec<u8>);
