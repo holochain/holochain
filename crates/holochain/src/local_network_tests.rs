@@ -410,7 +410,7 @@ async fn call_each_other(
                     // in this test as it's a controlled local network
                     match tokio::time::timeout(std::time::Duration::from_millis(timeout), f).await {
                         Ok(r) => (i, j, Some(r)),
-                        Err(e) => (i, j, None),
+                        Err(_) => (i, j, None),
                     }
                 }
             };
