@@ -167,13 +167,10 @@ impl RealRibosome {
     }
 
     pub fn module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
-        let wasm: Arc<Box<[u8]>> = self.dna_file.get_wasm_for_zome(zome_name)?.code();
-        let cache_key = self.wasm_cache_key(zome_name)?;
-        let module_arc = {
-            let mut lock = holochain_wasmer_host::module::MODULE_CACHE.write();
-            lock.get(cache_key, &*wasm)?
-        };
-        Ok(module_arc)
+        Ok(holochain_wasmer_host::module::MODULE_CACHE.write().get(
+            self.wasm_cache_key(zome_name)?,
+            &*self.dna_file.get_wasm_for_zome(zome_name)?.code(),
+        )?)
     }
 
     pub fn wasm_cache_key(&self, zome_name: &ZomeName) -> Result<[u8; 32], DnaError> {
@@ -296,7 +293,7 @@ impl RealRibosome {
         }
 
         if let HostFnAccess {
-            agent_info: Permission::Allow,
+            non_determinism: Permission::Allow,
             ..
         } = host_fn_access
         {
@@ -312,7 +309,7 @@ impl RealRibosome {
         }
 
         if let HostFnAccess {
-            read_workspace: Permission::Allow,
+            agent_info: Permission::Allow,
             ..
         } = host_fn_access
         {
