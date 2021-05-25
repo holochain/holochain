@@ -94,9 +94,10 @@ impl ConductorConfig {
 
     /// Construct a config from the only required field, the environment path
     pub fn from_environment_path(env_path: PathBuf) -> Self {
-        let mut config = Self::default();
-        config.environment_path = env_path.into();
-        config
+        Self {
+            environment_path: env_path.into(),
+            ..Default::default()
+        }
     }
 
     /// Convenience "lens" for getting at the connection pool config, which
