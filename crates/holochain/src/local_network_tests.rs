@@ -69,7 +69,7 @@ fn conductors_call_remote(num_conductors: usize) {
         }
 
         // Let the remote messages be dropped
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
         let mut envs = Vec::with_capacity(handles.len());
         for h in &handles {
