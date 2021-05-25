@@ -51,8 +51,6 @@ fn conductors_call_remote(num_conductors: usize) {
         init_all(&handles[..]).await;
 
         // 100 ms should be enough time to hit another conductor locally.
-        // This can require multiple round trips if the head of the source chain keeps moving.
-        // Each time the chain head moves the call must be retried until a clean commit is made.
         let results = call_each_other(&handles[..], 100).await;
         for (_, _, result) in results {
             match result {
@@ -68,7 +66,8 @@ fn conductors_call_remote(num_conductors: usize) {
             }
         }
 
-        // Let the remote messages be dropped
+        // Let the remote messages be dropped.
+        // @todo Why??? what messages? why do these messages cause subsequent calls to fail?
         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
         let mut envs = Vec::with_capacity(handles.len());
@@ -79,6 +78,8 @@ fn conductors_call_remote(num_conductors: usize) {
         exchange_peer_info(envs);
 
         // Give a little longer timeout here because they must find each other to pass the test
+        // This can require multiple round trips if the head of the source chain keeps moving.
+        // Each time the chain head moves the call must be retried until a clean commit is made.
         let results = call_each_other(&handles[..], 1000).await;
         for (_, _, result) in results {
             self::assert_matches!(result, Some(Ok(ZomeCallResponse::Ok(_))));
