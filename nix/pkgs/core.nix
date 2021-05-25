@@ -53,7 +53,7 @@ rec {
     )
   '';
 
-  hcMergeTest = let
+  hcStaticChecks = let
       pathPrefix = lib.makeBinPath
         (builtins.attrValues { inherit (holonix.pkgs)
           hnRustClippy
@@ -62,14 +62,20 @@ rec {
           ;
         })
       ;
-    in writeShellScriptBin "hc-merge-test" ''
+    in writeShellScriptBin "hc-static-checks" ''
     export PATH=${pathPrefix}:$PATH
 
     set -euxo pipefail
     export RUST_BACKTRACE=1
-    hc-release-automation-test
     hn-rust-fmt-check
     hn-rust-clippy
+  '';
+
+  hcMergeTest = writeShellScriptBin "hc-merge-test" ''
+    set -euxo pipefail
+    export RUST_BACKTRACE=1
+    hc-release-automation-test
+    hc-static-checks
     hc-test
   '';
 
