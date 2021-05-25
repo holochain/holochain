@@ -41,8 +41,8 @@ impl<'de> serde::Deserialize<'de> for KdHash {
     where
         D: serde::Deserializer<'de>,
     {
-        Ok(KdHash::from_str_slice(&String::deserialize(deserializer)?)
-            .map_err(serde::de::Error::custom)?)
+        KdHash::from_str_slice(&String::deserialize(deserializer)?)
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -178,7 +178,7 @@ impl KdHash {
     /// Treating this hash as a sodoken pubkey,
     /// verify the given data / signature
     pub async fn verify_signature(&self, data: sodoken::Buffer, signature: Arc<[u8; 64]>) -> bool {
-        match async {
+        async {
             let pk = self.as_buffer();
             let sig = Buffer::from_ref(&signature[..]);
             KitsuneResult::Ok(
@@ -188,10 +188,7 @@ impl KdHash {
             )
         }
         .await
-        {
-            Ok(r) => r,
-            Err(_) => false,
-        }
+        .unwrap_or(false)
     }
 
     /// Generate a KdHash from data
