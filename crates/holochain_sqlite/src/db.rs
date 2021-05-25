@@ -278,7 +278,7 @@ impl<'e> WriteManager<'e> for PConn {
             }
         };
 
-        Ok(backoff::retry_notify::<_, _, _, R, E>(backoff, attempt, notify).map_err(handle_err)?)
+        backoff::retry_notify::<_, _, _, R, E>(backoff, attempt, notify).map_err(handle_err)
     }
 }
 
