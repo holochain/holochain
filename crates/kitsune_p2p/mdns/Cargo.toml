@@ -10,6 +10,14 @@ keywords = [ "holochain", "holo", "p2p", "mdns", "networking" ]
 categories = [ "network-programming" ]
 edition = "2018"
 
+[[example]]
+name = "broadcast"
+path = "examples/broadcast.rs"
+
+[[example]]
+name = "discover"
+path = "examples/discover.rs"
+
 [dependencies]
 libmdns = "=0.6.0"
 mdns = "=3.0.0"

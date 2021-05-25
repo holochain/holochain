@@ -33,8 +33,7 @@ const TIMEOUT_ERROR: &'static str = "inner function \'call_create_entry_remotely
 
 #[test_case(2)]
 #[test_case(5)]
-// #[test_case(10)] 10 works but might be too slow for our regular test run
-// FIXME: this test is flaky!
+// #[test_case(10)]
 fn conductors_call_remote(num_conductors: usize) {
     let f = async move {
         observability::test_run().ok();
@@ -51,8 +50,8 @@ fn conductors_call_remote(num_conductors: usize) {
 
         init_all(&handles[..]).await;
 
-        // 50 ms should be enough time to hit another conductor locally
-        let results = call_each_other(&handles[..], 50).await;
+        // 100 ms should be enough time to hit another conductor locally.
+        let results = call_each_other(&handles[..], 100).await;
         for (_, _, result) in results {
             match result {
                 Some(r) => match r {
@@ -67,8 +66,9 @@ fn conductors_call_remote(num_conductors: usize) {
             }
         }
 
-        // Let the remote messages be dropped
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        // Let the remote messages be dropped.
+        // @todo Why??? what messages? why do these messages cause subsequent calls to fail?
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
         let mut envs = Vec::with_capacity(handles.len());
         for h in &handles {
@@ -78,7 +78,9 @@ fn conductors_call_remote(num_conductors: usize) {
         exchange_peer_info(envs);
 
         // Give a little longer timeout here because they must find each other to pass the test
-        let results = call_each_other(&handles[..], 500).await;
+        // This can require multiple round trips if the head of the source chain keeps moving.
+        // Each time the chain head moves the call must be retried until a clean commit is made.
+        let results = call_each_other(&handles[..], 1000).await;
         for (_, _, result) in results {
             self::assert_matches!(result, Some(Ok(ZomeCallResponse::Ok(_))));
         }
