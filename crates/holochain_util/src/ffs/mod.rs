@@ -16,7 +16,7 @@
 
 mod io_error;
 
-pub use crate::io_error::{IoError, IoResult};
+pub use self::io_error::{IoError, IoResult};
 use std::path::PathBuf;
 
 fn mapper<P: AsRef<std::path::Path>>(path: P) -> impl FnOnce(std::io::Error) -> IoError {

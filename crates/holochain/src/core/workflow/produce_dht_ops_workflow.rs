@@ -25,7 +25,7 @@ pub async fn produce_dht_ops_workflow(
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
+    writer.with_writer(|writer| workspace.flush_to_txn(writer))?;
 
     // trigger other workflows
     trigger_publish.trigger();

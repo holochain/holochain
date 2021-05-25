@@ -13,7 +13,7 @@ fn readline(prompt: Option<&str>) -> io::Result<Option<String>> {
     }
     io::stdin().read_line(&mut input)?;
     let input = input.trim();
-    Ok(if input == "" {
+    Ok(if input.is_empty() {
         None
     } else {
         Some(input.to_owned())
@@ -27,7 +27,7 @@ fn prompt_default<S: Into<String>>(prompt: &str, default: S) -> io::Result<Strin
 }
 
 fn prompt_optional(prompt: &str) -> io::Result<Option<String>> {
-    Ok(readline(Some(prompt))?)
+    readline(Some(prompt))
 }
 
 fn prompt_required(prompt: &str) -> io::Result<String> {

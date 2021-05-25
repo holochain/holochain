@@ -70,7 +70,7 @@ pub async fn sys_validation_workflow(
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    writer.with_writer(|writer| Ok(workspace.flush_to_txn_ref(writer)?))?;
+    writer.with_writer(|writer| workspace.flush_to_txn_ref(writer))?;
 
     // trigger other workflows
     trigger_app_validation.trigger();

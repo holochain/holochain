@@ -33,14 +33,14 @@ pub fn call(
     };
 
     // Make the call using this workspace
-    Ok(tokio_helper::block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         conductor_handle
             .call_zome(invocation, workspace)
             .await
             .map_err(Box::new)
     })
     .map_err(|conductor_api_error| WasmError::Host(conductor_api_error.to_string()))?
-    .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?)
+    .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))
 }
 
 #[cfg(test)]

@@ -253,7 +253,7 @@ impl TryFrom<&LinkTag> for Path {
     type Error = SerializedBytesError;
     fn try_from(link_tag: &LinkTag) -> Result<Self, Self::Error> {
         let sb = SerializedBytes::from(UnsafeBytes::from(link_tag.as_ref()[NAME.len()..].to_vec()));
-        Ok(Self::try_from(sb)?)
+        Self::try_from(sb)
     }
 }
 

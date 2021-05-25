@@ -2,7 +2,7 @@
 name = "holochain_zome_types"
 version = "0.0.2-alpha.1"
 description = "Holochain zome types"
-license-file = "LICENSE_CAL-1.0"
+license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://github.com/holochain/holochain"
 readme = "README.md"

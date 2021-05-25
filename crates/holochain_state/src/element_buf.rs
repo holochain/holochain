@@ -95,11 +95,8 @@ where
         private_entries_store: Option<SingleStore>,
         headers_store: SingleStore,
     ) -> DatabaseResult<Self> {
-        let private_entries = if let Some(store) = private_entries_store {
-            Some(CasBufFreshSync::new(env.clone(), store))
-        } else {
-            None
-        };
+        let private_entries =
+            private_entries_store.map(|store| CasBufFreshSync::new(env.clone(), store));
         Ok(Self {
             public_entries: CasBufFreshSync::new(env.clone(), public_entries_store),
             private_entries,

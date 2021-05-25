@@ -105,6 +105,7 @@ mod slow_tests {
     fn invocation_fixture() -> GenesisSelfCheckInvocation {
         GenesisSelfCheckInvocation {
             payload: GenesisSelfCheckData {
+                dna_def: fixt!(DnaDef),
                 membrane_proof: Some(().try_into().unwrap()),
                 agent_key: fixt!(AgentPubKey),
             },

@@ -1,3 +1,4 @@
+use holochain_util::ffs;
 use mr_bundle::error::MrBundleError;
 
 use crate::prelude::{AppManifestError, CellNick, DnaError};

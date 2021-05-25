@@ -71,11 +71,10 @@ where
         hash: &'a HoloHashOf<C>,
     ) -> DatabaseResult<Option<HoloHashed<C>>> {
         let k = PrefixHashKey::new(hash.as_hash());
-        Ok(if let Some(content) = self.0.get(r, &k)? {
-            Some(Self::deserialize_and_hash(hash.as_ref(), content))
-        } else {
-            None
-        })
+        Ok(self
+            .0
+            .get(r, &k)?
+            .map(|content| Self::deserialize_and_hash(hash.as_ref(), content)))
     }
 
     /// Check if a value is stored at this key
