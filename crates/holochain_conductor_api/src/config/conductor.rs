@@ -1,6 +1,7 @@
 #![deny(missing_docs)]
 //! This module is used to configure the conductor
 
+use holochain_zome_types::config::ConnectionPoolConfig;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -96,6 +97,15 @@ impl ConductorConfig {
         let mut config = Self::default();
         config.environment_path = env_path.into();
         config
+    }
+
+    /// Convenience "lens" for getting at the connection pool config, which
+    /// is used in many places
+    pub fn dev_pool_config(&self) -> ConnectionPoolConfig {
+        self.dev
+            .as_ref()
+            .and_then(|d| d.db_connection_pool.clone())
+            .unwrap_or_default()
     }
 }
 

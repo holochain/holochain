@@ -56,7 +56,7 @@ use crate::core::{queue_consumer::InitialQueueTriggers, ribosome::real_ribosome:
 use derive_more::From;
 use futures::future::FutureExt;
 use futures::StreamExt;
-use holochain_conductor_api::InstalledAppInfo;
+use holochain_conductor_api::{conductor::ConductorConfig, InstalledAppInfo};
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pCellT;
@@ -158,10 +158,13 @@ pub trait ConductorHandleT: Send + Sync {
     /// Send a signal to all managed tasks asking them to end ASAP.
     async fn shutdown(&self);
 
-    /// Request access to this conductor's keystore
+    /// Accessor for this conductor's keystore
     fn keystore(&self) -> &KeystoreSender;
 
-    /// Request access to this conductor's networking handle
+    /// Accessor for this conductor's config
+    async fn config(&self) -> ConductorConfig;
+
+    /// Accessor for this conductor's networking handle
     fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef;
 
     /// Create a new Cell in an existing App based on an existing DNA
@@ -458,6 +461,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     fn keystore(&self) -> &KeystoreSender {
         &self.keystore
+    }
+
+    async fn config(&self) -> ConductorConfig {
+        self.conductor.read().await.config().to_owned()
     }
 
     fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef {

@@ -43,7 +43,7 @@ pub type PConnInner = r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManage
 pub(crate) fn new_connection_pool(
     path: &Path,
     kind: DbKind,
-    config: ConnectionPoolConfig,
+    config: &ConnectionPoolConfig,
 ) -> ConnectionPool {
     use r2d2_sqlite::SqliteConnectionManager;
     let manager = SqliteConnectionManager::file(path);
@@ -51,6 +51,7 @@ pub(crate) fn new_connection_pool(
     let mut builder = r2d2::Pool::builder()
         .max_size(20)
         .min_idle(config.min_idle)
+        .max_lifetime(config.max_lifetime)
         .idle_timeout(config.idle_timeout)
         .connection_customizer(customizer);
 

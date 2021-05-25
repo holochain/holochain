@@ -104,15 +104,30 @@ mod tests {
                 &agent_pubkey2.to_string()
             );
 
+            let agent_pubkey3 = holo_hash::AgentPubKey::new_from_pure_entropy(&keystore)
+            .await
+            .unwrap();
+
             #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
             struct MyData(Vec<u8>);
 
-            let my_data_1 = MyData(b"signature test data 1".to_vec());
+            let my_data = MyData(b"signature test data 1".to_vec());
 
-            let signature = agent_pubkey1.sign(&keystore, &my_data_1).await.unwrap();
-
+            let signature1 = agent_pubkey1.sign(&keystore, &my_data).await.unwrap();
             assert!(agent_pubkey1
-                .verify_signature(&signature, &my_data_1)
+                .verify_signature(&signature1, &my_data)
+                .await
+                .unwrap());
+
+            let signature2 = agent_pubkey2.sign(&keystore, &my_data).await.unwrap();
+            assert!(agent_pubkey2
+                .verify_signature(&signature2, &my_data)
+                .await
+                .unwrap());
+
+            let signature3 = agent_pubkey3.sign(&keystore, &my_data).await.unwrap();
+            assert!(agent_pubkey3
+                .verify_signature(&signature3, &my_data)
                 .await
                 .unwrap());
         })

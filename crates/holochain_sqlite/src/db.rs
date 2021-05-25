@@ -70,12 +70,16 @@ pub struct DbWrite(DbRead);
 
 impl DbWrite {
     /// Create or open an existing database reference,
-    pub fn open(path_prefix: &Path, kind: DbKind) -> DatabaseResult<DbWrite> {
+    pub fn open(
+        path_prefix: &Path,
+        kind: DbKind,
+        config: &ConnectionPoolConfig,
+    ) -> DatabaseResult<DbWrite> {
         let path = path_prefix.join(kind.filename());
         if let Some(v) = DATABASE_HANDLES.get(&path) {
             Ok(v.clone())
         } else {
-            let db = Self::new(path_prefix, kind, None)?;
+            let db = Self::new(path_prefix, kind, config)?;
             DATABASE_HANDLES.insert_new(path, db.clone());
             Ok(db)
         }
@@ -84,7 +88,7 @@ impl DbWrite {
     pub(crate) fn new(
         path_prefix: &Path,
         kind: DbKind,
-        config: Option<ConnectionPoolConfig>,
+        config: &ConnectionPoolConfig,
     ) -> DatabaseResult<Self> {
         let path = path_prefix.join(kind.filename());
         let parent = path
@@ -94,7 +98,7 @@ impl DbWrite {
             std::fs::create_dir_all(parent)
                 .map_err(|_e| DatabaseError::DatabaseMissing(parent.to_owned()))?;
         }
-        let pool = new_connection_pool(&path, kind.clone(), config.unwrap_or_default());
+        let pool = new_connection_pool(&path, kind.clone(), config);
         let mut conn = pool.get()?;
         crate::table::initialize_database(&mut conn, &kind)?;
 
@@ -109,18 +113,18 @@ impl DbWrite {
     /// connection pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]
     pub fn test(tmpdir: &tempdir::TempDir, kind: DbKind) -> DatabaseResult<Self> {
-        Self::new(tmpdir.path(), kind, None)
+        Self::new(tmpdir.path(), kind, &ConnectionPoolConfig::default())
     }
 
     /// Create a unique db in a temp dir with no static management of the
-    /// connection pool, useful for testing.
+    /// connection pool, but with configuration for the pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]
     pub fn test_with_config(
         tmpdir: &tempdir::TempDir,
         kind: DbKind,
-        config: ConnectionPoolConfig,
+        config: &ConnectionPoolConfig,
     ) -> DatabaseResult<Self> {
-        Self::new(tmpdir.path(), kind, Some(config))
+        Self::new(tmpdir.path(), kind, config)
     }
 
     /// Remove the db and directory

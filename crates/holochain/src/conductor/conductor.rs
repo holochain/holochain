@@ -29,7 +29,6 @@ use super::manager::TaskManagerRunHandle;
 use super::p2p_store::all_agent_infos;
 use super::p2p_store::get_single_agent_info;
 use super::p2p_store::inject_agent_infos;
-use super::paths::EnvironmentRootPath;
 use super::state::AppInterfaceId;
 use super::state::ConductorState;
 use super::CellError;
@@ -65,6 +64,7 @@ use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::source_chain;
 use holochain_types::prelude::*;
+use holochain_zome_types::config::ConnectionPoolConfig;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::KitsuneSpace;
 use rusqlite::OptionalExtension;
@@ -446,6 +446,7 @@ where
         conductor_handle: ConductorHandle,
     ) -> ConductorResult<()> {
         let root_env_dir = std::path::PathBuf::from(self.config.environment_path.clone());
+        let pool_config = conductor_handle.config().await.dev_pool_config();
 
         let cells_tasks = cell_ids_with_proofs
             .into_iter()
@@ -458,11 +459,13 @@ where
                     .get_ribosome(cell_id.dna_hash())
                     .await
                     .map_err(Box::new)?;
+                let config = pool_config.clone();
                 tokio::spawn(async move {
                     let env = EnvWrite::open(
                         &root_env_dir,
                         DbKind::Cell(cell_id_inner.clone()),
                         keystore.clone(),
+                        &config,
                     )?;
                     Cell::genesis(cell_id_inner, conductor_handle, env, ribosome, proof).await
                 })
@@ -481,7 +484,7 @@ where
         // If there were errors, cleanup and return the errors
         if !errors.is_empty() {
             for cell_id in success {
-                let db = DbWrite::open(&root_env_dir, DbKind::Cell(cell_id))?;
+                let db = DbWrite::open(&root_env_dir, DbKind::Cell(cell_id), &pool_config)?;
                 db.remove().await?;
             }
 
@@ -501,7 +504,11 @@ where
         }
     }
 
-    fn get_or_create_cache(&self, dna_hash: &DnaHash) -> ConductorResult<EnvWrite> {
+    fn get_or_create_cache(
+        &self,
+        dna_hash: &DnaHash,
+        pool_config: &ConnectionPoolConfig,
+    ) -> ConductorResult<EnvWrite> {
         let mut caches = self.caches.lock();
         match caches.get(dna_hash) {
             Some(env) => Ok(env.clone()),
@@ -511,6 +518,7 @@ where
                     dir.as_ref(),
                     DbKind::Cache(dna_hash.clone()),
                     self.keystore.clone(),
+                    pool_config,
                 )?;
                 caches.insert(dna_hash.clone(), env.clone());
                 Ok(env)
@@ -562,6 +570,7 @@ where
                     // Create each cell
                     let cells_tasks = cells_to_create.map(
                         |(cell_id, dir, keystore, conductor_handle)| async move {
+                            let pool_config = conductor_handle.config().await.dev_pool_config();
                             let holochain_p2p_cell = self.holochain_p2p.to_cell(
                                 cell_id.dna_hash().clone(),
                                 cell_id.agent_pubkey().clone(),
@@ -571,9 +580,10 @@ where
                                 &dir,
                                 DbKind::Cell(cell_id.clone()),
                                 keystore.clone(),
+                                &pool_config,
                             )?;
                             let cache = self
-                                .get_or_create_cache(cell_id.dna_hash())
+                                .get_or_create_cache(cell_id.dna_hash(), &pool_config)
                                 .map_err(|e| CellError::FailedToCreateCache(e.into()))?;
                             Cell::create(
                                 cell_id.clone(),
@@ -969,8 +979,13 @@ where
             .or_insert_with(move || {
                 let root_env_dir = self.config.environment_path.as_ref();
                 let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2p(space), keystore)
-                    .expect("failed to open p2p_store database")
+                EnvWrite::open(
+                    root_env_dir,
+                    DbKind::P2p(space),
+                    keystore,
+                    &self.config().dev_pool_config(),
+                )
+                .expect("failed to open p2p_store database")
             })
             .clone()
     }
@@ -1237,8 +1252,9 @@ mod builder {
                 passphrase_service: _,
                 admin_interfaces: _,
                 network,
-                dev,
+                dev: _,
             } = &config;
+            let pool_config = config.dev_pool_config();
 
             let keystore = if let Some(keystore) = self.keystore {
                 keystore
@@ -1259,11 +1275,19 @@ mod builder {
             };
             let env_path = environment_path.clone();
 
-            let environment =
-                EnvWrite::open(env_path.as_ref(), DbKind::Conductor, keystore.clone())?;
+            let environment = EnvWrite::open(
+                env_path.as_ref(),
+                DbKind::Conductor,
+                keystore.clone(),
+                &pool_config,
+            )?;
 
-            let wasm_environment =
-                EnvWrite::open(env_path.as_ref(), DbKind::Wasm, keystore.clone())?;
+            let wasm_environment = EnvWrite::open(
+                env_path.as_ref(),
+                DbKind::Wasm,
+                keystore.clone(),
+                &pool_config,
+            )?;
 
             let p2p_env = Arc::new(parking_lot::Mutex::new(HashMap::new()));
 

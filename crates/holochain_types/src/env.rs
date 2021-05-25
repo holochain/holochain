@@ -4,6 +4,7 @@ use std::path::Path;
 
 use holochain_keystore::KeystoreSender;
 use holochain_sqlite::prelude::*;
+use holochain_zome_types::config::ConnectionPoolConfig;
 use shrinkwraprs::Shrinkwrap;
 
 /// Read access to a database, plus a keystore channel sender
@@ -36,9 +37,14 @@ pub struct EnvWrite {
 
 impl EnvWrite {
     /// Constructor
-    pub fn open(path: &Path, kind: DbKind, keystore: KeystoreSender) -> DatabaseResult<Self> {
+    pub fn open(
+        path: &Path,
+        kind: DbKind,
+        keystore: KeystoreSender,
+        config: &ConnectionPoolConfig,
+    ) -> DatabaseResult<Self> {
         Ok(Self {
-            db: DbWrite::open(path, kind)?,
+            db: DbWrite::open(path, kind, &config)?,
             keystore,
         })
     }
@@ -51,6 +57,19 @@ impl EnvWrite {
     ) -> DatabaseResult<Self> {
         Ok(Self {
             db: DbWrite::test(tmpdir, kind)?,
+            keystore,
+        })
+    }
+
+    /// Test constructor with config
+    pub fn test_with_config(
+        tmpdir: &tempdir::TempDir,
+        kind: DbKind,
+        keystore: KeystoreSender,
+        config: &ConnectionPoolConfig,
+    ) -> DatabaseResult<Self> {
+        Ok(Self {
+            db: DbWrite::test_with_config(tmpdir, kind, &config)?,
             keystore,
         })
     }

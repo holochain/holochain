@@ -2,7 +2,7 @@
 
 use crate::db::DbKind;
 use crate::db::DbWrite;
-use holochain_zome_types::test_utils::fake_cell_id;
+use holochain_zome_types::{config::ConnectionPoolConfig, test_utils::fake_cell_id};
 use shrinkwraprs::Shrinkwrap;
 use std::sync::Arc;
 use tempdir::TempDir;
@@ -16,7 +16,8 @@ pub fn test_cell_db() -> TestDb {
 fn test_db(kind: DbKind) -> TestDb {
     let tmpdir = Arc::new(TempDir::new("holochain-test-environments").unwrap());
     TestDb {
-        db: DbWrite::new(tmpdir.path(), kind, None).expect("Couldn't create test database"),
+        db: DbWrite::new(tmpdir.path(), kind, &Default::default())
+            .expect("Couldn't create test database"),
         tmpdir,
     }
 }
@@ -24,7 +25,13 @@ fn test_db(kind: DbKind) -> TestDb {
 /// Create a fresh set of test environments with a new TempDir
 pub fn test_dbs() -> TestDbs {
     let tempdir = TempDir::new("holochain-test-environments").unwrap();
-    TestDbs::new(tempdir)
+    TestDbs::new(tempdir, Default::default())
+}
+
+/// Create a fresh set of test environments with a new TempDir
+pub fn test_dbs_with_config(config: ConnectionPoolConfig) -> TestDbs {
+    let tempdir = TempDir::new("holochain-test-environments").unwrap();
+    TestDbs::new(tempdir, config)
 }
 
 /// A test database in a temp directory
@@ -65,12 +72,12 @@ pub struct TestDbs {
 #[allow(missing_docs)]
 impl TestDbs {
     /// Create all three non-cell environments at once
-    pub fn new(tempdir: TempDir) -> Self {
+    pub fn new(tempdir: TempDir, config: ConnectionPoolConfig) -> Self {
         use DbKind::*;
-        let conductor = DbWrite::new(&tempdir.path(), Conductor, None).unwrap();
-        let wasm = DbWrite::new(&tempdir.path(), Wasm, None).unwrap();
+        let conductor = DbWrite::new(&tempdir.path(), Conductor, &config).unwrap();
+        let wasm = DbWrite::new(&tempdir.path(), Wasm, &config).unwrap();
         let space = kitsune_p2p::KitsuneSpace(vec![0; 36]);
-        let p2p = DbWrite::new(&tempdir.path(), P2p(Arc::new(space)), None).unwrap();
+        let p2p = DbWrite::new(&tempdir.path(), P2p(Arc::new(space)), &config).unwrap();
         Self {
             conductor,
             wasm,

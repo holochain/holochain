@@ -199,10 +199,16 @@ async fn run(
                     tracing::error!("About to uninstall apps");
                     let app_ids = conductor.list_active_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
                     tracing::error!(
-                        "UNINSTALLING the following apps due to an unrecoverable error during genesis: {:?}\nError: {:?}\nContext: {}",
+                        "UNINSTALLING the following apps due to an unrecoverable error during genesis.
+Context: {}
+Cell:    {:?}
+Apps:    {:?}
+Error:   {:?}
+",
+                        context,
+                        cell_id,
                         app_ids,
                         error,
-                        context
                     );
                     for app_id in app_ids.iter() {
                         conductor.uninstall_app(app_id).await.map_err(TaskManagerError::internal)?;
@@ -213,10 +219,15 @@ async fn run(
                     tracing::error!("About to deactivate apps");
                     let app_ids = conductor.list_active_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
                     tracing::error!(
-                        "DEACTIVATING the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
+                        "DEACTIVATING the following apps due to an error in a Cell:
+Context: {}
+Cell:    {:?}
+Apps:    {:?}
+Error:   {:?}",
+                        context,
+                        cell_id,
                         app_ids,
                         error,
-                        context
                     );
                     for app_id in app_ids.iter() {
                         conductor.deactivate_app(app_id.to_string(), DeactivationReason::Quarantined { error: error.to_string() } ).await.map_err(TaskManagerError::internal)?;

@@ -495,7 +495,7 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
         .unwrap();
 
     let envs = test_envs_with_keystore(good_keystore.clone());
-    let config = standard_config();
+    let config = SweetConductor::standard_config();
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(&envs, &config).await,
         envs,
