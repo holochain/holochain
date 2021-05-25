@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use ffs::IoError;
+use holochain_util::ffs::IoError;
 
 /// Any error which can occur in this crate
 #[derive(Debug, thiserror::Error)]

@@ -105,8 +105,8 @@ pub async fn integrate_dht_ops_workflow(
                     total_integrated += 1;
                 }
                 Outcome::Deferred(op) => next_ops.push(OrderedOp {
-                    hash,
                     order,
+                    hash,
                     op,
                     value,
                 }),
@@ -137,7 +137,7 @@ pub async fn integrate_dht_ops_workflow(
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
+    writer.with_writer(|writer| workspace.flush_to_txn(writer))?;
 
     // trigger other workflows
 
@@ -428,10 +428,7 @@ fn put_data<P: PrefixType>(
     element_store: &mut ElementBuf<P>,
 ) -> DhtOpConvertResult<()> {
     let signed_header = SignedHeaderHashed::from_content_sync(SignedHeader(header, signature));
-    let maybe_entry_hashed = match maybe_entry {
-        Some(entry) => Some(EntryHashed::from_content_sync(entry)),
-        None => None,
-    };
+    let maybe_entry_hashed = maybe_entry.map(EntryHashed::from_content_sync);
     element_store.put(signed_header, maybe_entry_hashed)?;
     Ok(())
 }

@@ -100,6 +100,7 @@ macro_rules! builder_variant {
                     prev_header,
                 } = common;
 
+                #[allow(clippy::inconsistent_struct_constructor)]
                 header::$name {
                     author,
                     timestamp,

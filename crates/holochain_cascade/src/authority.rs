@@ -297,9 +297,9 @@ pub fn handle_get_agent_activity(
     };
 
     Ok(AgentActivityResponse {
+        agent,
         valid_activity,
         rejected_activity,
-        agent,
         status,
         highest_observed,
     })

@@ -5,6 +5,7 @@
 //! joining to ensure that they can catch any problems they can before being
 //! subject to the scrutiny of their peers and facing possible rejection.
 
+use crate::DnaDef;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 
@@ -15,14 +16,12 @@ pub type MembraneProof = SerializedBytes;
 /// chain entries
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct GenesisSelfCheckData {
+    /// The Dna header (1st element)
+    pub dna_def: DnaDef,
+
     /// The proof of membership provided by the AgentValidationPkg (2nd element)
     pub membrane_proof: Option<MembraneProof>,
 
     /// The 3rd element of the chain, the agent key
     pub agent_key: AgentPubKey,
-    //
-    // TODO: if we need to include the DnaDef for validation, we can, but
-    // we need to move DnaDef into holochain_zome_types first.
-    // Excluding it for now.
-    // pub dna_def: DnaDef,
 }

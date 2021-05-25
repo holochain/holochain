@@ -696,10 +696,11 @@ async fn con_recv_logic(
             Err(_) => return None,
             Ok(p) => p,
         };
-        match state.con_recv.next().await {
-            Some(pending) => Some(((permit, pending), state)),
-            None => None,
-        }
+        state
+            .con_recv
+            .next()
+            .await
+            .map(|pending| ((permit, pending), state))
     });
 
     let inner = &inner;
