@@ -22,13 +22,11 @@ use std::sync::Arc;
 use super::error::ConductorResult;
 
 /// Inject multiple agent info entries into the peer store
-pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
-    env: EnvWrite,
-    iter: I,
-) -> StateMutationResult<()> {
-    env.conn()?.with_commit(|writer| {
-        for agent_info_signed in iter {
-            writer.p2p_put(&agent_info_signed)?;
+
+pub fn inject_agent_infos(env: EnvWrite, infos: Vec<AgentInfoSigned>) -> StateMutationResult<()> {
+    Ok(env.conn()?.with_commit(|writer| {
+        for agent_info_signed in infos.iter() {
+            writer.p2p_put(agent_info_signed)?;
         }
         StateMutationResult::Ok(())
     })

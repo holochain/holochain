@@ -353,6 +353,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "backoff"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fe17f59a06fe8b87a6fc8bf53bb70b3aba76d7685f432487a68cd5552853625"
+dependencies = [
+ "futures-core",
+ "getrandom 0.2.3",
+ "instant",
+ "pin-project 1.0.7",
+ "rand 0.8.3",
+ "tokio",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.59"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1953,6 +1967,7 @@ name = "holochain_sqlite"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "backoff",
  "byteorder",
  "cfg-if 0.1.10",
  "chashmap",

@@ -11,9 +11,9 @@ use holochain_zome_types::{cell::CellId, config::ConnectionPoolConfig};
 use kitsune_p2p::KitsuneSpace;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
-use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::{path::Path, time::Duration};
 
 mod p2p;
 pub use p2p::*;
@@ -190,8 +190,8 @@ pub trait WriteManager<'e> {
     // FIXME: B-01566: implement write failure detection
     fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
-        E: From<DatabaseError>,
-        F: 'e + FnOnce(&mut Transaction) -> Result<R, E>;
+        E: From<DatabaseError> + std::fmt::Debug,
+        F: 'e + Clone + FnOnce(&mut Transaction) -> Result<R, E>;
 
     // /// Get a raw read-write transaction for this environment.
     // /// It is preferable to use WriterManager::with_commit for database writes,
@@ -201,7 +201,7 @@ pub trait WriteManager<'e> {
     #[cfg(feature = "test_utils")]
     fn with_commit_test<R, F>(&'e mut self, f: F) -> Result<R, DatabaseError>
     where
-        F: 'e + FnOnce(&mut Transaction) -> R,
+        F: 'e + Clone + FnOnce(&mut Transaction) -> R,
     {
         self.with_commit(|w| DatabaseResult::Ok(f(w)))
     }
@@ -229,15 +229,56 @@ impl<'e> ReadManager<'e> for PConn {
 impl<'e> WriteManager<'e> for PConn {
     fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
-        E: From<DatabaseError>,
-        F: 'e + FnOnce(&mut Transaction) -> Result<R, E>,
+        E: From<DatabaseError> + std::fmt::Debug,
+        F: 'e + Clone + FnOnce(&mut Transaction) -> Result<R, E>,
     {
-        let mut txn = self
-            .transaction_with_behavior(TransactionBehavior::Exclusive)
-            .map_err(DatabaseError::from)?;
-        let result = f(&mut txn)?;
-        txn.commit().map_err(DatabaseError::from)?;
-        Ok(result)
+        let backoff = backoff::ExponentialBackoff {
+            initial_interval: Duration::from_millis(5),
+            multiplier: 1.5,
+            randomization_factor: 0.1,
+            // TODO: reduce these timeouts significantly after doing some initial
+            // testing to find out how long of a timeout, if any,
+            // fixes our database locking issues.
+            max_interval: Duration::from_secs(1),
+            max_elapsed_time: Some(Duration::from_secs(5)),
+            ..Default::default()
+        };
+
+        // NB: The `?` here converts all errors into `backoff::Error::Transient`.
+        //     If there are unrecoverable errors, we can explicitly map those
+        //     to `backoff::Error::Permanent`.
+        let attempt = || {
+            let mut txn = self
+                .transaction_with_behavior(TransactionBehavior::Exclusive)
+                .map_err(DatabaseError::from)
+                .map_err(E::from)?;
+            let result = (f.clone())(&mut txn)?;
+            txn.commit().map_err(DatabaseError::from).map_err(E::from)?;
+            Ok(result)
+        };
+
+        let notify = |err, dur| {
+            tracing::warn!("Database commit failed during exponential backoff, retrying.\nInterval: {:?}\nError: {:?}", dur, err);
+        };
+
+        let handle_err = |backoff_err| match backoff_err {
+            backoff::Error::Transient(err) => {
+                tracing::error!(
+                    "Got a Transient error while doing exponential backoff on a DB commit: {:?}",
+                    err,
+                );
+                err
+            }
+            backoff::Error::Permanent(err) => {
+                tracing::error!(
+                    "Got a Permanent error while doing exponential backoff on a DB commit: {:?}",
+                    err,
+                );
+                err
+            }
+        };
+
+        Ok(backoff::retry_notify::<_, _, _, R, E>(backoff, attempt, notify).map_err(handle_err)?)
     }
 }
 
@@ -265,7 +306,6 @@ where
     Fut: Future<Output = Result<T, E>>,
     E: std::error::Error,
 {
-    use tokio::time::Duration;
     const NUM_CONSECUTIVE_FAILURES: usize = 10;
     const RETRY_INTERVAL: Duration = Duration::from_millis(500);
     let mut errors = Vec::new();

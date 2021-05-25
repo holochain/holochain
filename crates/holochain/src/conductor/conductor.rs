@@ -1124,7 +1124,7 @@ where
     /// Update the internal state with a pure function mapping old state to new
     async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
     where
-        F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
+        F: Clone + FnOnce(ConductorState) -> ConductorResult<ConductorState>,
     {
         let (state, _) = self.update_state_prime(|s| Ok((f(s)?, ()))).await?;
         Ok(state)
@@ -1135,7 +1135,7 @@ where
     /// this function
     async fn update_state_prime<F: Send, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
     where
-        F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)>,
+        F: Clone + FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)>,
     {
         self.check_running()?;
         let mut guard = self.env.conn()?;

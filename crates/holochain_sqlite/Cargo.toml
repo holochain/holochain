@@ -10,6 +10,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.26"
+backoff = { version = "0.3.0", features = ["tokio"] }
 byteorder = "1.3.4"
 cfg-if = "0.1"
 chashmap = "2.2"

@@ -140,14 +140,14 @@ mod tests {
         JoinHandle<()>,
         tokio::sync::oneshot::Receiver<()>,
     ) {
-        // Create data fixts for op
-        let mut sig_fixt = SignatureFixturator::new(Unpredictable);
-        let mut link_add_fixt = CreateLinkFixturator::new(Unpredictable);
         let author = fake_agent_pubkey_1();
 
         env.conn()
             .unwrap()
             .with_commit(|txn| {
+                // Create data fixts for op
+                let mut sig_fixt = SignatureFixturator::new(Unpredictable);
+                let mut link_add_fixt = CreateLinkFixturator::new(Unpredictable);
                 for _ in 0..num_hash {
                     // Create data for op
                     let sig = sig_fixt.next().unwrap();
