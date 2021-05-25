@@ -51,7 +51,7 @@ fn conductors_call_remote(num_conductors: usize) {
         init_all(&handles[..]).await;
 
         // 50 ms should be enough time to hit another conductor locally
-        let results = call_each_other(&handles[..], 50).await;
+        let results = call_each_other(&handles[..], 100).await;
         for (_, _, result) in results {
             match result {
                 Some(r) => match r {
@@ -67,7 +67,7 @@ fn conductors_call_remote(num_conductors: usize) {
         }
 
         // Let the remote messages be dropped
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(4)).await;
 
         let mut envs = Vec::with_capacity(handles.len());
         for h in &handles {
@@ -78,7 +78,6 @@ fn conductors_call_remote(num_conductors: usize) {
 
         // Give a little longer timeout here because they must find each other to pass the test
         let results = call_each_other(&handles[..], 1000).await;
-        dbg!(&results);
         for (_, _, result) in results {
             self::assert_matches!(result, Some(Ok(ZomeCallResponse::Ok(_))));
         }
@@ -412,7 +411,7 @@ async fn call_each_other(
                     match tokio::time::timeout(std::time::Duration::from_millis(timeout), f).await {
                         Ok(r) => (i, j, Some(r)),
                         Err(e) => {
-                            dbg!(e);
+                            dbg!(&e, &timeout);
                             (i, j, None)
                         }
                     }

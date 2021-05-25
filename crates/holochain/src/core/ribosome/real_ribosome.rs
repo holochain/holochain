@@ -168,9 +168,12 @@ impl RealRibosome {
 
     pub fn module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
         let wasm: Arc<Box<[u8]>> = self.dna_file.get_wasm_for_zome(zome_name)?.code();
-        Ok(holochain_wasmer_host::module::MODULE_CACHE
-            .write()
-            .get(self.wasm_cache_key(zome_name)?, &wasm)?)
+        let cache_key = self.wasm_cache_key(zome_name)?;
+        let module_arc = {
+            let mut lock = holochain_wasmer_host::module::MODULE_CACHE.write();
+            lock.get(cache_key, &*wasm)?
+        };
+        Ok(module_arc)
     }
 
     pub fn wasm_cache_key(&self, zome_name: &ZomeName) -> Result<[u8; 32], DnaError> {
@@ -192,9 +195,10 @@ impl RealRibosome {
         let zome_name = call_context.zome.zome_name().clone();
         let module = self.module(&zome_name)?;
         let imports: ImportObject = Self::imports(self, call_context, module.store());
-        Ok(Arc::new(Mutex::new(
+        let instance = Arc::new(Mutex::new(
             Instance::new(&module, &imports).map_err(|e| WasmError::Compile(e.to_string()))?,
-        )))
+        ));
+        Ok(instance)
     }
 
     fn imports(&self, call_context: CallContext, store: &Store) -> ImportObject {
