@@ -2125,10 +2125,10 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
- "tokio-tungstenite",
+ "tokio-tungstenite 0.13.0",
  "tracing",
  "tracing-futures",
- "tungstenite",
+ "tungstenite 0.12.0",
  "unwrap_to",
  "url2",
 ]
@@ -2439,12 +2439,30 @@ dependencies = [
  "arrayref",
  "base64",
  "futures",
+ "hyper",
  "kitsune_p2p",
+ "kitsune_p2p_direct_api",
+ "kitsune_p2p_proxy",
+ "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
+ "rand 0.8.3",
  "serde",
  "serde_json",
  "sodoken",
+ "structopt",
  "tokio",
+ "tokio-tungstenite 0.14.0",
+ "tungstenite 0.13.0",
+]
+
+[[package]]
+name = "kitsune_p2p_direct_api"
+version = "0.0.1"
+dependencies = [
+ "arrayref",
+ "base64",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -4915,7 +4933,20 @@ dependencies = [
  "pin-project 1.0.7",
  "tokio",
  "tokio-native-tls",
- "tungstenite",
+ "tungstenite 0.12.0",
+]
+
+[[package]]
+name = "tokio-tungstenite"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e96bb520beab540ab664bd5a9cfeaa1fcd846fa68c830b42e2c8963071251d2"
+dependencies = [
+ "futures-util",
+ "log",
+ "pin-project 1.0.7",
+ "tokio",
+ "tungstenite 0.13.0",
 ]
 
 [[package]]
@@ -5074,6 +5105,27 @@ dependencies = [
  "native-tls",
  "rand 0.8.3",
  "sha-1",
+ "url 2.2.2",
+ "utf-8",
+]
+
+[[package]]
+name = "tungstenite"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fe8dada8c1a3aeca77d6b51a4f1314e0f4b8e438b7b1b71e3ddaca8080e4093"
+dependencies = [
+ "base64",
+ "byteorder",
+ "bytes",
+ "http",
+ "httparse",
+ "input_buffer",
+ "log",
+ "native-tls",
+ "rand 0.8.3",
+ "sha-1",
+ "thiserror",
  "url 2.2.2",
  "utf-8",
 ]

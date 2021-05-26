@@ -16,17 +16,16 @@ async fn main() {
         async move {
             let AgentHookInput {
                 root,
-                root_entry_hash,
+                app_entry_hash,
                 agent,
-                kdirect,
+                kdirect: _,
+                kdhnd,
             } = input;
 
-            let new_entry = KdEntryData {
-                type_hint: "u.foo".to_string(),
-                parent: root_entry_hash,
+            let new_entry = KdEntryContent {
+                kind: "u.foo".to_string(),
+                parent: app_entry_hash,
                 author: agent.clone(),
-                should_shard: true,
-                reverify_interval_s: u32::MAX,
                 verify: "".to_string(),
                 data: serde_json::json!({
                     "nonce": std::time::SystemTime::now()
@@ -35,9 +34,15 @@ async fn main() {
                         .as_secs_f64(),
                 }),
             };
-            let new_entry = KdEntry::sign(&kdirect.get_persist(), new_entry).await?;
+            let new_entry = kdhnd
+                .entry_author(
+                    root.clone(),
+                    agent.clone(),
+                    new_entry,
+                    vec![].into_boxed_slice().into(),
+                )
+                .await?;
             tracing::debug!(?new_entry);
-            kdirect.publish_entry(root, agent, new_entry).await?;
 
             Ok(())
         }

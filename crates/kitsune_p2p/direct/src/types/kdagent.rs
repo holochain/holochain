@@ -2,68 +2,62 @@
 
 use crate::*;
 use kitsune_p2p::agent_store::*;
-use kitsune_p2p_types::tx2::tx2_utils::*;
+use kitsune_p2p::KitsuneSignature;
 use std::convert::TryFrom;
-use types::kdhash::KdHash;
 
-/// the inner kd agent type
-pub struct KdAgentInfoInner {
-    /// the root app for this agent info
-    pub root: KdHash,
-    /// the agent pubkey
-    pub agent: KdHash,
-    /// transport addressses this agent is reachable at
-    pub urls: Vec<TxUrl>,
-    /// when this agent info record was signed
-    pub signed_at_ms: u64,
-    /// the raw kitsune agent info type
-    pub raw: AgentInfoSigned,
+pub use kitsune_p2p_direct_api::{kd_agent_info::KdAgentInfoInner, KdAgentInfo};
+
+/// Extension trait to augment the direct_api version of KdAgentInfo
+pub trait KdAgentInfoExt: Sized {
+    /// convert KdAgentInfo into a kitsune AgentInfoSigned
+    fn to_kitsune(&self) -> AgentInfoSigned;
+
+    /// convert a kitsune AgentInfoSigned into KdAgentInfo
+    fn from_kitsune(kitsune: &AgentInfoSigned) -> KdResult<Self>;
 }
 
-impl std::fmt::Debug for KdAgentInfoInner {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("KdAgentInfoInner")
-            .field("root", &self.root)
-            .field("agent", &self.agent)
-            .field("urls", &self.urls)
-            .field("signed_at_ms", &self.signed_at_ms)
-            .finish()
+fn clamp(u: u64) -> i64 {
+    if u > i64::MAX as u64 {
+        i64::MAX
+    } else {
+        u as i64
     }
 }
 
-/// a more ergonomic kdirect wrapper around the kitsune agent info type
-#[derive(Clone, Debug)]
-pub struct KdAgentInfo(pub Arc<KdAgentInfoInner>);
-
-impl std::ops::Deref for KdAgentInfo {
-    type Target = KdAgentInfoInner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+impl KdAgentInfoExt for KdAgentInfo {
+    fn to_kitsune(&self) -> AgentInfoSigned {
+        let agent = (*self.agent().to_kitsune_agent()).clone();
+        let signature = KitsuneSignature(self.as_signature_ref().to_vec());
+        let agent_info = self.as_encoded_info_ref().to_vec();
+        AgentInfoSigned::new_unchecked(agent, signature, agent_info)
     }
-}
 
-impl From<KdAgentInfo> for AgentInfoSigned {
-    fn from(f: KdAgentInfo) -> AgentInfoSigned {
-        f.0.raw.clone()
-    }
-}
-
-impl KdAgentInfo {
-    /// wrap a kitsune agent info type
-    pub fn new(f: AgentInfoSigned) -> KitsuneResult<Self> {
-        let i = AgentInfo::try_from(&f).map_err(KitsuneError::other)?;
-        assert_eq!(f.as_agent_ref(), i.as_agent_ref());
-        let root = i.as_space_ref().into();
-        let agent = i.as_agent_ref().into();
-        let signed_at_ms = i.signed_at_ms();
-        let urls = i.as_urls_ref().iter().map(|u| u.clone().into()).collect();
+    fn from_kitsune(kitsune: &AgentInfoSigned) -> KdResult<Self> {
+        let i = AgentInfo::try_from(kitsune).map_err(KdError::other)?;
+        let root = KdHash::from_kitsune_space(i.as_space_ref());
+        let agent = KdHash::from_kitsune_agent(i.as_agent_ref());
+        let url_list = i.as_urls_ref().iter().map(|u| u.clone().into()).collect();
+        let signed_at_ms = clamp(i.signed_at_ms());
+        let expires_at_ms = signed_at_ms + clamp(i.expires_after_ms());
+        let signature = kitsune
+            .as_signature_ref()
+            .0
+            .to_vec()
+            .into_boxed_slice()
+            .into();
+        let encoded_info = kitsune
+            .as_agent_info_ref()
+            .to_vec()
+            .into_boxed_slice()
+            .into();
         Ok(Self(Arc::new(KdAgentInfoInner {
             root,
             agent,
-            urls,
+            url_list,
             signed_at_ms,
-            raw: f,
+            expires_at_ms,
+            signature,
+            encoded_info,
         })))
     }
 }
