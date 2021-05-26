@@ -1,6 +1,7 @@
 //! KitsuneP2p Wire Protocol Encoding Decoding
 
 use crate::types::*;
+use crate::agent_store::AgentInfoSigned;
 use derive_more::*;
 use std::sync::Arc;
 
@@ -48,6 +49,18 @@ kitsune_p2p_types::write_codec_enum! {
         Gossip(0x42) {
             space.0: Arc<KitsuneSpace>,
             data.1: WireData,
+        },
+
+        /// Query a remote node for peers holding
+        /// or nearest to holding a u32 location.
+        PeerQuery(0x50) {
+            space.0: Arc<KitsuneSpace>,
+            basis.1: Arc<KitsuneBasis>,
+        },
+
+        /// Response to a peer query
+        PeerQueryResp(0x51) {
+            peer_list.0: Vec<AgentInfoSigned>,
         },
     }
 }

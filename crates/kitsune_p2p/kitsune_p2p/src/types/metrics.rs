@@ -7,7 +7,9 @@ observability::metrics!(
     CallResp,
     Notify,
     NotifyResp,
-    Gossip
+    Gossip,
+    PeerQuery,
+    PeerQueryResp
 );
 
 /// Print all metrics as tracing events
@@ -29,7 +31,7 @@ pub fn print_all_metrics() {
         .expect("Failed to print metrics");
         for (metric, count) in KitsuneMetrics::iter() {
             match metric {
-                Call | Notify | Gossip => {
+                Call | Notify | Gossip | PeerQuery => {
                     let percent = if total_writes > 0.0 {
                         count as f64 / total_writes * 100.0
                     } else {
@@ -45,7 +47,7 @@ pub fn print_all_metrics() {
                     )
                     .expect("Failed to print metrics");
                 }
-                Failure | CallResp | NotifyResp => {
+                Failure | CallResp | NotifyResp | PeerQueryResp => {
                     let percent = if total_reads > 0.0 {
                         count as f64 / total_reads * 100.0
                     } else {
