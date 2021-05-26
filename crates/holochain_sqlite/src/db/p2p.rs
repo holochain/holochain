@@ -27,6 +27,13 @@ pub trait AsP2pConExt {
         within_arc: DhtArc,
     ) -> DatabaseResult<Vec<KitsuneAgent>>;
 
+    /// Query agents sorted by nearness to basis loc
+    fn p2p_query_near_basis(
+        &mut self,
+        basis: u32,
+        limit: u32,
+    ) -> DatabaseResult<Vec<AgentInfoSigned>>;
+
     /// Prune all expired AgentInfoSigned records from the p2p_store
     fn p2p_prune(&mut self) -> DatabaseResult<()>;
 }
@@ -50,6 +57,9 @@ pub trait AsP2pTxExt {
         until_ms: u64,
         within_arc: DhtArc,
     ) -> DatabaseResult<Vec<KitsuneAgent>>;
+
+    /// Query agents sorted by nearness to basis loc
+    fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Prune all expired AgentInfoSigned records from the p2p_store
     fn p2p_prune(&self) -> DatabaseResult<()>;
@@ -75,6 +85,14 @@ impl AsP2pConExt for crate::db::PConn {
         within_arc: DhtArc,
     ) -> DatabaseResult<Vec<KitsuneAgent>> {
         self.with_reader(move |reader| reader.p2p_gossip_query(since_ms, until_ms, within_arc))
+    }
+
+    fn p2p_query_near_basis(
+        &mut self,
+        basis: u32,
+        limit: u32,
+    ) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        self.with_reader(move |reader| reader.p2p_query_near_basis(basis, limit))
     }
 
     fn p2p_prune(&mut self) -> DatabaseResult<()> {
@@ -170,6 +188,27 @@ impl AsP2pTxExt for Transaction<'_> {
                 Ok(KitsuneAgent(agent))
             },
         )? {
+            out.push(r?);
+        }
+        Ok(out)
+    }
+
+    fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        use std::convert::TryFrom;
+
+        let mut stmt = self
+            .prepare(sql_p2p::QUERY_NEAR_BASIS)
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+
+        let mut out = Vec::new();
+        for r in stmt.query_map(named_params! { ":basis": basis, ":limit": limit }, |r| {
+            let r = r.get_ref(0)?;
+            let r = r.as_blob()?;
+            let signed = AgentInfoSigned::try_from(r)
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+
+            Ok(signed)
+        })? {
             out.push(r?);
         }
         Ok(out)
