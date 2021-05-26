@@ -11,6 +11,8 @@ categories = [ "network-programming" ]
 edition = "2018"
 
 [dependencies]
+arrayref = "0.3.6"
+bloomfilter = { version = "1.0.5", features = [ "serde" ] }
 derive_more = "0.99.11"
 futures = "0.3"
 ghost_actor = "0.3.0-alpha.1"

@@ -77,8 +77,25 @@ pub mod tuning_params_struct {
     }
 
     mk_tune! {
-        /// Delay between gossip loop iteration. [Default: 10ms]
-        gossip_loop_iteration_delay_ms: u32 = 10,
+        /// Gossip strategy to use. [Default: simple-bloom]
+        gossip_strategy: String = "simple-bloom".to_string(),
+
+        /// Delay between gossip loop iteration. [Default: 1s]
+        gossip_loop_iteration_delay_ms: u32 = 1000,
+
+        /// The gossip loop will attempt to rate-limit output
+        /// to this count mega bits per second. [Default: 0.5]
+        gossip_output_target_mbps: f64 = 0.5,
+
+        /// How long should we hold off talking to a peer
+        /// we've previously spoken successfully to.
+        /// [Default: 1 minute]
+        gossip_peer_on_success_next_gossip_delay_ms: u32 = 1000 * 60,
+
+        /// How long should we hold off talking to a peer
+        /// we've previously gotten errors speaking to.
+        /// [Default: 5 minute]
+        gossip_peer_on_error_next_gossip_delay_ms: u32 = 1000 * 60 * 5,
 
         /// Default agent count for remote notify. [Default: 5]
         default_notify_remote_agent_count: u32 = 5,
@@ -113,7 +130,8 @@ pub mod tuning_params_struct {
         /// Mainly used as the for_each_concurrent limit,
         /// this restricts the number of active polled futures
         /// on a single thread.
-        concurrent_limit_per_thread: usize = 32,
+        /// [Default: 4096]
+        concurrent_limit_per_thread: usize = 4096,
 
         /// tx2 quic max_idle_timeout
         /// [Default: 30 seconds]
@@ -124,8 +142,8 @@ pub mod tuning_params_struct {
         tx2_pool_max_connection_count: usize = 4096,
 
         /// tx2 channel count per connection
-        /// [Default: 3]
-        tx2_channel_count_per_connection: usize = 3,
+        /// [Default: 16]
+        tx2_channel_count_per_connection: usize = 16,
 
         /// tx2 timeout used for passive background operations
         /// like reads / responds.
