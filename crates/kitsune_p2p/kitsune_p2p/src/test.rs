@@ -437,7 +437,8 @@ mod tests {
         // needed until we have some way of bootstrapping
         harness.magic_peer_info_exchange().await?;
 
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        // TODO - a better way to await gossip??
+        tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
 
         // - Check agent one now has all the data
         let res = harness.dump_local_gossip_data(a1.clone()).await?;
