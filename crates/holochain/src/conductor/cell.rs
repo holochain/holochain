@@ -795,8 +795,6 @@ impl Cell {
     /// LMDB environment. Completely reverses Cell creation.
     /// NB: This is NOT meant to be a Drop impl! This destroys all data
     ///     associated with a Cell, i.e. this Cell can never be instantiated again!
-    //
-
     #[tracing::instrument(skip(self))]
     pub async fn destroy(self) -> CellResult<()> {
         self.cleanup().await?;
