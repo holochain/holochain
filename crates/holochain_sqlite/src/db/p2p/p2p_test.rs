@@ -77,7 +77,7 @@ async fn test_p2p_store_sanity() {
 
     let space = rand_space();
 
-    let db = DbWrite::test(&tmp_dir, DbKind::P2p(Arc::new(space.clone()))).unwrap();
+    let db = DbWrite::test(&tmp_dir, DbKind::P2pState(Arc::new(space.clone()))).unwrap();
     let mut con = db.connection_pooled().unwrap();
 
     let mut example_agent = rand_agent();
