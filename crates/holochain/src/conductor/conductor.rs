@@ -99,8 +99,8 @@ where
     _state: CellState,
 }
 
-pub type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
-pub type StopReceiver = tokio::sync::broadcast::Receiver<()>;
+pub(crate) type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
+pub(crate) type StopReceiver = tokio::sync::broadcast::Receiver<()>;
 
 /// A Conductor is a group of [Cell]s
 pub struct Conductor<DS = RealDnaStore, CA = CellConductorApi>

@@ -564,7 +564,7 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     //     .unwrap();
 }
 
-fn simple_zome() -> InlineZome {
+pub(crate) fn simple_create_entry_zome() -> InlineZome {
     let unit_entry_def = EntryDef::default_with_id("unit");
     InlineZome::new_unique(vec![unit_entry_def.clone()]).callback("create", move |api, ()| {
         let entry_def_id: EntryDefId = unit_entry_def.id.clone();
@@ -577,7 +577,7 @@ fn simple_zome() -> InlineZome {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_reactivate_app() {
     observability::test_run().ok();
-    let zome = simple_zome();
+    let zome = simple_create_entry_zome();
     let (conductor, app) = common_genesis_test_app(zome).await.unwrap();
 
     conductor
