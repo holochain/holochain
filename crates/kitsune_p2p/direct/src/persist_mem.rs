@@ -2,6 +2,10 @@
 
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
+use kitsune_p2p::event::MetricDatum;
+use kitsune_p2p::event::MetricQuery;
+use kitsune_p2p::event::MetricQueryAnswer;
+use kitsune_p2p::KitsuneAgent;
 use kitsune_p2p_types::dht_arc::DhtArc;
 use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
@@ -183,6 +187,21 @@ impl AsKdPersist for PersistMem {
             Ok(root_map.values().cloned().collect())
         });
         async move { r }.boxed()
+    }
+
+    fn put_metric_datum(
+        &self,
+        _agent: KitsuneAgent,
+        _datum: MetricDatum,
+    ) -> BoxFuture<'static, KitsuneResult<()>> {
+        todo!()
+    }
+
+    fn query_metrics(
+        &self,
+        _query: MetricQuery,
+    ) -> BoxFuture<'static, KitsuneResult<MetricQueryAnswer>> {
+        todo!()
     }
 
     fn store_entry(

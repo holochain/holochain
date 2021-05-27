@@ -230,6 +230,10 @@ impl Cell {
                 // store lives.
                 unreachable!()
             }
+            PutMetricDatum { .. } | QueryMetrics { .. } => {
+                // Same goes for metrics
+                unreachable!()
+            }
             CallRemote {
                 span_context: _,
                 from_agent,
@@ -604,7 +608,7 @@ impl Cell {
                 FROM DHtOp
                 WHERE
                 DhtOp.when_integrated >= :from
-                AND 
+                AND
                 DhtOp.when_integrated < :to
                 ",
             )?;

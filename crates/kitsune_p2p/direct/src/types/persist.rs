@@ -2,6 +2,10 @@
 
 use crate::*;
 use futures::future::BoxFuture;
+use kitsune_p2p::event::MetricDatum;
+use kitsune_p2p::event::MetricQuery;
+use kitsune_p2p::event::MetricQueryAnswer;
+use kitsune_p2p::KitsuneAgent;
 use kitsune_p2p_types::dht_arc::DhtArc;
 use kitsune_p2p_types::tls::TlsConfig;
 use std::future::Future;
@@ -46,6 +50,19 @@ pub trait AsKdPersist: 'static + Send + Sync {
     /// Query agent info
     fn query_agent_info(&self, root: KdHash)
         -> BoxFuture<'static, KitsuneResult<Vec<KdAgentInfo>>>;
+
+    /// Store agent info
+    fn put_metric_datum(
+        &self,
+        agent: KitsuneAgent,
+        datum: MetricDatum,
+    ) -> BoxFuture<'static, KitsuneResult<()>>;
+
+    /// Store agent info
+    fn query_metrics(
+        &self,
+        query: MetricQuery,
+    ) -> BoxFuture<'static, KitsuneResult<MetricQueryAnswer>>;
 
     /// Store entry
     fn store_entry(

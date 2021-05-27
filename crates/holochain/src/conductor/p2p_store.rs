@@ -1,4 +1,4 @@
-//! A simple KvBuf for AgentInfoSigned.
+//! Queries for the P2pState store
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;

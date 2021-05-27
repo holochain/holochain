@@ -158,6 +158,21 @@ impl KitsuneP2pEventHandler for AgentHarness {
         Ok(async move { Ok(out) }.boxed().into())
     }
 
+    fn handle_put_metric_datum(
+        &mut self,
+        _agent: Arc<types::KitsuneAgent>,
+        _metric: MetricDatum,
+    ) -> KitsuneP2pEventHandlerResult<()> {
+        todo!()
+    }
+
+    fn handle_query_metrics(
+        &mut self,
+        _query: MetricQuery,
+    ) -> KitsuneP2pEventHandlerResult<MetricQueryAnswer> {
+        todo!()
+    }
+
     fn handle_call(
         &mut self,
         space: Arc<super::KitsuneSpace>,

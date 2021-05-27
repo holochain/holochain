@@ -70,6 +70,44 @@ pub struct QueryAgentInfoSignedEvt {
     pub agent: Arc<super::KitsuneAgent>,
 }
 
+/// A single datum of metric info about an Agent, to be recorded by the client.
+pub enum MetricDatum {
+    /// Our fast gossip loop synced this node up to this timestamp.
+    /// The next quick loop can sync from this timestamp forward.
+    LastQuickGossip(std::time::Instant),
+
+    /// The last time a full slow gossip loop completed was at this timestamp.
+    /// If that is too recent, we won't run another slow loop.
+    LastSlowGossip(std::time::Instant),
+
+    /// The last time we got a connection/timeout error with this node,
+    /// ignoring inactivity timeouts.
+    /// Lets us skip recently unreachable nodes in gossip loops.
+    LastConnectError(std::time::Instant),
+}
+
+/// Different kinds of queries about metric data
+pub enum MetricQuery {
+    /// Filters for the "last sync" query.
+    LastSync {
+        /// The agent to query by
+        agent: Arc<super::KitsuneAgent>,
+    },
+    /// Filters for the "oldest agent" query.
+    Oldest {
+        /// Agents whose last connection error is earlier than this time will be filtered out.
+        last_connect_error_threshold: std::time::Instant,
+    },
+}
+
+/// Different kinds of queries about metric data
+pub enum MetricQueryAnswer {
+    /// The last sync time for all agents.
+    LastSync(std::time::Instant),
+    /// The agent with the oldest last-connection time which satisfies the query.
+    Oldest(super::KitsuneAgent),
+}
+
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
     /// KitsuneP2p actor.
@@ -82,6 +120,12 @@ ghost_actor::ghost_chan! {
 
         /// We need to get previously stored agent info.
         fn query_agent_info_signed(input: QueryAgentInfoSignedEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
+
+        /// Record a metric datum about an agent.
+        fn put_metric_datum(agent: Arc<super::KitsuneAgent>, metric: MetricDatum) -> ();
+
+        /// Ask for metric data.
+        fn query_metrics(query: MetricQuery) -> MetricQueryAnswer;
 
         /// We are receiving a request from a remote node.
         fn call(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;
