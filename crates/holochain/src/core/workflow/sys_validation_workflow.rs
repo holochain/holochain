@@ -155,14 +155,22 @@ async fn validate_op(
         },
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationOutcome(e)) => {
-            warn!(
+            info!(
                 agent = %which_agent(conductor_api.cell_id().agent_pubkey()),
-                msg = "DhtOp has failed system validation",
+                msg = "DhtOp did not pass validation. (If rejected, a warning will follow.)",
                 ?op,
                 error = ?e,
                 error_msg = %e
             );
-            Ok(handle_failed(e))
+            let outcome = handle_failed(e);
+            if let Outcome::Rejected = outcome {
+                warn!(
+                    agent = %which_agent(conductor_api.cell_id().agent_pubkey()),
+                    msg = "DhtOp was rejected.",
+                    ?op,
+                )
+            }
+            Ok(outcome)
         }
         Err(e) => Err(e.into()),
     }
