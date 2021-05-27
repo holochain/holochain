@@ -6,7 +6,7 @@ pub mod post_commit;
 pub mod validate;
 pub mod validate_link;
 pub mod validation_package;
-use super::HostAccess;
+use super::HostContext;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;

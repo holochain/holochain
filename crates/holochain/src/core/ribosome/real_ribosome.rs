@@ -6,7 +6,7 @@ use super::guest_callback::validate::ValidateHostAccess;
 use super::guest_callback::validation_package::ValidationPackageHostAccess;
 use super::host_fn::get_agent_activity::get_agent_activity;
 use super::host_fn::HostFnApi;
-use super::HostAccess;
+use super::HostContext;
 use super::ZomeCallHostAccess;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
@@ -188,9 +188,12 @@ impl RealRibosome {
         Ok(key)
     }
 
-    pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Arc<Mutex<Instance>>> {
+    pub fn instance(
+        &self,
+        module: Arc<Module>,
+        call_context: CallContext,
+    ) -> RibosomeResult<Arc<Mutex<Instance>>> {
         let zome_name = call_context.zome.zome_name().clone();
-        let module = self.module(&zome_name)?;
         let imports: ImportObject = Self::imports(self, call_context, module.store());
         let instance = Arc::new(Mutex::new(
             Instance::new(&module, &imports).map_err(|e| WasmError::Compile(e.to_string()))?,
@@ -444,7 +447,7 @@ impl RibosomeT for RealRibosome {
                     // there is a callback to_call and it is implemented in the wasm
                     // it is important to fully instantiate this (e.g. don't try to use the module above)
                     // because it builds guards against memory leaks and handles imports correctly
-                    let instance = self.instance(call_context)?;
+                    let instance = self.instance(module, call_context)?;
 
                     let result: Result<ExternIO, WasmError> = holochain_wasmer_host::guest::call(
                         instance,

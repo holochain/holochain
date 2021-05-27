@@ -10,8 +10,10 @@ use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
 use holo_hash::hash_type;
 use holo_hash::AgentPubKey;
+use holo_hash::EntryHash;
 use holo_hash::HashableContent;
 use holo_hash::HashableContentBytes;
+use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;
@@ -199,7 +201,7 @@ impl AsRef<crate::EntryDefId> for EntryWithDefId {
     }
 }
 
-/// Zome IO inner for get and get_details calls.
+/// Zome IO for get and get_details calls.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct GetInput {
     /// Any DHT hash to pass to get or get_details.
@@ -215,6 +217,36 @@ impl GetInput {
             any_dht_hash,
             get_options,
         }
+    }
+}
+
+/// Zome IO for must_get_element.
+pub struct MustGetElementInput(HeaderHash);
+
+impl MustGetElementInput {
+    /// Consumes self for inner.
+    pub fn into_inner(self) -> HeaderHash {
+        self.0
+    }
+}
+
+/// Zome IO for must_get_entry.
+pub struct MustGetEntryInput(EntryHash);
+
+impl MustGetEntryInput {
+    /// Consumes self for inner.
+    pub fn into_inner(self) -> EntryHash {
+        self.0
+    }
+}
+
+/// Zome IO for must_get_header.
+pub struct MustGetHeaderInput(HeaderHash);
+
+impl MustGetHeaderInput {
+    /// Consumes self for inner.
+    pub fn into_inner(self) -> HeaderHash {
+        self.0
     }
 }
 

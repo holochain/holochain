@@ -1,5 +1,5 @@
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
@@ -20,13 +20,13 @@ impl EntryDefsInvocation {
 #[derive(Clone, Constructor)]
 pub struct EntryDefsHostAccess;
 
-impl From<&HostAccess> for EntryDefsHostAccess {
-    fn from(_: &HostAccess) -> Self {
+impl From<&HostContext> for EntryDefsHostAccess {
+    fn from(_: &HostContext) -> Self {
         Self
     }
 }
 
-impl From<EntryDefsHostAccess> for HostAccess {
+impl From<EntryDefsHostAccess> for HostContext {
     fn from(entry_defs_host_access: EntryDefsHostAccess) -> Self {
         Self::EntryDefs(entry_defs_host_access)
     }

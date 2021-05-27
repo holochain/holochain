@@ -144,6 +144,15 @@ wasm_io_types! {
     // Hash an entry on the host.
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
 
+    // Retreive an element from the DHT or short circuit.
+    fn must_get_element (zt::entry::MustGetElementInput) -> crate::Element;
+
+    // Retreive a entry from the DHT or short circuit.
+    fn must_get_entry (zt::entry::MustGetEntryInput) -> crate::Entry;
+
+    // Retrieve a header from the DHT or short circuit.
+    fn must_get_header (zt::entry::MustGetHeaderInput) -> crate::Header;
+
     // Query the source chain for data.
     fn query (zt::query::ChainQueryFilter) -> Vec<crate::Element>;
 
