@@ -126,12 +126,14 @@ async fn test_p2p_store_sanity() {
     // near
     let tgt = u32::MAX / 2;
     let near = con.p2p_query_near_basis(tgt, 20).unwrap();
+    let mut prev = 0;
     for agent_info_signed in near {
         use kitsune_p2p::KitsuneBinType;
         let loc = agent_info_signed.as_agent_ref().get_loc();
         let record = super::P2pRecord::from_signed(&agent_info_signed).unwrap();
-        let mut d1 = u32::MAX;
+        let mut dist = u32::MAX;
         let mut deb = "not reset";
+        // duplicate the distance formula and assert it is in order
         match (
             record.storage_start_1,
             record.storage_end_1,
@@ -141,27 +143,29 @@ async fn test_p2p_store_sanity() {
             (Some(s1), Some(e1), Some(s2), Some(e2)) => {
                 if (tgt >= s1 && tgt <= e1) || (tgt >= s2 && tgt <= e2) {
                     deb = "two-span-inside";
-                    d1 = 0;
+                    dist = 0;
                 } else {
                     deb = "two-span-outside";
-                    d1 = std::cmp::min(tgt - e1, s2 - tgt);
+                    dist = std::cmp::min(tgt - e1, s2 - tgt);
                 }
             }
             (Some(s1), Some(e1), None, None) => {
                 if tgt >= s1 && tgt <= e1 {
                     deb = "one-span-inside";
-                    d1 = 0;
+                    dist = 0;
                 } else if tgt < s1 {
                     deb = "one-span-before";
-                    d1 = std::cmp::min(s1 - tgt, (u32::MAX - e1) + tgt);
+                    dist = std::cmp::min(s1 - tgt, (u32::MAX - e1) + tgt);
                 } else {
                     deb = "one-span-after";
-                    d1 = std::cmp::min(tgt - e1, (u32::MAX - tgt) + s1);
+                    dist = std::cmp::min(tgt - e1, (u32::MAX - tgt) + s1);
                 }
             }
             _ => (),
         }
-        println!("loc({}) => d1({}) - {}", loc, d1, deb);
+        assert!(dist >= prev);
+        prev = dist;
+        println!("loc({}) => dist({}) - {}", loc, dist, deb);
     }
 
     // prune everything by expires time
