@@ -83,6 +83,7 @@ impl WireMessage {
         }
     }
 
+    #[allow(dead_code)]
     pub fn publish(
         request_validation_receipt: bool,
         dht_hash: holo_hash::AnyDhtHash,

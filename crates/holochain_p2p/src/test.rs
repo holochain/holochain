@@ -280,6 +280,7 @@ mod tests {
         r_task.await.unwrap();
     }
 
+    #[ignore = "disabled while publish is disabled"]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_publish_workflow() {
         let (dna, a1, a2, a3) = test_setup();
