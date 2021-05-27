@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_arguments)]
 use crate::actor::*;
 use crate::event::*;
 use crate::*;
