@@ -56,7 +56,7 @@ pub fn create<'a>(
     tokio_helper::block_forever_on(async move {
         // push the header and the entry into the source chain
         let header_hash = call_context
-            .host_access
+            .host_context
             .workspace()
             .source_chain()
             .put(header_builder, Some(entry))
@@ -72,7 +72,7 @@ pub fn extract_entry_def(
     entry_def_id: EntryDefId,
 ) -> Result<(holochain_zome_types::header::EntryDefIndex, EntryVisibility), WasmError> {
     let app_entry_type = match ribosome
-        .run_entry_defs((&call_context.host_access).into(), EntryDefsInvocation)
+        .run_entry_defs((&call_context.host_context).into(), EntryDefsInvocation)
         .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?
     {
         // the ribosome returned some defs
@@ -142,7 +142,7 @@ pub mod wasm_test {
         call_context.zome = TestWasm::Create.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace.clone();
-        call_context.host_access = host_access.into();
+        call_context.host_context = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::App("post".into());
         let input = EntryWithDefId::new(entry_def_id, app_entry.clone());

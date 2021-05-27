@@ -324,7 +324,7 @@ impl HostFnCaller {
         let (_, ribosome, call_context, workspace_lock) = self.unpack();
 
         let output = {
-            let host_access = call_context.host_access();
+            let host_access = call_context.host_context();
             let zcha = unwrap_to!(host_access => HostContext::ZomeCall).clone();
             ribosome.call_zome_function(zcha, invocation).unwrap()
         };

@@ -27,7 +27,7 @@ pub struct MigrateAgentHostAccess {
     pub workspace: HostFnWorkspace,
 }
 
-impl From<MigrateAgentHostAccess> for HostAccess {
+impl From<MigrateAgentHostAccess> for HostContext {
     fn from(migrate_agent_host_access: MigrateAgentHostAccess) -> Self {
         Self::MigrateAgent(migrate_agent_host_access)
     }

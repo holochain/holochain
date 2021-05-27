@@ -23,7 +23,7 @@ pub fn get_link_details<'a>(
         .expect("Failed to get ID for current zome.");
 
     // Get the network from the context
-    let network = call_context.host_access.network().clone();
+    let network = call_context.host_context.network().clone();
 
     tokio_helper::block_forever_on(async move {
         // Create the key
@@ -33,7 +33,7 @@ pub fn get_link_details<'a>(
             tag: tag_prefix,
         };
 
-        let workspace = call_context.host_access.workspace();
+        let workspace = call_context.host_context.workspace();
         let mut cascade = Cascade::from_workspace_network(workspace, network);
         // Get the links from the dht
         let link_details = LinkDetails::from(

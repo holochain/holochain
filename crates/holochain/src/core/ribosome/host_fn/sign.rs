@@ -11,7 +11,7 @@ pub fn sign(
     input: Sign,
 ) -> Result<Signature, WasmError> {
     tokio_helper::block_forever_on(async move {
-        call_context.host_access.keystore().sign(input).await
+        call_context.host_context.keystore().sign(input).await
     })
     .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
 }

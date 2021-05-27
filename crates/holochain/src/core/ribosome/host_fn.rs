@@ -128,13 +128,13 @@ host_fn_api_impls! {
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
 
     // Retreive an element from the DHT or short circuit.
-    fn must_get_element (zt::entry::MustGetElementInput) -> Element;
+    fn must_get_element (zt::entry::MustGetElementInput) -> (Element, bool);
 
     // Retreive a entry from the DHT or short circuit.
-    fn must_get_entry (zt::entry::MustGetEntryInput) -> Entry;
+    fn must_get_entry (zt::entry::MustGetEntryInput) -> EntryHashed;
 
     // Retrieve a header from the DHT or short circuit.
-    fn must_get_header (zt::entry::MustGetHeaderInput) -> Header;
+    fn must_get_header (zt::entry::MustGetHeaderInput) -> SignedHeaderHashed;
 
     // Query the source chain for data.
     fn query (zt::query::ChainQueryFilter) -> Vec<Element>;

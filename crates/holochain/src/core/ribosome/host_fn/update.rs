@@ -57,7 +57,7 @@ pub fn update<'a>(
         entry_hash,
     };
 
-    let workspace = call_context.host_access.workspace();
+    let workspace = call_context.host_context.workspace();
 
     // return the hash of the updated entry
     // note that validation is handled by the workflow

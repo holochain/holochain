@@ -14,7 +14,7 @@ pub struct GenesisSelfCheckInvocation {
 #[derive(Clone, Constructor)]
 pub struct GenesisSelfCheckHostAccess;
 
-impl From<GenesisSelfCheckHostAccess> for HostAccess {
+impl From<GenesisSelfCheckHostAccess> for HostContext {
     fn from(host_access: GenesisSelfCheckHostAccess) -> Self {
         Self::GenesisSelfCheck(host_access)
     }

@@ -11,7 +11,7 @@ pub fn agent_info<'a>(
     _input: (),
 ) -> Result<AgentInfo, WasmError> {
     let agent_pubkey = call_context
-        .host_access
+        .host_context
         .workspace()
         .source_chain()
         .agent_pubkey()

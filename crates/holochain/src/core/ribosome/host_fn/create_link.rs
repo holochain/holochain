@@ -29,7 +29,7 @@ pub fn create_link<'a>(
     let header_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
         // push the header into the source chain
         let header_hash = call_context
-            .host_access
+            .host_context
             .workspace()
             .source_chain()
             .put(header_builder, None)

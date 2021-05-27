@@ -18,7 +18,7 @@ pub fn delete<'a>(
 ) -> Result<HeaderHash, WasmError> {
     let deletes_entry_address = get_original_address(call_context.clone(), input.clone())?;
 
-    let host_access = call_context.host_access();
+    let host_access = call_context.host_context();
 
     // handle timeouts at the source chain layer
     tokio_helper::block_forever_on(async move {
@@ -40,8 +40,8 @@ pub(crate) fn get_original_address<'a>(
     call_context: Arc<CallContext>,
     address: HeaderHash,
 ) -> Result<EntryHash, WasmError> {
-    let network = call_context.host_access.network().clone();
-    let workspace = call_context.host_access.workspace();
+    let network = call_context.host_context.network().clone();
+    let workspace = call_context.host_context.workspace();
 
     tokio_helper::block_forever_on(async move {
         let mut cascade = Cascade::from_workspace_network(workspace, network);

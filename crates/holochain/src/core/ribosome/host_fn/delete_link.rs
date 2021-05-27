@@ -18,13 +18,13 @@ pub fn delete_link<'a>(
     // it is never valid to have divergent base address for add/remove links
     // the subconscious will validate the base address match but we need to fetch it here to
     // include it in the remove link header
-    let network = call_context.host_access.network().clone();
+    let network = call_context.host_context.network().clone();
     let address = input.clone();
     let call_context_2 = call_context.clone();
 
     // handle timeouts at the network layer
     let maybe_add_link: Option<SignedHeaderHashed> = tokio_helper::block_forever_on(async move {
-        let workspace = call_context_2.host_access.workspace();
+        let workspace = call_context_2.host_context.workspace();
         CascadeResult::Ok(
             Cascade::from_workspace_network(workspace, network)
                 .dht_get(address.into(), GetOptions::content())
@@ -52,7 +52,7 @@ pub fn delete_link<'a>(
     }
     .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
 
-    let source_chain = call_context.host_access.workspace().source_chain();
+    let source_chain = call_context.host_context.workspace().source_chain();
 
     // handle timeouts at the source chain layer
 

@@ -11,7 +11,7 @@ pub fn call(
     call: Call,
 ) -> Result<ZomeCallResponse, WasmError> {
     // Get the conductor handle
-    let host_access = call_context.host_access();
+    let host_access = call_context.host_context();
     let conductor_handle = host_access.call_zome_handle();
     let workspace = host_access.workspace();
 

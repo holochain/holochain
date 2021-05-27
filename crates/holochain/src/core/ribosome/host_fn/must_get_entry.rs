@@ -1,4 +1,6 @@
+use holochain_wasmer_host::prelude::*;
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::Cascade;
 use holochain_types::prelude::*;
@@ -12,16 +14,16 @@ pub fn must_get_entry<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: MustGetEntryInput,
-) -> Result<Entry, WasmError> {
-    // Get the network from the context
-    let network = call_context.host_access.network().clone();
+) -> Result<EntryHashed, WasmError> {
+    let entry_hash = input.into_inner();
+    let network = call_context.host_context.network().clone();
 
     // timeouts must be handled by the network
     tokio_helper::block_forever_on(async move {
-        let workspace = call_context.host_access.workspace();
+        let workspace = call_context.host_context.workspace();
         let mut cascade = Cascade::from_workspace_network(workspace, network);
-        let maybe_element = cascade
-            .retrieve_entry(input.into_inner(),
+        match cascade
+            .retrieve_entry(entry_hash.clone(),
             // Set every GetOptions manually here.
             // Using defaults is dangerous as it can undermine determinism.
             // We want refactors to explicitly consider this.
@@ -38,11 +40,15 @@ pub fn must_get_entry<'a>(
                 request_type: GetRequest::Pending,
             })
             .await
-            .map_err(|cascade_error| WasmError::HostShortCircuit(cascade_error.to_string()))?;
-
-        Ok(maybe_element)
+            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))? {
+                Some(entry) => Ok(entry),
+                None => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(match call_context.host_context {
+                    HostContext::EntryDefs(_) | HostContext::GenesisSelfCheck(_) | HostContext::MigrateAgent(_) | HostContext::PostCommit(_) | HostContext::ZomeCall(_) => holochain_serialized_bytes::encode(&Err::<(), WasmError>(WasmError::Host("Missing dep".into())))?,
+                    HostContext::Init(_) => holochain_serialized_bytes::encode(&Ok::<InitCallbackResult, ()>(InitCallbackResult::UnresolvedDependencies(vec![entry_hash.into()])))?,
+                    HostContext::ValidateCreateLink(_) => holochain_serialized_bytes::encode(&Ok::<ValidateLinkCallbackResult, ()>(ValidateLinkCallbackResult::UnresolvedDependencies(vec![entry_hash.into()])))?,
+                    HostContext::Validate(_) => holochain_serialized_bytes::encode(&Ok::<ValidateCallbackResult, ()>(ValidateCallbackResult::UnresolvedDependencies(vec![entry_hash.into()])))?,
+                    HostContext::ValidationPackage(_) => holochain_serialized_bytes::encode(&Ok::<ValidationPackageCallbackResult, ()>(ValidationPackageCallbackResult::UnresolvedDependencies(vec![entry_hash.into()])))?,
+                }))),
+            }
     })
 }
-
-// we are relying on the create tests to show the commit/get round trip
-// See commit_entry.rs

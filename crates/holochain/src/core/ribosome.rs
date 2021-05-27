@@ -71,7 +71,7 @@ impl CallContext {
         self.zome.clone()
     }
 
-    pub fn host_context(&self) -> HostAccess {
+    pub fn host_context(&self) -> HostContext {
         self.host_context.clone()
     }
 }
@@ -89,8 +89,8 @@ pub enum HostContext {
     ZomeCall(ZomeCallHostAccess),
 }
 
-impl From<&HostAccess> for HostFnAccess {
-    fn from(host_access: &HostAccess) -> Self {
+impl From<&HostContext> for HostFnAccess {
+    fn from(host_access: &HostContext) -> Self {
         match host_access {
             HostContext::ZomeCall(access) => access.into(),
             HostContext::GenesisSelfCheck(access) => access.into(),
@@ -105,7 +105,7 @@ impl From<&HostAccess> for HostFnAccess {
     }
 }
 
-impl HostAccess {
+impl HostContext {
     /// Get the workspace, panics if none was provided
     pub fn workspace(&self) -> &HostFnWorkspace {
         match self {
@@ -379,7 +379,7 @@ pub struct ZomeCallHostAccess {
     pub cell_id: CellId,
 }
 
-impl From<ZomeCallHostAccess> for HostAccess {
+impl From<ZomeCallHostAccess> for HostContext {
     fn from(zome_call_host_access: ZomeCallHostAccess) -> Self {
         Self::ZomeCall(zome_call_host_access)
     }
@@ -425,13 +425,13 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
 
     fn call_iterator<I: Invocation + 'static>(
         &self,
-        access: HostAccess,
+        host_context: HostContext,
         invocation: I,
     ) -> CallIterator<Self, I>;
 
     fn maybe_call<I: Invocation + 'static>(
         &self,
-        access: HostAccess,
+        host_context: HostContext,
         invocation: &I,
         zome: &Zome,
         to_call: &FunctionName,

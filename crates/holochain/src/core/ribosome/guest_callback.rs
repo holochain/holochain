@@ -16,7 +16,7 @@ use holochain_types::prelude::*;
 use holochain_zome_types::ExternIO;
 
 pub struct CallIterator<R: RibosomeT, I: Invocation> {
-    host_access: HostAccess,
+    host_context: HostContext,
     ribosome: R,
     invocation: I,
     remaining_zomes: Vec<Zome>,
@@ -24,9 +24,9 @@ pub struct CallIterator<R: RibosomeT, I: Invocation> {
 }
 
 impl<R: RibosomeT, I: Invocation> CallIterator<R, I> {
-    pub fn new(host_access: HostAccess, ribosome: R, invocation: I) -> Self {
+    pub fn new(host_context: HostContext, ribosome: R, invocation: I) -> Self {
         Self {
-            host_access,
+            host_context,
             remaining_zomes: ribosome.zomes_to_invoke(invocation.zomes()),
             ribosome,
             remaining_components: invocation.fn_components(),
@@ -44,7 +44,7 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
                 match self.remaining_components.next() {
                     Some(to_call) => {
                         match self.ribosome.maybe_call(
-                            self.host_access.clone(),
+                            self.host_context.clone(),
                             &self.invocation,
                             zome,
                             &to_call.into(),

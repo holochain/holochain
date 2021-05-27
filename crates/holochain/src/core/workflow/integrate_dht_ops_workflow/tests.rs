@@ -761,7 +761,7 @@ async fn commit_entry<'env>(
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
-        call_context.host_access = host_access.into();
+        call_context.host_context = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
         host_fn::create::create(ribosome.clone(), call_context.clone(), input).unwrap()
@@ -797,7 +797,7 @@ async fn get_entry(env: EnvWrite, entry_hash: EntryHash) -> Option<Entry> {
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        call_context.host_access = host_access.into();
+        call_context.host_context = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
         host_fn::get::get(ribosome.clone(), call_context.clone(), input).unwrap()
@@ -841,7 +841,7 @@ async fn create_link(
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
-        call_context.host_access = host_access.into();
+        call_context.host_context = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
         // Call the real create_link host fn
@@ -898,7 +898,7 @@ async fn get_links(
     let mut host_access = fixt!(ZomeCallHostAccess);
     host_access.workspace = workspace_lock;
     host_access.network = test_network.cell_network();
-    call_context.host_access = host_access.into();
+    call_context.host_context = host_access.into();
     let ribosome = Arc::new(ribosome);
     let call_context = Arc::new(call_context);
     host_fn::get_links::get_links(ribosome.clone(), call_context.clone(), input).unwrap()

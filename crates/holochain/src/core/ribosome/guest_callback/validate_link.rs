@@ -79,7 +79,7 @@ pub struct ValidateLinkHostAccess {
     pub network: HolochainP2pCell,
 }
 
-impl From<ValidateLinkHostAccess> for HostAccess {
+impl From<ValidateLinkHostAccess> for HostContext {
     fn from(validate_link_add_host_access: ValidateLinkHostAccess) -> Self {
         Self::ValidateCreateLink(validate_link_add_host_access)
     }

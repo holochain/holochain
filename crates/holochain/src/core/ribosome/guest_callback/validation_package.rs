@@ -30,7 +30,7 @@ pub struct ValidationPackageHostAccess {
     pub network: HolochainP2pCell,
 }
 
-impl From<ValidationPackageHostAccess> for HostAccess {
+impl From<ValidationPackageHostAccess> for HostContext {
     fn from(validation_package_host_access: ValidationPackageHostAccess) -> Self {
         Self::ValidationPackage(validation_package_host_access)
     }

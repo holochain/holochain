@@ -28,7 +28,7 @@ pub struct PostCommitHostAccess {
     pub network: HolochainP2pCell,
 }
 
-impl From<PostCommitHostAccess> for HostAccess {
+impl From<PostCommitHostAccess> for HostContext {
     fn from(post_commit_host_access: PostCommitHostAccess) -> Self {
         Self::PostCommit(post_commit_host_access)
     }

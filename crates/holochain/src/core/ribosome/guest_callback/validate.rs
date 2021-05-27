@@ -32,7 +32,7 @@ pub struct ValidateHostAccess {
     pub network: HolochainP2pCell,
 }
 
-impl From<ValidateHostAccess> for HostAccess {
+impl From<ValidateHostAccess> for HostContext {
     fn from(validate_host_access: ValidateHostAccess) -> Self {
         Self::Validate(validate_host_access)
     }

@@ -12,7 +12,7 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
 ) -> Result<XSalsa20Poly1305EncryptedData, WasmError> {
     tokio_helper::block_forever_on(async move {
         call_context
-            .host_access
+            .host_context
             .keystore()
             .x_25519_x_salsa20_poly1305_encrypt(input)
             .await

@@ -13,7 +13,7 @@ pub fn create_x25519_keypair(
 ) -> Result<X25519PubKey, WasmError> {
     tokio_helper::block_forever_on(async move {
         call_context
-            .host_access
+            .host_context
             .keystore()
             .create_x25519_keypair()
             .await

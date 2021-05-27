@@ -2119,7 +2119,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.67"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=develop#64a4dbc8314cd4e9dbeef6552a01d75cc5556167"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=develop#e33ec185873a43cb346c95ae996dc1bd00f7bbeb"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -2130,7 +2130,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_guest"
 version = "0.0.67"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=develop#64a4dbc8314cd4e9dbeef6552a01d75cc5556167"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=develop#e33ec185873a43cb346c95ae996dc1bd00f7bbeb"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -2142,7 +2142,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_host"
 version = "0.0.67"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=develop#64a4dbc8314cd4e9dbeef6552a01d75cc5556167"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=develop#e33ec185873a43cb346c95ae996dc1bd00f7bbeb"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -2365,9 +2365,9 @@ dependencies = [
 
 [[package]]
 name = "inferno"
-version = "0.10.5"
+version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37fb405dbcc505ed20838c4f8dad7b901094de90add237755df54bd5dcda2fdd"
+checksum = "3c3cbcc228d2ad2e99328c2b19f38d80ec387ca6a29f778e40e32ca9f25448c3"
 dependencies = [
  "ahash 0.6.3",
  "atty",
@@ -2636,9 +2636,9 @@ checksum = "3576a87f2ba00f6f106fdfcd16db1d698d648a26ad8e0573cad8537c3c362d2a"
 
 [[package]]
 name = "libc"
-version = "0.2.94"
+version = "0.2.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18794a8ad5b29321f790b55d93dfba91e125cb1a9edbd4f8e3150acc771c1a5e"
+checksum = "789da6d93f1b866ffe175afc5322a4d76c038605a1c3319bb57b06967ca98a36"
 
 [[package]]
 name = "libloading"
@@ -5461,7 +5461,7 @@ checksum = "d7cff876b8f18eed75a66cf49b65e7f967cb354a7aa16003fb55dbfd25b44b4f"
 [[package]]
 name = "wasmer"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#f0ad0bed115a5a79ded48ebc56375381c742e3b1"
 dependencies = [
  "cfg-if 0.1.10",
  "indexmap",
@@ -5484,7 +5484,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#f0ad0bed115a5a79ded48ebc56375381c742e3b1"
 dependencies = [
  "enumset",
  "loupe",
@@ -5502,7 +5502,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler-cranelift"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#f0ad0bed115a5a79ded48ebc56375381c742e3b1"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
@@ -5521,7 +5521,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler-singlepass"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#f0ad0bed115a5a79ded48ebc56375381c742e3b1"
 dependencies = [
  "byteorder",
  "dynasm",
@@ -5539,7 +5539,7 @@ dependencies = [
 [[package]]
 name = "wasmer-derive"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#f0ad0bed115a5a79ded48ebc56375381c742e3b1"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -5550,7 +5550,7 @@ dependencies = [
 [[package]]
 name = "wasmer-engine"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#f0ad0bed115a5a79ded48ebc56375381c742e3b1"
 dependencies = [
  "backtrace",
  "lazy_static",
@@ -5570,7 +5570,7 @@ dependencies = [
 [[package]]
 name = "wasmer-engine-jit"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#f0ad0bed115a5a79ded48ebc56375381c742e3b1"
 dependencies = [
  "cfg-if 0.1.10",
  "leb128",
@@ -5587,7 +5587,7 @@ dependencies = [
 [[package]]
 name = "wasmer-engine-native"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#f0ad0bed115a5a79ded48ebc56375381c742e3b1"
 dependencies = [
  "cfg-if 0.1.10",
  "leb128",
@@ -5608,7 +5608,7 @@ dependencies = [
 [[package]]
 name = "wasmer-object"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#f0ad0bed115a5a79ded48ebc56375381c742e3b1"
 dependencies = [
  "object",
  "thiserror",
@@ -5619,7 +5619,7 @@ dependencies = [
 [[package]]
 name = "wasmer-types"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#f0ad0bed115a5a79ded48ebc56375381c742e3b1"
 dependencies = [
  "indexmap",
  "loupe",
@@ -5631,7 +5631,7 @@ dependencies = [
 [[package]]
 name = "wasmer-vm"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#f0ad0bed115a5a79ded48ebc56375381c742e3b1"
 dependencies = [
  "backtrace",
  "cc",

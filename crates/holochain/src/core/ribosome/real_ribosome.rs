@@ -193,7 +193,6 @@ impl RealRibosome {
         module: Arc<Module>,
         call_context: CallContext,
     ) -> RibosomeResult<Arc<Mutex<Instance>>> {
-        let zome_name = call_context.zome.zome_name().clone();
         let imports: ImportObject = Self::imports(self, call_context, module.store());
         let instance = Arc::new(Mutex::new(
             Instance::new(&module, &imports).map_err(|e| WasmError::Compile(e.to_string()))?,
@@ -202,7 +201,7 @@ impl RealRibosome {
     }
 
     fn imports(&self, call_context: CallContext, store: &Store) -> ImportObject {
-        let host_fn_access = (&call_context.host_access()).into();
+        let host_fn_access = (&call_context.host_context()).into();
 
         let env = Env::default();
         let mut imports = imports! {};
@@ -429,14 +428,14 @@ impl RibosomeT for RealRibosome {
     /// if it does not exist then return Ok(None)
     fn maybe_call<I: Invocation>(
         &self,
-        host_access: HostAccess,
+        host_context: HostContext,
         invocation: &I,
         zome: &Zome,
         to_call: &FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
         let call_context = CallContext {
             zome: zome.clone(),
-            host_access,
+            host_context,
         };
 
         match zome.zome_def() {
@@ -476,10 +475,10 @@ impl RibosomeT for RealRibosome {
 
     fn call_iterator<I: crate::core::ribosome::Invocation>(
         &self,
-        access: HostAccess,
+        host_context: HostContext,
         invocation: I,
     ) -> CallIterator<Self, I> {
-        CallIterator::new(access, self.clone(), invocation)
+        CallIterator::new(host_context, self.clone(), invocation)
     }
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,

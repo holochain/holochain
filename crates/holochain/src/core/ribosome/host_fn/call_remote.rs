@@ -12,7 +12,7 @@ pub fn call_remote(
 ) -> Result<ZomeCallResponse, WasmError> {
     // it is the network's responsibility to handle timeouts and return an Err result in that case
     let result: Result<SerializedBytes, _> = tokio_helper::block_forever_on(async move {
-        let mut network = call_context.host_access().network().clone();
+        let mut network = call_context.host_context().network().clone();
         network
             .call_remote(
                 input.target_agent_as_ref().to_owned(),

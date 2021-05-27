@@ -11,7 +11,7 @@ pub fn query(
 ) -> Result<Vec<Element>, WasmError> {
     tokio_helper::block_forever_on(async move {
         let elements: Vec<Element> = call_context
-            .host_access
+            .host_context
             .workspace()
             .source_chain()
             .query(&input)

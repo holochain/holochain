@@ -460,9 +460,9 @@ where
             }
         }
 
-        // If we are not in the process of authoring this hash and we are not the
-        // authority we can skip the network call.
-        if !authoring && !authority {
+        // If we are not in the process of authoring this hash or its
+        // authority we need a network call.
+        if !(authoring || authority) {
             self.fetch_element(header_hash.into(), options.into())
                 .await?;
         }
