@@ -2,15 +2,34 @@
 
 use super::error::ConductorResult;
 use holochain_types::prelude::*;
-use kitsune_p2p::event::{MetricDatum, MetricQuery, MetricQueryAnswer};
+use kitsune_p2p::event::{MetricDatumKind, MetricQuery, MetricQueryAnswer};
 
 /// Record a p2p metric datum
 pub fn put_metric_datum(
-    _env: EnvWrite,
-    _agent: AgentPubKey,
-    _metric: MetricDatum,
+    env: EnvWrite,
+    agent: AgentPubKey,
+    metric: MetricDatumKind,
 ) -> ConductorResult<()> {
-    todo!()
+    env.with_commit(|txn| {
+        txn.execute(
+            sql_p2p_metrics::INSERT,
+            named_params! {
+                ":agent": agent,
+
+                ":encoded": &record.encoded,
+
+                ":signed_at_ms": &record.signed_at_ms,
+                ":expires_at_ms": &record.expires_at_ms,
+                ":storage_center_loc": &record.storage_center_loc,
+
+                ":storage_start_1": &record.storage_start_1,
+                ":storage_end_1": &record.storage_end_1,
+                ":storage_start_2": &record.storage_start_2,
+                ":storage_end_2": &record.storage_end_2,
+            },
+        )
+    })?;
+    Ok(())
 }
 
 /// Query the p2p_metrics database in a variety of ways
@@ -45,28 +64,28 @@ mod tests {
         put_metric_datum(
             env.clone(),
             agent1.clone(),
-            MetricDatum::LastQuickGossip(instants[0].clone()),
+            MetricDatumKind::LastQuickGossip(instants[0].clone()),
         )
         .unwrap();
 
         put_metric_datum(
             env.clone(),
             agent2.clone(),
-            MetricDatum::LastQuickGossip(instants[1].clone()),
+            MetricDatumKind::LastQuickGossip(instants[1].clone()),
         )
         .unwrap();
 
         put_metric_datum(
             env.clone(),
             agent1.clone(),
-            MetricDatum::LastQuickGossip(instants[2].clone()),
+            MetricDatumKind::LastQuickGossip(instants[2].clone()),
         )
         .unwrap();
 
         put_metric_datum(
             env.clone(),
             agent1.clone(),
-            MetricDatum::LastQuickGossip(instants[3].clone()),
+            MetricDatumKind::LastQuickGossip(instants[3].clone()),
         )
         .unwrap();
 

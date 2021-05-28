@@ -71,19 +71,20 @@ pub struct QueryAgentInfoSignedEvt {
 }
 
 /// A single datum of metric info about an Agent, to be recorded by the client.
-pub enum MetricDatum {
+#[derive(derive_more::Display)]
+pub enum MetricDatumKind {
     /// Our fast gossip loop synced this node up to this timestamp.
     /// The next quick loop can sync from this timestamp forward.
-    LastQuickGossip(std::time::Instant),
+    LastQuickGossip,
 
     /// The last time a full slow gossip loop completed was at this timestamp.
     /// If that is too recent, we won't run another slow loop.
-    LastSlowGossip(std::time::Instant),
+    LastSlowGossip,
 
     /// The last time we got a connection/timeout error with this node,
     /// ignoring inactivity timeouts.
     /// Lets us skip recently unreachable nodes in gossip loops.
-    LastConnectError(std::time::Instant),
+    LastConnectError,
 }
 
 /// Different kinds of queries about metric data
@@ -124,7 +125,7 @@ ghost_actor::ghost_chan! {
         fn query_agent_info_signed(input: QueryAgentInfoSignedEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
         /// Record a metric datum about an agent.
-        fn put_metric_datum(agent: Arc<super::KitsuneAgent>, metric: MetricDatum) -> ();
+        fn put_metric_datum(agent: Arc<super::KitsuneAgent>, metric: MetricDatumKind) -> ();
 
         /// Ask for metric data.
         fn query_metrics(query: MetricQuery) -> MetricQueryAnswer;

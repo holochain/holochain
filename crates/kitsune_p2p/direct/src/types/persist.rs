@@ -2,7 +2,7 @@
 
 use crate::*;
 use futures::future::BoxFuture;
-use kitsune_p2p::event::MetricDatum;
+use kitsune_p2p::event::MetricDatumKind;
 use kitsune_p2p::event::MetricQuery;
 use kitsune_p2p::event::MetricQueryAnswer;
 use kitsune_p2p::KitsuneAgent;
@@ -55,7 +55,7 @@ pub trait AsKdPersist: 'static + Send + Sync {
     fn put_metric_datum(
         &self,
         agent: KitsuneAgent,
-        datum: MetricDatum,
+        datum: MetricDatumKind,
     ) -> BoxFuture<'static, KitsuneResult<()>>;
 
     /// Store agent info

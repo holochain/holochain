@@ -327,7 +327,7 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_put_metric_datum(
         &mut self,
         agent: Arc<types::KitsuneAgent>,
-        metric: MetricDatum,
+        metric: MetricDatumKind,
     ) -> KitsuneP2pEventHandlerResult<()> {
         Ok(self.evt_sender.put_metric_datum(agent, metric))
     }

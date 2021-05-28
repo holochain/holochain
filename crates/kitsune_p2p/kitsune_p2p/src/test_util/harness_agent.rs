@@ -161,7 +161,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
     fn handle_put_metric_datum(
         &mut self,
         _agent: Arc<types::KitsuneAgent>,
-        _metric: MetricDatum,
+        _metric: MetricDatumKind,
     ) -> KitsuneP2pEventHandlerResult<()> {
         todo!()
     }

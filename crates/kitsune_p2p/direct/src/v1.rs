@@ -382,7 +382,7 @@ async fn handle_put_metric_datum(
     _clone_1: Arc<Kd1>,
     _clone_2: LogicChanHandle<KitsuneDirectEvt>,
     _agent: Arc<KitsuneAgent>,
-    _metric: MetricDatum,
+    _metric: MetricDatumKind,
 ) -> KitsuneResult<()> {
     todo!()
 }

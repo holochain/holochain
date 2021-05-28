@@ -9,7 +9,7 @@ use rusqlite::*;
 
 /// Extension trait to treat connection instances
 /// as p2p store accessors.
-pub trait AsP2pConExt {
+pub trait AsP2pStateConExt {
     /// Put an AgentInfoSigned record into the p2p_store
     fn p2p_put(&mut self, signed: &AgentInfoSigned) -> DatabaseResult<()>;
 
@@ -33,7 +33,7 @@ pub trait AsP2pConExt {
 
 /// Extension trait to treat transaction instances
 /// as p2p store accessors.
-pub trait AsP2pTxExt {
+pub trait AsP2pStateTxExt {
     /// Put an AgentInfoSigned record into the p2p_store
     fn p2p_put(&self, signed: &AgentInfoSigned) -> DatabaseResult<()>;
 
@@ -55,7 +55,7 @@ pub trait AsP2pTxExt {
     fn p2p_prune(&self) -> DatabaseResult<()>;
 }
 
-impl AsP2pConExt for crate::db::PConn {
+impl AsP2pStateConExt for crate::db::PConn {
     fn p2p_put(&mut self, signed: &AgentInfoSigned) -> DatabaseResult<()> {
         self.with_commit(move |writer| writer.p2p_put(signed))
     }
@@ -82,7 +82,7 @@ impl AsP2pConExt for crate::db::PConn {
     }
 }
 
-impl AsP2pTxExt for Transaction<'_> {
+impl AsP2pStateTxExt for Transaction<'_> {
     fn p2p_put(&self, signed: &AgentInfoSigned) -> DatabaseResult<()> {
         let record = P2pRecord::from_signed(signed)?;
         self.execute(

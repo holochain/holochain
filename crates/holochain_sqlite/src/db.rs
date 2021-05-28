@@ -15,8 +15,11 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-mod p2p;
-pub use p2p::*;
+mod p2p_state;
+pub use p2p_state::*;
+
+mod p2p_metrics;
+pub use p2p_metrics::*;
 
 /// A read-only version of [DbWrite].
 /// This environment can only generate read-only transactions, never read-write.
