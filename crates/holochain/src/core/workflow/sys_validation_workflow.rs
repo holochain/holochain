@@ -157,7 +157,7 @@ async fn validate_op(
         Err(SysValidationError::ValidationOutcome(e)) => {
             info!(
                 agent = %which_agent(conductor_api.cell_id().agent_pubkey()),
-                msg = "DhtOp did not pass validation. (If rejected, a warning will follow.)",
+                msg = "DhtOp did not pass system validation. (If rejected, a warning will follow.)",
                 ?op,
                 error = ?e,
                 error_msg = %e
@@ -166,7 +166,7 @@ async fn validate_op(
             if let Outcome::Rejected = outcome {
                 warn!(
                     agent = %which_agent(conductor_api.cell_id().agent_pubkey()),
-                    msg = "DhtOp was rejected.",
+                    msg = "DhtOp was rejected during system validation.",
                     ?op,
                 )
             }
