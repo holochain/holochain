@@ -98,7 +98,7 @@ pub enum MetricQuery {
     /// Filters for the "oldest agent" query.
     Oldest {
         /// Agents whose last connection error is earlier than this time will be filtered out.
-        last_connect_error_threshold: std::time::Instant,
+        last_connect_error_threshold: std::time::SystemTime,
     },
 }
 
@@ -106,7 +106,7 @@ pub enum MetricQuery {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MetricQueryAnswer {
     /// The last sync time for all agents.
-    LastSync(std::time::Instant),
+    LastSync(std::time::SystemTime),
     /// The agent with the oldest last-connection time which satisfies the query.
     Oldest(super::KitsuneAgent),
 }

@@ -23,6 +23,6 @@ pub(crate) mod sql_p2p_state {
 pub(crate) mod sql_p2p_metrics {
     pub(crate) const SCHEMA: &str = include_str!("sql/p2p_metrics/schema.sql");
     pub(crate) const INSERT: &str = include_str!("sql/p2p_metrics/insert.sql");
-    // pub(crate) const QUERY_LAST_SYNC: &str = include_str!("sql/p2p_metrics/select_last_sync.sql");
+    pub(crate) const QUERY_LAST_SYNC: &str = include_str!("sql/p2p_metrics/query_last_sync.sql");
     // pub(crate) const QUERY_OLDEST: &str = include_str!("sql/p2p_metrics/select_oldest.sql");
 }

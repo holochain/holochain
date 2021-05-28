@@ -178,6 +178,12 @@ macro_rules! make_kitsune_bin_type {
                     base64::encode_config(&self.0, base64::URL_SAFE_NO_PAD).fmt(f)
                 }
             }
+
+            impl AsRef<[u8]> for $name {
+                fn as_ref(&self) -> &[u8] {
+                    self.get_bytes()
+                }
+            }
         )*
     };
 }
