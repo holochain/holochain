@@ -1,4 +1,4 @@
-SELECT MAX(timestamp)
+SELECT MAX(moment)
 FROM p2p_metrics
-WHERE agent = :agent
-AND   metric = :metric
+WHERE agent  = :agent
+AND   kind   = :kind

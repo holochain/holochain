@@ -3,30 +3,43 @@ use crate::{
     sql::sql_p2p_metrics,
 };
 use holochain_zome_types::prelude::*;
-use kitsune_p2p::event::{MetricDatumKind, MetricQuery, MetricQueryAnswer};
+use kitsune_p2p::event::{MetricKind, MetricQuery, MetricQueryAnswer};
 use kitsune_p2p::*;
 use rusqlite::*;
-use std::{num::TryFromIntError, sync::Arc, time::Duration};
+use std::{
+    num::TryFromIntError,
+    sync::Arc,
+    time::{Duration, SystemTime, SystemTimeError},
+};
+
+fn time_to_ns(t: SystemTime) -> DatabaseResult<u64> {
+    t.duration_since(std::time::UNIX_EPOCH.into())
+        .map_err(|e| DatabaseError::Other(e.into()))?
+        .as_nanos()
+        .try_into()
+        .map_err(|e: TryFromIntError| DatabaseError::Other(e.into()))
+}
+
+fn time_from_ns(ns: u64) -> SystemTime {
+    std::time::UNIX_EPOCH
+        .checked_add(Duration::from_nanos(ns))
+        .expect("Time must be after 1970 and before the end of the universe")
+}
 
 /// Record a p2p metric datum
 pub fn put_metric_datum(
     txn: &mut Transaction,
     agent: Arc<KitsuneAgent>,
-    metric: MetricDatumKind,
+    metric: MetricKind,
     timestamp: std::time::SystemTime,
 ) -> DatabaseResult<()> {
-    let timestamp: u64 = timestamp
-        .duration_since(std::time::UNIX_EPOCH.into())
-        .map_err(|e| DatabaseError::Other(e.into()))?
-        .as_nanos()
-        .try_into()
-        .map_err(|e: TryFromIntError| DatabaseError::Other(e.into()))?;
+    let agent_bytes: &[u8] = agent.as_ref();
     txn.execute(
         sql_p2p_metrics::INSERT,
         named_params! {
-            ":agent": agent.get_bytes(),
-            ":metric": metric.to_string(),
-            ":timestamp": timestamp
+            ":agent": agent_bytes,
+            ":kind": metric.to_string(),
+            ":moment": time_to_ns(timestamp)?
         },
     )?;
     Ok(())
@@ -39,25 +52,31 @@ pub fn query_metrics(
 ) -> DatabaseResult<MetricQueryAnswer> {
     Ok(match query {
         MetricQuery::LastSync { agent } => {
+            let agent_bytes: &[u8] = agent.as_ref();
             let timestamp: u64 = txn.query_row(
                 sql_p2p_metrics::QUERY_LAST_SYNC,
                 named_params! {
-                    ":agent": agent.get_bytes(),
-                    ":metric": MetricDatumKind::LastQuickGossip.to_string(),
+                    ":agent": agent_bytes,
+                    ":kind": MetricKind::QuickGossip.to_string(),
                 },
                 |row| row.get(0),
             )?;
             dbg!(&timestamp);
-            MetricQueryAnswer::LastSync(
-                std::time::UNIX_EPOCH
-                    .checked_add(Duration::from_nanos(timestamp))
-                    .expect("weird time"),
-            )
+            MetricQueryAnswer::LastSync(time_from_ns(timestamp))
         }
         MetricQuery::Oldest {
             last_connect_error_threshold,
         } => {
-            todo!()
+            let agent_bytes: Vec<u8> = txn.query_row(
+                sql_p2p_metrics::QUERY_OLDEST,
+                named_params! {
+                    ":error_threshold": time_to_ns(last_connect_error_threshold)?,
+                    ":kind_error": MetricKind::ConnectError.to_string(),
+                    ":kind_slow_gossip": MetricKind::SlowGossip.to_string(),
+                },
+                |row| row.get(0),
+            )?;
+            MetricQueryAnswer::Oldest(KitsuneAgent::new(agent_bytes))
         }
     })
 }

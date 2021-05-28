@@ -5,7 +5,7 @@ use crate::*;
 use holochain_zome_types::signature::Signature;
 use kitsune_p2p::{
     agent_store::AgentInfoSigned,
-    event::{MetricDatumKind, MetricQuery, MetricQueryAnswer},
+    event::{MetricKind, MetricQuery, MetricQueryAnswer},
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -117,7 +117,7 @@ ghost_actor::ghost_chan! {
         fn query_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Vec<AgentInfoSigned>;
 
         /// We need to store some metric data on behalf of kitsune.
-        fn put_metric_datum(dna_hash: DnaHash, to_agent: AgentPubKey, metric: MetricDatumKind) -> ();
+        fn put_metric_datum(dna_hash: DnaHash, to_agent: AgentPubKey, metric: MetricKind) -> ();
 
         /// We need to provide some metric data to kitsune.
         fn query_metrics(dna_hash: DnaHash, to_agent: AgentPubKey, query: MetricQuery) -> MetricQueryAnswer;

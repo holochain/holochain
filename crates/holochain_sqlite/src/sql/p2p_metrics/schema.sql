@@ -1,7 +1,7 @@
 -- p2p store
 CREATE TABLE IF NOT EXISTS p2p_metrics (
-  agent BLOB NOT NULL,
-  metric TEXT NOT NULL,
-  timestamp INTEGER NOT NULL,
-  PRIMARY KEY (agent, metric, timestamp)
+  agent          BLOB NOT NULL,
+  kind           TEXT NOT NULL,
+  moment         INTEGER NOT NULL,
+  PRIMARY KEY (agent, kind, moment)
 );

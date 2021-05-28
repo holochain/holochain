@@ -6,14 +6,14 @@ use super::error::ConductorResult;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
-use kitsune_p2p::event::{MetricDatumKind, MetricQuery, MetricQueryAnswer};
+use kitsune_p2p::event::{MetricKind, MetricQuery, MetricQueryAnswer};
 use std::time::SystemTime;
 
 /// Record a p2p metric datum
 pub fn put_metric_datum(
     env: EnvWrite,
     agent: AgentPubKey,
-    metric: MetricDatumKind,
+    metric: MetricKind,
     timestamp: SystemTime,
 ) -> ConductorResult<()> {
     env.conn()?.with_commit(|txn| {
@@ -35,11 +35,9 @@ mod tests {
     use ::fixt::prelude::*;
     use holochain_p2p::agent_holo_to_kit;
     use holochain_state::prelude::test_p2p_metrics_env;
-    use std::{
-        sync::Arc,
-        time::{Duration, Instant},
-    };
+    use std::{sync::Arc, time::Duration};
 
+    /// Return an iterator of moments, each one later than the last by 1 second
     fn moments() -> impl Iterator<Item = SystemTime> {
         itertools::unfold(SystemTime::now(), |now| {
             now.checked_add(Duration::from_secs(1)).map(|next| {
@@ -51,46 +49,31 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_query_last_sync() {
+        use MetricKind::*;
+
         let test_env = test_p2p_metrics_env();
         let env = test_env.env();
         let agent1 = fixt!(AgentPubKey);
         let agent2 = fixt!(AgentPubKey);
-        // Vec of successively later Instants
-        let moments: Vec<SystemTime> = moments().take(5).collect();
+        let agent3 = fixt!(AgentPubKey);
 
-        dbg!(&moments);
+        let ms: Vec<SystemTime> = moments().take(6).collect();
 
-        put_metric_datum(
-            env.clone(),
-            agent1.clone(),
-            MetricDatumKind::LastQuickGossip,
-            moments[0].clone(),
-        )
-        .unwrap();
+        // insert relevant data
+        put_metric_datum(env.clone(), agent1.clone(), QuickGossip, ms[0].clone()).unwrap();
+        put_metric_datum(env.clone(), agent2.clone(), QuickGossip, ms[1].clone()).unwrap();
+        put_metric_datum(env.clone(), agent1.clone(), QuickGossip, ms[2].clone()).unwrap();
+        put_metric_datum(env.clone(), agent2.clone(), QuickGossip, ms[3].clone()).unwrap();
 
-        put_metric_datum(
-            env.clone(),
-            agent2.clone(),
-            MetricDatumKind::LastQuickGossip,
-            moments[1].clone(),
-        )
-        .unwrap();
-
-        put_metric_datum(
-            env.clone(),
-            agent1.clone(),
-            MetricDatumKind::LastQuickGossip,
-            moments[2].clone(),
-        )
-        .unwrap();
-
-        put_metric_datum(
-            env.clone(),
-            agent2.clone(),
-            MetricDatumKind::LastQuickGossip,
-            moments[3].clone(),
-        )
-        .unwrap();
+        // other metrics do not affect this query even if they're more recent
+        put_metric_datum(env.clone(), agent1.clone(), SlowGossip, ms[4].clone()).unwrap();
+        put_metric_datum(env.clone(), agent2.clone(), SlowGossip, ms[5].clone()).unwrap();
+        put_metric_datum(env.clone(), agent1.clone(), ConnectError, ms[4].clone()).unwrap();
+        put_metric_datum(env.clone(), agent2.clone(), ConnectError, ms[5].clone()).unwrap();
+        // more unrelated noise
+        put_metric_datum(env.clone(), agent3.clone(), QuickGossip, ms[5].clone()).unwrap();
+        put_metric_datum(env.clone(), agent3.clone(), SlowGossip, ms[5].clone()).unwrap();
+        put_metric_datum(env.clone(), agent3.clone(), ConnectError, ms[5].clone()).unwrap();
 
         assert_eq!(
             query_metrics(
@@ -100,8 +83,9 @@ mod tests {
                 }
             )
             .unwrap(),
-            MetricQueryAnswer::LastSync(moments[2].clone())
+            MetricQueryAnswer::LastSync(ms[2].clone())
         );
+
         assert_eq!(
             query_metrics(
                 env.clone(),
@@ -110,22 +94,60 @@ mod tests {
                 }
             )
             .unwrap(),
-            MetricQueryAnswer::LastSync(moments[3].clone())
+            MetricQueryAnswer::LastSync(ms[3].clone())
         );
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_query_oldest() {
+        use MetricKind::*;
+
         let test_env = test_p2p_metrics_env();
         let env = test_env.env();
         let agent1 = fixt!(AgentPubKey);
         let agent2 = fixt!(AgentPubKey);
-        let instants: Vec<Instant> = itertools::unfold(Instant::now(), |now| {
-            now.checked_add(Duration::from_secs(1))
-        })
-        .take(5)
-        .collect();
+        let ms: Vec<SystemTime> = moments().take(8).collect();
 
-        todo!();
+        // insert relevant data
+        put_metric_datum(env.clone(), agent1.clone(), SlowGossip, ms[0].clone()).unwrap();
+        put_metric_datum(env.clone(), agent2.clone(), SlowGossip, ms[1].clone()).unwrap();
+        put_metric_datum(env.clone(), agent1.clone(), SlowGossip, ms[2].clone()).unwrap();
+        put_metric_datum(env.clone(), agent2.clone(), SlowGossip, ms[3].clone()).unwrap();
+        // we're reusing some of the same moments here for convenience, but
+        // there is no significance in that fact.
+        put_metric_datum(env.clone(), agent1.clone(), ConnectError, ms[0].clone()).unwrap();
+        put_metric_datum(env.clone(), agent2.clone(), ConnectError, ms[2].clone()).unwrap();
+        put_metric_datum(env.clone(), agent2.clone(), ConnectError, ms[4].clone()).unwrap();
+        put_metric_datum(env.clone(), agent1.clone(), ConnectError, ms[6].clone()).unwrap();
+
+        // a little noise
+        put_metric_datum(env.clone(), agent1.clone(), QuickGossip, ms[0].clone()).unwrap();
+        put_metric_datum(env.clone(), agent2.clone(), QuickGossip, ms[0].clone()).unwrap();
+
+        // - agent 1 has the oldest latest slow gossip time, but the most recent
+        //   connection error, so with this threshold, agent 2 should be returned.
+        assert_eq!(
+            query_metrics(
+                env.clone(),
+                MetricQuery::Oldest {
+                    last_connect_error_threshold: ms[5].clone()
+                }
+            )
+            .unwrap(),
+            MetricQueryAnswer::Oldest(Arc::try_unwrap(agent2.to_kitsune()).unwrap())
+        );
+
+        // - with a more recent threshold, agent 1 should be returned, since
+        //   it is not filtered out
+        assert_eq!(
+            query_metrics(
+                env.clone(),
+                MetricQuery::Oldest {
+                    last_connect_error_threshold: ms[7].clone()
+                }
+            )
+            .unwrap(),
+            MetricQueryAnswer::Oldest(Arc::try_unwrap(agent1.to_kitsune()).unwrap())
+        );
     }
 }

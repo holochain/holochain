@@ -1,6 +1,6 @@
 INSERT INTO p2p_metrics (
-  agent, metric, timestamp
+  agent, kind, moment
 ) VALUES (
-  :agent, :metric, :timestamp
+  :agent, :kind, :moment
 )
 ;

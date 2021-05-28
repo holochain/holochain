@@ -2,7 +2,7 @@
 
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
-use kitsune_p2p::event::MetricDatumKind;
+use kitsune_p2p::event::MetricKind;
 use kitsune_p2p::event::MetricQuery;
 use kitsune_p2p::event::MetricQueryAnswer;
 use kitsune_p2p::KitsuneAgent;
@@ -192,7 +192,7 @@ impl AsKdPersist for PersistMem {
     fn put_metric_datum(
         &self,
         _agent: KitsuneAgent,
-        _datum: MetricDatumKind,
+        _datum: MetricKind,
     ) -> BoxFuture<'static, KitsuneResult<()>> {
         todo!()
     }

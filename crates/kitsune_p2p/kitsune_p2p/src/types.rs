@@ -181,7 +181,7 @@ macro_rules! make_kitsune_bin_type {
 
             impl AsRef<[u8]> for $name {
                 fn as_ref(&self) -> &[u8] {
-                    self.get_bytes()
+                    self.0.as_slice()
                 }
             }
         )*

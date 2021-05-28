@@ -296,7 +296,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     fn handle_put_metric_datum(
         &mut self,
         _agent: Arc<kitsune_p2p::KitsuneAgent>,
-        _metric: kitsune_p2p::event::MetricDatumKind,
+        _metric: kitsune_p2p::event::MetricKind,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
         todo!()
     }
