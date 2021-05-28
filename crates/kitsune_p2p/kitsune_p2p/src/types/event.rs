@@ -87,6 +87,7 @@ pub enum MetricDatum {
 }
 
 /// Different kinds of queries about metric data
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MetricQuery {
     /// Filters for the "last sync" query.
     LastSync {
@@ -100,7 +101,8 @@ pub enum MetricQuery {
     },
 }
 
-/// Different kinds of queries about metric data
+/// Corresponding response to `MetricQuery`
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MetricQueryAnswer {
     /// The last sync time for all agents.
     LastSync(std::time::Instant),
