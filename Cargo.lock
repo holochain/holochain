@@ -397,6 +397,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bit-vec"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bitflags"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -440,6 +449,17 @@ dependencies = [
  "fastrand",
  "futures-lite",
  "once_cell",
+]
+
+[[package]]
+name = "bloomfilter"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1cffe85a8b173164000edb6570ff7cf429acc9460b41d963e797df413f1765b4"
+dependencies = [
+ "bit-vec",
+ "rand 0.8.3",
+ "siphasher",
 ]
 
 [[package]]
@@ -2190,10 +2210,10 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
- "tokio-tungstenite",
+ "tokio-tungstenite 0.13.0",
  "tracing",
  "tracing-futures",
- "tungstenite",
+ "tungstenite 0.12.0",
  "unwrap_to",
  "url2",
 ]
@@ -2380,9 +2400,9 @@ dependencies = [
 
 [[package]]
 name = "inferno"
-version = "0.10.5"
+version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37fb405dbcc505ed20838c4f8dad7b901094de90add237755df54bd5dcda2fdd"
+checksum = "3c3cbcc228d2ad2e99328c2b19f38d80ec387ca6a29f778e40e32ca9f25448c3"
 dependencies = [
  "ahash 0.6.3",
  "atty",
@@ -2472,7 +2492,9 @@ dependencies = [
 name = "kitsune_p2p"
 version = "0.0.1"
 dependencies = [
+ "arrayref",
  "base64",
+ "bloomfilter",
  "derive_more",
  "fixt",
  "futures",
@@ -2495,6 +2517,49 @@ dependencies = [
  "tokio-stream",
  "tracing-subscriber",
  "url2",
+]
+
+[[package]]
+name = "kitsune_p2p_direct"
+version = "0.0.1"
+dependencies = [
+ "arrayref",
+ "base64",
+ "futures",
+ "hyper",
+ "kitsune_p2p",
+ "kitsune_p2p_direct_api",
+ "kitsune_p2p_proxy",
+ "kitsune_p2p_transport_quic",
+ "kitsune_p2p_types",
+ "rand 0.8.3",
+ "serde",
+ "serde_json",
+ "sodoken",
+ "structopt",
+ "tokio",
+ "tokio-tungstenite 0.14.0",
+ "tungstenite 0.13.0",
+]
+
+[[package]]
+name = "kitsune_p2p_direct_api"
+version = "0.0.1"
+dependencies = [
+ "arrayref",
+ "base64",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "kitsune_p2p_direct_test"
+version = "0.0.1"
+dependencies = [
+ "kitsune_p2p_direct",
+ "kitsune_p2p_proxy",
+ "kitsune_p2p_transport_quic",
+ "tokio",
 ]
 
 [[package]]
@@ -2651,9 +2716,9 @@ checksum = "3576a87f2ba00f6f106fdfcd16db1d698d648a26ad8e0573cad8537c3c362d2a"
 
 [[package]]
 name = "libc"
-version = "0.2.94"
+version = "0.2.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18794a8ad5b29321f790b55d93dfba91e125cb1a9edbd4f8e3150acc771c1a5e"
+checksum = "789da6d93f1b866ffe175afc5322a4d76c038605a1c3319bb57b06967ca98a36"
 
 [[package]]
 name = "libloading"
@@ -2681,6 +2746,17 @@ dependencies = [
  "rand 0.8.3",
  "socket2 0.3.19",
  "tokio",
+]
+
+[[package]]
+name = "libsodium-sys"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a685b64f837b339074115f2e7f7b431ac73681d08d75b389db7498b8892b8a58"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
 ]
 
 [[package]]
@@ -4622,6 +4698,9 @@ name = "siphasher"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cbce6d4507c7e4a3962091436e56e95290cb71fa302d0d270e32130b75fbff27"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "slab"
@@ -4672,6 +4751,22 @@ checksum = "9e3dfc207c526015c632472a77be09cf1b6e46866581aecae5cc38fb4235dea2"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "sodoken"
+version = "0.0.1-alpha.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e228d84d2c62a7cfebd521c724c7a9470596dc32674cd45a99953cb43d7436d"
+dependencies = [
+ "libc",
+ "libsodium-sys",
+ "num_cpus",
+ "once_cell",
+ "parking_lot 0.11.1",
+ "rayon",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -5021,7 +5116,20 @@ dependencies = [
  "pin-project 1.0.7",
  "tokio",
  "tokio-native-tls",
- "tungstenite",
+ "tungstenite 0.12.0",
+]
+
+[[package]]
+name = "tokio-tungstenite"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e96bb520beab540ab664bd5a9cfeaa1fcd846fa68c830b42e2c8963071251d2"
+dependencies = [
+ "futures-util",
+ "log",
+ "pin-project 1.0.7",
+ "tokio",
+ "tungstenite 0.13.0",
 ]
 
 [[package]]
@@ -5180,6 +5288,27 @@ dependencies = [
  "native-tls",
  "rand 0.8.3",
  "sha-1",
+ "url 2.2.2",
+ "utf-8",
+]
+
+[[package]]
+name = "tungstenite"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fe8dada8c1a3aeca77d6b51a4f1314e0f4b8e438b7b1b71e3ddaca8080e4093"
+dependencies = [
+ "base64",
+ "byteorder",
+ "bytes",
+ "http",
+ "httparse",
+ "input_buffer",
+ "log",
+ "native-tls",
+ "rand 0.8.3",
+ "sha-1",
+ "thiserror",
  "url 2.2.2",
  "utf-8",
 ]
@@ -5476,7 +5605,7 @@ checksum = "d7cff876b8f18eed75a66cf49b65e7f967cb354a7aa16003fb55dbfd25b44b4f"
 [[package]]
 name = "wasmer"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#fe8d077e4a7d1b1dd800c60b26b3d1ff3ca947bd"
 dependencies = [
  "cfg-if 0.1.10",
  "indexmap",
@@ -5499,7 +5628,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#fe8d077e4a7d1b1dd800c60b26b3d1ff3ca947bd"
 dependencies = [
  "enumset",
  "loupe",
@@ -5517,7 +5646,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler-cranelift"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#fe8d077e4a7d1b1dd800c60b26b3d1ff3ca947bd"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
@@ -5536,7 +5665,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler-singlepass"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#fe8d077e4a7d1b1dd800c60b26b3d1ff3ca947bd"
 dependencies = [
  "byteorder",
  "dynasm",
@@ -5554,7 +5683,7 @@ dependencies = [
 [[package]]
 name = "wasmer-derive"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#fe8d077e4a7d1b1dd800c60b26b3d1ff3ca947bd"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -5565,7 +5694,7 @@ dependencies = [
 [[package]]
 name = "wasmer-engine"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#fe8d077e4a7d1b1dd800c60b26b3d1ff3ca947bd"
 dependencies = [
  "backtrace",
  "lazy_static",
@@ -5585,7 +5714,7 @@ dependencies = [
 [[package]]
 name = "wasmer-engine-jit"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#fe8d077e4a7d1b1dd800c60b26b3d1ff3ca947bd"
 dependencies = [
  "cfg-if 0.1.10",
  "leb128",
@@ -5602,7 +5731,7 @@ dependencies = [
 [[package]]
 name = "wasmer-engine-native"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#fe8d077e4a7d1b1dd800c60b26b3d1ff3ca947bd"
 dependencies = [
  "cfg-if 0.1.10",
  "leb128",
@@ -5623,7 +5752,7 @@ dependencies = [
 [[package]]
 name = "wasmer-object"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#fe8d077e4a7d1b1dd800c60b26b3d1ff3ca947bd"
 dependencies = [
  "object",
  "thiserror",
@@ -5634,7 +5763,7 @@ dependencies = [
 [[package]]
 name = "wasmer-types"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#fe8d077e4a7d1b1dd800c60b26b3d1ff3ca947bd"
 dependencies = [
  "indexmap",
  "loupe",
@@ -5646,7 +5775,7 @@ dependencies = [
 [[package]]
 name = "wasmer-vm"
 version = "1.0.2"
-source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#d3c58eb9d63a5a19e382f70aaa9be495d110c4a2"
+source = "git+https://github.com/wasmerio/wasmer?branch=fix-cyclic-ref#fe8d077e4a7d1b1dd800c60b26b3d1ff3ca947bd"
 dependencies = [
  "backtrace",
  "cc",
