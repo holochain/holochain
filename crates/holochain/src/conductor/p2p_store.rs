@@ -80,6 +80,16 @@ pub fn query_agent_info_signed(
     Ok(environ.conn()?.p2p_list()?)
 }
 
+/// Get agent info for a single space near a basis loc
+pub fn query_agent_info_signed_near_basis(
+    environ: EnvWrite,
+    _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+    basis_loc: u32,
+    limit: u32,
+) -> ConductorResult<Vec<AgentInfoSigned>> {
+    Ok(environ.conn()?.p2p_query_near_basis(basis_loc, limit)?)
+}
+
 /// Get the peer density an agent is currently seeing within
 /// a given [`DhtArc`]
 pub fn query_peer_density(

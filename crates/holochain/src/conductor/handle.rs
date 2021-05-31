@@ -49,6 +49,7 @@ use super::manager::TaskManagerRunHandle;
 use super::p2p_store::get_agent_info_signed;
 use super::p2p_store::put_agent_info_signed;
 use super::p2p_store::query_agent_info_signed;
+use super::p2p_store::query_agent_info_signed_near_basis;
 use super::Cell;
 use super::Conductor;
 use crate::core::workflow::ZomeCallResult;
@@ -409,6 +410,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             } => {
                 let env = { self.conductor.read().await.p2p_env(space) };
                 let res = query_agent_info_signed(env, kitsune_space)
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            QueryAgentInfoSignedNearBasis {
+                kitsune_space,
+                kitsune_basis,
+                limit,
+                respond,
+                ..
+            } => {
+                use kitsune_p2p::KitsuneBinType;
+                let basis_loc = kitsune_basis.get_loc();
+                let env = { self.conductor.read().await.p2p_env(space) };
+                let res = query_agent_info_signed_near_basis(env, kitsune_space, basis_loc, limit)
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }

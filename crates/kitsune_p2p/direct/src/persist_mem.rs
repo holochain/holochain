@@ -351,6 +351,29 @@ impl AsKdPersist for PersistMem {
         .boxed()
     }
 
+    fn query_agent_info_near_basis(
+        &self,
+        root: KdHash,
+        _basis_loc: u32,
+        limit: u32,
+    ) -> BoxFuture<'static, KdResult<Vec<KdAgentInfo>>> {
+        let store = self.0.share_mut(move |i, _| match i.agent_info.get(&root) {
+            Some(store) => Ok(store.clone()),
+            None => Err("root not found".into()),
+        });
+        async move {
+            let store = match store {
+                Err(_) => return Ok(vec![]),
+                Ok(store) => store,
+            };
+            // TODO - FIXME - sort by nearness to basis
+            store
+                .get_all()
+                .map(|list| list.into_iter().take(limit as usize).collect())
+        }
+        .boxed()
+    }
+
     fn store_entry(
         &self,
         root: KdHash,

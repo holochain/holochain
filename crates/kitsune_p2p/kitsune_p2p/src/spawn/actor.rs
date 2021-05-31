@@ -326,6 +326,17 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         Ok(self.evt_sender.query_agent_info_signed(input))
     }
 
+    fn handle_query_agent_info_signed_near_basis(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        basis: Arc<KitsuneBasis>,
+        limit: u32,
+    ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
+        Ok(self
+            .evt_sender
+            .query_agent_info_signed_near_basis(space, basis, limit))
+    }
+
     fn handle_call(
         &mut self,
         space: Arc<KitsuneSpace>,

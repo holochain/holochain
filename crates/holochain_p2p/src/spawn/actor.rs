@@ -292,6 +292,24 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         .into())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
+    fn handle_query_agent_info_signed_near_basis(
+        &mut self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+        basis: Arc<kitsune_p2p::KitsuneBasis>,
+        limit: u32,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<AgentInfoSigned>> {
+        let h_space = DnaHash::from_kitsune(&space);
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            Ok(evt_sender
+                .query_agent_info_signed_near_basis(h_space, space, basis, limit)
+                .await?)
+        }
+        .boxed()
+        .into())
+    }
+
     #[tracing::instrument(skip(self, space, to_agent, from_agent, payload), level = "trace")]
     fn handle_call(
         &mut self,

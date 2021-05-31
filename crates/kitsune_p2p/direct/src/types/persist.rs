@@ -39,6 +39,14 @@ pub trait AsKdPersist: 'static + Send + Sync {
     /// Query agent info
     fn query_agent_info(&self, root: KdHash) -> BoxFuture<'static, KdResult<Vec<KdAgentInfo>>>;
 
+    /// Query agent info near basis
+    fn query_agent_info_near_basis(
+        &self,
+        root: KdHash,
+        basis_loc: u32,
+        limit: u32,
+    ) -> BoxFuture<'static, KdResult<Vec<KdAgentInfo>>>;
+
     /// Store entry
     fn store_entry(
         &self,
@@ -144,6 +152,16 @@ impl KdPersist {
         root: KdHash,
     ) -> impl Future<Output = KdResult<Vec<KdAgentInfo>>> + 'static + Send {
         AsKdPersist::query_agent_info(&*self.0, root)
+    }
+
+    /// Query agent info near basis
+    pub fn query_agent_info_near_basis(
+        &self,
+        root: KdHash,
+        basis_loc: u32,
+        limit: u32,
+    ) -> impl Future<Output = KdResult<Vec<KdAgentInfo>>> + 'static + Send {
+        AsKdPersist::query_agent_info_near_basis(&*self.0, root, basis_loc, limit)
     }
 
     /// Store entry
