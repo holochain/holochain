@@ -175,11 +175,14 @@ pub trait ReadManager<'e> {
         E: From<DatabaseError>,
         F: 'e + FnOnce(Transaction) -> Result<R, E>;
 
-    #[cfg(feature = "test_utils")]
     /// Same as with_reader, but with no Results: everything gets unwrapped
+    #[cfg(feature = "test_utils")]
     fn with_reader_test<R, F>(&'e mut self, f: F) -> R
     where
-        F: 'e + FnOnce(Transaction) -> R;
+        F: 'e + FnOnce(Transaction) -> R,
+    {
+        self.with_reader(|r| DatabaseResult::Ok(f(r))).unwrap()
+    }
 }
 
 /// Implementors are able to create a new read-write DB transaction
@@ -207,6 +210,26 @@ pub trait WriteManager<'e> {
     }
 }
 
+impl<'e> ReadManager<'e> for DbRead {
+    fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: 'e + FnOnce(Transaction) -> Result<R, E>,
+    {
+        Ok(self.conn()?.with_reader(f)?)
+    }
+}
+
+impl<'e> WriteManager<'e> for DbWrite {
+    fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError> + std::fmt::Debug,
+        F: 'e + Clone + FnOnce(&mut Transaction) -> Result<R, E>,
+    {
+        Ok(self.conn()?.with_commit(f)?)
+    }
+}
+
 impl<'e> ReadManager<'e> for PConn {
     fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
@@ -215,14 +238,6 @@ impl<'e> ReadManager<'e> for PConn {
     {
         let txn = self.transaction().map_err(DatabaseError::from)?;
         f(txn)
-    }
-
-    #[cfg(feature = "test_utils")]
-    fn with_reader_test<R, F>(&'e mut self, f: F) -> R
-    where
-        F: 'e + FnOnce(Transaction) -> R,
-    {
-        self.with_reader(|r| DatabaseResult::Ok(f(r))).unwrap()
     }
 }
 
