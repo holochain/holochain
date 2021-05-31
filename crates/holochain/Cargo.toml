@@ -32,7 +32,7 @@ holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }
 holochain_serialized_bytes = "=0.0.50"
 holochain_state = { version = "0.0.1", path = "../holochain_state" }
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
-holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "26d106430a90f21d8eb9825436d1a077b7a12d03" }
+holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", tag = "v0.0.69" }
 holochain_websocket = { version = "0.0.1", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
 human-panic = "1.0.3"
