@@ -234,20 +234,26 @@ impl<'e> WriteManager<'e> for DbWrite {
 }
 
 impl<'e> ReadManager<'e> for PConn {
+    #[tracing::instrument(skip(self, f))]
     fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: 'e + FnOnce(Transaction) -> Result<R, E>,
     {
+        tracing::trace!("Attempting to acquire read lock on TXN_MUTEX.");
         let _g = TXN_MUTEX.read();
+        tracing::trace!("Got read lock on TXN_MUTEX.");
         let txn = self
             .transaction_with_behavior(TransactionBehavior::Deferred)
             .map_err(DatabaseError::from)?;
-        f(txn)
+        let result = f(txn);
+        tracing::trace!("Released read lock on TXN_MUTEX.");
+        result
     }
 }
 
 impl<'e> WriteManager<'e> for PConn {
+    #[tracing::instrument(skip(self, f))]
     fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + std::fmt::Debug,
@@ -269,13 +275,16 @@ impl<'e> WriteManager<'e> for PConn {
         //     If there are unrecoverable errors, we can explicitly map those
         //     to `backoff::Error::Permanent`.
         let attempt = || {
+            tracing::trace!("Attempting to acquire write lock on TXN_MUTEX.");
             let _g = TXN_MUTEX.write();
+            tracing::trace!("Got write lock on TXN_MUTEX.");
             let mut txn = self
                 .transaction_with_behavior(TransactionBehavior::Exclusive)
                 .map_err(DatabaseError::from)
                 .map_err(E::from)?;
             let result = (f.clone())(&mut txn)?;
             txn.commit().map_err(DatabaseError::from).map_err(E::from)?;
+            tracing::trace!("Released write lock on TXN_MUTEX.");
             Ok(result)
         };
 
