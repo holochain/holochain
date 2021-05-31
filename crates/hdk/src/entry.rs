@@ -215,6 +215,24 @@ where
     })
 }
 
+pub fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
+    HDK.with(|h| {
+        h.borrow().must_get_entry(MustGetEntryInput::new(entry_hash))
+    })
+}
+
+pub fn must_get_header(header_hash: HeaderHash) -> ExternResult<SignedHeaderHashed> {
+    HDK.with(|h| {
+        h.borrow().must_get_header(MustGetHeaderInput::new(header_hash))
+    })
+}
+
+pub fn must_get_element(header_hash: HeaderHash) -> ExternResult<(Element, bool)> {
+    HDK.with(|h| {
+        h.borrow().must_get_element(MustGetElementInput::new(header_hash))
+    })
+}
+
 /// Get an element from the hash AND the details for the entry or header hash passed in.
 /// Returns [ `None` ] if the entry/header does not exist.
 /// The details returned are a contextual mix of elements and header hashes, see below.

@@ -36,5 +36,5 @@ pub mod validate;
 
 pub mod test_utils;
 
-pub use entry::EntryHashed;
+pub use holochain_zome_types::entry::EntryHashed;
 pub use timestamp::{Timestamp, TimestampKey};

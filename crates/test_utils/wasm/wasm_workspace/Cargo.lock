@@ -1208,6 +1208,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_must_get"
+version = "0.0.1"
+dependencies = [
+ "hdk",
+ "holochain_test_wasm_common",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "test_wasm_post_commit_fail"
 version = "0.0.1"
 dependencies = [

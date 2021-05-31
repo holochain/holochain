@@ -10,7 +10,7 @@ pub fn hash_entry(
     _call_context: Arc<CallContext>,
     input: Entry,
 ) -> Result<EntryHash, WasmError> {
-    let entry_hash = holochain_types::entry::EntryHashed::from_content_sync(input).into_hash();
+    let entry_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(input).into_hash();
 
     Ok(entry_hash)
 }
@@ -104,7 +104,7 @@ pub mod wasm_test {
 
         let expected_path = hdk::hash_path::path::Path::from("foo.bar");
 
-        let expected_hash = holochain_types::entry::EntryHashed::from_content_sync(
+        let expected_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(
             Entry::app((&expected_path).try_into().unwrap()).unwrap(),
         )
         .into_hash();

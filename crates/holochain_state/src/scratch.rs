@@ -7,7 +7,7 @@ use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_types::prelude::Judged;
-use holochain_types::EntryHashed;
+use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::SignedHeaderHashed;

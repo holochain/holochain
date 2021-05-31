@@ -27,6 +27,7 @@ pub enum TestWasm {
     MigrateAgentFail,
     MigrateAgentPass,
     MultipleCalls,
+    MustGet,
     PostCommitFail,
     PostCommitSuccess,
     Query,
@@ -73,6 +74,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::MigrateAgentFail => "migrate_agent_fail",
             TestWasm::MigrateAgentPass => "migrate_agent_pass",
             TestWasm::MultipleCalls => "multiple_calls",
+            TestWasm::MustGet => "must_get",
             TestWasm::PostCommitFail => "post_commit_fail",
             TestWasm::PostCommitSuccess => "post_commit_success",
             TestWasm::Query => "query",
@@ -149,6 +151,9 @@ impl From<TestWasm> for DnaWasm {
                 get_code("wasm32-unknown-unknown/release/test_wasm_migrate_agent_pass.wasm")
             }
             TestWasm::MultipleCalls => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_multiple_calls.wasm")
+            }
+            TestWasm::MustGet => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_multiple_calls.wasm")
             }
             TestWasm::PostCommitFail => {

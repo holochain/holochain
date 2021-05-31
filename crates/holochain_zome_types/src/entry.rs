@@ -34,6 +34,9 @@ pub type CapGrantEntry = ZomeCallCapGrant;
 /// The data type written to the source chain to denote a capability claim
 pub type CapClaimEntry = CapClaim;
 
+/// An Entry paired with its EntryHash
+pub type EntryHashed = holo_hash::HoloHashed<Entry>;
+
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 /// Options for controlling how get works
 pub struct GetOptions {
@@ -221,9 +224,15 @@ impl GetInput {
 }
 
 /// Zome IO for must_get_element.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MustGetElementInput(HeaderHash);
 
 impl MustGetElementInput {
+    /// Constructor.
+    pub fn new(header_hash: HeaderHash) -> Self {
+        Self(header_hash)
+    }
+
     /// Consumes self for inner.
     pub fn into_inner(self) -> HeaderHash {
         self.0
@@ -231,9 +240,15 @@ impl MustGetElementInput {
 }
 
 /// Zome IO for must_get_entry.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MustGetEntryInput(EntryHash);
 
 impl MustGetEntryInput {
+    /// Constructor.
+    pub fn new(entry_hash: EntryHash) -> Self {
+        Self(entry_hash)
+    }
+
     /// Consumes self for inner.
     pub fn into_inner(self) -> EntryHash {
         self.0
@@ -241,9 +256,15 @@ impl MustGetEntryInput {
 }
 
 /// Zome IO for must_get_header.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MustGetHeaderInput(HeaderHash);
 
 impl MustGetHeaderInput {
+    /// Constructor.
+    pub fn new(header_hash: HeaderHash) -> Self {
+        Self(header_hash)
+    }
+
     /// Consumes self for inner.
     pub fn into_inner(self) -> HeaderHash {
         self.0

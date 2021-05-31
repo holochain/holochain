@@ -46,6 +46,9 @@ use crate::core::ribosome::host_fn::dna_info::dna_info;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
+use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
+use crate::core::ribosome::host_fn::must_get_header::must_get_header;
+use crate::core::ribosome::host_fn::must_get_element::must_get_element;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash_entry::hash_entry;
@@ -336,6 +339,9 @@ impl RealRibosome {
             host_fn_builder
                 .with_host_function(&mut ns, "__get", get)
                 .with_host_function(&mut ns, "__get_details", get_details)
+                .with_host_function(&mut ns, "__must_get_entry", must_get_entry)
+                .with_host_function(&mut ns, "__must_get_header", must_get_header)
+                .with_host_function(&mut ns, "__must_get_element", must_get_element)
                 .with_host_function(&mut ns, "__get_links", get_links)
                 .with_host_function(&mut ns, "__get_link_details", get_link_details)
                 .with_host_function(&mut ns, "__get_agent_activity", get_agent_activity)
@@ -344,6 +350,9 @@ impl RealRibosome {
             host_fn_builder
                 .with_host_function(&mut ns, "__get", unreachable)
                 .with_host_function(&mut ns, "__get_details", unreachable)
+                .with_host_function(&mut ns, "__must_get_entry", unreachable)
+                .with_host_function(&mut ns, "__must_get_header", unreachable)
+                .with_host_function(&mut ns, "__must_get_element", unreachable)
                 .with_host_function(&mut ns, "__get_links", unreachable)
                 .with_host_function(&mut ns, "__get_link_details", unreachable)
                 .with_host_function(&mut ns, "__get_agent_activity", unreachable)

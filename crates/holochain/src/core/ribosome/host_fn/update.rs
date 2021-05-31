@@ -23,7 +23,7 @@ pub fn update<'a>(
     // build the entry hash
     let async_entry = AsRef::<Entry>::as_ref(&entry_with_def_id).to_owned();
     let entry_hash =
-        holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
+        holochain_zome_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
 
     // extract the zome position
     let header_zome_id = ribosome

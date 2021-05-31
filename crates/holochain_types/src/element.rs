@@ -5,7 +5,7 @@ use crate::header::WireHeaderStatus;
 use crate::header::WireNewEntryHeader;
 use crate::header::WireUpdateRelationship;
 use crate::prelude::*;
-use crate::EntryHashed;
+use holochain_zome_types::entry::EntryHashed;
 use error::ElementGroupError;
 use error::ElementGroupResult;
 use holochain_keystore::KeystoreError;
