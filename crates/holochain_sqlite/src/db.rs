@@ -18,6 +18,9 @@ use std::{path::Path, time::Duration};
 mod p2p;
 pub use p2p::*;
 
+static TXN_MUTEX: once_cell::sync::Lazy<parking_lot::RwLock<()>> =
+    once_cell::sync::Lazy::new(|| parking_lot::RwLock::new(()));
+
 /// A read-only version of [DbWrite].
 /// This environment can only generate read-only transactions, never read-write.
 #[derive(Clone)]
@@ -236,7 +239,10 @@ impl<'e> ReadManager<'e> for PConn {
         E: From<DatabaseError>,
         F: 'e + FnOnce(Transaction) -> Result<R, E>,
     {
-        let txn = self.transaction().map_err(DatabaseError::from)?;
+        let _g = TXN_MUTEX.read();
+        let txn = self
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .map_err(DatabaseError::from)?;
         f(txn)
     }
 }
@@ -263,6 +269,7 @@ impl<'e> WriteManager<'e> for PConn {
         //     If there are unrecoverable errors, we can explicitly map those
         //     to `backoff::Error::Permanent`.
         let attempt = || {
+            let _g = TXN_MUTEX.write();
             let mut txn = self
                 .transaction_with_behavior(TransactionBehavior::Exclusive)
                 .map_err(DatabaseError::from)
