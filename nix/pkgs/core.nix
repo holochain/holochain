@@ -18,11 +18,11 @@ rec {
 
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
-    cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture
+    cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture --test-threads 1
     # run all the remaining cargo tests
-    cargo test --workspace --exclude holochain -- --nocapture
+    cargo test --workspace --exclude holochain -- --nocapture --test-threads 1
     # run all the wasm tests (within wasm) with the conductor mocked
-    cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
+    cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture --test-threads 1
   '';
 
   hcReleaseAutomationTest = let
@@ -53,7 +53,7 @@ rec {
     )
   '';
 
-  hcMergeTest = let
+  hcStaticChecks = let
       pathPrefix = lib.makeBinPath
         (builtins.attrValues { inherit (holonix.pkgs)
           hnRustClippy
@@ -62,14 +62,20 @@ rec {
           ;
         })
       ;
-    in writeShellScriptBin "hc-merge-test" ''
+    in writeShellScriptBin "hc-static-checks" ''
     export PATH=${pathPrefix}:$PATH
 
     set -euxo pipefail
     export RUST_BACKTRACE=1
-    hc-release-automation-test
     hn-rust-fmt-check
     hn-rust-clippy
+  '';
+
+  hcMergeTest = writeShellScriptBin "hc-merge-test" ''
+    set -euxo pipefail
+    export RUST_BACKTRACE=1
+    hc-release-automation-test
+    hc-static-checks
     hc-test
   '';
 

@@ -2,19 +2,12 @@ use ghost_actor::dependencies::tracing;
 
 observability::metrics!(
     KitsuneMetrics,
+    Failure,
     Call,
     CallResp,
     Notify,
     NotifyResp,
-    FetchOpHashes,
-    FetchOpHashesResp,
-    FetchOpData,
-    FetchOpDataResp,
-    AgentInfoQuery,
-    AgentInfoQueryResp,
-    Gossip,
-    GossipResp,
-    Fail
+    Gossip
 );
 
 /// Print all metrics as tracing events
@@ -36,7 +29,7 @@ pub fn print_all_metrics() {
         .expect("Failed to print metrics");
         for (metric, count) in KitsuneMetrics::iter() {
             match metric {
-                Call | Notify | FetchOpHashes | FetchOpData | AgentInfoQuery | Gossip => {
+                Call | Notify | Gossip => {
                     let percent = if total_writes > 0.0 {
                         count as f64 / total_writes * 100.0
                     } else {
@@ -52,8 +45,7 @@ pub fn print_all_metrics() {
                     )
                     .expect("Failed to print metrics");
                 }
-                CallResp | NotifyResp | FetchOpHashesResp | FetchOpDataResp
-                | AgentInfoQueryResp | GossipResp | Fail => {
+                Failure | CallResp | NotifyResp => {
                     let percent = if total_reads > 0.0 {
                         count as f64 / total_reads * 100.0
                     } else {
