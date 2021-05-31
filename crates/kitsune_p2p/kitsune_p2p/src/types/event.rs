@@ -84,7 +84,7 @@ ghost_actor::ghost_chan! {
         fn query_agent_info_signed(input: QueryAgentInfoSignedEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
         /// query agent info in order of closeness to a basis location.
-        fn query_agent_info_signed_near_basis(space: Arc<super::KitsuneSpace>, basis: Arc<super::KitsuneBasis>, limit: u32) -> Vec<crate::types::agent_store::AgentInfoSigned>;
+        fn query_agent_info_signed_near_basis(space: Arc<super::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
         /// We are receiving a request from a remote node.
         fn call(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;

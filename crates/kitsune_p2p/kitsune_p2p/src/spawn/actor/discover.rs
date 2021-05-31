@@ -1,9 +1,10 @@
 #![allow(dead_code)]
 use super::*;
-use crate::agent_store::AgentInfo;
+use crate::agent_store::{AgentInfo, AgentInfoSigned};
 use ghost_actor::dependencies::must_future::MustBoxFuture;
 use std::collections::HashSet;
 use std::convert::TryFrom;
+use std::future::Future;
 
 /// This enum represents the outcomes from peer discovery
 /// - OkShortcut - the agent is locally joined, just mirror the request back out
@@ -99,6 +100,40 @@ pub(crate) fn peer_discover(
     .into()
 }
 
+/// local search for remote (non-local) agents closest to basis
+pub(crate) fn get_cached_remotes_near_basis(
+    space: &mut Space,
+    basis_loc: u32,
+    _timeout: KitsuneTimeout,
+) -> impl Future<Output = KitsuneP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
+    let i_s = space.i_s.clone();
+    let evt_sender = space.evt_sender.clone();
+    let space = space.space.clone();
+
+    async move {
+        let mut nodes = Vec::new();
+
+        for node in evt_sender
+            .query_agent_info_signed_near_basis(space.clone(), basis_loc, 20)
+            .await?
+        {
+            if !i_s
+                .is_agent_local(Arc::new(node.as_agent_ref().clone()))
+                .await
+                .unwrap_or(true)
+            {
+                nodes.push(node);
+            }
+        }
+
+        if nodes.is_empty() {
+            return Err("no remote nodes found, abort discovery".into());
+        }
+
+        Ok(nodes)
+    }
+}
+
 /// attempt to send messages to remote nodes in a staged timeout format
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn message_neighborhood<T, F>(
@@ -123,7 +158,6 @@ where
     let i_s = space.i_s.clone();
     let evt_sender = space.evt_sender.clone();
     let ep_hnd = space.ep_hnd.clone();
-    let bootstrap_service = space.config.bootstrap_service.clone();
     let space = space.space.clone();
     let accept_result_cb = Arc::new(accept_result_cb);
     async move {
@@ -163,7 +197,6 @@ where
                 _basis.clone(),
                 i_s.clone(),
                 evt_sender.clone(),
-                bootstrap_service.clone(),
             )
             .await
             {
@@ -230,7 +263,6 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
     _basis: Arc<KitsuneBasis>,
     i_s: ghost_actor::GhostSender<SpaceInternal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    bootstrap_service: Option<url2::Url2>,
 ) -> MustBoxFuture<'static, KitsuneP2pResult<HashSet<AgentInfo>>> {
     async move {
         let mut out = HashSet::new();
@@ -261,91 +293,11 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
             }
         }
 
-        if let Ok(list) = super::bootstrap::random(
-            bootstrap_service,
-            super::bootstrap::RandomQuery {
-                space: space.clone(),
-                // grap a couple extra incase they happen to be local
-                limit: 8.into(),
-            },
-        )
-        .await
-        {
-            for item in list {
-                // TODO - someday some validation here
-                if let Ok(info) = AgentInfo::try_from(&item) {
-                    if let Ok(is_local) = i_s
-                        .is_agent_local(Arc::new(info.as_agent_ref().clone()))
-                        .await
-                    {
-                        if !is_local {
-                            // we got a result - let's add it to our store for the future
-                            let _ = evt_sender
-                                .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                    space: space.clone(),
-                                    agent: from_agent.clone(),
-                                    agent_info_signed: item.clone(),
-                                })
-                                .await;
-                            out.insert(info);
-                        }
-                    }
-                }
-                if out.len() >= 5 {
-                    return Ok(out);
-                }
-            }
-        }
-
         if out.is_empty() {
             return Err("could not find any peers".into());
         }
 
         Ok(out)
-    }
-    .boxed()
-    .into()
-}
-
-pub(crate) fn add_5_or_less_non_local_agents(
-    space: Arc<KitsuneSpace>,
-    from_agent: Arc<KitsuneAgent>,
-    i_s: ghost_actor::GhostSender<SpaceInternal>,
-    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    bootstrap_service: url2::Url2,
-) -> MustBoxFuture<'static, KitsuneP2pResult<()>> {
-    async move {
-        if let Ok(list) = super::bootstrap::random(
-            Some(bootstrap_service),
-            super::bootstrap::RandomQuery {
-                space: space.clone(),
-                limit: 8.into(),
-            },
-        )
-        .await
-        {
-            for item in list {
-                // TODO - someday some validation here
-                if let Ok(info) = AgentInfo::try_from(&item) {
-                    if let Ok(is_local) = i_s
-                        .is_agent_local(Arc::new(info.as_agent_ref().clone()))
-                        .await
-                    {
-                        if !is_local {
-                            // we got a result - let's add it to our store for the future
-                            let _ = evt_sender
-                                .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                    space: space.clone(),
-                                    agent: from_agent.clone(),
-                                    agent_info_signed: item.clone(),
-                                })
-                                .await;
-                        }
-                    }
-                }
-            }
-        }
-        Ok(())
     }
     .boxed()
     .into()

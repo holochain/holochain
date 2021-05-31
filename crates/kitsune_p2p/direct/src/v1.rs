@@ -511,14 +511,14 @@ async fn handle_events(
                 event::KitsuneP2pEvent::QueryAgentInfoSignedNearBasis {
                     respond,
                     space,
-                    basis,
+                    basis_loc,
                     limit,
                     ..
                 } => {
                     respond.r(Ok(handle_query_agent_info_signed_near_basis(
                         kdirect.clone(),
                         space,
-                        basis,
+                        basis_loc,
                         limit,
                     )
                     .map_err(KitsuneP2pError::other)
@@ -640,12 +640,10 @@ async fn handle_query_agent_info_signed(
 async fn handle_query_agent_info_signed_near_basis(
     kdirect: Arc<Kd1>,
     space: Arc<KitsuneSpace>,
-    basis: Arc<KitsuneBasis>,
+    basis_loc: u32,
     limit: u32,
 ) -> KdResult<Vec<AgentInfoSigned>> {
     let root = KdHash::from_kitsune_space(&space);
-    let basis_loc = basis.get_loc();
-
     let map = kdirect
         .persist
         .query_agent_info_near_basis(root, basis_loc, limit)

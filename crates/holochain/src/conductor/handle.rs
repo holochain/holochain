@@ -415,13 +415,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             }
             QueryAgentInfoSignedNearBasis {
                 kitsune_space,
-                kitsune_basis,
+                basis_loc,
                 limit,
                 respond,
                 ..
             } => {
-                use kitsune_p2p::KitsuneBinType;
-                let basis_loc = kitsune_basis.get_loc();
                 let env = { self.conductor.read().await.p2p_env(space) };
                 let res = query_agent_info_signed_near_basis(env, kitsune_space, basis_loc, limit)
                     .map_err(holochain_p2p::HolochainP2pError::other);

@@ -296,14 +296,14 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     fn handle_query_agent_info_signed_near_basis(
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
-        basis: Arc<kitsune_p2p::KitsuneBasis>,
+        basis_loc: u32,
         limit: u32,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<AgentInfoSigned>> {
         let h_space = DnaHash::from_kitsune(&space);
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             Ok(evt_sender
-                .query_agent_info_signed_near_basis(h_space, space, basis, limit)
+                .query_agent_info_signed_near_basis(h_space, space, basis_loc, limit)
                 .await?)
         }
         .boxed()

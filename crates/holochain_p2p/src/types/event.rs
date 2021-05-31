@@ -114,7 +114,7 @@ ghost_actor::ghost_chan! {
         fn query_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Vec<AgentInfoSigned>;
 
         /// query agent info in order of closeness to a basis location.
-        fn query_agent_info_signed_near_basis(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_basis: Arc<kitsune_p2p::KitsuneBasis>, limit: u32) -> Vec<AgentInfoSigned>;
+        fn query_agent_info_signed_near_basis(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<AgentInfoSigned>;
 
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(
