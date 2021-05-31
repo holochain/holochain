@@ -125,11 +125,15 @@ fn get_encryption_key_shim() -> [u8; 32] {
 pub struct PConn {
     #[shrinkwrap(main_field)]
     inner: PConnInner,
-    _kind: DbKind,
+    db_kind: DbKind,
 }
 
 impl PConn {
-    pub(crate) fn new(inner: PConnInner, _kind: DbKind) -> Self {
-        Self { inner, _kind }
+    pub(crate) fn new(inner: PConnInner, db_kind: DbKind) -> Self {
+        Self { inner, db_kind }
+    }
+
+    pub fn db_kind(&self) -> &DbKind {
+        &self.db_kind
     }
 }

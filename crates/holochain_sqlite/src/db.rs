@@ -4,11 +4,14 @@ use crate::{
     conn::{new_connection_pool, ConnectionPool, PConn, DATABASE_HANDLES},
     prelude::*,
 };
+use chashmap::CHashMap;
 use derive_more::Into;
 use futures::Future;
 use holo_hash::DnaHash;
 use holochain_zome_types::{cell::CellId, config::ConnectionPoolConfig};
 use kitsune_p2p::KitsuneSpace;
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
 use std::path::PathBuf;
@@ -18,8 +21,17 @@ use std::{path::Path, time::Duration};
 mod p2p;
 pub use p2p::*;
 
-static TXN_MUTEX: once_cell::sync::Lazy<parking_lot::RwLock<()>> =
-    once_cell::sync::Lazy::new(|| parking_lot::RwLock::new(()));
+static TXN_MUTEX_MAP: Lazy<CHashMap<DbKind, Arc<Mutex<()>>>> = Lazy::new(CHashMap::new);
+
+fn get_txn_mutex(kind: &DbKind) -> Arc<Mutex<()>> {
+    if let Some(mx) = TXN_MUTEX_MAP.get(kind) {
+        mx.clone()
+    } else {
+        let mx = Arc::new(Mutex::new(()));
+        TXN_MUTEX_MAP.insert_new(kind.clone(), mx.clone());
+        mx
+    }
+}
 
 /// A read-only version of [DbWrite].
 /// This environment can only generate read-only transactions, never read-write.
@@ -141,7 +153,7 @@ impl DbWrite {
 }
 
 /// The various types of database, used to specify the list of databases to initialize
-#[derive(Clone, Debug, derive_more::Display)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, derive_more::Display)]
 pub enum DbKind {
     /// Specifies the environment used by each Cell
     Cell(CellId),
@@ -219,7 +231,7 @@ impl<'e> ReadManager<'e> for DbRead {
         E: From<DatabaseError>,
         F: 'e + FnOnce(Transaction) -> Result<R, E>,
     {
-        Ok(self.conn()?.with_reader(f)?)
+        self.conn()?.with_reader(f)
     }
 }
 
@@ -229,7 +241,7 @@ impl<'e> WriteManager<'e> for DbWrite {
         E: From<DatabaseError> + std::fmt::Debug,
         F: 'e + Clone + FnOnce(&mut Transaction) -> Result<R, E>,
     {
-        Ok(self.conn()?.with_commit(f)?)
+        self.conn()?.with_commit(f)
     }
 }
 
@@ -240,14 +252,12 @@ impl<'e> ReadManager<'e> for PConn {
         E: From<DatabaseError>,
         F: 'e + FnOnce(Transaction) -> Result<R, E>,
     {
-        tracing::trace!("Attempting to acquire read lock on TXN_MUTEX.");
-        let _g = TXN_MUTEX.read();
-        tracing::trace!("Got read lock on TXN_MUTEX.");
+        tracing::trace!("Opened DB read transaction.");
         let txn = self
             .transaction_with_behavior(TransactionBehavior::Deferred)
             .map_err(DatabaseError::from)?;
         let result = f(txn);
-        tracing::trace!("Released read lock on TXN_MUTEX.");
+        tracing::trace!("Closed DB read transaction.");
         result
     }
 }
@@ -275,16 +285,22 @@ impl<'e> WriteManager<'e> for PConn {
         //     If there are unrecoverable errors, we can explicitly map those
         //     to `backoff::Error::Permanent`.
         let attempt = || {
-            tracing::trace!("Attempting to acquire write lock on TXN_MUTEX.");
-            let _g = TXN_MUTEX.write();
-            tracing::trace!("Got write lock on TXN_MUTEX.");
+            tracing::trace!(
+                "Attempting to acquire lock on txn mutex for {:?}.",
+                self.db_kind()
+            );
+            let mx = get_txn_mutex(self.db_kind());
+            let _g = mx.lock();
+            tracing::trace!("Acquired lock on txn mutex for {:?}.", self.db_kind());
+
             let mut txn = self
                 .transaction_with_behavior(TransactionBehavior::Exclusive)
                 .map_err(DatabaseError::from)
                 .map_err(E::from)?;
             let result = (f.clone())(&mut txn)?;
             txn.commit().map_err(DatabaseError::from).map_err(E::from)?;
-            tracing::trace!("Released write lock on TXN_MUTEX.");
+
+            tracing::trace!("Released write lock on txn mutex for {:?}.", self.db_kind());
             Ok(result)
         };
 
