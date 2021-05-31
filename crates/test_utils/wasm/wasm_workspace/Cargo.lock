@@ -350,7 +350,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.67"
-source = "git+https://github.com/holochain/holochain-wasmer.git?tag=v0.0.68#64a4dbc8314cd4e9dbeef6552a01d75cc5556167"
+source = "git+https://github.com/holochain/holochain-wasmer.git?tag=v0.0.69#850b8811730d4adecf490ca8f8df2d16ba3024e9"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -361,7 +361,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_guest"
 version = "0.0.67"
-source = "git+https://github.com/holochain/holochain-wasmer.git?tag=v0.0.68#64a4dbc8314cd4e9dbeef6552a01d75cc5556167"
+source = "git+https://github.com/holochain/holochain-wasmer.git?tag=v0.0.69#850b8811730d4adecf490ca8f8df2d16ba3024e9"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -1534,18 +1534,3 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
-
-[[patch.unused]]
-name = "holochain_wasmer_common"
-version = "0.0.67"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=wasmer-patch#b7fcc65c88f89f39f75f5d2946de893cb30eeec2"
-
-[[patch.unused]]
-name = "holochain_wasmer_guest"
-version = "0.0.67"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=wasmer-patch#b7fcc65c88f89f39f75f5d2946de893cb30eeec2"
-
-[[patch.unused]]
-name = "holochain_wasmer_host"
-version = "0.0.67"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=wasmer-patch#b7fcc65c88f89f39f75f5d2946de893cb30eeec2"
