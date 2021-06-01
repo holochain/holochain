@@ -403,10 +403,11 @@ impl SourceChain {
                     let (header, op_hash) =
                         UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
                     let op_order = OpOrder::new(op_type, header.timestamp());
+                    let timestamp = header.timestamp();
                     // Put the header back by value.
                     h = Some(header);
                     // Collect the DhtOpLight, DhtOpHash and OpOrder.
-                    ops.push((op, op_hash, op_order));
+                    ops.push((op, op_hash, op_order, timestamp));
                 }
 
                 // Put the SignedHeaderHashed back together.
@@ -444,8 +445,8 @@ impl SourceChain {
             for header in headers {
                 insert_header(txn, header)?;
             }
-            for (op, op_hash, op_order) in ops {
-                insert_op_lite(txn, op, op_hash.clone(), true, op_order)?;
+            for (op, op_hash, op_order, timestamp) in ops {
+                insert_op_lite(txn, op, op_hash.clone(), true, op_order, timestamp)?;
                 set_validation_status(txn, op_hash, holochain_zome_types::ValidationStatus::Valid)?;
             }
             SourceChainResult::Ok(())
@@ -528,8 +529,9 @@ pub fn put_raw(
         let (h, op_hash) =
             UniqueForm::op_hash(op_type, header.take().expect("This can't be empty"))?;
         let op_order = OpOrder::new(op_type, h.timestamp());
+        let timestamp = h.timestamp();
         header = Some(h);
-        hashes.push((op_hash, op_order));
+        hashes.push((op_hash, op_order, timestamp));
     }
     let shh = SignedHeaderHashed::with_presigned(
         HeaderHashed::with_pre_hashed(header.expect("This can't be empty"), hash),
@@ -539,8 +541,8 @@ pub fn put_raw(
         insert_entry(txn, EntryHashed::from_content_sync(entry))?;
     }
     insert_header(txn, shh)?;
-    for (op, (op_hash, op_order)) in ops.into_iter().zip(hashes) {
-        insert_op_lite(txn, op, op_hash, true, op_order)?;
+    for (op, (op_hash, op_order, timestamp)) in ops.into_iter().zip(hashes) {
+        insert_op_lite(txn, op, op_hash, true, op_order, timestamp)?;
     }
     Ok(())
 }
