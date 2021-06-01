@@ -595,7 +595,7 @@ impl Cell {
         until: Timestamp,
     ) -> CellResult<Vec<DhtOpHash>> {
         // FIXME: Test this query.
-        let full = (dht_arc.coverage() - 1.0) < f64::EPSILON;
+        let full = (dht_arc.coverage() - 1.0).abs() < f64::EPSILON;
         let (storage_1, storage_2) = split_arc(&dht_arc);
         let mut conn = self.env().conn()?;
         let result = conn.with_reader(|txn| {
