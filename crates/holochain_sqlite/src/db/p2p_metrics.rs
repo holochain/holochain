@@ -12,18 +12,18 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-fn time_to_ns(t: SystemTime) -> DatabaseResult<u64> {
+fn time_to_micros(t: SystemTime) -> DatabaseResult<i64> {
     t.duration_since(std::time::UNIX_EPOCH.into())
         .map_err(|e| DatabaseError::Other(e.into()))?
-        .as_nanos()
+        .as_micros()
         .try_into()
         .map_err(|e: TryFromIntError| DatabaseError::Other(e.into()))
 }
 
-fn time_from_ns(ns: u64) -> SystemTime {
+fn time_from_micros(micros: i64) -> SystemTime {
     std::time::UNIX_EPOCH
-        .checked_add(Duration::from_nanos(ns))
-        .expect("Time must be after 1970 and before the end of the universe")
+        .checked_add(Duration::from_micros(micros as u64))
+        .expect("Time must be after 1970 and roughly before 200000")
 }
 
 /// Record a p2p metric datum
@@ -39,7 +39,7 @@ pub fn put_metric_datum(
         named_params! {
             ":agent": agent_bytes,
             ":kind": metric.to_string(),
-            ":moment": time_to_ns(timestamp)?
+            ":moment": time_to_micros(timestamp)?
         },
     )?;
     Ok(())
@@ -53,7 +53,7 @@ pub fn query_metrics(
     Ok(match query {
         MetricQuery::LastSync { agent } => {
             let agent_bytes: &[u8] = agent.as_ref();
-            let timestamp: u64 = txn.query_row(
+            let timestamp: i64 = txn.query_row(
                 sql_p2p_metrics::QUERY_LAST_SYNC,
                 named_params! {
                     ":agent": agent_bytes,
@@ -62,7 +62,7 @@ pub fn query_metrics(
                 |row| row.get(0),
             )?;
             dbg!(&timestamp);
-            MetricQueryAnswer::LastSync(time_from_ns(timestamp))
+            MetricQueryAnswer::LastSync(time_from_micros(timestamp))
         }
         MetricQuery::Oldest {
             last_connect_error_threshold,
@@ -70,7 +70,7 @@ pub fn query_metrics(
             let agent_bytes: Vec<u8> = txn.query_row(
                 sql_p2p_metrics::QUERY_OLDEST,
                 named_params! {
-                    ":error_threshold": time_to_ns(last_connect_error_threshold)?,
+                    ":error_threshold": time_to_micros(last_connect_error_threshold)?,
                     ":kind_error": MetricKind::ConnectError.to_string(),
                     ":kind_slow_gossip": MetricKind::SlowGossip.to_string(),
                 },
