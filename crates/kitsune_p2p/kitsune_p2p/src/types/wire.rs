@@ -51,15 +51,26 @@ kitsune_p2p_types::write_codec_enum! {
             data.1: WireData,
         },
 
+        /// Ask a remote node if they know about a specific agent
+        PeerGet(0x50) {
+            space.0: Arc<KitsuneSpace>,
+            agent.1: Arc<KitsuneAgent>,
+        },
+
+        /// Response to a peer get
+        PeerGetResp(0x51) {
+            agent_info_signed.0: AgentInfoSigned,
+        },
+
         /// Query a remote node for peers holding
         /// or nearest to holding a u32 location.
-        PeerQuery(0x50) {
+        PeerQuery(0x52) {
             space.0: Arc<KitsuneSpace>,
-            basis.1: Arc<KitsuneBasis>,
+            basis_loc.1: u32,
         },
 
         /// Response to a peer query
-        PeerQueryResp(0x51) {
+        PeerQueryResp(0x53) {
             peer_list.0: Vec<AgentInfoSigned>,
         },
     }

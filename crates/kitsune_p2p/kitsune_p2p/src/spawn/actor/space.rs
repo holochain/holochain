@@ -300,7 +300,8 @@ impl KitsuneP2pHandler for Space {
         let timeout = KitsuneTimeout::from_millis(timeout_ms);
 
         let discover_fut =
-            discover::peer_discover(self, to_agent.clone(), from_agent.clone(), timeout_ms);
+            discover::search_and_discover_peer_connect(
+                self, to_agent.clone(), timeout);
 
         Ok(async move {
             match discover_fut.await {

@@ -108,6 +108,8 @@ impl KitsuneP2pActor {
                 "Wire::Notify" => KitsuneMetrics::Notify,
                 "Wire::NotifyResp" => KitsuneMetrics::NotifyResp,
                 "Wire::Gossip" => KitsuneMetrics::Gossip,
+                "Wire::PeerGet" => KitsuneMetrics::PeerGet,
+                "Wire::PeerGetResp" => KitsuneMetrics::PeerGetResp,
                 "Wire::PeerQuery" => KitsuneMetrics::PeerQuery,
                 "Wire::PeerQueryResp" => KitsuneMetrics::PeerQueryResp,
                 _ => return,
