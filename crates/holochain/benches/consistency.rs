@@ -108,7 +108,7 @@ impl Producer {
                 ManyAnchorInput(inputs),
             )
             .await;
-        // holochain_state::prelude::dump_tmp(self.cell.env());
+        holochain_state::prelude::dump_tmp(self.cell.env());
     }
 }
 
