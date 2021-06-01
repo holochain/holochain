@@ -118,12 +118,12 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
             match connection {
                 Ok((tx_to_iface, rx_from_iface)) => {
                     let rx_from_cell = signal_broadcaster.subscribe();
-                    tokio::task::spawn(recv_incoming_msgs_and_outgoing_signals(
+                    spawn_recv_incoming_msgs_and_outgoing_signals(
                         api.clone(),
                         rx_from_iface,
                         rx_from_cell,
                         tx_to_iface,
-                    ));
+                    );
                 }
                 Err(err) => {
                     warn!("Admin socket connection failed: {}", err);
@@ -140,60 +140,70 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
 /// Used by Admin interface.
 async fn recv_incoming_admin_msgs<A: InterfaceApi>(
     api: A,
-    mut rx_from_iface: WebsocketReceiver,
+    rx_from_iface: WebsocketReceiver,
     num_connections: Arc<AtomicIsize>,
 ) {
-    while let Some(msg) = rx_from_iface.next().await {
-        match handle_incoming_message(msg, api.clone()).await {
-            Err(e) => error!(error = &e as &dyn std::error::Error),
-            Ok(()) => {}
-        }
-    }
+    use futures::stream::StreamExt;
+
+    rx_from_iface
+        .for_each_concurrent(4096, move |msg| {
+            let api = api.clone();
+            async move {
+                match handle_incoming_message(msg, api.clone()).await {
+                    Err(e) => error!(error = &e as &dyn std::error::Error),
+                    Ok(()) => {}
+                }
+            }
+        })
+        .await;
     num_connections.fetch_sub(1, Ordering::SeqCst);
 }
 
 /// Polls for messages coming in from the external client while simultaneously
 /// polling for signals being broadcast from the Cells associated with this
 /// App interface.
-async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
+fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     api: A,
-    mut rx_from_iface: WebsocketReceiver,
-    mut rx_from_cell: broadcast::Receiver<Signal>,
-    mut tx_to_iface: WebsocketSender,
-) -> InterfaceResult<()> {
+    rx_from_iface: WebsocketReceiver,
+    rx_from_cell: broadcast::Receiver<Signal>,
+    tx_to_iface: WebsocketSender,
+) {
+    use futures::stream::StreamExt;
+
     trace!("CONNECTION: {}", rx_from_iface.remote_addr());
 
-    loop {
-        tokio::select! {
-            // If we receive a Signal broadcasted from a Cell, push it out
-            // across the interface
-            signal = rx_from_cell.recv() => {
-                if let Ok(signal) = signal {
-                    trace!(msg = "Sending signal!", ?signal);
-                    let bytes = SerializedBytes::try_from(
-                        signal
-                        // .map_err(InterfaceError::SignalReceive)?,
-                    )?;
-                    tx_to_iface.signal(bytes).await?;
-                } else {
-                    debug!("Closing interface: signal stream empty");
-                    break;
-                }
-            },
-
-            // If we receive a message from outside, handle it
-            msg = rx_from_iface.next() => {
-                if let Some(msg) = msg {
-                    handle_incoming_message(msg, api.clone()).await?
-                } else {
-                    debug!("Closing interface: message stream empty");
-                    break;
-                }
-            },
+    let rx_from_cell = futures::stream::unfold(rx_from_cell, |mut rx_from_cell| async move {
+        if let Ok(item) = rx_from_cell.recv().await {
+            Some((item, rx_from_cell))
+        } else {
+            None
         }
-    }
+    });
 
-    Ok(())
+    tokio::task::spawn(rx_from_cell.for_each_concurrent(4096, move |signal| {
+        let mut tx_to_iface = tx_to_iface.clone();
+        async move {
+            trace!(msg = "Sending signal!", ?signal);
+            if let Err(err) = async move {
+                let bytes = SerializedBytes::try_from(signal)?;
+                tx_to_iface.signal(bytes).await?;
+                InterfaceResult::Ok(())
+            }
+            .await
+            {
+                error!(?err, "error emitting signal");
+            }
+        }
+    }));
+
+    tokio::task::spawn(rx_from_iface.for_each_concurrent(4096, move |msg| {
+        let api = api.clone();
+        async move {
+            if let Err(err) = handle_incoming_message(msg, api).await {
+                error!(?err, "error handling websocket message");
+            }
+        }
+    }));
 }
 
 /// Handles messages on all interfaces
