@@ -88,6 +88,9 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     is_authored      INTEGER        NOT NULL,      -- BOOLEAN
     require_receipt  INTEGER        NOT NULL,      -- BOOLEAN
 
+    storage_center_loc          INTEGER   NOT NULL,
+    authored_timestamp_ms       INTEGER   NOT NULL,
+
     -- This is the order that process ops should result 
     -- in dependencies before dependants.
     -- See OpOrder.
@@ -128,6 +131,10 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     FOREIGN KEY(header_hash) REFERENCES Header(hash)
 );
 CREATE INDEX IF NOT EXISTS DhtOp_type_idx ON DhtOp ( type );
+CREATE INDEX IF NOT EXISTS DhtOp_validation_stage_idx ON DhtOp ( validation_stage );
+CREATE INDEX IF NOT EXISTS DhtOp_validation_status_idx ON DhtOp ( validation_status );
+CREATE INDEX IF NOT EXISTS DhtOp_authored_timestamp_ms_idx ON DhtOp ( authored_timestamp_ms );
+CREATE INDEX IF NOT EXISTS DhtOp_storage_center_loc_idx ON DhtOp ( storage_center_loc );
 -- CREATE INDEX DhtOp_basis_hash_idx ON DhtOp ( basis_hash );
 
 CREATE TABLE IF NOT EXISTS ValidationReceipt (
