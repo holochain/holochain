@@ -71,6 +71,12 @@ impl ElementReference {
     }
 }
 
+entry_defs![
+    EntryReference::entry_def(),
+    HeaderReference::entry_def(),
+    ElementReference::entry_def()
+];
+
 #[hdk_extern]
 fn validate_create_entry_entry_reference(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
     let entry_reference = EntryReference::try_from(&data.element)?;

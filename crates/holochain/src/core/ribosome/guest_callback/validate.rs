@@ -10,7 +10,7 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ValidateInvocation {
     pub zomes_to_invoke: ZomesToInvoke,
     // Arc here as entry may be very large
@@ -295,6 +295,20 @@ mod slow_tests {
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_validate_must_get_entry() {
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::MustGet]))
+            .next()
+            .unwrap();
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty).next().unwrap();
+        validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::MustGet.into());
+
+        dbg!(&validate_invocation);
+
+        let result = ribosome.run_validate(fixt!(ValidateHostAccess), validate_invocation).unwrap();
+        dbg!(result);
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_unimplemented() {
