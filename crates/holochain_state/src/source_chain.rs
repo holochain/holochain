@@ -446,7 +446,11 @@ impl SourceChain {
             }
             for (op, op_hash, op_order) in ops {
                 insert_op_lite(txn, op, op_hash.clone(), true, op_order)?;
-                set_validation_status(txn, op_hash.clone(), holochain_zome_types::ValidationStatus::Valid)?;
+                set_validation_status(
+                    txn,
+                    op_hash.clone(),
+                    holochain_zome_types::ValidationStatus::Valid,
+                )?;
                 // TODO: SHARDING: Check if we are the authority here.
                 set_validation_stage(txn, op_hash, ValidationLimboStatus::AwaitingIntegration)?;
             }
