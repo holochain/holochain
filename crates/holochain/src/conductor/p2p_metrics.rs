@@ -37,11 +37,13 @@ mod tests {
     use holochain_state::prelude::test_p2p_metrics_env;
     use std::{sync::Arc, time::Duration};
 
-    /// Return an iterator of moments, each one later than the last by 1 second
+    /// Return an iterator of moments, each one later than the last by 1 second,
+    /// and at a granularity of microseconds
     fn moments() -> impl Iterator<Item = SystemTime> {
-        itertools::unfold(SystemTime::now(), |now| {
-            now.checked_add(Duration::from_secs(1)).map(|next| {
-                *now = next;
+        let initial = time_from_micros(time_to_micros(SystemTime::now()).unwrap()).unwrap();
+        itertools::unfold(initial, |t| {
+            t.checked_add(Duration::from_secs(1)).map(|next| {
+                *t = next;
                 next
             })
         })

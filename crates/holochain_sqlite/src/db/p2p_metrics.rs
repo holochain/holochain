@@ -12,7 +12,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-fn time_to_micros(t: SystemTime) -> DatabaseResult<i64> {
+pub fn time_to_micros(t: SystemTime) -> DatabaseResult<i64> {
     t.duration_since(std::time::UNIX_EPOCH.into())
         .map_err(|e| DatabaseError::Other(e.into()))?
         .as_micros()
@@ -20,10 +20,15 @@ fn time_to_micros(t: SystemTime) -> DatabaseResult<i64> {
         .map_err(|e: TryFromIntError| DatabaseError::Other(e.into()))
 }
 
-fn time_from_micros(micros: i64) -> SystemTime {
+pub fn time_from_micros(micros: i64) -> DatabaseResult<SystemTime> {
     std::time::UNIX_EPOCH
         .checked_add(Duration::from_micros(micros as u64))
-        .expect("Time must be after 1970 and roughly before 200000")
+        .ok_or_else(|| {
+            DatabaseError::Other(anyhow::anyhow!(
+                "Got invalid i64 microsecond timestamp: {}",
+                micros
+            ))
+        })
 }
 
 /// Record a p2p metric datum
@@ -61,8 +66,7 @@ pub fn query_metrics(
                 },
                 |row| row.get(0),
             )?;
-            dbg!(&timestamp);
-            MetricQueryAnswer::LastSync(time_from_micros(timestamp))
+            MetricQueryAnswer::LastSync(time_from_micros(timestamp)?)
         }
         MetricQuery::Oldest {
             last_connect_error_threshold,
