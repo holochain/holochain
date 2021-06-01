@@ -595,42 +595,52 @@ impl Cell {
         until: Timestamp,
     ) -> CellResult<Vec<DhtOpHash>> {
         // FIXME: Test this query.
-        // TODO: Figure out how to make DhtArc.contains()
-        // into a WHERE constraint.
-        let result = self.env().conn()?.with_reader(|txn| {
-            let mut stmt = txn.prepare(
-                "
-                SELECT DhtOp.hash, DhtOp.basis_hash
-                FROM DHtOp
-                WHERE
-                DhtOp.when_integrated >= :from
-                AND 
-                DhtOp.when_integrated < :to
-                ",
-            )?;
-            let r = stmt
-                .query_map(
-                    named_params! {
-                        ":from": since,
-                        ":to": until,
-                    },
-                    |row| {
-                        let hash: DhtOpHash = row.get("hash")?;
-                        let basis_hash: AnyDhtHash = row.get("basis_hash")?;
-                        Ok((hash, basis_hash))
-                    },
-                )?
-                .filter_map(|r| match r {
-                    Ok((hash, basis)) => {
-                        if dht_arc.contains(basis.get_loc()) {
-                            Some(Ok(hash))
-                        } else {
-                            None
-                        }
-                    }
-                    Err(e) => Some(Err(e)),
-                })
-                .collect::<rusqlite::Result<Vec<_>>>()?;
+        let full = dht_arc.coverage() == 1.0;
+        let (storage_1, storage_2) = split_arc(&dht_arc);
+        let mut conn = self.env().conn()?;
+        let result = conn.with_reader(|txn| {
+            let r = if full {
+                txn.prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_FULL)?
+                    .query_map(
+                        named_params! {
+                        ":from": since.to_sql_ms_lossy(),
+                        ":to": until.to_sql_ms_lossy(),
+                        },
+                        |row| row.get("hash"),
+                    )?
+                    .collect::<rusqlite::Result<Vec<_>>>()?
+            } else {
+                match (storage_1, storage_2) {
+                    (None, None) => Vec::with_capacity(0),
+                    (None, Some(_)) => unreachable!("Cannot have only second arc"),
+                    (Some(storage_1), None) => txn
+                        .prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_SINGLE)?
+                        .query_map(
+                            named_params! {
+                            ":from": since.to_sql_ms_lossy(),
+                            ":to": until.to_sql_ms_lossy(),
+                            ":storage_start_1": storage_1.0,
+                            ":storage_end_1": storage_1.1,
+                            },
+                            |row| row.get("hash"),
+                        )?
+                        .collect::<rusqlite::Result<Vec<_>>>()?,
+                    (Some(storage_1), Some(storage_2)) => txn
+                        .prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_WRAP)?
+                        .query_map(
+                            named_params! {
+                            ":from": since.to_sql_ms_lossy(),
+                            ":to": until.to_sql_ms_lossy(),
+                            ":storage_start_1": storage_1.0,
+                            ":storage_end_1": storage_1.1,
+                            ":storage_start_2": storage_2.0,
+                            ":storage_end_2": storage_2.1,
+                            },
+                            |row| row.get("hash"),
+                        )?
+                        .collect::<rusqlite::Result<Vec<_>>>()?,
+                }
+            };
             DatabaseResult::Ok(r)
         })?;
         Ok(result)
