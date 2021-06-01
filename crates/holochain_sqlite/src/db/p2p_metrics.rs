@@ -9,7 +9,7 @@ use rusqlite::*;
 use std::{
     num::TryFromIntError,
     sync::Arc,
-    time::{Duration, SystemTime, SystemTimeError},
+    time::{Duration, SystemTime},
 };
 
 fn time_to_ns(t: SystemTime) -> DatabaseResult<u64> {

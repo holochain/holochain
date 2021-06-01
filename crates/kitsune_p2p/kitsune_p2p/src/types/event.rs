@@ -1,7 +1,7 @@
 //! Definitions for events emited from the KitsuneP2p actor.
 
 use crate::types::agent_store::AgentInfoSigned;
-use std::sync::Arc;
+use std::{sync::Arc, time::SystemTime};
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
 #[derive(Debug)]
@@ -71,7 +71,7 @@ pub struct QueryAgentInfoSignedEvt {
 }
 
 /// A single datum of metric info about an Agent, to be recorded by the client.
-#[derive(derive_more::Display)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, derive_more::Display)]
 pub enum MetricKind {
     /// Our fast gossip loop synced this node up to this timestamp.
     /// The next quick loop can sync from this timestamp forward.
@@ -85,6 +85,26 @@ pub enum MetricKind {
     /// ignoring inactivity timeouts.
     /// Lets us skip recently unreachable nodes in gossip loops.
     ConnectError,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Ord)]
+/// A single row in the metrics database
+pub struct MetricDatum {
+    /// The agent this event is about
+    pub agent: Arc<super::KitsuneAgent>,
+    /// The kind of event
+    pub kind: MetricKind,
+    /// The time at which this occurred
+    pub timestamp: SystemTime,
+}
+
+impl PartialOrd for MetricDatum {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self.timestamp.cmp(&other.timestamp) {
+            std::cmp::Ordering::Equal => Some(self.agent.cmp(&other.agent)),
+            o => Some(o),
+        }
+    }
 }
 
 /// Different kinds of queries about metric data
@@ -125,7 +145,7 @@ ghost_actor::ghost_chan! {
         fn query_agent_info_signed(input: QueryAgentInfoSignedEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
         /// Record a metric datum about an agent.
-        fn put_metric_datum(agent: Arc<super::KitsuneAgent>, metric: MetricKind) -> ();
+        fn put_metric_datum(datum: MetricDatum) -> ();
 
         /// Ask for metric data.
         fn query_metrics(query: MetricQuery) -> MetricQueryAnswer;

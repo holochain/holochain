@@ -3,6 +3,7 @@ use crate::event::*;
 use crate::*;
 
 use futures::future::FutureExt;
+use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricQueryAnswer;
 
 use crate::types::AgentPubKeyExt;
@@ -295,17 +296,40 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
 
     fn handle_put_metric_datum(
         &mut self,
-        _agent: Arc<kitsune_p2p::KitsuneAgent>,
-        _metric: kitsune_p2p::event::MetricKind,
+        datum: MetricDatum,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
-        todo!()
+        let evt_sender = self.evt_sender.clone();
+        // These dummy values are not used
+        let dna_hash = DnaHash::from_raw_32([0; 32].to_vec());
+        let to_agent = AgentPubKey::from_raw_32([0; 32].to_vec());
+
+        let agent = AgentPubKey::from_kitsune(&datum.agent);
+        let kind = datum.kind;
+        let timestamp = datum.timestamp;
+        Ok(async move {
+            Ok(evt_sender
+                .put_metric_datum(dna_hash, to_agent, agent, kind, timestamp)
+                .await?)
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_query_metrics(
         &mut self,
-        _query: kitsune_p2p::event::MetricQuery,
+        query: kitsune_p2p::event::MetricQuery,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<MetricQueryAnswer> {
-        todo!()
+        let evt_sender = self.evt_sender.clone();
+
+        // These dummy values are not used
+        let dna_hash = DnaHash::from_raw_32([0; 32].to_vec());
+        let to_agent = AgentPubKey::from_raw_32([0; 32].to_vec());
+
+        Ok(
+            async move { Ok(evt_sender.query_metrics(dna_hash, to_agent, query).await?) }
+                .boxed()
+                .into(),
+        )
     }
 
     #[tracing::instrument(skip(self, space, to_agent, from_agent, payload), level = "trace")]

@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use super::*;
 
 ghost_actor::ghost_chan! {
@@ -63,6 +65,7 @@ struct AgentHarness {
     harness_chan: HarnessEventChannel,
     agent_store: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
     gossip_store: HashMap<Arc<KitsuneOpHash>, String>,
+    metric_store: BTreeSet<MetricDatum>,
 }
 
 impl AgentHarness {
@@ -78,6 +81,7 @@ impl AgentHarness {
             harness_chan,
             agent_store: HashMap::new(),
             gossip_store: HashMap::new(),
+            metric_store: BTreeSet::new(),
         })
     }
 }
@@ -158,12 +162,9 @@ impl KitsuneP2pEventHandler for AgentHarness {
         Ok(async move { Ok(out) }.boxed().into())
     }
 
-    fn handle_put_metric_datum(
-        &mut self,
-        _agent: Arc<types::KitsuneAgent>,
-        _metric: MetricKind,
-    ) -> KitsuneP2pEventHandlerResult<()> {
-        todo!()
+    fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {
+        let _ = self.metric_store.insert(datum);
+        Ok(async move { Ok(()) }.boxed().into())
     }
 
     fn handle_query_metrics(

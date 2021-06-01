@@ -417,25 +417,17 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             PutMetricDatum {
-                span_context,
                 respond,
-                dna_hash,
-                to_agent,
+                agent,
                 metric,
+                ..
             } => {
                 let env = { self.conductor.read().await.p2p_env(space) };
-                let agent = todo!("can we use to_agent?");
                 let res = put_metric_datum(env, agent, metric, SystemTime::now())
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            QueryMetrics {
-                span_context,
-                respond,
-                dna_hash,
-                to_agent,
-                query,
-            } => {
+            QueryMetrics { respond, query, .. } => {
                 let env = { self.conductor.read().await.p2p_env(space) };
                 let res =
                     query_metrics(env, query).map_err(holochain_p2p::HolochainP2pError::other);

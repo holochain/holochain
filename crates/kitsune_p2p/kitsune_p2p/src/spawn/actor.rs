@@ -324,12 +324,8 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         Ok(self.evt_sender.query_agent_info_signed(input))
     }
 
-    fn handle_put_metric_datum(
-        &mut self,
-        agent: Arc<types::KitsuneAgent>,
-        metric: MetricKind,
-    ) -> KitsuneP2pEventHandlerResult<()> {
-        Ok(self.evt_sender.put_metric_datum(agent, metric))
+    fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {
+        Ok(self.evt_sender.put_metric_datum(datum))
     }
 
     fn handle_query_metrics(
