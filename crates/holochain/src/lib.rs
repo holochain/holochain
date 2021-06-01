@@ -10,6 +10,7 @@ pub mod conductor;
 pub mod core;
 #[cfg(any(test, feature = "test_utils"))]
 #[allow(missing_docs)]
+#[cfg(feature = "test_utils")]
 pub mod fixt;
 
 #[cfg(any(test, feature = "test_utils"))]
