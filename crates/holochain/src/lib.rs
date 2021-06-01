@@ -9,6 +9,7 @@ pub mod conductor;
 #[allow(missing_docs)]
 pub mod core;
 #[allow(missing_docs)]
+#[cfg(feature = "test_utils")]
 pub mod fixt;
 
 #[cfg(any(test, feature = "test_utils"))]
