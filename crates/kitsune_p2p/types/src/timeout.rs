@@ -12,11 +12,7 @@ pub struct KitsuneBackoff {
 
 impl KitsuneBackoff {
     /// backoff constructor
-    pub fn new(
-        timeout: KitsuneTimeout,
-        initial_ms: u64,
-        max_ms: u64,
-    ) -> Self {
+    pub fn new(timeout: KitsuneTimeout, initial_ms: u64, max_ms: u64) -> Self {
         let cur_ms = Arc::new(AtomicU64::new(initial_ms));
         Self {
             timeout,
@@ -41,7 +37,7 @@ impl KitsuneBackoff {
             std::cmp::min(
                 self.max_ms,
                 self.timeout.time_remaining().as_millis() as u64,
-            )
+            ),
         );
 
         // wait that time

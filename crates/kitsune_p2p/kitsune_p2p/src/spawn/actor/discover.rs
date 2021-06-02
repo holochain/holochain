@@ -19,169 +19,97 @@ pub(crate) enum PeerDiscoverResult {
     Err(KitsuneP2pError),
 }
 
-/// attempt to establish a connection to another peer within given timeout
-pub(crate) fn peer_discover(
-    space: &mut Space,
-    to_agent: Arc<KitsuneAgent>,
-    _from_agent: Arc<KitsuneAgent>,
-    // TODO - FIXME - upgrade to KitsuneTimeout
-    timeout_ms: u64,
-) -> MustBoxFuture<'static, PeerDiscoverResult> {
-    let timeout = KitsuneTimeout::from_millis(timeout_ms);
-
-    let i_s = space.i_s.clone();
-    let evt_sender = space.evt_sender.clone();
-    let ep_hnd = space.ep_hnd.clone();
-    let space = space.space.clone();
-    async move {
-        // run tx.create_channel an conver success result into our return type
-        let try_connect = |url: url2::Url2| async {
-            let con_hnd = ep_hnd.get_connection(url.clone(), timeout).await?;
-            KitsuneP2pResult::Ok(PeerDiscoverResult::OkRemote { url, con_hnd })
-        };
-
-        // check if this agent is locally joined
-        let check_local = || async {
-            if i_s.is_agent_local(to_agent.clone()).await? {
-                return Ok(PeerDiscoverResult::OkShortcut);
-            }
-
-            KitsuneP2pResult::Err("failed to connect".into())
-        };
-
-        // check if we have a reference to this agent in our peer store
-        // if so, see if that url is valid via try_connect
-        let check_peer_store = || async {
-            if let Some(info) = evt_sender
-                .get_agent_info_signed(GetAgentInfoSignedEvt {
-                    space: space.clone(),
-                    agent: to_agent.clone(),
-                })
-                .await?
-            {
-                let info = types::agent_store::AgentInfo::try_from(&info)?;
-                let url = info
-                    .as_urls_ref()
-                    .get(0)
-                    .ok_or_else(|| KitsuneP2pError::from("no url"))?
-                    .clone();
-                return try_connect(url).await;
-            }
-
-            KitsuneP2pResult::Err("failed to connect".into())
-        };
-
-        let start_time = std::time::Instant::now();
-        let mut interval_ms = 50;
-
-        loop {
-            if let Ok(res) = check_local().await {
-                return res;
-            }
-
-            if let Ok(res) = check_peer_store().await {
-                return res;
-            }
-
-            let elapsed_ms = start_time.elapsed().as_millis() as u64;
-            if elapsed_ms >= timeout_ms {
-                return PeerDiscoverResult::Err("timeout".into());
-            }
-
-            interval_ms *= 2;
-            if interval_ms > timeout_ms - elapsed_ms {
-                interval_ms = timeout_ms - elapsed_ms;
-            }
-
-            tokio::time::sleep(std::time::Duration::from_millis(interval_ms)).await;
-        }
-    }
-    .boxed()
-    .into()
-}
-
 /// search for / discover / and open a connection to a specific remote agent
-pub(crate) async fn search_and_discover_peer_connect(
-    space: &mut Space,
+pub(crate) fn search_and_discover_peer_connect(
+    inner: Arc<SpaceReadOnlyInner>,
     to_agent: Arc<KitsuneAgent>,
     timeout: KitsuneTimeout,
-) -> PeerDiscoverResult {
+) -> impl Future<Output = PeerDiscoverResult> + 'static + Send {
     const INITIAL_DELAY: u64 = 100;
     const MAX_DELAY: u64 = 1000;
-    let backoff = timeout.backoff(INITIAL_DELAY, MAX_DELAY);
-    loop {
-        // see if the tgt agent is actually local
-        if let Ok(true) = space.i_s.is_agent_local(to_agent.clone()).await {
-            return PeerDiscoverResult::OkShortcut;
-        }
 
-        // see if we already know how to reach the tgt agent
-        if let Ok(Some(agent_info_signed)) = space
-            .evt_sender
-            .get_agent_info_signed(GetAgentInfoSignedEvt {
-                space: space.space.clone(),
-                agent: to_agent.clone(),
-            })
-            .await
-        {
-            return peer_connect(space, &agent_info_signed, timeout).await;
-        }
+    async move {
+        let backoff = timeout.backoff(INITIAL_DELAY, MAX_DELAY);
+        loop {
+            // see if the tgt agent is actually local
+            if let Ok(true) = inner.i_s.is_agent_local(to_agent.clone()).await {
+                return PeerDiscoverResult::OkShortcut;
+            }
 
-        // the next step involves making network requests
-        // so check our timeout first
-        if timeout.is_expired() {
-            return PeerDiscoverResult::Err("timeout discovering peer".into());
-        }
+            // see if we already know how to reach the tgt agent
+            if let Ok(Some(agent_info_signed)) = inner
+                .evt_sender
+                .get_agent_info_signed(GetAgentInfoSignedEvt {
+                    space: inner.space.clone(),
+                    agent: to_agent.clone(),
+                })
+                .await
+            {
+                return peer_connect(inner.clone(), &agent_info_signed, timeout).await;
+            }
 
-        // let's do some discovery
-        if let Ok(nodes) = search_remotes_covering_basis(space, to_agent.get_loc(), timeout).await {
-            for node in nodes {
-                // try connecting to the returned nodes
-                if let PeerDiscoverResult::OkRemote { con_hnd, .. } =
-                    peer_connect(space, &node, timeout).await
-                {
-                    // make a peer query for the basis
-                    let payload = wire::Wire::peer_get(space.space.clone(), to_agent.clone());
-                    match con_hnd.request(&payload, timeout).await {
-                        Ok(wire::Wire::PeerGetResp(wire::PeerGetResp { agent_info_signed })) => {
-                            let agent = Arc::new(agent_info_signed.as_agent_ref().clone());
-                            let _ = space
-                                .evt_sender
-                                .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                    space: space.space.clone(),
-                                    agent,
-                                    agent_info_signed: agent_info_signed.clone(),
-                                })
-                                .await;
-                            return peer_connect(space, &agent_info_signed, timeout).await;
-                        }
-                        peer_resp => {
-                            tracing::warn!(?peer_resp, "unexpected peer resp");
+            // the next step involves making network requests
+            // so check our timeout first
+            if timeout.is_expired() {
+                return PeerDiscoverResult::Err("timeout discovering peer".into());
+            }
+
+            // let's do some discovery
+            if let Ok(nodes) =
+                search_remotes_covering_basis(inner.clone(), to_agent.get_loc(), timeout).await
+            {
+                for node in nodes {
+                    // try connecting to the returned nodes
+                    if let PeerDiscoverResult::OkRemote { con_hnd, .. } =
+                        peer_connect(inner.clone(), &node, timeout).await
+                    {
+                        // make a peer query for the basis
+                        let payload = wire::Wire::peer_get(inner.space.clone(), to_agent.clone());
+                        match con_hnd.request(&payload, timeout).await {
+                            Ok(wire::Wire::PeerGetResp(wire::PeerGetResp {
+                                agent_info_signed,
+                            })) => {
+                                let agent = Arc::new(agent_info_signed.as_agent_ref().clone());
+                                let _ = inner
+                                    .evt_sender
+                                    .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                        space: inner.space.clone(),
+                                        agent,
+                                        agent_info_signed: agent_info_signed.clone(),
+                                    })
+                                    .await;
+
+                                // hey, we got our target node info
+                                // return the try-to-connect future
+                                return peer_connect(inner, &agent_info_signed, timeout).await;
+                            }
+                            peer_resp => {
+                                tracing::warn!(?peer_resp, "unexpected peer resp");
+                            }
                         }
                     }
                 }
             }
-        }
 
-        backoff.wait().await;
+            backoff.wait().await;
+        }
     }
 }
 
 /// attempt to establish a connection to another peer within given timeout
 pub(crate) fn peer_connect(
-    space: &mut Space,
+    inner: Arc<SpaceReadOnlyInner>,
     agent_info_signed: &AgentInfoSigned,
     timeout: KitsuneTimeout,
 ) -> impl Future<Output = PeerDiscoverResult> + 'static + Send {
     let agent = Arc::new(agent_info_signed.as_agent_ref().clone());
     let info = AgentInfo::try_from(agent_info_signed);
-    let i_s = space.i_s.clone();
-    let ep_hnd = space.ep_hnd.clone();
 
     async move {
         let info = info?;
 
-        if i_s.is_agent_local(agent).await? {
+        // if they are local, return the shortcut result
+        if inner.i_s.is_agent_local(agent).await? {
             return Ok(PeerDiscoverResult::OkShortcut);
         }
 
@@ -191,7 +119,10 @@ pub(crate) fn peer_connect(
             .ok_or_else(|| KitsuneP2pError::from("no url"))?
             .clone();
 
-        let con_hnd = ep_hnd.get_connection(url.clone(), timeout).await?;
+        // attempt an outgoing connection
+        let con_hnd = inner.ep_hnd.get_connection(url.clone(), timeout).await?;
+
+        // return the result
         Ok(PeerDiscoverResult::OkRemote { url, con_hnd })
     }
     .map(|r| match r {
@@ -202,106 +133,108 @@ pub(crate) fn peer_connect(
 
 /// looping search for agents covering basis_loc
 /// by requesting closer agents from remote nodes
-pub(crate) async fn search_remotes_covering_basis(
-    space: &mut Space,
+pub(crate) fn search_remotes_covering_basis(
+    inner: Arc<SpaceReadOnlyInner>,
     basis_loc: u32,
     timeout: KitsuneTimeout,
-) -> KitsuneP2pResult<Vec<AgentInfoSigned>> {
+) -> impl Future<Output = KitsuneP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
     const INITIAL_DELAY: u64 = 100;
     const MAX_DELAY: u64 = 1000;
     const CHECK_NODE_COUNT: usize = 8;
 
-    let backoff = timeout.backoff(INITIAL_DELAY, MAX_DELAY);
-    loop {
-        let mut cover_nodes = Vec::new();
-        let mut near_nodes = Vec::new();
+    async move {
+        let backoff = timeout.backoff(INITIAL_DELAY, MAX_DELAY);
+        loop {
+            let mut cover_nodes = Vec::new();
+            let mut near_nodes = Vec::new();
 
-        // first check our local peer store,
-        // sort into nodes covering the basis and otherwise
-        for node in get_cached_remotes_near_basis(space, basis_loc, timeout)
-            .await
-            .unwrap_or_else(|_| Vec::new())
-        {
-            if let Ok(info) = AgentInfo::try_from(&node) {
-                if let Ok(arc) = info.dht_arc() {
-                    if arc.contains(basis_loc) {
-                        cover_nodes.push(node);
-                        continue;
-                    }
-                }
-            }
-            near_nodes.push(node);
-            if cover_nodes.len() + near_nodes.len() >= CHECK_NODE_COUNT {
-                break;
-            }
-        }
-
-        // if we have any nodes covering the basis, return them
-        if !cover_nodes.is_empty() {
-            return Ok(cover_nodes);
-        }
-
-        if near_nodes.is_empty() {
-            // maybe just wait and try again?
-            backoff.wait().await;
-            continue;
-        }
-
-        // the next step involves making network requests
-        // so check our timeout first
-        timeout.ok()?;
-
-        // shuffle the returned nodes so we don't keep hammering the same one
-        use rand::prelude::*;
-        near_nodes.shuffle(&mut rand::thread_rng());
-
-        let mut added_data = false;
-        for node in near_nodes {
-            // try connecting to the returned nodes
-            if let PeerDiscoverResult::OkRemote { con_hnd, .. } =
-                peer_connect(space, &node, timeout).await
+            // first check our local peer store,
+            // sort into nodes covering the basis and otherwise
+            for node in get_cached_remotes_near_basis(inner.clone(), basis_loc, timeout)
+                .await
+                .unwrap_or_else(|_| Vec::new())
             {
-                // make a peer query for the basis
-                let payload = wire::Wire::peer_query(space.space.clone(), basis_loc);
-                match con_hnd.request(&payload, timeout).await {
-                    Ok(wire::Wire::PeerQueryResp(wire::PeerQueryResp { peer_list })) => {
-                        if peer_list.is_empty() {
-                            tracing::warn!("empty discovery peer list");
+                if let Ok(info) = AgentInfo::try_from(&node) {
+                    if let Ok(arc) = info.dht_arc() {
+                        if arc.contains(basis_loc) {
+                            cover_nodes.push(node);
                             continue;
                         }
-                        // if we got results, add them to our peer store
-                        for agent_info_signed in peer_list {
-                            let agent = Arc::new(agent_info_signed.as_agent_ref().clone());
-                            let _ = space
-                                .evt_sender
-                                .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                    space: space.space.clone(),
-                                    agent,
-                                    agent_info_signed,
-                                })
-                                .await;
-                        }
-                        // then break, to pull up the local query
-                        // that should now include these new results
-                        added_data = true;
-                        break;
                     }
-                    peer_resp => {
-                        tracing::warn!(?peer_resp, "unexpected peer resp");
+                }
+                near_nodes.push(node);
+                if cover_nodes.len() + near_nodes.len() >= CHECK_NODE_COUNT {
+                    break;
+                }
+            }
+
+            // if we have any nodes covering the basis, return them
+            if !cover_nodes.is_empty() {
+                return Ok(cover_nodes);
+            }
+
+            if near_nodes.is_empty() {
+                // maybe just wait and try again?
+                backoff.wait().await;
+                continue;
+            }
+
+            // the next step involves making network requests
+            // so check our timeout first
+            timeout.ok()?;
+
+            // shuffle the returned nodes so we don't keep hammering the same one
+            use rand::prelude::*;
+            near_nodes.shuffle(&mut rand::thread_rng());
+
+            let mut added_data = false;
+            for node in near_nodes {
+                // try connecting to the returned nodes
+                if let PeerDiscoverResult::OkRemote { con_hnd, .. } =
+                    peer_connect(inner.clone(), &node, timeout).await
+                {
+                    // make a peer query for the basis
+                    let payload = wire::Wire::peer_query(inner.space.clone(), basis_loc);
+                    match con_hnd.request(&payload, timeout).await {
+                        Ok(wire::Wire::PeerQueryResp(wire::PeerQueryResp { peer_list })) => {
+                            if peer_list.is_empty() {
+                                tracing::warn!("empty discovery peer list");
+                                continue;
+                            }
+                            // if we got results, add them to our peer store
+                            for agent_info_signed in peer_list {
+                                let agent = Arc::new(agent_info_signed.as_agent_ref().clone());
+                                let _ = inner
+                                    .evt_sender
+                                    .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                        space: inner.space.clone(),
+                                        agent,
+                                        agent_info_signed,
+                                    })
+                                    .await;
+                            }
+                            // then break, to pull up the local query
+                            // that should now include these new results
+                            added_data = true;
+                            break;
+                        }
+                        peer_resp => {
+                            tracing::warn!(?peer_resp, "unexpected peer resp");
+                        }
                     }
                 }
             }
-        }
 
-        if !added_data {
-            backoff.wait().await;
+            if !added_data {
+                backoff.wait().await;
+            }
         }
     }
 }
 
 /// local search for remote (non-local) agents closest to basis
 pub(crate) fn get_cached_remotes_near_basis(
-    space: &mut Space,
+    inner: Arc<SpaceReadOnlyInner>,
     basis_loc: u32,
     _timeout: KitsuneTimeout,
 ) -> impl Future<Output = KitsuneP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
@@ -309,18 +242,16 @@ pub(crate) fn get_cached_remotes_near_basis(
     // results than we strictly need
     const LIMIT: u32 = 20;
 
-    let i_s = space.i_s.clone();
-    let evt_sender = space.evt_sender.clone();
-    let space = space.space.clone();
-
     async move {
         let mut nodes = Vec::new();
 
-        for node in evt_sender
-            .query_agent_info_signed_near_basis(space.clone(), basis_loc, LIMIT)
+        for node in inner
+            .evt_sender
+            .query_agent_info_signed_near_basis(inner.space.clone(), basis_loc, LIMIT)
             .await?
         {
-            if !i_s
+            if !inner
+                .i_s
                 .is_agent_local(Arc::new(node.as_agent_ref().clone()))
                 .await
                 .unwrap_or(true)
