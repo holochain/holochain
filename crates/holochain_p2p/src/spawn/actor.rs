@@ -83,6 +83,22 @@ impl WrapEvtSender {
         )
     }
 
+    fn query_agent_info_signed_near_basis(
+        &self,
+        dna_hash: DnaHash,
+        kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+        basis_loc: u32,
+        limit: u32,
+    ) -> impl Future<Output = HolochainP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
+        timing_trace!(
+            {
+                self.0
+                    .query_agent_info_signed_near_basis(dna_hash, kitsune_space, basis_loc, limit)
+            },
+            "(hp2p:handle) query_agent_info_signed_near_basis",
+        )
+    }
+
     fn call_remote(
         &self,
         dna_hash: DnaHash,
