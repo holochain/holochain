@@ -81,7 +81,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
                         match &*chunk {
                             MetaOpData::Op(key, data) => {
                                 futs.push(bloom.evt_sender.gossip(
-                                    i.space.clone(),
+                                    bloom.space.clone(),
                                     agent.clone(),
                                     agent.clone(), // TODO - from??
                                     key.clone(),
@@ -93,7 +93,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
                                 // once, since the agent store is shared...
                                 futs.push(bloom.evt_sender.put_agent_info_signed(
                                     PutAgentInfoSignedEvt {
-                                        space: i.space.clone(),
+                                        space: bloom.space.clone(),
                                         agent: agent.clone(),
                                         agent_info_signed: agent_info_signed.clone(),
                                     },
@@ -287,7 +287,7 @@ async fn data_map_get(
     let (space, agent, maybe_data) = bloom.inner.share_mut(|i, _| {
         // erm, just using a random agent??
         Ok((
-            i.space.clone(),
+            bloom.space.clone(),
             i.local_agents.iter().next().unwrap().clone(),
             i.local_data_map.get(key).cloned(),
         ))

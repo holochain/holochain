@@ -4,6 +4,7 @@ use super::*;
 //             the gossip mutex is locked for the duration of this fn!
 pub(crate) fn danger_mutex_locked_sync_step_3_initiate_inner(
     inner: &mut SimpleBloomModInner,
+    tuning_params: &KitsuneP2pTuningParams,
 ) -> KitsuneResult<()> {
     // we have decided to do an initiate check, mark the time
     inner.last_initiate_check = std::time::Instant::now();
@@ -58,14 +59,10 @@ pub(crate) fn danger_mutex_locked_sync_step_3_initiate_inner(
 
                 let saw_recently = if e.was_err {
                     e.last_touch.elapsed().as_millis() as u32 + last_touch_fudge_ms
-                        <= inner
-                            .tuning_params
-                            .gossip_peer_on_error_next_gossip_delay_ms
+                        <= tuning_params.gossip_peer_on_error_next_gossip_delay_ms
                 } else {
                     e.last_touch.elapsed().as_millis() as u32 + last_touch_fudge_ms
-                        <= inner
-                            .tuning_params
-                            .gossip_peer_on_success_next_gossip_delay_ms
+                        <= tuning_params.gossip_peer_on_success_next_gossip_delay_ms
                 };
 
                 if saw_recently {

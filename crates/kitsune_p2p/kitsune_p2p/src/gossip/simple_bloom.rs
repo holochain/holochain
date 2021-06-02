@@ -144,10 +144,6 @@ pub(crate) enum HowToConnect {
 }
 
 pub(crate) struct SimpleBloomModInner {
-    tuning_params: KitsuneP2pTuningParams,
-    space: Arc<KitsuneSpace>,
-    ep_hnd: Tx2EpHnd<wire::Wire>,
-
     local_agents: HashSet<Arc<KitsuneAgent>>,
     local_bloom: BloomFilter,
     local_data_map: DataMap,
@@ -161,36 +157,17 @@ pub(crate) struct SimpleBloomModInner {
     incoming: Vec<(Tx2ConHnd<wire::Wire>, GossipWire)>,
 
     last_outgoing: std::time::Instant,
-    send_interval_ms: u64,
     outgoing: Vec<(Tx2Cert, HowToConnect, GossipWire)>,
 }
 
 impl SimpleBloomModInner {
-    pub fn new(
-        tuning_params: KitsuneP2pTuningParams,
-        space: Arc<KitsuneSpace>,
-        ep_hnd: Tx2EpHnd<wire::Wire>,
-    ) -> Self {
-        let send_interval_ms: u64 = (
-            // !*)&^$# cargo fmt...
-            16384.0    // max bytes in a gossip msg
-            * 8.0      // bits per byte
-            * 1000.0   // milliseconds
-            / 1024.0   // kbps
-            / 1024.0   // mbps
-            / tuning_params.gossip_output_target_mbps
-        ) as u64;
-
+    pub fn new() -> Self {
         // pick an old instant for initialization
         let old = std::time::Instant::now()
             .checked_sub(std::time::Duration::from_secs(60 * 60 * 24))
             .unwrap();
 
         Self {
-            tuning_params,
-            space,
-            ep_hnd,
-
             local_agents: HashSet::new(),
             local_bloom: bloomfilter::Bloom::new(1, 1),
             local_data_map: HashMap::new(),
@@ -204,7 +181,6 @@ impl SimpleBloomModInner {
             incoming: Vec::new(),
 
             last_outgoing: old,
-            send_interval_ms,
             outgoing: Vec::new(),
         }
     }
@@ -223,6 +199,10 @@ enum CheckResult {
 }
 
 pub(crate) struct SimpleBloomMod {
+    tuning_params: KitsuneP2pTuningParams,
+    send_interval_ms: u64,
+    space: Arc<KitsuneSpace>,
+    ep_hnd: Tx2EpHnd<wire::Wire>,
     evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
     inner: Share<SimpleBloomModInner>,
 }
@@ -234,11 +214,23 @@ impl SimpleBloomMod {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
     ) -> Arc<Self> {
-        let inner = SimpleBloomModInner::new(tuning_params, space, ep_hnd);
+        let inner = SimpleBloomModInner::new();
 
-        let send_interval_ms = inner.send_interval_ms;
+        let send_interval_ms: u64 = (
+            // !*)&^$# cargo fmt...
+            16384.0    // max bytes in a gossip msg
+            * 8.0      // bits per byte
+            * 1000.0   // milliseconds
+            / 1024.0   // kbps
+            / 1024.0   // mbps
+            / tuning_params.gossip_output_target_mbps
+        ) as u64;
 
         let this = Arc::new(Self {
+            tuning_params,
+            space,
+            ep_hnd,
+            send_interval_ms,
             evt_sender,
             inner: Share::new(inner),
         });
@@ -324,7 +316,7 @@ impl SimpleBloomMod {
                 if let Some(metric) = i.remote_metrics.get(&initiate_tgt) {
                     if metric.was_err
                         || metric.last_touch.elapsed().as_millis() as u32
-                            > i.tuning_params.gossip_peer_on_success_next_gossip_delay_ms
+                            > self.tuning_params.gossip_peer_on_success_next_gossip_delay_ms
                             // give us a little leeway... we don't
                             // need to be too agressive with timing out
                             // this loop
@@ -347,7 +339,7 @@ impl SimpleBloomMod {
 
             if i.initiate_tgt.is_none()
                 && i.last_initiate_check.elapsed().as_millis() as u32
-                    > i.tuning_params.gossip_loop_iteration_delay_ms
+                    > self.tuning_params.gossip_loop_iteration_delay_ms
             {
                 return Ok(CheckResult::SyncAndInitiate);
             }
@@ -362,7 +354,7 @@ impl SimpleBloomMod {
         let evt_sender = self.evt_sender.clone();
         let (space, local_agents) = self
             .inner
-            .share_mut(|i, _| Ok((i.space.clone(), i.local_agents.clone())))?;
+            .share_mut(|i, _| Ok((self.space.clone(), i.local_agents.clone())))?;
 
         let (data_map, key_set, bloom) =
             match step_2_local_sync_inner(space, evt_sender, local_agents).await {
@@ -384,8 +376,9 @@ impl SimpleBloomMod {
     }
 
     async fn step_3_initiate(&self) -> KitsuneResult<bool> {
-        self.inner
-            .share_mut(|i, _| danger_mutex_locked_sync_step_3_initiate_inner(i))?;
+        self.inner.share_mut(|i, _| {
+            danger_mutex_locked_sync_step_3_initiate_inner(i, &self.tuning_params)
+        })?;
 
         Ok(true)
     }
@@ -397,7 +390,7 @@ impl SimpleBloomMod {
             let (tuning_params, space, ep_hnd, mut maybe_outgoing, mut maybe_incoming) =
                 self.inner.share_mut(|i, _| {
                     let maybe_outgoing = if !i.outgoing.is_empty()
-                        && i.last_outgoing.elapsed().as_millis() as u64 > i.send_interval_ms
+                        && i.last_outgoing.elapsed().as_millis() as u64 > self.send_interval_ms
                     {
                         let (cert, how, gossip) = i.outgoing.remove(0);
 
@@ -407,7 +400,7 @@ impl SimpleBloomMod {
                         // when we get a success or failure below.
                         i.last_outgoing = std::time::Instant::now()
                             .checked_add(std::time::Duration::from_millis(
-                                i.tuning_params.tx2_implicit_timeout_ms as u64,
+                                self.tuning_params.tx2_implicit_timeout_ms as u64,
                             ))
                             .expect("Congratulations on running holochain near the heat death of the universe :)");
 
@@ -421,9 +414,9 @@ impl SimpleBloomMod {
                         None
                     };
                     Ok((
-                        i.tuning_params.clone(),
-                        i.space.clone(),
-                        i.ep_hnd.clone(),
+                        self.tuning_params.clone(),
+                        self.space.clone(),
+                        self.ep_hnd.clone(),
                         maybe_outgoing,
                         maybe_incoming,
                     ))
