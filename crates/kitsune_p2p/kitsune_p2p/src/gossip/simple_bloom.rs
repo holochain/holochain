@@ -258,6 +258,18 @@ impl SimpleBloomMod {
         this
     }
 
+    /// Get metrics data in the form of NodeInfo
+    // TODO: remove NodeInfo
+    async fn get_node_info(&self, _agent: &KitsuneAgent) -> Option<NodeInfo> {
+        todo!("use evt_sender to get metric data and massage it into NodeInfo");
+    }
+
+    /// Record metrics data in the form of NodeInfo
+    // TODO: remove NodeInfo
+    async fn record_metric(&self, _agent: KitsuneAgent, _info: NodeInfo) {
+        todo!("use evt_sender to record metric data based on NodeInfo");
+    }
+
     async fn run_one_iteration(&self) -> GossipIterationResult {
         // # Step 1 - check state
         //   - if closed, send GossipIterationResult::Close
