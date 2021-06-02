@@ -234,6 +234,47 @@ impl KitsuneP2pActor {
                                     .respond(resp, tuning_params.implicit_timeout())
                                     .await;
                             }
+                            wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
+                                if let Ok(Some(agent_info_signed)) = evt_sender
+                                    .get_agent_info_signed(GetAgentInfoSignedEvt { space, agent })
+                                    .await
+                                {
+                                    let resp = wire::Wire::peer_get_resp(agent_info_signed);
+                                    let _ = respond
+                                        .respond(resp, tuning_params.implicit_timeout())
+                                        .await;
+                                } else {
+                                    let resp = wire::Wire::failure("no such agent".into());
+                                    let _ = respond
+                                        .respond(resp, tuning_params.implicit_timeout())
+                                        .await;
+                                }
+                            }
+                            wire::Wire::PeerQuery(wire::PeerQuery { space, basis_loc }) => {
+                                // this *does* go over the network...
+                                // so we don't want it to be too many
+                                const LIMIT: u32 = 8;
+                                match evt_sender
+                                    .query_agent_info_signed_near_basis(space, basis_loc, LIMIT)
+                                    .await
+                                {
+                                    Ok(list) if !list.is_empty() => {
+                                        let resp = wire::Wire::peer_query_resp(list);
+                                        let _ = respond
+                                            .respond(resp, tuning_params.implicit_timeout())
+                                            .await;
+                                    }
+                                    res => {
+                                        let resp = wire::Wire::failure(format!(
+                                            "error getting agents: {:?}",
+                                            res
+                                        ));
+                                        let _ = respond
+                                            .respond(resp, tuning_params.implicit_timeout())
+                                            .await;
+                                    }
+                                }
+                            }
                             data => unimplemented!("{:?}", data),
                         },
                         IncomingNotify(Tx2EpIncomingNotify { con, data, .. }) => match data {

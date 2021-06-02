@@ -135,7 +135,6 @@ pub trait ConductorHandleT: Send + Sync {
     /// Warning: returning an error from this function kills the network for the conductor.
     async fn dispatch_holochain_p2p_event(
         &self,
-        cell_id: &CellId,
         event: holochain_p2p::event::HolochainP2pEvent,
     ) -> ConductorApiResult<()>;
 
@@ -376,11 +375,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     #[instrument(skip(self))]
     async fn dispatch_holochain_p2p_event(
         &self,
-        cell_id: &CellId,
         event: holochain_p2p::event::HolochainP2pEvent,
     ) -> ConductorApiResult<()> {
-        let space = cell_id.dna_hash().to_kitsune();
-        trace!(agent = ?cell_id.agent_pubkey(), dispatch_event = ?event);
+        let space = event.dna_hash().to_kitsune();
+        trace!(dispatch_event = ?event);
         match event {
             PutAgentInfoSigned {
                 agent_info_signed,
@@ -425,15 +423,21 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            SignNetworkData { respond, data, .. } => {
-                let signature = cell_id
-                    .agent_pubkey()
-                    .sign_raw(self.keystore(), &data)
-                    .await?;
+            SignNetworkData {
+                respond,
+                to_agent,
+                data,
+                ..
+            } => {
+                let signature = to_agent.sign_raw(self.keystore(), &data).await?;
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
-            _ => {
-                let cell = self.cell_by_id(cell_id).await?;
+            event => {
+                let cell_id = CellId::new(
+                    event.dna_hash().clone(),
+                    event.target_agent_as_ref().clone(),
+                );
+                let cell = self.cell_by_id(&cell_id).await?;
                 cell.handle_holochain_p2p_event(event).await?;
             }
         }

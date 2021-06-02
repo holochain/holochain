@@ -1393,9 +1393,7 @@ async fn p2p_event_task(
         .for_each_concurrent(NUM_PARALLEL_EVTS, |evt| {
             let handle = handle.clone();
             async move {
-                let cell_id =
-                    CellId::new(evt.dna_hash().clone(), evt.target_agent_as_ref().clone());
-                if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
+                if let Err(e) = handle.dispatch_holochain_p2p_event(evt).await {
                     tracing::error!(
                         message = "error dispatching network event",
                         error = ?e,
