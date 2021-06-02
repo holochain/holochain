@@ -376,10 +376,7 @@ impl SimpleBloomMod {
     }
 
     async fn step_3_initiate(&self) -> KitsuneResult<bool> {
-        self.inner.share_mut(|i, _| {
-            danger_mutex_locked_sync_step_3_initiate_inner(i, &self.tuning_params)
-        })?;
-
+        step_3_initiate_inner(self).await?;
         Ok(true)
     }
 
