@@ -32,7 +32,7 @@ pub(crate) async fn step_4_com_loop_inner_outgoing(
 }
 
 pub(crate) async fn step_4_com_loop_inner_incoming(
-    inner: &Share<SimpleBloomModInner>,
+    bloom: &SimpleBloomMod,
     con: Tx2ConHnd<wire::Wire>,
     gossip: GossipWire,
 ) -> KitsuneResult<()> {
@@ -67,7 +67,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
             );
 
             // parse/integrate the chunks
-            let futs = inner.share_mut(move |i, _| {
+            let futs = bloom.inner.share_mut(move |i, _| {
                 if let Some(tgt_cert) = i.initiate_tgt.clone() {
                     if finished && con.peer_cert() == tgt_cert {
                         i.initiate_tgt = None;
@@ -80,7 +80,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
                     for agent in i.local_agents.iter() {
                         match &*chunk {
                             MetaOpData::Op(key, data) => {
-                                futs.push(i.evt_sender.gossip(
+                                futs.push(bloom.evt_sender.gossip(
                                     i.space.clone(),
                                     agent.clone(),
                                     agent.clone(), // TODO - from??
@@ -91,7 +91,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
                             MetaOpData::Agent(agent_info_signed) => {
                                 // TODO - we actually only need to do this
                                 // once, since the agent store is shared...
-                                futs.push(i.evt_sender.put_agent_info_signed(
+                                futs.push(bloom.evt_sender.put_agent_info_signed(
                                     PutAgentInfoSignedEvt {
                                         space: i.space.clone(),
                                         agent: agent.clone(),
@@ -123,7 +123,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
 
     // send accept if applicable / gather the keys the remote needs
     let con_clone = con.clone();
-    let out_keys = inner.share_mut(move |i, _| {
+    let out_keys = bloom.inner.share_mut(move |i, _| {
         // for now, just always accept gossip initiates
         if send_accept {
             let local_filter = encode_bloom_filter(&i.local_bloom);
@@ -152,7 +152,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
     if out_keys.is_empty() {
         // the remote doesn't need anything from us
         // ... if we initiated this gossip, mark it as done.
-        inner.share_mut(move |i, _| {
+        bloom.inner.share_mut(move |i, _| {
             if let Some(tgt_cert) = i.initiate_tgt.clone() {
                 if con.peer_cert() == tgt_cert {
                     i.initiate_tgt = None;
@@ -173,7 +173,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
     // get all the local data we have that they need
     let mut out_data = Vec::new();
     for key in out_keys {
-        if let Some(data) = data_map_get(inner, &key).await? {
+        if let Some(data) = data_map_get(bloom, &key).await? {
             out_data.push(data);
         }
     }
@@ -214,7 +214,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
     let last_idx = gossip.len() - 1;
     gossip[last_idx].0 = true;
 
-    inner.share_mut(move |i, _| {
+    bloom.inner.share_mut(move |i, _| {
         for (finished, chunks) in gossip {
             let gossip = GossipWire::chunk(finished, chunks);
             let peer_cert = con.peer_cert();
@@ -278,18 +278,17 @@ fn pick_url_for_cert(inner: &Share<SimpleBloomModInner>, cert: &Tx2Cert) -> Kits
 }
 
 async fn data_map_get(
-    inner: &Share<SimpleBloomModInner>,
+    bloom: &SimpleBloomMod,
     key: &Arc<MetaOpKey>,
 ) -> KitsuneResult<Option<Arc<MetaOpData>>> {
     use crate::event::*;
 
     // first, see if we already have the data
-    let (space, agent, evt_sender, maybe_data) = inner.share_mut(|i, _| {
+    let (space, agent, maybe_data) = bloom.inner.share_mut(|i, _| {
         // erm, just using a random agent??
         Ok((
             i.space.clone(),
             i.local_agents.iter().next().unwrap().clone(),
-            i.evt_sender.clone(),
             i.local_data_map.get(key).cloned(),
         ))
     })?;
@@ -306,7 +305,8 @@ async fn data_map_get(
     };
 
     // next, check locally
-    let mut op = match evt_sender
+    let mut op = match bloom
+        .evt_sender
         .fetch_op_hash_data(FetchOpHashDataEvt {
             space,
             agent,
@@ -328,7 +328,7 @@ async fn data_map_get(
     assert_eq!(key, &fetched_key);
 
     // store it before returning it
-    inner.share_mut(|i, _| {
+    bloom.inner.share_mut(|i, _| {
         i.local_data_map.insert(fetched_key, data.clone());
         Ok(())
     })?;

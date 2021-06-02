@@ -60,7 +60,6 @@ impl MetaOpData {
 }
 
 type KeySet = HashSet<Arc<MetaOpKey>>;
-type HasMap = HashMap<Arc<KitsuneAgent>, KeySet>;
 type DataMap = HashMap<Arc<MetaOpKey>, Arc<MetaOpData>>;
 type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
 
@@ -148,7 +147,6 @@ pub(crate) struct SimpleBloomModInner {
     tuning_params: KitsuneP2pTuningParams,
     space: Arc<KitsuneSpace>,
     ep_hnd: Tx2EpHnd<wire::Wire>,
-    evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
 
     local_agents: HashSet<Arc<KitsuneAgent>>,
     local_bloom: BloomFilter,
@@ -172,7 +170,6 @@ impl SimpleBloomModInner {
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
-        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
     ) -> Self {
         let send_interval_ms: u64 = (
             // !*)&^$# cargo fmt...
@@ -193,7 +190,6 @@ impl SimpleBloomModInner {
             tuning_params,
             space,
             ep_hnd,
-            evt_sender,
 
             local_agents: HashSet::new(),
             local_bloom: bloomfilter::Bloom::new(1, 1),
@@ -226,7 +222,10 @@ enum CheckResult {
     SkipSyncAndInitiate,
 }
 
-struct SimpleBloomMod(Share<SimpleBloomModInner>);
+pub(crate) struct SimpleBloomMod {
+    evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+    inner: Share<SimpleBloomModInner>,
+}
 
 impl SimpleBloomMod {
     pub fn new(
@@ -235,11 +234,14 @@ impl SimpleBloomMod {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
     ) -> Arc<Self> {
-        let inner = SimpleBloomModInner::new(tuning_params, space, ep_hnd, evt_sender);
+        let inner = SimpleBloomModInner::new(tuning_params, space, ep_hnd);
 
         let send_interval_ms = inner.send_interval_ms;
 
-        let this = Arc::new(Self(Share::new(inner)));
+        let this = Arc::new(Self {
+            evt_sender,
+            inner: Share::new(inner),
+        });
 
         // this value needs to be somewhat frequent to support send timing
         let loop_check_interval_ms = std::cmp::max(send_interval_ms / 3, 100);
@@ -310,7 +312,7 @@ impl SimpleBloomMod {
     }
 
     fn step_1_check(&self) -> CheckResult {
-        match self.0.share_mut(|i, _| {
+        match self.inner.share_mut(|i, _| {
             // first, if we don't have any local agents, there's
             // no point in doing any gossip logic
             if i.local_agents.is_empty() {
@@ -357,13 +359,10 @@ impl SimpleBloomMod {
     }
 
     async fn step_2_local_sync(&self) -> KitsuneResult<bool> {
-        let (space, evt_sender, local_agents) = self.0.share_mut(|i, _| {
-            Ok((
-                i.space.clone(),
-                i.evt_sender.clone(),
-                i.local_agents.clone(),
-            ))
-        })?;
+        let evt_sender = self.evt_sender.clone();
+        let (space, local_agents) = self
+            .inner
+            .share_mut(|i, _| Ok((i.space.clone(), i.local_agents.clone())))?;
 
         let (data_map, key_set, bloom) =
             match step_2_local_sync_inner(space, evt_sender, local_agents).await {
@@ -374,7 +373,7 @@ impl SimpleBloomMod {
                 Ok(r) => r,
             };
 
-        self.0.share_mut(move |i, _| {
+        self.inner.share_mut(move |i, _| {
             i.local_data_map = data_map;
             i.local_key_set = key_set;
             i.local_bloom = bloom;
@@ -385,7 +384,7 @@ impl SimpleBloomMod {
     }
 
     async fn step_3_initiate(&self) -> KitsuneResult<bool> {
-        self.0
+        self.inner
             .share_mut(|i, _| danger_mutex_locked_sync_step_3_initiate_inner(i))?;
 
         Ok(true)
@@ -396,7 +395,7 @@ impl SimpleBloomMod {
 
         loop {
             let (tuning_params, space, ep_hnd, mut maybe_outgoing, mut maybe_incoming) =
-                self.0.share_mut(|i, _| {
+                self.inner.share_mut(|i, _| {
                     let maybe_outgoing = if !i.outgoing.is_empty()
                         && i.last_outgoing.elapsed().as_millis() as u64 > i.send_interval_ms
                     {
@@ -437,7 +436,7 @@ impl SimpleBloomMod {
             if let Some(outgoing) = maybe_outgoing.take() {
                 let (cert, how, gossip) = outgoing;
                 if let Err(e) = step_4_com_loop_inner_outgoing(
-                    &self.0,
+                    &self.inner,
                     tuning_params.clone(),
                     space.clone(),
                     ep_hnd,
@@ -448,7 +447,7 @@ impl SimpleBloomMod {
                 .await
                 {
                     tracing::warn!("failed to send outgoing: {:?} {:?}", cert, e);
-                    self.0.share_mut(move |i, _| {
+                    self.inner.share_mut(move |i, _| {
                         i.last_outgoing = std::time::Instant::now();
                         i.remote_metrics.insert(
                             cert,
@@ -460,7 +459,7 @@ impl SimpleBloomMod {
                         Ok(())
                     })?;
                 } else {
-                    self.0.share_mut(move |i, _| {
+                    self.inner.share_mut(move |i, _| {
                         i.last_outgoing = std::time::Instant::now();
                         i.remote_metrics.insert(
                             cert,
@@ -476,7 +475,7 @@ impl SimpleBloomMod {
 
             if let Some(incoming) = maybe_incoming.take() {
                 let (con, gossip) = incoming;
-                if let Err(e) = step_4_com_loop_inner_incoming(&self.0, con, gossip).await {
+                if let Err(e) = step_4_com_loop_inner_incoming(&self, con, gossip).await {
                     tracing::warn!("failed to process incoming: {:?}", e);
                 }
             }
@@ -498,7 +497,7 @@ impl AsGossipModule for SimpleBloomMod {
     ) -> KitsuneResult<()> {
         use kitsune_p2p_types::codec::*;
         let (_, gossip) = GossipWire::decode_ref(&gossip_data).map_err(KitsuneError::other)?;
-        self.0.share_mut(move |i, _| {
+        self.inner.share_mut(move |i, _| {
             i.incoming.push((con, gossip));
             if i.incoming.len() > 20 {
                 tracing::warn!(
@@ -511,14 +510,14 @@ impl AsGossipModule for SimpleBloomMod {
     }
 
     fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
-        let _ = self.0.share_mut(move |i, _| {
+        let _ = self.inner.share_mut(move |i, _| {
             i.local_agents.insert(a);
             Ok(())
         });
     }
 
     fn local_agent_leave(&self, a: Arc<KitsuneAgent>) {
-        let _ = self.0.share_mut(move |i, _| {
+        let _ = self.inner.share_mut(move |i, _| {
             i.local_agents.remove(&a);
             Ok(())
         });
