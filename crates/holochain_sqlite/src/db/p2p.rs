@@ -246,8 +246,8 @@ struct P2pRecord {
     storage_end_2: Option<u32>,
 }
 
-type SplitRange = (u32, u32);
-fn split_arc(arc: &DhtArc) -> (Option<SplitRange>, Option<SplitRange>) {
+pub type SplitRange = (u32, u32);
+pub fn split_arc(arc: &DhtArc) -> (Option<SplitRange>, Option<SplitRange>) {
     let mut storage_1 = None;
     let mut storage_2 = None;
 
