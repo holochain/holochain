@@ -196,6 +196,7 @@ impl<D: Into<core::time::Duration>> Sub<D> for &Timestamp {
     }
 }
 
+// TODO: This is not needed, `?` can be used with Option.
 macro_rules! try_opt {
     ($e:expr) => {
         match $e {
@@ -326,6 +327,16 @@ impl Timestamp {
         let seconds: i64 = try_opt!(self.0.checked_sub(dur_seconds));
         let nanos: i64 = try_opt!(i64::from(self.1).checked_sub(dur_nanos));
         Some(try_opt!(Timestamp::normalize(seconds, nanos)))
+    }
+
+    /// Convert this timestamp to fit into a sqlite integer which is
+    /// an i64. The value will be clamped between 0 and i64::MAX.
+    pub fn to_sql_ms_lossy(&self) -> i64 {
+        use std::time::Duration;
+        let s = Duration::from_secs(self.0.max(0) as u64);
+        let ms = Duration::from_millis(self.1 as u64);
+        let ts = s.checked_add(ms).unwrap_or(s);
+        ts.as_millis().clamp(0, i64::MAX as u128) as i64
     }
 }
 
