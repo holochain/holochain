@@ -1,5 +1,4 @@
 use crate::agent_store::AgentInfoSigned;
-use crate::types::bloom_endpoint::*;
 use crate::types::gossip::*;
 use crate::types::*;
 use ghost_actor::dependencies::tracing;
@@ -153,12 +152,12 @@ pub(crate) struct SimpleBloomModInner {
     remote_metrics: HashMap<KitsuneAgent, NodeInfo>,
 
     last_initiate_check: std::time::Instant,
-    initiate_tgt: Option<BloomEndpoint>,
+    initiate_tgt: Option<GossipTgt>,
 
     incoming: Vec<(Tx2ConHnd<wire::Wire>, GossipWire)>,
 
     last_outgoing: std::time::Instant,
-    outgoing: Vec<(BloomEndpoint, HowToConnect, GossipWire)>,
+    outgoing: Vec<(GossipTgt, HowToConnect, GossipWire)>,
 }
 
 impl SimpleBloomModInner {

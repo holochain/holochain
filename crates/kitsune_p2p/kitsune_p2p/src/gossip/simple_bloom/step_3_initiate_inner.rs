@@ -6,7 +6,7 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
     // we have decided to do an initiate check, mark the time
 
     // get the remote certs we might want to speak to
-    let endpoints: HashMap<BloomEndpoint, TxUrl> = bloom.inner.share_mut(|inner, _| {
+    let endpoints: HashMap<GossipTgt, TxUrl> = bloom.inner.share_mut(|inner, _| {
         inner.last_initiate_check = std::time::Instant::now();
         // TODO: In the future we'll pull the endpoints from a p2p store query that
         //       finds nodes which overlap our arc.
@@ -31,7 +31,7 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
                         if let Some(url) = agent_info.as_urls_ref().get(0) {
                             if let Ok(purl) = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()) {
                                 return Some((
-                                    BloomEndpoint::new(
+                                    GossipTgt::new(
                                         agent_info.as_agent_ref().clone(),
                                         Tx2Cert::from(purl.digest()),
                                     ),
@@ -45,7 +45,7 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
             })
             .collect())
     })?;
-    let mut endpoints: Vec<(BloomEndpoint, TxUrl)> = endpoints.into_iter().collect();
+    let mut endpoints: Vec<(GossipTgt, TxUrl)> = endpoints.into_iter().collect();
 
     // randomize the keys
     use rand::prelude::*;

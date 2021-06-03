@@ -130,7 +130,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
             let gossip = GossipWire::accept(local_filter);
             let peer_cert = con_clone.peer_cert();
             let endpoint =
-                BloomEndpoint::new(todo!("how to determine which agent to talk to?"), peer_cert);
+                GossipTgt::new(todo!("how to determine which agent to talk to?"), peer_cert);
             i.outgoing
                 .push((endpoint, HowToConnect::Con(con_clone), gossip));
         }
@@ -165,7 +165,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
             let gossip = GossipWire::chunk(true, Vec::new());
             let peer_cert = con.peer_cert();
             let endpoint =
-                BloomEndpoint::new(todo!("how to determine which agent to talk to?"), peer_cert);
+                GossipTgt::new(todo!("how to determine which agent to talk to?"), peer_cert);
             i.outgoing.push((endpoint, HowToConnect::Con(con), gossip));
 
             Ok(())
@@ -223,7 +223,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
             let gossip = GossipWire::chunk(finished, chunks);
             let peer_cert = con.peer_cert();
             let endpoint =
-                BloomEndpoint::new(todo!("how to determine which agent to talk to?"), peer_cert);
+                GossipTgt::new(todo!("how to determine which agent to talk to?"), peer_cert);
             i.outgoing
                 .push((endpoint, HowToConnect::Con(con.clone()), gossip));
         }

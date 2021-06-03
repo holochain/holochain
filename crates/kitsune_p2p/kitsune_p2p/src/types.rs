@@ -233,7 +233,6 @@ impl std::fmt::Debug for KitsuneSignature {
 
 pub mod actor;
 pub mod agent_store;
-pub mod bloom_endpoint;
 pub mod event;
 pub(crate) mod gossip;
 pub(crate) mod wire;
