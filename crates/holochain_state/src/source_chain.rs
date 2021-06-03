@@ -6,6 +6,7 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dht_op::produce_op_lights_from_iter;
 use holochain_types::dht_op::DhtOpLight;
+use holochain_types::dht_op::DhtOpType;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
 use holochain_types::element::SignedHeaderHashedExt;
@@ -19,6 +20,7 @@ use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
+use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::GrantedFunction;
 use holochain_zome_types::Header;
 use holochain_zome_types::HeaderBuilder;
@@ -404,10 +406,11 @@ impl SourceChain {
                         UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
                     let op_order = OpOrder::new(op_type, header.timestamp());
                     let timestamp = header.timestamp();
+                    let visibility = header.entry_type().map(|et| et.visibility().clone());
                     // Put the header back by value.
                     h = Some(header);
                     // Collect the DhtOpLight, DhtOpHash and OpOrder.
-                    ops.push((op, op_hash, op_order, timestamp));
+                    ops.push((op, op_hash, op_order, timestamp, visibility));
                 }
 
                 // Put the SignedHeaderHashed back together.
@@ -445,11 +448,20 @@ impl SourceChain {
             for header in headers {
                 insert_header(txn, header)?;
             }
-            for (op, op_hash, op_order, timestamp) in ops {
+            for (op, op_hash, op_order, timestamp, visibility) in ops {
+                let op_type = op.get_type();
                 insert_op_lite(txn, op, op_hash.clone(), true, op_order, timestamp)?;
-                set_validation_status(txn, op_hash.clone(), holochain_zome_types::ValidationStatus::Valid)?;
+                set_validation_status(
+                    txn,
+                    op_hash.clone(),
+                    holochain_zome_types::ValidationStatus::Valid,
+                )?;
                 // TODO: SHARDING: Check if we are the authority here.
-                set_validation_stage(txn, op_hash, ValidationLimboStatus::AwaitingIntegration)?;
+                if !(op_type == DhtOpType::StoreEntry
+                    && visibility == Some(EntryVisibility::Private))
+                {
+                    set_validation_stage(txn, op_hash, ValidationLimboStatus::AwaitingIntegration)?;
+                }
             }
             SourceChainResult::Ok(())
         })?;
