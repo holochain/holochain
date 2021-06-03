@@ -68,7 +68,6 @@ use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::KitsuneSpace;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
-use std::time::SystemTime;
 use std::{collections::HashSet, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::*;
@@ -420,10 +419,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond,
                 agent,
                 metric,
+                timestamp,
                 ..
             } => {
                 let env = { self.conductor.read().await.p2p_env(space) };
-                let res = put_metric_datum(env, agent, metric, SystemTime::now())
+                let res = put_metric_datum(env, agent, metric, timestamp)
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
