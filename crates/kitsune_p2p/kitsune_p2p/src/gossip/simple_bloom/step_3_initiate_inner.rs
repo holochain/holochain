@@ -6,9 +6,9 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
     // we have decided to do an initiate check, mark the time
 
     // get the remote certs we might want to speak to
-    let certs: HashMap<Tx2Cert, TxUrl> = bloom.inner.share_mut(|inner, _| {
+    let endpoints: HashMap<BloomEndpoint, TxUrl> = bloom.inner.share_mut(|inner, _| {
         inner.last_initiate_check = std::time::Instant::now();
-        // TODO: In the future we'll pull the certs from a p2p store query that
+        // TODO: In the future we'll pull the endpoints from a p2p store query that
         //       finds nodes which overlap our arc.
         //       For now we use `local_data_map`.
         Ok(inner
@@ -31,7 +31,10 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
                         if let Some(url) = agent_info.as_urls_ref().get(0) {
                             if let Ok(purl) = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()) {
                                 return Some((
-                                    Tx2Cert::from(purl.digest()),
+                                    BloomEndpoint::new(
+                                        agent_info.as_agent_ref().clone(),
+                                        Tx2Cert::from(purl.digest()),
+                                    ),
                                     TxUrl::from(url.as_str()),
                                 ));
                             }
@@ -42,12 +45,12 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
             })
             .collect())
     })?;
-    let mut certs: Vec<(Tx2Cert, TxUrl)> = certs.into_iter().collect();
+    let mut endpoints: Vec<(BloomEndpoint, TxUrl)> = endpoints.into_iter().collect();
 
     // randomize the keys
     use rand::prelude::*;
     let mut rng = thread_rng();
-    certs.shuffle(&mut rng);
+    endpoints.shuffle(&mut rng);
 
     // last_touch fudge
     // we don't really want two nodes to both decide to initiate gossip
@@ -60,8 +63,8 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
     let mut initiate = None;
 
     bloom.inner.share_mut(|inner, _| {
-        for (cert, url) in certs {
-            match inner.remote_metrics.entry(cert.clone()) {
+        for (endpoint, url) in endpoints {
+            match inner.remote_metrics.entry(endpoint.agent().clone()) {
                 std::collections::hash_map::Entry::Occupied(mut e) => {
                     // we've seen this node before, let's see if it's been too long
                     let e = e.get_mut();
@@ -79,7 +82,7 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
                     };
 
                     if saw_recently {
-                        tracing::trace!(?cert, "saw too recently");
+                        tracing::trace!(?endpoint, "saw too recently");
                         // we've seen this node too recently, skip them
                         continue;
                     }
@@ -88,7 +91,7 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
                     // talk to them
                     e.last_touch = std::time::Instant::now();
                     e.was_err = false;
-                    initiate = Some((cert, url));
+                    initiate = Some((endpoint, url));
                     break;
                 }
                 std::collections::hash_map::Entry::Vacant(e) => {
@@ -97,19 +100,21 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
                         last_touch: std::time::Instant::now(),
                         was_err: false,
                     });
-                    inner.initiate_tgt = Some(cert.clone());
-                    initiate = Some((cert, url));
+                    inner.initiate_tgt = Some(endpoint.clone());
+                    initiate = Some((endpoint, url));
                     break;
                 }
             }
         }
 
-        if let Some((cert, url)) = initiate {
+        if let Some((endpoint, url)) = initiate {
             let gossip = encode_bloom_filter(&inner.local_bloom);
             let bloom_byte_count = gossip.len();
-            tracing::info!(%url, ?cert, %bloom_byte_count, "initiating gossip");
+            tracing::info!(%url, ?endpoint, %bloom_byte_count, "initiating gossip");
             let gossip = GossipWire::initiate(gossip);
-            inner.outgoing.push((cert, HowToConnect::Url(url), gossip));
+            inner
+                .outgoing
+                .push((endpoint, HowToConnect::Url(url), gossip));
         }
         Ok(())
     })?;

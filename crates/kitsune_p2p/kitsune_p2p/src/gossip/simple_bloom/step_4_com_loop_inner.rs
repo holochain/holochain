@@ -68,8 +68,8 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
 
             // parse/integrate the chunks
             let futs = bloom.inner.share_mut(move |i, _| {
-                if let Some(tgt_cert) = i.initiate_tgt.clone() {
-                    if finished && con.peer_cert() == tgt_cert {
+                if let Some(endpoint) = i.initiate_tgt.clone() {
+                    if finished && con.peer_cert() == *endpoint.cert() {
                         i.initiate_tgt = None;
                     }
                 }
@@ -129,8 +129,10 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
             let local_filter = encode_bloom_filter(&i.local_bloom);
             let gossip = GossipWire::accept(local_filter);
             let peer_cert = con_clone.peer_cert();
+            let endpoint =
+                BloomEndpoint::new(todo!("how to determine which agent to talk to?"), peer_cert);
             i.outgoing
-                .push((peer_cert, HowToConnect::Con(con_clone), gossip));
+                .push((endpoint, HowToConnect::Con(con_clone), gossip));
         }
 
         let mut out_keys = Vec::new();
@@ -153,8 +155,8 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
         // the remote doesn't need anything from us
         // ... if we initiated this gossip, mark it as done.
         bloom.inner.share_mut(move |i, _| {
-            if let Some(tgt_cert) = i.initiate_tgt.clone() {
-                if con.peer_cert() == tgt_cert {
+            if let Some(tgt) = i.initiate_tgt.clone() {
+                if con.peer_cert() == *tgt.cert() {
                     i.initiate_tgt = None;
                 }
             }
@@ -162,7 +164,9 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
             // publish an empty chunk incase it was the remote who initiated
             let gossip = GossipWire::chunk(true, Vec::new());
             let peer_cert = con.peer_cert();
-            i.outgoing.push((peer_cert, HowToConnect::Con(con), gossip));
+            let endpoint =
+                BloomEndpoint::new(todo!("how to determine which agent to talk to?"), peer_cert);
+            i.outgoing.push((endpoint, HowToConnect::Con(con), gossip));
 
             Ok(())
         })?;
@@ -218,8 +222,10 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
         for (finished, chunks) in gossip {
             let gossip = GossipWire::chunk(finished, chunks);
             let peer_cert = con.peer_cert();
+            let endpoint =
+                BloomEndpoint::new(todo!("how to determine which agent to talk to?"), peer_cert);
             i.outgoing
-                .push((peer_cert, HowToConnect::Con(con.clone()), gossip));
+                .push((endpoint, HowToConnect::Con(con.clone()), gossip));
         }
 
         Ok(())

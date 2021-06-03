@@ -1,4 +1,5 @@
 use crate::agent_store::AgentInfoSigned;
+use crate::types::bloom_endpoint::*;
 use crate::types::gossip::*;
 use crate::types::*;
 use ghost_actor::dependencies::tracing;
@@ -149,15 +150,15 @@ pub(crate) struct SimpleBloomModInner {
     local_data_map: DataMap,
     local_key_set: KeySet,
 
-    remote_metrics: HashMap<Tx2Cert, NodeInfo>,
+    remote_metrics: HashMap<KitsuneAgent, NodeInfo>,
 
     last_initiate_check: std::time::Instant,
-    initiate_tgt: Option<Tx2Cert>,
+    initiate_tgt: Option<BloomEndpoint>,
 
     incoming: Vec<(Tx2ConHnd<wire::Wire>, GossipWire)>,
 
     last_outgoing: std::time::Instant,
-    outgoing: Vec<(Tx2Cert, HowToConnect, GossipWire)>,
+    outgoing: Vec<(BloomEndpoint, HowToConnect, GossipWire)>,
 }
 
 impl SimpleBloomModInner {
@@ -325,7 +326,7 @@ impl SimpleBloomMod {
 
             // next, check to see if we should time out any current initiate_tgt
             if let Some(initiate_tgt) = i.initiate_tgt.clone() {
-                if let Some(metric) = i.remote_metrics.get(&initiate_tgt) {
+                if let Some(metric) = i.remote_metrics.get(initiate_tgt.agent()) {
                     if metric.was_err
                         || metric.last_touch.elapsed().as_millis() as u32
                             > self.tuning_params.gossip_peer_on_success_next_gossip_delay_ms
@@ -436,23 +437,24 @@ impl SimpleBloomMod {
                     > tuning_params.gossip_loop_iteration_delay_ms;
 
             if let Some(outgoing) = maybe_outgoing.take() {
-                let (cert, how, gossip) = outgoing;
+                let (endpoint, how, gossip) = outgoing;
+                let agent = endpoint.agent().clone();
                 if let Err(e) = step_4_com_loop_inner_outgoing(
                     &self.inner,
                     tuning_params.clone(),
                     space.clone(),
                     ep_hnd,
-                    cert.clone(),
+                    endpoint.cert().clone(),
                     how,
                     gossip,
                 )
                 .await
                 {
-                    tracing::warn!("failed to send outgoing: {:?} {:?}", cert, e);
+                    tracing::warn!("failed to send outgoing: {:?} {:?}", endpoint, e);
                     self.inner.share_mut(move |i, _| {
                         i.last_outgoing = std::time::Instant::now();
                         i.remote_metrics.insert(
-                            cert,
+                            agent,
                             NodeInfo {
                                 last_touch: std::time::Instant::now(),
                                 was_err: true,
@@ -464,7 +466,7 @@ impl SimpleBloomMod {
                     self.inner.share_mut(move |i, _| {
                         i.last_outgoing = std::time::Instant::now();
                         i.remote_metrics.insert(
-                            cert,
+                            agent,
                             NodeInfo {
                                 last_touch: std::time::Instant::now(),
                                 was_err: false,
