@@ -365,12 +365,10 @@ impl SimpleBloomMod {
 
     async fn step_2_local_sync(&self) -> KitsuneResult<bool> {
         let evt_sender = self.evt_sender.clone();
-        let (space, local_agents) = self
-            .inner
-            .share_mut(|i, _| Ok((self.space.clone(), i.local_agents.clone())))?;
+        let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
 
         let (data_map, key_set, bloom) =
-            match step_2_local_sync_inner(space, evt_sender, local_agents).await {
+            match step_2_local_sync_inner(self.space.clone(), evt_sender, local_agents).await {
                 Err(e) => {
                     tracing::warn!("gossip error: {:?}", e);
                     return Ok(false);
@@ -397,7 +395,12 @@ impl SimpleBloomMod {
         let loop_start = std::time::Instant::now();
 
         loop {
-            let (tuning_params, space, ep_hnd, mut maybe_outgoing, mut maybe_incoming) =
+            let (tuning_params, space, ep_hnd) = (
+                self.tuning_params.clone(),
+                self.space.clone(),
+                self.ep_hnd.clone(),
+            );
+            let (mut maybe_outgoing, mut maybe_incoming) =
                 self.inner.share_mut(|i, _| {
                     let maybe_outgoing = if !i.outgoing.is_empty()
                         && i.last_outgoing.elapsed().as_millis() as u64 > self.send_interval_ms
@@ -424,9 +427,6 @@ impl SimpleBloomMod {
                         None
                     };
                     Ok((
-                        self.tuning_params.clone(),
-                        self.space.clone(),
-                        self.ep_hnd.clone(),
                         maybe_outgoing,
                         maybe_incoming,
                     ))

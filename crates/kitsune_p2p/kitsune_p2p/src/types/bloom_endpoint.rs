@@ -5,13 +5,21 @@ use kitsune_p2p_types::Tx2Cert;
 
 /// The specific provenance/destination of gossip is to a particular Agent on
 /// a connection specified by a Tx2Cert
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Constructor)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BloomEndpoint {
-    agent: KitsuneAgent,
+    agent: Arc<KitsuneAgent>,
     cert: Tx2Cert,
 }
 
 impl BloomEndpoint {
+    /// Constructor
+    pub fn new(agent: KitsuneAgent, cert: Tx2Cert) -> Self {
+        Self {
+            agent: Arc::new(agent),
+            cert,
+        }
+    }
+
     /// Accessor
     pub fn agent(&self) -> &KitsuneAgent {
         self.as_ref()
