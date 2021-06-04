@@ -5,11 +5,11 @@ use crate::header::WireHeaderStatus;
 use crate::header::WireNewEntryHeader;
 use crate::header::WireUpdateRelationship;
 use crate::prelude::*;
-use holochain_zome_types::entry::EntryHashed;
 use error::ElementGroupError;
 use error::ElementGroupResult;
 use holochain_keystore::KeystoreError;
 use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::entry::EntryHashed;
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 

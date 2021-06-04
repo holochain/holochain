@@ -57,7 +57,7 @@ pub mod wasm_test {
         host_access.workspace = workspace;
 
         let output: Vec<EphemeralSignatures> =
-            crate::call_test_ribosome!(host_access, TestWasm::Sign, "sign_ephemeral", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Sign, "sign_ephemeral", ()).unwrap();
 
         #[derive(Serialize, Deserialize, Debug)]
         struct One([u8; 2]);

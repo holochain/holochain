@@ -149,7 +149,7 @@ pub mod wasm_test {
                     TestWasm::Sign,
                     "verify_signature_raw",
                     VerifySignature::new_raw(k.clone(), sig.clone().into(), data.clone())
-                );
+                ).unwrap();
 
                 assert_eq!(expect, output_raw, "raw: {}", name);
             }
@@ -175,6 +175,6 @@ pub mod wasm_test {
             TestWasm::Sign,
             "verify_signature",
             fake_agent_pubkey_1()
-        );
+        ).unwrap();
     }
 }

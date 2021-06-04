@@ -301,12 +301,16 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::MustGet]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty).next().unwrap();
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty)
+            .next()
+            .unwrap();
         validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::MustGet.into());
 
         dbg!(&validate_invocation);
 
-        let result = ribosome.run_validate(fixt!(ValidateHostAccess), validate_invocation).unwrap();
+        let result = ribosome
+            .run_validate(fixt!(ValidateHostAccess), validate_invocation)
+            .unwrap();
         dbg!(result);
     }
 
@@ -397,7 +401,8 @@ mod slow_tests {
         host_access.workspace = workspace.clone();
 
         let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ())
+                .unwrap();
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
@@ -422,7 +427,8 @@ mod slow_tests {
         host_access.workspace = workspace.clone();
 
         let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ())
+                .unwrap();
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {

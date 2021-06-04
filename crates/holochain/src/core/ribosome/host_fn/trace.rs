@@ -81,7 +81,7 @@ pub mod wasm_test {
         host_access.workspace = workspace;
 
         // this shows that we can get line numbers out of wasm
-        let output: () = crate::call_test_ribosome!(host_access, TestWasm::Debug, "debug", ());
+        let output: () = crate::call_test_ribosome!(host_access, TestWasm::Debug, "debug", ()).unwrap();
         assert_eq!(output, ());
     }
 }

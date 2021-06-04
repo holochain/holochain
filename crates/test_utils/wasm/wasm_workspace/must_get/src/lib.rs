@@ -23,6 +23,9 @@ fn element_to_entry<'a, O>(element: &'a Element) -> Result<O, Error> where O: Tr
     })
 }
 
+#[hdk_entry(id = "something")]
+struct Something(#[serde(with = "serde_bytes")] Vec<u8>);
+
 #[hdk_entry(id = "entry_reference")]
 struct EntryReference(EntryHash);
 
@@ -72,6 +75,7 @@ impl ElementReference {
 }
 
 entry_defs![
+    Something::entry_def(),
     EntryReference::entry_def(),
     HeaderReference::entry_def(),
     ElementReference::entry_def()
@@ -99,7 +103,27 @@ fn validate_create_entry_header_reference(data: ValidateData) -> ExternResult<Va
 fn validate_create_entry_element_reference(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
     let element_reference = ElementReference::try_from(&data.element)?;
 
-    let (_element, _valid): (Element, bool) = must_get_element(element_reference.into_inner())?;
+    let _element: Element = must_get_valid_element(element_reference.into_inner())?;
 
     Ok(ValidateCallbackResult::Valid)
+}
+
+#[hdk_extern]
+fn create_entry(_: ()) -> ExternResult<HeaderHash> {
+    hdk::prelude::create_entry(Something(vec![1, 2, 3]))
+}
+
+#[hdk_extern]
+fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
+    hdk::prelude::must_get_valid_element(header_hash)
+}
+
+#[hdk_extern]
+fn must_get_header(header_hash: HeaderHash) -> ExternResult<SignedHeaderHashed> {
+    hdk::prelude::must_get_header(header_hash)
+}
+
+#[hdk_extern]
+fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
+    hdk::prelude::must_get_entry(entry_hash)
 }

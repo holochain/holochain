@@ -78,13 +78,13 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "ensure",
             "foo.bar".to_string()
-        );
+        ).unwrap();
         let _: () = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "ensure",
             "foo.bar".to_string()
-        );
+        ).unwrap();
 
         // ensure foo.baz
         let _: () = crate::call_test_ribosome!(
@@ -92,14 +92,14 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "ensure",
             "foo.baz".to_string()
-        );
+        ).unwrap();
 
         let exists_output: bool = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "exists",
             "foo".to_string()
-        );
+        ).unwrap();
 
         assert_eq!(true, exists_output,);
 
@@ -108,21 +108,21 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "hash",
             "foo.bar".to_string()
-        );
+        ).unwrap();
 
         let foo_baz: holo_hash::EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "hash",
             "foo.baz".to_string()
-        );
+        ).unwrap();
 
         let children_output: holochain_zome_types::link::Links = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children",
             "foo".to_string()
-        );
+        ).unwrap();
 
         let links = children_output.into_inner();
         assert_eq!(2, links.len());
@@ -147,7 +147,7 @@ pub mod slow_tests {
             TestWasm::Anchor,
             "anchor",
             AnchorInput("foo".to_string(), "bar".to_string())
-        );
+        ).unwrap();
 
         assert_eq!(
             anchor_address_one.get_raw_32().to_vec(),
@@ -163,7 +163,7 @@ pub mod slow_tests {
             TestWasm::Anchor,
             "anchor",
             AnchorInput("foo".to_string(), "baz".to_string())
-        );
+        ).unwrap();
 
         assert_eq!(
             anchor_address_two.get_raw_32().to_vec(),
@@ -178,7 +178,7 @@ pub mod slow_tests {
             TestWasm::Anchor,
             "get_anchor",
             anchor_address_one
-        );
+        ).unwrap();
 
         assert_eq!(
             Some(Anchor {
@@ -193,7 +193,7 @@ pub mod slow_tests {
             TestWasm::Anchor,
             "list_anchor_type_addresses",
             ()
-        );
+        ).unwrap();
 
         // should be 1 anchor type, "foo"
         assert_eq!(list_anchor_type_addresses_output.0.len(), 1,);
@@ -213,7 +213,7 @@ pub mod slow_tests {
                 TestWasm::Anchor,
                 "list_anchor_addresses",
                 "foo".to_string()
-            )
+            ).unwrap()
         };
 
         // should be 2 anchors under "foo" sorted by hash
@@ -232,7 +232,7 @@ pub mod slow_tests {
             TestWasm::Anchor,
             "list_anchor_tags",
             "foo".to_string()
-        );
+        ).unwrap();
 
         assert_eq!(
             vec!["bar".to_string(), "baz".to_string()],

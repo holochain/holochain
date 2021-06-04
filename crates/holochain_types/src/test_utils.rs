@@ -1,11 +1,11 @@
 //! Some common testing helpers.
 
+use crate::dna::wasm::DnaWasm;
 use crate::element::SignedHeaderHashedExt;
 use crate::fixt::*;
 use crate::prelude::*;
 use crate::timestamp;
 use holochain_zome_types::prelude::EntryHashed;
-use crate::{dna::wasm::DnaWasm};
 use std::path::PathBuf;
 
 pub use holochain_zome_types::test_utils::*;

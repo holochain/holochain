@@ -46,12 +46,12 @@ use crate::core::ribosome::host_fn::dna_info::dna_info;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
-use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
-use crate::core::ribosome::host_fn::must_get_header::must_get_header;
-use crate::core::ribosome::host_fn::must_get_element::must_get_element;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash_entry::hash_entry;
+use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
+use crate::core::ribosome::host_fn::must_get_header::must_get_header;
+use crate::core::ribosome::host_fn::must_get_valid_element::must_get_valid_element;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
 use crate::core::ribosome::host_fn::remote_signal::remote_signal;
@@ -341,7 +341,7 @@ impl RealRibosome {
                 .with_host_function(&mut ns, "__get_details", get_details)
                 .with_host_function(&mut ns, "__must_get_entry", must_get_entry)
                 .with_host_function(&mut ns, "__must_get_header", must_get_header)
-                .with_host_function(&mut ns, "__must_get_element", must_get_element)
+                .with_host_function(&mut ns, "__must_get_valid_element", must_get_valid_element)
                 .with_host_function(&mut ns, "__get_links", get_links)
                 .with_host_function(&mut ns, "__get_link_details", get_link_details)
                 .with_host_function(&mut ns, "__get_agent_activity", get_agent_activity)
@@ -352,7 +352,7 @@ impl RealRibosome {
                 .with_host_function(&mut ns, "__get_details", unreachable)
                 .with_host_function(&mut ns, "__must_get_entry", unreachable)
                 .with_host_function(&mut ns, "__must_get_header", unreachable)
-                .with_host_function(&mut ns, "__must_get_element", unreachable)
+                .with_host_function(&mut ns, "__must_get_valid_element", unreachable)
                 .with_host_function(&mut ns, "__get_links", unreachable)
                 .with_host_function(&mut ns, "__get_link_details", unreachable)
                 .with_host_function(&mut ns, "__get_agent_activity", unreachable)
@@ -608,12 +608,12 @@ pub mod wasm_test {
         host_access.workspace = workspace;
 
         let foo_result: String =
-            crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "foo", ());
+            crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "foo", ()).unwrap();
 
         assert_eq!("foo", foo_result.as_str());
 
         let bar_result: String =
-            crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "bar", ());
+            crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "bar", ()).unwrap();
 
         assert_eq!("foobar", bar_result.as_str());
     }

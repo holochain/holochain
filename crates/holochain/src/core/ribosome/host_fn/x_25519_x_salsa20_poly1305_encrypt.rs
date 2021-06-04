@@ -48,7 +48,7 @@ pub mod wasm_test {
             TestWasm::XSalsa20Poly1305,
             "create_x25519_keypair",
             ()
-        );
+        ).unwrap();
         assert_eq!(
             &alice.as_ref(),
             &[
@@ -61,7 +61,7 @@ pub mod wasm_test {
             TestWasm::XSalsa20Poly1305,
             "create_x25519_keypair",
             ()
-        );
+        ).unwrap();
         assert_eq!(
             &bob.as_ref(),
             &[
@@ -74,7 +74,7 @@ pub mod wasm_test {
             TestWasm::XSalsa20Poly1305,
             "create_x25519_keypair",
             ()
-        );
+        ).unwrap();
         assert_eq!(
             &carol.as_ref(),
             &[
@@ -93,7 +93,7 @@ pub mod wasm_test {
             TestWasm::XSalsa20Poly1305,
             "x_25519_x_salsa20_poly1305_encrypt",
             encrypt_input
-        );
+        ).unwrap();
 
         let decrypt_input =
             holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(
@@ -107,7 +107,7 @@ pub mod wasm_test {
             TestWasm::XSalsa20Poly1305,
             "x_25519_x_salsa20_poly1305_decrypt",
             decrypt_input
-        );
+        ).unwrap();
 
         assert_eq!(decrypt_output, Some(data.clone()),);
 
@@ -122,7 +122,7 @@ pub mod wasm_test {
             TestWasm::XSalsa20Poly1305,
             "x_25519_x_salsa20_poly1305_decrypt",
             bad_decrypt_input
-        );
+        ).unwrap();
 
         assert_eq!(bad_decrypt_output, None,);
     }

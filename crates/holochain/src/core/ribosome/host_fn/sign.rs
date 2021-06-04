@@ -90,7 +90,7 @@ pub mod wasm_test {
                     TestWasm::Sign,
                     "sign",
                     Sign::new_raw(k.clone(), data.clone())
-                );
+                ).unwrap();
 
                 assert_eq!(expect, output.as_ref().to_vec());
             }

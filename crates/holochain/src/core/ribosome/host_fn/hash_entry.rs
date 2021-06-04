@@ -65,7 +65,7 @@ pub mod wasm_test {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace;
         let output: EntryHash =
-            crate::call_test_ribosome!(host_access, TestWasm::HashEntry, "hash_entry", input);
+            crate::call_test_ribosome!(host_access, TestWasm::HashEntry, "hash_entry", input).unwrap();
         assert_eq!(*output.hash_type(), holo_hash::hash_type::Entry);
 
         let entry_hash_output: EntryHash = crate::call_test_ribosome!(
@@ -73,14 +73,14 @@ pub mod wasm_test {
             TestWasm::HashEntry,
             "twenty_three_degrees_entry_hash",
             ()
-        );
+        ).unwrap();
 
         let hash_output: EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashEntry,
             "twenty_three_degrees_hash",
             ()
-        );
+        ).unwrap();
 
         assert_eq!(entry_hash_output, hash_output);
     }
@@ -100,7 +100,7 @@ pub mod wasm_test {
         host_access.workspace = workspace;
         let input = "foo.bar".to_string();
         let output: EntryHash =
-            crate::call_test_ribosome!(host_access, TestWasm::HashPath, "hash", input);
+            crate::call_test_ribosome!(host_access, TestWasm::HashPath, "hash", input).unwrap();
 
         let expected_path = hdk::hash_path::path::Path::from("foo.bar");
 

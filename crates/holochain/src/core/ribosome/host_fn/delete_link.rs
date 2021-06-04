@@ -95,52 +95,52 @@ pub mod slow_tests {
         host_access.workspace = workspace;
 
         // links should start empty
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
+        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
         assert!(links.into_inner().len() == 0);
 
         // add a couple of links
         let link_one: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ()).unwrap();
 
         // add a couple of links
         let link_two: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ()).unwrap();
 
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
+        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
         assert!(links.into_inner().len() == 2);
 
         // remove a link
         let _: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_one);
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_one).unwrap();
 
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
+        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
         assert!(links.into_inner().len() == 1);
 
         // remove a link
         let _: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_two);
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_two).unwrap();
 
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
+        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
         assert!(links.into_inner().len() == 0);
 
         // Add some links then delete them all
         let _h: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ()).unwrap();
         let _h: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ()).unwrap();
 
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
+        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
         assert!(links.into_inner().len() == 2);
 
-        crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_all_links", ());
+        let _: () = crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_all_links", ()).unwrap();
 
         // Should be no links left
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
+        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
         assert!(links.into_inner().len() == 0);
     }

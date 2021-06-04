@@ -153,9 +153,7 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::MultipleCalls => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_multiple_calls.wasm")
             }
-            TestWasm::MustGet => {
-                get_code("wasm32-unknown-unknown/release/test_wasm_multiple_calls.wasm")
-            }
+            TestWasm::MustGet => get_code("wasm32-unknown-unknown/release/test_wasm_must_get.wasm"),
             TestWasm::PostCommitFail => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_fail.wasm")
             }

@@ -46,7 +46,7 @@ pub mod test {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace;
         let zome_info: ZomeInfo =
-            crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "zome_info", ());
+            crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "zome_info", ()).unwrap();
         assert_eq!(zome_info.dna_name, "test",);
     }
 }

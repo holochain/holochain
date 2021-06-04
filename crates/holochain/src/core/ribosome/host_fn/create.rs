@@ -173,7 +173,7 @@ pub mod wasm_test {
 
         // get the result of a commit entry
         let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Create, "create_entry", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Create, "create_entry", ()).unwrap();
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
@@ -184,7 +184,7 @@ pub mod wasm_test {
         assert_eq!(&chain_head, &output);
 
         let round: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry", ()).unwrap();
 
         let bytes: Vec<u8> = match round.and_then(|el| el.into()) {
             Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => {

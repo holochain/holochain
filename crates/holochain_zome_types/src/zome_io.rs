@@ -145,7 +145,7 @@ wasm_io_types! {
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
 
     // Retreive an element from the DHT or short circuit.
-    fn must_get_element (zt::entry::MustGetElementInput) -> (zt::element::Element, bool);
+    fn must_get_valid_element (zt::entry::MustGetValidElementInput) -> zt::element::Element;
 
     // Retreive a entry from the DHT or short circuit.
     fn must_get_entry (zt::entry::MustGetEntryInput) -> zt::entry::EntryHashed;

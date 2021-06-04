@@ -48,7 +48,7 @@ pub mod test {
         host_access.workspace = workspace;
 
         let agent_info: AgentInfo =
-            crate::call_test_ribosome!(host_access, TestWasm::AgentInfo, "agent_info", ());
+            crate::call_test_ribosome!(host_access, TestWasm::AgentInfo, "agent_info", ()).unwrap();
         assert_eq!(agent_info.agent_initial_pubkey, fake_agent_pubkey_1(),);
         assert_eq!(agent_info.agent_latest_pubkey, fake_agent_pubkey_1(),);
     }

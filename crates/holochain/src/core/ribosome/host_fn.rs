@@ -128,7 +128,7 @@ host_fn_api_impls! {
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
 
     // Retreive an element from the DHT or short circuit.
-    fn must_get_element (zt::entry::MustGetElementInput) -> (Element, bool);
+    fn must_get_valid_element (zt::entry::MustGetValidElementInput) -> Element;
 
     // Retreive a entry from the DHT or short circuit.
     fn must_get_entry (zt::entry::MustGetEntryInput) -> EntryHashed;

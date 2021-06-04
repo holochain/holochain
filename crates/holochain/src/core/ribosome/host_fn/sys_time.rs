@@ -39,6 +39,6 @@ pub mod wasm_test {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace;
         let _: core::time::Duration =
-            crate::call_test_ribosome!(host_access, TestWasm::SysTime, "sys_time", ());
+            crate::call_test_ribosome!(host_access, TestWasm::SysTime, "sys_time", ()).unwrap();
     }
 }

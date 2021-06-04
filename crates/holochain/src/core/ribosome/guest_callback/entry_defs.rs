@@ -254,7 +254,8 @@ mod slow_tests {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace;
         let output: () =
-            crate::call_test_ribosome!(host_access, TestWasm::EntryDefs, "assert_indexes", ());
+            crate::call_test_ribosome!(host_access, TestWasm::EntryDefs, "assert_indexes", ())
+                .unwrap();
 
         assert_eq!(&(), &output);
     }

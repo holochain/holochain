@@ -46,7 +46,7 @@ pub mod wasm_test {
         host_access.workspace = workspace.clone();
 
         let _output: CapSecret =
-            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ()).unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -65,15 +65,15 @@ pub mod wasm_test {
         host_access.workspace = workspace.clone();
 
         let secret: CapSecret =
-            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ()).unwrap();
         let header: HeaderHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::Capability,
             "transferable_cap_grant",
             secret
-        );
+        ).unwrap();
         let maybe_element: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Capability, "get_entry", header);
+            crate::call_test_ribosome!(host_access, TestWasm::Capability, "get_entry", header).unwrap();
 
         let entry_secret: CapSecret = match maybe_element {
             Some(element) => {

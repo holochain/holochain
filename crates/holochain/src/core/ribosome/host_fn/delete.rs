@@ -101,9 +101,9 @@ pub mod wasm_test {
         host_access.workspace = workspace.clone();
 
         let thing_a: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "create", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "create", ()).unwrap();
         let get_thing: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a);
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a).unwrap();
         match get_thing {
             Some(element) => assert!(element.entry().as_option().is_some()),
 
@@ -111,10 +111,10 @@ pub mod wasm_test {
         }
 
         let _: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete", thing_a);
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete", thing_a).unwrap();
 
         let get_thing: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a);
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a).unwrap();
         match get_thing {
             None => {
                 // this is what we want, deletion => None for a get

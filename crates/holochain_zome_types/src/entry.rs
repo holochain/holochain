@@ -223,11 +223,11 @@ impl GetInput {
     }
 }
 
-/// Zome IO for must_get_element.
+/// Zome IO for must_get_valid_element.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct MustGetElementInput(HeaderHash);
+pub struct MustGetValidElementInput(HeaderHash);
 
-impl MustGetElementInput {
+impl MustGetValidElementInput {
     /// Constructor.
     pub fn new(header_hash: HeaderHash) -> Self {
         Self(header_hash)

@@ -77,13 +77,13 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "ensure",
             "foo.bar".to_string()
-        );
+        ).unwrap();
         let _: () = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "ensure",
             "foo.bar".to_string()
-        );
+        ).unwrap();
 
         // ensure foo.baz
         let _: () = crate::call_test_ribosome!(
@@ -91,14 +91,14 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "ensure",
             "foo.baz".to_string()
-        );
+        ).unwrap();
 
         let exists_output: bool = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "exists",
             "foo".to_string()
-        );
+        ).unwrap();
 
         assert_eq!(true, exists_output,);
 
@@ -107,21 +107,21 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "hash",
             "foo.bar".to_string()
-        );
+        ).unwrap();
 
         let _foo_baz: holo_hash::EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "hash",
             "foo.baz".to_string()
-        );
+        ).unwrap();
 
         let children_details_output: holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children_details",
             "foo".to_string()
-        );
+        ).unwrap();
 
         let link_details = children_details_output.into_inner();
 
@@ -134,14 +134,14 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "delete_link",
             to_remove_hash
-        );
+        ).unwrap();
 
         let children_details_output_2: holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children_details",
             "foo".to_string()
-        );
+        ).unwrap();
 
         let children_details_output_2_vec = children_details_output_2.into_inner();
         assert_eq!(2, children_details_output_2_vec.len());

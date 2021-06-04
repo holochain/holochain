@@ -41,13 +41,45 @@ pub fn must_get_header<'a>(
             .await
             .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))? {
                 Some(header) => Ok(header),
-                None => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(match call_context.host_context {
-                    HostContext::EntryDefs(_) | HostContext::GenesisSelfCheck(_) | HostContext::MigrateAgent(_) | HostContext::PostCommit(_) | HostContext::ZomeCall(_) => holochain_serialized_bytes::encode(&Err::<(), WasmError>(WasmError::Host("Missing dep".into())))?,
-                    HostContext::Init(_) => holochain_serialized_bytes::encode(&Ok::<InitCallbackResult, ()>(InitCallbackResult::UnresolvedDependencies(vec![header_hash.into()])))?,
-                    HostContext::ValidateCreateLink(_) => holochain_serialized_bytes::encode(&Ok::<ValidateLinkCallbackResult, ()>(ValidateLinkCallbackResult::UnresolvedDependencies(vec![header_hash.into()])))?,
-                    HostContext::Validate(_) => holochain_serialized_bytes::encode(&Ok::<ValidateCallbackResult, ()>(ValidateCallbackResult::UnresolvedDependencies(vec![header_hash.into()])))?,
-                    HostContext::ValidationPackage(_) => holochain_serialized_bytes::encode(&Ok::<ValidationPackageCallbackResult, ()>(ValidationPackageCallbackResult::UnresolvedDependencies(vec![header_hash.into()])))?,
-                }))),
+                None => match call_context.host_context {
+                    HostContext::EntryDefs(_) | HostContext::GenesisSelfCheck(_) | HostContext::MigrateAgent(_) | HostContext::PostCommit(_) | HostContext::ZomeCall(_) => Err(WasmError::Host(format!("Failed to get SignedHeaderHashed {}", header_hash))),
+                    HostContext::Init(_) => RuntimeError::raise(
+                        Box::new(
+                            WasmError::HostShortCircuit(
+                                holochain_serialized_bytes::encode(
+                                    &Ok::<InitCallbackResult, ()>(InitCallbackResult::UnresolvedDependencies(vec![header_hash.into()]))
+                                )?
+                            )
+                        )
+                    ),
+                    HostContext::ValidateCreateLink(_) => RuntimeError::raise(
+                        Box::new(
+                            WasmError::HostShortCircuit(
+                                holochain_serialized_bytes::encode(
+                                    &Ok::<ValidateLinkCallbackResult, ()>(ValidateLinkCallbackResult::UnresolvedDependencies(vec![header_hash.into()]))
+                                )?
+                            )
+                        )
+                    ),
+                    HostContext::Validate(_) => RuntimeError::raise(
+                        Box::new(
+                            WasmError::HostShortCircuit(
+                                holochain_serialized_bytes::encode(
+                                    &Ok::<ValidateCallbackResult, ()>(ValidateCallbackResult::UnresolvedDependencies(vec![header_hash.into()]))
+                                )?
+                            )
+                        )
+                    ),
+                    HostContext::ValidationPackage(_) => RuntimeError::raise(
+                        Box::new(
+                            WasmError::HostShortCircuit(
+                                holochain_serialized_bytes::encode(
+                                    &Ok::<ValidationPackageCallbackResult, ()>(ValidationPackageCallbackResult::UnresolvedDependencies(vec![header_hash.into()]))
+                                )?
+                            )
+                        )
+                    ),
+                },
             }
     })
 }

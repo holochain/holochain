@@ -546,7 +546,7 @@ pub mod wasm_test {
                     .next()
                     .unwrap();
 
-                let author = $crate::fixt::AgentPubKeyFixturator::new(Predictable)
+                let author = $crate::fixt::AgentPubKeyFixturator::new(::fixt::prelude::Predictable)
                     .next()
                     .unwrap();
 
@@ -573,22 +573,17 @@ pub mod wasm_test {
                     .next()
                     .unwrap();
                 let zome_invocation_response =
-                    match ribosome.call_zome_function(host_access, invocation.clone()) {
-                        Ok(v) => v,
-                        Err(e) => {
-                            dbg!("call_zome_function error", &invocation, &e);
-                            panic!();
-                        }
-                    };
+                    ribosome.call_zome_function(host_access, invocation.clone());
 
                 let output = match zome_invocation_response {
-                    crate::core::ribosome::ZomeCallResponse::Ok(guest_output) => {
-                        guest_output.decode().unwrap()
+                    Ok(crate::core::ribosome::ZomeCallResponse::Ok(guest_output)) => {
+                        Ok(guest_output.decode().unwrap())
                     }
-                    crate::core::ribosome::ZomeCallResponse::Unauthorized(_, _, _, _) => {
+                    Ok(crate::core::ribosome::ZomeCallResponse::Unauthorized(_, _, _, _)) => {
                         unreachable!()
                     }
-                    crate::core::ribosome::ZomeCallResponse::NetworkError(_) => unreachable!(),
+                    Ok(crate::core::ribosome::ZomeCallResponse::NetworkError(_)) => unreachable!(),
+                    Err(e) => Err(e),
                 };
                 output
             })

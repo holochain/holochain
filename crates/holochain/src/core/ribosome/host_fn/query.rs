@@ -52,16 +52,16 @@ pub mod slow_tests {
         let (_test_env, host_access) = setup().await;
 
         let _hash_a: EntryHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "a".to_string());
+            crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "a".to_string()).unwrap();
         let _hash_b: EntryHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "b".to_string());
+            crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "b".to_string()).unwrap();
 
         let elements: Vec<Element> = crate::call_test_ribosome!(
             host_access,
             TestWasm::Query,
             "query",
             ChainQueryFilter::default()
-        );
+        ).unwrap();
 
         assert_eq!(elements.len(), 5);
     }

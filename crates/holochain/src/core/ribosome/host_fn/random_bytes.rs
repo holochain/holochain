@@ -69,7 +69,7 @@ pub mod wasm_test {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace;
         let output: hdk::prelude::Bytes =
-            crate::call_test_ribosome!(host_access, TestWasm::RandomBytes, "random_bytes", LEN);
+            crate::call_test_ribosome!(host_access, TestWasm::RandomBytes, "random_bytes", LEN).unwrap();
 
         assert_ne!(&vec![0; LEN as usize], &output.to_vec());
     }

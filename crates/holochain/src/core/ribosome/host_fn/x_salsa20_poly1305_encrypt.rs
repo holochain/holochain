@@ -77,7 +77,7 @@ pub mod wasm_test {
             TestWasm::XSalsa20Poly1305,
             "x_salsa20_poly1305_encrypt",
             input
-        );
+        ).unwrap();
         let decrypt_output: Option<XSalsa20Poly1305Data> = crate::call_test_ribosome!(
             host_access,
             TestWasm::XSalsa20Poly1305,
@@ -86,7 +86,7 @@ pub mod wasm_test {
                 key_ref,
                 output.clone(),
             )
-        );
+        ).unwrap();
         assert_eq!(&decrypt_output, &Some(data),);
 
         let bad_key_ref = XSalsa20Poly1305KeyRef::from([2; 32]);
@@ -98,7 +98,7 @@ pub mod wasm_test {
                 bad_key_ref,
                 output
             )
-        );
+        ).unwrap();
         assert_eq!(None, bad_output);
     }
 }

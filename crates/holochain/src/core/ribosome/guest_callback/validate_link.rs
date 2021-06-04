@@ -365,7 +365,8 @@ mod slow_tests {
         host_access.workspace = workspace.clone();
 
         let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_valid_link", ());
+            crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_valid_link", ())
+                .unwrap();
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
@@ -393,7 +394,8 @@ mod slow_tests {
         host_access.workspace = workspace.clone();
 
         let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_invalid_link", ());
+            crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_invalid_link", ())
+                .unwrap();
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {

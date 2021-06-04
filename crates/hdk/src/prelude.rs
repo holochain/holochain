@@ -18,10 +18,10 @@ pub use crate::entry::delete;
 pub use crate::entry::delete_entry;
 pub use crate::entry::get;
 pub use crate::entry::get_details;
+pub use crate::entry::hash_entry;
 pub use crate::entry::must_get_entry;
 pub use crate::entry::must_get_header;
-pub use crate::entry::must_get_element;
-pub use crate::entry::hash_entry;
+pub use crate::entry::must_get_valid_element;
 pub use crate::entry::update;
 pub use crate::entry::update_entry;
 pub use crate::entry::EntryDefRegistration;
@@ -70,6 +70,7 @@ pub use holo_hash::EntryHashes;
 pub use holo_hash::HasHash;
 pub use holo_hash::HeaderHash;
 pub use holo_hash::HoloHash;
+pub use holo_hash::HoloHashed;
 pub use holochain_wasmer_guest::*;
 pub use holochain_zome_types;
 pub use holochain_zome_types::prelude::*;
@@ -79,7 +80,6 @@ pub use std::convert::TryFrom;
 pub use tracing;
 pub use tracing::{debug, error, info, instrument, trace, warn};
 pub use tracing_subscriber;
-pub use holo_hash::HoloHashed;
 
 #[cfg(feature = "mock")]
 pub use mockall;
@@ -111,7 +111,7 @@ macro_rules! holochain_externs {
             __get_link_details,
             __get_agent_activity,
             __must_get_entry,
-            __must_get_element,
+            __must_get_valid_element,
             __must_get_header,
             __query,
             __call_remote,

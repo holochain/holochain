@@ -217,19 +217,22 @@ where
 
 pub fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
     HDK.with(|h| {
-        h.borrow().must_get_entry(MustGetEntryInput::new(entry_hash))
+        h.borrow()
+            .must_get_entry(MustGetEntryInput::new(entry_hash))
     })
 }
 
 pub fn must_get_header(header_hash: HeaderHash) -> ExternResult<SignedHeaderHashed> {
     HDK.with(|h| {
-        h.borrow().must_get_header(MustGetHeaderInput::new(header_hash))
+        h.borrow()
+            .must_get_header(MustGetHeaderInput::new(header_hash))
     })
 }
 
-pub fn must_get_element(header_hash: HeaderHash) -> ExternResult<(Element, bool)> {
+pub fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
     HDK.with(|h| {
-        h.borrow().must_get_element(MustGetElementInput::new(header_hash))
+        h.borrow()
+            .must_get_valid_element(MustGetValidElementInput::new(header_hash))
     })
 }
 
