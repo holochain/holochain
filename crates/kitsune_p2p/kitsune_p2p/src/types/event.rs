@@ -134,7 +134,7 @@ pub enum MetricQueryAnswer {
     /// The last sync time for all agents.
     LastSync(Option<std::time::SystemTime>),
     /// The agent with the oldest last-connection time which satisfies the query.
-    Oldest(Option<super::KitsuneAgent>),
+    Oldest(Option<Arc<super::KitsuneAgent>>),
 }
 
 ghost_actor::ghost_chan! {

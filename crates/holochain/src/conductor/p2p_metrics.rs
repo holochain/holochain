@@ -136,7 +136,7 @@ mod tests {
                 }
             )
             .unwrap(),
-            MetricQueryAnswer::Oldest(Some(Arc::try_unwrap(agent2.to_kitsune()).unwrap()))
+            MetricQueryAnswer::Oldest(Some(agent2.to_kitsune()))
         );
 
         // - with a more recent threshold, agent 1 should be returned, since
@@ -149,7 +149,7 @@ mod tests {
                 }
             )
             .unwrap(),
-            MetricQueryAnswer::Oldest(Some(Arc::try_unwrap(agent1.to_kitsune()).unwrap()))
+            MetricQueryAnswer::Oldest(Some(agent1.to_kitsune()))
         );
     }
 }

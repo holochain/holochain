@@ -2477,6 +2477,7 @@ version = "0.0.1"
 dependencies = [
  "arrayref",
  "base64",
+ "derive_more",
  "futures",
  "hyper",
  "kitsune_p2p",

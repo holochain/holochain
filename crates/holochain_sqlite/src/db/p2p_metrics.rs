@@ -88,7 +88,7 @@ pub fn query_metrics(
                     |row| row.get(0),
                 )
                 .optional()?;
-            MetricQueryAnswer::Oldest(agent_bytes.map(KitsuneAgent::new))
+            MetricQueryAnswer::Oldest(agent_bytes.map(KitsuneAgent::new).map(Arc::new))
         }
     })
 }
