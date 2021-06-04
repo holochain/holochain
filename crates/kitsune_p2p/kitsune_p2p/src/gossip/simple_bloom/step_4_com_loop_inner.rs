@@ -39,26 +39,30 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
     use crate::event::*;
 
     // parse the message
-    let (send_accept, remote_filter) = match gossip {
-        GossipWire::Initiate(Initiate { filter }) => {
+    let (send_accept, remote_filter, remote_agents) = match gossip {
+        GossipWire::Initiate(Initiate { agents, filter }) => {
             let bloom_byte_count = filter.len();
             tracing::debug!(
                 %bloom_byte_count,
                 "incoming 'Initiate'",
             );
 
-            (true, filter)
+            (true, filter, agents)
         }
-        GossipWire::Accept(Accept { filter }) => {
+        GossipWire::Accept(Accept { agents, filter }) => {
             let bloom_byte_count = filter.len();
             tracing::debug!(
                 %bloom_byte_count,
                 "incoming 'Accept'",
             );
 
-            (false, filter)
+            (false, filter, agents)
         }
-        GossipWire::Chunk(Chunk { finished, chunks }) => {
+        GossipWire::Chunk(Chunk {
+            agents: remote_agents,
+            finished,
+            chunks,
+        }) => {
             let chunk_count = chunks.len();
             tracing::info!(
                 %finished,
@@ -76,6 +80,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
 
                 let mut futs = Vec::new();
 
+                // Locally sync the newly received data
                 for chunk in chunks {
                     for agent in i.local_agents.iter() {
                         match &*chunk {
@@ -83,7 +88,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
                                 futs.push(bloom.evt_sender.gossip(
                                     bloom.space.clone(),
                                     agent.clone(),
-                                    agent.clone(), // TODO - from??
+                                    todo!("remote_agents.clone()"),
                                     key.clone(),
                                     data.clone(),
                                 ));
@@ -127,10 +132,9 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
         // for now, just always accept gossip initiates
         if send_accept {
             let local_filter = encode_bloom_filter(&i.local_bloom);
-            let gossip = GossipWire::accept(local_filter);
+            let gossip = GossipWire::accept(todo!("me"), local_filter);
             let peer_cert = con_clone.peer_cert();
-            let endpoint =
-                GossipTgt::new(todo!("how to determine which agent to talk to?"), peer_cert);
+            let endpoint = GossipTgt::new(remote_agents.clone(), peer_cert);
             i.outgoing
                 .push((endpoint, HowToConnect::Con(con_clone), gossip));
         }
@@ -161,11 +165,10 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
                 }
             }
 
-            // publish an empty chunk incase it was the remote who initiated
-            let gossip = GossipWire::chunk(true, Vec::new());
+            // publish an empty chunk in case it was the remote who initiated
+            let gossip = GossipWire::chunk(todo!("me"), true, Vec::new());
             let peer_cert = con.peer_cert();
-            let endpoint =
-                GossipTgt::new(todo!("how to determine which agent to talk to?"), peer_cert);
+            let endpoint = GossipTgt::new(remote_agents.clone(), peer_cert);
             i.outgoing.push((endpoint, HowToConnect::Con(con), gossip));
 
             Ok(())
@@ -220,10 +223,9 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
 
     bloom.inner.share_mut(move |i, _| {
         for (finished, chunks) in gossip {
-            let gossip = GossipWire::chunk(finished, chunks);
+            let gossip = GossipWire::chunk(todo!("me"), finished, chunks);
             let peer_cert = con.peer_cert();
-            let endpoint =
-                GossipTgt::new(todo!("how to determine which agent to talk to?"), peer_cert);
+            let endpoint = GossipTgt::new(remote_agents, peer_cert);
             i.outgoing
                 .push((endpoint, HowToConnect::Con(con.clone()), gossip));
         }

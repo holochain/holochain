@@ -116,19 +116,22 @@ kitsune_p2p_types::write_codec_enum! {
     codec GossipWire {
         /// Initiate a round of gossip with a remote node
         Initiate(0x10) {
-            filter.0: PoolBuf,
+            agents.0: Vec<Arc<KitsuneAgent>>,
+            filter.1: PoolBuf,
         },
 
         /// Accept an incoming round of gossip from a remote node
         Accept(0x20) {
-            filter.0: PoolBuf,
+            agents.0: Vec<Arc<KitsuneAgent>>,
+            filter.1: PoolBuf,
         },
 
         /// Send a chunks of gossip meta op data,
         /// if "finished" this will be the final chunk.
         Chunk(0x30) {
-            finished.0: bool,
-            chunks.1: Vec<Arc<MetaOpData>>,
+            agents.0: Vec<Arc<KitsuneAgent>>,
+            finished.1: bool,
+            chunks.2: Vec<Arc<MetaOpData>>,
         },
     }
 }
@@ -325,7 +328,7 @@ impl SimpleBloomMod {
 
             // next, check to see if we should time out any current initiate_tgt
             if let Some(initiate_tgt) = i.initiate_tgt.clone() {
-                if let Some(metric) = i.remote_metrics.get(initiate_tgt.agent()) {
+                if let Some(metric) = todo!("i.remote_metrics.get(initiate_tgt.agent())") {
                     if metric.was_err
                         || metric.last_touch.elapsed().as_millis() as u32
                             > self.tuning_params.gossip_peer_on_success_next_gossip_delay_ms
@@ -437,7 +440,7 @@ impl SimpleBloomMod {
 
             if let Some(outgoing) = maybe_outgoing.take() {
                 let (endpoint, how, gossip) = outgoing;
-                let agent = endpoint.agent().clone();
+                let agents = endpoint.agents().clone();
                 if let Err(e) = step_4_com_loop_inner_outgoing(
                     &self.inner,
                     tuning_params.clone(),
@@ -452,25 +455,27 @@ impl SimpleBloomMod {
                     tracing::warn!("failed to send outgoing: {:?} {:?}", endpoint, e);
                     self.inner.share_mut(move |i, _| {
                         i.last_outgoing = std::time::Instant::now();
-                        i.remote_metrics.insert(
-                            agent,
-                            NodeInfo {
-                                last_touch: std::time::Instant::now(),
-                                was_err: true,
-                            },
-                        );
+                        todo!("record metric");
+                        // i.remote_metrics.insert(
+                        //     agents,
+                        //     NodeInfo {
+                        //         last_touch: std::time::Instant::now(),
+                        //         was_err: true,
+                        //     },
+                        // );
                         Ok(())
                     })?;
                 } else {
                     self.inner.share_mut(move |i, _| {
                         i.last_outgoing = std::time::Instant::now();
-                        i.remote_metrics.insert(
-                            agent,
-                            NodeInfo {
-                                last_touch: std::time::Instant::now(),
-                                was_err: false,
-                            },
-                        );
+                        todo!("record metric");
+                        // i.remote_metrics.insert(
+                        //     agents,
+                        //     NodeInfo {
+                        //         last_touch: std::time::Instant::now(),
+                        //         was_err: false,
+                        //     },
+                        // );
                         Ok(())
                     })?;
                 }

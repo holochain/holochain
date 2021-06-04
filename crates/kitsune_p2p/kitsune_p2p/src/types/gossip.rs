@@ -63,35 +63,26 @@ impl GossipModuleFactory {
 
 /// The specific provenance/destination of gossip is to a particular Agent on
 /// a connection specified by a Tx2Cert
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Constructor)]
 pub struct GossipTgt {
-    agent: Arc<KitsuneAgent>,
+    /// The agents on the remote node for whom this gossip is intended.
+    /// In the current full-sync case, it makes sense to address gossip to all
+    /// known agents on a node, but after sharding, we may make this a single
+    /// agent target.
+    agents: Vec<Arc<KitsuneAgent>>,
+    /// The cert which represents the remote node to talk to.
     cert: Tx2Cert,
 }
 
 impl GossipTgt {
-    /// Constructor
-    pub fn new(agent: KitsuneAgent, cert: Tx2Cert) -> Self {
-        Self {
-            agent: Arc::new(agent),
-            cert,
-        }
-    }
-
     /// Accessor
-    pub fn agent(&self) -> &KitsuneAgent {
-        self.as_ref()
+    pub fn agents(&self) -> &Vec<Arc<KitsuneAgent>> {
+        &self.agents
     }
 
     /// Accessor
     pub fn cert(&self) -> &Tx2Cert {
         self.as_ref()
-    }
-}
-
-impl AsRef<KitsuneAgent> for GossipTgt {
-    fn as_ref(&self) -> &KitsuneAgent {
-        &self.agent
     }
 }
 

@@ -32,7 +32,7 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
                             if let Ok(purl) = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()) {
                                 return Some((
                                     GossipTgt::new(
-                                        agent_info.as_agent_ref().clone(),
+                                        vec![Arc::new(agent_info.as_agent_ref().clone())],
                                         Tx2Cert::from(purl.digest()),
                                     ),
                                     TxUrl::from(url.as_str()),
@@ -64,7 +64,8 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
 
     bloom.inner.share_mut(|inner, _| {
         for (endpoint, url) in endpoints {
-            match inner.remote_metrics.entry(endpoint.agent().clone()) {
+            match todo!("get metric info") {
+                // match inner.remote_metrics.entry(endpoint.agent().clone()) {
                 std::collections::hash_map::Entry::Occupied(mut e) => {
                     // we've seen this node before, let's see if it's been too long
                     let e = e.get_mut();
@@ -111,7 +112,7 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
             let gossip = encode_bloom_filter(&inner.local_bloom);
             let bloom_byte_count = gossip.len();
             tracing::info!(%url, ?endpoint, %bloom_byte_count, "initiating gossip");
-            let gossip = GossipWire::initiate(gossip);
+            let gossip = GossipWire::initiate(todo!("me"), gossip);
             inner
                 .outgoing
                 .push((endpoint, HowToConnect::Url(url), gossip));
