@@ -13,7 +13,7 @@ use std::{
 };
 
 pub fn time_to_micros(t: SystemTime) -> DatabaseResult<i64> {
-    t.duration_since(std::time::UNIX_EPOCH.into())
+    t.duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| DatabaseError::Other(e.into()))?
         .as_micros()
         .try_into()

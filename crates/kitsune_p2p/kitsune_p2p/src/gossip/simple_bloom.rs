@@ -379,6 +379,7 @@ impl SimpleBloomMod {
         //   TODO: this may not be technically correct, since we may want to
         //       record metrics from previous steps even if those other steps
         //       short-circuited this iteration. Revisit.
+        #[allow(clippy::single_match)]
         match self.step_5_flush_metrics().await {
             Err(_) => return GossipIterationResult::Close,
             Ok(_) => (),

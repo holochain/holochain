@@ -87,7 +87,7 @@ pub enum MetricKind {
     ConnectError,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 /// A single row in the metrics database
 pub struct MetricDatum {
     /// The agent this event is about
@@ -104,6 +104,12 @@ impl PartialOrd for MetricDatum {
             std::cmp::Ordering::Equal => Some(self.agent.cmp(&other.agent)),
             o => Some(o),
         }
+    }
+}
+
+impl Ord for MetricDatum {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
     }
 }
 
