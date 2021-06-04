@@ -85,7 +85,7 @@ mod tests {
                 }
             )
             .unwrap(),
-            MetricQueryAnswer::LastSync(ms[2].clone())
+            MetricQueryAnswer::LastSync(Some(ms[2].clone()))
         );
 
         assert_eq!(
@@ -96,7 +96,7 @@ mod tests {
                 }
             )
             .unwrap(),
-            MetricQueryAnswer::LastSync(ms[3].clone())
+            MetricQueryAnswer::LastSync(Some(ms[3].clone()))
         );
     }
 
@@ -136,7 +136,7 @@ mod tests {
                 }
             )
             .unwrap(),
-            MetricQueryAnswer::Oldest(Arc::try_unwrap(agent2.to_kitsune()).unwrap())
+            MetricQueryAnswer::Oldest(Some(Arc::try_unwrap(agent2.to_kitsune()).unwrap()))
         );
 
         // - with a more recent threshold, agent 1 should be returned, since
@@ -149,7 +149,7 @@ mod tests {
                 }
             )
             .unwrap(),
-            MetricQueryAnswer::Oldest(Arc::try_unwrap(agent1.to_kitsune()).unwrap())
+            MetricQueryAnswer::Oldest(Some(Arc::try_unwrap(agent1.to_kitsune()).unwrap()))
         );
     }
 }

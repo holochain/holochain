@@ -2,7 +2,7 @@ use super::*;
 
 // !WARNING! - this should be sync and as fast as possible
 //             the gossip mutex is locked for the duration of this fn!
-pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResult<()> {
+pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneP2pResult<()> {
     // we have decided to do an initiate check, mark the time
 
     // get the remote certs we might want to speak to
@@ -64,17 +64,17 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
     let mut initiate = None;
 
     for (endpoint, url) in endpoints {
-        match bloom.get_metric(endpoint.agents().clone()).await {
+        match bloom.get_metric(endpoint.agents().clone()).await? {
             Some(info) => {
                 // we've seen this node before, let's see if it's been too long
 
                 let saw_recently = if info.was_err {
-                    info.last_touch.elapsed().as_millis() as u32 + last_touch_fudge_ms
+                    info.last_touch.elapsed()?.as_millis() as u32 + last_touch_fudge_ms
                         <= bloom
                             .tuning_params
                             .gossip_peer_on_error_next_gossip_delay_ms
                 } else {
-                    info.last_touch.elapsed().as_millis() as u32 + last_touch_fudge_ms
+                    info.last_touch.elapsed()?.as_millis() as u32 + last_touch_fudge_ms
                         <= bloom
                             .tuning_params
                             .gossip_peer_on_success_next_gossip_delay_ms
@@ -89,13 +89,7 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
                 // it's been a while since we spoke to this node,
                 // talk to them
                 bloom.inner.share_mut(|inner, _| {
-                    inner.record_pending_metric(
-                        endpoint.agents().clone(),
-                        NodeInfo {
-                            last_touch: std::time::Instant::now(),
-                            was_err: false,
-                        },
-                    );
+                    inner.record_pending_metric(endpoint.agents().clone(), false);
                     Ok(())
                 })?;
                 initiate = Some((endpoint, url));
@@ -105,13 +99,7 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneResu
             None => {
                 // yay, we haven't seen this node, let's talk to them
                 bloom.inner.share_mut(|inner, _| {
-                    inner.record_pending_metric(
-                        endpoint.agents().clone(),
-                        NodeInfo {
-                            last_touch: std::time::Instant::now(),
-                            was_err: false,
-                        },
-                    );
+                    inner.record_pending_metric(endpoint.agents().clone(), false);
                     inner.initiate_tgt = Some(endpoint.clone());
                     Ok(())
                 })?;

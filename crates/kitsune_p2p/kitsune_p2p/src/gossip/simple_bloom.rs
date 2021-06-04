@@ -1,4 +1,7 @@
 use crate::agent_store::AgentInfoSigned;
+use crate::event::MetricQuery;
+use crate::event::MetricQueryAnswer;
+use crate::types::event::*;
 use crate::types::gossip::*;
 use crate::types::*;
 use ghost_actor::dependencies::tracing;
@@ -138,7 +141,7 @@ kitsune_p2p_types::write_codec_enum! {
 }
 
 struct NodeInfo {
-    last_touch: std::time::Instant,
+    last_touch: std::time::SystemTime,
     was_err: bool,
 }
 
@@ -192,7 +195,11 @@ impl SimpleBloomModInner {
 
     /// Record a metric to be recorded at the end of this gossip round
     // TODO: remove NodeInfo
-    fn record_pending_metric(&mut self, agents: Vec<Arc<KitsuneAgent>>, info: NodeInfo) {
+    fn record_pending_metric(&mut self, agents: Vec<Arc<KitsuneAgent>>, was_err: bool) {
+        let info = NodeInfo {
+            last_touch: std::time::SystemTime::now(),
+            was_err,
+        };
         self.pending_metrics.push((agents, info))
     }
 }
@@ -269,16 +276,61 @@ impl SimpleBloomMod {
         this
     }
 
-    /// Get metrics data in the form of NodeInfo
+    /// Get metrics data via event channel in the form of NodeInfo
     // TODO: remove NodeInfo
-    async fn get_metric(&self, _agents: Vec<Arc<KitsuneAgent>>) -> Option<NodeInfo> {
-        todo!("use evt_sender to get metric data and massage it into NodeInfo");
+    async fn get_metric(
+        &self,
+        agents: Vec<Arc<KitsuneAgent>>,
+    ) -> KitsuneP2pResult<Option<NodeInfo>> {
+        let arbitrary_agent = agents
+            .first()
+            .expect("Gossip must have a least one from_agent")
+            .clone();
+        let last_touch = match self
+            .evt_sender
+            .query_metrics(MetricQuery::LastSync {
+                agent: arbitrary_agent,
+            })
+            .await?
+        {
+            MetricQueryAnswer::LastSync(time) => time,
+            _ => unreachable!(),
+        };
+        Ok(last_touch.map(|last_touch| NodeInfo {
+            last_touch,
+            was_err: false,
+        }))
     }
 
-    /// Record a metric
+    /// Record a metric via event channel
     // TODO: remove NodeInfo
-    async fn record_metric(&self, _agents: Vec<Arc<KitsuneAgent>>, _info: NodeInfo) {
-        todo!("use evt_sender to interpret NodeInfo and record it as a metric");
+    async fn record_metric(
+        &self,
+        agents: Vec<Arc<KitsuneAgent>>,
+        info: NodeInfo,
+    ) -> KitsuneP2pResult<()> {
+        if info.was_err {
+            for agent in agents {
+                self.evt_sender
+                    .put_metric_datum(MetricDatum {
+                        agent,
+                        kind: MetricKind::ConnectError,
+                        timestamp: info.last_touch,
+                    })
+                    .await?;
+            }
+        } else {
+            for agent in agents {
+                self.evt_sender
+                    .put_metric_datum(MetricDatum {
+                        agent,
+                        kind: MetricKind::QuickGossip,
+                        timestamp: info.last_touch,
+                    })
+                    .await?;
+            }
+        }
+        Ok(())
     }
 
     async fn run_one_iteration(&self) -> GossipIterationResult {
@@ -365,7 +417,7 @@ impl SimpleBloomMod {
         Ok(true)
     }
 
-    async fn step_3_initiate(&self) -> KitsuneResult<bool> {
+    async fn step_3_initiate(&self) -> KitsuneP2pResult<bool> {
         step_3_initiate_inner(self).await?;
         Ok(true)
     }
@@ -432,25 +484,13 @@ impl SimpleBloomMod {
                     tracing::warn!("failed to send outgoing: {:?} {:?}", endpoint, e);
                     self.inner.share_mut(move |i, _| {
                         i.last_outgoing = std::time::Instant::now();
-                        i.record_pending_metric(
-                            agents,
-                            NodeInfo {
-                                last_touch: std::time::Instant::now(),
-                                was_err: true,
-                            },
-                        );
+                        i.record_pending_metric(agents, true);
                         Ok(())
                     })?;
                 } else {
                     self.inner.share_mut(move |i, _| {
                         i.last_outgoing = std::time::Instant::now();
-                        i.record_pending_metric(
-                            agents,
-                            NodeInfo {
-                                last_touch: std::time::Instant::now(),
-                                was_err: false,
-                            },
-                        );
+                        i.record_pending_metric(agents, false);
                         Ok(())
                     })?;
                 }
@@ -471,11 +511,13 @@ impl SimpleBloomMod {
         Ok(true)
     }
 
-    async fn step_5_flush_metrics(&self) -> KitsuneResult<()> {
+    async fn step_5_flush_metrics(&self) -> KitsuneP2pResult<()> {
         let metrics: Vec<_> = self
             .inner
             .share_mut(|i, _| Ok(i.pending_metrics.drain(..).collect()))?;
-        todo!("record metrics");
+        for (agents, info) in metrics {
+            self.record_metric(agents, info).await?;
+        }
         Ok(())
     }
 }

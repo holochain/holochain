@@ -58,29 +58,37 @@ pub fn query_metrics(
     Ok(match query {
         MetricQuery::LastSync { agent } => {
             let agent_bytes: &[u8] = agent.as_ref();
-            let timestamp: i64 = txn.query_row(
-                sql_p2p_metrics::QUERY_LAST_SYNC,
-                named_params! {
-                    ":agent": agent_bytes,
-                    ":kind": MetricKind::QuickGossip.to_string(),
-                },
-                |row| row.get(0),
-            )?;
-            MetricQueryAnswer::LastSync(time_from_micros(timestamp)?)
+            let timestamp: Option<i64> = txn
+                .query_row(
+                    sql_p2p_metrics::QUERY_LAST_SYNC,
+                    named_params! {
+                        ":agent": agent_bytes,
+                        ":kind": MetricKind::QuickGossip.to_string(),
+                    },
+                    |row| row.get(0),
+                )
+                .optional()?;
+            let time = match timestamp {
+                Some(t) => Some(time_from_micros(t)?),
+                None => None,
+            };
+            MetricQueryAnswer::LastSync(time)
         }
         MetricQuery::Oldest {
             last_connect_error_threshold,
         } => {
-            let agent_bytes: Vec<u8> = txn.query_row(
-                sql_p2p_metrics::QUERY_OLDEST,
-                named_params! {
-                    ":error_threshold": time_to_micros(last_connect_error_threshold)?,
-                    ":kind_error": MetricKind::ConnectError.to_string(),
-                    ":kind_slow_gossip": MetricKind::SlowGossip.to_string(),
-                },
-                |row| row.get(0),
-            )?;
-            MetricQueryAnswer::Oldest(KitsuneAgent::new(agent_bytes))
+            let agent_bytes: Option<Vec<u8>> = txn
+                .query_row(
+                    sql_p2p_metrics::QUERY_OLDEST,
+                    named_params! {
+                        ":error_threshold": time_to_micros(last_connect_error_threshold)?,
+                        ":kind_error": MetricKind::ConnectError.to_string(),
+                        ":kind_slow_gossip": MetricKind::SlowGossip.to_string(),
+                    },
+                    |row| row.get(0),
+                )
+                .optional()?;
+            MetricQueryAnswer::Oldest(agent_bytes.map(KitsuneAgent::new))
         }
     })
 }

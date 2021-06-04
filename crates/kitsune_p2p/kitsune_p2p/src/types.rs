@@ -53,6 +53,8 @@ pub enum KitsuneP2pError {
     Other(Box<dyn std::error::Error + Send + Sync>),
 }
 
+pub use crate::actor::KitsuneP2pResult;
+
 impl KitsuneP2pError {
     /// promote a custom error type to a KitsuneP2pError
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {

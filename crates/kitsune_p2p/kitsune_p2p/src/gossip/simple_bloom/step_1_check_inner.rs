@@ -1,10 +1,10 @@
-use kitsune_p2p_types::KitsuneResult;
+use crate::*;
 use observability::tracing;
 
 use super::{CheckResult, SimpleBloomMod};
 
 impl SimpleBloomMod {
-    pub(super) async fn step_1_check_inner(&self) -> KitsuneResult<CheckResult> {
+    pub(super) async fn step_1_check_inner(&self) -> KitsuneP2pResult<CheckResult> {
         let (not_ready, tgt) = self.inner.share_mut(|i, _| {
             // first, if we don't have any local agents, there's
             // no point in doing any gossip logic
@@ -18,9 +18,9 @@ impl SimpleBloomMod {
 
         // next, check to see if we should time out any current initiate_tgt
         if let Some(initiate_tgt) = tgt {
-            if let Some(metric) = self.get_metric(initiate_tgt.agents().clone()).await {
+            if let Some(metric) = self.get_metric(initiate_tgt.agents().clone()).await? {
                 if metric.was_err
-                    || metric.last_touch.elapsed().as_millis() as u32
+                    || metric.last_touch.elapsed()?.as_millis() as u32
                         > self.tuning_params.gossip_peer_on_success_next_gossip_delay_ms
                         // give us a little leeway... we don't
                         // need to be too agressive with timing out

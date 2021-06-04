@@ -1,5 +1,4 @@
 use super::*;
-use crate::event::*;
 use kitsune_p2p_types::dht_arc::*;
 
 type HasMap = HashMap<Arc<KitsuneAgent>, KeySet>;

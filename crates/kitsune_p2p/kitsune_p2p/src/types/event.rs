@@ -126,9 +126,9 @@ pub enum MetricQuery {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MetricQueryAnswer {
     /// The last sync time for all agents.
-    LastSync(std::time::SystemTime),
+    LastSync(Option<std::time::SystemTime>),
     /// The agent with the oldest last-connection time which satisfies the query.
-    Oldest(super::KitsuneAgent),
+    Oldest(Option<super::KitsuneAgent>),
 }
 
 ghost_actor::ghost_chan! {
