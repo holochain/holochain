@@ -8,6 +8,8 @@ use holochain_zome_types::fixt::*;
 use holochain_zome_types::Create;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
+use holochain_zome_types::EntryType;
+use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::Header;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::Judged;
@@ -51,8 +53,13 @@ impl ElementTestData {
         let update_entry = Entry::App(update_entry);
         let update_entry_hash = EntryHash::with_data_sync(&update_entry);
 
+        let mut entry_type_fixt =
+            AppEntryTypeFixturator::new(EntryVisibility::Public).map(EntryType::App);
+
         create.entry_hash = entry_hash.clone();
+        create.entry_type = entry_type_fixt.next().unwrap();
         update.entry_hash = update_entry_hash;
+        update.entry_type = entry_type_fixt.next().unwrap();
 
         let create_header = Header::Create(create);
         let create_hash = HeaderHash::with_data_sync(&create_header);
@@ -95,10 +102,19 @@ impl ElementTestData {
         let mut any_entry_hash = None;
         if any_header.entry_hash().is_some() {
             match &mut any_header {
-                Header::Create(Create { entry_hash: eh, .. })
-                | Header::Update(Update { entry_hash: eh, .. }) => {
+                Header::Create(Create {
+                    entry_hash: eh,
+                    entry_type,
+                    ..
+                })
+                | Header::Update(Update {
+                    entry_hash: eh,
+                    entry_type,
+                    ..
+                }) => {
                     let entry = fixt!(AppEntryBytes);
                     let entry = Entry::App(entry);
+                    *entry_type = entry_type_fixt.next().unwrap();
                     *eh = EntryHash::with_data_sync(&entry);
                     any_entry_hash = Some(eh.clone());
                     any_entry = Some(Box::new(entry));

@@ -12,6 +12,8 @@ use holochain_types::link::WireLinkKey;
 use holochain_types::prelude::EntryData;
 use holochain_zome_types::fixt::*;
 use holochain_zome_types::Entry;
+use holochain_zome_types::EntryType;
+use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::Header;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::Judged;
@@ -64,8 +66,13 @@ impl EntryTestData {
         let update_entry = Entry::App(update_entry);
         let update_entry_hash = EntryHash::with_data_sync(&update_entry);
 
+        let mut entry_type_fixt =
+            AppEntryTypeFixturator::new(EntryVisibility::Public).map(EntryType::App);
+
         create.entry_hash = entry_hash.clone();
+        create.entry_type = entry_type_fixt.next().unwrap();
         update.entry_hash = update_entry_hash;
+        update.entry_type = entry_type_fixt.next().unwrap();
 
         let create_header = Header::Create(create.clone());
         let create_hash = HeaderHash::with_data_sync(&create_header);
