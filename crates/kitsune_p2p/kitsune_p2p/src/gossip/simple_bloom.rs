@@ -104,6 +104,7 @@ pub(crate) fn decode_bloom_filter(bloom: &[u8]) -> BloomFilter {
     bloomfilter::Bloom::from_existing(&bloom[44..], bitmap_bits, k_num, sip_keys)
 }
 
+mod step_1_check_inner;
 mod step_2_local_sync_inner;
 use step_2_local_sync_inner::*;
 mod step_3_initiate_inner;
@@ -116,20 +117,20 @@ kitsune_p2p_types::write_codec_enum! {
     codec GossipWire {
         /// Initiate a round of gossip with a remote node
         Initiate(0x10) {
-            agents.0: Vec<Arc<KitsuneAgent>>,
+            agents.0:HashSet<Arc<KitsuneAgent>>,
             filter.1: PoolBuf,
         },
 
         /// Accept an incoming round of gossip from a remote node
         Accept(0x20) {
-            agents.0: Vec<Arc<KitsuneAgent>>,
+            agents.0:HashSet<Arc<KitsuneAgent>>,
             filter.1: PoolBuf,
         },
 
         /// Send a chunks of gossip meta op data,
         /// if "finished" this will be the final chunk.
         Chunk(0x30) {
-            agents.0: Vec<Arc<KitsuneAgent>>,
+            agents.0:HashSet<Arc<KitsuneAgent>>,
             finished.1: bool,
             chunks.2: Vec<Arc<MetaOpData>>,
         },
@@ -152,7 +153,8 @@ pub(crate) struct SimpleBloomModInner {
     local_data_map: DataMap,
     local_key_set: KeySet,
 
-    remote_metrics: HashMap<KitsuneAgent, NodeInfo>,
+    /// Metrics to be recorded at the end of this round of gossip
+    pending_metrics: Vec<(Vec<Arc<KitsuneAgent>>, NodeInfo)>,
 
     last_initiate_check: std::time::Instant,
     initiate_tgt: Option<GossipTgt>,
@@ -176,7 +178,7 @@ impl SimpleBloomModInner {
             local_data_map: HashMap::new(),
             local_key_set: HashSet::new(),
 
-            remote_metrics: HashMap::new(),
+            pending_metrics: Vec::new(),
 
             last_initiate_check: old,
             initiate_tgt: None,
@@ -186,6 +188,12 @@ impl SimpleBloomModInner {
             last_outgoing: old,
             outgoing: Vec::new(),
         }
+    }
+
+    /// Record a metric to be recorded at the end of this gossip round
+    // TODO: remove NodeInfo
+    fn record_pending_metric(&mut self, agents: Vec<Arc<KitsuneAgent>>, info: NodeInfo) {
+        self.pending_metrics.push((agents, info))
     }
 }
 
@@ -263,21 +271,21 @@ impl SimpleBloomMod {
 
     /// Get metrics data in the form of NodeInfo
     // TODO: remove NodeInfo
-    async fn get_node_info(&self, _agent: &KitsuneAgent) -> Option<NodeInfo> {
+    async fn get_metric(&self, _agents: Vec<Arc<KitsuneAgent>>) -> Option<NodeInfo> {
         todo!("use evt_sender to get metric data and massage it into NodeInfo");
     }
 
-    /// Record metrics data in the form of NodeInfo
+    /// Record a metric
     // TODO: remove NodeInfo
-    async fn record_metric(&self, _agent: KitsuneAgent, _info: NodeInfo) {
-        todo!("use evt_sender to record metric data based on NodeInfo");
+    async fn record_metric(&self, _agents: Vec<Arc<KitsuneAgent>>, _info: NodeInfo) {
+        todo!("use evt_sender to interpret NodeInfo and record it as a metric");
     }
 
     async fn run_one_iteration(&self) -> GossipIterationResult {
         // # Step 1 - check state
         //   - if closed, send GossipIterationResult::Close
         //   - if not ready, exit early
-        let sync_and_initiate = match self.step_1_check() {
+        let sync_and_initiate = match self.step_1_check().await {
             CheckResult::Close => return GossipIterationResult::Close,
             CheckResult::NotReady => return GossipIterationResult::Good,
             CheckResult::SyncAndInitiate => true,
@@ -315,51 +323,20 @@ impl SimpleBloomMod {
             Ok(true) => (),
         }
 
+        // # Step 5 - flush all pending metrics via KitsuneP2pEvent channel
+        //   TODO: this may not be technically correct, since we may want to
+        //       record metrics from previous steps even if those other steps
+        //       short-circuited this iteration. Revisit.
+        match self.step_5_flush_metrics().await {
+            Err(_) => return GossipIterationResult::Close,
+            Ok(_) => (),
+        }
+
         GossipIterationResult::Good
     }
 
-    fn step_1_check(&self) -> CheckResult {
-        match self.inner.share_mut(|i, _| {
-            // first, if we don't have any local agents, there's
-            // no point in doing any gossip logic
-            if i.local_agents.is_empty() {
-                return Ok(CheckResult::NotReady);
-            }
-
-            // next, check to see if we should time out any current initiate_tgt
-            if let Some(initiate_tgt) = i.initiate_tgt.clone() {
-                if let Some(metric) = todo!("i.remote_metrics.get(initiate_tgt.agent())") {
-                    if metric.was_err
-                        || metric.last_touch.elapsed().as_millis() as u32
-                            > self.tuning_params.gossip_peer_on_success_next_gossip_delay_ms
-                            // give us a little leeway... we don't
-                            // need to be too agressive with timing out
-                            // this loop
-                            * 2
-                    {
-                        tracing::warn!("gossip timeout on initiate tgt {:?}", i.initiate_tgt);
-                        i.initiate_tgt = None;
-                    } else {
-                        // we're still processing the current initiate...
-                        // don't bother syncing locally
-                        return Ok(CheckResult::SkipSyncAndInitiate);
-                    }
-                } else {
-                    // erm... we have an initate tgt,
-                    // but we've never seen them??
-                    // this must be a logic error.
-                    unreachable!()
-                }
-            }
-
-            if i.initiate_tgt.is_none()
-                && i.last_initiate_check.elapsed().as_millis() as u32
-                    > self.tuning_params.gossip_loop_iteration_delay_ms
-            {
-                return Ok(CheckResult::SyncAndInitiate);
-            }
-            Ok(CheckResult::SkipSyncAndInitiate)
-        }) {
+    async fn step_1_check(&self) -> CheckResult {
+        match self.step_1_check_inner().await {
             Err(_) => CheckResult::Close,
             Ok(r) => r,
         }
@@ -455,27 +432,25 @@ impl SimpleBloomMod {
                     tracing::warn!("failed to send outgoing: {:?} {:?}", endpoint, e);
                     self.inner.share_mut(move |i, _| {
                         i.last_outgoing = std::time::Instant::now();
-                        todo!("record metric");
-                        // i.remote_metrics.insert(
-                        //     agents,
-                        //     NodeInfo {
-                        //         last_touch: std::time::Instant::now(),
-                        //         was_err: true,
-                        //     },
-                        // );
+                        i.record_pending_metric(
+                            agents,
+                            NodeInfo {
+                                last_touch: std::time::Instant::now(),
+                                was_err: true,
+                            },
+                        );
                         Ok(())
                     })?;
                 } else {
                     self.inner.share_mut(move |i, _| {
                         i.last_outgoing = std::time::Instant::now();
-                        todo!("record metric");
-                        // i.remote_metrics.insert(
-                        //     agents,
-                        //     NodeInfo {
-                        //         last_touch: std::time::Instant::now(),
-                        //         was_err: false,
-                        //     },
-                        // );
+                        i.record_pending_metric(
+                            agents,
+                            NodeInfo {
+                                last_touch: std::time::Instant::now(),
+                                was_err: false,
+                            },
+                        );
                         Ok(())
                     })?;
                 }
@@ -494,6 +469,14 @@ impl SimpleBloomMod {
         }
 
         Ok(true)
+    }
+
+    async fn step_5_flush_metrics(&self) -> KitsuneResult<()> {
+        let metrics: Vec<_> = self
+            .inner
+            .share_mut(|i, _| Ok(i.pending_metrics.drain(..).collect()))?;
+        todo!("record metrics");
+        Ok(())
     }
 }
 
