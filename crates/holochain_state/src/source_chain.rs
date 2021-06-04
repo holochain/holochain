@@ -457,6 +457,9 @@ impl SourceChain {
                     holochain_zome_types::ValidationStatus::Valid,
                 )?;
                 // TODO: SHARDING: Check if we are the authority here.
+                // StoreEntry ops with private entries are never gossiped or published
+                // so we don't need to integrate them.
+                // TODO: Can anything every depend on a private store entry op? I don't think so.
                 if !(op_type == DhtOpType::StoreEntry
                     && visibility == Some(EntryVisibility::Private))
                 {
