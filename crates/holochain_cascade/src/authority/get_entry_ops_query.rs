@@ -9,6 +9,7 @@ use holochain_types::prelude::EntryData;
 use holochain_types::prelude::HasValidationStatus;
 use holochain_types::prelude::WireEntryOps;
 use holochain_zome_types::EntryType;
+use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::Header;
 use holochain_zome_types::Judged;
 use holochain_zome_types::Signature;
@@ -110,19 +111,28 @@ impl Query for GetEntryOpsQuery {
     fn fold(&self, mut state: Self::State, dht_op: Self::Item) -> StateQueryResult<Self::State> {
         match &dht_op.data.op_type {
             DhtOpType::StoreEntry => {
-                let status = dht_op.validation_status();
-                if state.entry_data.is_none() {
-                    state.entry_data = dht_op
-                        .data
-                        .header
-                        .0
-                        .entry_data()
-                        .map(|(h, t)| (h.clone(), t.clone()));
+                if dht_op
+                    .data
+                    .header
+                    .0
+                    .entry_type()
+                    .filter(|et| *et.visibility() == EntryVisibility::Public)
+                    .is_some()
+                {
+                    let status = dht_op.validation_status();
+                    if state.entry_data.is_none() {
+                        state.entry_data = dht_op
+                            .data
+                            .header
+                            .0
+                            .entry_data()
+                            .map(|(h, t)| (h.clone(), t.clone()));
+                    }
+                    state
+                        .ops
+                        .creates
+                        .push(Judged::raw(dht_op.data.header.try_into()?, status));
                 }
-                state
-                    .ops
-                    .creates
-                    .push(Judged::raw(dht_op.data.header.try_into()?, status));
             }
             DhtOpType::RegisterDeletedEntryHeader => {
                 let status = dht_op.validation_status();

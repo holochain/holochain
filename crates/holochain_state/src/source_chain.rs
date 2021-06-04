@@ -406,7 +406,7 @@ impl SourceChain {
                         UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
                     let op_order = OpOrder::new(op_type, header.timestamp());
                     let timestamp = header.timestamp();
-                    let visibility = header.entry_type().map(|et| et.visibility().clone());
+                    let visibility = header.entry_type().map(|et| *et.visibility());
                     // Put the header back by value.
                     h = Some(header);
                     // Collect the DhtOpLight, DhtOpHash and OpOrder.

@@ -34,12 +34,13 @@ fn consistency(bench: &mut Criterion) {
     );
     let runtime = rt();
 
-    let (mut producer, mut consumer) = runtime.block_on(setup());
+    let (mut producer, mut consumer, others) = runtime.block_on(setup());
     if let Some(n) = std::env::var_os("BENCH_NUM_OPS") {
         let num_ops = n.to_string_lossy().parse::<usize>().unwrap();
         runtime.block_on(async {
             producer.fill(num_ops).await;
-            let cells = vec![&consumer.cell, &producer.cell];
+            let mut cells = vec![&consumer.cell, &producer.cell];
+            cells.extend(others.cells.iter());
             let num_tries = std::env::var_os("BENCH_NUM_WAITS")
                 .and_then(|s| s.to_string_lossy().parse::<usize>().ok())
                 .unwrap_or(100);
@@ -49,6 +50,7 @@ fn consistency(bench: &mut Criterion) {
                 std::time::Duration::from_millis(500),
             )
             .await;
+            holochain_state::prelude::dump_tmp(consumer.cell.env());
         });
     }
     runtime.spawn(async move {
@@ -63,6 +65,10 @@ fn consistency(bench: &mut Criterion) {
     runtime.block_on(async move {
         consumer.conductor.shutdown_and_wait().await;
         drop(consumer);
+        for c in others.conductors {
+            c.shutdown_and_wait().await;
+            drop(c);
+        }
     });
     runtime.shutdown_background();
 }
@@ -78,6 +84,11 @@ struct Consumer {
     cell: SweetCell,
     last: usize,
     tx: tokio::sync::mpsc::Sender<usize>,
+}
+
+struct Others {
+    conductors: Vec<SweetConductor>,
+    cells: Vec<SweetCell>,
 }
 
 impl Producer {
@@ -108,7 +119,7 @@ impl Producer {
                 ManyAnchorInput(inputs),
             )
             .await;
-        holochain_state::prelude::dump_tmp(self.cell.env());
+        // holochain_state::prelude::dump_tmp(self.cell.env());
     }
 }
 
@@ -131,7 +142,7 @@ impl Consumer {
     }
 }
 
-async fn setup() -> (Producer, Consumer) {
+async fn setup() -> (Producer, Consumer, Others) {
     let (tx, rx) = tokio::sync::mpsc::channel(1);
     let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor])
         .await
@@ -151,10 +162,17 @@ async fn setup() -> (Producer, Consumer) {
             ..Default::default()
         }
     };
-    let configs = vec![config(), config()];
+    let configs = vec![config(), config(), config(), config(), config()];
     let mut conductors = SweetConductorBatch::from_configs(configs.clone()).await;
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();
-    let ((alice,), (bobbo,)) = apps.into_tuples();
+    let mut cells = apps
+        .into_inner()
+        .into_iter()
+        .map(|c| c.into_cells().into_iter().next().unwrap());
+    let alice = cells.next().unwrap();
+    let bobbo = cells.next().unwrap();
+
+    // let ((alice,), (bobbo,)) = apps.into_tuples();
     conductors.exchange_peer_info().await;
     let mut conductors = conductors.into_inner().into_iter();
     tx.send(0).await.unwrap();
@@ -170,6 +188,10 @@ async fn setup() -> (Producer, Consumer) {
             cell: bobbo,
             tx,
             last: 0,
+        },
+        Others {
+            conductors: conductors.collect(),
+            cells: cells.collect(),
         },
     )
 }

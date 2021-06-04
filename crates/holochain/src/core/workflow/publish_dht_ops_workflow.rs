@@ -518,8 +518,8 @@ mod tests {
                 .await;
                 let cell_network = test_network.cell_network();
                 let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
-                // We are expecting six ops per agent plus one for self
-                let total_expected = (num_agents + 1) * 6;
+                // We are expecting six ops per agent plus one for self plus 7 for genesis.
+                let total_expected = (num_agents + 1) * (6 + 7);
                 let mut recv_count: u32 = 0;
 
                 // Receive events and increment count
@@ -546,10 +546,16 @@ mod tests {
                                                 assert_eq!(dht_hash, expected_op.dht_basis());
                                                 count.fetch_add(1, Ordering::SeqCst);
                                             }
-                                            None => panic!(
-                                                "This DhtOpHash was not expected: {:?}",
-                                                op_hash
-                                            ),
+                                            None => {
+                                                if let DhtOp::StoreEntry(_, h, _) = op {
+                                                    if *h.visibility() == EntryVisibility::Private {
+                                                        panic!(
+                                                            "A private op has been published: {:?}",
+                                                            h
+                                                        )
+                                                    }
+                                                }
+                                            }
                                         }
                                         recv_count += 1;
                                     }
