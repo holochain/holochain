@@ -63,6 +63,7 @@ struct AgentHarness {
     harness_chan: HarnessEventChannel,
     agent_store: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
     gossip_store: HashMap<Arc<KitsuneOpHash>, String>,
+    metric_store: KdMetricStore,
 }
 
 impl AgentHarness {
@@ -78,6 +79,7 @@ impl AgentHarness {
             harness_chan,
             agent_store: HashMap::new(),
             gossip_store: HashMap::new(),
+            metric_store: KdMetricStore::default(),
         })
     }
 }
@@ -158,15 +160,17 @@ impl KitsuneP2pEventHandler for AgentHarness {
         Ok(async move { Ok(out) }.boxed().into())
     }
 
-    fn handle_put_metric_datum(&mut self, _datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {
-        unimplemented!("Not adding features to a deprecated test harness. See kitsune_p2p_direct's KdMetricStore for an implementation if needed.")
+    fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {
+        self.metric_store.put_metric_datum(datum);
+        Ok(async move { Ok(()) }.boxed().into())
     }
 
     fn handle_query_metrics(
         &mut self,
-        _query: MetricQuery,
+        query: MetricQuery,
     ) -> KitsuneP2pEventHandlerResult<MetricQueryAnswer> {
-        unimplemented!("Not adding features to a deprecated test harness. See kitsune_p2p_direct's KdMetricStore for an implementation if needed.")
+        let answer = self.metric_store.query_metrics(query);
+        Ok(async move { Ok(answer) }.boxed().into())
     }
 
     fn handle_call(
