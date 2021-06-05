@@ -88,8 +88,9 @@ impl From<ValidateLinkHostAccess> for HostContext {
 impl From<&ValidateLinkHostAccess> for HostFnAccess {
     fn from(_: &ValidateLinkHostAccess) -> Self {
         let mut access = Self::none();
-        access.read_workspace = Permission::Allow;
-        access.dna_bindings = Permission::Allow;
+        access.keystore_deterministic = Permission::Allow;
+        access.read_workspace_deterministic = Permission::Allow;
+        access.bindings_deterministic = Permission::Allow;
         access
     }
 }
@@ -224,8 +225,9 @@ mod test {
                 .next()
                 .unwrap();
         let mut access = HostFnAccess::none();
-        access.read_workspace = Permission::Allow;
-        access.dna_bindings = Permission::Allow;
+        access.read_workspace_deterministic = Permission::Allow;
+        access.bindings_deterministic = Permission::Allow;
+        access.keystore_deterministic = Permission::Allow;
         assert_eq!(HostFnAccess::from(&validate_link_add_host_access), access,);
     }
 

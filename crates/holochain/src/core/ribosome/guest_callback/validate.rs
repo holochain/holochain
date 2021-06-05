@@ -41,9 +41,9 @@ impl From<ValidateHostAccess> for HostContext {
 impl From<&ValidateHostAccess> for HostFnAccess {
     fn from(_: &ValidateHostAccess) -> Self {
         let mut access = Self::none();
-        access.read_workspace = Permission::Allow;
-        access.keystore = Permission::Allow;
-        access.dna_bindings = Permission::Allow;
+        access.read_workspace_deterministic = Permission::Allow;
+        access.keystore_deterministic = Permission::Allow;
+        access.bindings_deterministic = Permission::Allow;
         access
     }
 }
@@ -191,9 +191,9 @@ mod test {
             .next()
             .unwrap();
         let mut access = HostFnAccess::none();
-        access.read_workspace = Permission::Allow;
-        access.keystore = Permission::Allow;
-        access.dna_bindings = Permission::Allow;
+        access.read_workspace_deterministic = Permission::Allow;
+        access.keystore_deterministic = Permission::Allow;
+        access.bindings_deterministic = Permission::Allow;
         assert_eq!(HostFnAccess::from(&validate_host_access), access);
     }
 
@@ -295,24 +295,6 @@ mod slow_tests {
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_validate_must_get_entry() {
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::MustGet]))
-            .next()
-            .unwrap();
-        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty)
-            .next()
-            .unwrap();
-        validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::MustGet.into());
-
-        dbg!(&validate_invocation);
-
-        let result = ribosome
-            .run_validate(fixt!(ValidateHostAccess), validate_invocation)
-            .unwrap();
-        dbg!(result);
-    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_unimplemented() {

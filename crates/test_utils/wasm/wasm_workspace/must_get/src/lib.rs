@@ -86,7 +86,10 @@ entry_defs![
 fn validate_create_entry_entry_reference(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
     let entry_reference = EntryReference::try_from(&data.element)?;
 
-    let _entry: EntryHashed = must_get_entry(entry_reference.into_inner())?;
+    let entry_hashed: EntryHashed = must_get_entry(entry_reference.into_inner())?;
+    let entry: Entry = entry_hashed.into();
+    let _something_hashed: Something = entry_hashed.try_into()?;
+    let _something: Something = entry.try_into()?;
 
     Ok(ValidateCallbackResult::Valid)
 }
@@ -95,7 +98,8 @@ fn validate_create_entry_entry_reference(data: ValidateData) -> ExternResult<Val
 fn validate_create_entry_header_reference(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
     let header_reference = HeaderReference::try_from(&data.element)?;
 
-    let _header: SignedHeaderHashed = must_get_header(header_reference.into_inner())?;
+    let signed_heder_hashed: SignedHeaderHashed = must_get_header(header_reference.into_inner())?;
+    let _header: Header = signed_header_hashed.into();
 
     Ok(ValidateCallbackResult::Valid)
 }
@@ -104,7 +108,8 @@ fn validate_create_entry_header_reference(data: ValidateData) -> ExternResult<Va
 fn validate_create_entry_element_reference(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
     let element_reference = ElementReference::try_from(&data.element)?;
 
-    let _element: Element = must_get_valid_element(element_reference.into_inner())?;
+    let element: Element = must_get_valid_element(element_reference.into_inner())?;
+    let something: Something = element.try_into()?;
 
     Ok(ValidateCallbackResult::Valid)
 }
@@ -118,7 +123,7 @@ fn create_entry(_: ()) -> ExternResult<(HeaderHash, HeaderHash, HeaderHash, Head
     // Commit some references to Something so we can test validation.
     let header_reference_hash = hdk::prelude::create_entry(HeaderReference(header_hash.clone()))?;
     let element_reference_hash = hdk::prelude::create_entry(ElementReference(header_hash.clone()))?;
-    let entry_reference_hash = hdk::prelude::create_entry(EntryReference(entry_hash.clone()))?;
+    let entry_reference_hash = hdk::prelude::create_entry(EntryReference(entry_hash))?;
 
     Ok((header_hash, header_reference_hash, element_reference_hash, entry_reference_hash))
 }

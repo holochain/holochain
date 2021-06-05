@@ -39,7 +39,7 @@ impl From<ValidationPackageHostAccess> for HostContext {
 impl From<&ValidationPackageHostAccess> for HostFnAccess {
     fn from(_: &ValidationPackageHostAccess) -> Self {
         let mut access = Self::none();
-        access.read_workspace = Permission::Allow;
+        access.read_workspace_deterministic = Permission::Allow;
         access.agent_info = Permission::Allow;
         access
     }
@@ -179,12 +179,15 @@ mod test {
             HostFnAccess::from(&validation_package_host_access),
             HostFnAccess {
                 agent_info: Allow,
-                read_workspace: Allow,
+                read_workspace: Deny,
+                read_workspace_deterministic: Allow,
                 write_workspace: Deny,
                 write_network: Deny,
-                dna_bindings: Deny,
+                bindings: Deny,
+                bindings_deterministic: Deny,
                 non_determinism: Deny,
                 keystore: Deny,
+                keystore_deterministic: Deny,
             }
         );
     }

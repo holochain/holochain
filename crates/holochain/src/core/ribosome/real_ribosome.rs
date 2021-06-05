@@ -238,12 +238,35 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__unreachable", unreachable);
 
         if let HostFnAccess {
-            keystore: Permission::Allow,
+            keystore_deterministic: Permission::Allow,
             ..
         } = host_fn_access
         {
             host_fn_builder
                 .with_host_function(&mut ns, "__verify_signature", verify_signature)
+                .with_host_function(
+                    &mut ns,
+                    "__x_salsa20_poly1305_decrypt",
+                    x_salsa20_poly1305_decrypt,
+                )
+                .with_host_function(
+                    &mut ns,
+                    "__x_25519_x_salsa20_poly1305_decrypt",
+                    x_25519_x_salsa20_poly1305_decrypt,
+                );
+        } else {
+            host_fn_builder
+                .with_host_function(&mut ns, "__verify_signature", unreachable)
+                .with_host_function(&mut ns, "__x_salsa20_poly1305_decrypt", unreachable)
+                .with_host_function(&mut ns, "__x_25519_x_salsa20_poly1305_decrypt", unreachable);
+        }
+
+        if let HostFnAccess {
+            keystore: Permission::Allow,
+            ..
+        } = host_fn_access
+        {
+            host_fn_builder
                 .with_host_function(&mut ns, "__sign", sign)
                 .with_host_function(&mut ns, "__sign_ephemeral", sign_ephemeral)
                 .with_host_function(&mut ns, "__create_x25519_keypair", create_x25519_keypair)
@@ -254,46 +277,43 @@ impl RealRibosome {
                 )
                 .with_host_function(
                     &mut ns,
-                    "__x_salsa20_poly1305_decrypt",
-                    x_salsa20_poly1305_decrypt,
-                )
-                .with_host_function(
-                    &mut ns,
                     "__x_25519_x_salsa20_poly1305_encrypt",
                     x_25519_x_salsa20_poly1305_encrypt,
-                )
-                .with_host_function(
-                    &mut ns,
-                    "__x_25519_x_salsa20_poly1305_decrypt",
-                    x_25519_x_salsa20_poly1305_decrypt,
                 );
         } else {
             host_fn_builder
-                .with_host_function(&mut ns, "__verify_signature", unreachable)
                 .with_host_function(&mut ns, "__sign", unreachable)
                 .with_host_function(&mut ns, "__sign_ephemeral", unreachable)
                 .with_host_function(&mut ns, "__create_x25519_keypair", unreachable)
                 .with_host_function(&mut ns, "__x_salsa20_poly1305_encrypt", unreachable)
-                .with_host_function(&mut ns, "__x_salsa20_poly1305_decrypt", unreachable)
-                .with_host_function(&mut ns, "__x_25519_x_salsa20_poly1305_encrypt", unreachable)
-                .with_host_function(&mut ns, "__x_25519_x_salsa20_poly1305_decrypt", unreachable);
+                .with_host_function(&mut ns, "__x_25519_x_salsa20_poly1305_encrypt", unreachable);
         }
 
         if let HostFnAccess {
-            dna_bindings: Permission::Allow,
+            bindings_deterministic: Permission::Allow,
             ..
         } = host_fn_access
         {
             host_fn_builder
                 .with_host_function(&mut ns, "__zome_info", zome_info)
-                .with_host_function(&mut ns, "__app_info", app_info)
-                .with_host_function(&mut ns, "__dna_info", dna_info)
-                .with_host_function(&mut ns, "__call_info", call_info);
+                .with_host_function(&mut ns, "__dna_info", dna_info);
         } else {
             host_fn_builder
                 .with_host_function(&mut ns, "__zome_info", unreachable)
+                .with_host_function(&mut ns, "__dna_info", unreachable);
+        }
+
+        if let HostFnAccess {
+            bindings: Permission::Allow,
+            ..
+        } = host_fn_access
+        {
+            host_fn_builder
+                .with_host_function(&mut ns, "__app_info", app_info)
+                .with_host_function(&mut ns, "__call_info", call_info);
+        } else {
+            host_fn_builder
                 .with_host_function(&mut ns, "__app_info", unreachable)
-                .with_host_function(&mut ns, "__dna_info", unreachable)
                 .with_host_function(&mut ns, "__call_info", unreachable);
         }
 
@@ -332,6 +352,22 @@ impl RealRibosome {
         }
 
         if let HostFnAccess {
+            read_workspace_deterministic: Permission::Allow,
+            ..
+        } = host_fn_access
+        {
+            host_fn_builder
+                .with_host_function(&mut ns, "__must_get_entry", must_get_entry)
+                .with_host_function(&mut ns, "__must_get_header", must_get_header)
+                .with_host_function(&mut ns, "__must_get_valid_element", must_get_valid_element);
+        } else {
+            host_fn_builder
+                .with_host_function(&mut ns, "__must_get_entry", unreachable)
+                .with_host_function(&mut ns, "__must_get_header", unreachable)
+                .with_host_function(&mut ns, "__must_get_valid_element", unreachable);
+        }
+
+        if let HostFnAccess {
             read_workspace: Permission::Allow,
             ..
         } = host_fn_access
@@ -339,9 +375,6 @@ impl RealRibosome {
             host_fn_builder
                 .with_host_function(&mut ns, "__get", get)
                 .with_host_function(&mut ns, "__get_details", get_details)
-                .with_host_function(&mut ns, "__must_get_entry", must_get_entry)
-                .with_host_function(&mut ns, "__must_get_header", must_get_header)
-                .with_host_function(&mut ns, "__must_get_valid_element", must_get_valid_element)
                 .with_host_function(&mut ns, "__get_links", get_links)
                 .with_host_function(&mut ns, "__get_link_details", get_link_details)
                 .with_host_function(&mut ns, "__get_agent_activity", get_agent_activity)
@@ -350,9 +383,6 @@ impl RealRibosome {
             host_fn_builder
                 .with_host_function(&mut ns, "__get", unreachable)
                 .with_host_function(&mut ns, "__get_details", unreachable)
-                .with_host_function(&mut ns, "__must_get_entry", unreachable)
-                .with_host_function(&mut ns, "__must_get_header", unreachable)
-                .with_host_function(&mut ns, "__must_get_valid_element", unreachable)
                 .with_host_function(&mut ns, "__get_links", unreachable)
                 .with_host_function(&mut ns, "__get_link_details", unreachable)
                 .with_host_function(&mut ns, "__get_agent_activity", unreachable)

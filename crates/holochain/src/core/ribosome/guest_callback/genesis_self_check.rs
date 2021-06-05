@@ -23,7 +23,7 @@ impl From<GenesisSelfCheckHostAccess> for HostContext {
 impl From<&GenesisSelfCheckHostAccess> for HostFnAccess {
     fn from(_: &GenesisSelfCheckHostAccess) -> Self {
         let mut access = Self::none();
-        access.keystore = Permission::Allow;
+        access.keystore_deterministic = Permission::Allow;
         access
     }
 }
