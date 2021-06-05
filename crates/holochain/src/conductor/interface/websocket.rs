@@ -511,7 +511,7 @@ pub mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::AppActivated);
+            assert_matches!(response, AdminResponse::AppActivated(_));
             async { Ok(()) }.boxed().into()
         };
         let respond = Respond::Request(Box::new(respond));

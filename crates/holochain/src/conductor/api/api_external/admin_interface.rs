@@ -556,7 +556,9 @@ mod test {
                 installed_app_id: "test-by-path".to_string(),
             })
             .await;
-        assert_matches!(res, AdminResponse::AppActivated);
+        assert_matches!(res,
+            AdminResponse::AppActivated(info) if info == expected_installed_app_info
+        );
 
         let res = admin_api
             .handle_admin_request(AdminRequest::ListCellIds)
