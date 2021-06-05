@@ -220,7 +220,8 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             }
             ActivateApp { installed_app_id } => {
                 // Activate app
-                let app = self.conductor_handle
+                let app = self
+                    .conductor_handle
                     .activate_app(installed_app_id.clone())
                     .await?;
 
@@ -240,9 +241,11 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     // There was an error in this app so return it
                     .map(|this_app_error| Ok(AdminResponse::Error(this_app_error.into())))
                     // No error, return success
-                    .unwrap_or(Ok(AdminResponse::AppActivated(
-                        InstalledAppInfo::from_installed_app(&InstalledApp::Active(app)),                        
-                    )))
+                    .unwrap_or_else(|| {
+                        Ok(AdminResponse::AppActivated(
+                            InstalledAppInfo::from_installed_app(&InstalledApp::Active(app)),
+                        ))
+                    })
             }
             DeactivateApp { installed_app_id } => {
                 // Activate app

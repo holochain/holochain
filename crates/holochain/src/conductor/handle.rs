@@ -604,7 +604,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<ActiveApp> {
-        let app = self.conductor
+        let app = self
+            .conductor
             .write()
             .await
             .activate_app_in_db(installed_app_id)
