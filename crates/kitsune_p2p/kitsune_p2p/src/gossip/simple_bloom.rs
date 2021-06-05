@@ -120,20 +120,20 @@ kitsune_p2p_types::write_codec_enum! {
     codec GossipWire {
         /// Initiate a round of gossip with a remote node
         Initiate(0x10) {
-            agents.0:HashSet<Arc<KitsuneAgent>>,
+            agents.0: HashSet<Arc<KitsuneAgent>>,
             filter.1: PoolBuf,
         },
 
         /// Accept an incoming round of gossip from a remote node
         Accept(0x20) {
-            agents.0:HashSet<Arc<KitsuneAgent>>,
+            agents.0: HashSet<Arc<KitsuneAgent>>,
             filter.1: PoolBuf,
         },
 
         /// Send a chunks of gossip meta op data,
         /// if "finished" this will be the final chunk.
         Chunk(0x30) {
-            agents.0:HashSet<Arc<KitsuneAgent>>,
+            agents.0: HashSet<Arc<KitsuneAgent>>,
             finished.1: bool,
             chunks.2: Vec<Arc<MetaOpData>>,
         },

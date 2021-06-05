@@ -1,7 +1,5 @@
 use super::*;
 
-// !WARNING! - this should be sync and as fast as possible
-//             the gossip mutex is locked for the duration of this fn!
 pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneP2pResult<()> {
     // we have decided to do an initiate check, mark the time
 
