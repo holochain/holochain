@@ -24,6 +24,7 @@ fn element_to_entry<'a, O>(element: &'a Element) -> Result<O, Error> where O: Tr
 }
 
 #[hdk_entry(id = "something")]
+#[derive(Clone)]
 struct Something(#[serde(with = "serde_bytes")] Vec<u8>);
 
 #[hdk_entry(id = "entry_reference")]
@@ -109,8 +110,29 @@ fn validate_create_entry_element_reference(data: ValidateData) -> ExternResult<V
 }
 
 #[hdk_extern]
-fn create_entry(_: ()) -> ExternResult<HeaderHash> {
-    hdk::prelude::create_entry(Something(vec![1, 2, 3]))
+fn create_entry(_: ()) -> ExternResult<(HeaderHash, HeaderHash, HeaderHash, HeaderHash)> {
+    let something = Something(vec![1, 2, 3]);
+    let entry_hash: EntryHash = hdk::prelude::hash_entry(something.clone())?;
+    let header_hash: HeaderHash = hdk::prelude::create_entry(something)?;
+
+    // Commit some references to Something so we can test validation.
+    let header_reference_hash = hdk::prelude::create_entry(HeaderReference(header_hash.clone()))?;
+    let element_reference_hash = hdk::prelude::create_entry(ElementReference(header_hash.clone()))?;
+    let entry_reference_hash = hdk::prelude::create_entry(EntryReference(entry_hash.clone()))?;
+
+    Ok((header_hash, header_reference_hash, element_reference_hash, entry_reference_hash))
+}
+
+#[hdk_extern]
+fn create_dangling_references(_: ()) -> ExternResult<(HeaderHash, HeaderHash, HeaderHash)> {
+    let bad_header_hash = HeaderHash::from_raw_32(vec![0; 32]);
+    let bad_entry_hash = EntryHash::from_raw_32(vec![0; 32]);
+
+    Ok((
+        hdk::prelude::create_entry(HeaderReference(bad_header_hash.clone()))?,
+        hdk::prelude::create_entry(ElementReference(bad_header_hash))?,
+        hdk::prelude::create_entry(EntryReference(bad_entry_hash))?,
+    ))
 }
 
 #[hdk_extern]

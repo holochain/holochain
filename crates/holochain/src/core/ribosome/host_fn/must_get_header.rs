@@ -47,7 +47,7 @@ pub fn must_get_header<'a>(
                         Box::new(
                             WasmError::HostShortCircuit(
                                 holochain_serialized_bytes::encode(
-                                    &Ok::<InitCallbackResult, ()>(InitCallbackResult::UnresolvedDependencies(vec![header_hash.into()]))
+                                    &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(vec![header_hash.into()]))?
                                 )?
                             )
                         )
@@ -56,7 +56,7 @@ pub fn must_get_header<'a>(
                         Box::new(
                             WasmError::HostShortCircuit(
                                 holochain_serialized_bytes::encode(
-                                    &Ok::<ValidateLinkCallbackResult, ()>(ValidateLinkCallbackResult::UnresolvedDependencies(vec![header_hash.into()]))
+                                    &ExternIO::encode(ValidateLinkCallbackResult::UnresolvedDependencies(vec![header_hash.into()]))?
                                 )?
                             )
                         )
@@ -64,9 +64,9 @@ pub fn must_get_header<'a>(
                     HostContext::Validate(_) => RuntimeError::raise(
                         Box::new(
                             WasmError::HostShortCircuit(
-                                holochain_serialized_bytes::encode(
-                                    &Ok::<ValidateCallbackResult, ()>(ValidateCallbackResult::UnresolvedDependencies(vec![header_hash.into()]))
-                                )?
+                                holochain_serialized_bytes::encode(&ExternIO::encode(
+                                    ValidateCallbackResult::UnresolvedDependencies(vec![header_hash.into()])
+                                )?)?
                             )
                         )
                     ),
@@ -74,7 +74,7 @@ pub fn must_get_header<'a>(
                         Box::new(
                             WasmError::HostShortCircuit(
                                 holochain_serialized_bytes::encode(
-                                    &Ok::<ValidationPackageCallbackResult, ()>(ValidationPackageCallbackResult::UnresolvedDependencies(vec![header_hash.into()]))
+                                    &ExternIO::encode(ValidationPackageCallbackResult::UnresolvedDependencies(vec![header_hash.into()]))?
                                 )?
                             )
                         )

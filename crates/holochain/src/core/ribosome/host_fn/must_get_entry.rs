@@ -44,10 +44,22 @@ pub fn must_get_entry<'a>(
                 Some(entry) => Ok(entry),
                 None => match call_context.host_context {
                     HostContext::EntryDefs(_) | HostContext::GenesisSelfCheck(_) | HostContext::MigrateAgent(_) | HostContext::PostCommit(_) | HostContext::ZomeCall(_) => Err(WasmError::Host(format!("Failed to get EntryHashed {}", entry_hash))),
-                    HostContext::Init(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(holochain_serialized_bytes::encode(&Ok::<InitCallbackResult, ()>(InitCallbackResult::UnresolvedDependencies(vec![entry_hash.into()])))?))),
-                    HostContext::ValidateCreateLink(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(holochain_serialized_bytes::encode(&Ok::<ValidateLinkCallbackResult, ()>(ValidateLinkCallbackResult::UnresolvedDependencies(vec![entry_hash.into()])))?))),
-                    HostContext::Validate(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(holochain_serialized_bytes::encode(&Ok::<ValidateCallbackResult, ()>(ValidateCallbackResult::UnresolvedDependencies(vec![entry_hash.into()])))?))),
-                    HostContext::ValidationPackage(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(holochain_serialized_bytes::encode(&Ok::<ValidationPackageCallbackResult, ()>(ValidationPackageCallbackResult::UnresolvedDependencies(vec![entry_hash.into()])))?))),
+                    HostContext::Init(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(
+                        holochain_serialized_bytes::encode(
+                            &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(vec![entry_hash.into()]))?
+                        )?
+                    ))),
+                    HostContext::ValidateCreateLink(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(
+                        holochain_serialized_bytes::encode(
+                            &ExternIO::encode(ValidateLinkCallbackResult::UnresolvedDependencies(vec![entry_hash.into()]))?
+                        )?
+                    ))),
+                    HostContext::Validate(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(
+                        holochain_serialized_bytes::encode(&ExternIO::encode(&ValidateCallbackResult::UnresolvedDependencies(vec![entry_hash.into()]))?)?
+                    ))),
+                    HostContext::ValidationPackage(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(holochain_serialized_bytes::encode(&
+                        ExternIO::encode(ValidationPackageCallbackResult::UnresolvedDependencies(vec![entry_hash.into()]))?
+                    )?))),
                 },
             }
     })
@@ -55,14 +67,20 @@ pub fn must_get_entry<'a>(
 
 #[cfg(test)]
 pub mod test {
-    use holochain_util::tokio_helper;
     use ::fixt::prelude::fixt;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use crate::core::ribosome::HostFnWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::core::SourceChainResult;
     use crate::core::ribosome::RibosomeError;
+    use std::sync::Arc;
+    use crate::fixt::ValidateHostAccessFixturator;
+    use crate::fixt::curve::Zomes;
+    use crate::fixt::RealRibosomeFixturator;
+    use crate::fixt::ValidateInvocationFixturator;
+    use crate::core::ribosome::ZomesToInvoke;
+    use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::guest_callback::validate::ValidateResult;
 
     /// Mimics inside the must_get wasm.
     #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug, PartialEq)]
@@ -77,24 +95,25 @@ pub mod test {
         let env = test_env.env();
         let author = fake_agent_pubkey_1();
         crate::test_utils::fake_genesis(env.clone()).await.unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author.clone()).unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace.clone();
 
         // get the result of a commit entry
-        let output: HeaderHash =
+        let (header_hash, header_reference_hash, element_reference_hash, entry_reference_hash): (HeaderHash, HeaderHash, HeaderHash, HeaderHash) =
             crate::call_test_ribosome!(host_access, TestWasm::MustGet, "create_entry", ()).unwrap();
 
-        // the chain head should be the committed entry header
-        let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(workspace.source_chain().chain_head()?.0)
-        })
-        .unwrap();
-
-        assert_eq!(&chain_head, &output);
-
         let round_element: Element =
-            crate::call_test_ribosome!(host_access, TestWasm::MustGet, "must_get_valid_element", output).unwrap();
+            crate::call_test_ribosome!(host_access, TestWasm::MustGet, "must_get_valid_element", header_hash).unwrap();
+
+        let header_reference_element: Element = crate::call_test_ribosome!(host_access, TestWasm::MustGet, "must_get_valid_element", header_reference_hash).unwrap();
+        let element_reference_element: Element = crate::call_test_ribosome!(host_access, TestWasm::MustGet, "must_get_valid_element", element_reference_hash).unwrap();
+        let entry_reference_element: Element = crate::call_test_ribosome!(host_access, TestWasm::MustGet, "must_get_valid_element", entry_reference_hash).unwrap();
+
+        let (header_dangling_header_hash, element_dangling_header_hash, entry_dangling_header_hash): (HeaderHash, HeaderHash, HeaderHash) = crate::call_test_ribosome!(host_access, TestWasm::MustGet, "create_dangling_references", ()).unwrap();
+        let header_dangling_element: Element = crate::call_test_ribosome!(host_access, TestWasm::MustGet, "must_get_valid_element", header_dangling_header_hash).unwrap();
+        let element_dangling_element: Element = crate::call_test_ribosome!(host_access, TestWasm::MustGet, "must_get_valid_element", element_dangling_header_hash).unwrap();
+        let entry_dangling_element: Element = crate::call_test_ribosome!(host_access, TestWasm::MustGet, "must_get_valid_element", entry_dangling_header_hash).unwrap();
 
         let round_entry = round_element.entry().to_app_option::<Something>().unwrap().unwrap();
 
@@ -120,7 +139,7 @@ pub mod test {
             _ => unreachable!(),
         };
 
-        let signed_header: SignedHeaderHashed = crate::call_test_ribosome!(host_access, TestWasm::MustGet, "must_get_header", output).unwrap();
+        let signed_header: SignedHeaderHashed = crate::call_test_ribosome!(host_access, TestWasm::MustGet, "must_get_header", header_hash).unwrap();
 
         assert_eq!(
             &signed_header,
@@ -165,5 +184,70 @@ pub mod test {
             ),
             _ => unreachable!(),
         }
+
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::MustGet])).next().unwrap();
+        let test_network = crate::test_utils::test_network(
+            Some(ribosome.dna_def().as_hash().clone()),
+            Some(author),
+        )
+        .await;
+        let cell_network = test_network.cell_network();
+        host_access.network = cell_network;
+
+        let mut validate_invocation = fixt!(ValidateInvocation);
+        validate_invocation.element = Arc::new(header_reference_element.clone());
+        validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::MustGet.into());
+        validate_invocation.entry_def_id = Some(EntryDefId::App("header_reference".into()));
+        let mut validate_host_access = fixt!(ValidateHostAccess);
+        validate_host_access.network = host_access.network.clone();
+        validate_host_access.workspace = host_access.workspace.clone();
+
+        let header_reference_validate_result = ribosome.run_validate(validate_host_access.clone(), validate_invocation.clone()).unwrap();
+
+        assert_eq!(ValidateResult::Valid, header_reference_validate_result);
+
+        validate_invocation.element = Arc::new(element_reference_element.clone());
+        validate_invocation.entry_def_id = Some(EntryDefId::App("element_reference".into()));
+
+        let element_reference_validate_result = ribosome.run_validate(validate_host_access.clone(), validate_invocation.clone()).unwrap();
+
+        assert_eq!(ValidateResult::Valid, element_reference_validate_result);
+
+        validate_invocation.element = Arc::new(entry_reference_element.clone());
+        validate_invocation.entry_def_id = Some(EntryDefId::App("entry_reference".into()));
+
+        let entry_reference_validate_result = ribosome.run_validate(validate_host_access.clone(), validate_invocation.clone()).unwrap();
+
+        assert_eq!(ValidateResult::Valid, entry_reference_validate_result);
+
+        validate_invocation.element = Arc::new(header_dangling_element.clone());
+        validate_invocation.entry_def_id = Some(EntryDefId::App("header_reference".into()));
+
+        let header_dangling_validate_result = ribosome.run_validate(validate_host_access.clone(), validate_invocation.clone()).unwrap();
+
+        assert_eq!(
+            ValidateResult::UnresolvedDependencies(vec![fail_header_hash.clone().into()]),
+            header_dangling_validate_result,
+        );
+
+        validate_invocation.element = Arc::new(element_dangling_element);
+        validate_invocation.entry_def_id = Some(EntryDefId::App("element_reference".into()));
+
+        let element_dangling_validate_result = ribosome.run_validate(validate_host_access.clone(), validate_invocation.clone()).unwrap();
+
+        assert_eq!(
+            ValidateResult::UnresolvedDependencies(vec![fail_header_hash.clone().into()]),
+            element_dangling_validate_result,
+        );
+
+        validate_invocation.element = Arc::new(entry_dangling_element);
+        validate_invocation.entry_def_id = Some(EntryDefId::App("entry_reference".into()));
+
+        let entry_dangling_validate_result = ribosome.run_validate(validate_host_access.clone(), validate_invocation.clone()).unwrap();
+
+        assert_eq!(
+            ValidateResult::UnresolvedDependencies(vec![fail_entry_hash.clone().into()]),
+            entry_dangling_validate_result,
+        );
     }
 }
