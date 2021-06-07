@@ -51,7 +51,7 @@ macro_rules! map_extern {
                     };
 
                     // Call the function and handle the output.
-                    let maybe_extern_io: Result<ExternIO, SerializedBytesError> = match super::$f(inner) {
+                    let maybe_extern_io: std::result::Result<$crate::prelude::ExternIO, $crate::prelude::SerializedBytesError> = match super::$f(inner) {
                         Ok(v) => {
                             $crate::prelude::ExternIO::encode(v)
                         },
