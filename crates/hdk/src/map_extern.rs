@@ -29,7 +29,7 @@ macro_rules! map_extern {
                 use super::*;
 
                 #[no_mangle]
-                pub extern "C" fn $name<IO>(guest_ptr: $crate::prelude::GuestPtr, len: $crate::prelude::Len) -> $crate::prelude::GuestPtrLen {
+                pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr, len: $crate::prelude::Len) -> $crate::prelude::GuestPtrLen {
                     // Setup tracing.
                     // @TODO feature flag this?
                     let _subscriber_guard = $crate::prelude::tracing::subscriber::set_default(
@@ -57,8 +57,8 @@ macro_rules! map_extern {
                         },
                         Err(e) => {
                             let output_type_id = std::any::TypeId::of::<$output>();
-                            if output_type_id == std::any::TypeId::of::<ExternResult<ValidateCallbackResult>>() {
-                                match ValidateCallbackResult::try_from(e) {
+                            if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::ValidateCallbackResult>>() {
+                                match $crate::prelude::ValidateCallbackResult::try_from(e) {
                                     Ok(v) => $crate::prelude::ExternIO::encode(v),
                                     Err(e) => return $crate::prelude::return_err_ptr(e),
                                 }
